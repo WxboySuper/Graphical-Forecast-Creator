@@ -31,10 +31,11 @@ This record pins down what #1456 actually built. The base doc describes the plan
 ## Cloud handoff
 
 - A staged custom-product handoff names its destination workspace. The forecast editor consumes it only when it is mounted as that workspace, so a Custom product can never land in Severe. The library hands off to `/forecast/custom`.
-- Cloud loads wrap the payload in the workspace envelope. An already enveloped payload is reused as is. A mismatched envelope is rejected.
+- Cloud loads classify the payload with the production validators before anything is written. An already enveloped payload is reused as is, an envelope that names another workspace is rejected, malformed input throws instead of being wrapped as forecast data, and a Custom record's save classifies as Custom rather than Severe.
 - A workspace can open cloud payloads only when it has a registered editor route for the current build target. That is Severe everywhere and Custom where `customWorkspace` is on. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
-- A cross-workspace handoff that reaches the wrong editor is a user-visible error. The pending cloud session is cleared and the editor shows an error toast instead of silently falling back to local restore.
-- A malformed or unknown pending handoff is cleared the same way with an invalid-session error; absence alone is not treated as corruption.
+- A handoff that reaches the wrong editor is a user-visible error. The pending session stays staged under the workspace that owns it, the editor shows an error toast, and local restore still runs, so a handoff waiting for another editor is neither deleted nor allowed to hide this workspace's own session. Its owner opens or clears it on a later mount.
+- A malformed or unknown pending handoff is cleared with an invalid-session error, and local restore still runs. Absence alone is not treated as corruption.
+- Pre-workspace `cloudCyclePayload` / `cloudCycleMeta` keys are adopted on mount. A key that already names the mounting account moves into that account's workspace slot, so a pending load survives sign-in. Unscoped leftovers move into the anonymous slot and never into an account scope, because nothing in them says which account staged them. Values that will not parse or classify are dropped.
 
 ## Exposure
 

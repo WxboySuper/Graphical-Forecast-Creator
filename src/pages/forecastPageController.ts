@@ -40,6 +40,7 @@ import {
   CLOUD_CYCLE_PAYLOAD_KEY,
   clearCloudSessionStorage,
   getCloudSessionStorageKey,
+  migrateLegacyCloudSessionStorage,
 } from '../utils/cloudSessionStorage';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
@@ -393,8 +394,13 @@ const restoreAvailableSession = (
   currentSession: { forecastCycle: ReturnType<typeof selectForecastCycle>; discussionDraftsByScope: RootState['forecast']['discussionDraftsByScope']; onCloudCycleLoaded?: (cloudCycle: { id: string; label: string }) => void },
   userId?: string | null,
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
-) => restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
-  || restoreLocalSession({ dispatch, addToast, currentSession, userId, workspaceId });
+) => {
+  // Older builds keyed pending cloud handoffs without a workspace. Adopt them
+  // before reading this workspace's slot so a pending load survives the trip.
+  migrateLegacyCloudSessionStorage(userId);
+  return restoreCloudSession({ dispatch, addToast, onCloudCycleLoaded: currentSession.onCloudCycleLoaded, userId, workspaceId })
+    || restoreLocalSession({ dispatch, addToast, currentSession, userId, workspaceId });
+};
 
 export const buildRestoreKey = (
   userId?: string | null,

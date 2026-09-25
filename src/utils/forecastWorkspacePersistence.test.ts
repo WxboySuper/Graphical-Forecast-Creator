@@ -1,4 +1,5 @@
 import {
+  buildCloudLoadValidators,
   buildCloudSessionPayload,
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
@@ -127,5 +128,36 @@ describe('forecast workspace persistence contract', () => {
       forecast: customPayload,
     });
     expect(() => buildCloudSessionPayload('severe', customPayload, validators)).toThrow(/different forecast workspace/);
+  });
+
+  test('classifies with the production cloud-load validators for the workspace that opened the cycle', () => {
+    const forecast = validForecast();
+
+    // Severe cannot claim a Custom record's save, and vice versa.
+    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('custom'))).toEqual({
+      ok: true,
+      workspaceId: 'custom',
+      payload: forecast,
+      legacy: true,
+    });
+    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('severe'))).toEqual({
+      ok: true,
+      workspaceId: 'severe',
+      payload: forecast,
+      legacy: true,
+    });
+
+    // Malformed input fails both checks instead of being wrapped as forecast data.
+    expect(classifyForecastWorkspacePayload({ legacy: true }, buildCloudLoadValidators('custom')))
+      .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
+    expect(() => buildCloudSessionPayload('custom', { legacy: true }, buildCloudLoadValidators('custom')))
+      .toThrow(/not supported by any workspace/);
+
+    // An explicit envelope still outranks the record it rode in on.
+    const severeEnvelope = createForecastWorkspaceSave('severe', forecast);
+    expect(() => buildCloudSessionPayload('custom', severeEnvelope, buildCloudLoadValidators('custom')))
+      .toThrow(/different forecast workspace/);
+    expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
+      .toEqual(createForecastWorkspaceSave('custom', forecast));
   });
 });

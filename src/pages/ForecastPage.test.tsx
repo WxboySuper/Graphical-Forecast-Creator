@@ -352,6 +352,76 @@ describe('ForecastPage layout selection', () => {
     expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
   });
 
+  test('carries an account-tagged legacy handoff across the sign-in transition', async () => {
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    // Written by the pre-workspace build: scoped to the account, no workspace segment.
+    sessionStorage.setItem('cloudCyclePayload:user-user-1', JSON.stringify(payload));
+    sessionStorage.setItem('cloudCycleMeta:user-user-1', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:user-user-1')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('keeps an unscoped legacy handoff out of the signed-in account and parks it anonymously', async () => {
+    seedSevereAutosaveWithMarker();
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    sessionStorage.setItem('cloudCyclePayload', JSON.stringify(payload));
+    sessionStorage.setItem('cloudCycleMeta', JSON.stringify({ id: 'legacy-1', label: 'Legacy save' }));
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-2' }, syncedSettings: null });
+
+    const store = createStore();
+    const firstMount = renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-2')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    // The same browser tab can still open it once the account scope is gone.
+    expect(JSON.parse(sessionStorage.getItem('cloudCyclePayload:severe:anonymous') ?? 'null')).toEqual(payload);
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+
+    firstMount.unmount();
+    mockAddToast.mockClear();
+    mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
+    const anonymousStore = createStore();
+    renderForecastPage(anonymousStore);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expectSingleOutlookRestored(anonymousStore, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('drops an unreadable legacy handoff and still restores the local session', async () => {
+    seedSevereAutosaveWithMarker();
+    sessionStorage.setItem('cloudCyclePayload', 'not-json');
+    sessionStorage.setItem('cloudCycleMeta', 'not-json');
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+  });
+
   test('clears a malformed cloud handoff and still restores the local session', async () => {
     seedSevereAutosaveWithMarker();
     seedInvalidCloudHandoff('not-json');

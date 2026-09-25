@@ -12,7 +12,7 @@ import { useCloudCycles } from '../hooks/useCloudCycles';
 import { CloudCycleMetadata } from '../types/cloudCycles';
 import { getBuildTarget } from '../config/buildTarget';
 import { getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { buildCloudSessionPayload } from '../utils/forecastWorkspacePersistence';
+import { buildCloudLoadValidators, buildCloudSessionPayload } from '../utils/forecastWorkspacePersistence';
 import {
   getForecastWorkspacePath,
   isSupportedCloudLoadWorkspace,
@@ -758,7 +758,11 @@ const useCloudLibraryActions = ({
     (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
       try {
         // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
-        const storable = buildCloudSessionPayload(workspaceId, payload);
+        // The validators come from production, keyed to the workspace that opened
+        // the cycle: Severe cannot claim a Custom record's save, a Custom record's
+        // save classifies as Custom, and malformed input throws here instead of
+        // being written to session storage.
+        const storable = buildCloudSessionPayload(workspaceId, payload, buildCloudLoadValidators(workspaceId));
         // Each workspace stages into its own slot so loading a Severe cycle can
         // never overwrite a handoff already waiting for the Custom editor.
         sessionStorage.setItem(getCloudSessionStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, { userId, workspaceId }), JSON.stringify(storable));

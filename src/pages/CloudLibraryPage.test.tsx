@@ -8,6 +8,7 @@ import CloudLibraryPage from "./CloudLibraryPage";
 import { getDefaultForecastWorkspacePath, getForecastWorkspacePath, isSupportedCloudLoadWorkspace } from "../routing/forecastWorkspaceRoutes";
 import { buildCloudSessionPayload } from "../utils/forecastWorkspacePersistence";
 import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { getMismatchedCloudWorkspaceId, parseStoredForecastPayload } from "./forecastPageController";
 import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 const mockNavigate = jest.fn();
@@ -189,6 +190,61 @@ describe("CloudLibraryPage", () => {
     await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(sessionStorage.getItem("cloudCyclePayload:severe:user-user-1")).toBeNull();
+  });
+
+  it("stages a Custom cloud load that only the Custom workspace can restore", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-roundtrip" }).forecastCycle;
+    const payload = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    const loadCycle = jest.fn().mockResolvedValue(payload);
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(getForecastWorkspacePath("custom")));
+    const staged = sessionStorage.getItem("cloudCyclePayload:custom:user-user-1");
+    expect(staged).not.toBeNull();
+    expect(parseStoredForecastPayload(staged, "custom")).toEqual(JSON.parse(staged as string));
+    expect(getMismatchedCloudWorkspaceId(staged, "severe")).toBe("custom");
+    expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1"))
+      .toBe(JSON.stringify({ id: "custom-1", label: "Custom save" }));
+  });
+
+  it("refuses a Severe envelope served for a Custom record instead of staging it", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-mismatch" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(
+      serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 }),
+    );
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed input on a Custom record instead of wrapping it as forecast data", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
+    expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("returns early without calling loadCycle when the selected cycle no longer resolves", async () => {

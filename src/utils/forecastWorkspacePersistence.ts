@@ -134,3 +134,29 @@ export const buildCloudSessionPayload = (
   }
   return createForecastWorkspaceSave(workspaceId, classification.payload);
 };
+
+/**
+ * Validators for one cloud load, built from the workspace that asked for it.
+ *
+ * Every workspace serializes the same `GFCForecastSaveData` shape, so an
+ * untagged legacy payload carries no owner of its own and Severe's validator
+ * would otherwise claim every save in the library. The cloud record is the
+ * only Custom identity a legacy save has, so Severe claims an untagged payload
+ * only for a Severe load and the Custom validator claims it for a Custom load,
+ * which keeps a Custom record's payload from being classified as Severe before
+ * the envelope is written. Input that fails both checks is rejected instead of
+ * being staged.
+ *
+ * Severe still runs first inside the shared contract, so a Severe save with
+ * embedded custom layers is never reclassified as Custom. #915 owns the
+ * payload-level Custom schema that will replace the record-derived half of
+ * this check.
+ */
+export const buildCloudLoadValidators = (
+  workspaceId: ForecastWorkspaceId,
+): ForecastWorkspaceLegacyValidators => ({
+  isSeverePayload: (value): value is GFCForecastSaveData =>
+    workspaceId !== 'custom' && validateForecastData(value),
+  isCustomPayload: (value): value is GFCForecastSaveData =>
+    workspaceId === 'custom' && validateForecastData(value),
+});
