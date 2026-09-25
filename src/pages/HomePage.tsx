@@ -1,3 +1,9 @@
+/**
+ * Home route: this page coordinates authentication-aware dashboard data,
+ * saved-cycle history, workflow entry actions, and the home presentation
+ * surfaces. It owns route composition and callback wiring while cycle storage,
+ * forecast state, and feature policy remain in their dedicated modules.
+ */
 import React from 'react';
 import CycleHistoryModal from '../components/CycleManager/CycleHistoryModal';
 import ConfirmationModal from '../components/DrawingTools/ConfirmationModal';
