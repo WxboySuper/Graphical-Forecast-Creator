@@ -37,10 +37,9 @@ import {
 } from './AuthProvider';
 import { queueProductMetric } from '../utils/productMetrics';
 import themeReducer from '../store/themeSlice';
-import overlaysReducer from '../store/overlaysSlice';
+import overlaysReducer, { type OverlaysState } from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
-import type { OverlaysState } from '../store/overlaysSlice';
 
 const TEST_OVERLAY_STATE: OverlaysState = {
   baseMapStyle: 'osm',
