@@ -48,9 +48,12 @@ export const getCloudLibraryTabLabel = (
 /** Resolves the editor route for one tab, keeping Custom on its legacy path. */
 export const getCloudLibraryWorkspacePath = (tabId: CloudLibraryTabId): string => {
   if (tabId === 'all') return getDefaultForecastWorkspacePath();
-  if (tabId === 'custom') return '/custom-products';
   const workspace = getForecastWorkspace(tabId);
-  return workspace ? workspace.path : getDefaultForecastWorkspacePath();
+  if (!workspace) return getDefaultForecastWorkspacePath();
+  if (workspace.id === 'custom') {
+    return workspace.legacyPaths[0] ?? getDefaultForecastWorkspacePath();
+  }
+  return workspace.status === 'available' ? workspace.path : getDefaultForecastWorkspacePath();
 };
 
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */

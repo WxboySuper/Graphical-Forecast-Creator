@@ -96,7 +96,8 @@ describe('cloud library workspace boundaries', () => {
     expect(getCloudLibraryWorkspacePath('all')).toBe(getDefaultForecastWorkspacePath());
     expect(getCloudLibraryWorkspacePath('severe')).toBe('/forecast/severe');
     expect(getCloudLibraryWorkspacePath('custom')).toBe('/custom-products');
-    expect(getCloudLibraryWorkspacePath('winter')).toBe('/forecast/winter');
+    expect(getCloudLibraryWorkspacePath('mesoscale')).toBe(getDefaultForecastWorkspacePath());
+    expect(getCloudLibraryWorkspacePath('winter')).toBe(getDefaultForecastWorkspacePath());
   });
 
   it('resolves arrow, home, and end keys across tabs', () => {
