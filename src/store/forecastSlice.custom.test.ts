@@ -1,6 +1,5 @@
 import type { Polygon } from 'geojson';
-import type { OneOffCustomLayer, CustomPolygonFeature } from '../types/customProducts';
-import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type OneOffCustomLayer, type CustomPolygonFeature } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
 import reducer, {
   addCustomFeature,

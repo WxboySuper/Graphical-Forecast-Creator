@@ -2,9 +2,8 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import forecastReducer from '../../store/forecastSlice';
+import forecastReducer, { type SavedCycle } from '../../store/forecastSlice';
 import useHomePageLogic from './useHomePageLogic';
-import type { SavedCycle } from '../../store/forecastSlice';
 
 const mockNavigate = jest.fn();
 const mockAddToast = jest.fn();
