@@ -1,3 +1,9 @@
+/**
+ * Cycle-history persistence hook: this module restores and persists saved
+ * forecast-cycle history through the configured store and browser storage
+ * contracts. It owns lifecycle wiring and migration coordination, not cycle
+ * serialization rules or cloud transport.
+ */
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import type { Store } from 'redux';
