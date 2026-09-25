@@ -1,3 +1,7 @@
+/**
+ * Integrated-toolbar selection strip. It renders active tab context and
+ * selection controls while delegating edits to the toolbar controller.
+ */
 import React from 'react';
 import { Button } from '../ui/button';
 import { CheckCircle2 } from 'lucide-react';
