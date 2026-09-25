@@ -1,3 +1,8 @@
+/**
+ * Server-side metric definitions and normalization helpers used by product
+ * telemetry. The module constrains event names and maps events to aggregate
+ * user fields stored by the metrics service.
+ */
 'use strict';
 
 const crypto = require('crypto');
