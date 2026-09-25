@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback, useMemo, useState, type MutableRefObject } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
-import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { UseCloudCyclesResult } from './useCloudCycles';
@@ -20,13 +21,15 @@ const clearSyncTimeout = (syncTimeoutRef: MutableRefObject<ReturnType<typeof set
 };
 
 /** Builds the current sync hash from all persisted forecast state, excluding volatile timestamp fields. */
-const buildCloudSyncHash = (serializedPayload: ReturnType<typeof serializeForecast> | null) =>
-  serializedPayload ?
-  JSON.stringify({
-    forecastCycle: serializedPayload.forecastCycle,
-    mapView: serializedPayload.mapView,
-    cycleMetadata: serializedPayload.cycleMetadata,
-  }) : '';
+const buildCloudSyncHash = (serializedPayload: ForecastWorkspacePayload | null) => {
+  if (!serializedPayload) return '';
+  const inner = getForecastDataFromWorkspacePayload(serializedPayload);
+  return JSON.stringify({
+    forecastCycle: inner.forecastCycle,
+    mapView: inner.mapView,
+    cycleMetadata: inner.cycleMetadata,
+  });
+};
 
 /** Runs one hosted cloud save for the active cloud cycle and updates sync state around the request. */
 const syncCurrentCloudCycle = async ({
@@ -46,7 +49,7 @@ const syncCurrentCloudCycle = async ({
   currentCloud: Pick<UseCloudCyclesResult, 'currentCloud'>['currentCloud'];
   saveCycle: Pick<UseCloudCyclesResult, 'saveCycle'>['saveCycle'];
   updateSyncState: Pick<UseCloudCyclesResult, 'updateSyncState'>['updateSyncState'];
-  payload: ReturnType<typeof serializeForecast>;
+  payload: ForecastWorkspacePayload;
   cycleDate: RootState['forecast']['forecastCycle']['cycleDate'];
   forecastCycle: RootState['forecast']['forecastCycle'];
   workflowMetadata: RootState['forecast']['workflowMetadata'];
@@ -98,7 +101,7 @@ const useCloudSyncOperations = ({
   currentCloud: CloudSyncInput['currentCloud'];
   saveCycle: CloudSyncInput['saveCycle'];
   updateSyncState: CloudSyncInput['updateSyncState'];
-  serializedPayload: ReturnType<typeof serializeForecast> | null;
+  serializedPayload: ForecastWorkspacePayload | null;
   forecastCycle: RootState['forecast']['forecastCycle'];
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   currentHash: string;
@@ -107,12 +110,13 @@ const useCloudSyncOperations = ({
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastSyncedHash, setLastSyncedHashState] = useState<string | null>(null);
   const performSync = useCallback(async () => {
+    if (!serializedPayload) return;
     await syncCurrentCloudCycle({
       canSync,
       currentCloud,
       saveCycle,
       updateSyncState,
-      payload: serializedPayload as ReturnType<typeof serializeForecast>,
+      payload: serializedPayload,
       cycleDate: forecastCycle.cycleDate,
       forecastCycle,
       workflowMetadata,
@@ -183,8 +187,8 @@ export const useCloudSync = (
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const canSync = Boolean(currentCloud) && premiumActive;
   const serializedPayload = useMemo(
-    () => canSync ? serializeForecast(forecastCycle, mapView, workflowMetadata) : null,
-    [canSync, forecastCycle, mapView, workflowMetadata]
+    () => canSync ? serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata) : null,
+    [canSync, forecastCycle, mapView, workflowMetadata, workspaceId]
   );
   const currentHash = useMemo(() => buildCloudSyncHash(serializedPayload), [serializedPayload]);
   const operations = useCloudSyncOperations({

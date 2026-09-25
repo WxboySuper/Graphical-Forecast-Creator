@@ -14,7 +14,7 @@ import { completionMetadataFromForecastCycle } from './forecastCompletionMetadat
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
-import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload } from './forecastWorkspaceEnvelope';
+import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload, createForecastWorkspaceSave } from './forecastWorkspaceEnvelope';
 import { isFeatureExposed } from '../config/featureExposure';
 import { validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
@@ -286,33 +286,38 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  * excessive coordinates are rejected before any state mutation. The boolean
  * return preserves the existing call contract.
  */
-export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
-  if (isWorkflowExportPackage(data)) return validateForecastData(data.forecast);
-  return validateForecastImport(data).ok;
-};
+export const validateForecastData = (data: unknown): data is GFCForecastSaveData =>
+  validateForecastImport(data).ok;
 
 /**
  * Validates imported forecast data and returns an actionable failure reason
  * when it is rejected. Returns null for valid documents, and narrows the input
  * type so callers can deserialize safely after validation.
+ *
+ * The shared validator already unwraps workflow packages, so the outer owner is
+ * checked on the way through instead of being skipped.
  */
 export const validateForecastDataReason = (data: unknown): string | null => {
-  if (isWorkflowExportPackage(data)) return validateForecastDataReason(data.forecast);
   const result = validateForecastImport(data);
   return result.ok ? null : (result.reason ?? 'Invalid forecast data format.');
 };
 
 /**
- * Triggers a download of the serialized forecast data as a JSON file.
+ * Triggers a download of the workspace envelope for the serialized forecast data.
  * When `cycleMetadata` is provided, the export keeps the active workflow
  * metadata so a re-import can restore the workflow session.
+ *
+ * The owner is a required argument: this helper exists next to the bare legacy
+ * writer, and requiring an owner is what keeps it from producing a payload that
+ * carries no workspace identity.
  */
 export const exportForecastToJson = (
+  workspaceId: import('../config/forecastWorkspaces').ForecastWorkspaceId,
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
   cycleMetadata?: CycleMetadata
 ) => {
-  const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
+  const data = createForecastWorkspaceSave(workspaceId, serializeForecast(forecastCycle, mapView, cycleMetadata));
   const jsonString = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   

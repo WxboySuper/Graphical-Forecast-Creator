@@ -224,6 +224,22 @@ describe('workspace envelope validation', () => {
     expect(validateForecastImport(workflowPackage)).toEqual({ ok: true });
     expect(validateForecastData(workflowPackage)).toBe(true);
   });
+
+  it('rejects a workflow package whose outer workspace is not registered', () => {
+    for (const workspaceId of ['bogus', 'Severe', 42]) {
+      const workflowPackage = {
+        packageType: 'cycle',
+        schemaVersion: '1.0.0',
+        exportedAt: '2026-07-20T00:00:00.000Z',
+        workspaceId,
+        forecast: validSave(),
+      };
+
+      expect(validateForecastImport(workflowPackage))
+        .toEqual({ ok: false, reason: 'This forecast belongs to an unknown workspace.' });
+      expect(validateForecastData(workflowPackage)).toBe(false);
+    }
+  });
 });
 
 describe('validateForecastData compatibility', () => {

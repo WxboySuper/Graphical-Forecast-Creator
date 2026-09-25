@@ -113,7 +113,7 @@ describe('forecastTransfer', () => {
     expect(importedFeatures?.[0].geometry.type).toBe('Polygon');
   });
 
-  test('imports untagged KML files as Severe-owned transfers guarded in other workspaces', async () => {
+  test('imports untagged KML files without claiming ownership the file cannot know', async () => {
     const forecastCycle = buildForecast();
     const kml = buildStructuredKmlDocument({
       forecastCycle,
@@ -130,7 +130,10 @@ describe('forecastTransfer', () => {
     expect(result.format).toBe('kml');
     expect(result.warnings).toEqual([]);
     expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(2);
-    expect(result.workspaceId).toBe('severe');
+    // A KML file carries no workspace identity, so the import reports it as
+    // unowned rather than asserting Severe ownership. The Severe entry policy
+    // decides where that geometry may open.
+    expect(result.workspaceId).toBeNull();
   });
 
   test('preserves explicit workspace identity for native imports', async () => {
@@ -260,14 +263,16 @@ describe('forecastTransfer', () => {
     await expect(importForecastTransfer(file)).rejects.toThrow('cannot be verified');
   });
 
-  test('accepts an outer Severe label over an untagged legacy forecast with a warning', async () => {
+  test('accepts an outer Severe label over an untagged legacy forecast without a warning', async () => {
     const bare = serializeForecast(buildForecast(), mapView());
 
     const file = await packageFile(bareInnerPackage(bare, 'severe'), 'labeled-legacy.zip');
 
     const result = await importForecastTransfer(file);
     expect(result.workspaceId).toBe('severe');
-    expect(result.warnings.join(' ')).toMatch('untagged legacy');
+    // The label matches what the payload proves, so nothing about ownership
+    // changed and there is nothing to warn about.
+    expect(result.warnings).toEqual([]);
   });
 
   test('round-trips a new Custom package because inner and outer identities agree', async () => {
@@ -483,6 +488,20 @@ describe('forecastTransfer', () => {
       mapView,
       workspaceId: 'custom',
     })).rejects.toThrow('Severe workspace');
+  });
+
+  test('applies the same kmz feature gate in the export API that the transfer UI uses', async () => {
+    const spy = jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+
+    await expect(exportForecastTransfer({
+      format: 'kml',
+      scope: 'cycle',
+      forecastCycle: buildForecast(),
+      mapView: mapView(),
+      workspaceId: 'severe',
+    })).rejects.toThrow('not available in this build');
+
+    spy.mockRestore();
   });
 
   test('rejects workflow packages with present-but-unknown or noncanonical outer workspaces', async () => {

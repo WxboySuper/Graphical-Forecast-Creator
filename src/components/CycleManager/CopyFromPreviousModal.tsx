@@ -4,7 +4,7 @@ import type { RootState } from '../../store';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
 import { DayType, ForecastCycle } from '../../types/outlooks';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
-import { readForecastImportFile, validateForecastData } from '../../utils/fileUtils';
+import { readForecastImportFile, validateForecastData, validateForecastDataReason } from '../../utils/fileUtils';
 import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
@@ -17,11 +17,25 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
+/**
+ * True for failures that name an exact ownership or envelope problem. Those are
+ * shown verbatim so a user can tell an unknown workspace or a corrupt envelope
+ * apart from an ordinary unparseable file.
+ */
+const isSpecificOwnershipError = (message: string): boolean =>
+  message.startsWith('This forecast belongs to ')
+  || message.startsWith('This workflow package declares')
+  || message.startsWith('This forecast envelope')
+  || message.startsWith('This workspace forecast')
+  || message.startsWith('This package labels an untagged legacy forecast');
+
 /** Reads a forecast file with its owning workspace and import notes so dispatch can re-check. */
 export const parseForecastFileWithOwner = async (file: File, workspaceId: ForecastWorkspaceId): Promise<{ cycle: ForecastCycle; workspaceId: ForecastWorkspaceId; warnings: string[] }> => {
   const parsed = await readForecastImportFile(file);
   if (!validateForecastData(parsed)) {
-    throw new Error('Invalid GFC forecast file.');
+    // Surface the specific reason when validation has one: an unknown owner or a
+    // corrupt envelope is actionable, "invalid file" is not.
+    throw new Error(validateForecastDataReason(parsed) ?? 'Invalid GFC forecast file.');
   }
   const resolved = resolveNativeFileContent(parsed);
   if (resolved.workspaceId !== workspaceId) {
@@ -185,7 +199,9 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
         addToast(warning, 'warning');
       }
     } catch (error) {
-      const message = error instanceof Error && error.message.startsWith('This forecast belongs to ')
+      // Ownership, package-label, and envelope failures name the exact problem,
+      // so they are shown verbatim. Anything else keeps the generic message.
+      const message = error instanceof Error && isSpecificOwnershipError(error.message)
         ? error.message
         : 'Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.';
       addToast(message, 'error');

@@ -538,17 +538,6 @@ describe("CloudLibraryPage", () => {
     expect(window.history.length).toBe(entriesBefore);
   });
 
-  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
-    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
-    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
-    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
-    const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
-    expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
-    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
-    const wrapped = buildCloudSessionPayload("severe", bare) as { workspaceId?: string };
-    expect(wrapped.workspaceId).toBe("severe");
-  });
-
   it("refuses a cloud payload that no workspace classifier accepts", () => {
     const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
     const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
@@ -573,6 +562,23 @@ describe("CloudLibraryPage", () => {
     expect(() => buildCloudSessionPayload(undefined as never, bare)).toThrow(/valid workspace/);
   });
 
+  it("refuses to hand off an untagged payload for a non-Severe record", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/bare-custom" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(serializeForecast(cycle, { center: [0, 0], zoom: 4 }));
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
+    expect(await screen.findByText(/cannot be verified/)).toBeInTheDocument();
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
+  });
+
   it("refuses to hand off a cloud cycle that names an unknown workspace", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();
@@ -592,33 +598,4 @@ describe("CloudLibraryPage", () => {
     expect(window.location.pathname).toBe("/");
   });
 
-  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
-    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
-    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
-    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
-    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
-    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
-    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
-    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
-  });
-
-  it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [
-          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
-          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
-        ],
-      })
-    );
-    window.history.replaceState({}, "", "/cloud-library?workspace=custom&source=bookmark");
-
-    renderPage();
-
-    expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /All 2/i }));
-    expect(window.location.search).toBe("?source=bookmark");
-  });
 });

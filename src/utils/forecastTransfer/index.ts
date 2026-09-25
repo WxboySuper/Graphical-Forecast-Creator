@@ -16,6 +16,8 @@ import {
   toWorkflowScope,
 } from './transferExportUtils';
 import { importTransferFile } from './transferImportUtils';
+import { isFeatureExposed } from '../../config/featureExposure';
+import { GIS_ENTRY_WORKSPACE } from './importPolicy';
 
 /** Downloads a workspace-owned native JSON transfer so identity survives round-trips. */
 const downloadWorkspaceJsonTransfer = (
@@ -30,11 +32,19 @@ const downloadWorkspaceJsonTransfer = (
   );
 };
 
-/** KML/KMZ geometry is Severe-owned; other workspaces cannot produce it. */
+/**
+ * Guards KML/KMZ export behind the same two conditions the transfer modal uses:
+ * the Severe entry workspace and the `kmzExport` feature gate. GIS geometry is a
+ * Severe-only, feature-gated capability, not a claim about who owns a file, so
+ * the UI and this API expose the formats identically.
+ */
 const assertSevereKmlExport = (format: ForecastExportRequest['format'], workspaceId: ForecastExportRequest['workspaceId']): void => {
   if (format !== 'kml' && format !== 'kmz') return;
-  if (workspaceId !== 'severe') {
-    throw new Error('KML/KMZ exports belong to the Severe workspace. Switch to Severe to export GIS geometry.');
+  if (workspaceId !== GIS_ENTRY_WORKSPACE) {
+    throw new Error('KML/KMZ export is only available in the Severe workspace. Switch to Severe to export GIS geometry.');
+  }
+  if (!isFeatureExposed('kmzExport')) {
+    throw new Error('KML/KMZ export is not available in this build.');
   }
 };
 

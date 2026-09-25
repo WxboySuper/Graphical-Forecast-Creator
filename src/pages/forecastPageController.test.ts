@@ -37,15 +37,17 @@ describe('forecastPageController', () => {
     expect(getForecastImportWorkspaceError({ ...result, workspaceId: 'severe' }, 'severe')).toBeNull();
   });
 
-  test('keeps Severe-owned KML/KMZ in Severe and rejects it elsewhere', () => {
-    const result = { workspaceId: 'severe', format: 'kml' } as ForecastImportResult;
+  test('opens unowned GIS geometry only in Severe and rejects it elsewhere', () => {
+    const gis = { workspaceId: null, format: 'kml' } as ForecastImportResult;
 
-    expect(getForecastImportWorkspaceError(result, 'severe')).toBeNull();
-    expect(getForecastImportWorkspaceError(result, 'custom')).toContain('severe workspace');
+    expect(getForecastImportWorkspaceError(gis, 'severe')).toBeNull();
+    expect(getForecastImportWorkspaceError(gis, 'custom')).toContain('does not declare');
+    expect(getForecastImportWorkspaceError({ ...gis, format: 'kmz' }, 'severe')).toBeNull();
+    expect(getForecastImportWorkspaceError({ ...gis, format: 'kmz' }, 'winter')).toContain('does not declare');
   });
 
-  test('rejects unowned transfers in every workspace, including severe', () => {
-    const result = { workspaceId: null, format: 'kml' } as ForecastImportResult;
+  test('rejects unowned native transfers in every workspace, including severe', () => {
+    const result = { workspaceId: null, format: 'json' } as ForecastImportResult;
 
     expect(getForecastImportWorkspaceError(result, 'severe')).toContain('does not declare');
     expect(getForecastImportWorkspaceError(result, 'custom')).toContain('does not declare');
@@ -223,15 +225,19 @@ describe('forecastPageController', () => {
     exportSpy.mockRestore();
   });
 
-  test('keeps cloud handoff enveloped so a bare rollover payload cannot silently downgrade', async () => {
+  test('refuses to relabel an untagged cloud payload and keeps enveloped identity', async () => {
     const { buildCloudSessionPayload } = await import('./CloudLibraryPage');
     const { deserializeForecastWorkspace } = await import('../utils/forecastWorkspacePersistenceAdapter');
     const cycle = createForecastCycle();
     const bare = fileUtils.serializeForecast(cycle, { center: [0, 0], zoom: 4 });
 
-    const storable = buildCloudSessionPayload('custom', bare) as { workspaceId?: string };
-    expect(storable.workspaceId).toBe('custom');
-    expect(deserializeForecastWorkspace(storable).workspaceId).toBe('custom');
+    // An untagged payload only proves Severe ownership, so a Custom record
+    // cannot claim it. This mirrors how native import treats an untagged file.
+    expect(() => buildCloudSessionPayload('custom', bare)).toThrow(/cannot be verified/);
+
+    const storable = buildCloudSessionPayload('severe', bare) as { workspaceId?: string };
+    expect(storable.workspaceId).toBe('severe');
+    expect(deserializeForecastWorkspace(storable).workspaceId).toBe('severe');
 
     const envelope = serializeForecastWorkspace('custom', cycle, { center: [0, 0], zoom: 4 });
     expect(buildCloudSessionPayload('custom', envelope)).toBe(envelope);

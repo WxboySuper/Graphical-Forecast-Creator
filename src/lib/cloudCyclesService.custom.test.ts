@@ -1,4 +1,5 @@
 import type { GFCForecastSaveData } from '../types/outlooks';
+import { getForecastDataFromWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { getDoc, onSnapshot } from 'firebase/firestore';
 import {
   createCloudCyclePayloadStorage,
@@ -56,7 +57,7 @@ test('cloud payload encoding round-trips custom geometry and appearance', () => 
   const restored = parseCloudCyclePayload(encoded.payloadJson);
 
   expect(encoded.payloadBytes).toBeGreaterThan(0);
-  expect(restored?.forecastCycle?.days[1]?.customLayers).toEqual(payload.forecastCycle?.days[1]?.customLayers);
+  expect(restored && getForecastDataFromWorkspacePayload(restored).forecastCycle?.days[1]?.customLayers).toEqual(payload.forecastCycle?.days[1]?.customLayers);
 });
 
 test('legacy reads return data without Firestore writes and remain visible with hosted records', async () => {

@@ -18,6 +18,7 @@ import {
   type ForecastTransferScope,
   type KmlArchiveStrategy,
 } from '../../utils/forecastTransfer';
+import { getForecastImportWorkspaceError } from '../../utils/forecastTransfer/importPolicy';
 import { isFeatureExposed } from '../../config/featureExposure';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
@@ -177,12 +178,9 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         defaultDay: forecastCycle.currentDay as DayType,
       });
       setImportWarnings(result.warnings);
-      if (result.workspaceId !== null && result.workspaceId !== workspaceId) {
-        onError?.(`This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`);
-        return;
-      }
-      if (result.workspaceId === null) {
-        onError?.('This file does not declare a forecast workspace and cannot be imported.');
+      const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+      if (workspaceError) {
+        onError?.(workspaceError);
         return;
       }
       onImported(result);

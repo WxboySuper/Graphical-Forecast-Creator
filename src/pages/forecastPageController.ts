@@ -15,10 +15,13 @@ import {
   selectForecastCycle,
 } from '../store/forecastSlice';
 import type { RootState } from '../store';
-import { downloadBlob, readForecastImportFile, serializeForecast, validateForecastDataReason } from '../utils/fileUtils';
+import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
 import type { ForecastCycle } from '../types/outlooks';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { getForecastImportWorkspaceError } from '../utils/forecastTransfer/importPolicy';
+
+export { getForecastImportWorkspaceError };
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
 import type { ForecastImportResult } from '../utils/forecastTransfer';
@@ -162,22 +165,6 @@ export const applyForecastImportResult = (
   if (workspaceError) return workspaceError;
   applyImportCycleState(dispatch, result);
   return applyImportMapViewState(dispatch, mapRef, result);
-};
-
-/** Returns an error when a transfer cannot be opened in the active forecast workspace. */
-export const getForecastImportWorkspaceError = (
-  result: ForecastImportResult,
-  workspaceId: ForecastWorkspaceId,
-): string | null => {
-  if (result.workspaceId === null) {
-    if (result.format === 'kml' || result.format === 'kmz') {
-      return 'This file does not declare a forecast workspace. KML/KMZ geometry cannot be imported across the workspace boundary.';
-    }
-    return 'This file does not declare a forecast workspace and cannot be imported.';
-  }
-  return result.workspaceId === workspaceId
-    ? null
-    : `This forecast belongs to the ${result.workspaceId} workspace. Open it there before importing it.`;
 };
 
 /** Downloads the active workspace cycle as a workspace-owned native JSON file. */
@@ -675,7 +662,7 @@ export const runDayRolloverDownloadAction = ({ forecastCycle, mapView, dispatch,
 
 export const runDayRolloverCloudSaveAction = async ({ forecastCycle, currentMapView, saveCycle, clearCurrent, dispatch, workspaceId }: { forecastCycle: ReturnType<typeof selectForecastCycle>; currentMapView: RootState['forecast']['currentMapView']; saveCycle: UseCloudCyclesResult['saveCycle']; clearCurrent: UseCloudCyclesResult['clearCurrent']; dispatch: ShortcutDispatch; workspaceId: ForecastWorkspaceId }): Promise<boolean> => {
   try {
-    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecast(forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId });
+    const success = await saveCycle(buildRolloverSaveLabel(forecastCycle.cycleDate), forecastCycle.cycleDate, countForecastMetrics(forecastCycle), serializeForecastWorkspace(workspaceId, forecastCycle, currentMapView), undefined, { saveAsNew: true, workspaceId });
     if (!success) return false;
     clearCurrent();
     dispatch(resetForecasts());

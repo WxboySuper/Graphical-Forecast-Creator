@@ -1,6 +1,7 @@
 jest.mock('../../utils/fileUtils', () => ({
   readForecastImportFile: jest.fn(),
   validateForecastData: jest.fn(),
+  validateForecastDataReason: jest.fn(),
 }));
 
 jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
@@ -9,9 +10,10 @@ jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
 
 import { parseForecastFile, parseForecastFileWithOwner } from './CopyFromPreviousModal';
 
-const { readForecastImportFile, validateForecastData } = jest.requireMock('../../utils/fileUtils') as {
+const { readForecastImportFile, validateForecastData, validateForecastDataReason } = jest.requireMock('../../utils/fileUtils') as {
   readForecastImportFile: jest.Mock;
   validateForecastData: jest.Mock;
+  validateForecastDataReason: jest.Mock;
 };
 const { resolveNativeFileContent } = jest.requireMock('../../utils/forecastTransfer/nativeImportUtils') as {
   resolveNativeFileContent: jest.Mock;
@@ -22,7 +24,24 @@ describe('parseForecastFile workspace ownership', () => {
     jest.clearAllMocks();
     readForecastImportFile.mockResolvedValue({});
     validateForecastData.mockReturnValue(true);
+    validateForecastDataReason.mockReturnValue(null);
     resolveNativeFileContent.mockReturnValue({ workspaceId: 'custom', forecastCycle: { cycleDate: '2026-09-22' } });
+  });
+
+  it('surfaces the specific reason when validation rejects the file', async () => {
+    validateForecastData.mockReturnValue(false);
+    validateForecastDataReason.mockReturnValue('This forecast belongs to an unknown workspace.');
+
+    await expect(parseForecastFileWithOwner(new File(['{}'], 'bad.json'), 'severe'))
+      .rejects.toThrow('This forecast belongs to an unknown workspace.');
+  });
+
+  it('falls back to a generic reason when validation gives none', async () => {
+    validateForecastData.mockReturnValue(false);
+    validateForecastDataReason.mockReturnValue(null);
+
+    await expect(parseForecastFileWithOwner(new File(['{}'], 'bad.json'), 'severe'))
+      .rejects.toThrow('Invalid GFC forecast file.');
   });
 
   it('accepts a file owned by the active workspace', async () => {

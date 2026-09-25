@@ -65,25 +65,14 @@ const mergePackageView = (pkg: WorkflowExportPackage, inner: InnerView): Pick<Re
   cycleMetadata: pkg.metadata ?? pkg.cycleMetadata ?? inner.cycleMetadata,
 });
 
-/** Builds the relabeled result for a declared owner over an untagged legacy forecast. */
-const buildLegacyRelabeledContent = (
-  restored: RestoredWorkspace,
-  workspaceId: ForecastWorkspaceId,
-  view: Pick<ResolvedNativeFileContent, 'mapView' | 'cycleMetadata'>,
-): ResolvedNativeFileContent => ({
-  forecastCycle: restored.forecastCycle,
-  workspaceId,
-  mapView: view.mapView,
-  cycleMetadata: view.cycleMetadata,
-  warnings: [`This package labels an untagged legacy forecast as ${workspaceId} workspace.`],
-  legacy: true,
-});
-
 /**
  * Rejects an outer label that would move an untagged legacy forecast into a
  * workspace its contents cannot prove. The inner payload of a legacy package
  * only ever validates as Severe, so any other declared owner is an unverifiable
  * reassignment; callers see the throw before any state is touched.
+ *
+ * When the declared owner matches the proven one there is no reassignment at
+ * all, so the import is accepted without a warning.
  */
 const assertDeclaredLegacyOwnership = (
   declaredWorkspaceId: ForecastWorkspaceId | null,
@@ -140,24 +129,12 @@ const resolvePackageOwnership = (
   };
 };
 
-/** Returns relabeled content when an outer label covers an untagged legacy forecast. Null otherwise. */
-const resolveDeclaredLegacyContent = (
-  declaredWorkspaceId: ForecastWorkspaceId | null,
-  restored: RestoredWorkspace,
-  view: Pick<ResolvedNativeFileContent, 'mapView' | 'cycleMetadata'>,
-): ResolvedNativeFileContent | null => {
-  if (declaredWorkspaceId === null || !restored.legacy) return null;
-  return buildLegacyRelabeledContent(restored, declaredWorkspaceId, view);
-};
-
 /** Resolves a workflow export package envelope into workspace, cycle, view, and warnings. */
 const resolveWorkflowPackageContent = (data: WorkflowExportPackage): ResolvedNativeFileContent => {
   const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
   const restored = deserializeForecastWorkspace(data.forecast);
   const view = mergePackageView(data, getInnerView(data.forecast));
   assertDeclaredLegacyOwnership(declaredWorkspaceId, restored);
-  const legacyRelabeled = resolveDeclaredLegacyContent(declaredWorkspaceId, restored, view);
-  if (legacyRelabeled) return legacyRelabeled;
   assertPackageWorkspaceMatch(declaredWorkspaceId, restored);
   return resolvePackageOwnership(declaredWorkspaceId, restored, view);
 };
@@ -183,10 +160,11 @@ const resolveBareFileContent = (data: unknown): ResolvedNativeFileContent => {
  * readers are read-only and may inspect a forecast owned by another workspace.
  *
  * A declared outer workspace that matches the owner a legacy inner forecast can
- * prove is accepted with a warning. One that names any other workspace throws,
- * because a stripped or repackaged legacy file must not change owners. Packages
- * with no outer label keep backward compatibility by falling back to the inner
- * owner, and both inferred-ownership outcomes are surfaced as warnings.
+ * prove is accepted silently, because nothing about the owner changes. One that
+ * names any other workspace throws, because a stripped or repackaged legacy file
+ * must not change owners. Packages with no outer label keep backward
+ * compatibility by falling back to the inner owner, and that inferred ownership
+ * is surfaced as a warning.
  */
 export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) return resolveWorkflowPackageContent(data);

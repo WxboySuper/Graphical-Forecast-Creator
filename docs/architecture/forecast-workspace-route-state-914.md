@@ -27,10 +27,12 @@ This record pins down what #1456 actually built. The base doc describes the plan
 - A pending debounced save flushes to its original workspace before a scope change. A deliberate fresh start clears both signed-in and anonymous copies.
 - Sign-in migrates anonymous autosaves per workspace. A non-Severe draft is never promoted into Severe.
 - Every new cloud record requires `workspaceId`. Library tabs filter on it. Legacy records without an id read as Severe.
+- Saved cycles are never hidden. A record whose workspace id this build does not recognize stays in history under the legacy Severe fallback instead of being dropped, so the user can still see it and delete it.
 
 ## Cloud handoff
 
 - Cloud loads wrap the payload in the workspace envelope. An already enveloped payload is reused as is. A mismatched envelope is rejected.
+- An untagged payload proves Severe ownership and nothing else. A Severe record accepts it and wraps it; a record for any other workspace is refused instead of relabeled. This mirrors native file import, which also refuses an outer label over an untagged inner forecast. Cloud saves write the workspace envelope, so Custom and later workspaces always arrive carrying the identity that justifies their owner.
 - A workspace can open cloud payloads only when it has a registered editor route for the current build target. Today that is Severe and exposed Custom. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
 - A cross-workspace handoff that reaches the wrong editor is a user-visible error. The pending cloud session is cleared and the editor shows an error toast instead of silently falling back to local restore.
 - A malformed or unknown pending handoff is cleared the same way with an invalid-session error; absence alone is not treated as corruption.

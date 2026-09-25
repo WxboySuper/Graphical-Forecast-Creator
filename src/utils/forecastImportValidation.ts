@@ -7,9 +7,9 @@ import {
   type ImportValidationResult,
 } from './forecastValidationTypes';
 import { validateForecastCycle, validateLegacyOutlooks } from './forecastOutlookValidation';
+import { getForecastWorkspace } from '../config/forecastWorkspaces';
 import {
   declaresWorkspaceEnvelope,
-  isRecord,
   isWorkspaceSaveEnvelope,
 } from './forecastWorkspaceEnvelope';
 
@@ -112,7 +112,17 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
     forecastCycle?: unknown;
     outlooks?: unknown;
     forecast?: unknown;
+    workspaceId?: unknown;
   };
+
+  // A declared owner must resolve before anything is unwrapped. Packages and
+  // envelopes both carry one, so checking here means an unknown workspace fails
+  // at the validation boundary instead of later in the ownership resolver.
+  if (candidate.workspaceId !== undefined) {
+    if (typeof candidate.workspaceId !== 'string' || getForecastWorkspace(candidate.workspaceId) === undefined) {
+      return fail('This forecast belongs to an unknown workspace.');
+    }
+  }
 
   // Workspace save envelope: version, registered owner, and payload shape are
   // all part of the contract. A corrupt envelope is rejected here instead of
@@ -120,9 +130,7 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
   // rather than `candidate` so the legacy checks below keep their own types.
   if (declaresWorkspaceEnvelope(data)) {
     if (!isWorkspaceSaveEnvelope(data)) {
-      return fail(isRecord(candidate.forecast)
-        ? 'This forecast belongs to an unknown workspace.'
-        : 'This workspace forecast is incomplete or invalid.');
+      return fail('This workspace forecast is incomplete or invalid.');
     }
     return validateForecastImport(data.forecast);
   }

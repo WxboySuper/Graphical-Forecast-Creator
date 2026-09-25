@@ -742,11 +742,14 @@ const CloudLibrarySignedInLayout: React.FC<{
 /**
  * Builds the session payload for a cloud handoff without double-wrapping an envelope.
  *
- * A payload that no workspace classifier accepts is refused rather than wrapped,
- * because a wrapped copy of unclassifiable data would fail again on restore after
- * the handoff already navigated away. A payload that already carries an owner is
- * kept only when that owner matches; an untagged legacy payload takes the owner
- * from the cloud record, which is the ownership evidence for that record.
+ * Trust policy, mirroring native file import. A payload that no workspace
+ * classifier accepts is refused rather than wrapped, because a wrapped copy of
+ * unclassifiable data would fail again on restore after the handoff already
+ * navigated away. A payload that already carries an owner is kept only when that
+ * owner matches the record. An untagged payload proves Severe ownership and
+ * nothing more, so it is accepted for a Severe record and refused for any other
+ * owner instead of being relabeled. Cloud saves write the workspace envelope, so
+ * a non-Severe record always arrives carrying the identity that justifies it.
  */
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
@@ -758,6 +761,11 @@ export const buildCloudSessionPayload = (
     throw getForecastWorkspaceLoadError(classification);
   }
   if (classification.legacy) {
+    if (owner !== classification.workspaceId) {
+      throw new Error(
+        `This cloud cycle labels an untagged forecast as ${owner} workspace, which cannot be verified. Save it from that workspace to include its workspace identity.`,
+      );
+    }
     return createForecastWorkspaceSave(owner, payload as GFCForecastSaveData);
   }
   if (classification.workspaceId !== owner) {
@@ -805,9 +813,17 @@ const useCloudLibraryActions = ({
 
   const persistCloudCycleToSession = useCallback(
     (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
+      let storable: unknown;
       try {
         // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
-        const storable = buildCloudSessionPayload(workspaceId, payload);
+        storable = buildCloudSessionPayload(workspaceId, payload);
+      } catch (error) {
+        // Ownership and validity failures are written for the user; they say
+        // what is wrong with this record instead of a generic retry message.
+        setMessage(error instanceof Error && error.message ? error.message : 'Unable to hand this cloud cycle off to the editor right now. Please try again.');
+        return false;
+      }
+      try {
         sessionStorage.setItem(payloadKey, JSON.stringify(storable));
         sessionStorage.setItem(
           metaKey,

@@ -80,11 +80,17 @@ describe('useCloudSync', () => {
     });
 
     expect(updateSyncState).toHaveBeenCalledWith('saving');
+    // Cloud saves store the workspace envelope so a non-Severe record always
+    // arrives carrying the identity that justifies its owner.
     expect(saveCycle).toHaveBeenCalledWith('Storm Day', '2026-04-24', {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
-    }, payload, workflowMetadata, { workspaceId: 'severe' });
+    }, expect.objectContaining({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: payload,
+    }), workflowMetadata, { workspaceId: 'severe' });
     expect(updateSyncState).toHaveBeenCalledWith('saved');
   });
 

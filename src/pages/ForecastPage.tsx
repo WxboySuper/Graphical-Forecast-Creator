@@ -25,7 +25,7 @@ import {
   undoLastEdit,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
-import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
@@ -532,7 +532,7 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
-      const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
+      const payload = serializeForecastWorkspace(workspaceId, forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
       const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
 

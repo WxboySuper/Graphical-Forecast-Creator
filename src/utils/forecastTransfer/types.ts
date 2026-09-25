@@ -30,9 +30,9 @@ export interface ForecastExportRequest {
 export interface ForecastImportResult {
   forecastCycle: ForecastCycle;
   /**
-   * Owning workspace for the transfer. Untagged KML/KMZ defaults to Severe
-   * ownership so Severe keeps its GIS route and other workspaces reject it.
-   * Null means unowned and is always rejected.
+   * Owning workspace for the transfer, or null when the file carries no
+   * workspace identity. A null owner is rejected for native formats, and for
+   * KML/KMZ it is accepted only in Severe, which is the GIS entry policy.
    */
   workspaceId: ForecastWorkspaceId | null;
   mapView?: ForecastTransferMapView;
