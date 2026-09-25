@@ -54,7 +54,10 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
 } from "./openLayersMapStyles";
-import { loadOpenFreeMapBasemap } from "./openLayersBasemap";
+import {
+  beginOpenFreeMapBasemapRequest,
+  loadOpenFreeMapBasemap,
+} from "./openLayersBasemap";
 import { ReportType } from "../../types/stormReports";
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from "../../utils/stormReportColors";
 import type { DatEvidence } from "../../utils/dat";
@@ -466,8 +469,7 @@ const OpenLayersVerificationMap = forwardRef<
 
     // Every style change invalidates any OpenFreeMap request started by a
     // previous selection, including a switch back to a raster or blank map.
-    const requestId = vectorStyleRequestRef.current + 1;
-    vectorStyleRequestRef.current = requestId;
+    const requestId = beginOpenFreeMapBasemapRequest(vectorStyleRequestRef);
 
     /**
      * Load US state boundary features into the `landSourceRef` if they

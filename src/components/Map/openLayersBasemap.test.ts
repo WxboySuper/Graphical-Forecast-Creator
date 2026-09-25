@@ -11,7 +11,10 @@ import {
   loadOpenFreeMapLayerGroups,
   replaceLayerGroupLayers,
 } from './openLayersMapStyles';
-import { loadOpenFreeMapBasemap } from './openLayersBasemap';
+import {
+  beginOpenFreeMapBasemapRequest,
+  loadOpenFreeMapBasemap,
+} from './openLayersBasemap';
 
 jest.mock('../../lib/openFreeMap', () => ({
   getOpenFreeMapStyleSet: jest.fn(),
@@ -120,7 +123,7 @@ describe('loadOpenFreeMapBasemap', () => {
     const requestRef = { current: 1 };
 
     loadOpenFreeMapBasemap(options({ requestRef, requestId: 1 }));
-    requestRef.current += 1;
+    beginOpenFreeMapBasemapRequest(requestRef);
     resolveStyle({} as OpenFreeMapStyleSet);
     await flushPromises();
 
@@ -151,7 +154,7 @@ describe('loadOpenFreeMapBasemap', () => {
     // Style set resolved, but the second-stage apply is still pending when
     // the user picks a newer basemap.
     await flushPromises();
-    requestRef.current += 1;
+    beginOpenFreeMapBasemapRequest(requestRef);
     resolveLayers({
       baseGroup: makeGroup() as unknown as LayerGroup,
       referenceGroup: makeGroup() as unknown as LayerGroup,
@@ -174,7 +177,7 @@ describe('loadOpenFreeMapBasemap', () => {
     const requestRef = { current: 7 };
 
     loadOpenFreeMapBasemap(options({ requestRef, requestId: 7 }));
-    requestRef.current += 1;
+    beginOpenFreeMapBasemapRequest(requestRef);
     rejectLayers(new Error('stale load failed'));
     await flushPromises();
 
@@ -204,5 +207,79 @@ describe('loadOpenFreeMapBasemap', () => {
     expect(tile.setVisible).toHaveBeenCalledWith(true);
     expect(labels.setSource).toHaveBeenCalledWith(labelSource);
     expect(labels.setVisible).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('beginOpenFreeMapBasemapRequest', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('a late vector success cannot reveal vector layers after a blank selection', async () => {
+    let resolveStyle!: (value: OpenFreeMapStyleSet) => void;
+    jest.mocked(getOpenFreeMapStyleSet).mockReturnValue(
+      new Promise((resolve) => {
+        resolveStyle = resolve;
+      })
+    );
+    jest.mocked(loadOpenFreeMapLayerGroups).mockResolvedValue({
+      baseGroup: makeGroup() as unknown as LayerGroup,
+      referenceGroup: makeGroup() as unknown as LayerGroup,
+    });
+    const requestRef = { current: 0 };
+    const vectorBaseGroup = makeGroup();
+    const vectorReferenceGroup = makeGroup();
+
+    loadOpenFreeMapBasemap(options({
+      requestRef,
+      requestId: beginOpenFreeMapBasemapRequest(requestRef),
+      vectorBaseGroup,
+      vectorReferenceGroup,
+    }));
+
+    // Blank selection bumps the id before the effect branches.
+    beginOpenFreeMapBasemapRequest(requestRef);
+    resolveStyle({} as OpenFreeMapStyleSet);
+    await flushPromises();
+
+    expect(replaceLayerGroupLayers).not.toHaveBeenCalled();
+    expect(vectorBaseGroup.setVisible).not.toHaveBeenCalledWith(true);
+    expect(vectorReferenceGroup.setVisible).not.toHaveBeenCalledWith(true);
+  });
+
+  test('a late vector failure cannot overwrite the raster fallback', async () => {
+    let rejectLayers!: (reason: unknown) => void;
+    jest.mocked(getOpenFreeMapStyleSet).mockResolvedValue({} as OpenFreeMapStyleSet);
+    jest.mocked(loadOpenFreeMapLayerGroups).mockReturnValue(
+      new Promise((_, reject) => {
+        rejectLayers = reject;
+      })
+    );
+    const requestRef = { current: 0 };
+    const tile = makeTile();
+    const vectorBaseGroup = makeGroup();
+    const vectorReferenceGroup = makeGroup();
+
+    loadOpenFreeMapBasemap(options({
+      requestRef,
+      requestId: beginOpenFreeMapBasemapRequest(requestRef),
+      tile,
+      vectorBaseGroup,
+      vectorReferenceGroup,
+    }));
+
+    // Raster selection bumps the id, then the fallback tiles are in place.
+    beginOpenFreeMapBasemapRequest(requestRef);
+    const rasterSource = {};
+    tile.setSource(rasterSource);
+    const rasterCalls = tile.setSource.mock.calls.length;
+
+    rejectLayers(new Error('stale load failed'));
+    await flushPromises();
+
+    expect(replaceLayerGroupLayers).not.toHaveBeenCalled();
+    expect(vectorBaseGroup.setVisible).not.toHaveBeenCalledWith(true);
+    expect(tile.setSource).toHaveBeenCalledTimes(rasterCalls);
+    expect(createTileSource).not.toHaveBeenCalled();
   });
 });
