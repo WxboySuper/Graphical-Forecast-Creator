@@ -76,9 +76,11 @@ describe('cloneEntries', () => {
     const second = createFeature('same-id', 2);
     const clonedFirst = cloneEntries(new Map([['2%', [first]]]));
     const clonedSecond = cloneEntries(new Map([['2%', [second]]]));
+    const firstClone = clonedFirst!.get('2%')![0];
+    const secondClone = clonedSecond!.get('2%')![0];
 
-    expect(clonedFirst?.get('2%')?.[0]).toEqual(clonedSecond?.get('2%')?.[0]);
-    expect(clonedFirst?.get('2%')?.[0]).not.toBe(clonedSecond?.get('2%')?.[0]);
+    expect(firstClone).toEqual(secondClone);
+    expect(firstClone).not.toBe(secondClone);
   });
 
   test('keys Immer drafts by the stable base object', () => {
@@ -126,9 +128,11 @@ describe('cloneOutlookData', () => {
   test.each(outlookCloneCases)('clones the $key map', ({ key, probability, id, offset }) => {
     const data = createSingleMapData(key, probability, id, offset);
     const cloned = cloneOutlookData(data);
+    const sourceFeature = data[key]!.get(probability)![0];
+    const clonedFeature = cloned[key]!.get(probability)![0];
 
-    expect(cloned[key]?.get(probability)?.[0]).toEqual(data[key]?.get(probability)?.[0]);
-    expect(cloned[key]?.get(probability)?.[0]).not.toBe(data[key]?.get(probability)?.[0]);
+    expect(clonedFeature).toEqual(sourceFeature);
+    expect(clonedFeature).not.toBe(sourceFeature);
   });
 
   test('preserves missing maps and isolates live edits', () => {
