@@ -9,9 +9,9 @@ This record pins down what #1456 actually built. The base doc describes the plan
 ## Routes
 
 - `/forecast/severe` is the available editor. `/forecast` redirects there and keeps query parameters and hash.
-- `/forecast/custom` is registered when the existing `customProducts` exposure is on. It reuses the shared ForecastPage editor.
-- `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
-- `/custom-products` stays a separate library route. It is not a legacy Forecast editor path.
+- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor. Issue #914 ships the route contract, so staging and production keep the workspace on the unavailable-workspace page instead of opening a second production editor.
+- `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
+- `/custom-products` stays a separate library route gated by `customProducts`. It is not a legacy Forecast editor path.
 - Canonical matching tolerates trailing slashes. Non-forecast pages leave Redux workspace ownership alone instead of resetting it to Severe.
 
 ## State ownership
@@ -30,14 +30,16 @@ This record pins down what #1456 actually built. The base doc describes the plan
 
 ## Cloud handoff
 
+- A staged custom-product handoff names its destination workspace. The forecast editor consumes it only when it is mounted as that workspace, so a Custom product can never land in Severe. The library hands off to `/forecast/custom`.
 - Cloud loads wrap the payload in the workspace envelope. An already enveloped payload is reused as is. A mismatched envelope is rejected.
-- A workspace can open cloud payloads only when it has a registered editor route for the current build target. Today that is Severe and exposed Custom. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
+- A workspace can open cloud payloads only when it has a registered editor route for the current build target. That is Severe everywhere and Custom where `customWorkspace` is on. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
 - A cross-workspace handoff that reaches the wrong editor is a user-visible error. The pending cloud session is cleared and the editor shows an error toast instead of silently falling back to local restore.
 - A malformed or unknown pending handoff is cleared the same way with an invalid-session error; absence alone is not treated as corruption.
 
 ## Exposure
 
 - `src/config/forecastWorkspaces.ts` owns the workspace list. `src/routing/forecastWorkspaceRoutes.ts` owns route resolution and the exposed-route list. App registers routes from that list.
+- Every non-Severe workspace owns its own exposure key. The Custom editor route reads `customWorkspace`, which is off on staging and production, so the library feature gate cannot open a production workspace route by accident.
 - Future workspace modules stay behind route loaders. The shell never imports them at module scope.
 
 ## Follow-ups, not in scope

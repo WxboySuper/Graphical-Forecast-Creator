@@ -40,7 +40,7 @@ All notable changes to this project will be documented in this file.
 - **stripe:** ^22.4.0 → ^22.6.1 (`server`)
 - **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
 - **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
-- **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves/loads to the active workspace, and add a feature-flagged Custom workspace at `/forecast/custom`.
+- **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves/loads to the active workspace, and add a beta-gated Custom workspace at `/forecast/custom`.
 
 <!-- Continue next-major work here after this stable line is cut. -->
 

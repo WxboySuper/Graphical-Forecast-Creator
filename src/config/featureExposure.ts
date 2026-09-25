@@ -185,6 +185,21 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     serverBacked: false,
     trackingIssue: 913,
   },
+  customWorkspace: {
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
+    owner: 'WxboySuper',
+    addedDate: '2026-09-24',
+    temporary: true,
+    removalCondition:
+      'Open the Custom workspace on release targets once #915 registers /forecast/custom and moves the Custom UI.',
+    serverBacked: false,
+    trackingIssue: 915,
+  },
   collaborationRoom: {
     exposure: { ...ALL_TARGETS_OFF },
     owner: 'WxboySuper',

@@ -63,7 +63,9 @@ export const FORECAST_WORKSPACES = [
     label: 'Custom',
     productType: 'custom',
     status: 'gated',
-    exposureKey: 'customProducts',
+    // #914 ships the route contract only: the Custom workspace stays off release
+    // targets until #915 registers it. The library route keeps its own gate.
+    exposureKey: 'customWorkspace',
     // /custom-products remains the separate Custom Products library route,
     // not a legacy Forecast editor route.
     legacyPaths: [],

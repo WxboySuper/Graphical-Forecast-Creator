@@ -21,8 +21,11 @@ describe('forecast workspace product contract', () => {
     ]);
   });
 
-  test.each(BUILD_TARGETS)('exposes Severe and Custom according to the %s target', (target: BuildTarget) => {
-    expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
+  test.each(BUILD_TARGETS)('exposes Severe and gates Custom on the %s target', (target: BuildTarget) => {
+    const expected = target === 'production' || target === 'staging'
+      ? ['severe']
+      : ['severe', 'custom'];
+    expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(expected);
   });
 
   test('keeps unknown IDs and malformed paths out of the contract', () => {
@@ -54,6 +57,12 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('custom')?.productType).toBe('custom');
     expect(isForecastWorkspaceExposed(getForecastWorkspace('severe')!, 'production')).toBe(true);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
+    // #914 ships the route contract only: no future workspace opens on a release target.
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'staging')).toBe(false);
+    expect(getForecastWorkspace('custom')?.exposureKey).toBe('customWorkspace');
+    // The library feature gate must not decide whether the editor route registers.
+    expect(getForecastWorkspace('custom')?.exposureKey).not.toBe('customProducts');
   });
 
   test('keeps the Custom Products library separate from legacy Forecast entry points', () => {
