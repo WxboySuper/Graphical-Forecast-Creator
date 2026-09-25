@@ -16,6 +16,7 @@ import forecastReducer, {
   updateDiscussion,
 } from '../../store/forecastSlice';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { getLocalCalendarDate } from '../../utils/localDate';
 
 jest.mock('lucide-react', () => new Proxy({}, {
   get: () => (props: React.SVGProps<SVGSVGElement>) => <svg {...props} />,
@@ -78,22 +79,27 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
   );
 };
 
-const previousOutlookButtonName = /^Use [A-Z][a-z]{2} \d{1,2} Day 2$/;
+const yesterdayCycleDate = getYesterdayLocalDate();
+const anyPreviousOutlookButtonName = /^Use .* Day 2$/;
+const formatCycleLabel = (cycleDate: string): string =>
+  new Date(`${cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const previousOutlookButtonName = new RegExp(`^Use ${formatCycleLabel(yesterdayCycleDate)} Day 2$`);
 
 const renderPanelWithMixedWorkspaceHistory = (activeWorkspace: ForecastWorkspaceId) => {
   const store = createCompleteWorkflowStore();
-  const sourceCycleDate = getYesterdayLocalDate();
-  (['custom', 'severe'] as const).forEach((sourceWorkspace) => {
+  const otherWorkspace: ForecastWorkspaceId = activeWorkspace === 'custom' ? 'severe' : 'custom';
+  // The active workspace saves first, so the newest cycle belongs to the other
+  // workspace and an unfiltered selector picks the wrong source either way.
+  ([activeWorkspace, otherWorkspace] as const).forEach((sourceWorkspace) => {
     store.dispatch(setForecastWorkspace(sourceWorkspace));
     store.dispatch(setForecastDay(2));
     store.dispatch(addFeature({
       feature: createFeature(`${sourceWorkspace}-source`, sourceWorkspace === 'custom' ? 0 : 2, 'tornado', '2%'),
     }));
-    store.dispatch(setCycleDate(sourceCycleDate));
+    store.dispatch(setCycleDate(yesterdayCycleDate));
     store.dispatch(saveCurrentCycle({ label: `${sourceWorkspace} source` }));
   });
   store.dispatch(setForecastWorkspace(activeWorkspace));
-  store.dispatch(setForecastDay(1));
   store.dispatch(startBlankCycle({
     workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
     cycleDate: '2026-08-12',
@@ -120,7 +126,7 @@ const renderPanelWithLegacyWorkspaceHistory = (
   store.dispatch(addFeature({
     feature: createFeature('legacy-source', 2, 'tornado', '2%'),
   }));
-  store.dispatch(setCycleDate(getYesterdayLocalDate()));
+  store.dispatch(setCycleDate(yesterdayCycleDate));
   store.dispatch(saveCurrentCycle({ label: 'legacy source' }));
 
   const [saved] = store.getState().forecast.savedCycles.slice(-1);
@@ -133,7 +139,6 @@ const renderPanelWithLegacyWorkspaceHistory = (
   store.dispatch(loadCycleHistory([legacyCycle as never]));
 
   store.dispatch(setForecastWorkspace(activeWorkspace));
-  store.dispatch(setForecastDay(1));
   store.dispatch(startBlankCycle({
     workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
     cycleDate: '2026-08-12',
@@ -180,13 +185,45 @@ describe('ForecastWorkflowPanel completion review', () => {
     ['selects Severe history when Severe is active', 'severe'],
   ] as const)('%s', (_caseName, activeWorkspace) => {
     const store = renderPanelWithMixedWorkspaceHistory(activeWorkspace);
+    const otherWorkspace: ForecastWorkspaceId = activeWorkspace === 'custom' ? 'severe' : 'custom';
     expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: previousOutlookButtonName }));
 
     const importedFeatureIds = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')
       ?.map((feature) => feature.id);
     expect(importedFeatureIds).toContain(`${activeWorkspace}-source`);
-    expect(importedFeatureIds).not.toContain(`${activeWorkspace === 'custom' ? 'severe' : 'custom'}-source`);
+    expect(importedFeatureIds).not.toContain(`${otherWorkspace}-source`);
+
+    const { forecastCycle } = store.getState().forecast;
+    expect(forecastCycle.cycleDate).toBe(getLocalCalendarDate());
+    expect(forecastCycle.currentDay).toBe(1);
+  });
+
+  it('suggests nothing when yesterday\'s cycle in the active workspace has no package work', () => {
+    const store = createCompleteWorkflowStore();
+    store.dispatch(setForecastDay(2));
+    store.dispatch(setCycleDate(yesterdayCycleDate));
+    store.dispatch(saveCurrentCycle({ label: 'no package work' }));
+    store.dispatch(startBlankCycle({
+      workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+      cycleDate: '2026-08-12',
+    }));
+
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastWorkflowPanel context="forecast" />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    expect(store.getState().forecast.savedCycles).toHaveLength(1);
+    expect(store.getState().forecast.savedCycles[0]).toMatchObject({
+      cycleDate: yesterdayCycleDate,
+      workspaceId: 'severe',
+    });
+    expect(screen.queryByRole('button', { name: anyPreviousOutlookButtonName })).not.toBeInTheDocument();
   });
 
   it.each([
