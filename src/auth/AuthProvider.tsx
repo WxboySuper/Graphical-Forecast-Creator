@@ -1,3 +1,11 @@
+/**
+ * Auth and profile boundary for the client application.
+ *
+ * This provider owns Firebase auth observation, local fixture accounts,
+ * profile/settings hydration, and the auth actions exposed to route consumers.
+ * Hosted persistence and billing remain behind their dedicated services and
+ * entitlement provider; this module coordinates identity and account state.
+ */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
