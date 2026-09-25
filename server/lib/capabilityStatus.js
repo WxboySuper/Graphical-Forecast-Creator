@@ -1,3 +1,7 @@
+/**
+ * Server capability-status helpers. It combines feature exposure, target, and
+ * emergency override state into the capability response consumed by clients.
+ */
 'use strict';
 
 const { isEmergencyDisabledCapability } = require('./emergencyCapabilityOverrides');
