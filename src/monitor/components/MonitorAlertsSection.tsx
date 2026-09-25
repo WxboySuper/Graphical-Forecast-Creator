@@ -1,3 +1,7 @@
+/**
+ * Monitor alerts section. It renders normalized NWS alerts and delegates alert
+ * selection and refresh actions to the monitor page controller.
+ */
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
