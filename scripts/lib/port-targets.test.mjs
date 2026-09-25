@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import * as portTargetExports from './port-targets.mjs';
 import {
   PORTING_MANUAL_LABEL,
   isManualForwardPortPr,
@@ -9,6 +10,11 @@ import {
 } from './port-targets.mjs';
 
 describe('port targets', () => {
+  it('exports only the canonical open-port parser', () => {
+    const parserExports = Object.keys(portTargetExports).filter((name) => name.startsWith('parse'));
+    assert.deepEqual(parserExports, ['parseOpenPortPrsJson']);
+  });
+
   it('ports stable merges to main only', () => {
     assert.deepEqual(resolvePortTargets({ baseBranch: 'stable/1.6.x' }), ['main']);
   });
