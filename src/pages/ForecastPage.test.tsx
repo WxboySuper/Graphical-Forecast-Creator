@@ -46,6 +46,7 @@ import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { DAY_ROLLOVER_LAST_ACTIVE_KEY, getRolloverStorageKey } from '../utils/dayRolloverStorage';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -569,7 +570,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(createStore());
 
     expect(await screen.findByText('New day detected')).toBeInTheDocument();
-    expect(localStorage.getItem('gfc-last-active-local-day:anonymous')).toBe(today);
+    expect(localStorage.getItem(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, null, 'severe'))).toBe(today);
     expect(screen.getByRole('button', { name: 'Download a copy & start new day' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace without saving' })).toBeInTheDocument();
   });

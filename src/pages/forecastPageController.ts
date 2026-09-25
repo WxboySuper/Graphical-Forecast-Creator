@@ -28,6 +28,8 @@ import {
   type DayRolloverPromptState,
   clearStoredRolloverPrompt,
   getRolloverStorageKey,
+  readLegacyRolloverDayValue,
+  readLegacyRolloverPrompt,
   readStoredDayValue,
   readStoredRolloverPrompt,
   writeStoredDayValue,
@@ -484,60 +486,53 @@ export const useUnsavedChangesWarning = (isSaved: boolean) => {
 
 interface RolloverStorageSnapshot {
   today: string;
+  workspaceId: ForecastWorkspaceId;
   scopedLastActiveKey: string;
   scopedPromptedKey: string;
+  scopedLastActiveDay: string | null;
   legacyLastActiveDay: string | null;
   legacyPromptedDay: string | null;
-  scopedLastActiveDay: string | null;
   lastActiveDay: string | null;
   alreadyPromptedToday: boolean;
   existingPendingPrompt: DayRolloverPromptState | null;
+  legacyPendingPrompt: DayRolloverPromptState | null;
 }
 
-const readRolloverStorageSnapshot = (userId: string | null | undefined, today: string): RolloverStorageSnapshot => {
-  const scopedLastActiveKey = getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId);
-  const scopedPromptedKey = getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId);
-  const legacyLastActiveDay = userId ? null : readStoredDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY);
-  const legacyPromptedDay = userId ? null : readStoredDayValue(DAY_ROLLOVER_PROMPTED_KEY);
+const readRolloverStorageSnapshot = (
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
+  today: string,
+): RolloverStorageSnapshot => {
+  const scopedLastActiveKey = getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId, workspaceId);
+  const scopedPromptedKey = getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId, workspaceId);
+  // Legacy keys never named a workspace, so only the default workspace reads them.
+  const legacyLastActiveDay = readLegacyRolloverDayValue(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId, workspaceId);
+  const legacyPromptedDay = readLegacyRolloverDayValue(DAY_ROLLOVER_PROMPTED_KEY, userId, workspaceId);
   const scopedLastActiveDay = readStoredDayValue(scopedLastActiveKey);
   const promptedDay = readStoredDayValue(scopedPromptedKey) ?? legacyPromptedDay;
 
   return {
     today,
+    workspaceId,
     scopedLastActiveKey,
     scopedPromptedKey,
+    scopedLastActiveDay,
     legacyLastActiveDay,
     legacyPromptedDay,
-    scopedLastActiveDay,
     lastActiveDay: scopedLastActiveDay ?? legacyLastActiveDay,
     alreadyPromptedToday: promptedDay === today,
-    existingPendingPrompt: readStoredRolloverPrompt(userId),
+    existingPendingPrompt: readStoredRolloverPrompt(userId, workspaceId),
+    legacyPendingPrompt: readLegacyRolloverPrompt(userId, workspaceId),
   };
 };
 
-const deriveLegacyRolloverPrompt = ({ today, legacyLastActiveDay, legacyPromptedDay, existingPendingPrompt }: RolloverStorageSnapshot): DayRolloverPromptState | null => {
+const deriveLegacyRolloverPrompt = ({ today, legacyLastActiveDay, legacyPromptedDay, legacyPendingPrompt, existingPendingPrompt }: RolloverStorageSnapshot): DayRolloverPromptState | null => {
   if (existingPendingPrompt) return existingPendingPrompt;
+  if (legacyPendingPrompt) return legacyPendingPrompt;
   if (legacyPromptedDay !== today) return null;
   if (!legacyLastActiveDay) return null;
   if (legacyLastActiveDay === today) return null;
   return { previousDay: legacyLastActiveDay, currentDay: today };
-};
-
-const migrateAnonymousLastActiveDay = (userId: string | null | undefined, snapshot: RolloverStorageSnapshot): void => {
-  if (userId) return;
-  if (!snapshot.legacyLastActiveDay) return;
-  if (snapshot.scopedLastActiveDay) return;
-  writeStoredDayValue(snapshot.scopedLastActiveKey, snapshot.legacyLastActiveDay);
-};
-
-const migratePendingRolloverPrompt = (
-  userId: string | null | undefined,
-  snapshot: RolloverStorageSnapshot,
-  pendingPrompt: DayRolloverPromptState | null,
-): void => {
-  if (!pendingPrompt) return;
-  if (snapshot.existingPendingPrompt) return;
-  writeStoredRolloverPrompt(pendingPrompt, userId);
 };
 
 const migrateLegacyRolloverStorage = (
@@ -545,12 +540,21 @@ const migrateLegacyRolloverStorage = (
   snapshot: RolloverStorageSnapshot,
   pendingPrompt: DayRolloverPromptState | null,
 ): void => {
-  migrateAnonymousLastActiveDay(userId, snapshot);
-  migratePendingRolloverPrompt(userId, snapshot, pendingPrompt);
+  // Copy-only migration: legacy keys stay in place so an older tab still reading them
+  // keeps its value, and a failed write can never destroy the only copy.
+  if (snapshot.legacyLastActiveDay !== null && snapshot.scopedLastActiveDay === null) {
+    writeStoredDayValue(snapshot.scopedLastActiveKey, snapshot.legacyLastActiveDay);
+  }
+  if (snapshot.legacyPromptedDay !== null && readStoredDayValue(snapshot.scopedPromptedKey) === null) {
+    writeStoredDayValue(snapshot.scopedPromptedKey, snapshot.legacyPromptedDay);
+  }
+  if (pendingPrompt && !snapshot.existingPendingPrompt) {
+    writeStoredRolloverPrompt(pendingPrompt, userId, snapshot.workspaceId);
+  }
 };
 
-const getDayRolloverSnapshot = (userId?: string | null) => {
-  const snapshot = readRolloverStorageSnapshot(userId, getLocalCalendarDate());
+const getDayRolloverSnapshot = (userId: string | null | undefined, workspaceId: ForecastWorkspaceId) => {
+  const snapshot = readRolloverStorageSnapshot(userId, workspaceId, getLocalCalendarDate());
   const pendingPrompt = deriveLegacyRolloverPrompt(snapshot);
   migrateLegacyRolloverStorage(userId, snapshot, pendingPrompt);
   return {
@@ -659,12 +663,13 @@ interface DayRolloverRuntimeRefs {
   promptStateRef: React.MutableRefObject<DayRolloverPromptState | null>;
 }
 
-const useDayRolloverRuntimeRefs = ({ forecastCycle, isSaved, restoredSession, promptState, userId, setPromptState, setActionError }: {
+const useDayRolloverRuntimeRefs = ({ forecastCycle, isSaved, restoredSession, promptState, userId, workspaceId, setPromptState, setActionError }: {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   isSaved: boolean;
   restoredSession: boolean;
   promptState: DayRolloverPromptState | null;
   userId?: string;
+  workspaceId: ForecastWorkspaceId;
   setPromptState: PromptStateSetter;
   setActionError: ActionErrorSetter;
 }): DayRolloverRuntimeRefs => {
@@ -673,13 +678,15 @@ const useDayRolloverRuntimeRefs = ({ forecastCycle, isSaved, restoredSession, pr
   const restoredSessionRef = useRef(restoredSession);
   const promptStateRef = useRef(promptState);
   const previousUserIdRef = useRef(userId);
+  const previousWorkspaceIdRef = useRef(workspaceId);
 
   useEffect(() => {
-    if (previousUserIdRef.current === userId) return;
+    if (previousUserIdRef.current === userId && previousWorkspaceIdRef.current === workspaceId) return;
     previousUserIdRef.current = userId;
+    previousWorkspaceIdRef.current = workspaceId;
     setPromptState(null);
     setActionError(null);
-  }, [setActionError, setPromptState, userId]);
+  }, [setActionError, setPromptState, userId, workspaceId]);
 
   useEffect(() => {
     forecastCycleRef.current = forecastCycle;
@@ -691,15 +698,16 @@ const useDayRolloverRuntimeRefs = ({ forecastCycle, isSaved, restoredSession, pr
   return { forecastCycleRef, isSavedRef, restoredSessionRef, promptStateRef };
 };
 
-const persistDetectedRolloverPrompt = (userId: string | undefined, today: string, nextPromptState: DayRolloverPromptState): void => {
-  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId), today);
-  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
-  writeStoredRolloverPrompt(nextPromptState, userId);
+const persistDetectedRolloverPrompt = (userId: string | undefined, workspaceId: ForecastWorkspaceId, today: string, nextPromptState: DayRolloverPromptState): void => {
+  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PROMPTED_KEY, userId, workspaceId), today);
+  writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId, workspaceId), today);
+  writeStoredRolloverPrompt(nextPromptState, userId, workspaceId);
 };
 
-const useDayRolloverDetection = ({ restoreComplete, userId, runtimeRefs, setPromptState, setActionError }: {
+const useDayRolloverDetection = ({ restoreComplete, userId, workspaceId, runtimeRefs, setPromptState, setActionError }: {
   restoreComplete: boolean;
   userId?: string;
+  workspaceId: ForecastWorkspaceId;
   runtimeRefs: DayRolloverRuntimeRefs;
   setPromptState: PromptStateSetter;
   setActionError: ActionErrorSetter;
@@ -707,16 +715,16 @@ const useDayRolloverDetection = ({ restoreComplete, userId, runtimeRefs, setProm
   const { forecastCycleRef, isSavedRef, restoredSessionRef, promptStateRef } = runtimeRefs;
 
   const detectDayRollover = useCallback(() => {
-    const { today, lastActiveDay, alreadyPromptedToday, pendingPrompt } = getDayRolloverSnapshot(userId);
+    const { today, lastActiveDay, alreadyPromptedToday, pendingPrompt } = getDayRolloverSnapshot(userId, workspaceId);
     const nextPromptState = getDayRolloverPromptState({ restoreComplete, lastActiveDay, today, alreadyPromptedToday, pendingPrompt, promptOpen: Boolean(promptStateRef.current), forecastCycle: forecastCycleRef.current, isSaved: isSavedRef.current && !restoredSessionRef.current });
     if (!nextPromptState) {
-      if (restoreComplete) writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId), today);
+      if (restoreComplete) writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, userId, workspaceId), today);
       return;
     }
-    persistDetectedRolloverPrompt(userId, today, nextPromptState);
+    persistDetectedRolloverPrompt(userId, workspaceId, today, nextPromptState);
     setActionError(null);
     setPromptState(nextPromptState);
-  }, [forecastCycleRef, isSavedRef, promptStateRef, restoreComplete, restoredSessionRef, setActionError, setPromptState, userId]);
+  }, [forecastCycleRef, isSavedRef, promptStateRef, restoreComplete, restoredSessionRef, setActionError, setPromptState, userId, workspaceId]);
 
   useEffect(() => {
     detectDayRollover();
@@ -771,14 +779,14 @@ export const useDayRolloverPrompt = ({ restoreComplete, restoredSession, dispatc
   const [promptState, setPromptState] = useState<DayRolloverPromptState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const runtimeRefs = useDayRolloverRuntimeRefs({ forecastCycle, isSaved, restoredSession, promptState, userId, setPromptState, setActionError });
-  useDayRolloverDetection({ restoreComplete, userId, runtimeRefs, setPromptState, setActionError });
+  const runtimeRefs = useDayRolloverRuntimeRefs({ forecastCycle, isSaved, restoredSession, promptState, userId, workspaceId, setPromptState, setActionError });
+  useDayRolloverDetection({ restoreComplete, userId, workspaceId, runtimeRefs, setPromptState, setActionError });
 
   const completeRollover = useCallback(() => {
-    clearStoredRolloverPrompt(userId);
+    clearStoredRolloverPrompt(userId, workspaceId);
     setPromptState(null);
     setActionError(null);
-  }, [setActionError, setPromptState, userId]);
+  }, [setActionError, setPromptState, userId, workspaceId]);
   const actions = useDayRolloverActions({ addToast, clearCurrent, completeRollover, currentMapView, dispatch, forecastCycle, saveCycle, setActionError, setIsBusy, workspaceId });
 
   return { promptState, canSaveToCloud, isBusy, error: actionError, ...actions };
