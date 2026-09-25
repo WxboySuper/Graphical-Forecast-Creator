@@ -18,6 +18,8 @@ import {
   getCloudCycleWorkspaceId,
   getCloudCycleWorkspaceLabel,
   getCloudLibraryTabs,
+  getCloudLibraryTabLabel,
+  getCloudLibraryWorkspacePath,
   getNextCloudLibraryTabId,
   resolveActiveCloudLibraryTab,
   type CloudLibraryTab,
@@ -405,7 +407,7 @@ const CloudCycleActions: React.FC<{
       <CloudCycleWriteActions
         cycle={cycle}
         canWrite={canWrite}
-        isBusy={loading || isDeleting || isSavingRename}
+        isBusy={isBusy}
         isRenaming={isRenaming}
         confirmingDelete={confirmingDelete}
         onStartRename={onStartRename}
@@ -552,17 +554,89 @@ const SignedOutGate: React.FC = () => (
 const CloudLibraryFeedbackCard: React.FC<{
   error: string | null;
   message: string | null;
-}> = ({ error, message }) => (
-  <Card className="cloud-library-surface-card">
-    <CardContent className="cloud-library-feedback" role="status">
-      {error ? (
-        <CloudOff className="h-5 w-5 shrink-0 text-destructive" />
-      ) : (
-        <Cloud className="h-5 w-5 shrink-0 text-primary" />
-      )}
-      <p>{error ?? message}</p>
-    </CardContent>
-  </Card>
+}> = ({ error, message }) => {
+  if (!error && !message) return null;
+
+  return (
+    <Card className="cloud-library-surface-card">
+      <CardContent className="cloud-library-feedback" role="status">
+        {error ? (
+          <CloudOff className="h-5 w-5 shrink-0 text-destructive" />
+        ) : (
+          <Cloud className="h-5 w-5 shrink-0 text-primary" />
+        )}
+        <p>{error ?? message}</p>
+      </CardContent>
+    </Card>
+  );
+};
+
+/** Modifier flags that turn arrow-key tab selection into a browser shortcut. */
+const KEYBOARD_MODIFIER_FLAGS = ['altKey', 'ctrlKey', 'metaKey', 'shiftKey'] as const;
+
+/** True when a tab key event carries Alt, Ctrl, Meta, or Shift. */
+const hasKeyboardModifier = (event: React.KeyboardEvent): boolean =>
+  KEYBOARD_MODIFIER_FLAGS.some((flag) => event[flag]);
+
+/** Picks the tab that should take focus after a keyboard selection, preferring the requested tab. */
+const resolveTabFocusId = (
+  tabs: CloudLibraryTab[],
+  requestedTabId: CloudLibraryTabId,
+  activeTab: CloudLibraryTabId,
+): CloudLibraryTabId | undefined => {
+  const fallbackTabId = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0]?.id;
+  return tabs.some((tab) => tab.id === requestedTabId) ? requestedTabId : fallbackTabId;
+};
+
+/** Applies one tab key press: roving selection, or a no-op for shortcuts and dead keys. */
+const handleTabKeyDown = (
+  event: React.KeyboardEvent,
+  options: {
+    tabs: CloudLibraryTab[];
+    tabId: CloudLibraryTabId;
+    onTabChange: (tabId: CloudLibraryTabId) => void;
+    onPendingFocus: (tabId: CloudLibraryTabId) => void;
+  },
+): void => {
+  const { tabs, tabId, onTabChange, onPendingFocus } = options;
+  if (hasKeyboardModifier(event)) return;
+  const nextId = getNextCloudLibraryTabId(tabs, tabId, event.key);
+  if (nextId === null || nextId === tabId) return;
+  event.preventDefault();
+  onPendingFocus(nextId);
+  onTabChange(nextId);
+};
+
+/** One roving tab button inside the workspace tablist. */
+const CloudLibraryTabButton: React.FC<{
+  tab: CloudLibraryTab;
+  tabs: CloudLibraryTab[];
+  isActive: boolean;
+  tabRefs: React.RefObject<Map<CloudLibraryTabId, HTMLButtonElement>>;
+  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onPendingFocus: (tabId: CloudLibraryTabId) => void;
+}> = ({ tab, tabs, isActive, tabRefs, onTabChange, onPendingFocus }) => (
+  <Button
+    ref={(node) => {
+      if (node) {
+        tabRefs.current.set(tab.id, node);
+      } else {
+        tabRefs.current.delete(tab.id);
+      }
+    }}
+    id={`cloud-library-tab-${tab.id}`}
+    role="tab"
+    aria-selected={isActive}
+    aria-controls="cloud-library-panel"
+    tabIndex={isActive ? 0 : -1}
+    variant={isActive ? 'default' : 'outline'}
+    className="cloud-library-tab"
+    onClick={() => onTabChange(tab.id)}
+    onKeyDown={(event) => handleTabKeyDown(event, { tabs, tabId: tab.id, onTabChange, onPendingFocus })}
+  >
+    <span>{tab.label}</span>
+    <Badge variant={isActive ? 'secondary' : 'outline'}>{tab.cycleCount}</Badge>
+  </Button>
 );
 
 /** Workspace tabs keep saved products separated while retaining an All view for discovery. */
@@ -577,10 +651,8 @@ const CloudLibraryTabs: React.FC<{
   /** Moves focus after render so keyboard selection lands on the new tab. */
   useEffect(() => {
     if (pendingFocus.current === null) return;
-    const requestedTabId = pendingFocus.current;
+    const focusTabId = resolveTabFocusId(tabs, pendingFocus.current, activeTab);
     pendingFocus.current = null;
-    const fallbackTabId = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0]?.id;
-    const focusTabId = tabs.some((tab) => tab.id === requestedTabId) ? requestedTabId : fallbackTabId;
     if (focusTabId) {
       tabRefs.current.get(focusTabId)?.focus();
     }
@@ -591,35 +663,17 @@ const CloudLibraryTabs: React.FC<{
   return (
     <div className="cloud-library-tabs" role="tablist" aria-label="Cloud library workspaces">
       {tabs.map((tab) => (
-        <Button
+        <CloudLibraryTabButton
           key={tab.id}
-          ref={(node) => {
-            if (node) {
-              tabRefs.current.set(tab.id, node);
-            } else {
-              tabRefs.current.delete(tab.id);
-            }
+          tab={tab}
+          tabs={tabs}
+          isActive={activeTab === tab.id}
+          tabRefs={tabRefs}
+          onTabChange={onTabChange}
+          onPendingFocus={(tabId) => {
+            pendingFocus.current = tabId;
           }}
-          id={`cloud-library-tab-${tab.id}`}
-          role="tab"
-          aria-selected={activeTab === tab.id}
-          aria-controls="cloud-library-panel"
-          tabIndex={activeTab === tab.id ? 0 : -1}
-          variant={activeTab === tab.id ? 'default' : 'outline'}
-          className="cloud-library-tab"
-          onClick={() => onTabChange(tab.id)}
-          onKeyDown={(event) => {
-            if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-            const nextId = getNextCloudLibraryTabId(tabs, tab.id, event.key);
-            if (nextId === null || nextId === tab.id) return;
-            event.preventDefault();
-            pendingFocus.current = nextId;
-            onTabChange(nextId);
-          }}
-        >
-          <span>{tab.label}</span>
-          <Badge variant={activeTab === tab.id ? 'secondary' : 'outline'}>{tab.cycleCount}</Badge>
-        </Button>
+        />
       ))}
     </div>
   );
@@ -910,14 +964,8 @@ const CloudLibraryPage: React.FC = () => {
     () => `${visibleCycles.length} cloud cycle${visibleCycles.length === 1 ? '' : 's'}`,
     [visibleCycles.length],
   );
-  const workspaceLabel =
-    effectiveActiveTab === 'all' ? undefined : tabs.find((tab) => tab.id === effectiveActiveTab)?.label;
-  const workspacePath =
-    effectiveActiveTab === 'all'
-      ? getDefaultForecastWorkspacePath()
-      : effectiveActiveTab === 'custom'
-        ? '/custom-products'
-        : (getForecastWorkspace(effectiveActiveTab)?.path ?? getDefaultForecastWorkspacePath());
+  const workspaceLabel = getCloudLibraryTabLabel(tabs, effectiveActiveTab);
+  const workspacePath = getCloudLibraryWorkspacePath(effectiveActiveTab);
 
   if (!user) {
     return <SignedOutGate />;
@@ -929,7 +977,7 @@ const CloudLibraryPage: React.FC = () => {
         <CloudLibraryHero premiumActive={premiumActive} cycleCount={cycles.length} isExpiredPremium={isExpiredPremium} />
 
         {isExpiredPremium ? <ExpiredPremiumNotice /> : null}
-        {error || message ? <CloudLibraryFeedbackCard error={error} message={message} /> : null}
+        <CloudLibraryFeedbackCard error={error} message={message} />
 
         <CloudLibrarySignedInLayout
           premiumActive={premiumActive}
