@@ -39,13 +39,24 @@ export const createForecastWorkspaceSave = (
 });
 
 /**
+ * True when a value claims the envelope schema version, whether or not its owner
+ * and forecast actually hold up. Readers branch on this first so a corrupt
+ * envelope is rejected instead of falling through to the legacy path, which would
+ * silently hand back an empty cycle.
+ *
+ * Workflow packages carry the semver string `'1.0.0'` as their schemaVersion, so
+ * they never match here and keep flowing to their own wrapper handling.
+ */
+export const declaresWorkspaceEnvelope = (value: unknown): value is Record<string, unknown> =>
+  isRecord(value) && value.schemaVersion === FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION;
+
+/**
  * True when a value carries the envelope wrapper at all: the schema version and
  * an object-shaped forecast. This says nothing about who owns it, so a caller
  * that unwraps must pair it with `isWorkspaceSaveEnvelope`.
  */
 export const hasWorkspaceEnvelopeWrapper = (value: unknown): value is Record<string, unknown> =>
-  isRecord(value) &&
-  value.schemaVersion === FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION &&
+  declaresWorkspaceEnvelope(value) &&
   isRecord(value.forecast);
 
 /**

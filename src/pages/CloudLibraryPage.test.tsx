@@ -552,6 +552,14 @@ describe("CloudLibraryPage", () => {
     expect(() => buildCloudSessionPayload("severe", declaresCustom)).toThrow(/incomplete or invalid/);
   });
 
+  it("refuses to stage a handoff for a workspace the registry does not know", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    expect(() => buildCloudSessionPayload("bogus" as never, bare)).toThrow(/valid workspace/);
+    expect(() => buildCloudSessionPayload(undefined as never, bare)).toThrow(/valid workspace/);
+  });
+
   it("refuses to hand off a cloud cycle that names an unknown workspace", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();

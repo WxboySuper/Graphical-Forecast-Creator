@@ -107,6 +107,19 @@ export const requireForecastWorkspaceId = (workspaceId: unknown): ForecastWorksp
   return workspaceId as ForecastWorkspaceId;
 };
 
+/**
+ * Resolves a workspace id read back from stored metadata.
+ *
+ * An absent id belongs to a record written before workspaces existed, so it stays
+ * on the default. An id this build does not register has no usable owner, so it
+ * returns null instead of being relabeled as the default; callers must treat null
+ * as "do not open, do not write back".
+ */
+export const resolveStoredWorkspaceId = (workspaceId: unknown): ForecastWorkspaceId | null => {
+  if (workspaceId === undefined || workspaceId === null) return DEFAULT_FORECAST_WORKSPACE;
+  return typeof workspaceId === 'string' ? WORKSPACES_BY_ID.get(workspaceId as ForecastWorkspaceId)?.id ?? null : null;
+};
+
 /** Returns the registered workspace for a canonical path, or undefined for malformed input. */
 export const getForecastWorkspaceByPath = (path: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_PATH.get(path as `/forecast/${ForecastWorkspaceId}`);

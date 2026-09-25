@@ -150,6 +150,48 @@ const renderPanelWithLegacyWorkspaceHistory = (
   return store;
 };
 
+interface SeededPreviousOutlook {
+  sourceWorkspace: ForecastWorkspaceId;
+  activeWorkspace?: ForecastWorkspaceId;
+  sourceFeatureId: string;
+  sourceLabel: string;
+}
+
+/**
+ * Seeds exactly one saved cycle in `sourceWorkspace`, then opens a blank cycle in
+ * `activeWorkspace`. Unlike the mixed-history helper this can produce a state
+ * where the active workspace has no candidate at all, which is the case the
+ * suggestion gating has to get right.
+ */
+const renderPanelWithSeededPreviousOutlook = ({
+  sourceWorkspace,
+  activeWorkspace = 'severe',
+  sourceFeatureId,
+  sourceLabel,
+}: SeededPreviousOutlook): void => {
+  const store = createCompleteWorkflowStore();
+  store.dispatch(setForecastWorkspace(sourceWorkspace));
+  store.dispatch(setForecastDay(2));
+  store.dispatch(addFeature({ feature: createFeature(sourceFeatureId, 0, 'tornado', '2%') }));
+  store.dispatch(setCycleDate(getYesterdayLocalDate()));
+  store.dispatch(saveCurrentCycle({ label: sourceLabel }));
+  store.dispatch(setForecastWorkspace(activeWorkspace));
+  store.dispatch(setForecastDay(1));
+  store.dispatch(startBlankCycle({
+    workflowTemplate: { id: 'severe-day1', label: 'Severe Convective Day 1', groupings: ['day1'] },
+    cycleDate: '2026-08-12',
+  }));
+  store.dispatch(setForecastDay(1));
+
+  render(
+    <MemoryRouter>
+      <Provider store={store}>
+        <ForecastWorkflowPanel context="forecast" />
+      </Provider>
+    </MemoryRouter>,
+  );
+};
+
 describe('ForecastWorkflowPanel completion review', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -207,6 +249,28 @@ describe('ForecastWorkflowPanel completion review', () => {
       const importedFeatureIds = store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%')
         ?.map((feature) => feature.id);
       expect(importedFeatureIds).toContain('legacy-source');
+    } else {
+      expect(previousOutlookButton).not.toBeInTheDocument();
+    }
+  });
+
+  it.each([
+    ['hides Custom history from Severe', 'custom', 'severe', false],
+    ['keeps Custom history visible in Custom', 'custom', 'custom', true],
+    ['keeps Severe history visible in Severe', 'severe', 'severe', true],
+    ['hides Severe history from Custom', 'severe', 'custom', false],
+  ] as const)('%s', (_caseName, sourceWorkspace, activeWorkspace, shouldSuggest) => {
+    renderPanelWithSeededPreviousOutlook({
+      sourceWorkspace,
+      activeWorkspace,
+      sourceFeatureId: `${sourceWorkspace}-source`,
+      sourceLabel: `${sourceWorkspace === 'custom' ? 'Custom' : 'Severe'} source`,
+    });
+
+    expect(screen.getByText(/Day 1 package/)).toBeInTheDocument();
+    const previousOutlookButton = screen.queryByRole('button', { name: previousOutlookButtonName });
+    if (shouldSuggest) {
+      expect(previousOutlookButton).toBeInTheDocument();
     } else {
       expect(previousOutlookButton).not.toBeInTheDocument();
     }

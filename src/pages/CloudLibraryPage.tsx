@@ -15,6 +15,7 @@ import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
 import {
   getForecastWorkspace,
   isForecastWorkspaceExposed,
+  requireForecastWorkspaceId,
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
@@ -762,14 +763,15 @@ export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
 ): unknown => {
+  const owner = requireForecastWorkspaceId(workspaceId);
   const classification = classifyForecastWorkspacePayload(payload);
   if (!classification.ok) {
     throw getForecastWorkspaceLoadError(classification);
   }
   if (classification.legacy) {
-    return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+    return createForecastWorkspaceSave(owner, payload as GFCForecastSaveData);
   }
-  if (classification.workspaceId !== workspaceId) {
+  if (classification.workspaceId !== owner) {
     throw new Error('Cloud payload belongs to a different forecast workspace.');
   }
   return payload;
@@ -839,9 +841,16 @@ const useCloudLibraryActions = ({
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     if (!selectedCycle) {
+      setMessage('That cloud cycle is no longer in your library. Refresh and try again.');
       return;
     }
     const workspaceId = getCloudCycleWorkspaceId(selectedCycle);
+    if (!workspaceId) {
+      // No usable ownership evidence: guessing Severe would file someone
+      // else's forecast under the wrong product and hand it to that editor.
+      setMessage('That cloud cycle does not belong to a known forecast workspace.');
+      return;
+    }
     const workspace = getForecastWorkspace(workspaceId);
     // Unexposed or unregistered workspaces reuse the existing failure path instead of
     // navigating to a /forecast/{workspace} route with no editor.

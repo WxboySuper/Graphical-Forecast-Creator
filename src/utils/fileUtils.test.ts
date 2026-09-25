@@ -82,6 +82,25 @@ describe('fileUtils', () => {
     expect(deserializeForecast(wrapper).cycleDate).toBe('2026-04-21');
   });
 
+  test('rejects a corrupt workspace envelope instead of returning an empty cycle', () => {
+    const bare = serializeForecast({
+      days: {}, currentDay: 1, cycleDate: '2026-04-21',
+    }, { center: [0, 0], zoom: 0 });
+
+    expect(deserializeForecast({ schemaVersion: 1, workspaceId: 'severe', forecast: bare }).cycleDate)
+      .toBe('2026-04-21');
+
+    // Both shapes used to fall through to the legacy reader and hand back an
+    // empty day-one cycle with no sign that the real forecast was discarded.
+    expect(() => deserializeForecast({ schemaVersion: 1, workspaceId: 'bogus', forecast: bare }))
+      .toThrow('not a valid workspace save');
+    expect(() => deserializeForecast({ schemaVersion: 1, workspaceId: 'severe', forecast: 'not-an-object' }))
+      .toThrow('not a valid workspace save');
+
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'bogus', forecast: bare })).toBe(false);
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'severe', forecast: bare })).toBe(true);
+  });
+
   test('reads the workflow manifest from an exported ZIP package', async () => {
     const manifest = { packageType: 'workflow', schemaVersion: '1.0.0', exportedAt: '2026-07-17T00:00:00.000Z', forecast: { forecastCycle: {} } };
     const zip = new JSZip();

@@ -7,7 +7,7 @@ import type { CycleMetadata } from '../types/workflow';
 import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './workflowMetadataContract';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
-import { DEFAULT_FORECAST_WORKSPACE, resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, resolveStoredWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -220,10 +220,18 @@ const normalizeStoredMetadata = ({
     return null;
   }
 
+  // A record naming an unregistered workspace cannot be attributed. Returning
+  // null keeps it out of listings and, more importantly, out of any write-back:
+  // normalizing it to the default would permanently overwrite the stored owner.
+  const workspaceId = resolveStoredWorkspaceId(rawMetadata.workspaceId);
+  if (workspaceId === null) {
+    return null;
+  }
+
   return {
     id: readRequiredText(rawMetadata.id) ?? cycleId,
     userId: readRequiredText(rawMetadata.userId) ?? fallbackUserId,
-    workspaceId: resolveForecastWorkspaceId(rawMetadata.workspaceId as string | undefined),
+    workspaceId,
     label,
     cycleDate,
     createdAt: readTimestampString(rawMetadata.createdAt),

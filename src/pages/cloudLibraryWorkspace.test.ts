@@ -17,9 +17,11 @@ const makeCycle = (id: string, workspaceId?: CloudCycleMetadata['workspaceId']):
 });
 
 describe('cloud library workspace boundaries', () => {
-  it('keeps legacy and malformed metadata in Severe', () => {
+  it('keeps legacy metadata in Severe but refuses to claim an unknown workspace', () => {
     expect(getCloudCycleWorkspaceId(makeCycle('legacy'))).toBe('severe');
-    expect(getCloudCycleWorkspaceId(makeCycle('malformed', 'not-a-workspace' as CloudCycleMetadata['workspaceId']))).toBe('severe');
+    expect(getCloudCycleWorkspaceId(makeCycle('malformed', 'not-a-workspace' as CloudCycleMetadata['workspaceId']))).toBeNull();
+    expect(getCloudCycleWorkspaceId(makeCycle('wrong-case', 'Severe' as CloudCycleMetadata['workspaceId']))).toBeNull();
+    expect(getCloudCycleWorkspaceId(makeCycle('valid', 'custom'))).toBe('custom');
   });
 
   it('filters cycles without changing the source list', () => {
@@ -28,6 +30,18 @@ describe('cloud library workspace boundaries', () => {
     expect(filterCloudCyclesByWorkspace(cycles, 'severe').map((cycle) => cycle.id)).toEqual(['legacy']);
     expect(filterCloudCyclesByWorkspace(cycles, 'custom').map((cycle) => cycle.id)).toEqual(['custom']);
     expect(filterCloudCyclesByWorkspace(cycles, 'all')).toBe(cycles);
+  });
+
+  it('keeps a cycle with an unknown owner visible in All but in no workspace tab', () => {
+    const cycles = [
+      makeCycle('legacy'),
+      makeCycle('custom', 'custom'),
+      makeCycle('rogue', 'not-a-workspace' as CloudCycleMetadata['workspaceId']),
+    ];
+
+    expect(filterCloudCyclesByWorkspace(cycles, 'all').map((cycle) => cycle.id)).toEqual(['legacy', 'custom', 'rogue']);
+    expect(filterCloudCyclesByWorkspace(cycles, 'severe').map((cycle) => cycle.id)).toEqual(['legacy']);
+    expect(filterCloudCyclesByWorkspace(cycles, 'custom').map((cycle) => cycle.id)).toEqual(['custom']);
   });
 
   it('creates All and exposed product tabs with counts', () => {
@@ -63,7 +77,7 @@ describe('cloud library workspace boundaries', () => {
 
   it('labels every cycle by its resolved workspace', () => {
     expect(getCloudCycleWorkspaceLabel(makeCycle('legacy'))).toBe('Severe');
-    expect(getCloudCycleWorkspaceLabel(makeCycle('malformed', 'not-a-workspace' as CloudCycleMetadata['workspaceId']))).toBe('Severe');
+    expect(getCloudCycleWorkspaceLabel(makeCycle('malformed', 'not-a-workspace' as CloudCycleMetadata['workspaceId']))).toBe('Unknown workspace');
     expect(getCloudCycleWorkspaceLabel(makeCycle('severe-1', 'severe'))).toBe('Severe');
     expect(getCloudCycleWorkspaceLabel(makeCycle('custom-1', 'custom'))).toBe('Custom');
     expect(getCloudCycleWorkspaceLabel(makeCycle('meso-1', 'mesoscale'))).toBe('Mesoscale');

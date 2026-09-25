@@ -1,7 +1,7 @@
 import {
   getExposedForecastWorkspaces,
   getForecastWorkspace,
-  resolveForecastWorkspaceId,
+  resolveStoredWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 import type { BuildTarget } from '../config/buildTarget';
@@ -24,15 +24,28 @@ export const getCloudLibraryTabFromSearchParams = (
   return tabs.some((tab) => tab.id === requestedTab) ? (requestedTab as CloudLibraryTabId) : 'all';
 };
 
-/** Resolves legacy or malformed cloud metadata to the Severe workspace boundary. */
-export const getCloudCycleWorkspaceId = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): ForecastWorkspaceId =>
-  resolveForecastWorkspaceId(cycle.workspaceId);
+/**
+ * Resolves the owner of a cloud record.
+ *
+ * Records with no workspace field predate workspace ownership and stay Severe.
+ * A record that names a workspace this build does not know has no usable owner,
+ * so it resolves to null and belongs to no workspace tab.
+ */
+export const getCloudCycleWorkspaceId = (
+  cycle: Pick<CloudCycleMetadata, 'workspaceId'>,
+): ForecastWorkspaceId | null => resolveStoredWorkspaceId(cycle.workspaceId);
+/**
+ * Resolves the display label for one cycle. Records with no workspace field map
+ * to Severe; a record naming a workspace this build does not know reads as
+ * unknown instead of being presented as a Severe save.
+ */
+export const getCloudCycleWorkspaceLabel = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): string => {
+  const workspaceId = getCloudCycleWorkspaceId(cycle);
+  if (!workspaceId) return 'Unknown workspace';
+  return getForecastWorkspace(workspaceId)?.label ?? 'Unknown workspace';
+};
 
-/** Resolves the display label for one cycle, mapping legacy records to Severe. */
-export const getCloudCycleWorkspaceLabel = (cycle: Pick<CloudCycleMetadata, 'workspaceId'>): string =>
-  getForecastWorkspace(getCloudCycleWorkspaceId(cycle))?.label ?? 'Severe';
-
-/** Returns the cycles owned by one workspace, treating legacy records as Severe. */
+/** Returns the cycles owned by one workspace; records with an unknown owner belong to no tab. */
 export const filterCloudCyclesByWorkspace = (
   cycles: CloudCycleMetadata[],
   tabId: CloudLibraryTabId,

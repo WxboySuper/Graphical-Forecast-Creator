@@ -7,6 +7,11 @@ import {
   type ImportValidationResult,
 } from './forecastValidationTypes';
 import { validateForecastCycle, validateLegacyOutlooks } from './forecastOutlookValidation';
+import {
+  declaresWorkspaceEnvelope,
+  isRecord,
+  isWorkspaceSaveEnvelope,
+} from './forecastWorkspaceEnvelope';
 
 /**
  * Bounded, schema-aware validation for imported forecast files.
@@ -108,6 +113,19 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
     outlooks?: unknown;
     forecast?: unknown;
   };
+
+  // Workspace save envelope: version, registered owner, and payload shape are
+  // all part of the contract. A corrupt envelope is rejected here instead of
+  // being unwrapped into an empty cycle downstream. The branch narrows `data`
+  // rather than `candidate` so the legacy checks below keep their own types.
+  if (declaresWorkspaceEnvelope(data)) {
+    if (!isWorkspaceSaveEnvelope(data)) {
+      return fail(isRecord(candidate.forecast)
+        ? 'This forecast belongs to an unknown workspace.'
+        : 'This workspace forecast is incomplete or invalid.');
+    }
+    return validateForecastImport(data.forecast);
+  }
 
   // Workflow package wrapper: validate the embedded forecast payload.
   if (isWorkflowWrapper(candidate)) {

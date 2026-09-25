@@ -2,6 +2,7 @@ import type { GFCForecastSaveData } from '../types/outlooks';
 import {
   FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
   createForecastWorkspaceSave,
+  declaresWorkspaceEnvelope,
   getForecastDataFromWorkspacePayload,
   hasWorkspaceEnvelopeWrapper,
   isWorkspaceSaveEnvelope,
@@ -25,6 +26,23 @@ describe('forecast workspace envelope checks', () => {
     expect(hasWorkspaceEnvelopeWrapper(validForecast())).toBe(false);
     expect(hasWorkspaceEnvelopeWrapper(null)).toBe(false);
     expect(hasWorkspaceEnvelopeWrapper([])).toBe(false);
+  });
+
+  test('flags a claimed envelope even when its forecast is the wrong shape', () => {
+    expect(declaresWorkspaceEnvelope({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: 'not-an-object',
+    })).toBe(true);
+    expect(declaresWorkspaceEnvelope(validForecast())).toBe(false);
+    // Workflow packages carry a semver schemaVersion, so they are not envelopes.
+    expect(declaresWorkspaceEnvelope({ schemaVersion: '1.0.0', workspaceId: 'severe', forecast: validForecast() }))
+      .toBe(false);
+    expect(hasWorkspaceEnvelopeWrapper({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: 'not-an-object',
+    })).toBe(false);
   });
 
   test('accepts an envelope only when the version, shape, and owner all resolve', () => {

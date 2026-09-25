@@ -14,7 +14,7 @@ import { completionMetadataFromForecastCycle } from './forecastCompletionMetadat
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
-import { isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload } from './forecastWorkspaceEnvelope';
+import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload } from './forecastWorkspaceEnvelope';
 import { isFeatureExposed } from '../config/featureExposure';
 import { validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
@@ -245,7 +245,15 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
  */
 export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
   if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
-  if (isWorkspaceSaveEnvelope(data)) return deserializeForecast(data.forecast);
+  // A declared envelope must pass the strict validator before it is unwrapped.
+  // Falling through instead would hand the caller an empty day-one cycle with
+  // no indication that the real forecast was discarded.
+  if (declaresWorkspaceEnvelope(data)) {
+    if (!isWorkspaceSaveEnvelope(data)) {
+      throw new Error('This forecast envelope is not a valid workspace save.');
+    }
+    return deserializeForecast(data.forecast);
+  }
   if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
   const forecastData = data as GFCForecastSaveData;
   if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
