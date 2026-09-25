@@ -283,7 +283,7 @@ describe('forecastHistory helpers', () => {
     const stacks = getOrCreateDayHistory(state, 1);
     const stored = stacks.undoStack[0].snapshot;
 
-    live.data.tornado?.get('2%')?.push(makeFeature('live-new', 7));
+    live.data.tornado!.get('2%')!.push(makeFeature('live-new', 7));
     live.metadata.outlookOpacities!.tornado = 0.1;
     live.metadata.lowProbabilityOutlooks = ['wind'];
     live.customLayers!.layers[0].features.pop();
@@ -297,17 +297,18 @@ describe('forecastHistory helpers', () => {
     });
 
     const restored = state.forecastCycle.days[1] as OutlookDay;
-    expect(restored.data.tornado?.get('2%')).toHaveLength(1);
+    const restoredFeatures = restored.data.tornado!.get('2%')!;
+    expect(restoredFeatures).toHaveLength(1);
 
-    restored.data.tornado?.get('2%')?.pop();
-    restored.metadata.lowProbabilityOutlooks?.push('hail' as never);
+    restoredFeatures.pop();
+    restored.metadata.lowProbabilityOutlooks!.push('hail' as never);
     restored.metadata.outlookOpacities!.tornado = 0.2;
     restored.customLayers!.layers[0].features.pop();
 
-    expect(stored.data.tornado?.get('2%')).toHaveLength(1);
+    expect(stored.data.tornado!.get('2%')!).toHaveLength(1);
     expect(stored.lowProbabilityOutlooks).toEqual([]);
     expect(stored.outlookOpacities).toEqual({ tornado: 0.4 });
-    expect(stored.customLayers?.layers[0].features).toHaveLength(1);
+    expect(stored.customLayers!.layers[0].features).toHaveLength(1);
   });
 
   test('clears every per-day stack', () => {
@@ -323,26 +324,32 @@ describe('forecastHistory helpers', () => {
 
 describe('forecast history reducer wiring', () => {
   const expectUndoResult = (undone: ForecastState) => {
-    expect(undone.forecastCycle.days[1]?.data.tornado?.get('2%') ?? []).toHaveLength(0);
-    expect(undone.historyByDay[1]?.undoStack).toHaveLength(0);
-    expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
-    expect(undone.historyByDay[1]?.redoStack[0].snapshot.data.tornado?.get('2%')?.[0].id).toBe(
-      'wiring-1',
-    );
+    const day = undone.forecastCycle.days[1]!;
+    const history = undone.historyByDay[1]!;
+    const currentFeatures = day.data.tornado!.get('2%') ?? [];
+    const redoFeatures = history.redoStack[0].snapshot.data.tornado!.get('2%')!;
+
+    expect(currentFeatures).toHaveLength(0);
+    expect(history.undoStack).toHaveLength(0);
+    expect(history.redoStack).toHaveLength(1);
+    expect(redoFeatures[0].id).toBe('wiring-1');
     expect(undone.forecastCycle.currentDay).toBe(1);
-    expect(undone.forecastCycle.days[1]?.metadata.lastModified).toBe(UNDO_NOW);
+    expect(day.metadata.lastModified).toBe(UNDO_NOW);
     expect(undone.isSaved).toBe(false);
   };
 
   const expectRedoResult = (redone: ForecastState) => {
-    expect(redone.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('wiring-1');
-    expect(redone.historyByDay[1]?.redoStack).toHaveLength(0);
-    expect(redone.historyByDay[1]?.undoStack).toHaveLength(1);
-    expect(redone.historyByDay[1]?.undoStack[0].snapshot.data.tornado?.get('2%') ?? []).toHaveLength(
-      0,
-    );
+    const day = redone.forecastCycle.days[1]!;
+    const history = redone.historyByDay[1]!;
+    const currentFeatures = day.data.tornado!.get('2%')!;
+    const undoFeatures = history.undoStack[0].snapshot.data.tornado!.get('2%') ?? [];
+
+    expect(currentFeatures[0].id).toBe('wiring-1');
+    expect(history.redoStack).toHaveLength(0);
+    expect(history.undoStack).toHaveLength(1);
+    expect(undoFeatures).toHaveLength(0);
     expect(redone.forecastCycle.currentDay).toBe(1);
-    expect(redone.forecastCycle.days[1]?.metadata.lastModified).toBe(REDO_NOW);
+    expect(day.metadata.lastModified).toBe(REDO_NOW);
     expect(redone.isSaved).toBe(false);
   };
 
