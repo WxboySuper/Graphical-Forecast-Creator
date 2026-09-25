@@ -1,5 +1,4 @@
-import type { NwsAlertDetails } from '../nwsAlertDetails';
-import { formatNwsAlertTime } from '../nwsAlertDetails';
+import { formatNwsAlertTime, type NwsAlertDetails } from '../nwsAlertDetails';
 
 /** Clears imperative alert popup content from an OpenLayers overlay container. */
 export const clearMonitorAlertPopup = (container: HTMLElement): void => {

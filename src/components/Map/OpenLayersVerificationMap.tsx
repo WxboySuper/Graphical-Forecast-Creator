@@ -21,8 +21,7 @@ import { fromLonLat } from "ol/proj";
 import { RootState } from "../../store";
 import { selectVerificationOutlooksForDay } from "../../store/verificationSlice";
 import { getGeoBoundarySource } from "../../config/geoBoundarySources";
-import { setBaseMapStyle } from "../../store/overlaysSlice";
-import type { BaseMapStyle } from "../../store/overlaysSlice";
+import { setBaseMapStyle, type BaseMapStyle } from "../../store/overlaysSlice";
 import { computeZIndex, getFeatureStyle } from "../../utils/mapStyleUtils";
 import { DayType } from "../../types/outlooks";
 import type { MapAdapterHandle } from "../../maps/contracts";
@@ -56,8 +55,7 @@ import {
 import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
 import { ReportType } from "../../types/stormReports";
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from "../../utils/stormReportColors";
-import type { DatEvidence } from "../../utils/dat";
-import { isTornadoDamagePoint } from "../../utils/dat";
+import { isTornadoDamagePoint, type DatEvidence } from "../../utils/dat";
 
 interface OpenLayersVerificationMapProps {
   activeOutlookType?: "categorical" | "tornado" | "wind" | "hail";

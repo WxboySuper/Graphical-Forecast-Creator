@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { RadarSiteOption } from './radarSites';
-import { fetchRadarSiteOptions } from './radarSites';
+import { fetchRadarSiteOptions, type RadarSiteOption } from './radarSites';
 
 export const useRadarSiteOptions = () => {
   const [sites, setSites] = useState<RadarSiteOption[]>([]);

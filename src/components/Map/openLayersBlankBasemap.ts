@@ -1,8 +1,7 @@
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { Fill, Stroke, Style } from "ol/style";
-import type { FeatureLike } from "ol/Feature";
-import type OLFeature from "ol/Feature";
+import { type default as OLFeature, type FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { getGeoBoundarySource } from "../../config/geoBoundarySources";
 
@@ -42,6 +41,7 @@ export const BLANK_LAND_OUTLINE_STYLE = new Style({
   stroke: new Stroke({ color: "#333333", width: 1 }),
 });
 
+/** Returns the shared style for a blank basemap layer. */
 const getStyleForKey = (key: BlankLayerKey): Style | undefined => {
   if (key === "worldCountries") return BLANK_WORLD_STYLE;
   if (key === "lakes") return BLANK_LAKE_STYLE;
