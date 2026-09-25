@@ -17,8 +17,7 @@ import {
   isTodayReportDate,
   isYesterdayReportDate,
 } from '../../utils/verificationV2/archiveDate';
-import { analyzeVerification, formatVerificationSummary } from '../../utils/verificationUtils';
-import type { OutlookTypeVerification, VerificationResult } from '../../utils/verificationUtils';
+import { analyzeVerification, formatVerificationSummary, type OutlookTypeVerification, type VerificationResult } from '../../utils/verificationUtils';
 import type { StormReport } from '../../types/stormReports';
 import { DayType } from '../../types/outlooks';
 import './VerificationPanel.css';

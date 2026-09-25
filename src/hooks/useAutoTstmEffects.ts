@@ -1,5 +1,4 @@
-import type { MutableRefObject } from 'react';
-import { useEffect } from 'react';
+import { useEffect, type MutableRefObject } from 'react';
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
 import {

@@ -1,6 +1,5 @@
 import type { DayType, GFCForecastSaveData } from '../types/outlooks';
-import type { CycleMetadata, SerializedWorkflowPackage } from '../types/workflow';
-import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
+import { WORKFLOW_SCHEMA_VERSION, type CycleMetadata, type SerializedWorkflowPackage } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
 
