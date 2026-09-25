@@ -169,6 +169,16 @@ describe("CloudLibraryPage", () => {
     const hint = screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.");
     expect(hint).toBeInTheDocument();
     expect(hint).toHaveAttribute("id", "cloud-cycle-load-hint-custom-1");
+    expect(
+      screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.", {
+        selector: ".cloud-cycle-main .cloud-cycle-load-hint",
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Custom loading is not supported yet. Only Severe saves can be opened.", {
+        selector: ".cloud-cycle-actions .cloud-cycle-load-hint",
+      })
+    ).not.toBeInTheDocument();
 
     fireEvent.click(loadButton);
     expect(loadCycle).not.toHaveBeenCalled();

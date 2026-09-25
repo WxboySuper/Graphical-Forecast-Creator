@@ -356,6 +356,8 @@ const CloudCycleActions: React.FC<{
   canWrite: boolean;
   loading: boolean;
   cycle: CloudCycleMetadata;
+  loadSupported: boolean;
+  loadHintId: string;
   isDeleting: boolean;
   isSavingRename: boolean;
   isRenaming: boolean;
@@ -369,6 +371,8 @@ const CloudCycleActions: React.FC<{
   canWrite,
   loading,
   cycle,
+  loadSupported,
+  loadHintId,
   isDeleting,
   isSavingRename,
   isRenaming,
@@ -379,9 +383,6 @@ const CloudCycleActions: React.FC<{
   onCancelDelete,
   onConfirmDelete,
 }) => {
-  const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
-  const loadSupported = getCloudCycleWorkspaceId(cycle) === 'severe';
-  const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
   const isBusy = loading || isDeleting || isSavingRename;
 
   /** Keeps unsupported Load focusable while blocking any load, fetch, or navigation. */
@@ -415,11 +416,6 @@ const CloudCycleActions: React.FC<{
         onCancelDelete={onCancelDelete}
         onConfirmDelete={onConfirmDelete}
       />
-      {!loadSupported ? (
-        <p id={loadHintId} className="cloud-cycle-load-hint">
-          {workspaceLabel} loading is not supported yet. Only Severe saves can be opened.
-        </p>
-      ) : null}
     </div>
   );
 };
@@ -456,6 +452,9 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
   const [isSavingRename, setIsSavingRename] = useState(false);
   const { isRenaming, confirmingDelete } = rowState;
   const newLabel = rowState.draft ?? cycle.label;
+  const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
+  const loadSupported = getCloudCycleWorkspaceId(cycle) === 'severe';
+  const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
 
   /** Deletes the selected cloud cycle after the inline confirmation has been accepted. */
   const handleDelete = async () => {
@@ -503,12 +502,19 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
           ) : null}
 
           <CloudCycleStats cycle={cycle} />
+          {!loadSupported ? (
+            <p id={loadHintId} className="cloud-cycle-load-hint">
+              {workspaceLabel} loading is not supported yet. Only Severe saves can be opened.
+            </p>
+          ) : null}
         </div>
 
         <CloudCycleActions
           canWrite={canWrite}
           loading={loading}
           cycle={cycle}
+          loadSupported={loadSupported}
+          loadHintId={loadHintId}
           isDeleting={isDeleting}
           isSavingRename={isSavingRename}
           isRenaming={isRenaming}
