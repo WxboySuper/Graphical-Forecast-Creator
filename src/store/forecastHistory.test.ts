@@ -322,13 +322,7 @@ describe('forecastHistory helpers', () => {
 });
 
 describe('forecast history reducer wiring', () => {
-  test('undoLastEdit drains undo into redo and stamps the action timestamp', () => {
-    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
-    expect(added.historyByDay[1]?.undoStack).toHaveLength(1);
-    expect(added.historyByDay[1]?.redoStack ?? []).toHaveLength(0);
-
-    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
-
+  const expectUndoResult = (undone: ForecastState) => {
     expect(undone.forecastCycle.days[1]?.data.tornado?.get('2%') ?? []).toHaveLength(0);
     expect(undone.historyByDay[1]?.undoStack).toHaveLength(0);
     expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
@@ -338,15 +332,9 @@ describe('forecast history reducer wiring', () => {
     expect(undone.forecastCycle.currentDay).toBe(1);
     expect(undone.forecastCycle.days[1]?.metadata.lastModified).toBe(UNDO_NOW);
     expect(undone.isSaved).toBe(false);
-  });
+  };
 
-  test('redoLastEdit drains redo into undo and stamps the action timestamp', () => {
-    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
-    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
-    expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
-
-    const redone = reducer(undone, { ...redoLastEdit(), meta: { timestamp: REDO_NOW } });
-
+  const expectRedoResult = (redone: ForecastState) => {
     expect(redone.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0].id).toBe('wiring-1');
     expect(redone.historyByDay[1]?.redoStack).toHaveLength(0);
     expect(redone.historyByDay[1]?.undoStack).toHaveLength(1);
@@ -356,5 +344,25 @@ describe('forecast history reducer wiring', () => {
     expect(redone.forecastCycle.currentDay).toBe(1);
     expect(redone.forecastCycle.days[1]?.metadata.lastModified).toBe(REDO_NOW);
     expect(redone.isSaved).toBe(false);
+  };
+
+  test('undoLastEdit drains undo into redo and stamps the action timestamp', () => {
+    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    expect(added.historyByDay[1]?.undoStack).toHaveLength(1);
+    expect(added.historyByDay[1]?.redoStack ?? []).toHaveLength(0);
+
+    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+
+    expectUndoResult(undone);
+  });
+
+  test('redoLastEdit drains redo into undo and stamps the action timestamp', () => {
+    const added = reducer(undefined, addFeature({ feature: makeFeature('wiring-1', 1) }));
+    const undone = reducer(added, { ...undoLastEdit(), meta: { timestamp: UNDO_NOW } });
+    expect(undone.historyByDay[1]?.redoStack).toHaveLength(1);
+
+    const redone = reducer(undone, { ...redoLastEdit(), meta: { timestamp: REDO_NOW } });
+
+    expectRedoResult(redone);
   });
 });
