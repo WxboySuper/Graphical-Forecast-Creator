@@ -346,6 +346,8 @@ const restoreCloudSession = ({
 }: RestoreCloudSessionOptions): boolean => {
   const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
   const storedValue = sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null);
+  if (!storedValue) return false;
+
   const payload = parseStoredForecastPayload(storedValue, workspaceId);
   if (!payload) {
     // A pending handoff for another workspace must not fail silently into local

@@ -7,6 +7,7 @@ import themeReducer from "../store/themeSlice";
 import CloudLibraryPage, { buildCloudSessionPayload, isSupportedCloudLoadWorkspace } from "./CloudLibraryPage";
 import { getDefaultForecastWorkspacePath, getForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
 import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { serializeForecast } from "../utils/fileUtils";
 import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 const mockNavigate = jest.fn();
@@ -530,8 +531,44 @@ describe("CloudLibraryPage", () => {
     expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
     const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
     expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
-    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
-    expect(wrapped.workspaceId).toBe('severe');
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+    const wrapped = buildCloudSessionPayload("severe", bare) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe("severe");
+  });
+
+  it("refuses a cloud payload that no workspace classifier accepts", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    // Untyped junk must not be wrapped into an envelope that fails on restore.
+    expect(() => buildCloudSessionPayload("severe", { legacy: true }))
+      .toThrow(/not supported by any workspace/);
+    expect(() => buildCloudSessionPayload("severe", { workspaceId: "bogus", forecastCycle: {} }))
+      .toThrow(/unknown workspace/);
+
+    // A payload that already names Custom must not be relabeled Severe just
+    // because the cloud record's metadata said Severe.
+    const declaresCustom = { workspaceId: "custom", ...bare };
+    expect(() => buildCloudSessionPayload("severe", declaresCustom)).toThrow(/incomplete or invalid/);
+  });
+
+  it("refuses to hand off a cloud cycle that names an unknown workspace", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "rogue-1", workspaceId: "not-a-workspace" as never, label: "Rogue save" }],
+        loadCycle,
+      })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    expect(await screen.findByText("That cloud cycle does not belong to a known forecast workspace.")).toBeInTheDocument();
+    expect(loadCycle).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
   });
 
   it("supports cloud loads only for workspaces with a registered exposed editor route", () => {

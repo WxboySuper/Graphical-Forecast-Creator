@@ -22,6 +22,7 @@ import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
 } from '../utils/forecastWorkspacePersistence';
+import { getForecastWorkspaceLoadError } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
 import {
   getForecastWorkspace,
@@ -748,19 +749,30 @@ const CloudLibrarySignedInLayout: React.FC<{
   </div>
 );
 
-/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
+/**
+ * Builds the session payload for a cloud handoff without double-wrapping an envelope.
+ *
+ * A payload that no workspace classifier accepts is refused rather than wrapped,
+ * because a wrapped copy of unclassifiable data would fail again on restore after
+ * the handoff already navigated away. A payload that already carries an owner is
+ * kept only when that owner matches; an untagged legacy payload takes the owner
+ * from the cloud record, which is the ownership evidence for that record.
+ */
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
 ): unknown => {
   const classification = classifyForecastWorkspacePayload(payload);
-  if (classification.ok && !classification.legacy) {
-    if (classification.workspaceId !== workspaceId) {
-      throw new Error('Cloud payload belongs to a different forecast workspace.');
-    }
-    return payload;
+  if (!classification.ok) {
+    throw getForecastWorkspaceLoadError(classification);
   }
-  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+  if (classification.legacy) {
+    return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+  }
+  if (classification.workspaceId !== workspaceId) {
+    throw new Error('Cloud payload belongs to a different forecast workspace.');
+  }
+  return payload;
 };
 
 /** A workspace can open cloud payloads only when it has a registered editor route for the target. */

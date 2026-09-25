@@ -1,5 +1,5 @@
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { requireForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { getForecastWorkspace, requireForecastWorkspaceId } from '../config/forecastWorkspaces';
 import type { GFCForecastSaveData } from '../types/outlooks';
 
 /**
@@ -38,12 +38,25 @@ export const createForecastWorkspaceSave = (
   forecast,
 });
 
-/** Structural envelope check. The forecast inside is validated by the classifier. */
-export const isWorkspaceSaveEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
+/**
+ * True when a value carries the envelope wrapper at all: the schema version and
+ * an object-shaped forecast. This says nothing about who owns it, so a caller
+ * that unwraps must pair it with `isWorkspaceSaveEnvelope`.
+ */
+export const hasWorkspaceEnvelopeWrapper = (value: unknown): value is Record<string, unknown> =>
   isRecord(value) &&
   value.schemaVersion === FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION &&
-  typeof value.workspaceId === 'string' &&
   isRecord(value.forecast);
+
+/**
+ * Validates the version, object shape, and a registered owner before anything
+ * reads `forecast`. A declared owner this build does not know fails here rather
+ * than being unwrapped and silently discarded as if the payload were unowned.
+ */
+export const isWorkspaceSaveEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
+  hasWorkspaceEnvelopeWrapper(value) &&
+  typeof value.workspaceId === 'string' &&
+  getForecastWorkspace(value.workspaceId) !== undefined;
 
 /** Extracts the forecast data from either a new envelope or a legacy payload. */
 export const getForecastDataFromWorkspacePayload = (

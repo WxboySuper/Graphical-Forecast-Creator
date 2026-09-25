@@ -49,8 +49,20 @@ const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   workflowMetadata: cycle.workflowMetadata,
 });
 
-/** Restores one saved cycle from storage, rehydrating its forecast maps and filling stats when missing. */
-const fromPersistedSavedCycle = (cycle: PersistedSavedCycle): SavedCycle => {
+/**
+ * Restores one saved cycle from storage, rehydrating its forecast maps and filling stats when missing.
+ *
+ * A record with no workspace field predates workspace ownership, so it stays Severe.
+ * A record that names a workspace this build does not recognize belongs to no
+ * workspace, so it is dropped instead of being relabeled Severe and opened in the
+ * wrong editor; the stored identity is never rewritten to cover up the mismatch.
+ */
+const fromPersistedSavedCycle = (cycle: PersistedSavedCycle): SavedCycle | null => {
+  const owner = cycle.workspaceId === undefined
+    ? DEFAULT_FORECAST_WORKSPACE
+    : getForecastWorkspace(cycle.workspaceId)?.id;
+  if (!owner) return null;
+
   const forecastCycle = deserializeForecast(cycle.forecastData);
 
   return {

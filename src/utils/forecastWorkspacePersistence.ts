@@ -31,9 +31,7 @@ const isWorkspaceId = (value: unknown): value is ForecastWorkspaceId =>
   typeof value === 'string' && getForecastWorkspace(value as ForecastWorkspaceId) !== undefined;
 
 const isEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
-  isWorkspaceSaveEnvelope(value) &&
-  isWorkspaceId(value.workspaceId) &&
-  validateForecastData(value.forecast);
+  isWorkspaceSaveEnvelope(value) && validateForecastData(value.forecast);
 
 /**
  * Classifies a saved payload before it is opened in a workspace.

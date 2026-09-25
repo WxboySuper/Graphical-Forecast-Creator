@@ -54,7 +54,7 @@ describe('cycleHistoryPersistence', () => {
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
   });
 
-  test('defaults malformed persisted workspace metadata to Severe', async () => {
+  test('drops persisted entries with an unregistered workspace instead of relabeling them Severe', async () => {
     jest.doMock('./fileUtils', () => ({
       serializeForecast: jest.fn(() => ({ serialized: true })),
       deserializeForecast: jest.fn(() => ({ restored: true })),
@@ -63,17 +63,33 @@ describe('cycleHistoryPersistence', () => {
       countForecastMetrics: jest.fn(() => ({ total: 1 })),
     }));
 
-    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
-      id: 'malformed-workspace',
-      timestamp: 'ts',
-      cycleDate: '2026-04-22',
-      forecastData: { serialized: true },
-      workspaceId: 'not-a-workspace',
-      stats: { total: 1 },
-    }]));
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([
+      {
+        id: 'owned-custom',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { serialized: true },
+        workspaceId: 'custom',
+        stats: { total: 1 },
+      },
+      {
+        id: 'malformed-workspace',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { serialized: true },
+        workspaceId: 'not-a-workspace',
+        stats: { total: 1 },
+      },
+    ]));
 
     const mod = await import('./cycleHistoryPersistence');
-    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
+    const loaded = mod.loadCycleHistoryFromStorage();
+
+    // The registered owner survives untouched; the unregistered one is dropped
+    // rather than being rewritten as Severe and opened in the wrong editor.
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.id).toBe('owned-custom');
+    expect(loaded[0]?.workspaceId).toBe('custom');
   });
 
   test('defaults legacy persisted records without workspace metadata to Severe', async () => {
