@@ -20,7 +20,7 @@ import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../uti
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastDataFromWorkspacePayload, type ForecastWorkspacePayload } from '../utils/forecastWorkspacePersistence';
 import { importForecastTransfer, type ForecastImportResult } from '../utils/forecastTransfer';
-import { getAutoSaveStorageKey, migrateLegacyAutoSave, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
+import { getAutoSaveStorageKey, migrateWorkspaceAutoSaves, selectPreferredAutoSaveValue } from '../hooks/useAutoSave';
 import {
   DAY_ROLLOVER_CHECK_INTERVAL_MS,
   DAY_ROLLOVER_LAST_ACTIVE_KEY,
@@ -442,7 +442,7 @@ export const useSessionRestore = (
       const liveSession = previousUserIdRef.current == null && userId
         ? serializeForecastWorkspace(workspaceId, forecastCycleRef.current, currentMapViewRef.current, workflowMetadataRef.current)
         : undefined;
-      migrateLegacyAutoSave(userId, liveSession, workspaceId);
+      migrateWorkspaceAutoSaves(userId, liveSession, workspaceId);
       previousUserIdRef.current = userId;
       const restoreKey = buildRestoreKey(userId, workspaceId);
       if (appliedRestoreKeyRef.current === restoreKey) {

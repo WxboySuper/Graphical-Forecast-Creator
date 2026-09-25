@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { selectForecastCycle } from '../store/forecastSlice';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
-import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, FORECAST_WORKSPACES, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
@@ -245,6 +245,27 @@ export const migrateLegacyAutoSave = (
   workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
 ): void => {
   migrateWorkspaceAutoSave(userId, liveSession, workspaceId);
+};
+
+/**
+ * Signs every workspace in at once. Sign-in can happen on any page, so waiting
+ * for each workspace to mount would leave anonymous drafts behind until the
+ * user happened to open them. Only the mounted workspace can reconcile live
+ * editor state; the rest promote their stored anonymous copy.
+ */
+export const migrateWorkspaceAutoSaves = (
+  userId?: string | null,
+  liveSession?: unknown,
+  mountedWorkspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+): void => {
+  if (!userId) return;
+  for (const workspace of FORECAST_WORKSPACES) {
+    migrateWorkspaceAutoSave(
+      userId,
+      workspace.id === mountedWorkspaceId ? liveSession : undefined,
+      workspace.id,
+    );
+  }
 };
 
 /** Returns whether two autosave scopes resolve to the same storage destination. */
