@@ -1,3 +1,9 @@
+/**
+ * Server-capability status hook: this module polls and caches hosted capability
+ * availability for exposure-gated client features, including retry and stale
+ * status handling. It reports server state to consumers and does not authorize
+ * requests or own feature rendering.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import { getFeatureExposure, type FeatureKey } from './featureExposure';
 
