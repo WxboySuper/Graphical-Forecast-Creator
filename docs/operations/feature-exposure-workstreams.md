@@ -1,6 +1,6 @@
 # v1.7 feature exposure workstreams
 
-Single adoption manifest for every unfinished v1.7 workstream registered in `src/config/featureExposure.ts`. Completing this adoption is tracked in FND-14 (#530).
+Single adoption manifest for v1.7 workstreams registered in `src/config/featureExposure.ts`, including unfinished temporary work and completed graduated work. Completing the remaining adoption is tracked in FND-14 (#530).
 
 ## Adoption rule
 
@@ -22,7 +22,7 @@ Every workstream must:
 | Tropical workspace | `tropicalWorkspace` | #432 | Gated route `/tropical` + navbar | Exemplar + route/nav tests |
 | Collaboration room | `collaborationRoom` | #433 | Gated route `/collaborate` + navbar | Exemplar + route/nav tests |
 
-Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved across local, beta, staging, and production for v1.7.
+Unreleased rows stay disabled until their enablement criteria pass. Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved on local, beta, staging, and production for v1.7 and hold `temporary: false`. Release approval only turns on targets. Auto-TSTM is release-approved on every target too, and it still holds `temporary: true` with its removal condition, because graduation is a separate decision that approval does not grant.
 
 ## Per-workstream detail
 
@@ -36,21 +36,21 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 
 ### Forecast workflow v2 (`forecastWorkflowV2`, #429)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** home workflow actions and forecast workspace workflow panel
 - **Tests:** signed-in home interaction coverage in `src/pages/home/HomePage.test.tsx`, adoption contract in `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after workflow continuity and adoption coverage
 
 ### Verification relaunch (`verificationRelaunch`, #430)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** none yet — the existing `/verification` route is core product, not this relaunch key
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after dashboard, coexistence, and adoption coverage
 
 ### Custom products (`customProducts`, #431)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** custom route, navigation, toolbar, repository, entitlement, and Firestore capability checks
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after implementation, UI review, and regression/E2E coverage

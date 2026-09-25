@@ -29,9 +29,9 @@ const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
 const v17WorkstreamRegistry = {
   autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
-  forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after v2.', serverBacked: false, trackingIssue: 429 },
-  verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after relaunch.', serverBacked: false, trackingIssue: 430 },
-  customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 431 },
+  forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
+  verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
+  customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
   tropicalWorkspace: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Keep disabled.', serverBacked: false, trackingIssue: 432 },
   collaborationRoom: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 433 },
 };
@@ -283,9 +283,9 @@ describe('feature exposure policy', () => {
       categoricalOutlook: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       significantThreats: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
-      forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after v2.', serverBacked: false, trackingIssue: 429 },
-      verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after relaunch.', serverBacked: false, trackingIssue: 430 },
-      customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 431 },
+      forecastWorkflowV2: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
+      verificationRelaunch: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
+      customProducts: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
       tropicalWorkspace: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Keep disabled.', serverBacked: false, trackingIssue: 432 },
       collaborationRoom: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Remove after ship.', serverBacked: false, trackingIssue: 433 },
     };
@@ -445,6 +445,40 @@ describe('feature exposure policy', () => {
       acknowledgements: v17Acknowledgements,
     });
   });
+
+  for (const featureKey of ['autoTstm', 'tropicalWorkspace', 'collaborationRoom']) {
+    it(`fails when unreleased v1.7 workstream ${featureKey} leaves the temporary lifecycle`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], temporary: false, removalCondition: undefined },
+      };
+      assertPolicyErrors(registry, [new RegExp(`${featureKey}.*cannot adopt permanent state`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
+    });
+  }
+
+  for (const featureKey of ['forecastWorkflowV2', 'verificationRelaunch', 'customProducts']) {
+    it(`fails when graduated v1.7 workstream ${featureKey} regresses to temporary`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], temporary: true, removalCondition: 'Revert after launch.' },
+      };
+      assertPolicyErrors(registry, [new RegExp(`Graduated v1\\.7 workstream "${featureKey}" must remain permanent`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
+    });
+
+    it(`fails when graduated v1.7 workstream ${featureKey} has a stale removal condition`, () => {
+      const registry = {
+        ...v17WorkstreamRegistry,
+        [featureKey]: { ...v17WorkstreamRegistry[featureKey], removalCondition: 'Stale condition.' },
+      };
+      assertPolicyErrors(registry, [new RegExp(`Graduated v1\\.7 workstream "${featureKey}" cannot declare a removalCondition`)], emptySurfaces, {
+        acknowledgements: v17Acknowledgements,
+      });
+    });
+  }
 
   it('fails when all v1.7 workstream keys are removed from the registry', () => {
     const registry = {

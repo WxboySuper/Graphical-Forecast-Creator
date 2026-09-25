@@ -16,6 +16,18 @@ const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ] as const satisfies readonly FeatureKey[];
 
+const TEMPORARY_V17_WORKSTREAM_KEYS = [
+  'autoTstm',
+  'tropicalWorkspace',
+  'collaborationRoom',
+] as const satisfies readonly FeatureKey[];
+
+const GRADUATED_V17_WORKSTREAM_KEYS = [
+  'forecastWorkflowV2',
+  'verificationRelaunch',
+  'customProducts',
+] as const satisfies readonly FeatureKey[];
+
 describe('v1.7 workstream adoption contract', () => {
   test('forecastWorkflowV2 is enabled on every release target', () => {
     for (const target of BUILD_TARGETS) {
@@ -64,13 +76,23 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(V17_WORKSTREAM_KEYS)('%s declares required lifecycle metadata', (feature) => {
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS)('%s declares required temporary lifecycle metadata', (feature) => {
     const definition = getFeatureExposure(feature);
 
     expect(definition.temporary).toBe(true);
     expect(definition.removalCondition.trim().length).toBeGreaterThan(0);
     expect(definition.trackingIssue).toBeGreaterThan(0);
     expect(definition.owner.trim().length).toBeGreaterThan(0);
+    expect(definition.addedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test.each(GRADUATED_V17_WORKSTREAM_KEYS)('%s is permanent and keeps its adoption metadata', (feature) => {
+    const definition = getFeatureExposure(feature);
+
+    expect(definition.temporary).toBe(false);
+    expect('removalCondition' in definition).toBe(false);
+    expect(definition.owner.trim().length).toBeGreaterThan(0);
+    expect(definition.trackingIssue).toBeGreaterThan(0);
     expect(definition.addedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
