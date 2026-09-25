@@ -38,6 +38,3 @@ export const CONTENT_MANAGED_LABELS = [
   'exposure:server-backed',
   'exposure:registry-change',
 ];
-
-/** @deprecated Use CONTENT_MANAGED_LABELS or CI_MANAGED_LABELS */
-export const MANAGED_LABELS = [...CONTENT_MANAGED_LABELS, ...CI_MANAGED_LABELS];
