@@ -1,3 +1,7 @@
+/**
+ * Outlook constraint definitions. It maps each outlook type to valid days,
+ * probability values, and editor limits used by forecast controls.
+ */
 import type {
   CategoricalRiskLevel,
   CIGLevel,

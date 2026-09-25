@@ -1,3 +1,7 @@
+/**
+ * Release-notes helpers. It reads changelog metadata and release tags, then
+ * prepares the versioned notes consumed by GitHub release automation.
+ */
 import { execFileSync } from 'node:child_process';
 
 const VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/;
