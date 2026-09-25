@@ -1,3 +1,9 @@
+/**
+ * Verification composite evidence: this module combines report, DAT, and
+ * forecast evidence into the normalized inputs consumed by grade scoring. It
+ * owns evidence composition and missing-data handling, not account policy,
+ * persistence, or presentation.
+ */
 import type { OutlookData } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import { summarizeDatEvidence, tornadoDamagePoints, type DatEvidence } from '../dat';
