@@ -1,4 +1,5 @@
-import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId, type CloudLibraryTabId } from './cloudLibraryWorkspace';
+import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, resolveActiveCloudLibraryTab, getNextCloudLibraryTabId, getCloudLibraryTabLabel, getCloudLibraryWorkspacePath, type CloudLibraryTabId } from './cloudLibraryWorkspace';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
@@ -78,6 +79,24 @@ describe('cloud library workspace boundaries', () => {
 
     expect(resolveActiveCloudLibraryTab(tabs, 'severe')).toBe('severe');
     expect(resolveActiveCloudLibraryTab(tabs, 'custom')).toBe('all');
+  });
+
+  it('resolves tab labels and editor routes for each workspace tab', () => {
+    const tabs = [
+      { id: 'all' as const, label: 'All', cycleCount: 2 },
+      { id: 'severe' as const, label: 'Severe', cycleCount: 1 },
+      { id: 'custom' as const, label: 'Custom', cycleCount: 1 },
+    ];
+
+    expect(getCloudLibraryTabLabel(tabs, 'all')).toBeUndefined();
+    expect(getCloudLibraryTabLabel(tabs, 'severe')).toBe('Severe');
+    expect(getCloudLibraryTabLabel(tabs, 'custom')).toBe('Custom');
+    expect(getCloudLibraryTabLabel(tabs, 'winter')).toBeUndefined();
+
+    expect(getCloudLibraryWorkspacePath('all')).toBe(getDefaultForecastWorkspacePath());
+    expect(getCloudLibraryWorkspacePath('severe')).toBe('/forecast/severe');
+    expect(getCloudLibraryWorkspacePath('custom')).toBe('/custom-products');
+    expect(getCloudLibraryWorkspacePath('winter')).toBe('/forecast/winter');
   });
 
   it('resolves arrow, home, and end keys across tabs', () => {

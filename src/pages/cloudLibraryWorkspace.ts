@@ -4,6 +4,7 @@ import {
   getForecastWorkspace,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
@@ -36,6 +37,21 @@ export const resolveActiveCloudLibraryTab = (
   activeTab: CloudLibraryTabId,
 ): CloudLibraryTabId =>
   tabs.some((tab) => tab.id === activeTab) ? activeTab : 'all';
+
+/** Resolves the display label for one tab, undefined for the combined All view. */
+export const getCloudLibraryTabLabel = (
+  tabs: CloudLibraryTab[],
+  tabId: CloudLibraryTabId,
+): string | undefined =>
+  tabId === 'all' ? undefined : tabs.find((tab) => tab.id === tabId)?.label;
+
+/** Resolves the editor route for one tab, keeping Custom on its legacy path. */
+export const getCloudLibraryWorkspacePath = (tabId: CloudLibraryTabId): string => {
+  if (tabId === 'all') return getDefaultForecastWorkspacePath();
+  if (tabId === 'custom') return '/custom-products';
+  const workspace = getForecastWorkspace(tabId);
+  return workspace ? workspace.path : getDefaultForecastWorkspacePath();
+};
 
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */
 const getCloudLibraryEdgeTabId = (
