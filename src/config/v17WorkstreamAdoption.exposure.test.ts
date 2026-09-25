@@ -16,7 +16,24 @@ const V17_WORKSTREAM_KEYS = [
   'collaborationRoom',
 ] as const satisfies readonly FeatureKey[];
 
+const TEMPORARY_V17_WORKSTREAM_KEYS = [
+  'autoTstm',
+  'tropicalWorkspace',
+  'collaborationRoom',
+] as const satisfies readonly FeatureKey[];
+
+const PERMANENT_V17_WORKSTREAM_KEYS = [
+  'forecastWorkflowV2',
+  'verificationRelaunch',
+  'customProducts',
+] as const satisfies readonly FeatureKey[];
+
 describe('v1.7 workstream adoption contract', () => {
+  test('permanent and temporary key sets partition V17_WORKSTREAM_KEYS', () => {
+    const combined = [...PERMANENT_V17_WORKSTREAM_KEYS, ...TEMPORARY_V17_WORKSTREAM_KEYS];
+    expect(combined.sort()).toEqual([...V17_WORKSTREAM_KEYS].sort());
+  });
+
   test('forecastWorkflowV2 is enabled on every release target', () => {
     for (const target of BUILD_TARGETS) {
       const expected = true;
@@ -25,12 +42,7 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(
-    V17_WORKSTREAM_KEYS.filter(
-      (feature) =>
-        !['autoTstm', 'forecastWorkflowV2', 'verificationRelaunch', 'customProducts'].includes(feature)
-    )
-  )(
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS.filter((feature) => feature !== 'autoTstm'))(
     '%s stays disabled on every build target',
     (feature) => {
       for (const target of BUILD_TARGETS) {
@@ -64,7 +76,7 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(V17_WORKSTREAM_KEYS)('%s declares required lifecycle metadata', (feature) => {
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS)('%s declares required temporary lifecycle metadata', (feature) => {
     const definition = getFeatureExposure(feature);
 
     expect(definition.temporary).toBe(true);
@@ -72,6 +84,13 @@ describe('v1.7 workstream adoption contract', () => {
     expect(definition.trackingIssue).toBeGreaterThan(0);
     expect(definition.owner.trim().length).toBeGreaterThan(0);
     expect(definition.addedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test.each(PERMANENT_V17_WORKSTREAM_KEYS)('%s ships permanent with no removal condition', (feature) => {
+    const definition = getFeatureExposure(feature);
+
+    expect(definition.temporary).toBe(false);
+    expect(definition).not.toHaveProperty('removalCondition');
   });
 
   test('only autoTstm is server-backed among v1.7 workstreams', () => {
