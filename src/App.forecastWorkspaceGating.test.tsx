@@ -1,96 +1,72 @@
-import { useEffect } from 'react';
-import { render, screen } from '@testing-library/react';
-import { Provider, useDispatch, useSelector } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import forecastReducer, {
+import { render, screen, waitFor } from '@testing-library/react';
+import { Outlet as MockOutlet } from 'react-router';
+import App from './App';
+import { store } from './store';
+import {
   addFeature,
   saveCurrentCycle,
   setForecastWorkspace,
   updateDiscussionDraft,
 } from './store/forecastSlice';
-import type { RootState } from './store';
-import {
-  getExposedForecastWorkspaceRoutes,
-  getUnavailableForecastWorkspaceRoutes,
-  resolveRouteForecastWorkspace,
-} from './routing/forecastWorkspaceRoutes';
-import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWorkspacePage';
-import overlaysReducer from './store/overlaysSlice';
-import stormReportsReducer from './store/stormReportsSlice';
-import appModeReducer from './store/appModeSlice';
-import themeReducer from './store/themeSlice';
-import verificationReducer from './store/verificationSlice';
-import monitorReducer from './store/monitorSlice';
+import { saveCycleHistoryToStorage } from './utils/cycleHistoryPersistence';
 
-const createTestStore = () =>
-  configureStore({
-    reducer: {
-      forecast: forecastReducer,
-      overlays: overlaysReducer,
-      stormReports: stormReportsReducer,
-      appMode: appModeReducer,
-      theme: themeReducer,
-      verification: verificationReducer,
-      monitor: monitorReducer,
-    },
-    middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({
-        serializableCheck: false,
-        immutableCheck: false,
-      }),
-  });
-
-type TestStore = ReturnType<typeof createTestStore>;
-
-/**
- * Replicates the workspace-ownership rule in App.tsx AppHooks: only an exposed
- * forecast route may retag Redux. Gated and unknown paths leave state alone.
- */
-const RouteWorkspaceSync = () => {
-  const dispatch = useDispatch();
-  const location = useLocation();
-  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  const routeWorkspace = resolveRouteForecastWorkspace(location.pathname);
-
-  useEffect(() => {
-    if (routeWorkspace && routeWorkspace.id !== activeWorkspaceId) {
-      dispatch(setForecastWorkspace(routeWorkspace.id));
-    }
-  }, [activeWorkspaceId, dispatch, routeWorkspace]);
-
-  return null;
-};
-
-/**
- * Replicates the forecast branch in App.tsx AppRoutes using the same route
- * records, so this stays a regression for the shipped wiring.
- */
-const ForecastRouteTree = () => (
-  <Routes>
-    <Route path="forecast">
-      {getExposedForecastWorkspaceRoutes().map((route) => (
-        <Route
-          key={route.id}
-          path={route.routePath}
-          element={<div>Forecast editor mock</div>}
-        />
-      ))}
-      {getUnavailableForecastWorkspaceRoutes().map((route) => (
-        <Route
-          key={`unavailable-${route.id}`}
-          path={route.routePath}
-          element={<UnavailableForecastWorkspacePage workspaceId={route.id} />}
-        />
-      ))}
-    </Route>
-    <Route path="*" element={<div>Global fallback mock</div>} />
-  </Routes>
-);
+// The routing test renders the shipped App: real providers, real AppHooks, real
+// route tree. Only the heavy pages and shells are stubbed so the test exercises
+// route registration instead of a copy of it.
+jest.mock('./pages/HomePage', () => ({
+  __esModule: true,
+  default: () => <div>HomePage Mock</div>,
+}));
+jest.mock('./pages/AccountPage', () => ({
+  __esModule: true,
+  default: () => <div>AccountPage Mock</div>,
+}));
+jest.mock('./pages/PricingPage', () => ({
+  __esModule: true,
+  default: () => <div>PricingPage Mock</div>,
+}));
+jest.mock('./pages/UpdatesPage', () => ({
+  UpdatesPage: () => <div>UpdatesPage Mock</div>,
+}));
+jest.mock('./pages/BetaLandingPage', () => ({
+  __esModule: true,
+  default: () => <div>BetaLandingPage Mock</div>,
+}));
+jest.mock('./pages/BetaInvitePage', () => ({
+  __esModule: true,
+  default: () => <div>BetaInvitePage Mock</div>,
+}));
+jest.mock('./pages/ForecastPage', () => ({
+  __esModule: true,
+  ForecastPage: () => <div>Forecast editor mock</div>,
+  default: () => <div>Forecast editor mock</div>,
+}));
+jest.mock('./components/Layout', () => ({
+  AppLayout: () => (
+    <div>
+      <div>AppLayout Mock</div>
+      <MockOutlet />
+    </div>
+  ),
+}));
+jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
+jest.mock('./components/ToS/ToSModal', () => ({
+  __esModule: true,
+  hasAcceptedToS: () => true,
+  default: () => <div>ToSModal Mock</div>,
+}));
+jest.mock('./components/PrivacyPolicy/PrivacyPolicyModal', () => ({
+  __esModule: true,
+  hasAcceptedPrivacyPolicy: () => true,
+  default: () => <div>PrivacyPolicyModal Mock</div>,
+}));
 
 const ACTIVE_FEATURE_ID = 'active-severe-outlook';
 
-const seedActiveSevereDocument = (store: TestStore): void => {
+const seedActiveSevereDocument = (): void => {
+  // Switch away and back so every test starts from a blank Severe document
+  // regardless of what an earlier case left behind.
+  store.dispatch(setForecastWorkspace('custom'));
   store.dispatch(setForecastWorkspace('severe'));
   store.dispatch(
     addFeature({
@@ -116,72 +92,83 @@ const seedActiveSevereDocument = (store: TestStore): void => {
     }),
   );
   store.dispatch(saveCurrentCycle({ label: 'Active severe cycle' }));
+  // App hydrates saved cycles from storage on mount, so seed the persisted copy
+  // as well or the real AppHooks wipe the Redux history on first render.
+  const { savedCycles, lifetimeCycleStats } = store.getState().forecast;
+  saveCycleHistoryToStorage(savedCycles, undefined, lifetimeCycleStats);
 };
 
-const renderAtPath = (store: TestStore, initialPath: string) =>
-  render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <Provider store={store}>
-        <RouteWorkspaceSync />
-        <ForecastRouteTree />
-      </Provider>
-    </MemoryRouter>,
-  );
-
-const activeSevereDocument = (store: TestStore) => {
+const activeSevereDocument = () => {
   const state = store.getState().forecast;
   return {
     workspaceId: state.workspaceId,
-    featureIds: state.forecastCycle.days[1]?.data.tornado?.get('2%')?.map((feature) => feature.id) ?? [],
+    featureIds:
+      state.forecastCycle.days[1]?.data.tornado?.get('2%')?.map((feature) => feature.id) ?? [],
     discussionDraft: state.discussionDraftsByScope['day-1']?.diyContent,
     savedCycles: state.savedCycles.map((cycle) => ({ id: cycle.id, workspaceId: cycle.workspaceId })),
   };
+};
+
+const renderAppAt = (path: string) => {
+  window.history.pushState({}, '', path);
+  return render(<App />);
 };
 
 describe('App forecast workspace gating', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    window.history.pushState({}, '', '/');
+    seedActiveSevereDocument();
   });
 
-  test('gated tropical URL shows the unavailable page without clearing or retagging the active forecast', () => {
-    expect(getUnavailableForecastWorkspaceRoutes().some((route) => route.id === 'tropical')).toBe(true);
-    expect(resolveRouteForecastWorkspace('/forecast/tropical')).toBeUndefined();
+  test('gated tropical URL shows the unavailable page without clearing or retagging the active forecast', async () => {
+    const before = activeSevereDocument();
 
-    const store = createTestStore();
-    seedActiveSevereDocument(store);
-    const before = activeSevereDocument(store);
-
-    renderAtPath(store, '/forecast/tropical');
+    renderAppAt('/forecast/tropical');
 
     expect(
-      screen.getByRole('heading', { level: 1, name: /tropical forecast is not available yet/i }),
+      await screen.findByRole('heading', { level: 1, name: /tropical forecast is not available yet/i }),
     ).toBeInTheDocument();
     expect(screen.queryByText('Forecast editor mock')).not.toBeInTheDocument();
 
-    const after = activeSevereDocument(store);
+    const after = activeSevereDocument();
     expect(after.workspaceId).toBe('severe');
     expect(after).toEqual(before);
     expect(after.featureIds).toContain(ACTIVE_FEATURE_ID);
     expect(after.discussionDraft).toBe('Active discussion draft');
-    expect(after.savedCycles).toHaveLength(1);
+    expect(after.savedCycles).toHaveLength(before.savedCycles.length);
     expect(after.savedCycles[0]?.workspaceId).toBe('severe');
   });
 
-  test('unknown forecast path keeps not-found behavior without touching the active forecast', () => {
-    expect(resolveRouteForecastWorkspace('/forecast/unknown')).toBeUndefined();
+  test('unknown forecast path falls back to the app root without touching the active forecast', async () => {
+    const before = activeSevereDocument();
 
-    const store = createTestStore();
-    seedActiveSevereDocument(store);
-    const before = activeSevereDocument(store);
+    renderAppAt('/forecast/unknown');
 
-    renderAtPath(store, '/forecast/unknown');
-
+    expect(await screen.findByText('HomePage Mock')).toBeInTheDocument();
     expect(screen.queryByText('Forecast editor mock')).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
     expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
-
-    expect(activeSevereDocument(store)).toEqual(before);
+    expect(activeSevereDocument()).toEqual(before);
     expect(store.getState().forecast.workspaceId).toBe('severe');
+  });
+
+  test('the exposed Severe editor mounts at its canonical route with the document intact', async () => {
+    const before = activeSevereDocument();
+
+    renderAppAt('/forecast/severe');
+
+    expect(await screen.findByText('Forecast editor mock')).toBeInTheDocument();
+    expect(activeSevereDocument()).toEqual(before);
+    expect(store.getState().forecast.workspaceId).toBe('severe');
+  });
+
+  test('the exposed Custom route retags Redux ownership to its own workspace', async () => {
+    renderAppAt('/forecast/custom');
+
+    expect(await screen.findByText('Forecast editor mock')).toBeInTheDocument();
+    await waitFor(() => expect(store.getState().forecast.workspaceId).toBe('custom'));
+    // History is workspace-owned and survives the switch by design.
+    expect(store.getState().forecast.savedCycles.length).toBeGreaterThan(0);
   });
 });
