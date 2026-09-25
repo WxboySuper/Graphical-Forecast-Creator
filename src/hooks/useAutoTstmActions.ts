@@ -1,3 +1,7 @@
+/**
+ * Auto-TSTM action hook. It builds generation actions, commits accepted preview
+ * results, and exposes typed callbacks for the Auto-TSTM panel.
+ */
 import { useCallback, type MutableRefObject } from 'react';
 import type { Dispatch } from '@reduxjs/toolkit';
 import type { DayType, ForecastCycle } from '../types/outlooks';
