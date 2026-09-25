@@ -1,3 +1,7 @@
+/**
+ * Paint-bucket edit strategy. It applies a requested fill operation to forecast
+ * features and returns the edit action consumed by the map interaction layer.
+ */
 import type { Feature } from 'geojson';
 import type { OutlookType } from '../../types/outlooks';
 import {
