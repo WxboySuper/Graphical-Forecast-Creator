@@ -1,3 +1,9 @@
+/**
+ * Terms-of-service modal: this component presents the current user-facing terms
+ * document and its accessible acknowledgment dialog. It owns modal lifecycle
+ * and local interaction state; legal text and account persistence are kept in
+ * their separate content and policy boundaries.
+ */
 import React, { useState } from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './ToSModal.css';
