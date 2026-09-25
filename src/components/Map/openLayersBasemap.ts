@@ -25,6 +25,24 @@ interface OpenFreeMapBasemapOptions {
   logPrefix: string;
 }
 
+interface RasterBasemapOptions {
+  style: Exclude<BaseMapStyle, "blank">;
+  tile: TileLayer<OSM | XYZ>;
+  labels: TileLayer<OSM | XYZ>;
+}
+
+/** Applies a raster tile source and keeps its optional label overlay in sync. */
+export const applyRasterBasemap = ({ style, tile, labels }: RasterBasemapOptions): void => {
+  tile.setSource(createTileSource(style));
+  const labelSource = createLabelOverlaySource(style);
+  if (labelSource) {
+    labels.setSource(labelSource);
+    labels.setVisible(true);
+  } else {
+    labels.setVisible(false);
+  }
+};
+
 /**
  * Replaces both vector groups after a successful load, falling back to raster
  * tiles and labels when vector loading fails. Callers own request-id
@@ -57,12 +75,11 @@ export const loadOpenFreeMapBasemap = ({
       );
       vectorBaseGroup.getLayers().clear();
       vectorReferenceGroup.getLayers().clear();
-      tile.setSource(createTileSource(style));
+      applyRasterBasemap({
+        style,
+        tile,
+        labels,
+      });
       tile.setVisible(true);
-      const labelSource = createLabelOverlaySource(style);
-      if (labelSource) {
-        labels.setSource(labelSource);
-        labels.setVisible(true);
-      }
     });
 };
