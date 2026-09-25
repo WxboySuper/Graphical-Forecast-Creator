@@ -16,6 +16,13 @@ describe('forecast workspace persistence adapter', () => {
     expect(result.forecast.forecastCycle?.cycleDate).toBe('2026-09-08');
   });
 
+  test('refuses to serialize a cycle without a registered workspace owner', () => {
+    for (const invalid of [undefined, '', 'Severe', 'mesoscale-v2']) {
+      expect(() => serializeForecastWorkspace(invalid as never, cycle(), { center: [0, 0], zoom: 0 }))
+        .toThrow('valid workspace');
+    }
+  });
+
   test('restores the workspace identity and forecast data from an envelope', () => {
     const payload = serializeForecastWorkspace('custom', cycle(), { center: [-98, 39], zoom: 4 });
 

@@ -79,6 +79,23 @@ const buildLegacyRelabeledContent = (
   legacy: true,
 });
 
+/**
+ * Rejects an outer label that would move an untagged legacy forecast into a
+ * workspace its contents cannot prove. The inner payload of a legacy package
+ * only ever validates as Severe, so any other declared owner is an unverifiable
+ * reassignment; callers see the throw before any state is touched.
+ */
+const assertDeclaredLegacyOwnership = (
+  declaredWorkspaceId: ForecastWorkspaceId | null,
+  restored: RestoredWorkspace,
+): void => {
+  if (declaredWorkspaceId === null || !restored.legacy) return;
+  if (declaredWorkspaceId === restored.workspaceId) return;
+  throw new Error(
+    `This package labels an untagged legacy forecast as ${declaredWorkspaceId} workspace, which cannot be verified. Export it from that workspace to include its workspace identity.`,
+  );
+};
+
 /** Resolves ownership for an unlabeled package. Legacy falls back to inner owner with warning. */
 const resolveUnlabeledPackageContent = (
   restored: RestoredWorkspace,
@@ -90,7 +107,7 @@ const resolveUnlabeledPackageContent = (
       workspaceId: restored.workspaceId,
       mapView: view.mapView,
       cycleMetadata: view.cycleMetadata,
-      warnings: ['This package has no workspace label; treated as a Severe legacy package.'],
+      warnings: [`This package has no workspace label; treated as a ${restored.workspaceId} legacy package.`],
       legacy: true,
     };
   }
@@ -99,7 +116,9 @@ const resolveUnlabeledPackageContent = (
     workspaceId: restored.workspaceId,
     mapView: view.mapView,
     cycleMetadata: view.cycleMetadata,
-    warnings: [],
+    warnings: [
+      `This package has no workspace label; ownership inferred from its inner forecast as ${restored.workspaceId} workspace.`,
+    ],
     legacy: false,
   };
 };
@@ -136,6 +155,7 @@ const resolveWorkflowPackageContent = (data: WorkflowExportPackage): ResolvedNat
   const declaredWorkspaceId = getDeclaredPackageWorkspace(data);
   const restored = deserializeForecastWorkspace(data.forecast);
   const view = mergePackageView(data, getInnerView(data.forecast));
+  assertDeclaredLegacyOwnership(declaredWorkspaceId, restored);
   const legacyRelabeled = resolveDeclaredLegacyContent(declaredWorkspaceId, restored, view);
   if (legacyRelabeled) return legacyRelabeled;
   assertPackageWorkspaceMatch(declaredWorkspaceId, restored);
@@ -162,11 +182,11 @@ const resolveBareFileContent = (data: unknown): ResolvedNativeFileContent => {
  * must compare workspaceId before dispatch; grade, monitor, and verification
  * readers are read-only and may inspect a forecast owned by another workspace.
  *
- * A declared outer workspace is canonical over an untagged legacy inner forecast,
- * but that relabel is surfaced as a warning so a stripped or repackaged legacy
- * file cannot silently change owners. Packages without an outer label keep
- * backward compatibility by falling back to the inner owner with a warning that
- * ownership was inferred as Severe legacy.
+ * A declared outer workspace that matches the owner a legacy inner forecast can
+ * prove is accepted with a warning. One that names any other workspace throws,
+ * because a stripped or repackaged legacy file must not change owners. Packages
+ * with no outer label keep backward compatibility by falling back to the inner
+ * owner, and both inferred-ownership outcomes are surfaced as warnings.
  */
 export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) return resolveWorkflowPackageContent(data);

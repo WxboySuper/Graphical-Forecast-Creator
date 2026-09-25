@@ -3,7 +3,12 @@ import type { CycleMetadata, SerializedOutlookVersionData, SerializedWorkflowPac
 import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
-import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { requireForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import {
+  createForecastWorkspaceSave,
+  getForecastDataFromWorkspacePayload,
+  type ForecastWorkspacePayload,
+} from './forecastWorkspaceEnvelope';
 
 export type WorkflowExportScope = 'workflow' | 'cycle';
 
@@ -12,7 +17,7 @@ export interface WorkflowExportPackage {
   schemaVersion: typeof WORKFLOW_SCHEMA_VERSION;
   exportedAt: string;
   metadata?: CycleMetadata;
-  forecast: GFCForecastSaveData;
+  forecast: ForecastWorkspacePayload;
   cycleMetadata?: CycleMetadata;
   mapView?: GFCForecastSaveData['mapView'];
   workspaceId: ForecastWorkspaceId;
@@ -91,7 +96,7 @@ export const restrictForecastToWorkflow = (
 
 interface BuildWorkflowExportPackageInput {
   scope: WorkflowExportScope;
-  forecast: GFCForecastSaveData;
+  forecast: ForecastWorkspacePayload;
   cycleMetadata?: CycleMetadata;
   styleSnapshots?: Record<string, unknown>;
   workspaceId: ForecastWorkspaceId;
@@ -134,7 +139,13 @@ const applyPackageCustomContent = (pkg: WorkflowExportPackage, scopedForecast: G
   };
 };
 
-/** Builds the JSON payload used by both workflow- and cycle-scoped exports. */
+/**
+ * Builds the JSON payload used by both workflow- and cycle-scoped exports.
+ *
+ * The workspace is resolved at runtime and the forecast is wrapped in that
+ * workspace's envelope, so the inner and outer identities a package carries
+ * always name the same owner.
+ */
 export const buildWorkflowExportPackage = ({
   scope,
   forecast,
@@ -143,16 +154,18 @@ export const buildWorkflowExportPackage = ({
   workspaceId,
   exportedAt = new Date().toISOString(),
 }: BuildWorkflowExportPackageInput): WorkflowExportPackage => {
-  const scopedForecast = resolveScopedPackageForecast(scope, forecast, cycleMetadata);
+  const owner = requireForecastWorkspaceId(workspaceId);
+  const sourceForecast = getForecastDataFromWorkspacePayload(forecast);
+  const scopedForecast = resolveScopedPackageForecast(scope, sourceForecast, cycleMetadata);
   const pkg: WorkflowExportPackage = {
     packageType: scope,
     schemaVersion: WORKFLOW_SCHEMA_VERSION,
     exportedAt,
-    workspaceId,
-    forecast: scopedForecast,
+    workspaceId: owner,
+    forecast: createForecastWorkspaceSave(owner, scopedForecast),
   };
   applyPackageMetadata(pkg, cycleMetadata);
-  applyPackageMapView(pkg, forecast);
+  applyPackageMapView(pkg, sourceForecast);
   applyPackageStyleSnapshots(pkg, styleSnapshots);
   applyPackageCustomContent(pkg, scopedForecast);
   return pkg;
@@ -200,7 +213,7 @@ export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): Seriali
   const metadata = pkg.metadata;
   if (!metadata) return null;
   const version = getSerializedPackageVersion(metadata);
-  const dayEntries = Object.entries(pkg.forecast.forecastCycle?.days ?? {});
+  const dayEntries = Object.entries(getForecastDataFromWorkspacePayload(pkg.forecast).forecastCycle?.days ?? {});
   const groupingData = buildSerializedGroupingData(dayEntries, version);
   return {
     schemaVersion: pkg.schemaVersion,

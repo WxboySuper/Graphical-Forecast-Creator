@@ -14,6 +14,7 @@ import { completionMetadataFromForecastCycle } from './forecastCompletionMetadat
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
+import { isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload } from './forecastWorkspaceEnvelope';
 import { isFeatureExposed } from '../config/featureExposure';
 import { validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
@@ -244,6 +245,7 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
  */
 export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
   if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
+  if (isWorkspaceSaveEnvelope(data)) return deserializeForecast(data.forecast);
   if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
   const forecastData = data as GFCForecastSaveData;
   if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
@@ -381,12 +383,12 @@ export const downloadGfcPackage = async (
 ): Promise<void> => {
   const zip = new JSZip();
 
-  // 1. Forecast JSON
+  // 1. Forecast JSON. Both entries carry the same workspace envelope so the
+  // manifest, its fallback copy, and the package label all name one owner.
   const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata, workspaceId });
-  const data = pkg.forecast;
-  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+  zip.file('forecast_cycle.json', JSON.stringify(pkg.forecast, null, 2));
   zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
-  addPackageDiscussions(zip, data, cycleMetadata);
+  addPackageDiscussions(zip, getForecastDataFromWorkspacePayload(pkg.forecast), cycleMetadata);
 
   const blob = await zip.generateAsync({ type: 'blob' });
 

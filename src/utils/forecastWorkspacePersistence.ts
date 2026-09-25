@@ -2,17 +2,19 @@ import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { validateForecastData } from './fileUtils';
+import {
+  isRecord,
+  isWorkspaceSaveEnvelope,
+  type ForecastWorkspacePayload,
+  type ForecastWorkspaceSaveEnvelope,
+} from './forecastWorkspaceEnvelope';
 
-/** Version of the workspace-aware save envelope, independent of forecast data version. */
-export const FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION = 1 as const;
-
-export interface ForecastWorkspaceSaveEnvelope {
-  schemaVersion: typeof FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION;
-  workspaceId: ForecastWorkspaceId;
-  forecast: GFCForecastSaveData;
-}
-
-export type ForecastWorkspacePayload = ForecastWorkspaceSaveEnvelope | GFCForecastSaveData;
+export {
+  FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+  createForecastWorkspaceSave,
+  getForecastDataFromWorkspacePayload,
+} from './forecastWorkspaceEnvelope';
+export type { ForecastWorkspaceSaveEnvelope, ForecastWorkspacePayload } from './forecastWorkspaceEnvelope';
 
 export type ForecastWorkspaceClassification =
   | { ok: true; workspaceId: ForecastWorkspaceId; payload: ForecastWorkspacePayload; legacy: boolean }
@@ -25,25 +27,11 @@ export interface ForecastWorkspaceLegacyValidators {
   isCustomPayload?: (value: unknown) => value is GFCForecastSaveData;
 }
 
-/** Creates the explicit envelope required for all new workspace-owned saves. */
-export const createForecastWorkspaceSave = (
-  workspaceId: ForecastWorkspaceId,
-  forecast: GFCForecastSaveData,
-): ForecastWorkspaceSaveEnvelope => ({
-  schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
-  workspaceId,
-  forecast,
-});
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const isWorkspaceId = (value: unknown): value is ForecastWorkspaceId =>
   typeof value === 'string' && getForecastWorkspace(value as ForecastWorkspaceId) !== undefined;
 
 const isEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
-  isRecord(value) &&
-  value.schemaVersion === FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION &&
+  isWorkspaceSaveEnvelope(value) &&
   isWorkspaceId(value.workspaceId) &&
   validateForecastData(value.forecast);
 
@@ -85,8 +73,3 @@ export const classifyForecastWorkspacePayload = (
 
   return { ok: false, reason: 'unsupported-legacy-payload' };
 };
-
-/** Extracts the forecast data from either a new envelope or a legacy payload. */
-export const getForecastDataFromWorkspacePayload = (
-  payload: ForecastWorkspacePayload,
-): GFCForecastSaveData => 'forecast' in payload ? payload.forecast : payload;

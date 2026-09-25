@@ -183,7 +183,26 @@ describe('createFileHandlers workspace envelope round-trip', () => {
     expect((imported?.[0] as { payload: ForecastCycle }).payload.cycleDate).toBe(cycleDate);
   });
 
-  it('binds a legacy inner forecast to the declared outer workspace with an explicit warning', async () => {
+  it('refuses a package whose outer label would move a legacy forecast into the active workspace', async () => {
+    const cycleDate = '2026-09-14';
+    const bare = serializeForecast(buildCycle(cycleDate), { center: [39.8, -98.5], zoom: 4 });
+    const { buildWorkflowExportPackage } = await import('../utils/workflowPackage');
+    const base = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'severe' });
+    const relabeled = { ...base, forecast: bare, workspaceId: 'custom' };
+    const handlers = createFileHandlers({
+      addToast,
+      dispatch,
+      forecastCycle: buildCycle('2026-01-01'),
+      workspaceId: 'custom',
+    });
+
+    await handlers.handleLoad(textFile('package.json', JSON.stringify(relabeled)));
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('cannot be verified'), 'error');
+  });
+
+  it('binds an enveloped inner forecast to the declared outer workspace', async () => {
     const cycleDate = '2026-09-14';
     const bare = serializeForecast(buildCycle(cycleDate), { center: [39.8, -98.5], zoom: 4 });
     const { buildWorkflowExportPackage } = await import('../utils/workflowPackage');
@@ -197,8 +216,8 @@ describe('createFileHandlers workspace envelope round-trip', () => {
 
     await handlers.handleLoad(textFile('package.json', JSON.stringify(pkg)));
 
-    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
     expect(addToast).toHaveBeenCalledWith('Forecast loaded successfully!', 'success');
+    expect(addToast).not.toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
     const imported = dispatch.mock.calls.find((call) => (call[0] as { type?: string })?.type === 'forecast/importForecastCycle');
     expect((imported?.[0] as { payload: ForecastCycle }).payload.cycleDate).toBe(cycleDate);
   });

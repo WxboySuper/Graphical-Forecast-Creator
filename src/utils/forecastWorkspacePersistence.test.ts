@@ -24,6 +24,12 @@ describe('forecast workspace persistence contract', () => {
     });
   });
 
+  test('refuses to build an envelope for a missing or unregistered workspace', () => {
+    for (const invalid of [undefined, '', 'Severe', 'mesoscale-v2', 42]) {
+      expect(() => createForecastWorkspaceSave(invalid as never, validForecast())).toThrow('valid workspace');
+    }
+  });
+
   test('uses the explicit workspace identity before legacy inference', () => {
     const payload = createForecastWorkspaceSave('custom', validForecast());
     expect(classifyForecastWorkspacePayload(payload)).toEqual({

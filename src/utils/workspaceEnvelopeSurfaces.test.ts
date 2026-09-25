@@ -185,16 +185,39 @@ describe('workspace envelope loads across file surfaces', () => {
     expect(legacy?.deserializedCycle.cycleDate).toBe(cycleDate);
   });
 
-  test('parseLoadedForecast surfaces legacy package relabel warnings without losing identity', async () => {
+  test('parseLoadedForecast rejects a package that relabels an untagged legacy forecast into Custom', async () => {
     const cycleDate = '2026-09-25';
     const bare = makeBarePayload(cycleDate);
     const { buildWorkflowExportPackage } = await import('./workflowPackage');
-    const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'custom' });
+    const base = buildWorkflowExportPackage({ scope: 'cycle', forecast: bare, workspaceId: 'severe' });
+    const relabeled = { ...base, forecast: bare, workspaceId: 'custom' };
     const addToast = jest.fn();
 
-    const loaded = await parseLoadedForecast(payloadFile(pkg), addToast, 'custom');
+    const loaded = await parseLoadedForecast(payloadFile(relabeled), addToast, 'custom');
+
+    expect(loaded).toBeNull();
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('cannot be verified'), 'error');
+    expect(addToast).not.toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
+  });
+
+  test('parseLoadedForecast warns when a package without a label carries an inner envelope', async () => {
+    const cycleDate = '2026-09-26';
+    const envelope = makeEnvelope('custom', cycleDate);
+    const { buildWorkflowExportPackage } = await import('./workflowPackage');
+    const base = buildWorkflowExportPackage({ scope: 'cycle', forecast: envelope, workspaceId: 'custom' });
+    const unlabeled = {
+      packageType: base.packageType,
+      schemaVersion: base.schemaVersion,
+      exportedAt: base.exportedAt,
+      forecast: base.forecast,
+    };
+    const addToast = jest.fn();
+
+    const loaded = await parseLoadedForecast(payloadFile(unlabeled), addToast, 'custom');
+
     expect(loaded?.deserializedCycle.cycleDate).toBe(cycleDate);
-    expect(loaded?.warnings.join(' ')).toMatch('untagged legacy');
-    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('untagged legacy'), 'warning');
+    expect(loaded?.warnings.join(' ')).toMatch('no workspace label');
+    expect(loaded?.warnings.join(' ')).toMatch('ownership inferred');
+    expect(addToast).toHaveBeenCalledWith(expect.stringContaining('ownership inferred'), 'warning');
   });
 });

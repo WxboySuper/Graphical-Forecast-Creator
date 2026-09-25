@@ -8,6 +8,7 @@ import {
   getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
+  requireForecastWorkspaceId,
 } from './forecastWorkspaces';
 
 describe('forecast workspace product contract', () => {
@@ -62,5 +63,16 @@ describe('forecast workspace product contract', () => {
     expect(getDefaultForecastWorkspace().legacyPaths).toContain('/forecast');
     expect(getForecastWorkspaceByLegacyPath('/forecast')?.id).toBe('severe');
     expect(getForecastWorkspaceByLegacyPath('/custom-products')).toBeUndefined();
+  });
+
+  test('returns a registered workspace from requireForecastWorkspaceId', () => {
+    expect(requireForecastWorkspaceId('severe')).toBe('severe');
+    expect(requireForecastWorkspaceId('custom')).toBe('custom');
+  });
+
+  test('fails closed when a writer cannot name a registered workspace', () => {
+    for (const invalid of [undefined, null, '', 'Severe', 'mesoscale-v2', 42, {}]) {
+      expect(() => requireForecastWorkspaceId(invalid)).toThrow('valid workspace');
+    }
   });
 });
