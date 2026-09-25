@@ -48,6 +48,10 @@ import reducer, {
   setOutlookOpacity,
   selectCurrentOutlookOpacity,
   toggleSignificant,
+  setMapView,
+  setActiveProbability,
+  setCustomEditorMode,
+  selectCustomLayer,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -410,6 +414,27 @@ describe('forecastSlice undo/redo', () => {
     const beforeNoop = state.forecastCycle;
     state = reducer(state, setForecastWorkspace('custom'));
     expect(state.forecastCycle).toBe(beforeNoop);
+  });
+
+  test('resets editor, map, and completion state when the route switches workspaces', () => {
+    let state = reducer(undefined, setMapView({ center: [10, 20], zoom: 9 }));
+    state = reducer(state, setActiveProbability('15%'));
+    state = reducer(state, toggleSignificant());
+    state = reducer(state, setCustomEditorMode('custom'));
+    state = reducer(state, selectCustomLayer('layer-1'));
+    state = reducer(state, validateCompletion());
+
+    expect(state.currentMapView).toEqual({ center: [10, 20], zoom: 9 });
+    expect(state.drawingState).toEqual({ activeOutlookType: 'tornado', activeProbability: '15%', isSignificant: true });
+    expect(state.customEditor.mode).toBe('custom');
+    expect(state.completionValidation.showCompletionModal).toBe(true);
+
+    state = reducer(state, setForecastWorkspace('custom'));
+
+    expect(state.currentMapView).toEqual({ center: [39.8283, -98.5795], zoom: 4 });
+    expect(state.drawingState).toEqual({ activeOutlookType: 'tornado', activeProbability: '2%', isSignificant: false });
+    expect(state.customEditor).toEqual({ mode: 'severe', activeLayerId: null, activeCategoryId: null });
+    expect(state.completionValidation).toEqual({ lastResult: null, showCompletionModal: false, omittedDays: {} });
   });
 
   test('memoizes workspace cycle selection across unrelated state changes', () => {

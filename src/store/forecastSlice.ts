@@ -1076,6 +1076,13 @@ export const forecastSlice = createSlice({
       state.isWorkflowActive = false;
       state.lastTrimResult = null;
       state.autoCategoricalError = null;
+      // Editor-owned state belongs to the workspace too: camera, active tool
+      // settings, custom-layer selection, and the completion dialog all reset so
+      // the new workspace starts from the same baseline as a fresh mount.
+      state.currentMapView = { center: [39.8283, -98.5795], zoom: 4 };
+      state.drawingState = { activeOutlookType: 'tornado', activeProbability: '2%', isSignificant: false };
+      state.customEditor = { mode: 'severe', activeLayerId: null, activeCategoryId: null };
+      state.completionValidation = { lastResult: null, showCompletionModal: false, omittedDays: {} };
       invalidateCompletionAcknowledgement(state);
     },
 
