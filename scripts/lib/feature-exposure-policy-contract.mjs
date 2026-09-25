@@ -35,10 +35,15 @@ function hasValidAcknowledgementTrackingIssue(acknowledgement) {
 }
 
 /** v1.7 workstreams that stay gated behind a removal condition. */
-export const V17_TEMPORARY_WORKSTREAM_KEYS = ['autoTstm', 'tropicalWorkspace', 'collaborationRoom'];
+export const V17_TEMPORARY_WORKSTREAM_KEYS = ['tropicalWorkspace', 'collaborationRoom'];
 
 /** v1.7 workstreams that ship for good and never declare a removal condition. */
-export const V17_PERMANENT_WORKSTREAM_KEYS = ['forecastWorkflowV2', 'verificationRelaunch', 'customProducts'];
+export const V17_PERMANENT_WORKSTREAM_KEYS = [
+  'autoTstm',
+  'forecastWorkflowV2',
+  'verificationRelaunch',
+  'customProducts',
+];
 
 /** Canonical v1.7 workstream keys — keep aligned with featureExposure.test.ts and v17WorkstreamAdoption.exposure.test.ts */
 export const V17_WORKSTREAM_KEYS = [
