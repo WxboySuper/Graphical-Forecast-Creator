@@ -54,7 +54,7 @@ describe('cycleHistoryPersistence', () => {
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
   });
 
-  test('drops persisted entries with an unregistered workspace instead of relabeling them Severe', async () => {
+  test('keeps a persisted entry with an unregistered workspace visible instead of hiding it', async () => {
     jest.doMock('./fileUtils', () => ({
       serializeForecast: jest.fn(() => ({ serialized: true })),
       deserializeForecast: jest.fn(() => ({ restored: true })),
@@ -85,11 +85,12 @@ describe('cycleHistoryPersistence', () => {
     const mod = await import('./cycleHistoryPersistence');
     const loaded = mod.loadCycleHistoryFromStorage();
 
-    // The registered owner survives untouched; the unregistered one is dropped
-    // rather than being rewritten as Severe and opened in the wrong editor.
-    expect(loaded).toHaveLength(1);
-    expect(loaded[0]?.id).toBe('owned-custom');
+    // Nothing disappears from the user's history. The registered owner keeps its
+    // identity; the unattributable one stays readable under the legacy fallback
+    // instead of being silently dropped from storage.
+    expect(loaded.map((cycle) => cycle.id)).toEqual(['owned-custom', 'malformed-workspace']);
     expect(loaded[0]?.workspaceId).toBe('custom');
+    expect(loaded[1]?.workspaceId).toBe('severe');
   });
 
   test('drops a persisted cycle whose forecast payload is a corrupt envelope', async () => {

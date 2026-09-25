@@ -196,7 +196,10 @@ describe("CloudLibraryPage", () => {
 
   it("navigates to the canonical Severe route when loading a supported cycle", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/severe-load" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(
+      serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 })
+    );
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }], loadCycle })
     );
@@ -261,23 +264,26 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     expect(screen.getByRole("tab", { name: /All 6/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Severe 3/i })).toBeInTheDocument();
+    // A record naming an unknown workspace has no owner, so it is not counted
+    // under Severe. It stays listed under All instead of disappearing.
+    expect(screen.getByRole("tab", { name: /Severe 2/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /mesoscale/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /tropical/i })).not.toBeInTheDocument();
 
     for (const label of ["Severe save", "Legacy save", "Odd save", "Custom save", "Meso save", "Trop save"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.getByText("Unknown workspace")).toBeInTheDocument();
 
     // Tab label spans plus one ownership badge per matching row.
-    expect(screen.getAllByText("Severe")).toHaveLength(4);
+    expect(screen.getAllByText("Severe")).toHaveLength(3);
     expect(screen.getAllByText("Custom")).toHaveLength(2);
     expect(screen.getAllByText("Mesoscale")).toHaveLength(1);
     expect(screen.getAllByText("Tropical")).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Severe 3/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Severe 2/i }));
     expect(screen.getByText("Legacy save")).toBeInTheDocument();
-    expect(screen.getByText("Odd save")).toBeInTheDocument();
+    expect(screen.queryByText("Odd save")).not.toBeInTheDocument();
     expect(screen.queryByText("Meso save")).not.toBeInTheDocument();
     expect(screen.getAllByText("Severe")).toHaveLength(1);
   });
@@ -419,8 +425,15 @@ describe("CloudLibraryPage", () => {
     expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
     const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
     expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
-    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
-    expect(wrapped.workspaceId).toBe('severe');
+
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+    const wrapped = buildCloudSessionPayload("severe", bare) as { workspaceId?: string };
+    expect(wrapped.workspaceId).toBe("severe");
+
+    // A payload no workspace classifier accepts is refused instead of being
+    // wrapped into an envelope that would fail again on restore.
+    expect(() => buildCloudSessionPayload("severe", { legacy: true }))
+      .toThrow(/not supported by any workspace/);
   });
 
   it("supports cloud loads only for workspaces with a registered exposed editor route", () => {

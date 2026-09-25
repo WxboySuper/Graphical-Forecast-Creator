@@ -344,7 +344,7 @@ describe('forecastSlice undo/redo', () => {
     expect(hydrated.savedCycles[0]?.workspaceId).toBe('severe');
   });
 
-  test('drops history entries that name an unknown workspace instead of claiming them for Severe', () => {
+  test('keeps history entries that name an unknown workspace instead of hiding them', () => {
     let state = reducer(undefined, { type: 'test/init' });
     state = reducer(state, saveCurrentCycle({ label: 'Direct cycle' }));
     const malformedCycle = {
@@ -353,19 +353,19 @@ describe('forecastSlice undo/redo', () => {
     };
 
     const hydratedArray = reducer(undefined, loadCycleHistory([malformedCycle as never]));
-    expect(hydratedArray.savedCycles).toHaveLength(0);
-    expect(hydratedArray.lifetimeCycleStats?.totalCyclesMade).toBe(0);
+    expect(hydratedArray.savedCycles).toHaveLength(1);
+    expect(hydratedArray.savedCycles[0]?.workspaceId).toBe('severe');
+    expect(hydratedArray.lifetimeCycleStats?.totalCyclesMade).toBe(1);
 
     const hydratedSnapshot = reducer(undefined, loadCycleHistory({
       cycles: [malformedCycle as never],
       lifetimeCycleStats: { totalCyclesMade: 1, totalForecastsMade: 0 },
     }));
-    expect(hydratedSnapshot.savedCycles).toHaveLength(0);
-    // Lifetime stats come from storage, so they survive even when no entry is kept.
+    expect(hydratedSnapshot.savedCycles).toHaveLength(1);
     expect(hydratedSnapshot.lifetimeCycleStats?.totalCyclesMade).toBe(1);
   });
 
-  test('keeps registered owners while dropping only the unowned entry beside them', () => {
+  test('keeps registered owners while still showing the unknown-owner entry', () => {
     let state = reducer(undefined, { type: 'test/init' });
     state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
     const customCycle = { ...state.savedCycles[0], workspaceId: 'custom' };
@@ -373,8 +373,9 @@ describe('forecastSlice undo/redo', () => {
 
     const hydrated = reducer(undefined, loadCycleHistory([customCycle, unknownCycle] as never));
 
-    expect(hydrated.savedCycles).toHaveLength(1);
+    expect(hydrated.savedCycles).toHaveLength(2);
     expect(hydrated.savedCycles[0]?.workspaceId).toBe('custom');
+    expect(hydrated.savedCycles[1]?.workspaceId).toBe('severe');
   });
 
   test('keeps the route-owned workspace when loading a cycle from another workspace', () => {

@@ -26,17 +26,6 @@ import {
 import { getForecastWorkspaceLoadError } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
 import {
-  getForecastWorkspace,
-  isForecastWorkspaceExposed,
-  type ForecastWorkspaceDefinition,
-  type ForecastWorkspaceId,
-} from '../config/forecastWorkspaces';
-import {
-  classifyForecastWorkspacePayload,
-  createForecastWorkspaceSave,
-} from '../utils/forecastWorkspacePersistence';
-import { getForecastWorkspacePath, getExposedForecastWorkspaceRoutes } from '../routing/forecastWorkspaceRoutes';
-import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
   getCloudCycleWorkspaceLabel,
@@ -398,7 +387,7 @@ const CloudCycleActions: React.FC<{
 }) => {
   const workspaceId = getCloudCycleWorkspaceId(cycle);
   const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
-  const loadSupported = isSupportedCloudLoadWorkspace(workspaceId, getForecastWorkspace(workspaceId));
+  const loadSupported = workspaceId !== null && isSupportedCloudLoadWorkspace(workspaceId, getForecastWorkspace(workspaceId));
   const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
 
   return (
