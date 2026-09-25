@@ -75,6 +75,16 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
+  test('autoTstm declares permanent lifecycle metadata', () => {
+    const definition = getFeatureExposure('autoTstm');
+
+    expect(definition.temporary).toBe(false);
+    expect('removalCondition' in definition).toBe(false);
+    expect(definition.trackingIssue).toBe(427);
+    expect(definition.owner.trim().length).toBeGreaterThan(0);
+    expect(definition.addedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   test.each(TEMPORARY_V17_WORKSTREAM_KEYS)('%s declares required temporary lifecycle metadata', (feature) => {
     const definition = getFeatureExposure(feature);
 
