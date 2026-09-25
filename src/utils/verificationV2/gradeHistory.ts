@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade history persistence helpers. This module defines the local
+ * storage format and loads, validates, and saves historical grade snapshots.
+ */
 import type { GradeAccountTier, GradeCard, GradeSnapshot } from '../../types/forecastGrade';
 
 /**
