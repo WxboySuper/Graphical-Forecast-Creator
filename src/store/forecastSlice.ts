@@ -26,8 +26,6 @@ export {
   selectCurrentVersionNumber,
   selectAutoCategoricalError,
 } from './forecastSelectors';
-import { cloneForecastCycle } from '../utils/fileUtils';
-import { countForecastMetrics } from '../utils/forecastMetrics';
 import { createCustomLayerReducers } from './customLayerReducers';
 import { createCustomCategoryReducers } from './customCategoryReducers';
 import { createCustomFeatureReducers } from './customFeatureReducers';
@@ -83,6 +81,8 @@ import { restoreSavedCycle } from './forecastSavedCycle';
 import { hydrateForecastCycle } from './forecastCycleHydration';
 import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 import { startBlankForecastCycle } from './forecastBlankCycle';
+import { saveForecastCycle, SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
+export { SAVED_CYCLES_LIMIT } from './forecastCyclePersistence';
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -160,7 +160,6 @@ interface OutlookVersionSnapshot {
   createdAt: string;
 }
 
-export const SAVED_CYCLES_LIMIT = 50;
 /** Storage key for the workflow-active flag; persisted by the store subscription, not by reducers. */
 export const WORKFLOW_ACTIVE_STORAGE_KEY = 'gfc-active-forecast-workflow';
 /** Resolves the local calendar date from an action's stamped timestamp instead of the clock. */
@@ -173,15 +172,6 @@ const getActionLocalCalendarDate = (action: UnknownAction): string =>
  * replaying the same action sequence from the same state produces the same ids
  * while deleting a cycle can never cause a later id to collide.
  */
-const createSavedCycleId = (state: ForecastState, now: string): string => {
-  const highest = state.savedCycles.reduce((max, cycle) => {
-    const match = /-(\d+)$/.exec(cycle.id);
-    const sequence = match ? Number(match[1]) : 0;
-    return Number.isFinite(sequence) && sequence > max ? sequence : max;
-  }, 0);
-  return `cycle-${now}-${highest + 1}`;
-};
-
 /** Filters a template's groupings to the standard set used by completion validation, returning undefined when none qualify. */
 const getWorkflowValidationGroupings = (template?: WorkflowMetadata): StandardGrouping[] | undefined => {
   const standardGroupings = (template?.groupings ?? []).filter(
@@ -393,37 +383,10 @@ export const forecastSlice = createSlice({
 
     // Cycle History Management
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
-      const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
-      const now = readActionTimestamp(action);
-      const savedCycle: SavedCycle = {
-        id: createSavedCycleId(state, now),
-        timestamp: now,
-        cycleDate: state.forecastCycle.cycleDate,
+      saveForecastCycle(state, {
         label: action.payload.label,
-        forecastCycle: forecastCycleSnapshot,
-        stats: countForecastMetrics(forecastCycleSnapshot),
-        workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
-      };
-      state.savedCycles.push(savedCycle);
-      state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
-      state.lifetimeCycleStats.totalCyclesMade += 1;
-      state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
-      const lastSavedCycleDate = state.lifetimeCycleStats.lastSavedCycleDate;
-      if (!lastSavedCycleDate || savedCycle.cycleDate > lastSavedCycleDate) {
-        const previousDate = lastSavedCycleDate ? new Date(lastSavedCycleDate).getTime() : 0;
-        const currentDate = new Date(savedCycle.cycleDate).getTime();
-        const isConsecutiveDay = currentDate - previousDate === 86400000;
-        state.lifetimeCycleStats.forecastStreak = isConsecutiveDay
-          ? (state.lifetimeCycleStats.forecastStreak ?? 0) + 1
-          : 1;
-        state.lifetimeCycleStats.lastSavedCycleDate = savedCycle.cycleDate;
-      } else if (!state.lifetimeCycleStats.forecastStreak) {
-        state.lifetimeCycleStats.forecastStreak = 1;
-      }
-      if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
-        state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
-      }
-      state.isSaved = true;
+        timestamp: readActionTimestamp(action),
+      });
     },
 
     loadSavedCycle: (state, action: PayloadAction<string>) => {
