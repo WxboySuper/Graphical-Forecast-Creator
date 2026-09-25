@@ -5,10 +5,12 @@ import {
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
   getForecastDataFromWorkspacePayload,
-  type ForecastWorkspaceClassification,
+  getForecastWorkspaceLoadError,
   type ForecastWorkspaceLegacyValidators,
   type ForecastWorkspaceSaveEnvelope,
 } from './forecastWorkspacePersistence';
+
+export { getForecastWorkspaceLoadError };
 
 export interface ForecastWorkspaceMapView {
   center: [number, number];
@@ -23,20 +25,6 @@ export const serializeForecastWorkspace = (
   cycleMetadata?: CycleMetadata,
 ): ForecastWorkspaceSaveEnvelope =>
   createForecastWorkspaceSave(workspaceId, serializeForecast(forecastCycle, mapView, cycleMetadata));
-
-/** Returns an actionable error for a payload that cannot be opened in a workspace. */
-export const getForecastWorkspaceLoadError = (
-  classification: Extract<ForecastWorkspaceClassification, { ok: false }>,
-): Error => {
-  switch (classification.reason) {
-    case 'unknown-workspace':
-      return new Error('This forecast belongs to an unknown workspace.');
-    case 'invalid':
-      return new Error('This workspace forecast is incomplete or invalid.');
-    case 'unsupported-legacy-payload':
-      return new Error('This forecast format is not supported by any workspace.');
-  }
-};
 
 /** Classifies and deserializes a saved workspace payload without mutating app state. */
 export const deserializeForecastWorkspace = (

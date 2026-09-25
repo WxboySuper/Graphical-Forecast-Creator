@@ -27,7 +27,11 @@ import {
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
-import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
+import {
+  CLOUD_CYCLE_META_KEY,
+  CLOUD_CYCLE_PAYLOAD_KEY,
+  getCloudSessionStorageKey,
+} from '../utils/cloudSessionStorage';
 import './CloudLibraryPage.css';
 
 /** Formats cloud-cycle timestamps for the library surface. */
@@ -748,8 +752,6 @@ const useCloudLibraryActions = ({
   navigate: ReturnType<typeof useNavigate>;
   userId?: string;
 }): CloudLibraryActions => {
-  const payloadKey = getScopedStorageKey('cloudCyclePayload', getStorageScope(userId));
-  const metaKey = getScopedStorageKey('cloudCycleMeta', getStorageScope(userId));
   const [message, setMessage] = useState<string | null>(null);
 
   const persistCloudCycleToSession = useCallback(
@@ -757,9 +759,11 @@ const useCloudLibraryActions = ({
       try {
         // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
         const storable = buildCloudSessionPayload(workspaceId, payload);
-        sessionStorage.setItem(payloadKey, JSON.stringify(storable));
+        // Each workspace stages into its own slot so loading a Severe cycle can
+        // never overwrite a handoff already waiting for the Custom editor.
+        sessionStorage.setItem(getCloudSessionStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, { userId, workspaceId }), JSON.stringify(storable));
         sessionStorage.setItem(
-          metaKey,
+          getCloudSessionStorageKey(CLOUD_CYCLE_META_KEY, { userId, workspaceId }),
           JSON.stringify({
             id: cycleId,
             label,
@@ -771,7 +775,7 @@ const useCloudLibraryActions = ({
         return false;
       }
     },
-    [metaKey, payloadKey]
+    [userId]
   );
 
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */

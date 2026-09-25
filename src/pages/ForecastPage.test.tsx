@@ -160,22 +160,31 @@ const seedSevereAutosaveWithMarker = (featureId: string = LOCAL_AUTOSAVE_MARKER_
 };
 
 const seedInvalidCloudHandoff = (payload: string): void => {
-  sessionStorage.setItem('cloudCyclePayload:anonymous', payload);
-  sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+  sessionStorage.setItem('cloudCyclePayload:severe:anonymous', payload);
+  sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
 };
 
-const expectInvalidCloudHandoffClearedWithoutAutosaveFallback = async (
+const seedSevereCloudHandoff = (payload: unknown): void => {
+  sessionStorage.setItem('cloudCyclePayload:severe:anonymous', JSON.stringify(payload));
+  sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+};
+
+const markerRestoredFromAutoSave = (store: ReturnType<typeof createStore>): boolean =>
+  store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === LOCAL_AUTOSAVE_MARKER_ID) === true;
+
+const expectInvalidCloudHandoffClearedWithLocalRestore = async (
   store: ReturnType<typeof createStore>,
 ): Promise<void> => {
   await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
     'The pending cloud forecast was invalid and was cleared without loading.',
     'error',
   ));
-  expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
-  expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
+  expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+  expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
   expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
-  expect(mockAddToast).not.toHaveBeenCalledWith('Session restored from auto-save.', 'success');
-  expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === LOCAL_AUTOSAVE_MARKER_ID)).not.toBe(true);
+  // A broken handoff must never hide the local session it failed to replace.
+  expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+  expect(markerRestoredFromAutoSave(store)).toBe(true);
 };
 
 const buildCycleWithSingleOutlook = (
@@ -263,15 +272,37 @@ describe('ForecastPage layout selection', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  test('surfaces a cross-workspace cloud handoff instead of silently restoring locally', async () => {
+  test('keeps a handoff staged for another workspace and restores this one locally', async () => {
+    seedSevereAutosaveWithMarker();
     const store = createStore();
     const customPayload = serializeForecastWorkspace(
       'custom',
       store.getState().forecast.forecastCycle,
       { center: [0, 0], zoom: 4 },
     );
-    sessionStorage.setItem('cloudCyclePayload:anonymous', JSON.stringify(customPayload));
-    sessionStorage.setItem('cloudCycleMeta:anonymous', JSON.stringify({ id: 'custom-1', label: 'Custom save' }));
+    sessionStorage.setItem('cloudCyclePayload:custom:anonymous', JSON.stringify(customPayload));
+    sessionStorage.setItem('cloudCycleMeta:custom:anonymous', JSON.stringify({ id: 'custom-1', label: 'Custom save' }));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    // The staged Custom handoff stays staged so the Custom workspace can still open it.
+    expect(JSON.parse(sessionStorage.getItem('cloudCyclePayload:custom:anonymous') ?? 'null')).toEqual(customPayload);
+    expect(JSON.parse(sessionStorage.getItem('cloudCycleMeta:custom:anonymous') ?? 'null')).toEqual({ id: 'custom-1', label: 'Custom save' });
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+  });
+
+  test('preserves a misfiled cross-workspace handoff instead of deleting it', async () => {
+    seedSevereAutosaveWithMarker();
+    const store = createStore();
+    const customPayload = serializeForecastWorkspace(
+      'custom',
+      store.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    );
+    const misfiled = JSON.stringify(customPayload);
+    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', misfiled);
 
     renderForecastPage(store);
 
@@ -279,21 +310,59 @@ describe('ForecastPage layout selection', () => {
       'This cloud cycle belongs to a different forecast workspace and was not loaded.',
       'error',
     ));
-    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBe(misfiled);
     expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
   });
 
-  test('clears a malformed cloud handoff through session restore without falling back to autosave', async () => {
+  test('loads a handoff staged for this workspace and clears it', async () => {
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    seedSevereCloudHandoff(serializeForecastWorkspace('severe', sourceCycle, { center: [0, 0], zoom: 4 }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('loads a handoff staged for the signed-in account scope', async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const scopedKey = 'cloudCyclePayload:severe:user-user-1';
+    sessionStorage.setItem(scopedKey, JSON.stringify(
+      serializeForecastWorkspace('severe', sourceCycle, { center: [0, 0], zoom: 4 }),
+    ));
+    sessionStorage.setItem('cloudCycleMeta:severe:user-user-1', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('clears a malformed cloud handoff and still restores the local session', async () => {
     seedSevereAutosaveWithMarker();
     seedInvalidCloudHandoff('not-json');
 
     const store = createStore();
     renderForecastPage(store);
 
-    await expectInvalidCloudHandoffClearedWithoutAutosaveFallback(store);
+    await expectInvalidCloudHandoffClearedWithLocalRestore(store);
   });
 
-  test('clears an unknown-workspace cloud handoff through session restore without falling back to autosave', async () => {
+  test('clears an unknown-workspace cloud handoff and still restores the local session', async () => {
     seedSevereAutosaveWithMarker();
     seedInvalidCloudHandoff(JSON.stringify({
       schemaVersion: 1,
@@ -304,7 +373,7 @@ describe('ForecastPage layout selection', () => {
     const store = createStore();
     renderForecastPage(store);
 
-    await expectInvalidCloudHandoffClearedWithoutAutosaveFallback(store);
+    await expectInvalidCloudHandoffClearedWithLocalRestore(store);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
@@ -429,7 +498,8 @@ describe('ForecastPage layout selection', () => {
       workspaceId: 'custom',
       layer: stagedLayer,
     });
-    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    // The failed handoff adds no layer, and the workspace keeps its own editor mode.
+    expect(store.getState().forecast.customEditor.mode).toBe('custom');
   });
 
   test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {
@@ -661,11 +731,15 @@ describe('ForecastPage helpers', () => {
     expect(hasRestorableCloudSelection({ id: 'abc', label: 'Cycle' })).toBe(true);
     expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
 
-    sessionStorage.setItem('cloudCyclePayload', 'payload');
-    sessionStorage.setItem('cloudCycleMeta', 'meta');
-    clearStoredCloudSession();
+    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', 'payload');
+    sessionStorage.setItem('cloudCycleMeta:severe:anonymous', 'meta');
+    sessionStorage.setItem('cloudCyclePayload:custom:anonymous', 'custom-payload');
+    clearStoredCloudSession(null, 'severe');
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
     expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
-    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    // Another workspace's staged handoff is not this workspace's to clear.
+    expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBe('custom-payload');
   });
 
   test('recovers a pending rollover prompt after session restore marks the cycle saved', () => {

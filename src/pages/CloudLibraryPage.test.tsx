@@ -162,7 +162,8 @@ describe("CloudLibraryPage", () => {
 
   it("navigates to the canonical Severe route when loading a supported cycle", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/severe-load" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 }));
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }], loadCycle })
     );
@@ -172,6 +173,22 @@ describe("CloudLibraryPage", () => {
 
     await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
     expect(mockNavigate).toHaveBeenCalledWith(getDefaultForecastWorkspacePath());
+  });
+
+  it("keeps the editor closed when the loaded payload cannot be staged", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
+    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("cloudCyclePayload:severe:user-user-1")).toBeNull();
   });
 
   it("returns early without calling loadCycle when the selected cycle no longer resolves", async () => {
@@ -378,14 +395,13 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
   });
 
-  it("does not double-wrap an already-enveloped cloud handoff payload", () => {
+  it("rejects an invalid cloud handoff payload instead of wrapping it", () => {
     const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
     const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
     expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
     const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
     expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
-    const wrapped = buildCloudSessionPayload('severe', { legacy: true }) as { workspaceId?: string };
-    expect(wrapped.workspaceId).toBe('severe');
+    expect(() => buildCloudSessionPayload("severe", { legacy: true })).toThrow(/not supported by any workspace/);
   });
 
   it("supports cloud loads only for workspaces with a registered exposed editor route", () => {

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import type { CustomCategoryId, HostedCustomProduct } from '../../types/customProducts';
+import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../../lib/customProductHandoff';
 import CustomProductsPage from './CustomProductsPage';
 
 const mockUseAuth = jest.fn();
@@ -98,6 +99,28 @@ describe('CustomProductsPage', () => {
     expect(customProducts.deleteProduct).toHaveBeenCalledWith(product);
     expect(customProducts.useProduct).toHaveBeenCalledWith(product);
     expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
+  });
+
+  test('refuses to stage a product when the Custom workspace route is unavailable', async () => {
+    const user = userEvent.setup();
+    const customProducts = result({ products: [product], useProduct: jest.fn().mockReturnValue({ id: 'layer-1' }) });
+    mockUseCustomProducts.mockReturnValue(customProducts);
+    const originalTarget = globalThis.__GFC_BUILD_TARGET__;
+    globalThis.__GFC_BUILD_TARGET__ = 'production';
+
+    try {
+      render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
+
+      await user.click(screen.getByRole('button', { name: /Use in Forecast/i }));
+
+      // Staging without a route would leave a handoff no editor can consume.
+      expect(customProducts.useProduct).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(/Custom forecast is not available yet/i);
+      expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
+    } finally {
+      globalThis.__GFC_BUILD_TARGET__ = originalTarget;
+    }
   });
 
   test('keeps editing and new-map use unavailable without premium while retaining deletion', async () => {

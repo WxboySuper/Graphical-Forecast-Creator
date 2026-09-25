@@ -15,7 +15,8 @@ export interface ForecastWorkspaceSaveEnvelope {
 export type ForecastWorkspacePayload = ForecastWorkspaceSaveEnvelope | GFCForecastSaveData;
 
 export type ForecastWorkspaceClassification =
-  | { ok: true; workspaceId: ForecastWorkspaceId; payload: ForecastWorkspacePayload; legacy: boolean }
+  | { ok: true; workspaceId: ForecastWorkspaceId; payload: ForecastWorkspaceSaveEnvelope; legacy: false }
+  | { ok: true; workspaceId: ForecastWorkspaceId; payload: GFCForecastSaveData; legacy: true }
   | { ok: false; reason: 'invalid' | 'unknown-workspace' | 'unsupported-legacy-payload' };
 
 export interface ForecastWorkspaceLegacyValidators {
@@ -24,6 +25,20 @@ export interface ForecastWorkspaceLegacyValidators {
   /** Recognizes a legacy Custom payload owned by the Custom workspace. */
   isCustomPayload?: (value: unknown) => value is GFCForecastSaveData;
 }
+
+/** Returns an actionable error for a payload that cannot be opened in a workspace. */
+export const getForecastWorkspaceLoadError = (
+  classification: Extract<ForecastWorkspaceClassification, { ok: false }>,
+): Error => {
+  switch (classification.reason) {
+    case 'unknown-workspace':
+      return new Error('This forecast belongs to an unknown workspace.');
+    case 'invalid':
+      return new Error('This workspace forecast is incomplete or invalid.');
+    case 'unsupported-legacy-payload':
+      return new Error('This forecast format is not supported by any workspace.');
+  }
+};
 
 /** Creates the explicit envelope required for all new workspace-owned saves. */
 export const createForecastWorkspaceSave = (
@@ -77,7 +92,8 @@ export const classifyForecastWorkspacePayload = (
     return { ok: true, workspaceId: 'severe', payload: value, legacy: true };
   }
 
-  if (validators.isCustomPayload?.(value)) {
+  const isCustomPayload = validators.isCustomPayload;
+  if (isCustomPayload && isCustomPayload(value)) {
     return { ok: true, workspaceId: 'custom', payload: value, legacy: true };
   }
 
@@ -89,17 +105,32 @@ export const getForecastDataFromWorkspacePayload = (
   payload: ForecastWorkspacePayload,
 ): GFCForecastSaveData => 'forecast' in payload ? payload.forecast : payload;
 
-/** Builds the session payload for a cloud handoff without double-wrapping an envelope. */
+/**
+ * Builds the session payload for a cloud handoff.
+ *
+ * The payload is classified with real validators before anything is written:
+ * an invalid or unknown envelope throws instead of being wrapped as forecast
+ * data, an explicit envelope must name the workspace that opened it, and a
+ * payload a Custom validator recognized stays Custom. Legacy saves carry no
+ * identity of their own, so the workspace that opened the cycle owns them.
+ */
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
-): unknown => {
-  const classification = classifyForecastWorkspacePayload(payload);
-  if (classification.ok && !classification.legacy) {
+  validators: ForecastWorkspaceLegacyValidators = {},
+): ForecastWorkspaceSaveEnvelope => {
+  const classification = classifyForecastWorkspacePayload(payload, validators);
+  if (!classification.ok) throw getForecastWorkspaceLoadError(classification);
+
+  if (!classification.legacy) {
     if (classification.workspaceId !== workspaceId) {
       throw new Error('Cloud payload belongs to a different forecast workspace.');
     }
-    return payload;
+    return classification.payload;
   }
-  return createForecastWorkspaceSave(workspaceId, payload as GFCForecastSaveData);
+
+  if (classification.workspaceId === 'custom' && workspaceId !== 'custom') {
+    throw new Error('Cloud payload belongs to a different forecast workspace.');
+  }
+  return createForecastWorkspaceSave(workspaceId, classification.payload);
 };

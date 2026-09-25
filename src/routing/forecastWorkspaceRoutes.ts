@@ -83,8 +83,8 @@ export const getExposedForecastWorkspaceRoutes = (target?: BuildTarget): Forecas
     .filter((workspace) => getForecastWorkspaceByPath(workspace.path)?.id === workspace.id)
     .map((workspace) => ({ id: workspace.id, path: workspace.path, routePath: workspace.id }));
 
-/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
-export const isSupportedCloudLoadWorkspace = (
+/** A workspace has a usable editor only when this build target registers its route. */
+export const isForecastWorkspaceRouteAvailable = (
   workspaceId: ForecastWorkspaceId,
   workspace: ForecastWorkspaceDefinition | undefined,
   target?: BuildTarget,
@@ -97,6 +97,13 @@ export const isSupportedCloudLoadWorkspace = (
   }
   return getExposedForecastWorkspaceRoutes(target).some((route) => route.id === workspaceId);
 };
+
+/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
+export const isSupportedCloudLoadWorkspace = (
+  workspaceId: ForecastWorkspaceId,
+  workspace: ForecastWorkspaceDefinition | undefined,
+  target?: BuildTarget,
+): boolean => isForecastWorkspaceRouteAvailable(workspaceId, workspace, target);
 
 /** Resolves a known workspace route only when its build target does not expose it. */
 export const resolveUnavailableForecastWorkspacePath = (

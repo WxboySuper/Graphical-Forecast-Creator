@@ -7,7 +7,8 @@ import { Card, CardContent } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
 import { discardCustomProductForecastHandoff } from '../../lib/customProductHandoff';
-import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
+import { getForecastWorkspacePath, isForecastWorkspaceRouteAvailable } from '../../routing/forecastWorkspaceRoutes';
+import { getForecastWorkspace } from '../../config/forecastWorkspaces';
 import { isBuiltInCustomProduct } from '../../lib/builtInCustomProducts';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
@@ -134,6 +135,12 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
     setEditing(product);
   };
   const useProduct = (product: HostedCustomProduct) => {
+    if (!onProductUse && !isForecastWorkspaceRouteAvailable('custom', getForecastWorkspace('custom'))) {
+      // Staging without a route would leave a handoff nothing can ever consume,
+      // so the product stays put until the Custom workspace exists on this target.
+      setApplicationError('Custom forecast is not available yet. Your product was not loaded.');
+      return;
+    }
     const layer = customProducts.useProduct(product);
     if (!layer) return;
     if (onProductUse) {

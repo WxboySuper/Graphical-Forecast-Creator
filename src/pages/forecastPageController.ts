@@ -35,7 +35,12 @@ import {
   writeStoredDayValue,
   writeStoredRolloverPrompt,
 } from '../utils/dayRolloverStorage';
-import { getStorageScope, getScopedStorageKey } from '../utils/storageScope';
+import {
+  CLOUD_CYCLE_META_KEY,
+  CLOUD_CYCLE_PAYLOAD_KEY,
+  clearCloudSessionStorage,
+  getCloudSessionStorageKey,
+} from '../utils/cloudSessionStorage';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { queueProductMetric } from '../utils/productMetrics';
@@ -55,9 +60,6 @@ interface StoredCloudMeta {
   id?: string;
   label?: string;
 }
-
-const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
-const CLOUD_CYCLE_META_KEY = 'cloudCycleMeta';
 
 /** Reads the current map view through the adapter, with the application default as a safe fallback. */
 export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
@@ -249,19 +251,15 @@ export const getMismatchedCloudWorkspaceId = (
     return restored.workspaceId === workspaceId ? null : restored.workspaceId;
   } catch {
     // A non-empty value that fails to parse or classify is a corrupt handoff,
-    // not an absent one. Callers must clear it instead of falling back to local restore.
+    // not an absent one. Callers clear it, then still run local restore.
     return INVALID_CLOUD_HANDOFF;
   }
 };
 
-export const clearStoredCloudSession = (userId?: string | null) => {
-  sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId)));
-  sessionStorage.removeItem(getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId)));
-  if (!userId) {
-    sessionStorage.removeItem(CLOUD_CYCLE_PAYLOAD_KEY);
-    sessionStorage.removeItem(CLOUD_CYCLE_META_KEY);
-  }
-};
+export const clearStoredCloudSession = (
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
+) => clearCloudSessionStorage({ userId, workspaceId });
 
 export const hasRestorableCloudSelection = (
   cloudMeta: StoredCloudMeta | null,
@@ -296,32 +294,32 @@ const restoreCloudSession = ({
   userId,
   workspaceId,
 }: RestoreCloudSessionOptions): boolean => {
-  const payloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, getStorageScope(userId));
-  const storedValue = sessionStorage.getItem(payloadKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY) : null);
+  const payloadKey = getCloudSessionStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, { userId, workspaceId });
+  const storedValue = sessionStorage.getItem(payloadKey);
   const payload = parseStoredForecastPayload(storedValue, workspaceId);
   if (!payload) {
-    // A pending handoff for another workspace must not fail silently into local
-    // restore. Surface it, drop the stale handoff, and stop the fallback chain.
-    // The same applies to a present-but-unreadable handoff: clear it and stop
-    // instead of treating absence as corruption or falling back to autosave.
+    // A handoff staged for another workspace stays staged for its owner: this
+    // mount must not delete it or block its own local restore. A value this
+    // workspace cannot read is cleared, and local restore still runs so a
+    // broken handoff never hides the user's own session.
     const handoffIssue = getMismatchedCloudWorkspaceId(storedValue, workspaceId);
+    if (handoffIssue === INVALID_CLOUD_HANDOFF) {
+      clearStoredCloudSession(userId, workspaceId);
+      addToast('The pending cloud forecast was invalid and was cleared without loading.', 'error');
+      return false;
+    }
     if (handoffIssue) {
-      clearStoredCloudSession(userId);
-      if (handoffIssue === INVALID_CLOUD_HANDOFF) {
-        addToast('The pending cloud forecast was invalid and was cleared without loading.', 'error');
-      } else {
-        addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
-      }
-      return true;
+      addToast('This cloud cycle belongs to a different forecast workspace and was not loaded.', 'error');
+      return false;
     }
     return false;
   }
 
-  const metaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, getStorageScope(userId));
-  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(metaKey) ?? (!userId ? sessionStorage.getItem(CLOUD_CYCLE_META_KEY) : null));
+  const metaKey = getCloudSessionStorageKey(CLOUD_CYCLE_META_KEY, { userId, workspaceId });
+  const cloudMeta = parseStoredCloudMeta(sessionStorage.getItem(metaKey));
   restoreStoredForecastPayload(payload, dispatch);
   if (onCloudCycleLoaded && hasRestorableCloudSelection(cloudMeta)) onCloudCycleLoaded({ id: cloudMeta.id, label: cloudMeta.label });
-  clearStoredCloudSession(userId);
+  clearStoredCloudSession(userId, workspaceId);
   addToast('Cloud forecast loaded successfully.', 'success');
   return true;
 };

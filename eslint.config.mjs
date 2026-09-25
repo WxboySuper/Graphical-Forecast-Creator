@@ -98,7 +98,7 @@ export default [
           'expectCopyVerification',
           'expectCopyResult',
           'expectOutlookTypeEmpty',
-          'expectInvalidCloudHandoffClearedWithoutAutosaveFallback',
+          'expectInvalidCloudHandoffClearedWithLocalRestore',
           'expectSingleOutlookRestored',
           'assertGatedRoutesAbsent',
           'assertNavigationHidden',

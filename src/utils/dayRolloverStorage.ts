@@ -28,8 +28,8 @@ const parseRolloverPrompt = (stored: string | null): StoredRolloverPrompt | null
 /** Returns the localStorage key for rollover state in one account scope and one workspace. */
 export function getRolloverStorageKey(
   key: string,
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): string {
   return getScopedStorageKey(`${key}:${workspaceId}`, getStorageScope(userId));
 }
@@ -74,8 +74,8 @@ export function removeStoredDayValue(key: string): void {
  */
 export function readLegacyRolloverDayValue(
   key: string,
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): string | null {
   if (workspaceId !== DEFAULT_FORECAST_WORKSPACE) return null;
   const accountScoped = readStoredDayValue(getLegacyRolloverStorageKey(key, userId));
@@ -85,16 +85,16 @@ export function readLegacyRolloverDayValue(
 
 /** Reads a pre-workspace pending prompt for the default workspace only, using the same ownership rule as the day keys. */
 export function readLegacyRolloverPrompt(
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): StoredRolloverPrompt | null {
   return parseRolloverPrompt(readLegacyRolloverDayValue(DAY_ROLLOVER_PENDING_KEY, userId, workspaceId));
 }
 
 /** Reads a pending rollover prompt for one workspace, ignoring malformed or unavailable storage. */
 export function readStoredRolloverPrompt(
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): StoredRolloverPrompt | null {
   return parseRolloverPrompt(readStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId, workspaceId)));
 }
@@ -102,16 +102,16 @@ export function readStoredRolloverPrompt(
 /** Persists a pending rollover prompt for one account scope and workspace. */
 export function writeStoredRolloverPrompt(
   prompt: StoredRolloverPrompt,
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): void {
   writeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId, workspaceId), JSON.stringify(prompt));
 }
 
 /** Removes a pending rollover prompt for one account scope and workspace. */
 export function clearStoredRolloverPrompt(
-  userId?: string | null,
-  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+  userId: string | null | undefined,
+  workspaceId: ForecastWorkspaceId,
 ): void {
   removeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId, workspaceId));
 }
