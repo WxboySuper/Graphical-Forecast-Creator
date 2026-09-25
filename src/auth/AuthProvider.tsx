@@ -27,15 +27,39 @@ import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
-import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
+import { type MonitorSettings } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
-  normalizeForecastUiVariant,
   readStoredForecastUiVariant,
   type ForecastUiVariant,
   writeStoredForecastUiVariant,
 } from '../utils/forecastUiVariant';
+import {
+  areUserSettingsEqual,
+  createProfilePayload,
+  createSettingsSnapshot,
+  getRemoteSeedPayload,
+  getSettingsSyncError,
+  getSettingsUpdateError,
+  mergeUserSettingsDocument,
+  readProfileBetaAccess,
+  readRemoteSettings,
+  type UserProfileDocument,
+  type UserSettingsDocument,
+} from './authSettings';
+
+export {
+  areUserSettingsEqual,
+  createProfilePayload,
+  createSettingsSnapshot,
+  getRemoteSeedPayload,
+  getSettingsSyncError,
+  getSettingsUpdateError,
+  mergeUserSettingsDocument,
+  readProfileBetaAccess,
+  readRemoteSettings,
+} from './authSettings';
+export type { BuildSettingsArgs, UserProfileDocument, UserSettingsDocument } from './authSettings';
 
 /**
  * Safely parse JSON from a Response. Returns parsed value or null on failure.
@@ -69,21 +93,6 @@ export const extractLocalUserFromData = (data: unknown) => {
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
-
-interface UserSettingsDocument {
-  darkMode: boolean;
-  baseMapStyle: OverlaysState['baseMapStyle'];
-  stateBorders: boolean;
-  counties: boolean;
-  ghostOutlooks: OverlaysState['ghostOutlooks'];
-  defaultForecasterName: string;
-  forecastUiVariant: ForecastUiVariant;
-  monitorSettings: MonitorSettings;
-}
-
-interface UserProfileDocument {
-  betaAccess?: boolean;
-}
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -175,103 +184,6 @@ export const deleteHostedAccount = async (
   await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
 };
 
-/** Builds the normalized settings document shape from current local state. */
-interface BuildSettingsArgs {
-  darkMode: boolean;
-  overlays: OverlaysState;
-  defaultForecasterName: string;
-  forecastUiVariant: ForecastUiVariant;
-  monitorSettings?: MonitorSettings;
-}
-/** Builds the normalized settings document shape from current local state. */
-export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
-  const { darkMode, overlays, defaultForecasterName, forecastUiVariant, monitorSettings } = args;
-  return {
-    darkMode,
-    baseMapStyle: overlays.baseMapStyle,
-    stateBorders: overlays.stateBorders,
-    counties: overlays.counties,
-    ghostOutlooks: overlays.ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
-  };
-};
-
-/** Validates a Firestore settings payload before the app applies it locally. */
-export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
-  if (!value) {
-    return null;
-  }
-
-  const {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings,
-  } = value;
-
-  if (typeof darkMode !== 'boolean') {
-    return null;
-  }
-
-  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') {
-    return null;
-  }
-
-  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) {
-    return null;
-  }
-
-  if (!baseMapStyle || !ghostOutlooks) {
-    return null;
-  }
-
-  return {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
-    monitorSettings: normalizeMonitorSettings(monitorSettings),
-  };
-};
-
-/** Creates the user profile payload written to Firestore on hosted sign-in. */
-export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
-  email: user.email ?? '',
-  displayName: user.displayName ?? '',
-  photoURL: user.photoURL ?? '',
-  providers: (user.providerData ?? []).map((provider) => provider.providerId),
-  updatedAt: serverTimestamp(),
-  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
-});
-
-/** Reads the current beta-access flag from one hosted profile document snapshot. */
-export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
-  Boolean(value?.betaAccess);
-
-/** Normalizes update-write failures into a user-facing sync error message. */
-export const getSettingsUpdateError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to update synced settings right now.';
-
-/** Normalizes initial/settings hydration failures into a user-facing sync error message. */
-export const getSettingsSyncError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to sync account settings right now.';
-
-/** Builds the payload used when seeding or repairing a remote settings document. */
-export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
-  ...settings,
-  updatedAt: serverTimestamp(),
-  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
-});
-
 type LocalPostRequestOptions = {
   body?: unknown;
   failureMessage: string;
@@ -296,41 +208,6 @@ export const postLocalJson = async <TResponse = Record<string, unknown>>(
 
   return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
 };
-
-/** Compares hosted settings fields excluding updatedAt metadata. */
-const compareUserSettingsFields = (
-  left: UserSettingsDocument,
-  right: UserSettingsDocument,
-): boolean =>
-  left.darkMode === right.darkMode &&
-  left.baseMapStyle === right.baseMapStyle &&
-  left.stateBorders === right.stateBorders &&
-  left.counties === right.counties &&
-  left.defaultForecasterName === right.defaultForecasterName &&
-  left.forecastUiVariant === right.forecastUiVariant &&
-  JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
-  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
-
-/** True when two normalized settings payloads contain the same user-visible values. */
-export const areUserSettingsEqual = (
-  left: UserSettingsDocument | null,
-  right: UserSettingsDocument | null
-): boolean => {
-  if (!left || !right) {
-    return left === right;
-  }
-
-  return compareUserSettingsFields(left, right);
-};
-
-/** Applies a partial settings patch onto a normalized baseline document. */
-export const mergeUserSettingsDocument = (
-  base: UserSettingsDocument,
-  patch: Partial<UserSettingsDocument>,
-): UserSettingsDocument => ({
-  ...base,
-  ...patch,
-});
 
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
