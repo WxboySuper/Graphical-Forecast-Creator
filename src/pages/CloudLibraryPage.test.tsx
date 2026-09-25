@@ -139,7 +139,7 @@ describe("CloudLibraryPage", () => {
     const loadButton = screen.getByRole("button", { name: /load/i });
     expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
-    expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
     fireEvent.click(loadButton);
     await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
     expect(mockNavigate).toHaveBeenCalledWith(getForecastWorkspacePath("custom"));
@@ -157,7 +157,7 @@ describe("CloudLibraryPage", () => {
     expect(loadButton).not.toBeDisabled();
     expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
-    expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
   });
 
   it("navigates to the canonical Severe route when loading a supported cycle", async () => {
@@ -189,7 +189,7 @@ describe("CloudLibraryPage", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("keeps hidden-workspace Load activatable so the blocked message stays reachable", () => {
+  it("disables Load for a hidden workspace and explains the save is still stored", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();
     mockUseCloudCycles.mockReturnValue(
@@ -198,16 +198,15 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).not.toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "true");
+    expect(loadButton).toBeDisabled();
     expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-meso-1");
-    expect(screen.getByText("Mesoscale cloud loading is not available yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Mesoscale cloud loading is not available yet. Your save is still stored."),
+    ).toBeInTheDocument();
 
     fireEvent.click(loadButton);
     expect(loadCycle).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Mesoscale cloud loading is not available yet. Your save is still stored."
-    );
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("shows resolved workspace ownership in All without inventing gated tabs", () => {
