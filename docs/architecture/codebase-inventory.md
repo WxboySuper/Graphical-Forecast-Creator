@@ -3,11 +3,11 @@
 Issue: [#486](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/486)
 Parent tracker: [#434](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/434)
 
-This is the current-state guide for contributors. It explains where behavior
-lives, how the application is assembled, and which boundaries are intentional.
-DOC-03 (#488) supplies the generated local inventory as the exhaustive
-file-level companion; this document stays curated and human-sized so it is
-useful on its own before the later stack layer is present.
+This is the curated guide for the current architecture. It explains where
+behavior lives, how the application is assembled, and which boundaries are
+intentional. DOC-03 (#488) supplies the generated local inventory as the
+exhaustive file-level companion; this document stays human-sized so it remains
+useful when the generated snapshot is unavailable.
 
 ## Product shape
 
@@ -106,13 +106,14 @@ These services are optional from the local developer experience. A local build
 must remain useful without hosted credentials, while hosted-only capabilities
 must be visibly gated and server-checked.
 
-## Baseline inventory snapshot
+## Historical inventory baseline
 
-The prior read-only audit indexed **591 files**, recorded **11 mutual owner
-edges**, and retained the following highest-volume owners and cross-owner
-imports. This snapshot keeps the reviewable baseline in committed
-documentation; DOC-03 adds a deterministic generator for current checkout
-data rather than silently replacing these facts with ignored output.
+The original read-only audit indexed **591 files** and recorded **11 mutual
+owner edges**. The tables below preserve that historical baseline for the
+review that produced DOC-03 (#488); they are not a live count of the current
+checkout. DOC-03's deterministic generator is the source for current file and
+dependency counts, and its ignored output should not be copied into this
+curated guide without an intentional documentation update.
 
 Largest owner/file counts:
 
