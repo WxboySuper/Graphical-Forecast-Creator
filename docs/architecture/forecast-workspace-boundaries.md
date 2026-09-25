@@ -15,12 +15,12 @@ intent and that record describes that branch's code.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Exposure owner |
+| Workspace | Canonical path | v1.8 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
-| Tropical | `/forecast/tropical` | future; tracked separately from the legacy surface | Workspace status |
-| Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
+| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
+| Tropical | `/forecast/tropical` | future; tracked in #432 | Workspace status |
+| Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
