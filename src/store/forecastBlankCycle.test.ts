@@ -66,7 +66,16 @@ describe('startBlankForecastCycle', () => {
     const state = createInitialForecastState();
     const history = { undoStack: [], redoStack: [] };
     state.historyByDay[1] = history;
-    state.discussionDraftsByScope = { day1: { mode: 'diy', diyContent: 'Draft' } };
+    state.discussionDraftsByScope = {
+      day1: {
+        mode: 'diy',
+        validStart: '2026-07-04T00:00:00.000Z',
+        validEnd: '2026-07-05T00:00:00.000Z',
+        forecasterName: 'Test forecaster',
+        diyContent: 'Draft',
+        lastModified: timestamp,
+      },
+    };
     state.isSaved = true;
     state.outlookVersionSnapshots = [{ version: 1, days: {}, createdAt: timestamp }];
 
