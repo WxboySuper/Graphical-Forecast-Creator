@@ -22,6 +22,7 @@ const TEMPORARY_V17_WORKSTREAM_KEYS = [
 ] as const satisfies readonly FeatureKey[];
 
 const PERMANENT_V17_WORKSTREAM_KEYS = [
+  'autoTstm',
   'forecastWorkflowV2',
   'verificationRelaunch',
   'customProducts',
@@ -41,7 +42,7 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(TEMPORARY_V17_WORKSTREAM_KEYS.filter((feature) => feature !== 'autoTstm'))(
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS)(
     '%s stays disabled on every build target',
     (feature) => {
       for (const target of BUILD_TARGETS) {
