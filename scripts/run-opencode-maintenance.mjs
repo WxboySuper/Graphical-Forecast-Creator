@@ -4,9 +4,13 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
 const model = process.env.OPENCODE_MODEL;
+const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS ?? 15 * 60 * 1000);
 
 if (!promptPath || !outputPath || !model || !process.env.OPENCODE_API_KEY) {
   throw new Error('OpenCode prompt, output, model, and API key configuration are required.');
+}
+if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 120 * 60 * 1000) {
+  throw new Error('OpenCode timeout must be between one minute and two hours.');
 }
 
 const prompt = readFileSync(promptPath, 'utf8');
@@ -28,7 +32,7 @@ const result = spawnSync(
     encoding: 'utf8',
     env,
     maxBuffer: 2 * 1024 * 1024,
-    timeout: 15 * 60 * 1000,
+    timeout: timeoutMs,
   },
 );
 

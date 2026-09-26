@@ -1,122 +1,175 @@
-# OpenCode maintenance jobs
+# OpenCode maintenance
 
-GFC keeps its comment-driven OpenCode workflow in
-`.github/workflows/opencode.yml`. The automatic jobs use the same OpenCode CLI
-and model secret through `scripts/run-opencode-maintenance.mjs`. GitHub API
-context and publishing stay in workflow steps. The model process receives no
-GitHub token and cannot edit the checkout or run shell commands.
+GFC uses the existing OpenCode CLI and `OPENCODE_API_KEY` secret for bounded
+maintenance jobs. GitHub Actions supplies repository context and publishes
+results. OpenCode does not receive a GitHub token for investigation or review.
+The implementation worker can edit a small, eligible area, but it cannot run
+commands or publish. A separate workflow step validates and publishes its
+change as a PR. A human reviews and merges every PR.
 
-## Jobs
+## Job schedule
 
-| Job | Trigger | Output |
+| Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look review | Eligible PR opened, updated, reopened, or marked ready | One PR conversation comment per head SHA |
-| Issue triage | Issue opened | A technical comment or a focused request for missing details; no comment when there is nothing useful to add |
-| Bug hunt | Every Monday | At most two high-confidence, evidence-backed issues from one rotating code area |
-| Dependency and security review | First day of each month | At most two issues for alerts that affect code GFC uses; no automatic upgrades |
-| Docs and changelog check | As part of each PR first-look review | Specific documentation or changelog gaps in the review comment |
-| Bounded research | Explicit `workflow_dispatch` request | Read-only findings in the workflow run summary |
+| PR first-look | PR opened, new commits, reopened, ready for review | One review comment per revision and event review type |
+| CI supplement | `Checks | CI` completes for an associated PR | One supplemental comment per revision after check results are available |
+| Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
+| Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
+| Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
+| Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
+| Weekly deep audit | Sunday at 06:43 UTC | Rotating maintenance category and code area; at most eight issues |
+| Monthly deep audit | First day of the month at 09:19 UTC | Broad rotating audit; at most twelve issues |
+| Audit issue worker | Every two hours at minute 17 | Selects one eligible audit issue, rechecks it, validates a bounded fix, and opens a PR |
 
-The scheduled bug hunt rotates through `src/monitor`, `src/forecast`,
-`src/verification`, `server`, `scripts`, and `src/billing`. Before OpenCode
-runs, the workflow copies the shared runner to the temporary directory and
-uses Git sparse checkout to expose only the selected code area plus root-level
-project files. It also rejects bug-hunt findings whose file path is outside
-that area. The dependency job
-reads open Dependabot alerts and checks the affected dependency against GFC's
-manifests and code. If the Dependabot API is unavailable, the run fails rather
-than reporting that no vulnerabilities exist. Research requests are limited to
-4,000 characters, and an optional scope field is limited to 1,000 characters.
+Scheduled investigations run even when earlier runs found nothing. A complete
+empty result advances that job's rotation. Failed and inconclusive results do
+not advance it. High investigation frequency is intentional. Finding creation
+requires concrete evidence, a valid file and line, an impact description, and a
+high confidence score. Existing fingerprints suppress repeat issues.
 
-## PR review safety
+The weekly bug hunt rotates through `src/monitor`, `src/forecast`,
+`src/verification`, `src/components`, `src/utils`, `server`, `scripts`, and
+`src/billing`. Git sparse checkout exposes only the selected source area plus
+root project files to that model run. The publisher also rejects bug-hunt
+findings outside the selected area. The daily security worker rotates through
+security themes such as authorization, credential handling, validation, trust
+boundaries, API behavior, and dependency reachability. It never implements a
+security finding.
 
-The PR workflow uses `pull_request_target` so its comment permission is not
-downgraded by pull request token policy. It only runs for non-draft PRs from
-the same repository when the author association is owner, member, or
-collaborator. Fork PRs do not receive the model API key.
+The weekly audit rotates through bugs, architecture, incomplete work, dead
+paths, error handling, verification, documentation, API correctness, and
+reliability. The monthly audit covers broader cross-cutting concerns. These
+audits can create several verified issues in one run. Neither audit implements
+its findings. The Monday dependency review runs in the evening after
+Dependabot's Monday activity. It reads current alerts and open Dependabot PR
+context, but never upgrades or merges a dependency.
 
-The workflow checks out the trusted default branch, not the PR branch. It gets
-the PR metadata, diff patches, and check results through the GitHub API. It
-includes no more than 30 changed files and 2,000 patch characters per file. If
-that limit truncates the diff, the prompt asks OpenCode to state that limit.
-The job has a 20-minute timeout.
+## Audit issue lifecycle
 
-The token grants `contents: read`, `pull-requests: read`, `checks: read`, and
-`issues: write`. `issues: write` lets the workflow post a PR conversation
-comment. It has no `contents: write` or `pull-requests: write`, so it cannot
-push or merge. The model only gets `read`, `glob`, and `grep` tools inside the
-checkout. Every other OpenCode tool is denied, including shell, edit, write,
-web, and subagent tools. Reads outside the repository are denied, and `.env`
-files stay blocked. The job has no ID token or personal access token.
+Audit workflows create issues with the `opencode-audit` label and a hidden
+machine marker containing a fingerprint, category, issue kind, file, and
+permitted scope. The workflow adds `opencode-audit-eligible` only for lower-risk
+bug, documentation, test, and maintainability findings in approved repository
+areas. Security, dependency, authorization, billing, deployment, and other
+sensitive findings require a human-led fix.
 
-The PR diff and text are untrusted data. The workflow never checks out or runs
-PR code. The OpenCode process cannot call GitHub APIs; a separate workflow step
-posts its text result after checking that the PR head has not changed.
+The worker ignores ordinary issues, including issues that copy the audit
+marker. An issue must be open, authored by `github-actions[bot]`, contain the
+exact audit marker, and carry both labels added by the audit publisher. This
+keeps public issue text from becoming implementation instructions.
 
-## Issue triage
+## Implementation worker
 
-Triage runs once for a new non-bot issue. It reads the trusted default branch and gives
-the issue text to OpenCode as untrusted data. It can add code-backed context or
-ask a focused reproduction question. It cannot assign labels or edit files.
-When no useful comment is warranted, the workflow posts a hidden deduplication
-marker so a rerun does not spend model time on the same issue again.
+The worker selects the oldest eligible issue and claims it with a label and a
+hidden state comment. A repository-wide concurrency group allows only one
+worker run at a time. A claim younger than 90 minutes blocks another run. A
+stale claim can be reclaimed after the worker timeout. Setup or model failures
+release the claim and wait six hours before retry. A failed validation or an
+unclear, risky, or out-of-scope issue gets `opencode-audit-needs-human` and is
+removed from the queue. An open implementation PR gets `opencode-audit-pr` and
+is removed from the queue.
 
-## Scheduled maintenance and state
+The worker checks the finding again before editing. OpenCode can read the
+repository, but its edit permission allows changes only under the issue's
+machine-recorded directory. It has no shell, GitHub token, subagent, web,
+release, or deployment tools. It cannot commit or push. The workflow installs
+dependencies before starting OpenCode, then a separate step checks the staged
+diff, runs related Jest tests, runs ESLint for source changes, runs TypeScript
+checking for TypeScript changes, and builds the application for `src/` changes.
+That validation step does not receive the model key or GitHub token.
 
-Scheduled work has a shared concurrency group so overlapping runs cannot
-overwrite each other's state. On its first run, the scheduled workflow creates
-one issue titled `[Maintenance state] OpenCode job history`. It stores a small
-JSON record in a hidden bot comment on that issue. The record keeps each
-category's last successful period, inspected scope, commit SHA, finding count,
-and the last attempt status.
+After validation, a fixed publisher step creates a branch named
+`opencode/audit-<issue>-<run>-<attempt>`, pushes only that branch, opens a PR
+referencing the audit issue, and dispatches the first-look reviewer. Its token
+has the GitHub permissions needed to push that branch, create a PR, update the
+issue labels, and dispatch the review workflow. The OpenCode process never sees
+that token. The publisher has no merge, release, deployment, or repository
+settings code path. Existing branch protection and required human review remain
+the merge boundary. The workflow never merges a PR.
 
-The weekly bug hunt advances to the next code area only after a successful
-inspection. A failed or inconclusive run records its status but does not mark
-the period complete, so a later schedule can retry it. The local state snapshot
-is updated after the GitHub state comment is published, so failure cleanup
-cannot replace a published `inconclusive` result with `failed`. A regression
-test covers this file-based transition. Findings include a
-stable fingerprint in the issue body. Before opening an issue, the job checks
-existing issues for that fingerprint. It caps output at two findings per run
-and reports only findings with a concrete file, line, evidence, and declared
-confidence of at least 0.9. The dependency job never upgrades packages.
+## PR review and issue triage
 
-If the Dependabot alerts endpoint is disabled or unavailable, the workflow
-fails and records the attempt. It does not treat an inaccessible alert list as
-an empty list. GitHub Actions keeps logs for failed runs; the state comment
-stores a short pointer to those logs, not environment values or credentials.
+The first-look review uses `pull_request_target` but checks out the trusted
+default branch and reads PR content through the GitHub API. It skips forks,
+drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
+and 2,000 patch characters per file. Its token can read contents, PRs, and
+checks, and post an issue comment. It has no contents or pull-request write
+permission. The model can only read, list, and search the checkout.
 
-## Cost and configuration
+The first event review and the CI supplement use separate revision markers, so
+completed checks add context without repeating the first comment. GITHUB_TOKEN
+does not start normal pull-request workflows when the worker opens a PR, so the
+publisher explicitly dispatches the first-look review. Fork PRs never receive
+the model key.
 
-Event jobs run only for new issues or meaningful PR events. Scheduled work runs
-weekly or monthly, and the PR head marker, issue marker, scheduled period key,
-shared concurrency group, and 15-minute model timeout limit duplicate work.
-Each workflow also has an overall timeout. Empty bug-hunt results update state
-without opening an issue. Issue triage emits no visible comment when it has
-nothing useful to add.
+Issue triage runs only on newly opened non-bot issues. It can read code and
+comment with a specific technical observation or a focused question. If it has
+nothing useful to add, it leaves a hidden deduplication marker and no visible
+comment. It cannot assign labels or edit files. Audit-generated issues skip
+triage, avoiding an automation loop.
 
-All jobs use the existing `OPENCODE_API_KEY` Actions secret and the model
-configured in the workflows. Each workflow installs the exact npm package
-version `opencode-ai@1.18.32` instead of piping the live installer into Bash.
-Update the pinned version deliberately after reviewing a release. The API key is
-available only to the model-run step. The runner removes GitHub and Actions
-tokens from the child process environment.
+## State, deduplication, and failure handling
 
-The scheduled state issue is public because repository issues are public. Do
-not store secrets, user data, or long investigation transcripts in it.
+Scheduled jobs share one state issue titled `[Maintenance state] OpenCode job
+history`. A hidden bot comment stores the last successful period, last scope
+and focus, inspected commit, finding count, stable reported fingerprints, and
+last attempt status. The scheduled workflow serializes state updates.
 
-## Adding or changing a job
+The state comment is updated first. The same full state is then written back
+to `STATE_PATH` before an inconclusive result marks its step failed. Failure
+cleanup changes only a `started` attempt to `failed`, so it cannot overwrite a
+published `inconclusive` or `complete` result. Regression tests cover all
+three transitions. A run that cannot reach the state issue or Dependabot API
+fails visibly rather than recording an empty result.
 
-Give a job one trigger, one narrow prompt, an input-size limit, a timeout, and
-an explicit completion condition. Add only the token permissions its workflow
-steps need. Do not pass the GitHub token into the OpenCode process. For a new
-scheduled category, add a category key to the state issue record, a sensible
-interval, and a bounded code scope. Deduplicate reports using a stable marker
-that can be checked before creating an issue or comment.
+Audit issues carry stable fingerprints, and the worker state comment records
+`claimed`, `failed`, `needs-human`, or `pr-open`. Existing open PRs are checked
+before claiming an issue. PR review comments include the head SHA and review
+type. Issue triage uses one marker per issue. These markers keep retries and
+multiple triggers from creating duplicate work or comments.
 
-Autonomous jobs do not merge, release, deploy, change repository settings,
-write branches, or open corrective PRs. A research run returns findings for
-the maintainer to use in a separate engineering session. The first-look review
-can point out a fix worth proposing in a separate PR, but does not create that
-PR itself. The manual comment-driven workflow remains a separate,
-user-requested path.
+## Permissions and human control
+
+| Workflow | GitHub permissions |
+| --- | --- |
+| PR first-look | `contents: read`, `pull-requests: read`, `checks: read`, `issues: write` |
+| Issue triage | `contents: read`, `issues: write` |
+| Scheduled investigations | `contents: read`, `issues: write`, `security-events: read` |
+| Audit issue worker | `contents: write`, `issues: write`, `pull-requests: write`, `actions: write` for the isolated publisher job |
+
+The audit worker's GitHub token is available only to GitHub Actions steps. The
+model receives only `OPENCODE_API_KEY`, read access, and scoped file editing.
+GitHub API calls that create issues, update labels, push a worker branch, open
+a PR, or dispatch first-look review live in separate workflow steps. No job
+gets deployment or release permissions. No job can change repository settings
+or branch protection. Protected branches remain guarded by repository rules;
+all merges are human decisions.
+
+## Compute and output limits
+
+Daily inspections have 15- to 20-minute model limits. Dependency review has a
+25-minute limit. Weekly and monthly audits can use up to 60 and 100 minutes.
+The implementation worker runs every two hours but skips the model entirely
+when no eligible issue is waiting. A worker handles one issue per invocation,
+and retries failed setup or model runs no more than once every six hours.
+
+Finding limits are three for daily jobs, five for the dependency review, eight
+for weekly audits, and twelve for monthly audits. A candidate still needs a
+valid repository path and line, evidence, impact, a high confidence score, and
+a fingerprint not present in the existing issue backlog. OpenCode's CLI is
+installed from the exact npm package version `opencode-ai@1.18.32`. Update the
+version deliberately after reviewing a release.
+
+## Turning jobs off
+
+Each system has its own workflow and can be disabled from the repository's
+Actions settings without affecting the others:
+
+- PR review and CI supplement: `opencode-first-look.yml`
+- Issue triage: `opencode-issue-triage.yml`
+- Daily, dependency, weekly, and monthly investigations: `opencode-scheduled-maintenance.yml`
+- Audit implementation workers: `opencode-audit-issue-worker.yml`
+
+The manual comment-driven workflow in `opencode.yml` remains a separate,
+maintainer-requested path. The bounded research workflow can also be disabled
+independently in Actions.

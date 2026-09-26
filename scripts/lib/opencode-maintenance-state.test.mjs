@@ -55,3 +55,13 @@ test('a failure before a result is published changes a started attempt to failed
   assert.equal(markScheduledFailure(contextData, '2026-09-26T14:00:00Z'), true)
   assert.equal(contextData.state.lastAttempt.status, 'failed')
 })
+
+test('a complete result advances the category period and cannot be downgraded to failed', () => {
+  const contextData = startedContext()
+
+  applyScheduledResult(contextData, { status: 'complete', findings: [] }, 'def456', '2026-09-26T15:00:00Z', 0)
+  assert.equal(contextData.state.jobs['bug-hunt'].lastSuccessKey, '2026-W39')
+  assert.equal(contextData.state.jobs['bug-hunt'].head, 'def456')
+  assert.equal(markScheduledFailure(contextData, '2026-09-26T15:00:01Z'), false)
+  assert.equal(contextData.state.lastAttempt.status, 'complete')
+})
