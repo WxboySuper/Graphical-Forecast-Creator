@@ -116,9 +116,7 @@ jobs:
 
       - name: Install OpenCode CLI
         if: steps.context.outputs.run == 'true'
-        run: |
-          curl -fsSL https://opencode.ai/install | bash -s -- --version 1.18.32
-          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+        run: npm install --global --no-audit --no-fund opencode-ai@1.18.32
 
       - name: Run read-only review
         if: steps.context.outputs.run == 'true'

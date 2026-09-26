@@ -18,7 +18,11 @@ GitHub token and cannot edit the checkout or run shell commands.
 | Bounded research | Explicit `workflow_dispatch` request | Read-only findings in the workflow run summary |
 
 The scheduled bug hunt rotates through `src/monitor`, `src/forecast`,
-`src/verification`, `server`, `scripts`, and `src/billing`. The dependency job
+`src/verification`, `server`, `scripts`, and `src/billing`. Before OpenCode
+runs, the workflow copies the shared runner to the temporary directory and
+uses Git sparse checkout to expose only the selected code area plus root-level
+project files. It also rejects bug-hunt findings whose file path is outside
+that area. The dependency job
 reads open Dependabot alerts and checks the affected dependency against GFC's
 manifests and code. If the Dependabot API is unavailable, the run fails rather
 than reporting that no vulnerabilities exist. Research requests are limited to
@@ -68,7 +72,10 @@ and the last attempt status.
 
 The weekly bug hunt advances to the next code area only after a successful
 inspection. A failed or inconclusive run records its status but does not mark
-the period complete, so a later schedule can retry it. Findings include a
+the period complete, so a later schedule can retry it. The local state snapshot
+is updated after the GitHub state comment is published, so failure cleanup
+cannot replace a published `inconclusive` result with `failed`. A regression
+test covers this file-based transition. Findings include a
 stable fingerprint in the issue body. Before opening an issue, the job checks
 existing issues for that fingerprint. It caps output at two findings per run
 and reports only findings with a concrete file, line, evidence, and declared
@@ -89,8 +96,9 @@ without opening an issue. Issue triage emits no visible comment when it has
 nothing useful to add.
 
 All jobs use the existing `OPENCODE_API_KEY` Actions secret and the model
-configured in the workflows. The CLI is pinned to version `1.18.32`; update
-that version deliberately after reviewing a release. The API key is
+configured in the workflows. Each workflow installs the exact npm package
+version `opencode-ai@1.18.32` instead of piping the live installer into Bash.
+Update the pinned version deliberately after reviewing a release. The API key is
 available only to the model-run step. The runner removes GitHub and Actions
 tokens from the child process environment.
 
