@@ -9,9 +9,9 @@ const decodeModelResult = (raw) => {
 const validateEntryFormat = (entries) => {
   for (const entry of entries) {
     if (!ENTRY_PATTERN.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
-    if (/[\x60<>]/.test(entry) || /https?:\/\//i.test(entry) || /\[[^\]\r\n]+\]\([^)]+\)/.test(entry)) {
-      throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
-    }
+    if (/[\x60<>]/.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+    if (/https?:\/\//i.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+    if (/\[[^\]\r\n]+\]\([^)]+\)/.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
   }
   return entries;
 };
