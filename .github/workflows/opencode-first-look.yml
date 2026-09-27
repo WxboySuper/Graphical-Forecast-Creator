@@ -46,6 +46,9 @@ jobs:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
+      - name: Exclude tracked environment files from the model workspace
+        run: node scripts/prepare-opencode-workspace.mjs
+
       - name: Prepare bounded PR context
         id: context
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0

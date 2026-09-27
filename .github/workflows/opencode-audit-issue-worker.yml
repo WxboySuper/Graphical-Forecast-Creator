@@ -68,8 +68,11 @@ jobs:
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner, repo: context.repo.repo, state: 'open', per_page: 100,
             })
-            const commentsByIssue = new Map()
-            const requested = process.env.REQUESTED_ISSUE ? Number(process.env.REQUESTED_ISSUE) : null
+            const requestedText = process.env.REQUESTED_ISSUE?.trim()
+            if (requestedText && !/^[1-9]\d*$/.test(requestedText)) {
+              throw new Error('The requested issue number must be a positive integer.')
+            }
+            const requested = requestedText ? Number(requestedText) : null
             const candidates = []
             for (const issue of issues) {
               if (requested && issue.number !== requested) continue
@@ -80,7 +83,6 @@ jobs:
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, per_page: 100,
               })
-              commentsByIssue.set(issue.number, comments)
               const prior = comments.find((comment) => comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(stateMarker))
               let workerState = null
               if (prior) {
@@ -103,9 +105,19 @@ jobs:
             const openPulls = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner, repo: context.repo.repo, state: 'open', per_page: 100,
             })
-            if (openPulls.some((pull) => pull.body?.includes(`Fixes #${issue.number}`))) {
+            const existingPull = openPulls.find((pull) => new RegExp(`(?:fixes|closes|resolves)\\s+#${issue.number}\\b`, 'i').test(pull.body ?? ''))
+            if (existingPull) {
               core.notice(`An open PR already references audit issue #${issue.number}.`)
               await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, labels: ['opencode-audit-pr'] })
+              for (const label of ['opencode-audit-claimed', 'opencode-audit-eligible']) {
+                try { await github.rest.issues.removeLabel({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, name: label }) } catch (error) { if (error.status !== 404) throw error }
+              }
+              if (prior) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner, repo: context.repo.repo, comment_id: prior.id,
+                  body: `${stateMarker}\n${JSON.stringify({ status: 'pr-open', issue: issue.number, pullRequest: existingPull.number, pullRequestUrl: existingPull.html_url, at: new Date().toISOString() })}`,
+                })
+              }
               core.setOutput('run', 'false')
               return
             }
@@ -140,7 +152,7 @@ jobs:
             const permissions = {
               '*': 'deny',
               external_directory: { '*': 'deny' },
-              read: { '*': 'allow', '*.env': 'deny', '*.env.*': 'deny', '*.env.example': 'allow' },
+              read: { '*': 'allow', '**/.env': 'deny', '**/.env.*': 'deny', '*.env': 'deny', '*.env.*': 'deny', '.env.example': 'allow', '**/.env.example': 'allow' },
               edit: { '*': 'deny', [`${metadata.scope}/**`]: 'allow' },
               glob: 'allow',
               grep: 'allow',
@@ -175,9 +187,9 @@ jobs:
           node-version: 22.22.0
           cache: pnpm
 
-      - name: Install repository dependencies
+      - name: Exclude tracked environment files from the model workspace
         if: steps.select.outputs.run == 'true'
-        run: pnpm install --frozen-lockfile
+        run: node scripts/prepare-opencode-workspace.mjs
 
       - name: Install OpenCode CLI
         if: steps.select.outputs.run == 'true'
@@ -194,6 +206,10 @@ jobs:
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-audit-worker-output.md
           OPENCODE_TIMEOUT_MS: 1200000
         run: node scripts/run-opencode-maintenance.mjs
+
+      - name: Install repository dependencies for validation
+        if: steps.select.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Validate the scoped change and run repository checks
         id: validate

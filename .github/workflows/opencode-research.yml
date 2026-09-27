@@ -31,6 +31,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Exclude tracked environment files from the model workspace
+        run: node scripts/prepare-opencode-workspace.mjs
+
       - name: Prepare explicit research request
         env:
           REQUEST_TEXT: ${{ inputs.request }}

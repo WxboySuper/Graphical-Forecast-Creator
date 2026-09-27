@@ -27,7 +27,14 @@ not advance it. High investigation frequency is intentional. Finding creation
 requires concrete evidence, a valid file and line, an impact description, and a
 high confidence score. Existing fingerprints suppress repeat issues.
 
-The weekly bug hunt rotates through `src/monitor`, `src/forecast`,
+Each model workspace uses Git sparse checkout to omit every tracked `.env` or
+`.env.*` file except `.env.example`. This applies to review, triage, scheduled,
+research, and implementation runs. Bug hunts combine those exclusions with the
+selected source-area scope. OpenCode's grep permission is pattern-based rather
+than matched-file-based, so these files are removed from its searchable
+worktree instead of relying on grep permission rules to filter results.
+
+The daily bug hunt rotates through `src/monitor`, `src/forecast`,
 `src/verification`, `src/components`, `src/utils`, `server`, `scripts`, and
 `src/billing`. Git sparse checkout exposes only the selected source area plus
 root project files to that model run. The publisher also rejects bug-hunt
@@ -72,11 +79,15 @@ is removed from the queue.
 The worker checks the finding again before editing. OpenCode can read the
 repository, but its edit permission allows changes only under the issue's
 machine-recorded directory. It has no shell, GitHub token, subagent, web,
-release, or deployment tools. It cannot commit or push. The workflow installs
-dependencies before starting OpenCode, then a separate step checks the staged
-diff, runs related Jest tests, runs ESLint for source changes, runs TypeScript
+release, or deployment tools. It cannot commit or push. OpenCode sees the
+sanitized source checkout before dependencies are installed. After it exits,
+the workflow installs dependencies and a separate step checks the staged diff,
+runs related Jest tests, runs ESLint for source changes, runs TypeScript
 checking for TypeScript changes, and builds the application for `src/` changes.
 That validation step does not receive the model key or GitHub token.
+Validation also routes deletions, renames, symlinks, more than eight changed
+files, or a staged diff larger than 32 KiB to `opencode-audit-needs-human`.
+Those changes never reach the PR publisher.
 
 After validation, a fixed publisher step creates a branch named
 `opencode/audit-<issue>-<run>-<attempt>`, pushes only that branch, opens a PR
@@ -115,7 +126,9 @@ history`. A hidden bot comment stores the last successful period, last scope
 and focus, inspected commit, finding count, stable reported fingerprints, and
 last attempt status. The scheduled workflow serializes state updates.
 
-The state comment is updated first. The same full state is then written back
+The state schema calls the schedule key `period` and stores successful runs as
+`lastSuccessPeriod`, matching the workflow caller. Existing `lastSuccessKey`
+values are migrated when the state comment is read. The state comment is updated first. The same full state is then written back
 to `STATE_PATH` before an inconclusive result marks its step failed. Failure
 cleanup changes only a `started` attempt to `failed`, so it cannot overwrite a
 published `inconclusive` or `complete` result. Regression tests cover all
@@ -134,7 +147,7 @@ multiple triggers from creating duplicate work or comments.
 | --- | --- |
 | PR first-look | `contents: read`, `pull-requests: read`, `checks: read`, `issues: write` |
 | Issue triage | `contents: read`, `issues: write` |
-| Scheduled investigations | `contents: read`, `issues: write`, `security-events: read` |
+| Scheduled investigations | `contents: read`, `issues: write`, `security-events: read`, `vulnerability-alerts: read` |
 | Audit issue worker | `contents: write`, `issues: write`, `pull-requests: write`, `actions: write` for the isolated publisher job |
 
 The audit worker's GitHub token is available only to GitHub Actions steps. The

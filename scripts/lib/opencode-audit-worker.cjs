@@ -4,6 +4,8 @@ const auditMarkerPattern = /<!-- gfc-opencode-audit:v1 fingerprint=([a-f0-9]{20}
 const eligibleRoots = ['src/monitor/', 'src/forecast/', 'src/verification/', 'src/components/', 'src/utils/', 'docs/']
 const highRiskPath = /(^|\/)(billing|auth|authorization|security|entitlement|payment|stripe|deploy|deployment|secrets?)(\/|\.|$)/i
 const eligibleKinds = new Set(['bug', 'documentation', 'test', 'maintainability'])
+const MAX_IMPLEMENTATION_FILES = 8
+const MAX_IMPLEMENTATION_DIFF_BYTES = 32 * 1024
 
 function parseAuditIssue(issue) {
   if (issue.pull_request || issue.state !== 'open' || issue.user?.login !== 'github-actions[bot]') return null
@@ -29,4 +31,48 @@ function isWorkPathAllowed(file, scope) {
   return !highRiskPath.test(normalizedFile) && !/(^|\/)\.env(?:\.|$)/i.test(normalizedFile)
 }
 
-module.exports = { isWorkPathAllowed, parseAuditIssue }
+function implementationSizeLimit(paths, diffBytes) {
+  if (paths.length > MAX_IMPLEMENTATION_FILES) {
+    return `The generated change touches ${paths.length} files; the limit is ${MAX_IMPLEMENTATION_FILES}.`
+  }
+  if (!Number.isSafeInteger(diffBytes) || diffBytes < 0 || diffBytes > MAX_IMPLEMENTATION_DIFF_BYTES) {
+    return `The generated diff is ${diffBytes} bytes; the limit is ${MAX_IMPLEMENTATION_DIFF_BYTES} bytes.`
+  }
+  return null
+}
+
+function sensitiveEnvironmentPaths(paths) {
+  return paths.filter((file) => {
+    const basename = path.posix.basename(file.replace(/\\/g, '/'))
+    return basename === '.env' || (basename.startsWith('.env.') && basename !== '.env.example')
+  })
+}
+
+function sparseCheckoutPatterns({ scope, excludedPaths }) {
+  const patterns = scope
+    ? ['/*', '!/*/']
+    : ['/*']
+  if (scope) {
+    const segments = scope.split('/')
+    let current = ''
+    for (let index = 0; index < segments.length; index += 1) {
+      current = current ? `${current}/${segments[index]}` : segments[index]
+      patterns.push(`/${current}/`)
+      if (index < segments.length - 1) patterns.push(`!/${current}/*/`)
+    }
+    patterns.push(`/${scope}/**`)
+  }
+  for (const file of excludedPaths) {
+    const escaped = file.replace(/\\/g, '/').replace(/[\\*?\[\]]/g, '\\$&')
+    patterns.push(`!/${escaped}`)
+  }
+  return patterns
+}
+
+module.exports = {
+  implementationSizeLimit,
+  isWorkPathAllowed,
+  parseAuditIssue,
+  sensitiveEnvironmentPaths,
+  sparseCheckoutPatterns,
+}

@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
-import { isWorkPathAllowed } from './lib/opencode-audit-worker.cjs';
+import { appendFileSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import { implementationSizeLimit, isWorkPathAllowed } from './lib/opencode-audit-worker.cjs';
 
 const scope = process.env.AUDIT_SCOPE;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
@@ -14,10 +14,8 @@ const report = readFileSync(outputPath, 'utf8').trim();
 const statusEntries = execFileSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], {
   encoding: 'utf8',
 });
-const changedPaths = statusEntries
-  .split('\0')
-  .filter(Boolean)
-  .map((entry) => entry.slice(3));
+const statusRecords = statusEntries.split('\0').filter(Boolean);
+const changedPaths = statusRecords.map((entry) => entry.slice(3));
 
 function setOutputs(values) {
   appendFileSync(githubOutput, Object.entries(values).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
@@ -39,9 +37,29 @@ if (!report || !changedPaths.length) {
   process.exit(0);
 }
 
+if (statusRecords.some((entry) => /[DCRTU]/.test(entry.slice(0, 2)))) {
+  markHuman('The generated change deletes, renames, or changes file types; a maintainer should review it.');
+  process.exit(0);
+}
+
+const sizeRejection = implementationSizeLimit(changedPaths, 0);
+if (sizeRejection) {
+  markHuman(sizeRejection);
+  process.exit(0);
+}
+
 for (const file of changedPaths) {
   if (!isWorkPathAllowed(file, scope)) {
     throw new Error(`Changed path is outside the audit issue scope or is sensitive: ${file}`);
+  }
+  try {
+    if (!lstatSync(file).isFile()) {
+      markHuman('The generated change contains a non-regular file; a maintainer should review it.');
+      process.exit(0);
+    }
+  } catch {
+    markHuman('The generated change contains a missing or unreadable file; a maintainer should review it.');
+    process.exit(0);
   }
 }
 
@@ -53,6 +71,21 @@ if (diffCheck.status !== 0) {
   process.stderr.write(diffCheck.stdout ?? '');
   process.stderr.write(diffCheck.stderr ?? '');
   throw new Error('The generated change has whitespace errors.');
+}
+
+const diff = spawnSync('git', ['diff', '--cached', '--binary', '--no-ext-diff', '--no-color'], {
+  encoding: 'utf8',
+  maxBuffer: 64 * 1024,
+});
+if (diff.error?.code === 'ENOBUFS') {
+  markHuman('The generated diff is larger than the validation safety limit.');
+  process.exit(0);
+}
+if (diff.status !== 0) throw new Error('Could not measure the generated diff size.');
+const diffRejection = implementationSizeLimit(changedPaths, Buffer.byteLength(diff.stdout, 'utf8'));
+if (diffRejection) {
+  markHuman(diffRejection);
+  process.exit(0);
 }
 
 const sourcePaths = changedPaths.filter((file) => /\.(?:[cm]?[jt]sx?)$/i.test(file));

@@ -8,6 +8,7 @@ import { test } from 'node:test'
 const require = createRequire(import.meta.url)
 const {
   applyScheduledResult,
+  createScheduledContext,
   markScheduledFailure,
   persistScheduledState,
 } = require('./opencode-maintenance-state.cjs')
@@ -17,14 +18,14 @@ function startedContext() {
     trackerNumber: 42,
     stateCommentId: 17,
     category: 'bug-hunt',
-    runKey: '2026-W39',
+    period: '2026-W39',
     scope: 'src/monitor',
     state: {
       version: 1,
       jobs: {},
       lastAttempt: {
         category: 'bug-hunt',
-        runKey: '2026-W39',
+        period: '2026-W39',
         status: 'started',
         scope: 'src/monitor',
       },
@@ -57,11 +58,48 @@ test('a failure before a result is published changes a started attempt to failed
 })
 
 test('a complete result advances the category period and cannot be downgraded to failed', () => {
-  const contextData = startedContext()
+  const contextData = createScheduledContext(startedContext())
 
   applyScheduledResult(contextData, { status: 'complete', findings: [] }, 'def456', '2026-09-26T15:00:00Z', 0)
-  assert.equal(contextData.state.jobs['bug-hunt'].lastSuccessKey, '2026-W39')
+  assert.equal(contextData.state.jobs['bug-hunt'].lastSuccessPeriod, '2026-W39')
   assert.equal(contextData.state.jobs['bug-hunt'].head, 'def456')
   assert.equal(markScheduledFailure(contextData, '2026-09-26T15:00:01Z'), false)
   assert.equal(contextData.state.lastAttempt.status, 'complete')
+})
+
+test('the scheduled caller persists the same period field used for result state and deduplication', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/opencode-scheduled-maintenance.yml', import.meta.url), 'utf8')
+  assert.match(workflow, /createScheduledContext\(\{[\s\S]*?\bcategory,\s*period,\s*scope/)
+  assert.match(workflow, /JSON\.stringify\(contextData\)/)
+  assert.match(workflow, /lastSuccessPeriod\s*===\s*period/)
+  assert.ok(
+    workflow.indexOf('let stateCommentId = stateComment?.id ?? null') <
+      workflow.indexOf('const contextData = createScheduledContext('),
+  )
+
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'gfc-opencode-period-'))
+  const statePath = path.join(directory, 'state.json')
+  try {
+    const contextData = createScheduledContext({
+      ...startedContext(),
+      trackerNumber: 42,
+      stateCommentId: 17,
+      period: '2026-W39',
+      focus: 'correctness',
+      limits: { maxFindings: 3 },
+    })
+    applyScheduledResult(contextData, { status: 'complete', findings: [] }, 'def456', '2026-09-26T15:00:00Z', 0)
+    persistScheduledState(contextData, statePath)
+
+    const persisted = JSON.parse(readFileSync(statePath, 'utf8'))
+    assert.equal(persisted.state.jobs['bug-hunt'].lastSuccessPeriod, persisted.period)
+    assert.equal(persisted.state.lastAttempt.period, persisted.period)
+    assert.equal(markScheduledFailure(persisted, '2026-09-26T15:00:01Z'), false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('scheduled context rejects a missing period instead of storing an undefined success key', () => {
+  assert.throws(() => createScheduledContext({ ...startedContext(), period: undefined }), /category and period are required/)
 })

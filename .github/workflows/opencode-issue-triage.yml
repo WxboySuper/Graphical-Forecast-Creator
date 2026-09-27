@@ -21,6 +21,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Exclude tracked environment files from the model workspace
+        run: node scripts/prepare-opencode-workspace.mjs
+
       - name: Prepare issue context
         id: context
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
