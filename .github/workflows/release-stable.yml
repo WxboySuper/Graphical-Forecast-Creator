@@ -21,14 +21,58 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  final_changelog_audit:
+    if: inputs.confirmation == 'RELEASE-STABLE' && startsWith(inputs.ref, 'stable/')
+    name: Final changelog audit
+    uses: ./.github/workflows/opencode-changelog-audit.yml
+    with:
+      target_ref: ${{ inputs.ref }}
+      force: true
+      trigger_reason: stable-pre-release
+    secrets:
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+  changelog_gate:
+    name: Require clean changelog
+    needs: final_changelog_audit
+    if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out trusted release tooling
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Block release unless the final audit is clean
+        env:
+          AUDIT_RESULT: ${{ needs.final_changelog_audit.result }}
+          AUDIT_STATUS: ${{ needs.final_changelog_audit.outputs.status }}
+          TARGET_REF: ${{ inputs.ref }}
+          AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
+        run: node scripts/require-opencode-changelog-clean.mjs
+
+  release:
+    needs: [final_changelog_audit, changelog_gate]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     env:
       RELEASE_REF: ${{ inputs.ref }}
       CONFIRMATION: ${{ inputs.confirmation }}
+      AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
     steps:
       - name: Require explicit confirmation
         run: |
@@ -53,6 +97,10 @@ jobs:
         id: version
         run: |
           set -euo pipefail
+          if [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
+            echo "::error::${RELEASE_REF} moved after the final changelog audit; rerun the release workflow." >&2
+            exit 1
+          fi
           case "$RELEASE_REF" in
             stable/*) ;;
             *) echo "::error::Stable releases must come from stable/*, got $RELEASE_REF" >&2; exit 1 ;;
