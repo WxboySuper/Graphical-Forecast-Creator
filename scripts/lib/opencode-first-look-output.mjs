@@ -4,27 +4,66 @@ const MAX_TEXT_LENGTH = 900;
 const ASSESSMENTS = new Set(['addressed', 'still-open', 'unclear']);
 
 const boundedText = (value, name) => {
-  if (typeof value !== 'string' || !value.trim() || value.length > MAX_TEXT_LENGTH || /[\r\n]/.test(value)) {
-    throw new Error(`First-look ${name} must be a non-empty string under ${MAX_TEXT_LENGTH} characters.`);
-  }
+  assertTextType(value, name);
+  assertTextPresent(value, name);
+  assertTextLength(value, name);
+  assertSingleLine(value, name);
   return value.trim();
 };
 
+const assertTextType = (value, name) => {
+  if (typeof value !== 'string') throw invalidText(name);
+};
+
+const assertTextPresent = (value, name) => {
+  if (!value.trim()) throw invalidText(name);
+};
+
+const assertTextLength = (value, name) => {
+  if (value.length > MAX_TEXT_LENGTH) throw invalidText(name);
+};
+
+const assertSingleLine = (value, name) => {
+  if (/[\r\n]/.test(value)) throw invalidText(name);
+};
+
+const invalidText = (name) => new Error(`First-look ${name} must be a non-empty string under ${MAX_TEXT_LENGTH} characters.`);
+
 const boundedList = (value, name, { allowEmpty = true } = {}) => {
-  if (!Array.isArray(value) || value.length > MAX_BULLETS || (!allowEmpty && value.length === 0)) {
-    throw new Error(`First-look ${name} must contain ${allowEmpty ? 'zero to' : 'one to'} ${MAX_BULLETS} items.`);
-  }
+  assertListType(value, name);
+  assertListLimit(value, name);
+  assertListPresence(value, name, allowEmpty);
   return value.map((item) => boundedText(item, name));
 };
 
+const assertListType = (value, name) => {
+  if (!Array.isArray(value)) throw invalidList(name);
+};
+
+const assertListLimit = (value, name) => {
+  if (value.length > MAX_BULLETS) throw invalidList(name);
+};
+
+const assertListPresence = (value, name, allowEmpty) => {
+  if (!allowEmpty && value.length === 0) throw invalidList(name, allowEmpty);
+};
+
+const invalidList = (name, allowEmpty = true) => new Error(
+  `First-look ${name} must contain ${allowEmpty ? 'zero to' : 'one to'} ${MAX_BULLETS} items.`,
+);
+
 const boundedFindings = (value) => {
-  if (!Array.isArray(value) || value.length > MAX_BULLETS) throw new Error(`First-look badThings must contain zero to ${MAX_BULLETS} findings.`);
+  if (!Array.isArray(value)) throw invalidFindings();
+  if (value.length > MAX_BULLETS) throw invalidFindings();
   return value.map(parseFinding);
 };
 
+const invalidFindings = () => new Error(`First-look badThings must contain zero to ${MAX_BULLETS} findings.`);
+
 const parseFinding = (finding) => {
-  if (!finding || !['P0', 'P1', 'P2', 'P3'].includes(finding.priority)) throw new Error('First-look finding priority must be P0, P1, P2, or P3.');
-  if (finding.line !== null && (!Number.isInteger(finding.line) || finding.line < 1)) throw new Error('First-look finding line must be a positive integer or null.');
+  assertFindingObject(finding);
+  assertFindingPriority(finding.priority);
+  assertFindingLine(finding.line);
   return {
     priority: finding.priority,
     title: boundedText(finding.title, 'finding title'),
@@ -35,61 +74,143 @@ const parseFinding = (finding) => {
   };
 };
 
+const assertFindingObject = (finding) => {
+  if (!finding || typeof finding !== 'object') throw new Error('First-look finding must be an object.');
+  if (Array.isArray(finding)) throw new Error('First-look finding must be an object.');
+};
+
+const assertFindingPriority = (priority) => {
+  if (!['P0', 'P1', 'P2', 'P3'].includes(priority)) throw new Error('First-look finding priority must be P0, P1, P2, or P3.');
+};
+
+const assertFindingLine = (line) => {
+  if (line === null) return;
+  if (!Number.isInteger(line)) throw new Error('First-look finding line must be a positive integer or null.');
+  if (line < 1) throw new Error('First-look finding line must be a positive integer or null.');
+};
+
 const validateFindingLocations = (findings, context) => {
   const paths = new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
   for (const finding of findings) {
-    if (!paths.has(finding.path)) throw new Error('First-look finding path must be a changed PR file.');
-    if (finding.line !== null && !(context.changedLineNumbers?.[finding.path] ?? []).includes(finding.line)) {
-      throw new Error('First-look finding line must be an added line in the supplied PR diff, or null.');
-    }
+    assertChangedFindingPath(finding, paths);
+    assertChangedFindingLine(finding, context.changedLineNumbers);
   }
 };
 
+const assertChangedFindingPath = (finding, paths) => {
+  if (!paths.has(finding.path)) throw new Error('First-look finding path must be a changed PR file.');
+};
+
+const assertChangedFindingLine = (finding, changedLineNumbers = {}) => {
+  if (finding.line === null) return;
+  const lines = changedLineNumbers[finding.path] ?? [];
+  if (!lines.includes(finding.line)) throw new Error('First-look finding line must be an added line in the supplied PR diff, or null.');
+};
+
 const parseReviewAssessments = (assessments, openThreads) => {
-  if (!Array.isArray(assessments) || assessments.length !== openThreads.length) {
-    throw new Error('First-look output must assess each supplied open review thread exactly once.');
-  }
+  assertAssessmentCount(assessments, openThreads);
   const expected = new Set(openThreads.map((thread) => thread.id));
   const seen = new Set();
-  return assessments.map((assessment) => {
-    if (!assessment || !expected.has(assessment.threadId) || seen.has(assessment.threadId)) {
-      throw new Error('First-look review-thread assessments do not match the supplied open threads.');
-    }
-    if (!ASSESSMENTS.has(assessment.status)) throw new Error('First-look review-thread status is invalid.');
-    seen.add(assessment.threadId);
-    return { threadId: assessment.threadId, status: assessment.status, summary: boundedText(assessment.summary, 'review-comment summary') };
-  });
+  return assessments.map((assessment) => parseReviewAssessment(assessment, expected, seen));
+};
+
+const assertAssessmentCount = (assessments, openThreads) => {
+  if (!Array.isArray(assessments)) throw invalidAssessmentCount();
+  if (assessments.length !== openThreads.length) throw invalidAssessmentCount();
+};
+
+const invalidAssessmentCount = () => new Error('First-look output must assess each supplied open review thread exactly once.');
+
+const parseReviewAssessment = (assessment, expected, seen) => {
+  assertAssessmentIdentity(assessment, expected, seen);
+  assertAssessmentStatus(assessment.status);
+  seen.add(assessment.threadId);
+  return {
+    threadId: assessment.threadId,
+    status: assessment.status,
+    summary: boundedText(assessment.summary, 'review-comment summary'),
+  };
+};
+
+const assertAssessmentIdentity = (assessment, expected, seen) => {
+  if (!assessment) throw invalidAssessmentIdentity();
+  if (!expected.has(assessment.threadId)) throw invalidAssessmentIdentity();
+  if (seen.has(assessment.threadId)) throw invalidAssessmentIdentity();
+};
+
+const invalidAssessmentIdentity = () => new Error('First-look review-thread assessments do not match the supplied open threads.');
+
+const assertAssessmentStatus = (status) => {
+  if (!ASSESSMENTS.has(status)) throw new Error('First-look review-thread status is invalid.');
 };
 
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */
 export const parseOpenCodeFirstLookOutput = (raw, context) => {
-  if (typeof raw !== 'string' || raw.length > MAX_OUTPUT_LENGTH) throw new Error('First-look result is empty or too large.');
-  let result;
-  try { result = JSON.parse(raw); } catch { throw new Error('First-look result must be JSON.'); }
-  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('First-look result must be a JSON object.');
-
+  assertRawOutput(raw);
+  const result = parseJson(raw);
+  assertJsonObject(result);
   return parseReviewPayload(result, context);
 };
 
-const parseReviewPayload = (result, context) => {
-  const summary = boundedList(result.summary, 'summary', { allowEmpty: false });
-  const goodThings = boundedList(result.goodThings, 'goodThings');
-  const badThings = boundedFindings(result.badThings);
-  validateFindingLocations(badThings, context);
-  if (!Number.isInteger(result.rating) || result.rating < 0 || result.rating > 10) throw new Error('First-look rating must be an integer from 0 to 10.');
+const assertRawOutput = (raw) => {
+  if (typeof raw !== 'string') throw new Error('First-look result is empty or too large.');
+  if (raw.length > MAX_OUTPUT_LENGTH) throw new Error('First-look result is empty or too large.');
+};
 
+const parseJson = (raw) => {
+  try { return JSON.parse(raw); } catch { throw new Error('First-look result must be JSON.'); }
+};
+
+const assertJsonObject = (result) => {
+  if (!result || typeof result !== 'object') throw new Error('First-look result must be a JSON object.');
+  if (Array.isArray(result)) throw new Error('First-look result must be a JSON object.');
+};
+
+const parseReviewPayload = (result, context) => {
+  return {
+    summary: parseSummary(result),
+    goodThings: parseGoodThings(result),
+    badThings: parseFindings(result, context),
+    rating: parseRating(result.rating),
+    linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
+    reviewCommentAssessments: parseContextReviewAssessments(result, context),
+  };
+};
+
+const parseSummary = (result) => boundedList(result.summary, 'summary', { allowEmpty: false });
+const parseGoodThings = (result) => boundedList(result.goodThings, 'goodThings');
+
+const parseFindings = (result, context) => {
+  const findings = boundedFindings(result.badThings);
+  validateFindingLocations(findings, context);
+  return findings;
+};
+
+const parseRating = (rating) => {
+  if (!Number.isInteger(rating)) throw invalidRating();
+  if (rating < 0) throw invalidRating();
+  if (rating > 10) throw invalidRating();
+  return rating;
+};
+
+const invalidRating = () => new Error('First-look rating must be an integer from 0 to 10.');
+
+const parseLinkedIssueAssessment = (result, context) => {
   const linkedIssues = Array.isArray(context.linkedIssues) ? context.linkedIssues : [];
-  const linkedIssueAssessment = linkedIssues.length
-    ? boundedText(result.linkedIssueAssessment, 'linkedIssueAssessment')
-    : null;
-  if (!linkedIssues.length && result.linkedIssueAssessment !== null) {
+  if (linkedIssues.length) return boundedText(result.linkedIssueAssessment, 'linkedIssueAssessment');
+  assertNoLinkedIssueAssessment(result);
+  return null;
+};
+
+const assertNoLinkedIssueAssessment = (result) => {
+  if (result.linkedIssueAssessment !== null) {
     throw new Error('First-look output must omit linked-issue analysis when the PR has no linked issue.');
   }
+};
 
+const parseContextReviewAssessments = (result, context) => {
   const openThreads = Array.isArray(context.openReviewThreads) ? context.openReviewThreads : [];
-  const reviewCommentAssessments = parseReviewAssessments(result.reviewCommentAssessments, openThreads);
-
-  return { summary, goodThings, badThings, rating: result.rating, linkedIssueAssessment, reviewCommentAssessments };
+  return parseReviewAssessments(result.reviewCommentAssessments, openThreads);
 };
 
 /** Render a compact, consistent PR comment. Conditional sections come from GitHub context. */
