@@ -99,7 +99,7 @@ export const renderOpenCodeFirstLookComment = (result, context) => {
   if (context.linkedIssues?.length) {
     lines.push('', '## Connection to linked issue');
     for (const issue of context.linkedIssues) {
-      const title = String(issue.title).replace(/[\r\n]/g, ' ').replace(/[\\`*_{}\[\]()<>#+.!|]/g, '\\$&');
+      const title = String(issue.title).replace(/[\r\n]/g, ' ').replace(/[\\`*_{}\x5b\x5d()<>#+.!|]/g, '\\$&');
       lines.push(`- [#${issue.number}: ${title}](${issue.url})`);
     }
     lines.push('', result.linkedIssueAssessment);
