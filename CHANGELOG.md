@@ -9,8 +9,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
-- **Outlook editing:** Add beta prototypes for paint-bucket edits, Step/Set recategorization, and copying geometry between hazards.
-- **Population estimates:** Add a beta WorldPop estimate for the population inside an outlook.
+- **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
+- **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
 - **KMZ/KML export:** Add a beta export prototype for forecast products.
 
 #### Changed
@@ -34,8 +34,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
-- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.74, Lucide to 1.45, and related map, build, and test packages.
-- **Server:** Update Sentry to 10.74, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
+- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
+- **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
+
+#### Dependency summary
+<!-- dependabot-automation -->
 
 ### Stable 1.7.x hotfixes
 

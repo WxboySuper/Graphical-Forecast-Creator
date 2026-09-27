@@ -25,7 +25,13 @@ const isManualBaselineForTarget = (baselineRef, targetRef) => {
   if (COMMIT_SHA_PATTERN.test(baselineRef)) return true;
   const tag = /^v(\d+)\.(\d+)\.(\d+)(-beta\.\d+)?$/i.exec(baselineRef);
   if (!tag) return false;
-  if (targetRef === 'main') return Boolean(tag[4]);
+  if (targetRef === 'main') return isBetaTag(tag);
+  return isStableTagForTarget(tag, targetRef);
+};
+
+const isBetaTag = (tag) => Boolean(tag[4]);
+
+const isStableTagForTarget = (tag, targetRef) => {
   const line = /^stable\/(\d+)\.(\d+)\.x$/.exec(targetRef);
   return Boolean(line && !tag[4] && tag[1] === line[1] && tag[2] === line[2]);
 };
@@ -68,16 +74,27 @@ export const assertChangelogAuditHead = (expectedHead, liveHead) => {
 };
 
 /** Validate the model's bounded changelog audit response. */
-export const parseOpenCodeChangelogAuditResult = (raw) => {
+const parseAuditJson = (raw) => {
   if (typeof raw !== 'string' || raw.length > 16_000) throw new Error('Changelog audit result is empty or too large.');
-  let result;
-  try { result = JSON.parse(raw); } catch { throw new Error('Changelog audit result must be JSON.'); }
+  try { return JSON.parse(raw); } catch { throw new Error('Changelog audit result must be JSON.'); }
+};
+
+const validateAuditResult = (result) => {
   if (!result || !['current', 'update', 'inconclusive'].includes(result.status)) throw new Error('Changelog audit status is invalid.');
-  if (result.status !== 'update') return { status: result.status };
+};
+
+const parseAuditUpdate = (result) => {
   const validated = parseOpenCodeChangelogResult(JSON.stringify({
     status: 'complete',
     section: result.section,
     entries: result.entries,
   }));
   return { status: 'update', section: validated.section, entries: validated.entries };
+};
+
+/** Validate the model's bounded changelog audit response. */
+export const parseOpenCodeChangelogAuditResult = (raw) => {
+  const result = parseAuditJson(raw);
+  validateAuditResult(result);
+  return result.status === 'update' ? parseAuditUpdate(result) : { status: result.status };
 };
