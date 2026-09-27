@@ -497,6 +497,7 @@ const useKeyboardShortcuts = ({
 /** Returns the cloud-cycle restore callback and cloud-save action used by the forecast toolbar. */
 const useCloudForecastActions = ({
   addToast,
+  currentCloudId,
   currentMapView,
   forecastCycle,
   markAsCurrent,
@@ -506,10 +507,11 @@ const useCloudForecastActions = ({
   workflowMetadata,
 }: {
   addToast: AddToastFn;
+  currentCloudId: string | null;
   currentMapView: RootState['forecast']['currentMapView'];
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   markAsCurrent: UseCloudCyclesResult['markAsCurrent'];
-  markCurrentStateSynced: () => void;
+  markCurrentStateSynced: (cloudId?: string) => void;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
@@ -528,18 +530,30 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
+      const requestCloudId = currentCloudId ?? undefined;
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      let success: boolean;
+      try {
+        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      } catch (error) {
+        // Stale save completions throw the server error so explicit callers see
+        // the actual failure. The hook keeps global and selection state scoped,
+        // so propagate the message for the toolbar modal without extra handling.
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Unable to save this forecast to the cloud right now.');
+      }
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');
       }
 
-      markCurrentStateSynced();
+      markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
   );
 
   return {
@@ -616,6 +630,7 @@ const useForecastPageWorkspace = ({
 
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
     addToast,
+    currentCloudId: currentCloud?.id ?? null,
     currentMapView,
     forecastCycle,
     markAsCurrent,

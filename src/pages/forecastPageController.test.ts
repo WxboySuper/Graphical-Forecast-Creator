@@ -127,6 +127,19 @@ describe('forecastPageController', () => {
     })).toBe(false);
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
+
+    saveCycle.mockRejectedValueOnce(new Error('boom'));
+    clearCurrent.mockClear();
+    dispatch.mockClear();
+    await expect(runDayRolloverCloudSaveAction({
+      forecastCycle,
+      currentMapView: mapView,
+      saveCycle,
+      clearCurrent,
+      dispatch,
+    })).resolves.toBe(false);
+    expect(clearCurrent).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();
   });
 });
