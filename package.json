@@ -81,7 +81,7 @@
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d build",
     "prebuild": "pnpm run css:build",
-    "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --minify",
+    "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css",
     "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch"
   },
   "browserslist": {
