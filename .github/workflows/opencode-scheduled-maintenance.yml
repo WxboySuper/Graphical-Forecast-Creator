@@ -249,7 +249,9 @@ jobs:
           CATEGORY: ${{ steps.context.outputs.category }}
           SCOPE: ${{ steps.context.outputs.scope }}
         run: |
+          mkdir -p "$RUNNER_TEMP/lib"
           cp scripts/run-opencode-maintenance.mjs "$RUNNER_TEMP/run-opencode-maintenance.mjs"
+          cp scripts/lib/opencode-cli-output.mjs scripts/lib/opencode-env.cjs "$RUNNER_TEMP/lib/"
           cp scripts/lib/opencode-maintenance-state.cjs "$RUNNER_TEMP/opencode-maintenance-state.cjs"
           if [[ "$CATEGORY" == "bug-hunt" ]]; then
             OPENCODE_WORKSPACE_SCOPE="$SCOPE" node scripts/prepare-opencode-workspace.mjs
@@ -269,6 +271,7 @@ jobs:
           OPENCODE_MODEL: ${{ steps.context.outputs.model }}
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-scheduled-prompt.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-scheduled-output.json
+          OPENCODE_RESPONSE_FORMAT: json
           OPENCODE_TIMEOUT_MS: ${{ steps.context.outputs.timeout }}
           CATEGORY: ${{ steps.context.outputs.category }}
         run: |

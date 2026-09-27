@@ -273,6 +273,7 @@ jobs:
           OPENCODE_MODEL: opencode-go/muse-spark-1.3-contributor
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-pr-review.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-pr-review-output.md
+          OPENCODE_RESPONSE_FORMAT: json
         run: node scripts/run-opencode-maintenance.mjs
 
       - name: Publish first-look result

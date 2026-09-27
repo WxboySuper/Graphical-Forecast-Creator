@@ -6,7 +6,10 @@ import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
 const model = process.env.OPENCODE_MODEL;
+const responseFormat = process.env.OPENCODE_RESPONSE_FORMAT ?? 'text';
 const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS ?? 15 * 60 * 1000);
+
+if (!['text', 'json'].includes(responseFormat)) throw new Error('OpenCode response format must be text or json.');
 
 if (!promptPath || !outputPath || !model || !process.env.OPENCODE_API_KEY) {
   throw new Error('OpenCode prompt, output, model, and API key configuration are required.');
@@ -38,6 +41,6 @@ if (result.status !== 0) {
   throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
 }
 
-const output = extractFinalAssistantText(result.stdout ?? '');
+const output = extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
 writeFileSync(outputPath, output, 'utf8');
 process.stdout.write(output.slice(0, 12000));
