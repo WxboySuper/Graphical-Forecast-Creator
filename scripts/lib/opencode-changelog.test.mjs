@@ -53,3 +53,37 @@ test('refuses duplicate entries and ambiguous Unreleased lanes, but ignores hist
   assert.ok(result.indexOf(entry) < result.indexOf('## v1.7.0'));
   assert.ok(result.indexOf('- **Historical fix:**') > result.indexOf('## v1.7.0'));
 });
+
+
+test('inserts stable hotfix entries in the stable lane after the current Unreleased section', () => {
+  const stableChangelog = [
+    '# Changelog',
+    '## [Unreleased]',
+    '',
+    '### Next major / beta',
+    '',
+    '## v1.7.0',
+    '',
+    '#### Fixed',
+    '',
+    '- **Release fix:** Keep the beta release stable.',
+    '',
+    '### Stable 1.6.x hotfixes',
+    '',
+    '#### Fixed',
+    '',
+    '- **Prior hotfix:** Repair an earlier production defect.',
+    '',
+    '## v1.6.6',
+  ].join('\n');
+  const hotfix = '- **Current hotfix:** Preserve production behavior after the targeted correction.';
+  const result = addOpenCodeChangelogEntries({
+    changelog: stableChangelog,
+    laneHeading: '### Stable 1.6.x hotfixes',
+    section: 'Fixed',
+    entries: [hotfix],
+  });
+  assert.ok(result.indexOf(hotfix) > result.indexOf('### Stable 1.6.x hotfixes'));
+  assert.ok(result.indexOf(hotfix) < result.indexOf('- **Prior hotfix:**'));
+  assert.ok(result.indexOf(hotfix) < result.indexOf('## v1.6.6'));
+});

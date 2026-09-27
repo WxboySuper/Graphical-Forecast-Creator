@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: read
       issues: read
-      pull-requests: read
+      pull-requests: write
       checks: read
     steps:
       - name: Check out the trusted default branch
@@ -186,7 +186,7 @@ jobs:
           REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || inputs.expected_sha }}
           REVIEW_KIND: ${{ github.event_name == 'workflow_run' && 'ci' || 'event' }}
         with:
-          github-token: ${{ secrets.GH_PAT }}
+          github-token: ${{ github.token }}
           script: |
             const fs = require('fs')
             const pullNumber = Number(process.env.PULL_NUMBER)

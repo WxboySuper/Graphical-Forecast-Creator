@@ -30,7 +30,8 @@ const fetchRef = (ref) => {
   if (!/^(main|stable\/\d+\.\d+\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');
   return `refs/heads/${ref}:refs/remotes/origin/${ref}`;
 };
-execFileSync('git', ['fetch', '--no-tags', 'origin', fetchRef(baseRef), fetchRef(headRef)], { stdio: 'inherit' });
+const gitAuth = `http.https://github.com/.extraheader=AUTHORIZATION basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', fetchRef(baseRef), fetchRef(headRef)], { stdio: 'inherit' });
 const actualSha = execFileSync('git', ['rev-parse', `origin/${headRef}`], { encoding: 'utf8' }).trim();
 if (actualSha !== expectedSha) throw new Error('PR branch advanced while the changelog was being generated; refusing to publish stale content.');
 const changed = execFileSync('git', ['diff', '--name-only', `origin/${baseRef}...origin/${headRef}`], { encoding: 'utf8' }).split(/\r?\n/).filter(Boolean);

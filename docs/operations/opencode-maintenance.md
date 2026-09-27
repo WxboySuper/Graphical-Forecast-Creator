@@ -14,7 +14,7 @@ change as a PR. A human reviews and merges every PR.
 | PR first-look | PR opened, new commits, reopened, ready for review | One review per revision and event review type |
 | CI supplement | `Checks | CI` completes for an associated PR | One supplemental review per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
-| PR changelog draft | A trusted PR selects beta/hotfix without changing CHANGELOG.md | Bounded factual entry drafted read-only; publisher validates and commits to PR branch |
+| PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
@@ -106,9 +106,10 @@ The first-look review uses `pull_request_target` but checks out the trusted
 default branch and reads PR content through the GitHub API. It skips forks,
 drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
 and 2,000 patch characters per file. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
-checks. The separate publishing step uses `GH_PAT` only to create a PR review;
-the model never receives either token. The model can only read, list, and
-search the checkout.
+checks. The publishing step uses the job's `GITHUB_TOKEN` with only
+`pull-requests: write`, so GitHub posts the review as `github-actions[bot]`.
+The model never receives that token. It can only read, list, and search the
+checkout.
 
 The first event review and the CI supplement use separate revision markers, so
 completed checks add context without repeating the first comment. GITHUB_TOKEN
@@ -148,7 +149,7 @@ multiple triggers from creating duplicate work or comments.
 
 | Workflow | GitHub permissions |
 | --- | --- |
-| PR first-look | `GITHUB_TOKEN`: `contents: read`, `issues: read`, `pull-requests: read`, `checks: read`; publisher-only `GH_PAT`: `pull_requests: write` |
+| PR first-look | `GITHUB_TOKEN`: `contents: read`, `issues: read`, `pull-requests: write`, `checks: read`; review is posted as `github-actions[bot]` |
 | Issue triage | `contents: read`, `issues: write` |
 | Changelog audit | `contents: read`, `issues: write`, `pull-requests: read` |
 | Scheduled investigations | `contents: read`, `issues: write`, `security-events: read`, `vulnerability-alerts: read` |
@@ -162,20 +163,26 @@ gets deployment or release permissions. No job can change repository settings
 or branch protection. Protected branches remain guarded by repository rules;
 all merges are human decisions.
 
-PR changelog generation runs inside PR governance only when the description has
-exactly one `Changelog-Impact: beta` or `hotfix` decision and the diff does not
-already change `CHANGELOG.md`. It is bounded to 80 changed files, 90,000 diff
-characters, four entries, 450 characters per entry, and a 12-minute model timeout.
-Fork PRs, other decision values, oversized diffs, and inconclusive results do not
-produce automated edits; the changelog check remains the required gate. OpenCode
-gets no GitHub token or shell access. The workflow confines GitHub credentials
-to deterministic steps and removes checkout credentials before model execution.
-The publisher checks the live
-PR head and decision, commits only `CHANGELOG.md` with a normal push, and leaves
-branch protection and human merge authority intact. The `GH_PAT` secret is
-required only when a generated entry must be pushed, so the updated PR revision
-can trigger CI normally.
+PR changelog generation runs in `.github/workflows/opencode-changelog-pr.yml`
+on `pull_request_target`. The workflow checks out maintenance scripts from the
+repository default branch before it checks out the PR head. The PR checkout is
+input data only, with `persist-credentials: false`. The workflow executes no PR-provided
+script or local action. It removes tracked `.env` files and project OpenCode
+configuration, plugins, and hooks before starting the model.
 
+Generation requires exactly one `Changelog-Impact: beta` or `hotfix` decision
+and a diff that does not already change `CHANGELOG.md`. It is bounded to 80
+changed files, 90,000 diff characters, four entries, 450 characters per entry,
+and a 12-minute model timeout. Fork PRs, other decision values, oversized
+diffs, and inconclusive results do not produce automated edits; the changelog
+check remains the required gate. OpenCode has read-only repository tools and
+receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
+identity and head, then commits only `CHANGELOG.md`. The trusted automated
+preparation and publishing steps use `GH_PAT` for PR metadata updates or
+authenticated fetch/push. No checkout credential is persisted. The ordinary
+`pull_request` CI workflow has read-only token permissions, no repository
+secrets, and no token environment passed to PR-controlled scripts. Human review
+and branch protection remain the merge boundary.
 The flat changelog audit is available as **Maintenance | OpenCode changelog
 audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
 Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and

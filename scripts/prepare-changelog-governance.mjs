@@ -24,6 +24,14 @@ if (!isDependabot && !port) {
   process.exit(0);
 }
 
+const token = process.env.GH_TOKEN ?? '';
+if (!token) throw new Error('GH_TOKEN is required for trusted automated changelog preparation.');
+if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+\.\d+\.x$/.test(headRef)) {
+  throw new Error('Refusing to write automated changelog metadata to a protected source branch.');
+}
+const gitAuth = `http.https://github.com/.extraheader=AUTHORIZATION basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`, `refs/heads/${headRef}:refs/remotes/origin/${headRef}`], { stdio: 'inherit' });
+
 const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);
 let declaration = null;
 let nextChangelog = null;
@@ -71,6 +79,6 @@ if (nextChangelog !== null) {
   execFileSync('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
   execFileSync('git', ['add', changelogPath]);
   execFileSync('git', ['commit', '-m', 'chore: document automated dependency update'], { stdio: 'inherit' });
-  execFileSync('git', ['push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
+  execFileSync('git', ['-c', gitAuth, 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
   console.log(`Updated ${changelogPath} on ${headRef}.`);
 }

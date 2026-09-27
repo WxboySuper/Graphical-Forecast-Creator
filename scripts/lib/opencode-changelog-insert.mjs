@@ -29,10 +29,12 @@ const laneContentEnd = (changelog, bodyStart, releaseEnd) => {
 };
 
 const laneBounds = (changelog, laneHeading) => {
-  const release = unreleasedBounds(changelog);
-  const start = uniqueLaneStart(changelog, laneHeading, release);
+  const bounds = /^### Stable \d+\.\d+\.x hotfixes$/.test(laneHeading)
+    ? { start: 0, end: changelog.length }
+    : unreleasedBounds(changelog);
+  const start = uniqueLaneStart(changelog, laneHeading, bounds);
   const bodyStart = start + laneHeading.length;
-  return { start, bodyStart, end: laneContentEnd(changelog, bodyStart, release.end) };
+  return { start, bodyStart, end: laneContentEnd(changelog, bodyStart, bounds.end) };
 };
 
 /** Insert validated bullets beneath a bounded heading, creating the subsection when needed. */

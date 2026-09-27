@@ -38,11 +38,11 @@ The PR must change the matching lane in `CHANGELOG.md` when the impact is `beta`
 
 The check compares the lane before and after the PR. Merely touching the changelog or changing a different lane does not satisfy the gate.
 
-For trusted same-repository PRs targeting `main` or `stable/X.Y.x`, a `beta` or
-`hotfix` decision is enough to request an automatic entry. PR CI runs a bounded,
-read-only OpenCode changelog draft when the PR has not already changed
-`CHANGELOG.md`. OpenCode receives the PR title, description, bounded diff, and
-read-only repository checkout. It returns one to four factual bullets;
+For eligible same-repository PRs targeting `main` or `stable/X.Y.x`, a `beta` or
+`hotfix` decision is enough to request an automatic entry. The trusted
+`pull_request_target` changelog workflow runs a bounded, read-only OpenCode draft
+when the PR has not already changed `CHANGELOG.md`. OpenCode receives the PR
+title, description, bounded diff, and read-only repository checkout. It returns one to four factual bullets;
 deterministic code validates their format, section, size, selected lane, and
 current PR head before adding them and pushing a normal commit to the PR branch.
 The normal changelog policy then validates the generated entry. Setting `none`
@@ -50,22 +50,24 @@ with a reason or `inherited` skips generation. PRs from forks, oversized diffs,
 inconclusive model results, stale revisions, or branch-protection push failures
 still require a human-authored entry or a corrected decision.
 
-The model receives no GitHub token and cannot edit files or run commands.
-Checkout credentials are removed before the model runs. The `GH_PAT` secret is
-used by deterministic checkout and publisher steps; the publisher can make a
-normal push to the PR branch. Protected-branch rules, merges, releases, and
-deployments remain outside this job. The workflow also runs when the PR description is edited so adding the
-declaration starts the same validation flow.
+The workflow runs as `pull_request_target` and checks out its scripts from the
+repository default branch before checking out PR content. PR checkout credentials
+are not persisted. The model receives no GitHub token and cannot edit files or
+run commands. Trusted metadata-preparation and publisher steps use `GH_PAT`
+only to update eligible PR metadata or authenticate fetch/push to the PR branch. Protected-branch rules, merges, releases, and
+deployments remain outside this job. Editing the PR description also starts the
+validation flow when a changelog declaration is added.
 
 ## Dependabot updates
 
-Dependabot is handled by the required CI workflow before changelog validation runs.
+The trusted changelog workflow prepares eligible Dependabot PR metadata. When it
+pushes a changelog commit, the updated revision triggers the required CI checks.
 
 1. The workflow identifies the dependency update.
 2. It updates the PR description with a managed changelog declaration.
 3. Runtime or security dependency changes receive a generated `Dependencies` entry in the correct changelog lane.
 4. Tooling-only updates receive `Changelog-Impact: none` and an automated reason.
-5. The workflow commits the changelog update, refreshes the PR ref, and only then runs the required governance check.
+5. The workflow commits the changelog update to the PR branch, which triggers the required governance check on the new revision.
 
 The automation is idempotent, so retries replace the managed declaration instead of adding duplicates.
 
