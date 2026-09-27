@@ -17,12 +17,12 @@ const V17_WORKSTREAM_KEYS = [
 ] as const satisfies readonly FeatureKey[];
 
 const TEMPORARY_V17_WORKSTREAM_KEYS = [
-  'autoTstm',
   'tropicalWorkspace',
   'collaborationRoom',
 ] as const satisfies readonly FeatureKey[];
 
 const PERMANENT_V17_WORKSTREAM_KEYS = [
+  'autoTstm',
   'forecastWorkflowV2',
   'verificationRelaunch',
   'customProducts',
@@ -42,7 +42,7 @@ describe('v1.7 workstream adoption contract', () => {
     }
   });
 
-  test.each(TEMPORARY_V17_WORKSTREAM_KEYS.filter((feature) => feature !== 'autoTstm'))(
+  test.each(TEMPORARY_V17_WORKSTREAM_KEYS)(
     '%s stays disabled on every build target',
     (feature) => {
       for (const target of BUILD_TARGETS) {
@@ -74,6 +74,16 @@ describe('v1.7 workstream adoption contract', () => {
       expect(isFeatureExposedOnTarget('autoTstm', target)).toBe(expected);
       expect(FEATURE_EXPOSURE_REGISTRY.autoTstm.exposure[target]).toBe(expected);
     }
+  });
+
+  test('autoTstm declares permanent lifecycle metadata', () => {
+    const definition = getFeatureExposure('autoTstm');
+
+    expect(definition.temporary).toBe(false);
+    expect('removalCondition' in definition).toBe(false);
+    expect(definition.trackingIssue).toBe(427);
+    expect(definition.owner.trim().length).toBeGreaterThan(0);
+    expect(definition.addedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   test.each(TEMPORARY_V17_WORKSTREAM_KEYS)('%s declares required temporary lifecycle metadata', (feature) => {
