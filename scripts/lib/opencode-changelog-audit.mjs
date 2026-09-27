@@ -3,12 +3,20 @@ import { parseOpenCodeChangelogResult } from './opencode-changelog.mjs';
 const TARGET_REF_PATTERN = /^(main|stable\/\d+\.\d+\.x)$/;
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 
+const validateTargetRef = (targetRef) => {
+  if (typeof targetRef !== 'string') throw new Error('Prepared changelog audit target is invalid.');
+  if (!TARGET_REF_PATTERN.test(targetRef)) throw new Error('Prepared changelog audit target is invalid.');
+};
+
+const validateHeadSha = (headSha) => {
+  if (typeof headSha !== 'string') throw new Error('Prepared changelog audit target is invalid.');
+  if (!COMMIT_SHA_PATTERN.test(headSha)) throw new Error('Prepared changelog audit target is invalid.');
+};
+
 /** Accept only changelog audit targets that the publisher can safely address. */
 export const validateChangelogAuditTarget = (targetRef, headSha) => {
-  if (typeof targetRef !== 'string' || !TARGET_REF_PATTERN.test(targetRef) ||
-      typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
-    throw new Error('Prepared changelog audit target is invalid.');
-  }
+  validateTargetRef(targetRef);
+  validateHeadSha(headSha);
   return { targetRef, headSha };
 };
 
