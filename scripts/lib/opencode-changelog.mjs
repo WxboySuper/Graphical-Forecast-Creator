@@ -45,12 +45,15 @@ const unreleasedBounds = (changelog) => {
   return { start: releaseBodyStart, end: releaseEnd };
 };
 
+const hasDuplicateLane = (changelog, laneHeading, start, end) => {
+  const duplicate = changelog.indexOf(laneHeading, start + laneHeading.length);
+  return duplicate >= 0 && duplicate < end;
+};
+
 const uniqueLaneStart = (changelog, laneHeading, bounds) => {
   const start = changelog.indexOf(laneHeading, bounds.start);
-  const duplicate = start < 0 ? -1 : changelog.indexOf(laneHeading, start + laneHeading.length);
-  if (start < 0 || start >= bounds.end || (duplicate >= 0 && duplicate < bounds.end)) {
-    throw new Error(`Expected exactly one ${laneHeading} lane in Unreleased.`);
-  }
+  if (start < 0 || start >= bounds.end) throw new Error(`Expected exactly one ${laneHeading} lane in Unreleased.`);
+  if (hasDuplicateLane(changelog, laneHeading, start, bounds.end)) throw new Error(`Expected exactly one ${laneHeading} lane in Unreleased.`);
   return start;
 };
 
