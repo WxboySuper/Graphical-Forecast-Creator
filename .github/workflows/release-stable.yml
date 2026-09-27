@@ -8,7 +8,7 @@ on:
       ref:
         description: 'Stable branch, tag, or commit to release'
         required: true
-        default: stable/1.6.x
+        default: stable/1.7.x
         type: string
       confirmation:
         description: 'Type RELEASE-STABLE to create the production release'
