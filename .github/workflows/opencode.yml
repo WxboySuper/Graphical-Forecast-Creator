@@ -6,6 +6,10 @@ on:
   pull_request_review_comment:
     types: [created]
 
+concurrency:
+  group: gfc-opencode-maintenance-queue
+  queue: max
+
 jobs:
   classify-request:
     if: |

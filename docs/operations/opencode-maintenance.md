@@ -11,9 +11,11 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review | One review comment per revision and event review type |
-| CI supplement | `Checks | CI` completes for an associated PR | One supplemental comment per revision after check results are available |
+| PR first-look | PR opened, new commits, reopened, ready for review | One review per revision and event review type |
+| CI supplement | `Checks | CI` completes for an associated PR | One supplemental review per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
+| PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
+| Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
@@ -103,9 +105,11 @@ the merge boundary. The workflow never merges a PR.
 The first-look review uses `pull_request_target` but checks out the trusted
 default branch and reads PR content through the GitHub API. It skips forks,
 drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
-and 2,000 patch characters per file. Its token can read contents, PRs, and
-checks, and post an issue comment. It has no contents or pull-request write
-permission. The model can only read, list, and search the checkout.
+and 2,000 patch characters per file. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
+checks. The publishing step uses the job's `GITHUB_TOKEN` with only
+`pull-requests: write`, so GitHub posts the review as `github-actions[bot]`.
+The model never receives that token. It can only read, list, and search the
+checkout.
 
 The first event review and the CI supplement use separate revision markers, so
 completed checks add context without repeating the first comment. GITHUB_TOKEN
@@ -145,8 +149,9 @@ multiple triggers from creating duplicate work or comments.
 
 | Workflow | GitHub permissions |
 | --- | --- |
-| PR first-look | `contents: read`, `pull-requests: read`, `checks: read`, `issues: write` |
+| PR first-look | `GITHUB_TOKEN`: `contents: read`, `issues: read`, `pull-requests: write`, `checks: read`; review is posted as `github-actions[bot]` |
 | Issue triage | `contents: read`, `issues: write` |
+| Changelog audit | `contents: read`, `issues: write`, `pull-requests: read` |
 | Scheduled investigations | `contents: read`, `issues: write`, `security-events: read`, `vulnerability-alerts: read` |
 | Audit issue worker | `contents: write`, `issues: write`, `pull-requests: write`, `actions: write` for the isolated publisher job |
 
@@ -158,7 +163,65 @@ gets deployment or release permissions. No job can change repository settings
 or branch protection. Protected branches remain guarded by repository rules;
 all merges are human decisions.
 
+PR changelog generation runs in `.github/workflows/opencode-changelog-pr.yml`
+on `pull_request_target`. The workflow checks out maintenance scripts from the
+repository default branch before it checks out the PR head. The PR checkout is
+input data only, with `persist-credentials: false`. The workflow executes no PR-provided
+script or local action. It removes tracked `.env` files and project OpenCode
+configuration, plugins, and hooks before starting the model.
+
+Generation requires exactly one `Changelog-Impact: beta` or `hotfix` decision
+and a diff that does not already change `CHANGELOG.md`. It is bounded to 80
+changed files, 90,000 diff characters, four entries, 450 characters per entry,
+and a 12-minute model timeout. Fork PRs, other decision values, oversized
+diffs, and inconclusive results do not produce automated edits; the changelog
+check remains the required gate. OpenCode has read-only repository tools and
+receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
+identity and head, then commits only `CHANGELOG.md`. The trusted automated
+preparation and publishing steps use `GH_PAT` for PR metadata updates or
+authenticated fetch/push. No checkout credential is persisted. The ordinary
+`pull_request` CI workflow has read-only token permissions, no repository
+secrets, and no token environment passed to PR-controlled scripts. Human review
+and branch protection remain the merge boundary.
+The flat changelog audit is available as **Maintenance | OpenCode changelog
+audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
+Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and
+stable release workflows call the same bounded audit as a required final
+preflight before version preparation, release publication, or deployment. The
+preflight forces a fresh inspection of the exact release-line revision. If it
+finds a gap, it opens a normal PR containing only `CHANGELOG.md` and blocks the
+release. Merge that PR, then rerun the release workflow. Inconclusive results,
+failed audits, open correction PRs, and a release line that moves after audit
+all stop publication and deployment. A clean result allows the release to
+continue. Release notes combine the curated release-lane entries with GitHub
+categorized merged-PR notes. The generated Markdown is both the public GitHub
+release description and a downloadable `GFC-v<version>-release-notes.md` asset,
+so other publishing platforms can reuse the same text.
+
+The audit is bounded to 60 commits, 80 changed files, a 90,000-character code
+diff, four entries, and a 15-minute model run. It excludes environment and key
+files from model context, and an oversized or inconclusive run publishes no PR.
+The existing hidden maintenance-state comment stores each target line's last
+inspected commit and any pending audit PR. A forced manual or release-preflight
+run can reinspect the same commit; otherwise successful revisions and pending
+PRs are deduplicated. OpenCode remains read-only and token-free. Deterministic code validates the
+entries, writes only to a generated branch, and opens a human-reviewed PR. The
+reusable preflight gets `contents: read`, `issues: write`, and
+`pull-requests: read`; `GH_PAT` is isolated to its deterministic publisher and
+can push the generated branch and open the correction PR. No autonomous audit
+merges, releases, or deploys.
+
 ## Compute and output limits
+
+All workflows that invoke OpenCode share the repository-wide Actions concurrency
+group `gfc-opencode-maintenance-queue`. GitHub runs one workflow from that group
+at a time and queues up to 100 pending runs across event reviews, triage,
+scheduled work, changelog audits, issue implementation, research, and manual
+`/opencode` requests. The queue uses `queue: max`; runs beyond GitHub's 100-run
+limit are canceled. GitHub orders queued runs by when they enter the queue, so
+strict ordering by event time is not guaranteed. Long audits can delay first-look
+reviews because all OpenCode runs share this lane. Keep per-job timeouts and
+deduplication in place because a queued run can become stale before it starts.
 
 Daily inspections have 15- to 20-minute model limits. Dependency review has a
 25-minute limit. Weekly and monthly audits can use up to 60 and 100 minutes.
@@ -179,6 +242,7 @@ Each system has its own workflow and can be disabled from the repository's
 Actions settings without affecting the others:
 
 - PR review and CI supplement: `opencode-first-look.yml`
+- Changelog audit: `opencode-changelog-audit.yml`
 - Issue triage: `opencode-issue-triage.yml`
 - Daily, dependency, weekly, and monthly investigations: `opencode-scheduled-maintenance.yml`
 - Audit implementation workers: `opencode-audit-issue-worker.yml`

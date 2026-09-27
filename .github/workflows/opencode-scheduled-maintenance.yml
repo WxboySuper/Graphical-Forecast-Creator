@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: opencode-scheduled-maintenance
-  cancel-in-progress: false
+  group: gfc-opencode-maintenance-queue
+  queue: max
 
 jobs:
   inspect:

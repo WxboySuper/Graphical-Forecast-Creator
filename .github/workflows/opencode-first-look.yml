@@ -18,8 +18,8 @@ on:
         type: string
 
 concurrency:
-  group: opencode-first-look-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pull_number || github.run_id }}
-  cancel-in-progress: false
+  group: gfc-opencode-maintenance-queue
+  queue: max
 
 permissions:
   contents: read
@@ -36,8 +36,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
+      issues: read
+      pull-requests: write
       checks: read
     steps:
       - name: Check out the trusted default branch
@@ -91,16 +91,27 @@ jobs:
             }
 
             const marker = `<!-- gfc-opencode-first-look:${reviewKind}:${expectedSha} -->`
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pullNumber,
-              per_page: 100,
-            })
+            const [comments, reviews] = await Promise.all([
+              github.paginate(github.rest.issues.listComments, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pullNumber,
+                per_page: 100,
+              }),
+              github.paginate(github.rest.pulls.listReviews, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+                per_page: 100,
+              }),
+            ])
 
-            if (comments.some((comment) =>
-              comment.user?.login === 'github-actions[bot]' && comment.body?.includes(marker)
-            )) {
+            const trustedPublisher = (item) =>
+              ['github-actions[bot]', context.repo.owner].includes(item.user?.login)
+            const hasPriorResult = [...comments, ...reviews].some(
+              (item) => trustedPublisher(item) && item.body?.includes(marker),
+            )
+            if (hasPriorResult) {
               core.notice(`Revision ${expectedSha} already has a first-look result.`)
               core.setOutput('run', 'false')
               return
@@ -175,6 +186,7 @@ jobs:
           REVIEW_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || inputs.expected_sha }}
           REVIEW_KIND: ${{ github.event_name == 'workflow_run' && 'ci' || 'event' }}
         with:
+          github-token: ${{ github.token }}
           script: |
             const fs = require('fs')
             const pullNumber = Number(process.env.PULL_NUMBER)
@@ -192,9 +204,10 @@ jobs:
             const marker = `<!-- gfc-opencode-first-look:${process.env.REVIEW_KIND}:${expectedSha} -->`
             const text = fs.readFileSync(process.env.OUTPUT_PATH, 'utf8').trim().slice(0, 9000)
             if (!text) throw new Error('OpenCode returned an empty review.')
-            await github.rest.issues.createComment({
+            await github.rest.pulls.createReview({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: pullNumber,
+              pull_number: pullNumber,
+              event: 'COMMENT',
               body: `${text}\n\n${marker}`,
             })

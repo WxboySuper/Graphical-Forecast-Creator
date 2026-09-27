@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { modelEnvironment } from './lib/opencode-env.cjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
@@ -16,13 +17,7 @@ if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 120 * 
 const prompt = readFileSync(promptPath, 'utf8');
 if (!prompt.trim()) throw new Error('OpenCode prompt is empty.');
 
-const env = { ...process.env };
-for (const name of [
-  'GITHUB_TOKEN',
-  'GH_TOKEN',
-  'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
-  'ACTIONS_ID_TOKEN_REQUEST_URL',
-]) delete env[name];
+const env = modelEnvironment(process.env);
 
 const result = spawnSync(
   'opencode',
