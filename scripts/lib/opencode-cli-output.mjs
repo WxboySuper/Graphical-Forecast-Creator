@@ -1,3 +1,8 @@
+/** Build the bounded OpenCode CLI invocation. */
+export const openCodeRunArguments = (model, prompt) => [
+  'run', '--format', 'json', '--model', model, '--auto', prompt,
+];
+
 /** Extract the final assistant message from OpenCode's --format json event stream. */
 export const extractFinalAssistantText = (stdout) => {
   if (typeof stdout !== 'string' || !stdout.trim()) throw new Error('OpenCode returned no output.');

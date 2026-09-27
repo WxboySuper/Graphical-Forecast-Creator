@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { modelEnvironment } from './lib/opencode-env.cjs';
-import { extractFinalAssistantText } from './lib/opencode-cli-output.mjs';
+import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
@@ -22,7 +22,7 @@ const env = modelEnvironment(process.env);
 
 const result = spawnSync(
   'opencode',
-  ['run', '--format', 'json', '--model', model, '--auto', prompt],
+  openCodeRunArguments(model, prompt),
   {
     cwd: process.cwd(),
     encoding: 'utf8',

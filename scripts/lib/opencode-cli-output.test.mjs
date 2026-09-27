@@ -1,11 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extractFinalAssistantText } from './opencode-cli-output.mjs';
+import { extractFinalAssistantText, openCodeRunArguments } from './opencode-cli-output.mjs';
 import { parseOpenCodeFirstLookOutput } from './opencode-first-look-output.mjs';
 
 const textEvent = (messageID, text) => JSON.stringify({
   type: 'text',
   part: { type: 'text', messageID, text },
+});
+
+test('builds OpenCode arguments with JSON mode, the configured model, and auto mode', () => {
+  assert.deepEqual(openCodeRunArguments('opencode-go/model', 'Review this PR.'), [
+    'run', '--format', 'json', '--model', 'opencode-go/model', '--auto', 'Review this PR.',
+  ]);
 });
 
 test('selects the final assistant response instead of intermediate progress messages', () => {
