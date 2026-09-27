@@ -202,14 +202,25 @@ The audit is bounded to 60 commits, 80 changed files, a 90,000-character code
 diff, four entries, and a 15-minute model run. It excludes environment and key
 files from model context, and an oversized or inconclusive run publishes no PR.
 The existing hidden maintenance-state comment stores each target line's last
-inspected commit and any pending audit PR. A forced manual or release-preflight
-run can reinspect the same commit; otherwise successful revisions and pending
+inspected commit and any pending audit PR. `force` bypasses the same-head skip,
+but a zero-commit range still ends before OpenCode starts. Use `baseline_ref` to
+choose a different bounded range. Otherwise successful revisions and pending
 PRs are deduplicated. OpenCode remains read-only and token-free. Deterministic code validates the
 entries, writes only to a generated branch, and opens a human-reviewed PR. The
 reusable preflight gets `contents: read`, `issues: write`, and
 `pull-requests: read`; `GH_PAT` is isolated to its deterministic publisher and
 can push the generated branch and open the correction PR. No autonomous audit
 merges, releases, or deploys.
+
+Manual runs also accept an optional `baseline_ref`, which must be a full commit
+SHA or an ancestor version tag for the selected release line. `main` accepts
+beta tags; `stable/X.Y.x` accepts stable `vX.Y.Z` tags from that same line.
+This prevents a baseline from another release line from widening the audit.
+It overrides the saved/tag baseline for that run only; a clean result records the
+audited head as the next normal baseline. Leave it blank for ordinary runs.
+Use it to bound a deliberate backfill or the first audit after a large manual
+changelog cleanup. The target remains the current branch head, and the
+publisher still refuses to open a PR if that branch moves during the audit.
 
 ## Compute and output limits
 

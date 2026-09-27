@@ -1,179 +1,123 @@
 # Changelog
 <!-- markdownlint-disable -->
 
-All notable changes to this project will be documented in this file.
+All notable changes to GFC are recorded here. Entries focus on changes users can notice; internal refactors and maintenance-only work are left out.
 
 ## [Unreleased]
 
 ### Next major / beta
-#### Dependencies
-<!-- dependabot-automation -->
-
-- **@sentry/react:** ^10.74.0 → ^10.75.0
-- **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
-- **@testing-library/react:** ^16.2.0 → ^16.3.3
-- **@testing-library/user-event:** ^14.6.6 → ^14.6.7
-- **@types/node:** ^26.5.1 → ^26.6.1
-- **@types/react-dom:** 19.2.5 → 19.3.0
-- **firebase:** ^12.18.0 → ^12.19.0
-- **immer:** ^11.1.16 → ^11.1.18
-- **lucide-react:** ^1.45.0 → ^1.47.0
-- **ol-mapbox-style:** ^13.4.3 → ^13.5.1
-- **react-router:** ^8.3.1 → ~8.3.1 (hold on 8.3.x; 8.4.0 broke the Jest suite during upgrade validation)
-- **rollup:** >=4.63.1 → >=4.63.3
-- **uuid:** ^14.0.1 → ^14.0.2
-- **web-vitals:** ^6.1.0 → ^6.2.1
-- **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
-- **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
-- **babel-jest:** ^30.5.1 → ^30.5.2
-- **esbuild:** ^0.28.1 → ^0.28.2
-- **eslint-plugin-jest:** ^29.16.0 → ^29.16.5
-- **firebase-tools:** 15.26.0 → 15.28.2
-- **globals:** ^17.11.0 → ^17.12.0
-- **jest:** ^30.5.1 → ^30.5.2
-- **jest-environment-jsdom:** ^30.5.1 → ^30.5.2
-- **typescript-eslint:** ^8.68.0 → ^8.70.0
-- **vite:** ^8.2.1 → ^8.3.0
-- **@sentry/node:** ^10.74.0 → ^10.75.0 (`server`)
-- **firebase-admin:** ^14.2.0 → ^14.3.0 (`server`)
-- **express-rate-limit:** ^8.6.2 → ^8.7.0 (`server`)
-- **stripe:** ^22.4.0 → ^22.6.1 (`server`)
-- **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
-- **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
-
-<!-- Continue next-major work here after this stable line is cut. -->
-
-
-#### Fixed
-
-- **Production deployment action fallback:** Treat the manual workflow's `auto` option as a request to use the release manifest instead of rejecting it as an invalid deploy action.
-- **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
-- **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
-- **Forecast map basemap:** Restore vendored weather-map geometry on nested forecast routes and prevent delayed basemap loads from undoing a newer map selection.
-- **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
-- **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
-- **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.
-- Precision polygon editing now scopes vertex changes to the selected outlook tier and records multi-vertex edits as one undo step.
-- **Beta invite claims:** Activate premium access atomically when users claim a beta invite, preserve existing Stripe fields, and repair entitlement records for users already marked as beta-enabled.
-- **jszip:** ^3.10.1 → ^3.10.2
-- **react:** ^19.2.8 → ^19.3.0
-- **react-dom:** ^19.2.8 → ^19.3.0
-- **@babel/core:** ^8.0.5 → ^8.0.6
-- **@babel/parser:** ^8.0.5 → ^8.0.6
-- **@babel/preset-env:** ^8.0.5 → ^8.0.6
-- **@playwright/test:** ^1.62.1 → ^1.63.0
-- **@types/react:** 19.2.18 → 19.3.0
-- **autoprefixer:** ^10.5.6 → ^10.6.1
-- **postcss:** 8.5.26 → 8.5.28
-- **tailwind-merge:** ^3.5.0 → ^3.7.0
-- **@testing-library/dom:** ^10.4.0 → ^10.4.2
-
-## v1.7.0
-
-#### Dependencies
-
-<!-- dependabot-automation -->
-
-- **@testing-library/user-event:** ^14.6.1 → ^14.6.3
-- **@types/leaflet:** ^1.9.16 → ^1.9.22
-- **@types/node:** ^26.1.1 → ^26.1.2
-- **@types/react:** 19.2.17 → 19.2.18
-- **@types/react-dom:** 19.2.3 → 19.2.4
-- **rollup:** >=4.62.3 → >=4.62.4
-- **@playwright/test:** ^1.62.0 → ^1.62.1
-- **@vitejs/plugin-react:** ^6.0.4 → ^6.0.5
-- **postcss:** 8 → 8.5.26
-- **@turf/difference:** ^7.3.4 → ^7.4.0
-- **@turf/helpers:** ^7.3.5 → ^7.4.0
-- **@turf/turf:** ^7.3.4 → ^7.4.0
-- **firebase:** ^12.16.0 → ^12.17.1
-- **immer:** ^11.1.15 → ^11.1.16
-- **lucide-react:** ^1.27.0 → ^1.30.0
-- **ol:** ^10.9.0 → ^10.10.0
-- **web-vitals:** ^6.0.1 → ^6.1.0
-- **firebase-tools:** 15.25.1 → 15.26.0
-- **vite:** ^8.1.5 → ^8.2.1
-- **express-rate-limit:** ^8.6.1 → ^8.6.2 (`server`)
-- **stripe:** ^22.3.2 → ^22.4.0 (`server`)
 
 #### Added
 
-- **Built-in outlook opacity:** Add per-outlook fill opacity controls to the forecast workflow and preserve the selected values in saved and exported forecasts.
-- **Forecast Grade:** Add the verification workspace, source adapters, score breakdowns, report-quality checks, share cards, trend views, and premium snapshot support.
-- **NOAA DAT verification evidence:** Add a direct NOAA Damage Assessment Toolkit adapter and a prototype Forecast Grade survey layer that uses EF-coded damage points as supplemental tornado severity evidence.
-- **Workflow continuity:** Add reusable workflow templates, persistent workflow metadata, scoped discussion/draft persistence, package review and completion flows, lifecycle analytics, and handoff guidance.
-- **Custom products:** Add local custom layers and reusable hosted products with category styling, snapshots, exports/imports, owner-scoped storage, and premium enforcement.
-- **Monitor and custom styles:** Add free built-in WPC-style Excessive Rainfall Outlook and Tropical AOI products that are available to everyone and do not consume personal product slots.
-- **Auto-TSTM:** Add cached SPC-calibrated HREF guidance, scheduled ingestion, preview/apply/cancel flows, cache health reporting, and stale-result protection.
-- **v1.7 release exposure:** Enable Auto-TSTM, Forecast Workflow v2, Verification Relaunch, and Custom Products across staging and production, including the server capability and ingestion rollout required by Auto-TSTM.
-- **Account management:** Add recent-authentication account deletion with subscription cleanup, hosted-data removal, and local/offline-save preservation.
-- **Release updates and support:** Publish the v1.7 What's New experience, headlined by Verification v2 and Custom Products, plus support and privacy guidance for workflow, premium, upstream-data, and telemetry questions.
-- **Monitor reference layers:** Add an opt-in official SPC mesoscale discussion adapter with source metadata, valid-time state, and bounded caching.
+- **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
+- **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
+- **KMZ/KML export:** Add a beta export prototype for forecast products.
 
 #### Changed
 
-- **Forecast and verification:** Rework the forecast and verification experience around versioned workflow data, report-aware grading, event capture, severity intent, spatial scoring, probability skill, and false-alarm discipline.
-- **Telemetry and privacy:** Replace legacy analytics with privacy-gated self-hosted Umami while preserving native page views and minimizing tracker data.
-- **Server platform:** Move the analytics service to Express 5 and Stripe Node 22, harden billing/webhook handling, and add shared capability boundaries.
-- **Build and test tooling:** Upgrade to TypeScript 7, modernize the Jest/Babel toolchain, add production/test type checks, expand E2E coverage, and align dependency lockfiles.
-- **Pricing copy:** Consolidate the free/premium boundary into one shared copy contract used by Pricing, Account, and Cloud Library, and remove repeated explanatory sentences and duplicated plan-card summaries.
+- **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
 
 #### Fixed
 
-- **Workflow review and Tropical AOI:** Restore review-package visibility and Discussion-page modal controls, and align Tropical AOI with the three probability-band colors used by the reference product.
-- **Forecast reliability:** Repair legacy serialized map shapes, auto-categorical restoration, export sizing, map popup teardown, keyboard shortcuts, and Safari Firestore sleep/reconnect behavior.
-- **Import hardening:** Bound and schema-validate imported forecast files (size, nesting, arrays, features, strings, and coordinates) before any state mutation, with supported geometry types and finite coordinates enforced at every import entry point.
-- **Auto-categorical integrity:** Prevent silent geometry loss during categorical derivation by replacing partial union/hatching fallbacks with explicit failures that preserve the last known-good result and surface an editor-visible recovery banner.
-- **Monitoring and data products:** Stabilize radar/satellite refresh, alert and storm-report display, cached TSTM readiness, and source metadata handling.
-- **Hosted safety:** Harden Firestore authorization, premium entitlement writes, Stripe replay handling, account deletion races, deployment configuration validation, and rate limits.
-- **Map reliability:** Vendor runtime boundary datasets (US states, countries, lakes) under `public/geodata` with pinned checksums and single-source routing so mutable upstream branch URLs can no longer alter the product without a release.
-- **Error reporting:** Filter known browser telemetry noise while preserving actionable application errors, including `TypeError: Failed to fetch` promise-rejection noise from the Firestore realtime transport (GFC-WEB-Q).
-- **Deployment safety:** Fail production, beta, and staging deployments when Sentry sourcemap publication is configured but cannot be verified against the Sentry API, and delete local maps only after confirmed success so failed uploads retain recovery artifacts.
-- **Build and tooling:** Fix pre-existing TypeScript errors in the outlook constraints and outlook panel probability utilities so `pnpm typecheck` passes on `main`.
-- **Tooling:** Split application and tooling TypeScript configs so `typecheck` runs cleanly from a fresh checkout, add a coverage summary and dependency-audit gate to CI, remove blanket coverage exclusions for covered map and hosted-cloud files, and document the coverage-exclusion inventory.
-- **Accessibility and polish:** Improve toolbar organization, responsive controls, package dialogs, custom-product editing, and forecast map controls.
-- **License compliance:** Define an allowed/review-required/prohibited dependency-license policy, generate a reproducible `THIRD_PARTY_NOTICES.md` from root, server, and Python dependencies, and enforce it in CI.
-- **Status schema hardening:** Make public capability/status responses explicit allowlisted DTOs with schema-snapshot tests that fail on accidental field additions, and document which fields are monitoring-safe versus authenticated diagnostics.
-- **Editor responsiveness:** Move auto-categorical geometry derivation behind a cancellable Web Worker with request/version tracking so stale responses cannot overwrite newer edits, the editor stays responsive during expensive geometry work, and the last known-good result is preserved on failure or timeout.
-- **Bundle size:** Lazy-load heavy feature routes so the application shell loads independently from the map/editor and secondary workflow chunks, split vendor families into separate chunks, and enforce an entry-chunk budget in CI.
-- **Session restore:** Make restore idempotent by keying it to the user scope so React Strict Mode and remounts cannot reapply the same payload or fire duplicate notifications, bound the toast queue, keep mobile toasts clear of the forecast toolbar, and preserve live-region semantics.
-- **Monitor resilience:** Harden reference-layer attribution, z-ordering, retry/backoff, stale and malformed-source states, Sentry filtering, and phone layouts.
-- **Discussion editing:** Introduce a local `datetime-local` formatter/parser pair so validity times are displayed and persisted in the user's local wall-clock time instead of being shifted through UTC.
-- **Dialog accessibility:** Consolidate custom dialogs on one hardened focus-trap behavior (trapped Tab/Shift+Tab, initial focus, focus restore, Escape, background isolation), associate discussion validity/forecaster fields with accessible labels, and add primary `h1` landmarks to forecast, verification, and monitor routes.
-- **Same-day verification:** Route current-day SPC storm reports to the live `today.csv` feed instead of the not-yet-published dated archive, so in-event grading no longer fails for forecasts dated today.
-- **Selector stability:** Return shared immutable empty outlook data from forecast selectors so repeated selection against unchanged state yields the same reference and avoids avoidable renders and selector-stability warnings.
-- **Previous-day verification:** Route the previous calendar day's SPC storm reports to the live `yesterday.csv` feed, closing the same publication-window gap for forecasts dated the day before today.
-- **SPC report-day routing:** Align report-source selection and reached-date gating with SPC's 1200Z–1159Z report window instead of the browser's local calendar boundary.
+- **Beta account access:** Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
+- **Alert banner schedules:** Enforce configured start and expiry times after validating the schedule, and ignore stale configuration fetches.
+- **Autosave restore:** Ignore invalid snapshot timestamps so a malformed save cannot block a valid newer snapshot.
+- **Deployment action selection:** Treat the automatic choice as a request to use the release manifest.
+- **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
+- **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
+- **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
+- **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
 
 #### Security
 
-- Use immutable action references, protected reviewer gates, shell-safe branch handling, frozen dependency installs, pinned deployment host keys, concurrency controls, and explicit release validation.
+- **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
 
-#### Operations
+#### Dependencies
 
-- **Release and delivery:** Add manual release workflows, staging support, release manifests, OpenCode review automation, and maintenance reports.
-- **Release candidate:** Add evidence-gated v1.7 beta, staging, stable-promotion, rollback, and support gates, plus bootstrap of `stable/1.7.x` from an approved commit.
-- **Feature exposure:** Keep local, beta, staging, and production enablement explicit through target matrices, server capability gates, emergency disable controls, exposure diagnostics, and rollout validation.
-- **Deployment configuration:** Separate beta, staging, and production feature configuration and make release publication the only automatic deployment trigger.
-- **Dependency maintenance:** Keep frontend, server, test, and build dependencies current through regular automated updates.
+- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
+- **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
 
-#### Architecture
+#### Dependency summary
+<!-- dependabot-automation -->
 
-- **Deterministic Redux transitions:** Remove clock, storage, and DOM reads from forecast/theme/custom-product reducers. Timestamps are stamped onto action meta by a store middleware, and theme/workflow-active persistence moved into store subscriptions. Replaying the same action sequence from the same state now produces deeply equal output.
-- **Forecast map styling seam:** Extract the pure OpenLayers styling, feature identity, and base-map source helpers out of `OpenLayersForecastMap.tsx` into `src/components/Map/openLayersMapStyles.ts`, with focused unit tests and documented ownership/dependency direction.
+### Stable 1.7.x hotfixes
 
-#### Performance
+<!-- Add production fixes for the next stable 1.7.x release here. -->
 
-- **Forecast snapshot cloning:** Reduce recursive forecast feature clone allocations used by history snapshots while preserving deep-copy behavior.
-- **Forecast map synchronization:** Reconcile OpenLayers forecast layers incrementally by stable feature ID, preserving unchanged feature identity and avoiding full rehydration.
-- **SPC storm report parsing:** Reduce allocations in shared SPC storm-report CSV tokenization and traverse `today.csv` sections in a single pass.
-- **Cloud library efficiency:** Store forecast payloads in a dedicated `cloudCycles/{id}/payload` subcollection so library listings and realtime subscriptions never download payload content, and replace the tenancy-wide Firestore storage scan with bounded server-side aggregate queries.
+#### Fixed
 
-#### Beta-only and experimental
+<!-- The lane is empty after v1.7.7. -->
 
-- **Targeted rollout:** Auto-TSTM, Forecast workflow v2, Verification relaunch, and Custom products remain local/beta rollout surfaces until their production exposure is separately approved.
-- **Unreleased foundations:** Tropical workspace and Collaboration room remain disabled on all deployment targets until their release criteria are complete.
-- **Prototype evidence:** NOAA DAT damage points supplement official verification evidence and do not replace the primary verification sources.
+## v1.7.7
+
+### Fixed
+
+- **Beta entitlements:** Restore reliable premium access for beta users on the stable 1.7 line.
+
+## v1.7.6
+
+### Fixed
+
+- **Basemap availability:** Disable the broken Carto dark basemap in production.
+
+## v1.7.5
+
+### Fixed
+
+- **Auto-categorical recovery:** Recover from failed worker runs without losing the last valid outlook geometry.
+- **Malformed geometry:** Prevent invalid outlook shapes from crashing map rendering and snapping.
+- **Custom product handoff:** Handle unavailable iOS session storage without losing the pending handoff.
+
+## v1.7.2
+
+### Fixed
+
+- **Hosted custom products:** Restore the server capability at startup so authorized product saves work on the stable 1.7 line.
+
+## v1.7.1
+
+### Fixed
+
+- **Auto-TSTM production runtime:** Run the production worker with its verified Python runtime and fail deployment if the required capability is unavailable.
+
+## v1.7.0
+
+### Added
+
+- **Forecast Grade:** Add the verification workspace with scoring, report-quality checks, share cards, trends, premium snapshots, and NOAA DAT damage-point evidence.
+- **Custom products:** Add local and hosted forecast products with styling, import/export, snapshots, and owner-scoped storage.
+- **Forecast workflows:** Add reusable templates, saved workflow metadata, scoped discussion drafts, package review, and completion flows.
+- **Auto-TSTM:** Add cached HREF guidance with preview, apply, and cancel controls.
+- **Reference products:** Add built-in Excessive Rainfall Outlook and Tropical AOI layers, plus an opt-in SPC mesoscale discussion layer.
+- **Account controls:** Add recent-authentication account deletion with subscription cleanup and hosted-data removal.
+- **Forecast controls:** Add per-outlook opacity and day-by-day forecast workflow support.
+
+### Changed
+
+- **Forecast and verification:** Rework workflow data, event capture, severity intent, spatial scoring, and false-alarm reporting.
+- **Analytics and privacy:** Replace legacy analytics with privacy-gated Umami and reduce collected tracking data.
+- **Server platform:** Move the analytics service to Express 5 and Stripe Node 22, with shared capability checks.
+- **Pricing:** Use one free/premium copy contract across Pricing, Account, and Cloud Library.
+
+### Fixed
+
+- **Forecast reliability:** Repair legacy map data, exports, map teardown, keyboard shortcuts, and browser reconnect behavior.
+- **Editor performance:** Lazy-load feature routes and move expensive categorical geometry work into a cancellable worker.
+- **Import safety:** Validate file size, structure, strings, arrays, and coordinates before changing forecast state.
+- **Geometry editing:** Preserve valid outlooks when categorical geometry derivation fails or times out.
+- **Monitoring:** Stabilize alert, radar, satellite, storm-report, and source metadata handling.
+- **Hosted data and billing:** Harden authorization, entitlement updates, webhook replay handling, account deletion races, and public status responses.
+- **Verification reports:** Use live SPC feeds during publication windows so current-day and previous-day grading works.
+- **Accessibility and layout:** Improve keyboard handling, dialog focus, labels, page headings, and mobile controls.
+- **Session restore:** Prevent duplicate restores and notifications, and keep saved work scoped to the active account.
+
+### Security
+
+- **Authorization and release safety:** Tighten Firestore and capability boundaries, validate release configuration, and verify production sourcemap uploads before deleting local artifacts.
+
+### Dependencies
+
+- **App and server:** Update Firebase, OpenLayers, Turf, React tooling, Stripe, Express rate limiting, and related build and test dependencies.
 
 ### Stable 1.6.x hotfixes
 

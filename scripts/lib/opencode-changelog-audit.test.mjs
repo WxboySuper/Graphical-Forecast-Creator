@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assertChangelogAuditHead,
   parseOpenCodeChangelogAuditResult,
+  resolveManualChangelogAuditBaseline,
   validateChangelogAuditTarget,
 } from './opencode-changelog-audit.mjs';
 
@@ -23,6 +24,27 @@ test('publisher target validation excludes protected release branches and stale 
   assert.throws(() => validateChangelogAuditTarget('main', 'not-a-sha'), /target is invalid/);
   assert.doesNotThrow(() => assertChangelogAuditHead(sha, sha));
   assert.throws(() => assertChangelogAuditHead(sha, 'b'.repeat(40)), /refusing to publish stale content/);
+});
+
+test('manual audit baseline resolves only a full ancestor SHA or version tag', () => {
+  const head = 'b'.repeat(40);
+  const baseline = 'a'.repeat(40);
+  const resolveCommit = (ref) => ref.startsWith('v') ? baseline : ref;
+  const isAncestor = (candidate, target) => candidate === baseline && target === head;
+
+  const common = { targetRef: 'main', headSha: head, resolveCommit, isAncestor };
+  assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline }), baseline);
+  assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0-beta.5' }), baseline);
+  assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: '' }), null);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'main~1' }), /full commit SHA or version tag/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0' }), /match the selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.7.7' }), /match the selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0-beta.5', targetRef: 'stable/1.8.x' }), /match the selected release line/);
+  assert.equal(resolveManualChangelogAuditBaseline({
+    ...common, baselineRef: 'v1.8.3', targetRef: 'stable/1.8.x',
+  }), baseline);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline, resolveCommit: () => null }), /did not resolve/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline, isAncestor: () => false }), /must be an ancestor/);
 });
 
 test('validates update output with the shared strict changelog entry rules', () => {

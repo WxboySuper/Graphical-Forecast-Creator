@@ -75,10 +75,18 @@ describe('dependabot changelog', () => {
   });
 
   it('writes dependency automation into the stable hotfix lane', () => {
-    const changelog = '# Changelog\n\n## [Unreleased]\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable 1.6.x hotfixes\n\n#### Fixed\n- Fix\n';
+    const changelog = '# Changelog\n\n## [Unreleased]\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable 1.7.x hotfixes\n\n#### Fixed\n- Fix\n';
     const bump = { name: 'postcss', from: '8.5.14', to: '8.5.15', directory: 'root' };
     const updated = applyDependencyBumpsToChangelog(changelog, [bump], 'stable-hotfix');
-    assert.match(updated, /### Stable 1\.6\.x hotfixes[\s\S]*#### Dependencies[\s\S]*postcss/);
-    assert.doesNotMatch(updated.slice(0, updated.indexOf('### Stable 1.6.x hotfixes')), /postcss/);
+    assert.match(updated, /### Stable 1\.7\.x hotfixes[\s\S]*#### Dependencies[\s\S]*postcss/);
+    assert.doesNotMatch(updated.slice(0, updated.indexOf('### Stable 1.7.x hotfixes')), /postcss/);
+  });
+
+  it('keeps grouped dependency notes separate from the managed Dependabot block', () => {
+    const changelog = '# Changelog\n\n## [Unreleased]\n\n### Next major / beta\n\n#### Dependency summary\n- **App and tooling:** Update React and Firebase.\n\n#### Dependencies\n<!-- dependabot-automation -->\n\n### Stable 1.7.x hotfixes\n';
+    const bump = { name: 'vite', from: '^8.2.1', to: '^8.3.0', directory: 'root' };
+    const updated = applyDependencyBumpsToChangelog(changelog, [bump], 'next-major');
+    assert.match(updated, /#### Dependency summary\n- \*\*App and tooling:\*\* Update React and Firebase\./);
+    assert.match(updated, /#### Dependencies\n<!-- dependabot-automation -->\n\n- \*\*vite:\*\* \^8\.2\.1 → \^8\.3\.0/);
   });
 });

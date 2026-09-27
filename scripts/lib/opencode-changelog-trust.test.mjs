@@ -137,3 +137,15 @@ test('workspace preparation removes project OpenCode configuration even without 
   const source = readFileSync(path.join(repositoryRoot, 'scripts/prepare-opencode-workspace.mjs'), 'utf8');
   assert.ok(source.indexOf('removeProjectOpenCodeConfiguration(process.cwd())') < source.indexOf('if (!excludedPaths.length && !scope)'));
 });
+
+test('manual changelog audits pass an optional bounded baseline through the trusted workflow', () => {
+  const workflow = readWorkflow('opencode-changelog-audit.yml');
+  assert.equal(workflow.on.workflow_dispatch.inputs.baseline_ref.required, false);
+  assert.equal(workflow.on.workflow_dispatch.inputs.baseline_ref.type, 'string');
+  assert.equal(workflow.jobs.audit.env.BASELINE_REF, "${{ inputs.baseline_ref || github.event.inputs.baseline_ref || '' }}");
+  const context = allSteps(workflow.jobs.audit).find((step) => step.name === 'Prepare bounded changelog audit context and state');
+  assert.equal(context.env.BASELINE_REF, '${{ env.BASELINE_REF }}');
+  assert.match(context.with.script, /resolveManualChangelogAuditBaseline/);
+  assert.match(context.with.script, /baselineSha = manualBaselineSha/);
+  assert.match(context.with.script, /&& !manualBaselineSha/);
+});
