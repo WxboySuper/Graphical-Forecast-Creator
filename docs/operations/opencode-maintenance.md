@@ -11,8 +11,8 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review | One review per revision and event review type |
-| CI supplement | `Checks | CI` completes for an associated PR | One supplemental review per revision after check results are available |
+| PR first-look | PR opened, new commits, reopened, ready for review | One editable summary comment per PR, updated for later revisions |
+| CI supplement | `Checks | CI` completes for an associated PR | Updates that same comment with new CI evidence |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
@@ -235,6 +235,30 @@ valid repository path and line, evidence, impact, a high confidence score, and
 a fingerprint not present in the existing issue backlog. OpenCode's CLI is
 installed from the exact npm package version `opencode-ai@1.18.32`. Update the
 version deliberately after reviewing a release.
+
+## PR review format
+
+The first-look reviewer publishes one bot-owned issue comment on each PR and
+updates that comment on later PR revisions or CI follow-ups. It does not create
+a new pull-request review object for each run. Duplicate event/revision pairs
+are skipped. Earlier review objects from before this format change remain in
+the PR history; the workflow does not try to delete them.
+
+The publisher validates the model's bounded JSON result and renders the same
+sections every time: a first-review or latest-changes summary, good things,
+bad things, and a rating out of 10. Findings include P0 to P3 severity, a
+changed-file location, evidence, and impact. The linked-issue section appears
+only for GitHub-linked closing issues. The review-comment status section
+appears only when unresolved review threads exist; it reports open and
+resolved counts and whether this revision appears to address each supplied
+open thread. The bot never resolves review threads itself. Linked issues,
+review comments, and PR text are untrusted model context.
+
+Follow-up runs compare the current PR head with the head recorded in the bot
+comment and include the prior summary, so the reviewer can focus its summary on
+what changed. If GitHub cannot provide that comparison, the prompt includes
+the limitation and the full current diff remains available within the usual
+context bounds.
 
 ## Turning jobs off
 
