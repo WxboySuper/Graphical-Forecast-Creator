@@ -6,14 +6,18 @@ const decodeModelResult = (raw) => {
   try { return JSON.parse(raw); } catch { throw new Error('OpenCode changelog result must be JSON.'); }
 };
 
-const normalizeModelEntries = (entries) => {
-  if (!Array.isArray(entries) || entries.length < 1 || entries.length > 4) {
-    throw new Error('OpenCode changelog must contain one to four entries.');
+const validateEntryFormat = (entries) => {
+  for (const entry of entries) {
+    if (!ENTRY_PATTERN.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+    if (/[\x60<>]|\[|\]|\(|\)|https?:\/\//i.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
   }
-  const normalized = entries.map((entry) => String(entry).trim());
-  const invalid = normalized.some((entry) => !ENTRY_PATTERN.test(entry) || /[\x60<>]|\[|\]|\(|\)|https?:\/\//i.test(entry));
-  if (invalid) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
-  return normalized;
+  return entries;
+};
+
+const normalizeModelEntries = (entries) => {
+  if (!Array.isArray(entries)) throw new Error('OpenCode changelog must contain one to four entries.');
+  if (entries.length < 1 || entries.length > 4) throw new Error('OpenCode changelog must contain one to four entries.');
+  return validateEntryFormat(entries.map((entry) => String(entry).trim()));
 };
 
 const validateModelEntries = (result) => {
