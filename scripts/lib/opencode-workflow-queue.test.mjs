@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import yaml from 'yaml';
 
 const workflowFiles = [
   '../../.github/workflows/opencode.yml',
@@ -16,9 +15,8 @@ const queueGroup = 'gfc-opencode-maintenance-queue';
 
 test('every OpenCode workflow shares the single bounded concurrency queue', () => {
   for (const file of workflowFiles) {
-    const workflow = yaml.parse(readFileSync(new URL(file, import.meta.url), 'utf8'));
-    assert.equal(workflow.concurrency?.group, queueGroup, `${file} must join the shared queue`);
-    assert.equal(workflow.concurrency?.queue, 'max', `${file} must retain pending work in the queue`);
-    assert.notEqual(workflow.concurrency?.['cancel-in-progress'], true, `${file} must not cancel a running invocation`);
+    const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.match(source, new RegExp(`^concurrency:\\r?\\n  group: ${queueGroup}\\r?\\n  queue: max$`, 'm'), `${file} must join the shared queue`);
+    assert.doesNotMatch(source, /^  cancel-in-progress: true$/m, `${file} must not cancel a running invocation`);
   }
 });

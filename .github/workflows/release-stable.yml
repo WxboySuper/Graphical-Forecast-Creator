@@ -101,9 +101,20 @@ jobs:
       contents: read
     steps:
       - name: Dispatch post-release changelog audit
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-          RELEASE_REF: ${{ inputs.ref }}
           RELEASE_VERSION: ${{ needs.release.outputs.version }}
-        run: gh workflow run opencode-changelog-audit.yml --ref main -f target_ref="$RELEASE_REF" -f trigger_reason=stable-release -f release_tag="v$RELEASE_VERSION"
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::GH_PAT is missing; the stable release succeeded but the changelog audit was not dispatched."
+            exit 0
+          fi
+          if [[ "$RELEASE_VERSION" =~ ^v?([0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
+            TARGET_LINE="stable/${BASH_REMATCH[1]}.x"
+          else
+            echo "::warning::Stable release succeeded, but version '$RELEASE_VERSION' did not identify a stable changelog line."
+            exit 0
+          fi
+          if ! gh workflow run opencode-changelog-audit.yml --ref main -f target_ref="$TARGET_LINE" -f trigger_reason=stable-release -f release_tag="v${RELEASE_VERSION#v}"; then
+            echo "::warning::Stable release succeeded, but the changelog audit dispatch failed."
+          fi

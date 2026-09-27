@@ -264,7 +264,14 @@ jobs:
       contents: read
     steps:
       - name: Dispatch post-release changelog audit
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: gh workflow run opencode-changelog-audit.yml --ref main -f target_ref=main -f trigger_reason=beta-release -f release_tag="v${{ needs.release.outputs.version }}"
+          RELEASE_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::GH_PAT is missing; the beta release succeeded but the changelog audit was not dispatched."
+            exit 0
+          fi
+          if ! gh workflow run opencode-changelog-audit.yml --ref main -f target_ref=main -f trigger_reason=beta-release -f release_tag="v$RELEASE_VERSION"; then
+            echo "::warning::Beta release succeeded, but the changelog audit dispatch failed."
+          fi
