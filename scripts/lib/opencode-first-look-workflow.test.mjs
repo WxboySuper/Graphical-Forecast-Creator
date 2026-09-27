@@ -15,7 +15,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
-  assert.equal(workflow.jobs.review.permissions.issues, 'write');
+  assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   assert.equal(workflow.jobs.review.permissions.actions, undefined);
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
