@@ -20,3 +20,9 @@ test('every OpenCode workflow shares the single bounded concurrency queue', () =
     assert.doesNotMatch(source, /^  cancel-in-progress: true$/m, `${file} must not cancel a running invocation`);
   }
 });
+
+test('changelog audit keeps runner context references at step scope', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/opencode-changelog-audit.yml', import.meta.url), 'utf8');
+  const jobEnv = workflow.match(/^    env:\r?\n([\s\S]*?)^    steps:/m)?.[1] ?? '';
+  assert.doesNotMatch(jobEnv, /runner\.temp/, 'runner context is unavailable in job-level env');
+});
