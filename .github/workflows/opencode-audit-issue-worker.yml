@@ -201,7 +201,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: ${{ steps.select.outputs.permissions }}
-          OPENCODE_MODEL: opencode/muse-spark-1.2-contributor-free
+          OPENCODE_MODEL: opencode-go/muse-spark-1.3-contributor
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-audit-worker-prompt.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-audit-worker-output.md
           OPENCODE_TIMEOUT_MS: 1200000

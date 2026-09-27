@@ -161,7 +161,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: '{"*":"deny","external_directory":{"*":"deny"},"read":{"*":"allow","*.env":"deny","*.env.*":"deny","*.env.example":"allow"},"glob":"allow","grep":"allow"}'
-          OPENCODE_MODEL: opencode/muse-spark-1.2-contributor-free
+          OPENCODE_MODEL: opencode-go/muse-spark-1.3-contributor
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-pr-review.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-pr-review-output.md
         run: node scripts/run-opencode-maintenance.mjs
