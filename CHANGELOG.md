@@ -35,7 +35,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Security
 
-- **Account and request boundaries:** Require authentication for product analytics, validate billing redirect URLs, hide raw billing errors, enforce the production content security policy, and avoid exposing sensitive Sentry breadcrumb data.
+- **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
 - **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
 
 #### Dependencies
