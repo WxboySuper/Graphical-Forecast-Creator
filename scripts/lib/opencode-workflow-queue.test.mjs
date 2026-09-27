@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parse } from 'yaml';
+import { createRequire } from 'node:module';
+
+const { parse } = createRequire(import.meta.url)('yaml');
 
 const workflowFiles = [
   '../../.github/workflows/opencode.yml',
@@ -33,7 +35,7 @@ test('changelog audit keeps runner context references at step scope', () => {
   assert.doesNotMatch(jobEnv, /runner\.temp/, 'runner context is unavailable in job-level env');
 });
 
-test('first-look reviews publish as github-actions[bot] with only pull request write access', () => {
+test('first-look reviews publish one bot comment with only issue-comment write access', () => {
   const source = readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8');
   const workflow = parse(source);
   const review = workflow.jobs.review;
@@ -41,11 +43,13 @@ test('first-look reviews publish as github-actions[bot] with only pull request w
 
   assert.deepEqual(review.permissions, {
     contents: 'read',
-    issues: 'read',
-    'pull-requests': 'write',
+    issues: 'write',
+    'pull-requests': 'read',
     checks: 'read',
   });
   assert.equal(publisher.with['github-token'], '${{ github.token }}');
   assert.doesNotMatch(publisher.with['github-token'], /GH_PAT/);
-  assert.match(publisher.with.script, /github\.rest\.pulls\.createReview/);
+  assert.match(publisher.with.script, /github\.rest\.issues\.createComment/);
+  assert.match(publisher.with.script, /github\.rest\.issues\.updateComment/);
+  assert.doesNotMatch(publisher.with.script, /github\.rest\.pulls\.createReview/);
 });
