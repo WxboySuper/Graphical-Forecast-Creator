@@ -37,6 +37,37 @@ export const buildGitHubReleaseUploadArgs = ({ tag, notesFile }) => [
   `${notesFile}#GFC-${tag}-release-notes.md`,
 ];
 
+const runGitHubCommand = (args, options) => execFileSync('gh', args, options);
+
+const githubReleaseExists = (tag, runCommand) => {
+  try {
+    runCommand(['release', 'view', tag], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const githubReleaseHasNotesAsset = (tag, runCommand) => {
+  const release = JSON.parse(runCommand(['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
+  return release.assets.some((asset) => asset.name === `GFC-${tag}-release-notes.md`);
+};
+
+const uploadReleaseNotesAssetIfMissing = ({ tag, notesFile, runCommand }) => {
+  if (githubReleaseHasNotesAsset(tag, runCommand)) return;
+  runCommand(buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });
+};
+
+/** Publish the generated public release body with a portable Markdown notes asset. */
+export const publishGitHubRelease = ({ tag, targetBranch, notesFile, prerelease, runCommand = runGitHubCommand }) => {
+  if (githubReleaseExists(tag, runCommand)) {
+    uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand });
+    return `GitHub release ${tag} already exists.`;
+  }
+  runCommand(buildGitHubReleaseCreateArgs({ tag, targetBranch, notesFile, prerelease }), { stdio: 'inherit' });
+  return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`;
+};
+
 /** Validate the user-provided release version and target ref. */
 export const validateReleaseInputs = ({ version, targetBranch }) => {
   if (!version || !VERSION_PATTERN.test(version)) {
@@ -126,28 +157,7 @@ const run = () => {
   writeFileSync(notesFile, `${section}\n`);
 
   const prerelease = hasBetaPrerelease(version);
-  /** Check whether the requested GitHub release already exists. */
-  const ghReleaseExists = () => {
-    try {
-      execFileSync('gh', ['release', 'view', tag], { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  /** Create the requested GitHub release from the prepared notes file. */
-  if (ghReleaseExists()) {
-    console.log(`GitHub release ${tag} already exists.`);
-    const release = JSON.parse(execFileSync('gh', ['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
-    const assetName = `GFC-${tag}-release-notes.md`;
-    if (!release.assets.some((asset) => asset.name === assetName)) {
-      execFileSync('gh', buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });
-    }
-  } else {
-    execFileSync('gh', buildGitHubReleaseCreateArgs({ tag, targetBranch, notesFile, prerelease }), { stdio: 'inherit' });
-    console.log(`Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`);
-  }
+  console.log(publishGitHubRelease({ tag, targetBranch, notesFile, prerelease }));
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
