@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: gfc-opencode-maintenance-queue
+  queue: max
+
 jobs:
   triage:
     if: github.event.issue.user.type != 'Bot'

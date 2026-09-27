@@ -19,29 +19,18 @@ on:
         description: 'Optional just-published tag to exclude when selecting the previous release baseline'
         required: false
         type: string
-  workflow_call:
-    inputs:
-      target_ref:
-        description: 'Release line to inspect after a release'
-        required: true
-        type: string
       trigger_reason:
+        description: 'Why this audit was queued'
         required: false
         type: string
-    secrets:
-      OPENCODE_API_KEY:
-        required: true
-      GH_PAT:
-        required: true
-
 permissions:
   contents: read
   issues: write
   pull-requests: read
 
 concurrency:
-  group: opencode-changelog-audit-${{ inputs.target_ref || github.event.inputs.target_ref || 'main' }}
-  cancel-in-progress: false
+  group: gfc-opencode-maintenance-queue
+  queue: max
 
 jobs:
   audit:

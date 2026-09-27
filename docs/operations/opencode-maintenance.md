@@ -199,6 +199,15 @@ dispatch the audit workflow (`contents: write`, `pull-requests: write`, and
 
 ## Compute and output limits
 
+All workflows that invoke OpenCode share the repository-wide Actions concurrency
+group `gfc-opencode-maintenance-queue`. GitHub runs one workflow from that group
+at a time and queues up to 100 pending runs across event reviews, triage,
+scheduled work, changelog audits, issue implementation, research, and manual
+`/opencode` requests. The queue uses `queue: max`; runs beyond GitHub's 100-run
+limit are canceled. GitHub orders queued runs by when they enter the queue, so
+strict ordering by event time is not guaranteed. Keep per-job timeouts and
+deduplication in place because a queued run can become stale before it starts.
+
 Daily inspections have 15- to 20-minute model limits. Dependency review has a
 25-minute limit. Weekly and monthly audits can use up to 60 and 100 minutes.
 The implementation worker runs every two hours but skips the model entirely

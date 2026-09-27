@@ -14,8 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: opencode-audit-issue-worker
-  cancel-in-progress: false
+  group: gfc-opencode-maintenance-queue
+  queue: max
 
 jobs:
   implement:
