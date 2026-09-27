@@ -24,13 +24,6 @@ export const SITE_RADAR_PRODUCTS: Array<{ value: MonitorRadarProduct; label: str
   { value: 'sr-bref', label: 'Base Reflectivity' },
   { value: 'sr-bvel', label: 'Base Velocity' },
 ];
-
-/** @deprecated Use {@link getRadarProductsForMode} instead. */
-export const MRMS_PRODUCTS = [
-  ...MRMS_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'mrms-conus' as const })),
-  ...SITE_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'site' as const })),
-];
-
 export const getRadarProductsForMode = (mode: MonitorRadarMode) => {
   if (mode === 'site') {
     return SITE_RADAR_PRODUCTS;
@@ -215,8 +208,3 @@ export const fetchWmsCapabilities = async (url: string): Promise<string> => {
 
 export const fetchLayerTimeValues = async (config: WmsLayerConfig): Promise<string[]> =>
   findLayerTimeValues(await fetchWmsCapabilities(config.url), config.layer);
-
-export const fetchLatestLayerTime = async (config: WmsLayerConfig): Promise<string | undefined> => {
-  const timeValues = await fetchLayerTimeValues(config);
-  return timeValues[timeValues.length - 1];
-};
