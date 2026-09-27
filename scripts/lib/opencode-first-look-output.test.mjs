@@ -32,6 +32,8 @@ test('renders follow-up, linked-issue, and unresolved review-thread sections onl
     hasPriorReviewComment: true,
     linkedIssues: [{ number: 42, title: 'Prevent stale restore', url: 'https://github.com/org/repo/issues/42' }],
     openReviewThreads: [{ id: 'thread-1', path: 'src/restore.ts', line: 18 }],
+    changedFilePaths: ['src/restore.ts'],
+    changedLineNumbers: { 'src/restore.ts': [18] },
     resolvedReviewThreadCount: 2,
   };
   const richResult = {
@@ -60,4 +62,11 @@ test('rejects missing required sections, invalid ratings, hallucinated linked is
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
   const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify(result), withThread), /assess each supplied open review thread/);
+  const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+    ...context, changedFilePaths: ['src/b.ts'], changedLineNumbers: { 'src/b.ts': [9] },
+  }), /path must be a changed PR file/);
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
+  }), /line must be an added line/);
 });

@@ -1,4 +1,4 @@
-const MAX_OUTPUT_LENGTH = 12_000;
+const MAX_OUTPUT_LENGTH = 40_000;
 const MAX_BULLETS = 6;
 const MAX_TEXT_LENGTH = 900;
 const ASSESSMENTS = new Set(['addressed', 'still-open', 'unclear']);
@@ -35,6 +35,16 @@ const parseFinding = (finding) => {
   };
 };
 
+const validateFindingLocations = (findings, context) => {
+  const paths = new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
+  for (const finding of findings) {
+    if (!paths.has(finding.path)) throw new Error('First-look finding path must be a changed PR file.');
+    if (finding.line !== null && !(context.changedLineNumbers?.[finding.path] ?? []).includes(finding.line)) {
+      throw new Error('First-look finding line must be an added line in the supplied PR diff, or null.');
+    }
+  }
+};
+
 const parseReviewAssessments = (assessments, openThreads) => {
   if (!Array.isArray(assessments) || assessments.length !== openThreads.length) {
     throw new Error('First-look output must assess each supplied open review thread exactly once.');
@@ -65,6 +75,7 @@ const parseReviewPayload = (result, context) => {
   const summary = boundedList(result.summary, 'summary', { allowEmpty: false });
   const goodThings = boundedList(result.goodThings, 'goodThings');
   const badThings = boundedFindings(result.badThings);
+  validateFindingLocations(badThings, context);
   if (!Number.isInteger(result.rating) || result.rating < 0 || result.rating > 10) throw new Error('First-look rating must be an integer from 0 to 10.');
 
   const linkedIssues = Array.isArray(context.linkedIssues) ? context.linkedIssues : [];
