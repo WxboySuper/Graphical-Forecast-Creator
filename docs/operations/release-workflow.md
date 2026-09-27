@@ -170,7 +170,7 @@ when the stable changelog entry is carried forward.
 | `prepare-stable-promotion.yml` | Create a reviewed main promotion PR |
 | `bootstrap-stable-release.yml` | Create the immutable `stable/X.Y.x` branch from the approved main commit |
 | `release-stable.yml` | Create a stable or hotfix release |
-| `opencode-changelog-audit.yml` | Manually or weekly compare recent code changes with the Unreleased changelog and open a corrective PR when needed |
+| `opencode-changelog-audit.yml` | Manually or weekly compare code changes with the Unreleased changelog and open a corrective PR when needed; manual runs can set `baseline_ref` to bound the range |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |
 | `deploy-main-to-vps.yml` | Deploy a published stable release or selected ref |
 | `forward-port-stable-fix.yml` | Carry stable fixes forward into `main` |

@@ -2,6 +2,7 @@ import { parseOpenCodeChangelogResult } from './opencode-changelog.mjs';
 
 const TARGET_REF_PATTERN = /^(main|stable\/\d+\.\d+\.x)$/;
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
+const BASELINE_REF_PATTERN = /^(?:[a-f0-9]{40}|v\d+\.\d+\.\d+(?:-beta\.\d+)?)$/i;
 
 const validateTargetRef = (targetRef) => {
   if (typeof targetRef !== 'string') throw new Error('Prepared changelog audit target is invalid.');
@@ -18,6 +19,25 @@ export const validateChangelogAuditTarget = (targetRef, headSha) => {
   validateTargetRef(targetRef);
   validateHeadSha(headSha);
   return { targetRef, headSha };
+};
+
+/** Resolve an optional manual baseline and require it to be an ancestor of the audited head. */
+export const resolveManualChangelogAuditBaseline = ({ baselineRef, headSha, resolveCommit, isAncestor }) => {
+  if (!baselineRef) return null;
+  if (typeof baselineRef !== 'string' || !BASELINE_REF_PATTERN.test(baselineRef)) {
+    throw new Error('Manual changelog audit baseline must be a full commit SHA or version tag.');
+  }
+  if (typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
+    throw new Error('Manual changelog audit target is invalid.');
+  }
+  const baselineSha = resolveCommit(baselineRef);
+  if (typeof baselineSha !== 'string' || !COMMIT_SHA_PATTERN.test(baselineSha)) {
+    throw new Error('Manual changelog audit baseline did not resolve to a commit.');
+  }
+  if (!isAncestor(baselineSha, headSha)) {
+    throw new Error('Manual changelog audit baseline must be an ancestor of the target revision.');
+  }
+  return baselineSha;
 };
 
 /** Refuse to publish an audit prepared against a revision that has moved. */

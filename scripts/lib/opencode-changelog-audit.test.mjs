@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assertChangelogAuditHead,
   parseOpenCodeChangelogAuditResult,
+  resolveManualChangelogAuditBaseline,
   validateChangelogAuditTarget,
 } from './opencode-changelog-audit.mjs';
 
@@ -23,6 +24,20 @@ test('publisher target validation excludes protected release branches and stale 
   assert.throws(() => validateChangelogAuditTarget('main', 'not-a-sha'), /target is invalid/);
   assert.doesNotThrow(() => assertChangelogAuditHead(sha, sha));
   assert.throws(() => assertChangelogAuditHead(sha, 'b'.repeat(40)), /refusing to publish stale content/);
+});
+
+test('manual audit baseline resolves only a full ancestor SHA or version tag', () => {
+  const head = 'b'.repeat(40);
+  const baseline = 'a'.repeat(40);
+  const resolveCommit = (ref) => ref === 'v1.8.0-beta.5' ? baseline : ref;
+  const isAncestor = (candidate, target) => candidate === baseline && target === head;
+
+  assert.equal(resolveManualChangelogAuditBaseline({ baselineRef: baseline, headSha: head, resolveCommit, isAncestor }), baseline);
+  assert.equal(resolveManualChangelogAuditBaseline({ baselineRef: 'v1.8.0-beta.5', headSha: head, resolveCommit, isAncestor }), baseline);
+  assert.equal(resolveManualChangelogAuditBaseline({ baselineRef: '', headSha: head, resolveCommit, isAncestor }), null);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ baselineRef: 'main~1', headSha: head, resolveCommit, isAncestor }), /full commit SHA or version tag/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ baselineRef: baseline, headSha: head, resolveCommit: () => null, isAncestor }), /did not resolve/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ baselineRef: baseline, headSha: head, resolveCommit, isAncestor: () => false }), /must be an ancestor/);
 });
 
 test('validates update output with the shared strict changelog entry rules', () => {

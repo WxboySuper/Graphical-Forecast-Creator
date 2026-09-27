@@ -9,6 +9,9 @@ on:
       force:
         required: false
         type: boolean
+      baseline_ref:
+        required: false
+        type: string
       release_tag:
         required: false
         type: string
@@ -41,6 +44,10 @@ on:
         required: false
         default: false
         type: boolean
+      baseline_ref:
+        description: 'Optional full commit SHA or version tag to bound this run; it must be an ancestor of the target head'
+        required: false
+        type: string
       release_tag:
         description: 'Optional just-published tag to exclude when selecting the previous release baseline'
         required: false
@@ -74,6 +81,7 @@ jobs:
       FORCE_AUDIT: ${{ inputs.force || github.event.inputs.force || 'false' }}
       TRIGGER_REASON: ${{ inputs.trigger_reason || github.event.inputs.trigger_reason || github.event_name }}
       RELEASE_TAG: ${{ inputs.release_tag || github.event.inputs.release_tag || '' }}
+      BASELINE_REF: ${{ inputs.baseline_ref || github.event.inputs.baseline_ref || '' }}
       STATE_MARKER: '<!-- gfc-opencode-maintenance-state:v1 -->'
       STATE_TITLE: '[Maintenance state] OpenCode job history'
     steps:
@@ -102,6 +110,7 @@ jobs:
           FORCE_AUDIT: ${{ env.FORCE_AUDIT }}
           TRIGGER_REASON: ${{ env.TRIGGER_REASON }}
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
+          BASELINE_REF: ${{ env.BASELINE_REF }}
           STATE_MARKER: ${{ env.STATE_MARKER }}
           STATE_TITLE: ${{ env.STATE_TITLE }}
         with:
@@ -138,6 +147,21 @@ jobs:
             state.changelogAudits ??= {}
             const audit = state.changelogAudits[targetRef] ?? {}
 
+            const git = (args) => execFileSync('git', args, gitOptions).trim()
+            const ancestor = (candidate) => {
+              try { execFileSync('git', ['merge-base', '--is-ancestor', candidate, headSha], { cwd: process.env.SOURCE_PATH, stdio: 'ignore' }); return true }
+              catch { return false }
+            }
+            const { pathToFileURL } = require('url')
+            const auditHelper = require('path').join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-changelog-audit.mjs')
+            const { resolveManualChangelogAuditBaseline } = await import(pathToFileURL(auditHelper).href)
+            const manualBaselineSha = resolveManualChangelogAuditBaseline({
+              baselineRef: process.env.BASELINE_REF,
+              headSha,
+              resolveCommit: (ref) => git(['rev-parse', `${ref}^{commit}`]),
+              isAncestor: ancestor,
+            })
+
             if (audit.pendingPR?.number) {
               const { data: pending } = await github.rest.pulls.get({
                 owner: context.repo.owner, repo: context.repo.repo, pull_number: audit.pendingPR.number,
@@ -151,19 +175,14 @@ jobs:
               audit.pendingPR = null
               state.changelogAudits[targetRef] = audit
             }
-            if (audit.lastInspectedHead === headSha && process.env.FORCE_AUDIT !== 'true') {
+            if (audit.lastInspectedHead === headSha && process.env.FORCE_AUDIT !== 'true' && !manualBaselineSha) {
               core.notice(`Changelog audit already completed for ${targetRef}@${headSha.slice(0, 10)}.`)
               core.setOutput('run', 'false')
               core.setOutput('status', 'clean')
               return
             }
 
-            const git = (args) => execFileSync('git', args, gitOptions).trim()
-            const ancestor = (candidate) => {
-              try { execFileSync('git', ['merge-base', '--is-ancestor', candidate, headSha], { cwd: process.env.SOURCE_PATH, stdio: 'ignore' }); return true }
-              catch { return false }
-            }
-            let baselineSha = audit.lastInspectedHead && ancestor(audit.lastInspectedHead) ? audit.lastInspectedHead : null
+            let baselineSha = manualBaselineSha ?? (audit.lastInspectedHead && ancestor(audit.lastInspectedHead) ? audit.lastInspectedHead : null)
             const line = targetRef === 'main' ? null : targetRef.match(/^stable\/(\d+\.\d+)\.x$/)[1]
             if (!baselineSha) {
               const tags = targetRef === 'main'
@@ -193,7 +212,7 @@ jobs:
               impact: targetRef === 'main' ? 'beta' : 'hotfix',
               triggerReason: process.env.TRIGGER_REASON,
             }
-            state.lastAttempt = { category: 'changelog-audit', targetRef, head: headSha, at: new Date().toISOString(), status: 'started' }
+            state.lastAttempt = { category: 'changelog-audit', targetRef, baseline: baselineSha, head: headSha, at: new Date().toISOString(), status: 'started' }
             const body = `${process.env.STATE_MARKER}\n${JSON.stringify(state)}`
             if (contextData.stateCommentId) {
               await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: contextData.stateCommentId, body })
@@ -276,7 +295,7 @@ jobs:
             state.changelogAudits[prepared.targetRef] = audit
             state.lastAttempt = {
               category: 'changelog-audit', targetRef: prepared.targetRef, head: prepared.headSha,
-              at: new Date().toISOString(), status: result.status, pullRequest: result.url ?? null,
+              baseline: prepared.baselineSha, at: new Date().toISOString(), status: result.status, pullRequest: result.url ?? null,
             }
             const body = `${process.env.STATE_MARKER}\n${JSON.stringify(state)}`
             await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: prepared.stateCommentId, body })
