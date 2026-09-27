@@ -22,7 +22,6 @@ to each.
 - **@sentry/react** ^10.75.0 (root (pnpm)) — MIT — allowed
 - **@sentry/vite-plugin** ^5.4.0 (root (pnpm)) — MIT — allowed
 - **@tailwindcss/cli** ^4.3.3 (root (pnpm)) — MIT — allowed
-- **@tailwindcss/postcss** ^4.3.3 (root (pnpm)) — MIT — allowed
 - **@testing-library/dom** ^10.4.2 (root (pnpm)) — MIT — allowed
 - **@testing-library/jest-dom** ^7.0.1 (root (pnpm)) — MIT — allowed
 - **@testing-library/react** ^16.3.3 (root (pnpm)) — MIT — allowed
