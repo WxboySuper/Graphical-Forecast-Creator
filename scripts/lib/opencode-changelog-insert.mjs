@@ -1,4 +1,4 @@
-const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Security']);
+const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Security', 'Dependencies']);
 
 const unreleasedBounds = (changelog) => {
   const unreleased = changelog.indexOf('## [Unreleased]');

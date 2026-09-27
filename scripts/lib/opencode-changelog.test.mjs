@@ -12,6 +12,14 @@ test('parses valid bounded output', () => {
   });
 });
 
+test('allows dependency sections and ordinary parentheses while rejecting markdown links', () => {
+  const dependency = '- **@sentry/node:** Keep server tracing pinned to the supported integration (server runtime).';
+  assert.deepEqual(parseOpenCodeChangelogResult(JSON.stringify({ status: 'complete', section: 'Dependencies', entries: [dependency] })), {
+    status: 'complete', section: 'Dependencies', entries: [dependency],
+  });
+  assert.throws(() => parseOpenCodeChangelogResult(JSON.stringify({ status: 'complete', section: 'Added', entries: ['- **Forecast export:** Preserve the selection [details](more information).'] })), /format or size/);
+});
+
 test('rejects malformed, inconclusive, oversized, and duplicate output safely', () => {
   assert.throws(() => parseOpenCodeChangelogResult('not json'), /must be JSON/);
   assert.deepEqual(parseOpenCodeChangelogResult('{"status":"inconclusive"}'), { status: 'inconclusive' });

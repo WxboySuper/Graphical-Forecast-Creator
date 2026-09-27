@@ -1,4 +1,4 @@
-const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Security']);
+const SECTIONS = new Set(['Added', 'Changed', 'Fixed', 'Security', 'Dependencies']);
 const ENTRY_PATTERN = /^- \*\*[^*\r\n]{1,80}:\*\* [^\r\n<>]{15,450}$/u;
 
 const decodeModelResult = (raw) => {
@@ -9,7 +9,9 @@ const decodeModelResult = (raw) => {
 const validateEntryFormat = (entries) => {
   for (const entry of entries) {
     if (!ENTRY_PATTERN.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
-    if (/[\x60<>]|\[|\]|\(|\)|https?:\/\//i.test(entry)) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+    if (/[\x60<>]/.test(entry) || /https?:\/\//i.test(entry) || /\[[^\]\r\n]+\]\([^)]+\)/.test(entry)) {
+      throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+    }
   }
   return entries;
 };
