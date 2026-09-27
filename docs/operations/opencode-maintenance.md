@@ -218,6 +218,7 @@ Each system has its own workflow and can be disabled from the repository's
 Actions settings without affecting the others:
 
 - PR review and CI supplement: `opencode-first-look.yml`
+- Changelog audit: `opencode-changelog-audit.yml`
 - Issue triage: `opencode-issue-triage.yml`
 - Daily, dependency, weekly, and monthly investigations: `opencode-scheduled-maintenance.yml`
 - Audit implementation workers: `opencode-audit-issue-worker.yml`

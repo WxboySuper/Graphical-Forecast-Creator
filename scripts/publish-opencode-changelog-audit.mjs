@@ -3,16 +3,16 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { changelogLaneHeadingForBase, CHANGELOG_LANE_HEADINGS } from './lib/changelog-policy.mjs';
 import { addOpenCodeChangelogEntries } from './lib/opencode-changelog.mjs';
-import { parseOpenCodeChangelogAuditResult } from './lib/opencode-changelog-audit.mjs';
+import {
+  assertChangelogAuditHead,
+  parseOpenCodeChangelogAuditResult,
+  validateChangelogAuditTarget,
+} from './lib/opencode-changelog-audit.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'CONTEXT_PATH', 'OUTPUT_PATH', 'RESULT_PATH', 'GH_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error(`${key} is required.`);
 const context = JSON.parse(readFileSync(process.env.CONTEXT_PATH, 'utf8'));
-const targetRef = context.targetRef;
-const expectedHead = context.headSha;
-if (!/^(main|stable\/\d+\.\d+\.x)$/.test(targetRef) || !/^[a-f0-9]{40}$/i.test(expectedHead)) {
-  throw new Error('Prepared changelog audit target is invalid.');
-}
+const { targetRef, headSha: expectedHead } = validateChangelogAuditTarget(context.targetRef, context.headSha);
 
 const result = parseOpenCodeChangelogAuditResult(readFileSync(process.env.OUTPUT_PATH, 'utf8'));
 if (result.status === 'inconclusive') {
@@ -28,7 +28,7 @@ const githubEnv = { ...process.env, GH_TOKEN: process.env.GH_TOKEN };
 const gh = (args) => execFileSync('gh', args, { encoding: 'utf8', env: githubEnv }).trim();
 execFileSync('git', ['fetch', '--no-tags', 'origin', `refs/heads/${targetRef}:refs/remotes/origin/${targetRef}`], { stdio: 'inherit' });
 const liveHead = execFileSync('git', ['rev-parse', `refs/remotes/origin/${targetRef}`], { encoding: 'utf8' }).trim();
-if (liveHead !== expectedHead) throw new Error('Target branch advanced while the changelog audit ran; refusing to publish stale content.');
+assertChangelogAuditHead(expectedHead, liveHead);
 
 const impact = targetRef === 'main' ? 'beta' : 'hotfix';
 const laneHeading = targetRef === 'main' ? CHANGELOG_LANE_HEADINGS['next-major'] : changelogLaneHeadingForBase(targetRef);

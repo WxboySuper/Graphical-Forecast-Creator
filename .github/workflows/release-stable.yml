@@ -101,6 +101,7 @@ jobs:
       contents: read
     steps:
       - name: Dispatch post-release changelog audit
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           RELEASE_REF: ${{ inputs.ref }}

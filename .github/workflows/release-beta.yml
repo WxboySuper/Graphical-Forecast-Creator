@@ -264,6 +264,7 @@ jobs:
       contents: read
     steps:
       - name: Dispatch post-release changelog audit
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: gh workflow run opencode-changelog-audit.yml --ref main -f target_ref=main -f trigger_reason=beta-release -f release_tag="v${{ needs.release.outputs.version }}"
