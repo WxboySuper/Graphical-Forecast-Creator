@@ -23,12 +23,16 @@ test('first-look review keeps its least-privilege read context and one bot-owned
   assert.match(context.with.script, /reviewThreads\(first: 50\)/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
+  assert.match(context.with.script, /changedLineNumbers/);
+  assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
   assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);
+  assert.match(publish.with.script, /mergeOpenCodeFirstLookResults/);
+  assert.match(publish.with.script, /gfc-opencode-first-look-data/);
   assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
 
   const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;

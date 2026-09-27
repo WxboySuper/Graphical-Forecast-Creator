@@ -120,6 +120,21 @@ export const renderOpenCodeFirstLookComment = (result, context) => {
   return lines.join('\n');
 };
 
+/** Keep same-revision review findings when a later CI run replaces the shared comment. */
+export const mergeOpenCodeFirstLookResults = (previous, current) => {
+  const findings = uniqueBy([...previous.badThings, ...current.badThings], findingKey).slice(0, MAX_BULLETS);
+  return {
+    ...current,
+    summary: current.summary,
+    goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
+    badThings: findings,
+  };
+};
+
+const findingKey = (finding) => `${finding.priority}:${finding.path}:${finding.line ?? ''}:${finding.title.toLowerCase()}`;
+const uniqueBy = (items, key) => [...new Map(items.map((item) => [key(item), item])).values()];
+const uniqueStrings = (items) => [...new Set(items)];
+
 const renderFindings = (findings) => findings.length ? findings.map((finding) => {
   const location = finding.line ? `${finding.path}:${finding.line}` : finding.path;
   return `- **[${finding.priority}] ${finding.title}** (${location}) Evidence: ${finding.evidence} Impact: ${finding.impact}`;

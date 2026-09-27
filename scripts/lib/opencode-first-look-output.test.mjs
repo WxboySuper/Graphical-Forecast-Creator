@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } from './opencode-first-look-output.mjs';
+import { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } from './opencode-first-look-output.mjs';
 
 const context = {
   hasPriorReviewComment: false,
@@ -69,4 +69,19 @@ test('rejects missing required sections, invalid ratings, hallucinated linked is
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
   }), /line must be an added line/);
+});
+
+test('same-revision CI follow-ups retain earlier concrete findings in the shared comment', () => {
+  const previous = {
+    ...result,
+    badThings: [{ priority: 'P1', title: 'Unchecked response', path: 'src/a.ts', line: 9, evidence: 'No validation', impact: 'Bad data is accepted.' }],
+  };
+  const current = {
+    ...result,
+    summary: ['CI confirms the new tests pass.'],
+    badThings: [{ priority: 'P2', title: 'Missing edge case', path: 'src/a.ts', line: 11, evidence: 'No boundary test', impact: 'Regression may go unnoticed.' }],
+  };
+  const merged = mergeOpenCodeFirstLookResults(previous, current);
+  assert.deepEqual(merged.summary, current.summary);
+  assert.deepEqual(merged.badThings.map(({ title }) => title), ['Unchecked response', 'Missing edge case']);
 });

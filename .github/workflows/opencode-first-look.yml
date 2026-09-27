@@ -138,10 +138,17 @@ jobs:
             }
             const priorReviewComment = summaryComment?.body
               ?.replace(summaryMarker, '')
+              .replace(/<!-- gfc-opencode-first-look-data:[A-Za-z0-9+/=]+ -->/g, '')
               .replace(/<!-- gfc-opencode-first-look-(?:event|ci):[a-f0-9]{40} -->/g, '')
               .replace(/<!-- gfc-opencode-first-look-head:[a-f0-9]{40} -->/g, '')
               .trim()
               .slice(0, 5000) ?? ''
+            let priorStructuredReview = null
+            const priorStructuredData = summaryComment?.body?.match(/<!-- gfc-opencode-first-look-data:([A-Za-z0-9+/=]+) -->/)?.[1]
+            if (priorStructuredData) {
+              try { priorStructuredReview = JSON.parse(Buffer.from(priorStructuredData, 'base64').toString('utf8')) }
+              catch { core.warning('Prior structured review state is invalid; continuing without deterministic carry-forward.') }
+            }
 
             let reviewData = null
             try {
@@ -234,6 +241,7 @@ jobs:
               hasPriorReviewComment: Boolean(summaryComment),
               priorHeadSha,
               priorReviewComment,
+              priorStructuredReview,
               revisionDiff,
               revisionDiffUnavailable,
             }
@@ -285,11 +293,14 @@ jobs:
             const pullNumber = Number(process.env.PULL_NUMBER)
             const expectedSha = process.env.REVIEW_SHA
             const summaryMarker = '<!-- gfc-opencode-first-look-summary -->'
-            const { parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } = await import(
+            const { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } = await import(
               pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-first-look-output.mjs')).href,
             )
             const contextData = JSON.parse(fs.readFileSync(process.env.CONTEXT_PATH, 'utf8'))
-            const parsed = parseOpenCodeFirstLookOutput(fs.readFileSync(process.env.OUTPUT_PATH, 'utf8'), contextData)
+            let parsed = parseOpenCodeFirstLookOutput(fs.readFileSync(process.env.OUTPUT_PATH, 'utf8'), contextData)
+            if (contextData.reviewKind === 'ci' && contextData.priorHeadSha === expectedSha && contextData.priorStructuredReview) {
+              parsed = mergeOpenCodeFirstLookResults(contextData.priorStructuredReview, parsed)
+            }
             const review = renderOpenCodeFirstLookComment(parsed, contextData)
             const { data: pull } = await github.rest.pulls.get({
               owner: context.repo.owner,
@@ -313,7 +324,8 @@ jobs:
             )
             const previousMarkers = summaryComment?.body?.match(/<!-- gfc-opencode-first-look:(?:event|ci):[a-f0-9]{40} -->/g) ?? []
             const currentMarkers = previousMarkers.filter((item) => item.includes(expectedSha))
-            const body = [review, summaryMarker, ...new Set([...currentMarkers, marker]), `<!-- gfc-opencode-first-look-head:${expectedSha} -->`].join('\n\n')
+            const dataMarker = `<!-- gfc-opencode-first-look-data:${Buffer.from(JSON.stringify(parsed)).toString('base64')} -->`
+            const body = [review, dataMarker, summaryMarker, ...new Set([...currentMarkers, marker]), `<!-- gfc-opencode-first-look-head:${expectedSha} -->`].join('\n\n')
             if (summaryComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
