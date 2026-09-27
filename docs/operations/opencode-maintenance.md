@@ -166,7 +166,7 @@ The implementation worker runs every two hours but skips the model entirely
 when no eligible issue is waiting. A worker handles one issue per invocation,
 and retries failed setup or model runs no more than once every six hours.
 
-Finding limits are three for daily jobs, five for the dependency review, eight
+Security inspections and weekly/monthly deep audits use `opencode-go/glm-5.3-flash`; other maintenance jobs use `opencode-go/muse-spark-1.3-contributor`. The workflow selects the model from the scheduled category. Finding limits are three for daily jobs, five for the dependency review, eight
 for weekly audits, and twelve for monthly audits. A candidate still needs a
 valid repository path and line, evidence, impact, a high confidence score, and
 a fingerprint not present in the existing issue backlog. OpenCode's CLI is

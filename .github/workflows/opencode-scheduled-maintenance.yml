@@ -51,6 +51,11 @@ jobs:
               '19 9 1 * *': 'audit-monthly',
             }
             const category = categoryBySchedule[schedule]
+            const modelByCategory = {
+              'security-daily': 'opencode-go/glm-5.3-flash',
+              'audit-weekly': 'opencode-go/glm-5.3-flash',
+              'audit-monthly': 'opencode-go/glm-5.3-flash',
+            }
             if (!category) throw new Error(`Unexpected schedule: ${schedule}`)
 
             const now = new Date()
@@ -236,6 +241,7 @@ jobs:
             core.setOutput('category', category)
             core.setOutput('scope', scope ?? '')
             core.setOutput('timeout', String(limits.timeout))
+            core.setOutput('model', modelByCategory[category] ?? 'opencode-go/muse-spark-1.3-contributor')
 
       - name: Preserve runners and prepare the model workspace
         if: steps.context.outputs.run == 'true'
@@ -260,7 +266,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           OPENCODE_PERMISSION: '{"*":"deny","external_directory":{"*":"deny"},"read":{"*":"allow","*.env":"deny","*.env.*":"deny","*.env.example":"allow"},"glob":"allow","grep":"allow"}'
-          OPENCODE_MODEL: opencode-go/muse-spark-1.3-contributor
+          OPENCODE_MODEL: ${{ steps.context.outputs.model }}
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-scheduled-prompt.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-scheduled-output.json
           OPENCODE_TIMEOUT_MS: ${{ steps.context.outputs.timeout }}
