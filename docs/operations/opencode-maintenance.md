@@ -15,6 +15,7 @@ change as a PR. A human reviews and merges every PR.
 | CI supplement | `Checks | CI` completes for an associated PR | One supplemental comment per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | A trusted PR selects beta/hotfix without changing CHANGELOG.md | Bounded factual entry drafted read-only; publisher validates and commits to PR branch |
+| Changelog audit | Manual dispatch, weekly Friday schedule, beta/stable release workflows | Compare changed behavior with the Unreleased lane; create one corrective PR only when entries are missing |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
@@ -172,6 +173,29 @@ PR head and decision, commits only `CHANGELOG.md` with a normal push, and leaves
 branch protection and human merge authority intact. The `GH_PAT` secret is
 required only when a generated entry must be pushed, so the updated PR revision
 can trigger CI normally.
+
+The flat changelog audit is available as **Maintenance | OpenCode changelog
+audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
+Friday. The beta and stable release workflows dispatch the same audit after
+publishing the release. It compares commits since the previous successful audit
+or the latest release tag with the selected `Unreleased` lane. A current
+changelog is a successful no-op; a concrete gap creates a normal PR containing
+only `CHANGELOG.md`. An open audit PR suppresses duplicate runs for that target
+until it is resolved. Release creation and deployment do not wait for or depend
+on this post-release audit.
+
+The audit is bounded to 60 commits, 80 changed files, a 90,000-character code
+diff, four entries, and a 15-minute model run. It excludes environment and key
+files from model context, and an oversized or inconclusive run publishes no PR.
+The existing hidden maintenance-state comment stores each target line's last
+inspected commit and any pending audit PR. A forced manual run can reinspect the
+same commit; otherwise successful revisions and pending PRs are deduplicated.
+OpenCode remains read-only and token-free. Deterministic code validates the
+entries, writes only to a generated branch, and opens a human-reviewed PR.
+`GH_PAT` is used only by deterministic publishing and release-dispatch steps; it
+needs the repository permissions required to push a PR branch, open a PR, and
+dispatch the audit workflow (`contents: write`, `pull-requests: write`, and
+`actions: write`). No autonomous workflow merges, releases, or deploys.
 
 ## Compute and output limits
 

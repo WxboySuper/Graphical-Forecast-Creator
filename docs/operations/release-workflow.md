@@ -80,6 +80,11 @@ Beta is now a release channel, not a branch. To create a beta:
 
 The workflow creates a prerelease. Its GitHub Release uses GitHub's native generated notes to show merged PRs between the previous beta tag and the selected ref, with categories from [`.github/release.yml`](../.github/release.yml). The curated changelog remains the public product record and is linked from the release.
 
+After publishing, the workflow dispatches the bounded OpenCode changelog audit
+against `main`. If it finds a concrete missing user-facing entry, it opens a
+normal changelog-only PR for human review; it does not change the release just
+created or delay deployment.
+
 Publishing the prerelease activates the beta deployment workflow. A beta deployment can also be manually dispatched when an operator needs to deploy a selected ref.
 
 ## Stable major promotion
@@ -91,7 +96,7 @@ To promote the next-major line to production:
 3. Run **Bootstrap Stable Release Line** to create `stable/X.Y.x` at that exact approved main commit.
 4. Run **Create Stable Release** manually from the stable branch. If the branch still has the beta package version (for example `1.7.0-beta.114`), the workflow converts it to the stable version (`1.7.0`), commits that package update to the stable branch, and then creates the release.
 
-The stable GitHub Release starts with the curated changelog entry and may include GitHub's generated merged-PR notes afterward. Production deployment is activated by the published stable release.
+The stable GitHub Release starts with the curated changelog entry and may include GitHub's generated merged-PR notes afterward. Production deployment is activated by the published stable release. After publication, the workflow dispatches the same changelog audit against the selected `stable/X.Y.x` line; any corrective changelog update is proposed through a separate PR.
 
 The stable branch is now the immutable production family. New work can continue on `main` without changing what production runs.
 
@@ -163,6 +168,7 @@ when the stable changelog entry is carried forward.
 | `prepare-stable-promotion.yml` | Create a reviewed main promotion PR |
 | `bootstrap-stable-release.yml` | Create the immutable `stable/X.Y.x` branch from the approved main commit |
 | `release-stable.yml` | Create a stable or hotfix release |
+| `opencode-changelog-audit.yml` | Manually or weekly compare recent code changes with the Unreleased changelog and open a corrective PR when needed |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |
 | `deploy-main-to-vps.yml` | Deploy a published stable release or selected ref |
 | `forward-port-stable-fix.yml` | Carry stable fixes forward into `main` |
