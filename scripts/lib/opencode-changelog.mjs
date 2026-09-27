@@ -55,7 +55,6 @@ export const addOpenCodeChangelogEntries = ({ changelog, laneHeading, section, e
   if (laneText.indexOf(sectionHeading, sectionAt + sectionHeading.length) >= 0) throw new Error(`Expected at most one ${sectionHeading} subsection.`);
 
   const contentStart = sectionAt + sectionHeading.length;
-  const nextHeading = laneText.slice(contentStart).search(/\n#### /);
   const absoluteContentStart = lane.bodyStart + contentStart;
   const prefix = changelog.slice(0, absoluteContentStart).replace(/\s*$/, '');
   const suffix = changelog.slice(absoluteContentStart).replace(/^\s*/, '');
