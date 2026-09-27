@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
       checks: read
     steps:
       - name: Check out the trusted default branch
