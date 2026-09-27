@@ -213,8 +213,10 @@ can push the generated branch and open the correction PR. No autonomous audit
 merges, releases, or deploys.
 
 Manual runs also accept an optional `baseline_ref`, which must be a full commit
-SHA or a version tag that is an ancestor of the selected branch head. It
-overrides the saved/tag baseline for that run only; a clean result records the
+SHA or an ancestor version tag for the selected release line. `main` accepts
+beta tags; `stable/X.Y.x` accepts stable `vX.Y.Z` tags from that same line.
+This prevents a baseline from another release line from widening the audit.
+It overrides the saved/tag baseline for that run only; a clean result records the
 audited head as the next normal baseline. Leave it blank for ordinary runs.
 Use it to bound a deliberate backfill or the first audit after a large manual
 changelog cleanup. The target remains the current branch head, and the

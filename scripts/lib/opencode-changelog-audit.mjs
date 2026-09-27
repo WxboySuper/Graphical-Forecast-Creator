@@ -21,11 +21,20 @@ export const validateChangelogAuditTarget = (targetRef, headSha) => {
   return { targetRef, headSha };
 };
 
+const isManualBaselineForTarget = (baselineRef, targetRef) => {
+  if (COMMIT_SHA_PATTERN.test(baselineRef)) return true;
+  const tag = /^v(\d+)\.(\d+)\.(\d+)(-beta\.\d+)?$/i.exec(baselineRef);
+  if (!tag) return false;
+  if (targetRef === 'main') return Boolean(tag[4]);
+  const line = /^stable\/(\d+)\.(\d+)\.x$/.exec(targetRef);
+  return Boolean(line && !tag[4] && tag[1] === line[1] && tag[2] === line[2]);
+};
+
 /** Resolve an optional manual baseline and require it to be an ancestor of the audited head. */
-export const resolveManualChangelogAuditBaseline = ({ baselineRef, headSha, resolveCommit, isAncestor }) => {
+export const resolveManualChangelogAuditBaseline = ({ baselineRef, targetRef, headSha, resolveCommit, isAncestor }) => {
   if (!baselineRef) return null;
-  if (typeof baselineRef !== 'string' || !BASELINE_REF_PATTERN.test(baselineRef)) {
-    throw new Error('Manual changelog audit baseline must be a full commit SHA or version tag.');
+  if (typeof baselineRef !== 'string' || !BASELINE_REF_PATTERN.test(baselineRef) || !isManualBaselineForTarget(baselineRef, targetRef)) {
+    throw new Error('Manual changelog audit baseline must be a full commit SHA or a version tag for the selected release line.');
   }
   if (typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
     throw new Error('Manual changelog audit target is invalid.');

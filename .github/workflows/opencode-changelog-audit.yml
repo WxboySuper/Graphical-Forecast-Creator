@@ -157,6 +157,7 @@ jobs:
             const { resolveManualChangelogAuditBaseline } = await import(pathToFileURL(auditHelper).href)
             const manualBaselineSha = resolveManualChangelogAuditBaseline({
               baselineRef: process.env.BASELINE_REF,
+              targetRef,
               headSha,
               resolveCommit: (ref) => git(['rev-parse', `${ref}^{commit}`]),
               isAncestor: ancestor,
