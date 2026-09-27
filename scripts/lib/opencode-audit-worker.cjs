@@ -63,7 +63,7 @@ function sparseCheckoutPatterns({ scope, excludedPaths }) {
     patterns.push(`/${scope}/**`)
   }
   for (const file of excludedPaths) {
-    const escaped = file.replace(/\\/g, '/').replace(/[\\*?\[\]]/g, '\\$&')
+    const escaped = file.replaceAll('*', '\\*').replaceAll('?', '\\?').replaceAll('[', '\\[').replaceAll(']', '\\]')
     patterns.push(`!/${escaped}`)
   }
   return patterns
