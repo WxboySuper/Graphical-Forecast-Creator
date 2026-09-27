@@ -79,7 +79,10 @@
     "exposure:diagnostics": "node scripts/generate-exposure-diagnostics.mjs",
     "branches:report": "cross-env DRY_RUN=1 node scripts/generate-stale-branch-report.mjs",
     "predeploy": "pnpm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d build",
+    "prebuild": "pnpm run css:build",
+    "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css",
+    "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch"
   },
   "browserslist": {
     "production": [
@@ -103,7 +106,7 @@
     "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.63.0",
     "@sentry/vite-plugin": "^5.4.0",
-    "@tailwindcss/postcss": "^4.3.3",
+    "@tailwindcss/cli": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
