@@ -35,6 +35,7 @@ import {
   AuthProvider,
   useAuth,
 } from './AuthProvider';
+import { queueProductMetric } from '../utils/productMetrics';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
@@ -683,6 +684,110 @@ describe('AuthProvider Utils', () => {
 
     expect(unsubscribe).toHaveBeenCalledTimes(1);
     expect(setSubscription).not.toHaveBeenCalled();
+  });
+});
+
+describe('AuthProvider local credential edge cases', () => {
+  const makeCredentialDeps = () => ({
+    dispatch: jest.fn(),
+    currentDarkModeRef: { current: false },
+    currentOverlaysRef: { current: { ...TEST_OVERLAY_STATE } },
+    setUser: jest.fn(),
+    setStatus: jest.fn(),
+    setSyncedSettings: jest.fn(),
+    setSettingsSyncStatus: jest.fn(),
+    lastSyncedSettingsRef: { current: null },
+    setBetaAccess: jest.fn(),
+    setBetaAccessLoading: jest.fn(),
+    setError: jest.fn(),
+  });
+
+  const fetchMock = () => global.fetch as jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  test('maps sign-up HTTP failures to user-facing errors', async () => {
+    const deps = makeCredentialDeps();
+    fetchMock()
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'Email taken' }) })
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.reject(new Error('bad json')) });
+
+    await expect(localSignUpWithEmail({ email: 'taken@example.com', password: 'secret' }, deps)).rejects.toThrow(
+      'Email taken',
+    );
+    expect(deps.setError).toHaveBeenCalledWith('Email taken');
+
+    await expect(localSignUpWithEmail({ email: 'taken@example.com', password: 'secret' }, deps)).rejects.toThrow(
+      'Sign up failed',
+    );
+    expect(deps.setError).toHaveBeenCalledWith('Sign up failed');
+    expect(fetchMock()).toHaveBeenCalledTimes(2);
+    expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
+  });
+
+  test('tolerates malformed JSON on successful sign-in and sign-up', async () => {
+    const signInDeps = makeCredentialDeps();
+    const signUpDeps = makeCredentialDeps();
+    fetchMock()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('bad json')) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.reject(new Error('bad json')) });
+
+    await localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps);
+    expect(signInDeps.setStatus).toHaveBeenCalledWith('signed_in');
+    expect(signInDeps.setUser).toHaveBeenCalledWith(expect.objectContaining({ uid: 'local' }));
+    expect(signInDeps.setError).toHaveBeenCalledWith(null);
+
+    await localSignUpWithEmail({ email: 'new@example.com', password: 'secret' }, signUpDeps);
+    expect(signUpDeps.setStatus).toHaveBeenCalledWith('signed_in');
+    expect(signUpDeps.setUser).toHaveBeenCalledWith(expect.objectContaining({ uid: 'local' }));
+    expect(signUpDeps.setError).toHaveBeenCalledWith(null);
+  });
+
+  test('dispatches exact product metrics for sign-in and sign-up', async () => {
+    const metric = jest.mocked(queueProductMetric);
+    const signInDeps = makeCredentialDeps();
+    const signUpDeps = makeCredentialDeps();
+    const signInPayload = { uid: 'metric-signin', email: 'signin@example.com', displayName: 'Sign In' };
+    const signUpPayload = { uid: 'metric-signup', email: 'signup@example.com', displayName: 'Sign Up' };
+    fetchMock()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(signInPayload) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(signUpPayload) });
+
+    await localSignInWithEmail({ email: 'signin@example.com', password: 'secret' }, signInDeps);
+    expect(metric).toHaveBeenCalledWith({
+      event: 'account_signin',
+      user: { uid: 'metric-signin', email: 'signin@example.com', displayName: 'Sign In', providerData: [] },
+    });
+
+    await localSignUpWithEmail({ email: 'signup@example.com', password: 'secret' }, signUpDeps);
+    expect(metric).toHaveBeenCalledWith({
+      event: 'account_signup',
+      user: { uid: 'metric-signup', email: 'signup@example.com', displayName: 'Sign Up', providerData: [] },
+    });
+    expect(metric).toHaveBeenCalledTimes(2);
+  });
+
+  test('clears a stale error when a retry starts', async () => {
+    const deps = makeCredentialDeps();
+    fetchMock()
+      .mockResolvedValueOnce({ ok: false, json: () => Promise.resolve({ message: 'Bad password' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ uid: 'user-1', email: 'user@example.com', displayName: 'User' }),
+      });
+
+    await expect(localSignInWithEmail({ email: 'user@example.com', password: 'bad' }, deps)).rejects.toThrow(
+      'Bad password',
+    );
+    await localSignInWithEmail({ email: 'user@example.com', password: 'good' }, deps);
+
+    expect(deps.setError.mock.calls[0]).toEqual([null]);
+    expect(deps.setError.mock.calls[1]).toEqual(['Bad password']);
+    expect(deps.setError.mock.calls[2]).toEqual([null]);
+    expect(deps.setStatus).toHaveBeenCalledWith('signed_in');
   });
 });
 
