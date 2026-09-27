@@ -11,8 +11,8 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review | One review comment per revision and event review type |
-| CI supplement | `Checks | CI` completes for an associated PR | One supplemental comment per revision after check results are available |
+| PR first-look | PR opened, new commits, reopened, ready for review | One review per revision and event review type |
+| CI supplement | `Checks | CI` completes for an associated PR | One supplemental review per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | A trusted PR selects beta/hotfix without changing CHANGELOG.md | Bounded factual entry drafted read-only; publisher validates and commits to PR branch |
 | Changelog audit | Manual dispatch, weekly Friday schedule, beta/stable release workflows | Compare changed behavior with the Unreleased lane; create one corrective PR only when entries are missing |
@@ -105,9 +105,10 @@ the merge boundary. The workflow never merges a PR.
 The first-look review uses `pull_request_target` but checks out the trusted
 default branch and reads PR content through the GitHub API. It skips forks,
 drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
-and 2,000 patch characters per file. Its token can read contents, PRs, and
-checks, and post an issue comment. It has no contents or pull-request write
-permission. The model can only read, list, and search the checkout.
+and 2,000 patch characters per file. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
+checks. The separate publishing step uses `GH_PAT` only to create a PR review;
+the model never receives either token. The model can only read, list, and
+search the checkout.
 
 The first event review and the CI supplement use separate revision markers, so
 completed checks add context without repeating the first comment. GITHUB_TOKEN
@@ -147,8 +148,9 @@ multiple triggers from creating duplicate work or comments.
 
 | Workflow | GitHub permissions |
 | --- | --- |
-| PR first-look | `contents: read`, `pull-requests: read`, `checks: read`, `issues: write` |
+| PR first-look | `GITHUB_TOKEN`: `contents: read`, `issues: read`, `pull-requests: read`, `checks: read`; publisher-only `GH_PAT`: `pull_requests: write` |
 | Issue triage | `contents: read`, `issues: write` |
+| Changelog audit | `contents: read`, `issues: write`, `pull-requests: read` |
 | Scheduled investigations | `contents: read`, `issues: write`, `security-events: read`, `vulnerability-alerts: read` |
 | Audit issue worker | `contents: write`, `issues: write`, `pull-requests: write`, `actions: write` for the isolated publisher job |
 
@@ -205,7 +207,8 @@ at a time and queues up to 100 pending runs across event reviews, triage,
 scheduled work, changelog audits, issue implementation, research, and manual
 `/opencode` requests. The queue uses `queue: max`; runs beyond GitHub's 100-run
 limit are canceled. GitHub orders queued runs by when they enter the queue, so
-strict ordering by event time is not guaranteed. Keep per-job timeouts and
+strict ordering by event time is not guaranteed. Long audits can delay first-look
+reviews because all OpenCode runs share this lane. Keep per-job timeouts and
 deduplication in place because a queued run can become stale before it starts.
 
 Daily inspections have 15- to 20-minute model limits. Dependency review has a
