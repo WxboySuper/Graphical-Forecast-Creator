@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { modelEnvironment } from './lib/opencode-env.cjs';
+import { extractFinalAssistantText } from './lib/opencode-cli-output.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
@@ -21,7 +22,7 @@ const env = modelEnvironment(process.env);
 
 const result = spawnSync(
   'opencode',
-  ['run', '--model', model, '--auto', prompt],
+  ['run', '--format', 'json', '--model', model, '--auto', prompt],
   {
     cwd: process.cwd(),
     encoding: 'utf8',
@@ -37,7 +38,6 @@ if (result.status !== 0) {
   throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
 }
 
-const output = (result.stdout ?? '').trim();
-if (!output) throw new Error('OpenCode returned no output.');
+const output = extractFinalAssistantText(result.stdout ?? '');
 writeFileSync(outputPath, output, 'utf8');
 process.stdout.write(output.slice(0, 12000));
