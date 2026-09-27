@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
+      issues: read
       pull-requests: read
       checks: read
     steps:
@@ -106,7 +106,12 @@ jobs:
               }),
             ])
 
-            if ([...comments, ...reviews].some((item) => item.body?.includes(marker))) {
+            const trustedPublisher = (item) =>
+              ['github-actions[bot]', context.repo.owner].includes(item.user?.login)
+            const hasPriorResult = [...comments, ...reviews].some(
+              (item) => trustedPublisher(item) && item.body?.includes(marker),
+            )
+            if (hasPriorResult) {
               core.notice(`Revision ${expectedSha} already has a first-look result.`)
               core.setOutput('run', 'false')
               return
