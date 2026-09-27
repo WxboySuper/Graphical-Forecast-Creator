@@ -36,10 +36,10 @@ test('manual audit baseline resolves only a full ancestor SHA or version tag', (
   assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline }), baseline);
   assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0-beta.5' }), baseline);
   assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: '' }), null);
-  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'main~1' }), /full commit SHA or a version tag for the selected release line/);
-  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0' }), /selected release line/);
-  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.7.7' }), /selected release line/);
-  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0-beta.5', targetRef: 'stable/1.8.x' }), /selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'main~1' }), /full commit SHA or version tag/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0' }), /match the selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.7.7' }), /match the selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.8.0-beta.5', targetRef: 'stable/1.8.x' }), /match the selected release line/);
   assert.equal(resolveManualChangelogAuditBaseline({
     ...common, baselineRef: 'v1.8.3', targetRef: 'stable/1.8.x',
   }), baseline);

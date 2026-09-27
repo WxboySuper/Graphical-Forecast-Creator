@@ -30,12 +30,19 @@ const isManualBaselineForTarget = (baselineRef, targetRef) => {
   return Boolean(line && !tag[4] && tag[1] === line[1] && tag[2] === line[2]);
 };
 
+const validateManualBaselineRef = (baselineRef, targetRef) => {
+  if (typeof baselineRef !== 'string' || !BASELINE_REF_PATTERN.test(baselineRef)) {
+    throw new Error('Manual changelog audit baseline must be a full commit SHA or version tag.');
+  }
+  if (!isManualBaselineForTarget(baselineRef, targetRef)) {
+    throw new Error('Manual changelog audit version tag must match the selected release line.');
+  }
+};
+
 /** Resolve an optional manual baseline and require it to be an ancestor of the audited head. */
 export const resolveManualChangelogAuditBaseline = ({ baselineRef, targetRef, headSha, resolveCommit, isAncestor }) => {
   if (!baselineRef) return null;
-  if (typeof baselineRef !== 'string' || !BASELINE_REF_PATTERN.test(baselineRef) || !isManualBaselineForTarget(baselineRef, targetRef)) {
-    throw new Error('Manual changelog audit baseline must be a full commit SHA or a version tag for the selected release line.');
-  }
+  validateManualBaselineRef(baselineRef, targetRef);
   if (typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
     throw new Error('Manual changelog audit target is invalid.');
   }
