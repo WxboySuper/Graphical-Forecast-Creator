@@ -50,16 +50,19 @@ const findJsonObjectAfterPrefix = (text) => {
   for (let attempt = 0; attempt < 100; attempt++) {
     const start = text.indexOf('{', from);
     if (start < 0) return null;
-    const end = findObjectEnd(text, start);
-    if (end >= 0 && hasOnlyWhitespaceAfter(text, end)) {
-      const candidate = text.slice(start, end + 1);
-      if (isJsonObject(candidate)) return candidate;
-    }
+    const candidate = readValidObjectAt(text, start);
+    if (candidate) return candidate;
     from = start + 1;
   }
   return null;
 };
 
+const readValidObjectAt = (text, start) => {
+  const end = findObjectEnd(text, start);
+  if (end < 0 || !hasOnlyWhitespaceAfter(text, end)) return null;
+  const candidate = text.slice(start, end + 1);
+  return isJsonObject(candidate) ? candidate : null;
+};
 const hasOnlyWhitespaceAfter = (text, index) => !text.slice(index + 1).trim();
 
 const isJsonObject = (text) => {
