@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildCuratedNotes,
   buildReleaseNotes,
+  buildGitHubReleaseCreateArgs,
+  buildGitHubReleaseUploadArgs,
   resolvePreviousTag,
   validateReleaseInputs,
 } from './create-github-release.mjs';
@@ -56,4 +58,19 @@ test('composes the final release body from curated and generated notes', () => {
   });
   assert.match(notes, /Stable fix/);
   assert.match(notes, /#123 Fix/);
+});
+
+test('publishes the generated Markdown notes with every GitHub release', () => {
+  const args = buildGitHubReleaseCreateArgs({
+    tag: 'v1.7.0-beta.2',
+    targetBranch: 'main',
+    notesFile: 'beta-release-notes.md',
+    prerelease: true,
+  });
+  assert.ok(args.includes('beta-release-notes.md#GFC-v1.7.0-beta.2-release-notes.md'));
+  assert.ok(args.includes('--notes-file'));
+  assert.ok(args.includes('--prerelease'));
+  assert.deepEqual(buildGitHubReleaseUploadArgs({ tag: 'v1.6.7', notesFile: 'stable-release-notes.md' }), [
+    'release', 'upload', 'v1.6.7', 'stable-release-notes.md#GFC-v1.6.7-release-notes.md',
+  ]);
 });

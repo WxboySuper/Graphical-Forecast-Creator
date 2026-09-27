@@ -14,6 +14,29 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
 const BRANCH_PATTERN = /^[\w./-]+$/;
 export const RELEASE_NOTES_MODES = ['changelog', 'prs', 'changelog-and-prs'];
 
+/** Build the GitHub CLI arguments for a release and its portable Markdown notes asset. */
+export const buildGitHubReleaseCreateArgs = ({ tag, targetBranch, notesFile, prerelease }) => [
+  'release',
+  'create',
+  tag,
+  `${notesFile}#GFC-${tag}-release-notes.md`,
+  '--title',
+  tag,
+  '--notes-file',
+  notesFile,
+  '--target',
+  targetBranch,
+  ...(prerelease ? ['--prerelease'] : []),
+];
+
+/** Build an additive upload command for a release created before notes assets were added. */
+export const buildGitHubReleaseUploadArgs = ({ tag, notesFile }) => [
+  'release',
+  'upload',
+  tag,
+  `${notesFile}#GFC-${tag}-release-notes.md`,
+];
+
 /** Validate the user-provided release version and target ref. */
 export const validateReleaseInputs = ({ version, targetBranch }) => {
   if (!version || !VERSION_PATTERN.test(version)) {
@@ -114,26 +137,15 @@ const run = () => {
   };
 
   /** Create the requested GitHub release from the prepared notes file. */
-  const createGhRelease = () => {
-    const args = [
-      'release',
-      'create',
-      tag,
-      '--title',
-      tag,
-      '--notes-file',
-      notesFile,
-      '--target',
-      targetBranch,
-    ];
-    if (prerelease) args.push('--prerelease');
-    execFileSync('gh', args, { stdio: 'inherit' });
-  };
-
   if (ghReleaseExists()) {
     console.log(`GitHub release ${tag} already exists.`);
+    const release = JSON.parse(execFileSync('gh', ['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
+    const assetName = `GFC-${tag}-release-notes.md`;
+    if (!release.assets.some((asset) => asset.name === assetName)) {
+      execFileSync('gh', buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });
+    }
   } else {
-    createGhRelease();
+    execFileSync('gh', buildGitHubReleaseCreateArgs({ tag, targetBranch, notesFile, prerelease }), { stdio: 'inherit' });
     console.log(`Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`);
   }
 };

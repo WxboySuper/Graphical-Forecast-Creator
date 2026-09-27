@@ -1,6 +1,32 @@
 name: Maintenance | OpenCode changelog audit
 
 on:
+  workflow_call:
+    inputs:
+      target_ref:
+        required: true
+        type: string
+      force:
+        required: false
+        type: boolean
+      release_tag:
+        required: false
+        type: string
+      trigger_reason:
+        required: false
+        type: string
+    secrets:
+      OPENCODE_API_KEY:
+        required: true
+      GH_PAT:
+        required: true
+    outputs:
+      status:
+        description: Final result of the bounded audit.
+        value: ${{ jobs.audit.outputs.status }}
+      head_sha:
+        description: Audited target revision.
+        value: ${{ jobs.audit.outputs.head_sha }}
   schedule:
     - cron: '17 15 * * 5' # Weekly Friday afternoon UTC
   workflow_dispatch:
@@ -42,6 +68,7 @@ jobs:
       pull-requests: read
     outputs:
       status: ${{ steps.context.outputs.run == 'true' && steps.persist.outputs.status || steps.context.outputs.status }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
     env:
       TARGET_REF: ${{ inputs.target_ref || github.event.inputs.target_ref || 'main' }}
       FORCE_AUDIT: ${{ inputs.force || github.event.inputs.force || 'false' }}
@@ -50,10 +77,17 @@ jobs:
       STATE_MARKER: '<!-- gfc-opencode-maintenance-state:v1 -->'
       STATE_TITLE: '[Maintenance state] OpenCode job history'
     steps:
-      - name: Check out target release line
+      - name: Check out trusted maintenance tools
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Check out the target release line
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ inputs.target_ref || github.event.inputs.target_ref || 'main' }}
+          path: target-source
           fetch-depth: 0
           persist-credentials: false
 
@@ -62,6 +96,7 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           CONTEXT_PATH: ${{ runner.temp }}/opencode-changelog-audit-context.json
+          SOURCE_PATH: ${{ github.workspace }}/target-source
           STATE_PATH: ${{ runner.temp }}/opencode-changelog-audit-state.json
           TARGET_REF: ${{ env.TARGET_REF }}
           FORCE_AUDIT: ${{ env.FORCE_AUDIT }}
@@ -77,7 +112,10 @@ jobs:
             if (!/^(main|stable\/\d+\.\d+\.x)$/.test(targetRef)) throw new Error(`Unsupported changelog release line: ${targetRef}`)
             const { data: branch } = await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: targetRef })
             const headSha = branch.commit.sha
-            const checkedOut = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+            core.setOutput('head_sha', headSha)
+            const gitOptions = { encoding: 'utf8', cwd: process.env.SOURCE_PATH }
+            const head = execFileSync('git', ['rev-parse', 'HEAD'], gitOptions).trim()
+            const checkedOut = head
             if (headSha !== checkedOut) throw new Error('Target branch moved before checkout completed; retry against the current revision.')
 
             const issues = await github.paginate(github.rest.issues.listForRepo, {
@@ -120,9 +158,9 @@ jobs:
               return
             }
 
-            const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim()
+            const git = (args) => execFileSync('git', args, gitOptions).trim()
             const ancestor = (candidate) => {
-              try { execFileSync('git', ['merge-base', '--is-ancestor', candidate, headSha], { stdio: 'ignore' }); return true }
+              try { execFileSync('git', ['merge-base', '--is-ancestor', candidate, headSha], { cwd: process.env.SOURCE_PATH, stdio: 'ignore' }); return true }
               catch { return false }
             }
             let baselineSha = audit.lastInspectedHead && ancestor(audit.lastInspectedHead) ? audit.lastInspectedHead : null
@@ -176,11 +214,13 @@ jobs:
           CONTEXT_PATH: ${{ runner.temp }}/opencode-changelog-audit-context.json
           PROMPT_PATH: ${{ runner.temp }}/opencode-changelog-audit.md
           OUTPUT_PATH: ${{ runner.temp }}/opencode-changelog-audit-output.json
-        run: node scripts/prepare-opencode-changelog-audit.mjs
+        working-directory: target-source
+        run: node "$GITHUB_WORKSPACE/scripts/prepare-opencode-changelog-audit.mjs"
 
       - name: Prepare model-visible repository
         if: steps.context.outputs.run == 'true' && steps.task.outputs.run == 'true'
-        run: node scripts/prepare-opencode-workspace.mjs
+        working-directory: target-source
+        run: node "$GITHUB_WORKSPACE/scripts/prepare-opencode-workspace.mjs"
 
       - name: Install pinned OpenCode CLI
         if: steps.context.outputs.run == 'true' && steps.task.outputs.run == 'true'
@@ -195,7 +235,8 @@ jobs:
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-changelog-audit.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-changelog-audit-output.json
           OPENCODE_TIMEOUT_MS: 900000
-        run: node scripts/run-opencode-maintenance.mjs
+        working-directory: target-source
+        run: node "$GITHUB_WORKSPACE/scripts/run-opencode-maintenance.mjs"
 
       - name: Validate and publish a changelog PR
         if: steps.context.outputs.run == 'true'
@@ -205,7 +246,8 @@ jobs:
           OUTPUT_PATH: ${{ runner.temp }}/opencode-changelog-audit-output.json
           RESULT_PATH: ${{ runner.temp }}/opencode-changelog-audit-result.json
           GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: node scripts/publish-opencode-changelog-audit.mjs
+        working-directory: target-source
+        run: node "$GITHUB_WORKSPACE/scripts/publish-opencode-changelog-audit.mjs"
 
       - name: Persist changelog audit result
         id: persist

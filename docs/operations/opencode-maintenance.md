@@ -15,7 +15,7 @@ change as a PR. A human reviews and merges every PR.
 | CI supplement | `Checks | CI` completes for an associated PR | One supplemental review per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | A trusted PR selects beta/hotfix without changing CHANGELOG.md | Bounded factual entry drafted read-only; publisher validates and commits to PR branch |
-| Changelog audit | Manual dispatch, weekly Friday schedule, beta/stable release workflows | Compare changed behavior with the Unreleased lane; create one corrective PR only when entries are missing |
+| Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
@@ -178,26 +178,31 @@ can trigger CI normally.
 
 The flat changelog audit is available as **Maintenance | OpenCode changelog
 audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
-Friday. The beta and stable release workflows dispatch the same audit after
-publishing the release. It compares commits since the previous successful audit
-or the latest release tag with the selected `Unreleased` lane. A current
-changelog is a successful no-op; a concrete gap creates a normal PR containing
-only `CHANGELOG.md`. An open audit PR suppresses duplicate runs for that target
-until it is resolved. Release creation and deployment do not wait for or depend
-on this post-release audit.
+Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and
+stable release workflows call the same bounded audit as a required final
+preflight before version preparation, release publication, or deployment. The
+preflight forces a fresh inspection of the exact release-line revision. If it
+finds a gap, it opens a normal PR containing only `CHANGELOG.md` and blocks the
+release. Merge that PR, then rerun the release workflow. Inconclusive results,
+failed audits, open correction PRs, and a release line that moves after audit
+all stop publication and deployment. A clean result allows the release to
+continue. Release notes combine the curated release-lane entries with GitHub
+categorized merged-PR notes. The generated Markdown is both the public GitHub
+release description and a downloadable `GFC-v<version>-release-notes.md` asset,
+so other publishing platforms can reuse the same text.
 
 The audit is bounded to 60 commits, 80 changed files, a 90,000-character code
 diff, four entries, and a 15-minute model run. It excludes environment and key
 files from model context, and an oversized or inconclusive run publishes no PR.
 The existing hidden maintenance-state comment stores each target line's last
-inspected commit and any pending audit PR. A forced manual run can reinspect the
-same commit; otherwise successful revisions and pending PRs are deduplicated.
-OpenCode remains read-only and token-free. Deterministic code validates the
-entries, writes only to a generated branch, and opens a human-reviewed PR.
-`GH_PAT` is used only by deterministic publishing and release-dispatch steps; it
-needs the repository permissions required to push a PR branch, open a PR, and
-dispatch the audit workflow (`contents: write`, `pull-requests: write`, and
-`actions: write`). No autonomous workflow merges, releases, or deploys.
+inspected commit and any pending audit PR. A forced manual or release-preflight
+run can reinspect the same commit; otherwise successful revisions and pending
+PRs are deduplicated. OpenCode remains read-only and token-free. Deterministic code validates the
+entries, writes only to a generated branch, and opens a human-reviewed PR. The
+reusable preflight gets `contents: read`, `issues: write`, and
+`pull-requests: read`; `GH_PAT` is isolated to its deterministic publisher and
+can push the generated branch and open the correction PR. No autonomous audit
+merges, releases, or deploys.
 
 ## Compute and output limits
 
