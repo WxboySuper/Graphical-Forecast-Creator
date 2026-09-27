@@ -33,6 +33,7 @@ test('first-look review keeps its least-privilege read context and one bot-owned
   assert.match(publish.with.script, /issues\.createComment/);
   assert.match(publish.with.script, /mergeOpenCodeFirstLookResults/);
   assert.match(publish.with.script, /gfc-opencode-first-look-data/);
+  assert.match(publish.with.script, /body\.length > 60_000/);
   assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
 
   const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;

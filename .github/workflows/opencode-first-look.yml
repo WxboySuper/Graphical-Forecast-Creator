@@ -326,6 +326,7 @@ jobs:
             const currentMarkers = previousMarkers.filter((item) => item.includes(expectedSha))
             const dataMarker = `<!-- gfc-opencode-first-look-data:${Buffer.from(JSON.stringify(parsed)).toString('base64')} -->`
             const body = [review, dataMarker, summaryMarker, ...new Set([...currentMarkers, marker]), `<!-- gfc-opencode-first-look-head:${expectedSha} -->`].join('\n\n')
+            if (body.length > 60_000) throw new Error(`First-look comment exceeds the 60,000-character publishing limit (${body.length}).`)
             if (summaryComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
