@@ -6,13 +6,19 @@ const decodeModelResult = (raw) => {
   try { return JSON.parse(raw); } catch { throw new Error('OpenCode changelog result must be JSON.'); }
 };
 
-const validateModelEntries = (result) => {
-  if (!SECTIONS.has(result.section)) throw new Error('OpenCode changelog section is invalid.');
-  if (!Array.isArray(result.entries) || result.entries.length < 1 || result.entries.length > 4) {
+const normalizeModelEntries = (entries) => {
+  if (!Array.isArray(entries) || entries.length < 1 || entries.length > 4) {
     throw new Error('OpenCode changelog must contain one to four entries.');
   }
-  const entries = result.entries.map((entry) => String(entry).trim());
-  if (entries.some((entry) => !ENTRY_PATTERN.test(entry) || /[\x60<>]|\[|\]|\(|\)|https?:\/\//i.test(entry))) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+  const normalized = entries.map((entry) => String(entry).trim());
+  const invalid = normalized.some((entry) => !ENTRY_PATTERN.test(entry) || /[\x60<>]|\[|\]|\(|\)|https?:\/\//i.test(entry));
+  if (invalid) throw new Error('OpenCode returned an entry outside the allowed changelog format or size.');
+  return normalized;
+};
+
+const validateModelEntries = (result) => {
+  if (!SECTIONS.has(result.section)) throw new Error('OpenCode changelog section is invalid.');
+  const entries = normalizeModelEntries(result.entries);
   if (new Set(entries).size !== entries.length) throw new Error('OpenCode returned duplicate changelog entries.');
   return entries;
 };
