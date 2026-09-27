@@ -19,6 +19,9 @@ test('first-look review keeps its least-privilege read context and one bot-owned
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   assert.equal(workflow.jobs.review.permissions.actions, undefined);
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
+  assert.match(context.with.script, /A 9 is the minimum merge-ready score/);
+  assert.match(context.with.script, /An 8 or lower means the PR is not merge-ready and MUST include at least one concrete badThings item/);
+  assert.match(context.with.script, /If the review is complete and there are no actionable findings, rate it at least 9/);
   assert.match(context.with.script, /closingIssuesReferences/);
   assert.match(context.with.script, /reviewThreads\(first: 50\)/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);

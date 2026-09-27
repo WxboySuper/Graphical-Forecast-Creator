@@ -206,6 +206,7 @@ jobs:
           OPENCODE_MODEL: opencode-go/muse-spark-1.3-contributor
           OPENCODE_PROMPT_PATH: ${{ runner.temp }}/opencode-changelog-prompt.md
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-changelog-output.json
+          OPENCODE_RESPONSE_FORMAT: json
           OPENCODE_TIMEOUT_MS: 720000
         run: node "$GITHUB_WORKSPACE/_trusted/scripts/run-opencode-maintenance.mjs"
 
