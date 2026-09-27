@@ -31,22 +31,36 @@ export const parseOpenCodeChangelogResult = (raw) => {
   return { status: 'complete', section: result.section, entries: validateModelEntries(result) };
 };
 
-const laneBounds = (changelog, laneHeading) => {
+const unreleasedBounds = (changelog) => {
   const unreleased = changelog.indexOf('## [Unreleased]');
   if (unreleased < 0) throw new Error('CHANGELOG.md has no Unreleased section.');
   const releaseBodyStart = unreleased + '## [Unreleased]'.length;
   const releaseBody = changelog.slice(releaseBodyStart);
   const releaseLength = releaseBody.search(/\n## (?!#)/);
   const releaseEnd = releaseLength < 0 ? changelog.length : releaseBodyStart + releaseLength;
-  const start = changelog.indexOf(laneHeading, releaseBodyStart);
+  return { start: releaseBodyStart, end: releaseEnd };
+};
+
+const uniqueLaneStart = (changelog, laneHeading, bounds) => {
+  const start = changelog.indexOf(laneHeading, bounds.start);
   const duplicate = start < 0 ? -1 : changelog.indexOf(laneHeading, start + laneHeading.length);
-  if (start < 0 || start >= releaseEnd || (duplicate >= 0 && duplicate < releaseEnd)) {
+  if (start < 0 || start >= bounds.end || (duplicate >= 0 && duplicate < bounds.end)) {
     throw new Error(`Expected exactly one ${laneHeading} lane in Unreleased.`);
   }
-  const bodyStart = start + laneHeading.length;
+  return start;
+};
+
+const laneContentEnd = (changelog, bodyStart, releaseEnd) => {
   const rest = changelog.slice(bodyStart, releaseEnd);
   const next = rest.search(/\n### (?!#)/);
-  return { start, bodyStart, end: next < 0 ? releaseEnd : bodyStart + next };
+  return next < 0 ? releaseEnd : bodyStart + next;
+};
+
+const laneBounds = (changelog, laneHeading) => {
+  const release = unreleasedBounds(changelog);
+  const start = uniqueLaneStart(changelog, laneHeading, release);
+  const bodyStart = start + laneHeading.length;
+  return { start, bodyStart, end: laneContentEnd(changelog, bodyStart, release.end) };
 };
 
 /** Insert validated bullets beneath a bounded heading, creating the subsection when needed. */
