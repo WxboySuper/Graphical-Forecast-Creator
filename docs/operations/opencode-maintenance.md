@@ -14,6 +14,7 @@ change as a PR. A human reviews and merges every PR.
 | PR first-look | PR opened, new commits, reopened, ready for review | One review comment per revision and event review type |
 | CI supplement | `Checks | CI` completes for an associated PR | One supplemental comment per revision after check results are available |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
+| PR changelog draft | A trusted PR selects beta/hotfix without changing CHANGELOG.md | Bounded factual entry drafted read-only; publisher validates and commits to PR branch |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
@@ -157,6 +158,20 @@ a PR, or dispatch first-look review live in separate workflow steps. No job
 gets deployment or release permissions. No job can change repository settings
 or branch protection. Protected branches remain guarded by repository rules;
 all merges are human decisions.
+
+PR changelog generation runs inside PR governance only when the description has
+exactly one `Changelog-Impact: beta` or `hotfix` decision and the diff does not
+already change `CHANGELOG.md`. It is bounded to 80 changed files, 90,000 diff
+characters, four entries, 450 characters per entry, and a 12-minute model timeout.
+Fork PRs, other decision values, oversized diffs, and inconclusive results do not
+produce automated edits; the changelog check remains the required gate. OpenCode
+gets no GitHub token or shell access. The workflow confines GitHub credentials
+to deterministic steps and removes checkout credentials before model execution.
+The publisher checks the live
+PR head and decision, commits only `CHANGELOG.md` with a normal push, and leaves
+branch protection and human merge authority intact. The `GH_PAT` secret is
+required only when a generated entry must be pushed, so the updated PR revision
+can trigger CI normally.
 
 ## Compute and output limits
 

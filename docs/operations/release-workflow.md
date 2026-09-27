@@ -38,6 +38,25 @@ The PR must change the matching lane in `CHANGELOG.md` when the impact is `beta`
 
 The check compares the lane before and after the PR. Merely touching the changelog or changing a different lane does not satisfy the gate.
 
+For trusted same-repository PRs targeting `main` or `stable/X.Y.x`, a `beta` or
+`hotfix` decision is enough to request an automatic entry. PR CI runs a bounded,
+read-only OpenCode changelog draft when the PR has not already changed
+`CHANGELOG.md`. OpenCode receives the PR title, description, bounded diff, and
+read-only repository checkout. It returns one to four factual bullets;
+deterministic code validates their format, section, size, selected lane, and
+current PR head before adding them and pushing a normal commit to the PR branch.
+The normal changelog policy then validates the generated entry. Setting `none`
+with a reason or `inherited` skips generation. PRs from forks, oversized diffs,
+inconclusive model results, stale revisions, or branch-protection push failures
+still require a human-authored entry or a corrected decision.
+
+The model receives no GitHub token and cannot edit files or run commands.
+Checkout credentials are removed before the model runs. The `GH_PAT` secret is
+used by deterministic checkout and publisher steps; the publisher can make a
+normal push to the PR branch. Protected-branch rules, merges, releases, and
+deployments remain outside this job. The workflow also runs when the PR description is edited so adding the
+declaration starts the same validation flow.
+
 ## Dependabot updates
 
 Dependabot is handled by the required CI workflow before changelog validation runs.
