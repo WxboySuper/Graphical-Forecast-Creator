@@ -39,13 +39,7 @@ const validateManualBaselineRef = (baselineRef, targetRef) => {
   }
 };
 
-/** Resolve an optional manual baseline and require it to be an ancestor of the audited head. */
-export const resolveManualChangelogAuditBaseline = ({ baselineRef, targetRef, headSha, resolveCommit, isAncestor }) => {
-  if (!baselineRef) return null;
-  validateManualBaselineRef(baselineRef, targetRef);
-  if (typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
-    throw new Error('Manual changelog audit target is invalid.');
-  }
+const resolveAndValidateManualBaseline = ({ baselineRef, headSha, resolveCommit, isAncestor }) => {
   const baselineSha = resolveCommit(baselineRef);
   if (typeof baselineSha !== 'string' || !COMMIT_SHA_PATTERN.test(baselineSha)) {
     throw new Error('Manual changelog audit baseline did not resolve to a commit.');
@@ -54,6 +48,16 @@ export const resolveManualChangelogAuditBaseline = ({ baselineRef, targetRef, he
     throw new Error('Manual changelog audit baseline must be an ancestor of the target revision.');
   }
   return baselineSha;
+};
+
+/** Resolve an optional manual baseline and require it to be an ancestor of the audited head. */
+export const resolveManualChangelogAuditBaseline = ({ baselineRef, targetRef, headSha, resolveCommit, isAncestor }) => {
+  if (!baselineRef) return null;
+  validateManualBaselineRef(baselineRef, targetRef);
+  if (typeof headSha !== 'string' || !COMMIT_SHA_PATTERN.test(headSha)) {
+    throw new Error('Manual changelog audit target is invalid.');
+  }
+  return resolveAndValidateManualBaseline({ baselineRef, headSha, resolveCommit, isAncestor });
 };
 
 /** Refuse to publish an audit prepared against a revision that has moved. */
