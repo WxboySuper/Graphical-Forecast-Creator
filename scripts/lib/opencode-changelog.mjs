@@ -56,7 +56,6 @@ export const addOpenCodeChangelogEntries = ({ changelog, laneHeading, section, e
 
   const contentStart = sectionAt + sectionHeading.length;
   const nextHeading = laneText.slice(contentStart).search(/\n#### /);
-  const contentEnd = nextHeading < 0 ? laneText.length : contentStart + nextHeading;
   const absoluteContentStart = lane.bodyStart + contentStart;
   const prefix = changelog.slice(0, absoluteContentStart).replace(/\s*$/, '');
   const suffix = changelog.slice(absoluteContentStart).replace(/^\s*/, '');
