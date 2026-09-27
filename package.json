@@ -81,8 +81,8 @@
     "predeploy": "pnpm run build",
     "deploy": "gh-pages -d build",
     "prebuild": "pnpm run css:build",
-    "css:build": "tailwindcss -c tailwind.compat.config.js -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --minify",
-    "css:watch": "tailwindcss -c tailwind.compat.config.js -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch"
+    "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --minify",
+    "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch"
   },
   "browserslist": {
     "production": [
@@ -135,10 +135,12 @@
     "jest-environment-jsdom": "^30.5.2",
     "postcss": "8.5.28",
     "rollup": ">=4.63.3",
-    "tailwindcss": "3.4.19",
+    "tailwindcss": "^4.3.3",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.0",
-    "yaml": "2.9.0"
+    "yaml": "2.9.0",
+    "@tailwindcss/cli": "^4.3.3",
+    "@tailwindcss/postcss": "^4.3.3"
   }
 }
