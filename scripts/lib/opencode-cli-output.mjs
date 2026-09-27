@@ -5,17 +5,24 @@ export const openCodeRunArguments = (model, prompt) => [
 
 /** Extract the final assistant message from OpenCode's --format json event stream. */
 export const extractFinalAssistantText = (stdout, { format = 'text' } = {}) => {
+  assertExtractionInput(stdout, format);
+  const finalText = readFinalAssistantMessage(stdout);
+  return format === 'json' ? extractJsonAssistantResponse(finalText) : finalText;
+};
+
+const assertExtractionInput = (stdout, format) => {
   if (typeof stdout !== 'string' || !stdout.trim()) throw new Error('OpenCode returned no output.');
   if (!['text', 'json'].includes(format)) throw new Error('OpenCode response format must be text or json.');
+};
 
+const readFinalAssistantMessage = (stdout) => {
   const events = stdout.trim().split(/\r?\n/).map(parseEvent);
   const textEvents = events.filter(isTextEvent);
   if (!textEvents.length) throw new Error('OpenCode returned no assistant text.');
-
   const finalMessageId = textEvents.at(-1).part.messageID;
   const finalText = collectMessageParts(events, finalMessageId).join('\n').trim();
   if (!finalText) throw new Error('OpenCode returned no assistant text.');
-  return format === 'json' ? extractJsonAssistantResponse(finalText) : finalText;
+  return finalText;
 };
 
 const collectMessageParts = (events, messageId) => {
@@ -33,26 +40,35 @@ const collectMessageParts = (events, messageId) => {
 
 const extractJsonAssistantResponse = (text) => {
   const candidate = unwrapJsonFence(text.trim());
-  try {
-    const parsed = JSON.parse(candidate);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return candidate;
-  } catch { /* Find an object after assistant progress text. */ }
-
-  let start = candidate.indexOf('{');
-  let attempts = 0;
-  while (start >= 0 && attempts < 100) {
-    const end = findObjectEnd(candidate, start);
-    if (end >= 0 && !candidate.slice(end + 1).trim()) {
-      const json = candidate.slice(start, end + 1);
-      try {
-        const parsed = JSON.parse(json);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return json;
-      } catch { /* Continue in case prefatory text contains braces. */ }
-    }
-    start = candidate.indexOf('{', start + 1);
-    attempts++;
-  }
+  const directResult = isJsonObject(candidate) ? candidate : findJsonObjectAfterPrefix(candidate);
+  if (directResult) return directResult;
   throw new Error('OpenCode final assistant message did not contain a JSON object.');
+};
+
+const findJsonObjectAfterPrefix = (text) => {
+  let from = 0;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const start = text.indexOf('{', from);
+    if (start < 0) return null;
+    const end = findObjectEnd(text, start);
+    if (end >= 0 && hasOnlyWhitespaceAfter(text, end)) {
+      const candidate = text.slice(start, end + 1);
+      if (isJsonObject(candidate)) return candidate;
+    }
+    from = start + 1;
+  }
+  return null;
+};
+
+const hasOnlyWhitespaceAfter = (text, index) => !text.slice(index + 1).trim();
+
+const isJsonObject = (text) => {
+  try {
+    const parsed = JSON.parse(text);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed);
+  } catch {
+    return false;
+  }
 };
 
 const unwrapJsonFence = (text) => {
@@ -61,22 +77,29 @@ const unwrapJsonFence = (text) => {
 };
 
 const findObjectEnd = (text, start) => {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
+  const state = { depth: 0, inString: false, escaped: false };
   for (let index = start; index < text.length; index++) {
     const character = text[index];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (character === '\\') escaped = true;
-      else if (character === '"') inString = false;
+    if (state.inString) {
+      advanceStringState(character, state);
       continue;
     }
-    if (character === '"') inString = true;
-    else if (character === '{') depth++;
-    else if (character === '}' && --depth === 0) return index;
+    if (character === '"') state.inString = true;
+    else if (character === '{') state.depth++;
+    else if (character === '}' && closeObject(state)) return index;
   }
   return -1;
+};
+
+const advanceStringState = (character, state) => {
+  if (state.escaped) state.escaped = false;
+  else if (character === '\\') state.escaped = true;
+  else if (character === '"') state.inString = false;
+};
+
+const closeObject = (state) => {
+  state.depth--;
+  return state.depth === 0;
 };
 
 const parseEvent = (line) => {
