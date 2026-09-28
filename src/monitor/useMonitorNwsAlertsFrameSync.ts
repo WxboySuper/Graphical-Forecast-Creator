@@ -1,23 +1,29 @@
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import type { NwsAlertFeatureCollection } from './nwsAlerts';
 
 export const useMonitorNwsAlertsFrameSync = (
   enabled: boolean,
   animationEnabled: boolean,
-  rawFrameCount: number,
+  rawFrames: readonly NwsAlertFeatureCollection[],
   setFrameIndex: Dispatch<SetStateAction<number>>,
 ) => {
-  const previousRawFrameCountRef = useRef(0);
+  const previousRawFramesRef = useRef<readonly NwsAlertFeatureCollection[] | null>(null);
 
   useEffect(() => {
     if (!enabled || !animationEnabled) {
       return undefined;
     }
 
-    if (rawFrameCount > previousRawFrameCountRef.current) {
-      setFrameIndex(rawFrameCount - 1);
+    if (rawFrames.length === 0) {
+      previousRawFramesRef.current = rawFrames;
+      return undefined;
     }
-    previousRawFrameCountRef.current = rawFrameCount;
+
+    if (previousRawFramesRef.current !== rawFrames) {
+      setFrameIndex(rawFrames.length - 1);
+    }
+    previousRawFramesRef.current = rawFrames;
     return undefined;
-  }, [animationEnabled, enabled, rawFrameCount, setFrameIndex]);
+  }, [animationEnabled, enabled, rawFrames, setFrameIndex]);
 };

@@ -62,7 +62,7 @@ export const useMonitorNwsAlerts = ({
     animationEnabled,
     animationSpeedMs,
     filteredFrameCount: filteredFrames.length,
-    rawFrameCount: rawFrames.length,
+    rawFrames,
     setRawFrames,
     setFrameIndex,
     setFetchedAt,
