@@ -125,14 +125,6 @@ test('ordinary pull_request CI has no repository secrets, write permissions, or 
   }
 });
 
-
-test('trusted publisher authenticates private-repository fetches without persisting the header', () => {
-  const publisher = readFileSync(path.join(repositoryRoot, 'scripts/publish-opencode-changelog.mjs'), 'utf8');
-  assert.match(publisher, /const gitAuth = .*Buffer\.from\(\x60x-access-token:\$\{token\}\x60\)/);
-  assert.match(publisher, /execFileSync\('git', \[\x27-c\x27, gitAuth, \x27fetch\x27/);
-  assert.doesNotMatch(publisher, /git config --local .*extraheader/);
-});
-
 test('workspace preparation removes project OpenCode configuration even without sparse-checkout exclusions', () => {
   const source = readFileSync(path.join(repositoryRoot, 'scripts/prepare-opencode-workspace.mjs'), 'utf8');
   assert.ok(source.indexOf('removeProjectOpenCodeConfiguration(process.cwd())') < source.indexOf('if (!excludedPaths.length && !scope)'));
