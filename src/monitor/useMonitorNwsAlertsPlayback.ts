@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { NwsAlertFeatureCollection } from './nwsAlerts';
+import { snapshotCollectionKey, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { useMonitorNwsAlertsFrameAdvance } from './useMonitorNwsAlertsFrameAdvance';
 import { useMonitorNwsAlertsFrameSync } from './useMonitorNwsAlertsFrameSync';
 import { useMonitorNwsAlertsRefresh } from './useMonitorNwsAlertsRefresh';
@@ -9,7 +10,7 @@ interface UseMonitorNwsAlertsPlaybackArgs {
   animationEnabled: boolean;
   animationSpeedMs: number;
   filteredFrameCount: number;
-  rawFrameCount: number;
+  rawFrames: NwsAlertFeatureCollection[];
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFrameIndex: Dispatch<SetStateAction<number>>;
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
@@ -20,11 +21,15 @@ export const useMonitorNwsAlertsPlayback = ({
   animationEnabled,
   animationSpeedMs,
   filteredFrameCount,
-  rawFrameCount,
+  rawFrames,
   setRawFrames,
   setFrameIndex,
   setFetchedAt,
 }: UseMonitorNwsAlertsPlaybackArgs) => {
+  const latestSnapshotKey = useMemo(() => {
+    const latest = rawFrames[rawFrames.length - 1];
+    return latest ? snapshotCollectionKey(latest) : null;
+  }, [rawFrames]);
   useMonitorNwsAlertsFrameAdvance({
     enabled,
     animationEnabled,
@@ -39,5 +44,5 @@ export const useMonitorNwsAlertsPlayback = ({
     setRawFrames,
     setFetchedAt,
   });
-  useMonitorNwsAlertsFrameSync(enabled, animationEnabled, rawFrameCount, setFrameIndex);
+  useMonitorNwsAlertsFrameSync(enabled, animationEnabled, rawFrames.length, setFrameIndex, latestSnapshotKey);
 };
