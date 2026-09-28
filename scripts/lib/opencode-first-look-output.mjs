@@ -272,8 +272,11 @@ const renderPrSummary = (result) => ['## PR Summary', ...result.prSummary.map((i
 const renderLatestChanges = (result, context) => {
   if (!context.hasPriorReviewComment) return [];
   if (context.latestChangesMode === 'same') return ['', '## Changes since previous review', 'No new commits since the previous review.'];
+  if (context.latestChangesMode === 'comparison-failed') {
+    return ['', '## Changes since previous review', 'GitHub could not provide the comparison with the previous reviewed commit.'];
+  }
   if (context.latestChangesMode === 'unavailable') {
-    return ['', '## Changes since previous review', 'The previous review did not record a commit, so changes since it could not be identified.'];
+    return ['', '## Changes since previous review', 'The previous review did not record a commit, so GitHub could not identify changes since it.'];
   }
   const changes = result.latestChanges.length
     ? result.latestChanges.map((item) => `- ${item}`)
@@ -294,10 +297,15 @@ const renderReviewAssessment = (result) => [
 ];
 
 const renderReviewSections = (result, context) => [
+  ...renderCoverageSection(context),
   ...renderLinkedIssueSection(result, context),
   ...renderReviewThreadSection(result, context),
   ...renderPriorFindingSection(result, context),
 ];
+
+const renderCoverageSection = (context) => context.diffTruncationReasons?.length
+  ? ['', '## Review coverage', ...context.diffTruncationReasons.map((reason) => `- ${reason}`)]
+  : [];
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length
   ? renderLinkedIssues(result, context.linkedIssues)
@@ -318,7 +326,7 @@ const renderPriorFindingSection = (result, context) => context.priorFindings?.le
 export const mergeOpenCodeFirstLookResults = (previous, current) => {
   const statusById = new Map(current.priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
   const retainedPrevious = previous.badThings.filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
-  const findings = uniqueBy([...retainedPrevious, ...current.badThings], findingKey).slice(0, MAX_BULLETS);
+  const findings = uniqueBy([...current.badThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
   return {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),

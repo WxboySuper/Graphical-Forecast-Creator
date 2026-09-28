@@ -22,8 +22,8 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.actions, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
   assert.match(context.with.script, /A 9 is the minimum merge-ready score/);
-  assert.match(context.with.script, /An 8 or lower MUST include a concrete badThings finding/);
-  assert.match(context.with.script, /If complete and no actionable findings, rate it at least 9/);
+  assert.match(context.with.script, /An 8 or lower MUST include a concrete code finding/);
+  assert.match(context.with.script, /If complete and no actionable code findings, rate it at least 9/);
   assert.match(context.with.script, /closingIssuesReferences/);
   assert.match(context.with.script, /reviewThreads\(first: 50\)/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
@@ -33,6 +33,11 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
+  assert.match(context.with.script, /model context and OpenCode compaction are available/);
+  assert.match(context.with.script, /revisionTruncationReasons/);
+  assert.match(context.with.script, /diffTruncationReasons/);
+  assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
+  assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');

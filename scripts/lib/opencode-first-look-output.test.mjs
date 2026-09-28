@@ -89,7 +89,7 @@ test('same-revision CI follow-ups retain earlier concrete findings in the shared
   };
   const merged = mergeOpenCodeFirstLookResults(previous, current);
   assert.deepEqual(merged.prSummary, current.prSummary);
-  assert.deepEqual(merged.badThings.map(({ title }) => title), ['Unchecked response', 'Missing edge case']);
+  assert.deepEqual(merged.badThings.map(({ title }) => title), ['Missing edge case', 'Unchecked response']);
 });
 
 test('follow-up status marks prior findings resolved and does not carry them into current findings', () => {
@@ -117,4 +117,48 @@ test('follow-up status marks prior findings resolved and does not carry them int
   assert.deepEqual(merged.badThings, []);
   assert.match(rendered, /\[Resolved\] Unchecked response/);
   assert.match(rendered, /Changes since previous review\nNo new commits since the previous review\./);
+});
+
+test('new findings take precedence over retained findings at the published finding limit', () => {
+  const previousFindings = Array.from({ length: 6 }, (_, index) => ({
+    priority: 'P2', title: `Earlier issue ${index}`, path: 'src/a.ts', line: index + 1,
+    evidence: 'Earlier evidence', impact: 'Earlier impact.',
+  }));
+  const currentFinding = {
+    priority: 'P1', title: 'New regression', path: 'src/a.ts', line: 20,
+    evidence: 'New evidence', impact: 'New impact.',
+  };
+  const current = {
+    ...result,
+    badThings: [currentFinding],
+    priorFindingAssessments: previousFindings.map((finding) => ({
+      findingId: `${finding.priority}:${finding.path}:${finding.line}:${finding.title.toLowerCase()}`,
+      status: 'still-open',
+      summary: 'This earlier issue remains.',
+    })),
+  };
+  const merged = mergeOpenCodeFirstLookResults({ ...result, badThings: previousFindings }, current);
+  assert.equal(merged.badThings.length, 6);
+  assert.equal(merged.badThings[0].title, 'New regression');
+  assert.ok(!merged.badThings.some((finding) => finding.title === 'Earlier issue 5'));
+});
+
+test('distinguishes a failed commit comparison from an unrecorded prior head', () => {
+  const priorContext = { ...context, hasPriorReviewComment: true, latestChangesMode: 'comparison-failed' };
+  const rendered = renderOpenCodeFirstLookComment(parseOpenCodeFirstLookOutput(JSON.stringify(result), priorContext), priorContext);
+  assert.match(rendered, /GitHub could not provide the comparison with the previous reviewed commit/);
+  assert.doesNotMatch(rendered, /previous review did not record a commit/);
+});
+
+test('reports actual GitHub diff omissions as review coverage, not as a code finding', () => {
+  const limitedContext = {
+    ...context,
+    diffTruncated: true,
+    diffTruncationReasons: ['GitHub omitted a textual patch for one changed file.'],
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify(result), limitedContext);
+  const rendered = renderOpenCodeFirstLookComment(parsed, limitedContext);
+  assert.match(rendered, /## Review coverage\n- GitHub omitted a textual patch for one changed file\./);
+  assert.match(rendered, /## Bad things\n- No actionable findings\./);
+  assert.equal(parsed.badThings.length, 0);
 });

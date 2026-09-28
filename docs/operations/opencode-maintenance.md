@@ -274,11 +274,13 @@ bot never resolves review threads itself. Linked issues, review comments, and
 PR text are untrusted model context.
 
 Follow-up runs compare the current PR head with the head recorded in the bot
-comment, include commit subjects and a bounded incremental diff, and give the
-reviewer prior structured findings for explicit resolution status. The full PR
-summary remains present even when only the newest commits are being reviewed.
-If GitHub cannot provide the comparison, the output identifies that limitation
-and the full current diff remains available within normal context bounds.
+comment, include all commit subjects and all patches returned by GitHub, and
+give the reviewer prior structured findings for explicit resolution status.
+The workflow no longer clips patches at small per-file or total-size limits;
+OpenCode's model context and compaction handle large reviews. GitHub's own API
+response ceilings or omitted binary/oversized patches are reported in a separate
+**Review coverage** section, never as a code finding. A failed commit comparison
+is distinguished from a prior review that had no recorded head.
 
 The job token is limited to repository contents read, issue read, pull-request
 write, checks read, and Actions read (for matching the CI workflow run). The
