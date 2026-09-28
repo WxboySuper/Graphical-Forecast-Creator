@@ -32,6 +32,8 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
+  assert.match(context.with.script, /const path = require\('path'\)/);
+  assert.match(context.with.script, /const \{ pathToFileURL \} = require\('url'\)/);
   assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
   const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);

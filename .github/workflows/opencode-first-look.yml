@@ -169,6 +169,8 @@ jobs:
         with:
           script: |
             const fs = require('fs')
+            const path = require('path')
+            const { pathToFileURL } = require('url')
             const pullNumber = Number(process.env.PULL_NUMBER)
             let expectedSha = process.env.REVIEW_SHA
             const reviewKind = process.env.REVIEW_KIND
