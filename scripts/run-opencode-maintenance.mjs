@@ -20,12 +20,16 @@ if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 60_000 || timeoutMs > 120 * 
 
 const prompt = readFileSync(promptPath, 'utf8');
 if (!prompt.trim()) throw new Error('OpenCode prompt is empty.');
+const attachedFiles = (process.env.OPENCODE_FILE_PATHS ?? '')
+  .split(/\r?\n/)
+  .map((file) => file.trim())
+  .filter(Boolean);
 
 const env = modelEnvironment(process.env);
 
 const result = spawnSync(
   'opencode',
-  openCodeRunArguments(model, prompt),
+  openCodeRunArguments(model, prompt, attachedFiles),
   {
     cwd: process.cwd(),
     encoding: 'utf8',

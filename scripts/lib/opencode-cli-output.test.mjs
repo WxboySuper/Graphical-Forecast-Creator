@@ -28,6 +28,15 @@ test('builds OpenCode arguments with JSON event mode, the configured model, and 
   ]);
 });
 
+test('attaches large context files without embedding their contents in process arguments', () => {
+  assert.deepEqual(openCodeRunArguments('opencode-go/model', 'Review the attached PR context.', [
+    '/tmp/opencode-pr-review-context.json',
+  ]), [
+    'run', '--format', 'json', '--model', 'opencode-go/model', '--auto',
+    '--file', '/tmp/opencode-pr-review-context.json', 'Review the attached PR context.',
+  ]);
+});
+
 test('extracts plain-text workflow responses without imposing a JSON response format', () => {
   for (const response of ['NO_COMMENT', 'NEEDS_HUMAN: the issue is ambiguous', '## Investigation\nNo actionable finding.']) {
     assert.equal(extractFinalAssistantText(stream(textEvent('final', response))), response);
