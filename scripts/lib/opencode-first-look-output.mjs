@@ -170,7 +170,11 @@ const parsePriorFindingAssessment = (assessment, expected, seen) => {
 };
 
 const assertPriorFindingAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment || !expected.has(assessment.findingId) || seen.has(assessment.findingId)) {
+  if (!assessment) throw new Error('First-look previous-finding assessments do not match the supplied findings.');
+  if (!expected.has(assessment.findingId)) {
+    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
+  }
+  if (seen.has(assessment.findingId)) {
     throw new Error('First-look previous-finding assessments do not match the supplied findings.');
   }
 };
