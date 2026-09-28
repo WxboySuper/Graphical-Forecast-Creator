@@ -147,26 +147,45 @@ const assertAssessmentStatus = (status) => {
 
 const parsePriorFindingAssessments = (assessments, priorFindings) => {
   const expected = new Set(priorFindings.map((finding) => finding.findingId));
+  const accepted = collectValidPriorFindingAssessments(assessments, expected);
+  return priorFindings.map((finding) => assessmentOrUnclear(finding, accepted));
+};
+
+const collectValidPriorFindingAssessments = (assessments, expected) => {
   const accepted = new Map();
-  for (const assessment of Array.isArray(assessments) ? assessments : []) {
-    if (!assessment || !expected.has(assessment.findingId) || accepted.has(assessment.findingId)) continue;
-    if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) continue;
-    let summary;
-    try { summary = boundedText(assessment.summary, 'previous-finding summary'); }
-    catch { continue; }
-    accepted.set(assessment.findingId, {
+  if (!Array.isArray(assessments)) return accepted;
+  for (const assessment of assessments) {
+    if (!isNewKnownFindingAssessment(assessment, expected, accepted)) continue;
+    const parsed = parsePriorFindingAssessment(assessment);
+    if (parsed) accepted.set(parsed.findingId, parsed);
+  }
+  return accepted;
+};
+
+const isNewKnownFindingAssessment = (assessment, expected, accepted) => {
+  if (!assessment) return false;
+  if (!expected.has(assessment.findingId)) return false;
+  return !accepted.has(assessment.findingId);
+};
+
+const parsePriorFindingAssessment = (assessment) => {
+  if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) return null;
+  try {
+    return {
       findingId: assessment.findingId,
       status: assessment.status,
-      summary,
-    });
+      summary: boundedText(assessment.summary, 'previous-finding summary'),
+    };
+  } catch {
+    return null;
   }
-
-  return priorFindings.map((finding) => accepted.get(finding.findingId) ?? ({
-    findingId: finding.findingId,
-    status: 'unclear',
-    summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
-  }));
 };
+
+const assessmentOrUnclear = (finding, accepted) => accepted.get(finding.findingId) ?? ({
+  findingId: finding.findingId,
+  status: 'unclear',
+  summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
+});
 
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */
 export const parseOpenCodeFirstLookOutput = (raw, context) => {
