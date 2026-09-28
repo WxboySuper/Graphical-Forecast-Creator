@@ -435,8 +435,8 @@ jobs:
         env:
           OUTPUT_PATH: ${{ runner.temp }}/opencode-pr-review-output.md
           CONTEXT_PATH: ${{ runner.temp }}/opencode-pr-review-context.json
-          PULL_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pull_number }}
-          REVIEW_SHA: ${{ github.event.pull_request.head.sha || inputs.expected_sha }}
+          PULL_NUMBER: ${{ needs.wait-for-ci.outputs.pull_number }}
+          REVIEW_SHA: ${{ needs.wait-for-ci.outputs.head_sha }}
           REVIEW_KIND: ${{ github.event_name == 'issue_comment' && 'manual' || github.event_name == 'workflow_dispatch' && 'manual' || 'event' }}
           REVIEW_REQUEST_ID: ${{ github.event.comment.id || inputs.request_id || github.run_id }}
         with:
