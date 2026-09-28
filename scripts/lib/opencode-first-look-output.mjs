@@ -109,40 +109,34 @@ const assertChangedFindingLine = (finding, changedLineNumbers = {}) => {
 };
 
 const parseReviewAssessments = (assessments, openThreads) => {
-  assertAssessmentCount(assessments, openThreads);
   const expected = new Set(openThreads.map((thread) => thread.id));
+  const accepted = new Map();
   const seen = new Set();
-  return assessments.map((assessment) => parseReviewAssessment(assessment, expected, seen));
+  for (const assessment of Array.isArray(assessments) ? assessments : []) {
+    if (!assessment || !expected.has(assessment.threadId) || seen.has(assessment.threadId)) continue;
+    seen.add(assessment.threadId);
+    try {
+      accepted.set(assessment.threadId, parseReviewAssessment(assessment));
+    } catch {
+      // Keep publishing the review when the model omits or malforms a thread assessment.
+    }
+  }
+  return openThreads.map((thread) => accepted.get(thread.id) ?? ({
+    threadId: thread.id,
+    status: 'unclear',
+    summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
+  }));
 };
 
-const assertAssessmentCount = (assessments, openThreads) => {
-  if (!Array.isArray(assessments)) throw invalidAssessmentCount();
-  if (assessments.length !== openThreads.length) throw invalidAssessmentCount();
-};
-
-const invalidAssessmentCount = () => new Error('First-look output must assess each supplied open review thread exactly once.');
-
-const parseReviewAssessment = (assessment, expected, seen) => {
-  assertAssessmentIdentity(assessment, expected, seen);
-  assertAssessmentStatus(assessment.status);
-  seen.add(assessment.threadId);
-  return {
-    threadId: assessment.threadId,
-    status: assessment.status,
-    summary: boundedText(assessment.summary, 'review-comment summary'),
-  };
-};
-
-const assertAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment) throw invalidAssessmentIdentity();
-  if (!expected.has(assessment.threadId)) throw invalidAssessmentIdentity();
-  if (seen.has(assessment.threadId)) throw invalidAssessmentIdentity();
-};
-
-const invalidAssessmentIdentity = () => new Error('First-look review-thread assessments do not match the supplied open threads.');
+const parseReviewAssessment = (assessment) => ({
+  threadId: assessment.threadId,
+  status: assertAssessmentStatus(assessment.status),
+  summary: boundedText(assessment.summary, 'review-comment summary'),
+});
 
 const assertAssessmentStatus = (status) => {
   if (!ASSESSMENTS.has(status)) throw new Error('First-look review-thread status is invalid.');
+  return status;
 };
 
 const parsePriorFindingAssessments = (assessments, priorFindings) => {

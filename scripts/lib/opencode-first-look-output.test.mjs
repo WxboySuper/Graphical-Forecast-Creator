@@ -59,14 +59,12 @@ test('renders follow-up, linked-issue, and unresolved review-thread sections onl
   assert.match(rendered, /GitHub thread resolution remains a reviewer action\./);
 });
 
-test('rejects missing required sections, invalid ratings, hallucinated linked issues, and mismatched threads', () => {
+test('rejects missing required sections, invalid ratings, and hallucinated linked issues', () => {
   assert.throws(() => parseOpenCodeFirstLookOutput('{"prSummary":[]}', context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 11 }), context), /rating/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, prSummary: ['two lines\nnot allowed'] }), context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [{ priority: 'P4' }] }), context), /P0, P1, P2, or P3/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
-  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify(result), withThread), /assess each supplied open review thread/);
   const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/b.ts'], changedLineNumbers: { 'src/b.ts': [9] },
@@ -74,6 +72,32 @@ test('rejects missing required sections, invalid ratings, hallucinated linked is
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
   }), /line must be an added line/);
+});
+
+test('keeps the summary publishable when open-thread assessments are missing, duplicated, or malformed', () => {
+  const withThreads = {
+    ...context,
+    openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }, { id: 'thread-2', path: 'src/b.ts' }],
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    reviewCommentAssessments: [
+      { threadId: 'unknown-thread', status: 'addressed', summary: 'Untrusted extra thread.' },
+      { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
+      { threadId: 'thread-1', status: 'still-open', summary: 'Duplicate assessment is ignored.' },
+      { threadId: 'thread-2', status: 'invalid-status', summary: 'Invalid assessment is unclear.' },
+    ],
+  }), withThreads);
+
+  assert.deepEqual(parsed.reviewCommentAssessments, [
+    { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
+    {
+      threadId: 'thread-2',
+      status: 'unclear',
+      summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
+    },
+  ]);
+  assert.match(renderOpenCodeFirstLookComment(parsed, withThreads), /Unclear\.\*\* This run did not provide a valid assessment/);
 });
 
 test('same-revision CI follow-ups retain earlier concrete findings in the shared comment', () => {
