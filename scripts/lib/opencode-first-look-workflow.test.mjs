@@ -67,9 +67,9 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   const publish = steps.find((step) => step.name === 'Publish first-look result');
   assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
+  assert.match(publish.with.script, /mergeOpenCodeFirstLookResults\(contextData\.priorStructuredReview, parsed\)/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);
-  assert.doesNotMatch(publish.with.script, /mergeOpenCodeFirstLookResults/);
   assert.match(publish.with.script, /gfc-opencode-first-look-data/);
   assert.match(publish.with.script, /body\.length > 60_000/);
   assert.match(publish.with.script, /gfc-opencode-first-look:manual/);

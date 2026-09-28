@@ -146,42 +146,46 @@ const assertAssessmentStatus = (status) => {
 };
 
 const parsePriorFindingAssessments = (assessments, priorFindings) => {
-  assertPriorFindingAssessmentCount(assessments, priorFindings);
   const expected = new Set(priorFindings.map((finding) => finding.findingId));
-  const seen = new Set();
-  return assessments.map((assessment) => parsePriorFindingAssessment(assessment, expected, seen));
+  const accepted = collectValidPriorFindingAssessments(assessments, expected);
+  return priorFindings.map((finding) => assessmentOrUnclear(finding, accepted));
 };
 
-const assertPriorFindingAssessmentCount = (assessments, priorFindings) => {
-  if (!Array.isArray(assessments) || assessments.length !== priorFindings.length) {
-    throw new Error('First-look output must assess every previous finding exactly once.');
+const collectValidPriorFindingAssessments = (assessments, expected) => {
+  const accepted = new Map();
+  if (!Array.isArray(assessments)) return accepted;
+  for (const assessment of assessments) {
+    if (!isNewKnownFindingAssessment(assessment, expected, accepted)) continue;
+    const parsed = parsePriorFindingAssessment(assessment);
+    if (parsed) accepted.set(parsed.findingId, parsed);
+  }
+  return accepted;
+};
+
+const isNewKnownFindingAssessment = (assessment, expected, accepted) => {
+  if (!assessment) return false;
+  if (!expected.has(assessment.findingId)) return false;
+  return !accepted.has(assessment.findingId);
+};
+
+const parsePriorFindingAssessment = (assessment) => {
+  if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) return null;
+  try {
+    return {
+      findingId: assessment.findingId,
+      status: assessment.status,
+      summary: boundedText(assessment.summary, 'previous-finding summary'),
+    };
+  } catch {
+    return null;
   }
 };
 
-const parsePriorFindingAssessment = (assessment, expected, seen) => {
-  assertPriorFindingAssessmentIdentity(assessment, expected, seen);
-  assertPriorFindingAssessmentStatus(assessment.status);
-  seen.add(assessment.findingId);
-  return {
-    findingId: assessment.findingId,
-    status: assessment.status,
-    summary: boundedText(assessment.summary, 'previous-finding summary'),
-  };
-};
-
-const assertPriorFindingAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment) throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  if (!expected.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-  if (seen.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-};
-
-const assertPriorFindingAssessmentStatus = (status) => {
-  if (!PRIOR_FINDING_ASSESSMENTS.has(status)) throw new Error('First-look previous-finding status is invalid.');
-};
+const assessmentOrUnclear = (finding, accepted) => accepted.get(finding.findingId) ?? ({
+  findingId: finding.findingId,
+  status: 'unclear',
+  summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
+});
 
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */
 export const parseOpenCodeFirstLookOutput = (raw, context) => {

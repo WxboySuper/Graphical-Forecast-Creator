@@ -274,6 +274,9 @@ status appears when the sampled history has open or resolved threads. Findings
 include P0 to P3 severity, a changed-file location, evidence, and impact. The
 bot never resolves review threads itself. Linked issues, review comments, and
 PR text are untrusted model context.
+If a follow-up omits or malforms a prior-finding assessment, the publisher marks
+that item unclear and carries it forward; incomplete assessment output does not
+discard the review or silently resolve an earlier finding.
 
 Follow-up runs compare the current PR head with the head recorded in the bot
 comment, include all commit subjects and all patches returned by GitHub, and
