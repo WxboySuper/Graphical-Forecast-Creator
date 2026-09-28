@@ -210,15 +210,22 @@ const assertJsonObject = (result) => {
 };
 
 const parseReviewPayload = (result, context) => {
+  const prSummary = boundedList(result.prSummary, 'prSummary', { allowEmpty: false });
+  const latestChanges = boundedList(result.latestChanges, 'latestChanges');
+  const goodThings = parseGoodThings(result);
+  const badThings = parseFindings(result, context);
+  const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
+  const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
+  const unresolvedPriorFindings = (context.priorFindings ?? []).filter((finding) => statusById.get(finding.findingId) !== 'resolved');
   return {
-    prSummary: boundedList(result.prSummary, 'prSummary', { allowEmpty: false }),
-    latestChanges: boundedList(result.latestChanges, 'latestChanges'),
-    goodThings: parseGoodThings(result),
-    badThings: parseFindings(result, context),
-    rating: parseRating(result.rating),
+    prSummary,
+    latestChanges,
+    goodThings,
+    badThings,
+    rating: normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments: parseContextReviewAssessments(result, context),
-    priorFindingAssessments: parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []),
+    priorFindingAssessments,
   };
 };
 
@@ -238,6 +245,12 @@ const parseRating = (rating) => {
 };
 
 const invalidRating = () => new Error('First-look rating must be an integer from 0 to 10.');
+
+const normalizeRating = (rating, findings) => {
+  if (findings.length === 0) return 10;
+  if (findings.every((finding) => finding.priority === 'P3')) return 9;
+  return Math.min(rating, 8);
+};
 
 const parseLinkedIssueAssessment = (result, context) => {
   const linkedIssues = Array.isArray(context.linkedIssues) ? context.linkedIssues : [];
@@ -335,6 +348,7 @@ export const mergeOpenCodeFirstLookResults = (previous, current) => {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
     badThings: findings,
+    rating: normalizeRating(current.rating, findings),
   };
 };
 

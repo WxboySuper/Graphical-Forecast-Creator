@@ -35,9 +35,10 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);
   assert.ok(promptBlock, 'review prompt should be a separate bounded string');
   assert.doesNotMatch(promptBlock[1], /JSON\.stringify\(contextData\)/);
-  assert.match(context.with.script, /A 9 is the minimum merge-ready score/);
-  assert.match(context.with.script, /An 8 or lower MUST include a concrete code finding/);
-  assert.match(context.with.script, /If complete and no actionable code findings, rate it at least 9/);
+  assert.match(context.with.script, /Give exactly 10 when there are no current or unresolved prior findings/);
+  assert.match(context.with.script, /A 9 is the merge threshold and is only for P3 cosmetic or optional polish findings/);
+  assert.match(context.with.script, /Any bug, security, performance, API, test\/verification, behavior, or reliability finding must be P0-P2 and score at most 8/);
+  assert.match(context.with.script, /Every score below 10 needs findings that directly explain what keeps this PR from being perfect/);
   assert.match(context.with.script, /closingIssuesReferences/);
   assert.match(context.with.script, /reviewThreads\(first: 50\)/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
