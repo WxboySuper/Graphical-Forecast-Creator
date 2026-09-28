@@ -9,19 +9,26 @@ const { parse } = createRequire(import.meta.url)('yaml');
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-first-look.yml'), 'utf8'));
+const waitJob = workflow.jobs['wait-for-ci'];
+const waitStep = waitJob.steps.find((step) => step.name === 'Wait for matching Checks | CI');
 const steps = workflow.jobs.review.steps;
 const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
-  assert.deepEqual(workflow.on.workflow_run, { workflows: ['Checks | CI'], types: ['completed'] });
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
-  assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
+  assert.equal(workflow.on.workflow_run, undefined);
+  assert.equal(workflow.concurrency, undefined, 'CI waiting must not hold the shared OpenCode queue');
+  assert.equal(waitJob.concurrency, undefined, 'the CI waiter must run outside the model queue');
+  assert.equal(workflow.jobs.review.needs, 'wait-for-ci');
+  assert.deepEqual(workflow.jobs.review.concurrency, { group: 'gfc-opencode-maintenance-queue', queue: 'max' });
+  assert.equal(waitJob.permissions['pull-requests'], 'read');
+  assert.equal(waitJob.permissions.actions, 'read');
+  assert.equal(workflow.jobs.review.permissions.actions, undefined);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
-  assert.equal(workflow.jobs.review.permissions.actions, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
   assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
@@ -36,7 +43,9 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
-  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
+  assert.equal(context.env.PULL_NUMBER, '${{ needs.wait-for-ci.outputs.pull_number }}');
+  assert.equal(context.env.REVIEW_SHA, '${{ needs.wait-for-ci.outputs.head_sha }}');
+  assert.equal(context.env.CI_RUN_URL, '${{ needs.wait-for-ci.outputs.ci_run_url }}');
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
@@ -46,20 +55,28 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
-  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
+  assert.doesNotMatch(context.with.script, /Deferring first-look/);
+
+  assert.match(waitStep.with.script, /waitForMatchingCiRun/);
+  assert.match(waitStep.with.script, /CI_TIMEOUT_MS/);
+  assert.match(waitStep.with.script, /Skipping this stale review/);
+  assert.match(waitStep.with.script, /pull\.head\.ref/);
+  assert.match(waitStep.with.script, /The review will now enter the shared OpenCode queue/);
+  assert.match(waitJob.outputs.run, /steps\.wait\.outputs\.run/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
   assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);
-  assert.match(publish.with.script, /mergeOpenCodeFirstLookResults/);
+  assert.doesNotMatch(publish.with.script, /mergeOpenCodeFirstLookResults/);
   assert.match(publish.with.script, /gfc-opencode-first-look-data/);
   assert.match(publish.with.script, /body\.length > 60_000/);
   assert.match(publish.with.script, /gfc-opencode-first-look:manual/);
   assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
 
   const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;
+  assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', waitStep.with.script), 'CI wait script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', context.with.script), 'context script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', publish.with.script), 'publisher script should parse');
 });

@@ -1,8 +1,8 @@
 /** Build the bounded OpenCode CLI invocation. */
 export const openCodeRunArguments = (model, prompt, files = []) => [
   'run', '--format', 'json', '--model', model, '--auto',
-  ...files.flatMap((file) => ['--file', file]),
   prompt,
+  ...files.flatMap((file) => ['--file', file]),
 ];
 
 /** Extract the final assistant message from OpenCode's --format json event stream. */

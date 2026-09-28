@@ -33,7 +33,7 @@ test('attaches large context files without embedding their contents in process a
     '/tmp/opencode-pr-review-context.json',
   ]), [
     'run', '--format', 'json', '--model', 'opencode-go/model', '--auto',
-    '--file', '/tmp/opencode-pr-review-context.json', 'Review the attached PR context.',
+    'Review the attached PR context.', '--file', '/tmp/opencode-pr-review-context.json',
   ]);
 });
 
