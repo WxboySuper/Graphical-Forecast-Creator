@@ -152,6 +152,48 @@ test('missing or malformed prior-finding assessments stay unclear and retain fin
   assert.match(rendered, /\[Unclear\] Unchecked response/);
 });
 
+test('an unclear prior finding survives into the next saved review state', () => {
+  const priorFinding = {
+    priority: 'P1', title: 'Unchecked response', path: 'src/a.ts', line: 9,
+    evidence: 'No validation', impact: 'Bad data is accepted.',
+    findingId: 'P1:src/a.ts:9:unchecked response',
+  };
+  const firstFollowupContext = {
+    ...context,
+    hasPriorReviewComment: true,
+    priorFindings: [priorFinding],
+    changedFilePaths: ['src/a.ts'],
+    changedLineNumbers: { 'src/a.ts': [9] },
+  };
+  const firstFollowup = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    priorFindingAssessments: [],
+  }), firstFollowupContext);
+  const firstSavedState = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [priorFinding] },
+    firstFollowup,
+  );
+
+  const nextPriorFinding = {
+    ...firstSavedState.badThings[0],
+    findingId: 'P1:src/a.ts:9:unchecked response',
+  };
+  const secondFollowupContext = {
+    ...firstFollowupContext,
+    priorFindings: [nextPriorFinding],
+  };
+  const secondFollowup = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    priorFindingAssessments: [],
+  }), secondFollowupContext);
+  const secondSavedState = mergeOpenCodeFirstLookResults(firstSavedState, secondFollowup);
+  const rendered = renderOpenCodeFirstLookComment(secondSavedState, secondFollowupContext);
+
+  assert.equal(secondSavedState.badThings.length, 1);
+  assert.equal(secondSavedState.badThings[0].title, 'Unchecked response');
+  assert.match(rendered, /\[Unclear\] Unchecked response/);
+});
+
 test('new findings take precedence over retained findings at the published finding limit', () => {
   const previousFindings = Array.from({ length: 6 }, (_, index) => ({
     priority: 'P2', title: `Earlier issue ${index}`, path: 'src/a.ts', line: index + 1,
