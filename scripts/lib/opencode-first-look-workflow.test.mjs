@@ -13,20 +13,31 @@ const steps = workflow.jobs.review.steps;
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
+  assert.deepEqual(workflow.on.issue_comment.types, ['created']);
+  assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
-  assert.equal(workflow.jobs.review.permissions.actions, undefined);
+  assert.equal(workflow.jobs.review.permissions.actions, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
   assert.match(context.with.script, /A 9 is the minimum merge-ready score/);
-  assert.match(context.with.script, /An 8 or lower means the PR is not merge-ready and MUST include at least one concrete badThings item/);
-  assert.match(context.with.script, /If the review is complete and there are no actionable findings, rate it at least 9/);
+  assert.match(context.with.script, /An 8 or lower MUST include a concrete code finding/);
+  assert.match(context.with.script, /If complete and no actionable code findings, rate it at least 9/);
   assert.match(context.with.script, /closingIssuesReferences/);
   assert.match(context.with.script, /reviewThreads\(first: 50\)/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
+  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
+  assert.match(context.with.script, /priorFindingAssessments/);
+  assert.match(context.with.script, /latestChanges/);
+  assert.match(context.with.script, /review-opencode/);
+  assert.match(context.with.script, /model context and OpenCode compaction are available/);
+  assert.match(context.with.script, /revisionTruncationReasons/);
+  assert.match(context.with.script, /diffTruncationReasons/);
+  assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
+  assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
@@ -37,6 +48,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(publish.with.script, /mergeOpenCodeFirstLookResults/);
   assert.match(publish.with.script, /gfc-opencode-first-look-data/);
   assert.match(publish.with.script, /body\.length > 60_000/);
+  assert.match(publish.with.script, /gfc-opencode-first-look:manual/);
   assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
 
   const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;

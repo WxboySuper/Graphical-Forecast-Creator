@@ -46,6 +46,7 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
     issues: 'read',
     'pull-requests': 'write',
     checks: 'read',
+    actions: 'read',
   });
   assert.equal(publisher.with['github-token'], '${{ github.token }}');
   assert.doesNotMatch(publisher.with['github-token'], /GH_PAT/);
