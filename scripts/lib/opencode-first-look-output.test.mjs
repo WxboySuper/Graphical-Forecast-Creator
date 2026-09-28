@@ -15,7 +15,7 @@ const result = {
   latestChanges: [],
   goodThings: ['The output stays concise.'],
   badThings: [],
-  rating: 8,
+  rating: 10,
   linkedIssueAssessment: null,
   reviewCommentAssessments: [],
   priorFindingAssessments: [],
@@ -27,7 +27,7 @@ test('renders the fixed first-review sections and hides absent conditional secti
   assert.match(rendered, /^## PR Summary/);
   assert.match(rendered, /## Good things/);
   assert.match(rendered, /## Bad things\n- No actionable findings\./);
-  assert.match(rendered, /## Rating\n8\/10/);
+  assert.match(rendered, /## Rating\n10\/10/);
   assert.doesNotMatch(rendered, /Connection to linked issue|Review comment status/);
 });
 
@@ -59,14 +59,12 @@ test('renders follow-up, linked-issue, and unresolved review-thread sections onl
   assert.match(rendered, /GitHub thread resolution remains a reviewer action\./);
 });
 
-test('rejects missing required sections, invalid ratings, hallucinated linked issues, and mismatched threads', () => {
+test('rejects missing required sections, invalid ratings, and hallucinated linked issues', () => {
   assert.throws(() => parseOpenCodeFirstLookOutput('{"prSummary":[]}', context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 11 }), context), /rating/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, prSummary: ['two lines\nnot allowed'] }), context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [{ priority: 'P4' }] }), context), /P0, P1, P2, or P3/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
-  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify(result), withThread), /assess each supplied open review thread/);
   const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/b.ts'], changedLineNumbers: { 'src/b.ts': [9] },
@@ -74,6 +72,32 @@ test('rejects missing required sections, invalid ratings, hallucinated linked is
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
   }), /line must be an added line/);
+});
+
+test('keeps the summary publishable when open-thread assessments are missing, duplicated, or malformed', () => {
+  const withThreads = {
+    ...context,
+    openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }, { id: 'thread-2', path: 'src/b.ts' }],
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    reviewCommentAssessments: [
+      { threadId: 'unknown-thread', status: 'addressed', summary: 'Untrusted extra thread.' },
+      { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
+      { threadId: 'thread-1', status: 'still-open', summary: 'Duplicate assessment is ignored.' },
+      { threadId: 'thread-2', status: 'invalid-status', summary: 'Invalid assessment is unclear.' },
+    ],
+  }), withThreads);
+
+  assert.deepEqual(parsed.reviewCommentAssessments, [
+    { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
+    {
+      threadId: 'thread-2',
+      status: 'unclear',
+      summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
+    },
+  ]);
+  assert.match(renderOpenCodeFirstLookComment(parsed, withThreads), /Unclear\.\*\* This run did not provide a valid assessment/);
 });
 
 test('same-revision CI follow-ups retain earlier concrete findings in the shared comment', () => {
@@ -117,6 +141,44 @@ test('follow-up status marks prior findings resolved and does not carry them int
   assert.deepEqual(merged.badThings, []);
   assert.match(rendered, /\[Resolved\] Unchecked response/);
   assert.match(rendered, /Changes since previous review\nNo new commits since the previous review\./);
+});
+
+test('normalizes ratings to findings: clean is 10, cosmetic-only is 9, and merge-blocking findings cap at 8', () => {
+  const findingContext = { ...context, changedFilePaths: ['src/a.ts'] };
+  const cosmetic = { priority: 'P3', title: 'Tidy naming', path: 'src/a.ts', line: null, evidence: 'The name is inconsistent.', impact: 'Cosmetic consistency only.' };
+  const defect = { priority: 'P2', title: 'Missing boundary check', path: 'src/a.ts', line: null, evidence: 'The new path accepts an empty value.', impact: 'Invalid input reaches the API.' };
+
+  assert.equal(parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 6 }), findingContext).rating, 10);
+  assert.equal(parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 10, badThings: [cosmetic] }), findingContext).rating, 9);
+  assert.equal(parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 9, badThings: [defect] }), findingContext).rating, 8);
+  assert.equal(parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 7, badThings: [defect] }), findingContext).rating, 7);
+  assert.equal(parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 6, badThings: [cosmetic, defect] }), findingContext).rating, 6);
+});
+
+test('unresolved prior findings prevent a perfect score until they are resolved', () => {
+  const priorFinding = {
+    priority: 'P2', title: 'Missing boundary check', path: 'src/a.ts', line: null,
+    evidence: 'The prior review found the input check missing.', impact: 'Invalid input reaches the API.',
+    findingId: 'P2:src/a.ts::missing boundary check',
+  };
+  const priorContext = { ...context, priorFindings: [priorFinding] };
+  const unresolved = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 10 }), priorContext);
+  const resolved = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    rating: 8,
+    priorFindingAssessments: [{ findingId: priorFinding.findingId, status: 'resolved', summary: 'The new validation rejects empty input.' }],
+  }), priorContext);
+
+  assert.equal(unresolved.rating, 8);
+  assert.equal(resolved.rating, 10);
+});
+
+test('merged follow-up findings keep the score consistent with unresolved findings', () => {
+  const priorFinding = { priority: 'P3', title: 'Optional polish', path: 'src/a.ts', line: null, evidence: 'Name differs from convention.', impact: 'Cosmetic only.' };
+  const current = { ...result, rating: 10, badThings: [] };
+  const merged = mergeOpenCodeFirstLookResults({ ...result, badThings: [priorFinding] }, current);
+  assert.deepEqual(merged.badThings, [priorFinding]);
+  assert.equal(merged.rating, 9);
 });
 
 test('missing or malformed prior-finding assessments stay unclear and retain findings', () => {

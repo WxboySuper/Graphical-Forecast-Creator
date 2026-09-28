@@ -14,7 +14,7 @@ const expected = {
   latestChanges: [],
   goodThings: [],
   badThings: [],
-  rating: 8,
+  rating: 10,
   linkedIssueAssessment: null,
   reviewCommentAssessments: [],
   priorFindingAssessments: [],
