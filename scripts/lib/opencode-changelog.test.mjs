@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addOpenCodeChangelogEntries, parseOpenCodeChangelogResult } from './opencode-changelog.mjs';
+import { addOpenCodeChangelogEntries, assertOpenCodeChangelogResultEligible, parseOpenCodeChangelogResult } from './opencode-changelog.mjs';
 
 const entry = '- **Forecast export:** Preserve the selected outlook when exporting the current forecast.';
 const laneHeading = '### Next major / beta';
@@ -10,6 +10,15 @@ test('parses valid bounded output', () => {
   assert.deepEqual(parseOpenCodeChangelogResult(JSON.stringify({ status: 'complete', section: 'Added', entries: [entry] })), {
     status: 'complete', section: 'Added', entries: [entry],
   });
+});
+
+test('accepts a no-change result for dependency reviews that found no user-facing impact', () => {
+  const result = parseOpenCodeChangelogResult('{"status":"no-change"}');
+  assert.deepEqual(result, { status: 'no-change' });
+  assert.doesNotThrow(() => assertOpenCodeChangelogResultEligible(result, { isDependabot: true, impact: 'none' }));
+  assert.throws(() => assertOpenCodeChangelogResultEligible(result, { isDependabot: true, impact: 'beta' }), /only for a Dependabot PR/);
+  assert.throws(() => assertOpenCodeChangelogResultEligible(result, { isDependabot: false, impact: 'none' }), /only for a Dependabot PR/);
+  assert.throws(() => assertOpenCodeChangelogResultEligible({ status: 'complete' }, { isDependabot: true, impact: 'none' }), /entry for a PR declared Changelog-Impact: none/);
 });
 
 test('allows dependency sections and ordinary parentheses while rejecting markdown links', () => {

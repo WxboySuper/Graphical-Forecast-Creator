@@ -167,24 +167,32 @@ all merges are human decisions.
 PR changelog handling runs in `.github/workflows/opencode-changelog-pr.yml`
 on `pull_request_target`. Every same-repository Dependabot PR enters the
 trusted preparation job without needing a changelog declaration in its
-description. That job writes the managed impact declaration and updates the
-dependency section from the exact package manifest version changes. It is
-deterministic, so the OpenCode changelog generator does not run on those PRs or
-overwrite its output. The separate first-look review still evaluates their
-diff and CI result after CI completes. Collaborator PRs that declare a beta or
-hotfix impact use OpenCode to draft an entry. The workflow checks out
+description. Preparation classifies runtime dependency bumps as beta or
+hotfix, and development-tooling-only bumps as none. It updates only the
+managed PR description block. The dependent OpenCode job then investigates
+every Dependabot PR, including draft PRs, and decides whether an entry is
+needed. A no-change result is accepted only for a Dependabot PR declared none.
+Runtime dependency changes require a grounded entry or the job fails for
+maintainer follow-up. Generated changes go through the same trusted publisher
+as collaborator PRs. The normal PR synchronize event sees the existing
+CHANGELOG.md diff and does not generate a duplicate entry. Dependabot body-edit
+events are skipped because the opened/synchronize run waits for preparation.
+Collaborator PRs that declare a beta or hotfix impact also use OpenCode to
+draft an entry. The workflow checks out
 maintenance scripts from the
 repository default branch before it checks out the PR head. The PR checkout is
 input data only, with `persist-credentials: false`. The workflow executes no PR-provided
 script or local action. It removes tracked `.env` files and project OpenCode
 configuration, plugins, and hooks before starting the model.
 
-Generation requires exactly one `Changelog-Impact: beta` or `hotfix` decision
-and a diff that does not already change `CHANGELOG.md`. It is bounded to 80
+Generation requires exactly one eligible changelog declaration and a diff
+that does not already change `CHANGELOG.md`. It is bounded to 80
 changed files, 90,000 diff characters, four entries, 450 characters per entry,
 and a 12-minute model timeout. Fork PRs, other decision values, oversized
 diffs, and inconclusive results do not produce automated edits; the changelog
-check remains the required gate. OpenCode has read-only repository tools and
+check remains the required gate. Dependabot is accepted only when GitHub
+identifies `dependabot[bot]`, the head repository matches GFC, and the branch
+starts with `dependabot/`. OpenCode has read-only repository tools and
 receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
 identity and head, then commits only `CHANGELOG.md`. The trusted automated
 preparation and publishing steps use `GH_PAT` for PR metadata updates or
@@ -192,6 +200,16 @@ authenticated fetch/push. No checkout credential is persisted. The ordinary
 `pull_request` CI workflow has read-only token permissions, no repository
 secrets, and no token environment passed to PR-controlled scripts. Human review
 and branch protection remain the merge boundary.
+
+First-look reviews inspect each supplied open review thread against the current
+code and tests. An open GitHub thread does not by itself mean the code concern
+is unresolved. A technically addressed concern may still receive 10/10 while
+GitHub awaits a reviewer to resolve the thread. The parser rejects missing or
+invalid thread assessments, and it refuses to publish a clean score when the
+reviewer says a concern remains open or unclear without reporting a concrete
+finding. The workflow paginates through all review threads and comments rather
+than sampling the first page. If GitHub cannot return the complete history, the
+review job stops before publishing a score.
 The flat changelog audit is available as **Maintenance | OpenCode changelog
 audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
 Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   applyDependencyBumpsToChangelog,
+  dependabotChangelogDeclaration,
   extractDependenciesSubsection,
   findDependabotChangelogSection,
   formatDependencyChangelogBullet,
@@ -18,6 +19,16 @@ const sampleChangelog = `# Changelog
 `;
 
 describe('dependabot changelog', () => {
+  it('classifies runtime bumps for changelog generation and lets dev-only PRs be checked for no user-facing impact', () => {
+    assert.deepEqual(dependabotChangelogDeclaration([{ depType: 'devDependencies' }], false), {
+      impact: 'none',
+      reason: 'Automated dependency update changes development tooling only; the changelog runner checks for user-facing impact.',
+    });
+    assert.deepEqual(dependabotChangelogDeclaration([{ depType: 'dependencies' }], false), { impact: 'beta' });
+    assert.deepEqual(dependabotChangelogDeclaration([{ depType: 'dependencies' }], true), { impact: 'hotfix' });
+    assert.deepEqual(dependabotChangelogDeclaration([{ depType: 'devDependencies' }, { depType: 'dependencies' }], false), { impact: 'beta' });
+  });
+
   it('finds Unreleased as the active section', () => {
     const section = findDependabotChangelogSection(sampleChangelog);
     assert.equal(section?.heading, '## [Unreleased]');

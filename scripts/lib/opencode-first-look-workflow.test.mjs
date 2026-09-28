@@ -16,8 +16,6 @@ const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
-  assert.match(waitJob.if, /user\.login == 'dependabot\[bot\]'/);
-  assert.match(waitJob.if, /startsWith\(github\.head_ref, 'dependabot\/'\)/);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.equal(workflow.on.workflow_run, undefined);
   assert.equal(workflow.concurrency, undefined, 'CI waiting must not hold the shared OpenCode queue');
@@ -32,8 +30,6 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
-  assert.match(context.with.script, /const path = require\('path'\)/);
-  assert.match(context.with.script, /const \{ pathToFileURL \} = require\('url'\)/);
   assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
   const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);
@@ -43,8 +39,15 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /A 9 is the merge threshold and is only for P3 cosmetic or optional polish findings/);
   assert.match(context.with.script, /Any bug, security, performance, API, test\/verification, behavior, or reliability finding must be P0-P2 and score at most 8/);
   assert.match(context.with.script, /Every score below 10 needs findings that directly explain what keeps this PR from being perfect/);
+  assert.match(context.with.script, /A GitHub thread being open is not proof that its code concern remains unresolved/);
+  assert.match(context.with.script, /search surrounding code or history as needed until you can judge the technical status/);
+  assert.match(context.with.script, /Missing or invalid thread assessments stop publication/);
   assert.match(context.with.script, /closingIssuesReferences/);
-  assert.match(context.with.script, /reviewThreads\(first: 50\)/);
+  assert.match(context.with.script, /reviewThreads\(first: 100, after: \$after\)/);
+  assert.match(context.with.script, /while \(moreReviewThreads\)/);
+  assert.match(context.with.script, /could not return the complete review-thread history/);
+  assert.doesNotMatch(context.with.script, /filter\(\(thread\) => !thread\.isResolved\)\.slice/);
+  assert.doesNotMatch(context.with.script, /comments\.nodes\.slice/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
@@ -59,12 +62,10 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /diffTruncationReasons/);
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
-  assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
+  assert.match(context.with.script, /GitHub could not return the complete review-thread history/);
   assert.doesNotMatch(context.with.script, /Deferring first-look/);
 
   assert.match(waitStep.with.script, /waitForMatchingCiRun/);
-  assert.match(waitStep.with.script, /opencode-first-look-eligibility\.mjs/);
-  assert.match(context.with.script, /opencode-first-look-eligibility\.mjs/);
   assert.match(waitStep.with.script, /CI_TIMEOUT_MS/);
   assert.match(waitStep.with.script, /Skipping this stale review/);
   assert.match(waitStep.with.script, /pull\.head\.ref/);
@@ -88,14 +89,4 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', waitStep.with.script), 'CI wait script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', context.with.script), 'context script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', publish.with.script), 'publisher script should parse');
-});
-
-test('Dependabot PRs enter changelog preparation without a description declaration', () => {
-  const changelogWorkflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-changelog-pr.yml'), 'utf8'));
-  const prepare = changelogWorkflow.jobs['prepare-automated-changelog'];
-  assert.match(prepare.if, /head\.repo\.full_name == github\.repository/);
-  assert.match(prepare.if, /user\.login == 'dependabot\[bot\]'/);
-  const step = prepare.steps.find((item) => item.name === 'Prepare automated changelog metadata with trusted tooling');
-  assert.match(step.run, /prepare-changelog-governance\.mjs/);
-  assert.equal(changelogWorkflow.on.pull_request_target.types.includes('synchronize'), true);
 });

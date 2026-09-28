@@ -39,7 +39,18 @@ const validateModelEntries = (result) => {
 /** Parse and bound the untrusted model response. */
 export const parseOpenCodeChangelogResult = (raw) => {
   const result = decodeModelResult(raw);
-  if (!result || !['complete', 'inconclusive'].includes(result.status)) throw new Error('OpenCode changelog status is invalid.');
+  if (!result || !['complete', 'inconclusive', 'no-change'].includes(result.status)) throw new Error('OpenCode changelog status is invalid.');
   if (result.status === 'inconclusive') return { status: 'inconclusive' };
+  if (result.status === 'no-change') return { status: 'no-change' };
   return { status: 'complete', section: result.section, entries: validateModelEntries(result) };
+};
+
+/** Check that the model result agrees with the PR's trusted impact decision. */
+export const assertOpenCodeChangelogResultEligible = (result, { isDependabot, impact }) => {
+  if (result.status === 'no-change') {
+    if (isDependabot && impact === 'none') return;
+    throw new Error('OpenCode may return no-change only for a Dependabot PR declared Changelog-Impact: none.');
+  }
+  if (result.status !== 'complete') throw new Error('OpenCode could not produce a sufficiently grounded changelog entry; add it manually and rerun CI.');
+  if (impact === 'none') throw new Error('OpenCode returned a changelog entry for a PR declared Changelog-Impact: none.');
 };
