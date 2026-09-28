@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CHANGELOG_LANE_HEADINGS, parseChangelogDeclaration, changelogLaneHeadingForBase } from './lib/changelog-policy.mjs';
-import { addOpenCodeChangelogEntries, parseOpenCodeChangelogResult } from './lib/opencode-changelog.mjs';
+import { addOpenCodeChangelogEntries, assertOpenCodeChangelogResultEligible, parseOpenCodeChangelogResult } from './lib/opencode-changelog.mjs';
 import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'PR_NUMBER', 'BASE_REF', 'HEAD_REF', 'EXPECTED_HEAD_SHA', 'EXPECTED_BODY_SHA', 'EXPECTED_TITLE_SHA', 'OPENCODE_OUTPUT_PATH', 'GH_TOKEN'];
@@ -20,12 +20,18 @@ const hash = (value) => createHash('sha256').update(value ?? '').digest('hex');
 if (pull.head?.sha !== expectedSha || pull.head?.ref !== headRef || pull.base?.ref !== baseRef || pull.head?.repo?.full_name?.toLowerCase() !== repository.toLowerCase() || hash(pull.body) !== process.env.EXPECTED_BODY_SHA || hash(pull.title) !== process.env.EXPECTED_TITLE_SHA) {
   throw new Error('PR identity or head revision changed during changelog generation; retry against the latest revision.');
 }
-if (!['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pull.author_association)) throw new Error('PR author is not eligible for autonomous changelog generation.');
+const isDependabot = pull.user?.login === 'dependabot[bot]' && pull.head?.repo?.full_name?.toLowerCase() === repository.toLowerCase() && headRef.startsWith('dependabot/');
+if (!isDependabot && !['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pull.author_association)) throw new Error('PR author is not eligible for autonomous changelog generation.');
 const declaration = parseChangelogDeclaration(pull.body ?? '');
-if (!declaration.ok || !['beta', 'hotfix'].includes(declaration.impact)) throw new Error('The live PR description must declare exactly one beta or hotfix changelog impact.');
+const allowedImpacts = isDependabot ? ['beta', 'hotfix', 'none'] : ['beta', 'hotfix'];
+if (!declaration.ok || !allowedImpacts.includes(declaration.impact)) throw new Error('The live PR description must declare exactly one eligible changelog impact.');
 
 const result = parseOpenCodeChangelogResult(readFileSync(outputPath, 'utf8'));
-if (result.status !== 'complete') throw new Error('OpenCode could not produce a sufficiently grounded changelog entry; add it manually and rerun CI.');
+assertOpenCodeChangelogResultEligible(result, { isDependabot, impact: declaration.impact });
+if (result.status === 'no-change') {
+  process.stdout.write(`Confirmed no user-facing changelog entry is needed for Dependabot PR #${prNumber}.\n`);
+  process.exit(0);
+}
 
 const fetchRef = (ref) => {
   if (!/^(main|stable\/\d+\.\d+\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');

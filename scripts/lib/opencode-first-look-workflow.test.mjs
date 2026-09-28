@@ -39,8 +39,15 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /A 9 is the merge threshold and is only for P3 cosmetic or optional polish findings/);
   assert.match(context.with.script, /Any bug, security, performance, API, test\/verification, behavior, or reliability finding must be P0-P2 and score at most 8/);
   assert.match(context.with.script, /Every score below 10 needs findings that directly explain what keeps this PR from being perfect/);
+  assert.match(context.with.script, /A GitHub thread being open is not proof that its code concern remains unresolved/);
+  assert.match(context.with.script, /search surrounding code or history as needed until you can judge the technical status/);
+  assert.match(context.with.script, /Missing or invalid thread assessments stop publication/);
   assert.match(context.with.script, /closingIssuesReferences/);
-  assert.match(context.with.script, /reviewThreads\(first: 50\)/);
+  assert.match(context.with.script, /reviewThreads\(first: 100, after: \$after\)/);
+  assert.match(context.with.script, /while \(moreReviewThreads\)/);
+  assert.match(context.with.script, /could not return the complete review-thread history/);
+  assert.doesNotMatch(context.with.script, /filter\(\(thread\) => !thread\.isResolved\)\.slice/);
+  assert.doesNotMatch(context.with.script, /comments\.nodes\.slice/);
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
@@ -55,7 +62,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /diffTruncationReasons/);
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
-  assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
+  assert.match(context.with.script, /GitHub could not return the complete review-thread history/);
   assert.doesNotMatch(context.with.script, /Deferring first-look/);
 
   assert.match(waitStep.with.script, /waitForMatchingCiRun/);

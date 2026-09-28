@@ -74,12 +74,12 @@ test('rejects missing required sections, invalid ratings, and hallucinated linke
   }), /line must be an added line/);
 });
 
-test('keeps the summary publishable when open-thread assessments are missing, duplicated, or malformed', () => {
+test('requires complete open-thread assessments before publishing', () => {
   const withThreads = {
     ...context,
     openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }, { id: 'thread-2', path: 'src/b.ts' }],
   };
-  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
     ...result,
     reviewCommentAssessments: [
       { threadId: 'unknown-thread', status: 'addressed', summary: 'Untrusted extra thread.' },
@@ -87,17 +87,27 @@ test('keeps the summary publishable when open-thread assessments are missing, du
       { threadId: 'thread-1', status: 'still-open', summary: 'Duplicate assessment is ignored.' },
       { threadId: 'thread-2', status: 'invalid-status', summary: 'Invalid assessment is unclear.' },
     ],
-  }), withThreads);
+  }), withThreads), /review-thread status is invalid/);
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, reviewCommentAssessments: [] }), withThreads), /assess every supplied open review thread/);
+});
 
-  assert.deepEqual(parsed.reviewCommentAssessments, [
-    { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
-    {
-      threadId: 'thread-2',
-      status: 'unclear',
-      summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
-    },
-  ]);
-  assert.match(renderOpenCodeFirstLookComment(parsed, withThreads), /Unclear\.\*\* This run did not provide a valid assessment/);
+test('an open GitHub thread may still support 10/10 when investigation confirms the code resolves it', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary: 'The current guard resolves the concern; the GitHub thread still needs manual resolution.' }],
+  }), withThread);
+  assert.equal(parsed.rating, 10);
+});
+
+test('a thread assessed still-open or unclear cannot be published as a clean perfect review', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  for (const status of ['still-open', 'unclear']) {
+    assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
+      ...result,
+      reviewCommentAssessments: [{ threadId: 'thread-1', status, summary: 'The review concern remains unresolved.' }],
+    }), withThread), /concrete findings when a review thread remains open or unclear/);
+  }
 });
 
 test('same-revision CI follow-ups retain earlier concrete findings in the shared comment', () => {
