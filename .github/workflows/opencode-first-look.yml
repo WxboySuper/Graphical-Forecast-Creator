@@ -36,8 +36,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
+      issues: read
+      pull-requests: write
       checks: read
     steps:
       - name: Check out the trusted default branch

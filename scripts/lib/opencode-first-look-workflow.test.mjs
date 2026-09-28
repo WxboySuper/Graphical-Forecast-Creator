@@ -11,11 +11,11 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const workflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-first-look.yml'), 'utf8'));
 const steps = workflow.jobs.review.steps;
 
-test('first-look review keeps its least-privilege read context and one bot-owned summary comment', () => {
+test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
-  assert.equal(workflow.jobs.review.permissions['pull-requests'], 'read');
-  assert.equal(workflow.jobs.review.permissions.issues, 'write');
+  assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
+  assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   assert.equal(workflow.jobs.review.permissions.actions, undefined);
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');

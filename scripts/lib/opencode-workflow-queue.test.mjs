@@ -35,7 +35,7 @@ test('changelog audit keeps runner context references at step scope', () => {
   assert.doesNotMatch(jobEnv, /runner\.temp/, 'runner context is unavailable in job-level env');
 });
 
-test('first-look reviews publish one bot comment with only issue-comment write access', () => {
+test('first-look reviews publish one bot comment with read-only issue and pull-request write access', () => {
   const source = readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8');
   const workflow = parse(source);
   const review = workflow.jobs.review;
@@ -43,8 +43,8 @@ test('first-look reviews publish one bot comment with only issue-comment write a
 
   assert.deepEqual(review.permissions, {
     contents: 'read',
-    issues: 'write',
-    'pull-requests': 'read',
+    issues: 'read',
+    'pull-requests': 'write',
     checks: 'read',
   });
   assert.equal(publisher.with['github-token'], '${{ github.token }}');
