@@ -146,41 +146,26 @@ const assertAssessmentStatus = (status) => {
 };
 
 const parsePriorFindingAssessments = (assessments, priorFindings) => {
-  assertPriorFindingAssessmentCount(assessments, priorFindings);
   const expected = new Set(priorFindings.map((finding) => finding.findingId));
-  const seen = new Set();
-  return assessments.map((assessment) => parsePriorFindingAssessment(assessment, expected, seen));
-};
-
-const assertPriorFindingAssessmentCount = (assessments, priorFindings) => {
-  if (!Array.isArray(assessments) || assessments.length !== priorFindings.length) {
-    throw new Error('First-look output must assess every previous finding exactly once.');
+  const accepted = new Map();
+  for (const assessment of Array.isArray(assessments) ? assessments : []) {
+    if (!assessment || !expected.has(assessment.findingId) || accepted.has(assessment.findingId)) continue;
+    if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) continue;
+    let summary;
+    try { summary = boundedText(assessment.summary, 'previous-finding summary'); }
+    catch { continue; }
+    accepted.set(assessment.findingId, {
+      findingId: assessment.findingId,
+      status: assessment.status,
+      summary,
+    });
   }
-};
 
-const parsePriorFindingAssessment = (assessment, expected, seen) => {
-  assertPriorFindingAssessmentIdentity(assessment, expected, seen);
-  assertPriorFindingAssessmentStatus(assessment.status);
-  seen.add(assessment.findingId);
-  return {
-    findingId: assessment.findingId,
-    status: assessment.status,
-    summary: boundedText(assessment.summary, 'previous-finding summary'),
-  };
-};
-
-const assertPriorFindingAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment) throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  if (!expected.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-  if (seen.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-};
-
-const assertPriorFindingAssessmentStatus = (status) => {
-  if (!PRIOR_FINDING_ASSESSMENTS.has(status)) throw new Error('First-look previous-finding status is invalid.');
+  return priorFindings.map((finding) => accepted.get(finding.findingId) ?? ({
+    findingId: finding.findingId,
+    status: 'unclear',
+    summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
+  }));
 };
 
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */

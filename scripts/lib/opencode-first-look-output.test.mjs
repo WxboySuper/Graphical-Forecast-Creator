@@ -119,6 +119,39 @@ test('follow-up status marks prior findings resolved and does not carry them int
   assert.match(rendered, /Changes since previous review\nNo new commits since the previous review\./);
 });
 
+test('missing or malformed prior-finding assessments stay unclear and retain findings', () => {
+  const priorFinding = {
+    priority: 'P1', title: 'Unchecked response', path: 'src/a.ts', line: 9,
+    evidence: 'No validation', impact: 'Bad data is accepted.',
+    findingId: 'P1:src/a.ts:9:unchecked response',
+  };
+  const followupContext = {
+    ...context,
+    hasPriorReviewComment: true,
+    priorFindings: [priorFinding],
+    changedFilePaths: ['src/a.ts'],
+    changedLineNumbers: { 'src/a.ts': [9] },
+  };
+  const followup = {
+    ...result,
+    priorFindingAssessments: [
+      { findingId: 'unknown-id', status: 'resolved', summary: 'untrusted extra entry' },
+      { findingId: priorFinding.findingId, status: 'resolved', summary: ' ' },
+    ],
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify(followup), followupContext);
+  const merged = mergeOpenCodeFirstLookResults({ ...result, badThings: [priorFinding] }, parsed);
+  const rendered = renderOpenCodeFirstLookComment(merged, followupContext);
+
+  assert.deepEqual(parsed.priorFindingAssessments, [{
+    findingId: priorFinding.findingId,
+    status: 'unclear',
+    summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
+  }]);
+  assert.equal(merged.badThings.length, 1);
+  assert.match(rendered, /\[Unclear\] Unchecked response/);
+});
+
 test('new findings take precedence over retained findings at the published finding limit', () => {
   const previousFindings = Array.from({ length: 6 }, (_, index) => ({
     priority: 'P2', title: `Earlier issue ${index}`, path: 'src/a.ts', line: index + 1,
