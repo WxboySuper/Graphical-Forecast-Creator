@@ -18,7 +18,7 @@ const workflowFiles = [
 const queueGroup = 'gfc-opencode-maintenance-queue';
 
 test('every OpenCode workflow shares the single bounded concurrency queue', () => {
-  for (const file of workflowFiles) {
+  for (const file of workflowFiles.filter((file) => !file.endsWith('opencode-first-look.yml'))) {
     const source = readFileSync(new URL(file, import.meta.url), 'utf8');
     assert.match(
       source,
@@ -27,6 +27,11 @@ test('every OpenCode workflow shares the single bounded concurrency queue', () =
     );
     assert.doesNotMatch(source, /^[ ]{2}cancel-in-progress: true$/m, `${file} must not cancel a running invocation`);
   }
+
+  const firstLook = parse(readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8'));
+  assert.equal(firstLook.concurrency, undefined, 'CI waiting must stay outside the OpenCode queue');
+  assert.equal(firstLook.jobs['wait-for-ci'].concurrency, undefined);
+  assert.deepEqual(firstLook.jobs.review.concurrency, { group: queueGroup, queue: 'max' });
 });
 
 test('changelog audit keeps runner context references at step scope', () => {
@@ -46,6 +51,9 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
     issues: 'read',
     'pull-requests': 'write',
     checks: 'read',
+  });
+  assert.deepEqual(workflow.jobs['wait-for-ci'].permissions, {
+    'pull-requests': 'read',
     actions: 'read',
   });
   assert.equal(publisher.with['github-token'], '${{ github.token }}');
