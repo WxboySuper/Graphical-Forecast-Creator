@@ -3,8 +3,8 @@ const DEFAULT_POLL_INTERVAL_MS = 20 * 1000
 
 export function findMatchingCiRun(runs, pullNumber, headSha) {
   return runs
-    .filter((run) => run.event === 'pull_request' && run.head_sha === headSha &&
-      run.pull_requests?.some((pull) => pull.number === pullNumber))
+    .filter((run) => run.event === 'pull_request' &&
+      run.pull_requests?.some((pull) => pull.number === pullNumber && pull.head?.sha === headSha))
     .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))[0] ?? null
 }
 

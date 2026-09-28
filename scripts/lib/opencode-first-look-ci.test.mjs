@@ -6,7 +6,7 @@ const sha = 'a'.repeat(40)
 const matchingRun = (overrides = {}) => ({
   event: 'pull_request',
   head_sha: sha,
-  pull_requests: [{ number: 42 }],
+  pull_requests: [{ number: 42, head: { sha } }],
   created_at: '2026-09-27T00:00:00Z',
   status: 'in_progress',
   conclusion: null,
@@ -15,10 +15,19 @@ const matchingRun = (overrides = {}) => ({
 
 test('selects only a CI run matching both PR and head SHA', () => {
   assert.equal(findMatchingCiRun([
-    matchingRun({ head_sha: 'b'.repeat(40), status: 'completed' }),
-    matchingRun({ pull_requests: [{ number: 43 }], status: 'completed' }),
+    matchingRun({
+      head_sha: 'b'.repeat(40),
+      pull_requests: [{ number: 42, head: { sha: 'b'.repeat(40) } }],
+      status: 'completed',
+    }),
+    matchingRun({ pull_requests: [{ number: 43, head: { sha } }], status: 'completed' }),
     matchingRun(),
   ], 42, sha)?.status, 'in_progress')
+})
+
+test('matches a synthetic merge-commit CI run by its associated PR head SHA', () => {
+  const run = matchingRun({ head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'success' })
+  assert.equal(findMatchingCiRun([run], 42, sha), run)
 })
 
 test('waits in the current invocation until matching CI completes', async () => {

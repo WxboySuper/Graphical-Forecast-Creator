@@ -20,15 +20,11 @@ on:
         required: false
         type: string
 
-concurrency:
-  group: gfc-opencode-maintenance-queue
-  queue: max
-
 permissions:
   contents: read
 
 jobs:
-  review:
+  wait-for-ci:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.comment.body == '/review-opencode' && github.event.comment.user.login == github.repository_owner) ||
@@ -36,13 +32,118 @@ jobs:
        github.event.pull_request.head.repo.full_name == github.repository &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association))
     runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      pull-requests: read
+      actions: read
+    outputs:
+      run: ${{ steps.wait.outputs.run }}
+      pull_number: ${{ steps.wait.outputs.pull_number }}
+      head_sha: ${{ steps.wait.outputs.head_sha }}
+      ci_run_url: ${{ steps.wait.outputs.ci_run_url }}
+      ci_conclusion: ${{ steps.wait.outputs.ci_conclusion }}
+    steps:
+      - name: Check out trusted wait helper
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Wait for matching Checks | CI
+        id: wait
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          PULL_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pull_number }}
+          REVIEW_SHA: ${{ github.event.pull_request.head.sha || inputs.expected_sha }}
+          CI_TIMEOUT_MS: '2700000'
+        with:
+          script: |
+            const path = require('path')
+            const { pathToFileURL } = require('url')
+            const pullNumber = Number(process.env.PULL_NUMBER)
+            if (!Number.isInteger(pullNumber) || pullNumber < 1) {
+              core.notice('No valid PR number was provided.')
+              core.setOutput('run', 'false')
+              return
+            }
+
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullNumber,
+            })
+            const expectedSha = process.env.REVIEW_SHA || pull.head.sha
+            if (!/^[a-f0-9]{40}$/i.test(expectedSha ?? '') || pull.head.sha !== expectedSha) {
+              core.notice(`Skipping stale or invalid PR head ${expectedSha ?? '(missing)'}.`)
+              core.setOutput('run', 'false')
+              return
+            }
+            if (context.eventName === 'issue_comment' && (context.payload.comment?.body?.trim() !== '/review-opencode' || context.payload.comment?.user?.login?.toLowerCase() !== context.repo.owner.toLowerCase() || !context.payload.issue?.pull_request)) {
+              core.notice('Only the repository owner can request a review with /review-opencode on a PR.')
+              core.setOutput('run', 'false')
+              return
+            }
+            const trustedAuthor = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pull.author_association) ||
+              (pull.user?.login === 'github-actions[bot]' && pull.head.ref.startsWith('opencode/audit-'))
+            if (pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}` || !trustedAuthor || pull.draft) {
+              core.notice(`Skipping PR #${pullNumber} because it is not an eligible same-repository PR.`)
+              core.setOutput('run', 'false')
+              return
+            }
+
+            const { waitForMatchingCiRun } = await import(pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-first-look-ci.mjs')).href)
+            core.info(`Waiting for Checks | CI on PR #${pullNumber} at ${expectedSha} (up to ${process.env.CI_TIMEOUT_MS}ms).`)
+            let waitLogCount = 0
+            const ciWait = await waitForMatchingCiRun({
+              pullNumber,
+              headSha: expectedSha,
+              timeoutMs: Number(process.env.CI_TIMEOUT_MS),
+              listRuns: async () => github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                branch: pull.head.ref,
+                per_page: 100,
+              }),
+              getCurrentHead: async () => {
+                const { data: currentPull } = await github.rest.pulls.get({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pullNumber })
+                return currentPull.head.sha
+              },
+              onWait: (run) => {
+                waitLogCount += 1
+                if (waitLogCount % 3 === 1) core.info(run
+                  ? `Checks | CI is ${run.status}${run.conclusion ? ` (${run.conclusion})` : ''}; polling again.`
+                  : 'Waiting for the Checks | CI run to start.')
+              },
+            })
+            if (ciWait.status === 'stale') {
+              core.notice(`PR #${pullNumber} advanced beyond ${expectedSha} while waiting for CI. Skipping this stale review.`)
+              core.setOutput('run', 'false')
+              return
+            }
+
+            core.setOutput('run', 'true')
+            core.setOutput('pull_number', pullNumber)
+            core.setOutput('head_sha', expectedSha)
+            core.setOutput('ci_run_url', ciWait.run.html_url)
+            core.setOutput('ci_conclusion', ciWait.run.conclusion)
+            core.info(`Checks | CI completed with ${ciWait.run.conclusion}. The review will now enter the shared OpenCode queue.`)
+
+  review:
+    needs: wait-for-ci
+    if: >-
+      needs.wait-for-ci.outputs.run == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 75
+    concurrency:
+      group: gfc-opencode-maintenance-queue
+      queue: max
     permissions:
       contents: read
       issues: read
       pull-requests: write
       checks: read
-      actions: read
     steps:
       - name: Check out the trusted default branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -59,16 +160,15 @@ jobs:
         env:
           PROMPT_PATH: ${{ runner.temp }}/opencode-pr-review.md
           CONTEXT_PATH: ${{ runner.temp }}/opencode-pr-review-context.json
-          PULL_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pull_number }}
-          REVIEW_SHA: ${{ github.event.pull_request.head.sha || inputs.expected_sha }}
+          PULL_NUMBER: ${{ needs.wait-for-ci.outputs.pull_number }}
+          REVIEW_SHA: ${{ needs.wait-for-ci.outputs.head_sha }}
           REVIEW_KIND: ${{ github.event_name == 'issue_comment' && 'manual' || github.event_name == 'workflow_dispatch' && 'manual' || 'event' }}
           REVIEW_REQUEST_ID: ${{ github.event.comment.id || inputs.request_id || github.run_id }}
-          CI_TIMEOUT_MS: '2700000'
+          CI_RUN_URL: ${{ needs.wait-for-ci.outputs.ci_run_url }}
+          CI_CONCLUSION: ${{ needs.wait-for-ci.outputs.ci_conclusion }}
         with:
           script: |
             const fs = require('fs')
-            const path = require('path')
-            const { pathToFileURL } = require('url')
             const pullNumber = Number(process.env.PULL_NUMBER)
             let expectedSha = process.env.REVIEW_SHA
             const reviewKind = process.env.REVIEW_KIND
@@ -126,37 +226,7 @@ jobs:
               return
             }
 
-            const { waitForMatchingCiRun } = await import(pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-first-look-ci.mjs')).href)
-            core.info(`Waiting for Checks | CI on PR #${pullNumber} at ${expectedSha} (up to ${process.env.CI_TIMEOUT_MS}ms).`)
-            let waitLogCount = 0
-            const ciWait = await waitForMatchingCiRun({
-              pullNumber,
-              headSha: expectedSha,
-              timeoutMs: Number(process.env.CI_TIMEOUT_MS),
-              listRuns: async () => {
-                const { data } = await github.rest.actions.listWorkflowRuns({
-                  owner: context.repo.owner, repo: context.repo.repo, workflow_id: 'ci.yml', head_sha: expectedSha, per_page: 20,
-                })
-                return data.workflow_runs
-              },
-              getCurrentHead: async () => {
-                const { data: currentPull } = await github.rest.pulls.get({ owner: context.repo.owner, repo: context.repo.repo, pull_number: pullNumber })
-                return currentPull.head.sha
-              },
-              onWait: (run) => {
-                waitLogCount += 1
-                if (waitLogCount % 3 === 1) core.info(run
-                  ? `Checks | CI is ${run.status}${run.conclusion ? ` (${run.conclusion})` : ''}; polling again.`
-                  : 'Waiting for the Checks | CI run to start.')
-              },
-            })
-            if (ciWait.status === 'stale') {
-              core.notice(`PR #${pullNumber} advanced beyond ${expectedSha} while waiting for CI. Skipping this stale review.`)
-              core.setOutput('run', 'false')
-              return
-            }
-            core.info(`Checks | CI completed with ${ciWait.run.conclusion}. Continuing this run with the review.`)
-            const completedCi = { url: ciWait.run.html_url, conclusion: ciWait.run.conclusion }
+            const completedCi = { url: process.env.CI_RUN_URL, conclusion: process.env.CI_CONCLUSION }
 
             const priorHeadSha = summaryComment?.body?.match(/<!-- gfc-opencode-first-look-head:([a-f0-9]{40}) -->/)?.[1] ?? null
             let revisionDiff = null

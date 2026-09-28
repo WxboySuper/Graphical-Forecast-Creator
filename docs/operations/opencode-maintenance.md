@@ -248,10 +248,12 @@ version deliberately after reviewing a release.
 
 ## PR review format
 
-The first-look reviewer runs for eligible PR opens, new commits, reopenings, and
-ready-for-review events. That same queued run waits up to 45 minutes for the
-exact revision's `Checks | CI` run, then continues into the review. The run
-fails clearly if CI never completes and skips the stale review if the PR head
+  The first-look workflow runs for eligible PR opens, new commits, reopenings, and
+  ready-for-review events. A lightweight, read-only job waits up to 45 minutes
+  outside the shared OpenCode queue for the exact revision's `Checks | CI` run.
+  Once CI completes, the review job enters the shared queue and runs OpenCode.
+  This keeps slow CI for one PR from delaying unrelated OpenCode work. The run
+  fails clearly if CI never completes and skips the stale review if the PR head
 changes while it waits. The owner can also comment `/review-opencode` on the PR
 timeline to request a fresh review without opening Actions. Other users'
 commands are ignored. Duplicate event deliveries are idempotent, while each
@@ -282,8 +284,9 @@ response ceilings or omitted binary/oversized patches are reported in a separate
 **Review coverage** section, never as a code finding. A failed commit comparison
 is distinguished from a prior review that had no recorded head.
 
-The job token is limited to repository contents read, issue read, pull-request
-write, checks read, and Actions read (for matching the CI workflow run). The
+  The CI waiter token is limited to pull-request and Actions read. The separate
+  review job token is limited to repository contents read, issue read,
+  pull-request write, and checks read. The
 OpenCode process receives no GitHub token and is instructed not to edit, run
 commands, approve, request changes, push, or merge. The GitHub Actions publisher
 validates structured output and updates the single bot comment. It cannot merge,
