@@ -10,9 +10,11 @@ const { parse } = createRequire(import.meta.url)('yaml');
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-first-look.yml'), 'utf8'));
 const steps = workflow.jobs.review.steps;
+const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
+  assert.deepEqual(workflow.on.workflow_run, { workflows: ['Checks | CI'], types: ['completed'] });
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
@@ -21,6 +23,11 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   assert.equal(workflow.jobs.review.permissions.actions, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
+  assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
+  assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
+  const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);
+  assert.ok(promptBlock, 'review prompt should be a separate bounded string');
+  assert.doesNotMatch(promptBlock[1], /JSON\.stringify\(contextData\)/);
   assert.match(context.with.script, /A 9 is the minimum merge-ready score/);
   assert.match(context.with.script, /An 8 or lower MUST include a concrete code finding/);
   assert.match(context.with.script, /If complete and no actionable code findings, rate it at least 9/);
@@ -39,6 +46,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
+  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
   assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
