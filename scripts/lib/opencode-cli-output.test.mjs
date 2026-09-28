@@ -10,12 +10,14 @@ const textEvent = (messageID, text, id = `part-${messageID}`) => JSON.stringify(
 
 const context = { linkedIssues: [], openReviewThreads: [] };
 const expected = {
-  summary: ['Review complete.'],
+  prSummary: ['Review complete.'],
+  latestChanges: [],
   goodThings: [],
   badThings: [],
   rating: 8,
   linkedIssueAssessment: null,
   reviewCommentAssessments: [],
+  priorFindingAssessments: [],
 };
 
 const stream = (...events) => events.join('\n');

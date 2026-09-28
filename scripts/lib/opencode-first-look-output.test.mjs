@@ -4,23 +4,27 @@ import { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpen
 
 const context = {
   hasPriorReviewComment: false,
+  latestChangesMode: 'same',
+  priorFindings: [],
   linkedIssues: [],
   openReviewThreads: [],
   resolvedReviewThreadCount: 0,
 };
 const result = {
-  summary: ['Adds stable comment updates for PR review runs.'],
+  prSummary: ['Adds stable comment updates for PR review runs.'],
+  latestChanges: [],
   goodThings: ['The output stays concise.'],
   badThings: [],
   rating: 8,
   linkedIssueAssessment: null,
   reviewCommentAssessments: [],
+  priorFindingAssessments: [],
 };
 
 test('renders the fixed first-review sections and hides absent conditional sections', () => {
   const parsed = parseOpenCodeFirstLookOutput(JSON.stringify(result), context);
   const rendered = renderOpenCodeFirstLookComment(parsed, context);
-  assert.match(rendered, /^## PR summary \(first review\)/);
+  assert.match(rendered, /^## PR Summary/);
   assert.match(rendered, /## Good things/);
   assert.match(rendered, /## Bad things\n- No actionable findings\./);
   assert.match(rendered, /## Rating\n8\/10/);
@@ -46,7 +50,8 @@ test('renders follow-up, linked-issue, and unresolved review-thread sections onl
     reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary: 'The stale state is now ignored.' }],
   };
   const rendered = renderOpenCodeFirstLookComment(parseOpenCodeFirstLookOutput(JSON.stringify(richResult), richContext), richContext);
-  assert.match(rendered, /^## Latest changes \(follow-up\)/);
+  assert.match(rendered, /^## PR Summary/);
+  assert.match(rendered, /## Changes since previous review/);
   assert.match(rendered, /## Connection to linked issue/);
   assert.match(rendered, /## Review comment status\n- 1 unresolved; 2 resolved/);
   assert.match(rendered, /\[P2\] Retry can retain stale state/);
@@ -55,9 +60,9 @@ test('renders follow-up, linked-issue, and unresolved review-thread sections onl
 });
 
 test('rejects missing required sections, invalid ratings, hallucinated linked issues, and mismatched threads', () => {
-  assert.throws(() => parseOpenCodeFirstLookOutput('{"summary":[]}', context), /summary/);
+  assert.throws(() => parseOpenCodeFirstLookOutput('{"prSummary":[]}', context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 11 }), context), /rating/);
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, summary: ['two lines\nnot allowed'] }), context), /summary/);
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, prSummary: ['two lines\nnot allowed'] }), context), /prSummary/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [{ priority: 'P4' }] }), context), /P0, P1, P2, or P3/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
   const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
@@ -78,10 +83,38 @@ test('same-revision CI follow-ups retain earlier concrete findings in the shared
   };
   const current = {
     ...result,
-    summary: ['CI confirms the new tests pass.'],
+    prSummary: ['The full PR description.'],
+    priorFindingAssessments: [{ findingId: 'P1:src/a.ts:9:unchecked response', status: 'still-open', summary: 'Validation is still absent.' }],
     badThings: [{ priority: 'P2', title: 'Missing edge case', path: 'src/a.ts', line: 11, evidence: 'No boundary test', impact: 'Regression may go unnoticed.' }],
   };
   const merged = mergeOpenCodeFirstLookResults(previous, current);
-  assert.deepEqual(merged.summary, current.summary);
+  assert.deepEqual(merged.prSummary, current.prSummary);
   assert.deepEqual(merged.badThings.map(({ title }) => title), ['Unchecked response', 'Missing edge case']);
+});
+
+test('follow-up status marks prior findings resolved and does not carry them into current findings', () => {
+  const priorFinding = {
+    priority: 'P1', title: 'Unchecked response', path: 'src/a.ts', line: 9,
+    evidence: 'No validation', impact: 'Bad data is accepted.',
+    findingId: 'P1:src/a.ts:9:unchecked response',
+  };
+  const followupContext = {
+    ...context,
+    hasPriorReviewComment: true,
+    priorFindings: [priorFinding],
+    latestChangesMode: 'same',
+    changedFilePaths: ['src/a.ts'],
+    changedLineNumbers: { 'src/a.ts': [9] },
+  };
+  const followup = {
+    ...result,
+    priorFindingAssessments: [{ findingId: priorFinding.findingId, status: 'resolved', summary: 'The new guard rejects invalid data.' }],
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify(followup), followupContext);
+  const previous = { ...result, badThings: [priorFinding] };
+  const merged = mergeOpenCodeFirstLookResults(previous, parsed);
+  const rendered = renderOpenCodeFirstLookComment(merged, followupContext);
+  assert.deepEqual(merged.badThings, []);
+  assert.match(rendered, /\[Resolved\] Unchecked response/);
+  assert.match(rendered, /Changes since previous review\nNo new commits since the previous review\./);
 });

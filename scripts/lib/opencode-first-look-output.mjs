@@ -2,6 +2,7 @@ const MAX_OUTPUT_LENGTH = 40_000;
 const MAX_BULLETS = 6;
 const MAX_TEXT_LENGTH = 900;
 const ASSESSMENTS = new Set(['addressed', 'still-open', 'unclear']);
+const PRIOR_FINDING_ASSESSMENTS = new Set(['resolved', 'still-open', 'unclear']);
 
 const boundedText = (value, name) => {
   assertTextType(value, name);
@@ -144,6 +145,28 @@ const assertAssessmentStatus = (status) => {
   if (!ASSESSMENTS.has(status)) throw new Error('First-look review-thread status is invalid.');
 };
 
+const parsePriorFindingAssessments = (assessments, priorFindings) => {
+  if (!Array.isArray(assessments) || assessments.length !== priorFindings.length) {
+    throw new Error('First-look output must assess every previous finding exactly once.');
+  }
+  const expected = new Set(priorFindings.map((finding) => finding.findingId));
+  const seen = new Set();
+  return assessments.map((assessment) => {
+    if (!assessment || !expected.has(assessment.findingId) || seen.has(assessment.findingId)) {
+      throw new Error('First-look previous-finding assessments do not match the supplied findings.');
+    }
+    if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) {
+      throw new Error('First-look previous-finding status is invalid.');
+    }
+    seen.add(assessment.findingId);
+    return {
+      findingId: assessment.findingId,
+      status: assessment.status,
+      summary: boundedText(assessment.summary, 'previous-finding summary'),
+    };
+  });
+};
+
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */
 export const parseOpenCodeFirstLookOutput = (raw, context) => {
   assertRawOutput(raw);
@@ -168,16 +191,17 @@ const assertJsonObject = (result) => {
 
 const parseReviewPayload = (result, context) => {
   return {
-    summary: parseSummary(result),
+    prSummary: boundedList(result.prSummary, 'prSummary', { allowEmpty: false }),
+    latestChanges: boundedList(result.latestChanges, 'latestChanges'),
     goodThings: parseGoodThings(result),
     badThings: parseFindings(result, context),
     rating: parseRating(result.rating),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments: parseContextReviewAssessments(result, context),
+    priorFindingAssessments: parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []),
   };
 };
 
-const parseSummary = (result) => boundedList(result.summary, 'summary', { allowEmpty: false });
 const parseGoodThings = (result) => boundedList(result.goodThings, 'goodThings');
 
 const parseFindings = (result, context) => {
@@ -215,10 +239,21 @@ const parseContextReviewAssessments = (result, context) => {
 
 /** Render a compact, consistent PR comment. Conditional sections come from GitHub context. */
 export const renderOpenCodeFirstLookComment = (result, context) => {
-  const heading = context.hasPriorReviewComment ? 'Latest changes (follow-up)' : 'PR summary (first review)';
   const lines = [
-    `## ${heading}`,
-    ...result.summary.map((item) => `- ${item}`),
+    '## PR Summary',
+    ...result.prSummary.map((item) => `- ${item}`),
+  ];
+
+  if (context.hasPriorReviewComment) {
+    const latestChanges = context.latestChangesMode === 'same'
+      ? ['No new commits since the previous review.']
+      : context.latestChangesMode === 'unavailable'
+        ? ['The previous review did not record a commit, so changes since it could not be identified.']
+        : result.latestChanges.map((item) => `- ${item}`);
+    lines.push('', '## Changes since previous review', ...latestChanges);
+  }
+
+  lines.push(
     '',
     '## Good things',
     ...(result.goodThings.length ? result.goodThings.map((item) => `- ${item}`) : ['- No specific strengths noted.']),
@@ -228,7 +263,7 @@ export const renderOpenCodeFirstLookComment = (result, context) => {
     '',
     '## Rating',
     `${result.rating}/10`,
-  ];
+  );
 
   if (context.linkedIssues?.length) {
     lines.push(...renderLinkedIssues(result, context.linkedIssues));
@@ -237,22 +272,31 @@ export const renderOpenCodeFirstLookComment = (result, context) => {
   if (context.openReviewThreads?.length) {
     lines.push(...renderReviewThreads(result, context));
   }
+  if (!context.openReviewThreads?.length && context.resolvedReviewThreadCount > 0) {
+    lines.push('', '## Review comment status', `- 0 unresolved; ${context.resolvedReviewThreadCount} resolved in the supplied review history.`);
+  }
+
+  if (context.priorFindings?.length) {
+    lines.push(...renderPriorFindings(result, context.priorFindings));
+  }
 
   return lines.join('\n');
 };
 
-/** Keep same-revision review findings when a later CI run replaces the shared comment. */
+/** Carry prior findings forward only when the reviewer says they remain open or unclear. */
 export const mergeOpenCodeFirstLookResults = (previous, current) => {
-  const findings = uniqueBy([...previous.badThings, ...current.badThings], findingKey).slice(0, MAX_BULLETS);
+  const statusById = new Map(current.priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
+  const retainedPrevious = previous.badThings.filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
+  const findings = uniqueBy([...retainedPrevious, ...current.badThings], findingKey).slice(0, MAX_BULLETS);
   return {
     ...current,
-    summary: current.summary,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
     badThings: findings,
   };
 };
 
 const findingKey = (finding) => `${finding.priority}:${finding.path}:${finding.line ?? ''}:${finding.title.toLowerCase()}`;
+export const getFirstLookFindingId = (finding) => findingKey(finding);
 const uniqueBy = (items, key) => [...new Map(items.map((item) => [key(item), item])).values()];
 const uniqueStrings = (items) => [...new Set(items)];
 
@@ -289,5 +333,18 @@ const renderReviewThreads = (result, context) => {
     ...(context.reviewThreadsTruncated ? ['- Additional review threads were omitted from this bounded sample.'] : []),
     '',
     'GitHub thread resolution remains a reviewer action.',
+  ];
+};
+
+const renderPriorFindings = (result, priorFindings) => {
+  const assessments = new Map(result.priorFindingAssessments.map((assessment) => [assessment.findingId, assessment]));
+  return [
+    '',
+    '## Previous review findings',
+    ...priorFindings.map((finding) => {
+      const assessment = assessments.get(finding.findingId);
+      const status = { resolved: 'Resolved', 'still-open': 'Still open', unclear: 'Unclear' }[assessment.status];
+      return `- **[${status}] ${finding.title}** (${finding.path}${finding.line ? `:${finding.line}` : ''}). ${assessment.summary}`;
+    }),
   ];
 };
