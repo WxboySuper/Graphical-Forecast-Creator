@@ -113,7 +113,7 @@ const parseReviewAssessments = (assessments, openThreads) => {
   const accepted = new Map();
   const seen = new Set();
   for (const assessment of Array.isArray(assessments) ? assessments : []) {
-    if (!assessment || !expected.has(assessment.threadId) || seen.has(assessment.threadId)) continue;
+    if (!isNewExpectedReviewAssessment(assessment, expected, seen)) continue;
     seen.add(assessment.threadId);
     try {
       accepted.set(assessment.threadId, parseReviewAssessment(assessment));
@@ -126,6 +126,12 @@ const parseReviewAssessments = (assessments, openThreads) => {
     status: 'unclear',
     summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
   }));
+};
+
+const isNewExpectedReviewAssessment = (assessment, expected, seen) => {
+  if (!assessment) return false;
+  if (!expected.has(assessment.threadId)) return false;
+  return !seen.has(assessment.threadId);
 };
 
 const parseReviewAssessment = (assessment) => ({
