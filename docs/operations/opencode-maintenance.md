@@ -11,9 +11,9 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | The same queued run waits up to 45 minutes for matching `Checks | CI`, then writes or updates one summary comment. It stops if the PR head changes. |
+| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | Same-repository collaborator, audit-worker, and Dependabot PRs wait up to 45 minutes for matching `Checks | CI`, then write or update one summary comment. It stops if the PR head changes. |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
-| PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
+| PR changelog draft | `pull_request_target` activity for eligible PRs, including every same-repository Dependabot PR | Dependabot changes get deterministic dependency changelog preparation on every event, regardless of PR description. Eligible collaborator PRs use bounded OpenCode drafting. |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
 | Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
@@ -103,8 +103,10 @@ the merge boundary. The workflow never merges a PR.
 
 The first-look review uses `pull_request_target` but checks out the trusted
 default branch and reads PR content through the GitHub API. It skips forks,
-drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
-and 2,000 patch characters per file. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
+drafts, stale revisions, and untrusted authors. It admits Dependabot only when
+the REST API identifies `dependabot[bot]` and the same-repository branch starts
+with `dependabot/`. The model reviews the package changes, affected code, and
+completed CI results, including failures. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
 checks. The publishing step uses the job's `GITHUB_TOKEN` with only
 `pull-requests: write`, so GitHub posts the review as `github-actions[bot]`.
 The model never receives that token. It can only read, list, and search the
@@ -162,8 +164,16 @@ gets deployment or release permissions. No job can change repository settings
 or branch protection. Protected branches remain guarded by repository rules;
 all merges are human decisions.
 
-PR changelog generation runs in `.github/workflows/opencode-changelog-pr.yml`
-on `pull_request_target`. The workflow checks out maintenance scripts from the
+PR changelog handling runs in `.github/workflows/opencode-changelog-pr.yml`
+on `pull_request_target`. Every same-repository Dependabot PR enters the
+trusted preparation job without needing a changelog declaration in its
+description. That job writes the managed impact declaration and updates the
+dependency section from the exact package manifest version changes. It is
+deterministic, so the OpenCode changelog generator does not run on those PRs or
+overwrite its output. The separate first-look review still evaluates their
+diff and CI result after CI completes. Collaborator PRs that declare a beta or
+hotfix impact use OpenCode to draft an entry. The workflow checks out
+maintenance scripts from the
 repository default branch before it checks out the PR head. The PR checkout is
 input data only, with `persist-credentials: false`. The workflow executes no PR-provided
 script or local action. It removes tracked `.env` files and project OpenCode

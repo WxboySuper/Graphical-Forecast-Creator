@@ -16,6 +16,8 @@ const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
+  assert.match(waitJob.if, /user\.login == 'dependabot\[bot\]'/);
+  assert.match(waitJob.if, /startsWith\(github\.head_ref, 'dependabot\/'\)/);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.equal(workflow.on.workflow_run, undefined);
   assert.equal(workflow.concurrency, undefined, 'CI waiting must not hold the shared OpenCode queue');
@@ -59,6 +61,8 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotMatch(context.with.script, /Deferring first-look/);
 
   assert.match(waitStep.with.script, /waitForMatchingCiRun/);
+  assert.match(waitStep.with.script, /opencode-first-look-eligibility\.mjs/);
+  assert.match(context.with.script, /opencode-first-look-eligibility\.mjs/);
   assert.match(waitStep.with.script, /CI_TIMEOUT_MS/);
   assert.match(waitStep.with.script, /Skipping this stale review/);
   assert.match(waitStep.with.script, /pull\.head\.ref/);
@@ -82,4 +86,14 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', waitStep.with.script), 'CI wait script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', context.with.script), 'context script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', publish.with.script), 'publisher script should parse');
+});
+
+test('Dependabot PRs enter changelog preparation without a description declaration', () => {
+  const changelogWorkflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-changelog-pr.yml'), 'utf8'));
+  const prepare = changelogWorkflow.jobs['prepare-automated-changelog'];
+  assert.match(prepare.if, /head\.repo\.full_name == github\.repository/);
+  assert.match(prepare.if, /user\.login == 'dependabot\[bot\]'/);
+  const step = prepare.steps.find((item) => item.name === 'Prepare automated changelog metadata with trusted tooling');
+  assert.match(step.run, /prepare-changelog-governance\.mjs/);
+  assert.equal(changelogWorkflow.on.pull_request_target.types.includes('synchronize'), true);
 });
