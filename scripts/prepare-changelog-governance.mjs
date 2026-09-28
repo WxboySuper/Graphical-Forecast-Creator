@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { listDependencyBumpsBetweenRefs, applyDependencyBumpsToChangelog } from './lib/dependabot-changelog.mjs';
 import { parsePortBranch } from './lib/port-pr-policy.mjs';
 import { upsertManagedChangelogDeclaration } from './lib/changelog-automation.mjs';
+import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
@@ -29,7 +30,7 @@ if (!token) throw new Error('GH_TOKEN is required for trusted automated changelo
 if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+\.\d+\.x$/.test(headRef)) {
   throw new Error('Refusing to write automated changelog metadata to a protected source branch.');
 }
-const gitAuth = `http.https://github.com/.extraheader=AUTHORIZATION basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+const gitAuth = githubHttpExtraHeader(token);
 execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`, `refs/heads/${headRef}:refs/remotes/origin/${headRef}`], { stdio: 'inherit' });
 
 const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);

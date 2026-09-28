@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CHANGELOG_LANE_HEADINGS, parseChangelogDeclaration, changelogLaneHeadingForBase } from './lib/changelog-policy.mjs';
 import { addOpenCodeChangelogEntries, parseOpenCodeChangelogResult } from './lib/opencode-changelog.mjs';
+import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'PR_NUMBER', 'BASE_REF', 'HEAD_REF', 'EXPECTED_HEAD_SHA', 'EXPECTED_BODY_SHA', 'EXPECTED_TITLE_SHA', 'OPENCODE_OUTPUT_PATH', 'GH_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error(`${key} is required.`);
@@ -30,7 +31,7 @@ const fetchRef = (ref) => {
   if (!/^(main|stable\/\d+\.\d+\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');
   return `refs/heads/${ref}:refs/remotes/origin/${ref}`;
 };
-const gitAuth = `http.https://github.com/.extraheader=AUTHORIZATION basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+const gitAuth = githubHttpExtraHeader(token);
 execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', fetchRef(baseRef), fetchRef(headRef)], { stdio: 'inherit' });
 const actualSha = execFileSync('git', ['rev-parse', `origin/${headRef}`], { encoding: 'utf8' }).trim();
 if (actualSha !== expectedSha) throw new Error('PR branch advanced while the changelog was being generated; refusing to publish stale content.');
@@ -49,6 +50,5 @@ execFileSync('git', ['config', 'user.email', '41898282+github-actions[bot]@users
 execFileSync('git', ['add', '--', 'CHANGELOG.md']);
 execFileSync('git', ['diff', '--cached', '--check'], { stdio: 'inherit' });
 execFileSync('git', ['commit', '-m', `docs: generate changelog entry for PR #${prNumber}`], { stdio: 'inherit' });
-const authorization = `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
-execFileSync('git', ['-c', `http.https://github.com/.extraheader=${authorization}`, 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
+execFileSync('git', ['-c', githubHttpExtraHeader(token), 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
 process.stdout.write(`Generated a ${result.section.toLowerCase()} changelog entry for PR #${prNumber}.\n`);
