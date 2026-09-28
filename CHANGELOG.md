@@ -19,6 +19,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
+- **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
+- **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
+- **Forecast file handling:** Validate copied forecast files before import and keep generated downloads available long enough for browsers to save them.
+- **Reference layers and dialogs:** Restore saved reference-layer settings and keep keyboard focus inside open dialogs.
 - **Beta account access:** Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
 - **Alert banner schedules:** Enforce configured start and expiry times after validating the schedule, and ignore stale configuration fetches.
 - **Autosave restore:** Ignore invalid snapshot timestamps so a malformed save cannot block a valid newer snapshot.
@@ -30,6 +35,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Security
 
+- **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
 - **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
 
 #### Dependencies
