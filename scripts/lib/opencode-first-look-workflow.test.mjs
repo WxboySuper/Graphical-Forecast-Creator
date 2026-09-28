@@ -14,9 +14,8 @@ const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
-  assert.deepEqual(workflow.on.workflow_run, { workflows: ['Checks | CI'], types: ['completed'] });
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
-  assert.deepEqual(workflow.on.workflow_run.types, ['completed']);
+  assert.equal(workflow.on.workflow_run, undefined);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
@@ -36,7 +35,10 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
-  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
+  assert.match(context.with.script, /waitForMatchingCiRun/);
+  assert.match(context.with.script, /CI_TIMEOUT_MS/);
+  assert.match(context.with.script, /Skipping this stale review/);
+  assert.match(context.with.script, /Continuing this run with the review/);
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
@@ -46,14 +48,14 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /Optional linked-issue and review-thread context is unavailable/);
-  assert.match(context.with.script, /Deferring first-look until Checks \| CI completes/);
+  assert.doesNotMatch(context.with.script, /Deferring first-look/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
   assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);
-  assert.match(publish.with.script, /mergeOpenCodeFirstLookResults/);
+  assert.doesNotMatch(publish.with.script, /mergeOpenCodeFirstLookResults/);
   assert.match(publish.with.script, /gfc-opencode-first-look-data/);
   assert.match(publish.with.script, /body\.length > 60_000/);
   assert.match(publish.with.script, /gfc-opencode-first-look:manual/);

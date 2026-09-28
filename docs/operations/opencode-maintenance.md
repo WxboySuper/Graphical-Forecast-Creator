@@ -11,8 +11,7 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | Waits for matching `Checks | CI`, then writes or updates one summary comment |
-| CI completion | `Checks | CI` completes for an associated PR | Starts the deferred first-look, or skips if that revision already has a review |
+| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | The same queued run waits up to 45 minutes for matching `Checks | CI`, then writes or updates one summary comment. It stops if the PR head changes. |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
@@ -250,17 +249,18 @@ version deliberately after reviewing a release.
 ## PR review format
 
 The first-look reviewer runs for eligible PR opens, new commits, reopenings, and
-ready-for-review events. It checks the exact revision's `Checks | CI` run first
-and defers model work while CI is missing or running; the completed CI event
-then starts the review. The owner can also comment `/review-opencode` on the PR
+ready-for-review events. That same queued run waits up to 45 minutes for the
+exact revision's `Checks | CI` run, then continues into the review. The run
+fails clearly if CI never completes and skips the stale review if the PR head
+changes while it waits. The owner can also comment `/review-opencode` on the PR
 timeline to request a fresh review without opening Actions. Other users'
 commands are ignored. Duplicate event deliveries are idempotent, while each
 distinct owner command can request one new run.
 
 The reviewer publishes one bot-owned issue comment and updates it on later
-revisions, CI completion, and manual requests. It does not create a separate
-pull-request review object for each run. Earlier review objects from before
-this format remain in the PR history; the workflow does not delete them.
+revisions and manual requests. It does not create a separate pull-request
+review object for each run. Earlier review objects from before this format
+remain in the PR history; the workflow does not delete them.
 
 The publisher validates the model's bounded JSON result and renders a stable,
 compact format: a full **PR Summary** on every pass; on later passes, **Changes
@@ -295,7 +295,7 @@ comment exactly `/review-opencode`; only the repository owner can invoke it.
 Each system has its own workflow and can be disabled from the repository's
 Actions settings without affecting the others:
 
-- PR review and CI supplement: `opencode-first-look.yml`
+- PR first-look review: `opencode-first-look.yml`
 - Changelog audit: `opencode-changelog-audit.yml`
 - Issue triage: `opencode-issue-triage.yml`
 - Daily, dependency, weekly, and monthly investigations: `opencode-scheduled-maintenance.yml`
