@@ -82,6 +82,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     alertsOpacity: args.alertsOpacity,
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     refs,
+    selectedAlert,
     onClearSelectedAlert: clearSelectedAlert,
   });
 

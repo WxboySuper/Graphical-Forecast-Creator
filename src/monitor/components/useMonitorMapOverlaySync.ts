@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
 import {
+  isSelectedAlertStillPresent,
   syncAlertFeatures,
   syncMesoscaleDiscussionFeatures,
   syncOutlookFeatures,
@@ -25,6 +27,7 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
+  selectedAlert: NwsAlertDetails | null;
   onClearSelectedAlert: () => void;
 }
 
@@ -38,6 +41,7 @@ export const useMonitorMapOverlaySync = ({
   mesoscaleDiscussions,
   alertsOpacity,
   refs,
+  selectedAlert,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
   useEffect(() => {
@@ -78,8 +82,14 @@ export const useMonitorMapOverlaySync = ({
   }, [mesoscaleDiscussions, refs.mesoscaleDiscussionLayerRef, refs.mesoscaleDiscussionSourceRef]);
 
   useEffect(() => {
+    if (!selectedAlert) {
+      return;
+    }
+    if (isSelectedAlertStillPresent(alertsCollection, selectedAlert)) {
+      return;
+    }
     onClearSelectedAlert();
-  }, [alertsCollection, onClearSelectedAlert]);
+  }, [alertsCollection, selectedAlert, onClearSelectedAlert]);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);

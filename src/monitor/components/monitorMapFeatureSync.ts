@@ -6,6 +6,7 @@ import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import { parseNwsAlertProperties, type NwsAlertDetails } from '../nwsAlertDetails';
 import { buildStormReportStyle } from '../stormReportMapStyle';
 import { toOlStyle } from '../../components/Map/openLayersMapStyles';
 import { MONITOR_OUTLOOK_TRANSPARENCY_SCALE } from './monitorMapLayerUtils';
@@ -90,6 +91,36 @@ export const syncAlertFeatures = (
       }
       source.addFeature(olFeature as never);
     });
+  });
+};
+
+/** Returns true when the selected alert is still present in the collection. */
+export const isSelectedAlertStillPresent = (
+  alertsCollection: NwsAlertFeatureCollection,
+  selectedAlert: NwsAlertDetails | null,
+): boolean => {
+  if (!selectedAlert) {
+    return false;
+  }
+
+  return alertsCollection.features.some((feature) => {
+    const properties = (feature.properties ?? {}) as Record<string, unknown>;
+
+    if (selectedAlert.detailUrl) {
+      const candidates: unknown[] = [feature.id, properties['@id'], properties.id, properties.uri];
+      return candidates.some(
+        (candidate) => typeof candidate === 'string' && candidate === selectedAlert.detailUrl,
+      );
+    }
+
+    const candidate = parseNwsAlertProperties(properties);
+    return (
+      candidate.event === selectedAlert.event &&
+      candidate.headline === selectedAlert.headline &&
+      candidate.areaDesc === selectedAlert.areaDesc &&
+      candidate.effective === selectedAlert.effective &&
+      candidate.expires === selectedAlert.expires
+    );
   });
 };
 

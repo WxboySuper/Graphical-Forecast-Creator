@@ -1,12 +1,14 @@
 import VectorSource from 'ol/source/Vector';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import {
+  isSelectedAlertStillPresent,
   syncAlertFeatures,
   syncMesoscaleDiscussionFeatures,
   syncOutlookFeatures,
   syncStormReportFeatures,
 } from './monitorMapFeatureSync';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
 
 const makeCollection = (label: string): MonitorMesoscaleDiscussionCollection => ({
   type: 'FeatureCollection',
@@ -77,5 +79,72 @@ describe('syncMesoscaleDiscussionFeatures', () => {
     (sync as (source: VectorSource, input: never) => void)(source, input as never);
 
     expect(clearSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isSelectedAlertStillPresent', () => {
+  const makeAlertCollection = (ids: string[]): NwsAlertFeatureCollection => ({
+    type: 'FeatureCollection',
+    features: ids.map((id) => ({
+      type: 'Feature' as const,
+      id,
+      geometry: { type: 'Polygon' as const, coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: {
+        id,
+        event: 'Tornado Warning',
+        headline: 'Tornado Warning issued',
+        areaDesc: 'Oklahoma County',
+      },
+    })),
+  });
+
+  const selectedWithUrl: NwsAlertDetails = {
+    event: 'Tornado Warning',
+    headline: 'Tornado Warning issued',
+    areaDesc: 'Oklahoma County',
+    severity: null,
+    certainty: null,
+    urgency: null,
+    effective: null,
+    expires: null,
+    description: null,
+    instruction: null,
+    senderName: null,
+    detailUrl: 'https://api.weather.gov/alerts/urn:oid:alert-a',
+  };
+
+  test('returns false when nothing is selected', () => {
+    expect(isSelectedAlertStillPresent(makeAlertCollection(['https://api.weather.gov/alerts/urn:oid:alert-a']), null)).toBe(false);
+  });
+
+  test('keeps the popup when the selected alert persists in the next animation frame', () => {
+    const nextFrame = makeAlertCollection([
+      'https://api.weather.gov/alerts/urn:oid:alert-a',
+      'https://api.weather.gov/alerts/urn:oid:alert-b',
+    ]);
+    expect(isSelectedAlertStillPresent(nextFrame, selectedWithUrl)).toBe(true);
+  });
+
+  test('reports absence when the selected alert expired or was filtered out', () => {
+    const nextFrame = makeAlertCollection(['https://api.weather.gov/alerts/urn:oid:alert-b']);
+    expect(isSelectedAlertStillPresent(nextFrame, selectedWithUrl)).toBe(false);
+  });
+
+  test('falls back to content matching when the selection has no detail url', () => {
+    const selectedWithoutUrl: NwsAlertDetails = { ...selectedWithUrl, detailUrl: null };
+    const present: NwsAlertFeatureCollection = {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        properties: {
+          event: 'Tornado Warning',
+          headline: 'Tornado Warning issued',
+          areaDesc: 'Oklahoma County',
+        },
+      }],
+    };
+    expect(isSelectedAlertStillPresent(present, selectedWithoutUrl)).toBe(true);
+    expect(isSelectedAlertStillPresent({ type: 'FeatureCollection', features: [] }, selectedWithoutUrl)).toBe(false);
   });
 });
