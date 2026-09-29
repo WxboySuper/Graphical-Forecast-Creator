@@ -15,6 +15,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
+
 - **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
 
 #### Fixed
