@@ -19,7 +19,7 @@ to each.
 - **@radix-ui/react-tabs** ^1.1.21 (root (pnpm)) — MIT — allowed
 - **@radix-ui/react-tooltip** ^1.2.16 (root (pnpm)) — MIT — allowed
 - **@reduxjs/toolkit** ^2.12.0 (root (pnpm)) — MIT — allowed
-- **@sentry/react** ^10.75.0 (root (pnpm)) — MIT — allowed
+- **@sentry/react** ^11.0.0 (root (pnpm)) — MIT — allowed
 - **@sentry/vite-plugin** ^5.4.0 (root (pnpm)) — MIT — allowed
 - **@tailwindcss/cli** ^4.3.3 (root (pnpm)) — MIT — allowed
 - **@testing-library/dom** ^10.4.2 (root (pnpm)) — MIT — allowed
