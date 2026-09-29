@@ -1,0 +1,39 @@
+name: Sync GitHub work to Todoist
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, milestoned, demilestoned, closed, reopened]
+  pull_request:
+    types: [opened, edited, labeled, unlabeled, milestoned, demilestoned, closed, reopened, ready_for_review, converted_to_draft]
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: github-todoist-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # Pull request workflows run with restricted secrets. The hourly, issue-event,
+    # and manual reconciliation runs perform the sync after repository settings
+    # are configured.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Sync GitHub work to Todoist
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TODOIST_API_TOKEN: ${{ secrets.TODOIST_API_TOKEN }}
+          TODOIST_DEFAULT_PROJECT_ID: 6hWfhw6hPHWxf5Hw
+          TODOIST_PROJECT_ROUTES_JSON: '[{"projectId":"6hWfhw4gMqJGQH23","labels":["infrastructure"]}]'
+        run: node scripts/github-todoist-sync.mjs

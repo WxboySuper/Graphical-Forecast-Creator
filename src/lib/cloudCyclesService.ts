@@ -15,6 +15,7 @@ import type { CycleMetadata } from '../types/workflow';
 import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './workflowMetadataContract';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
+import { DEFAULT_FORECAST_WORKSPACE, getForecastWorkspace, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -84,6 +85,7 @@ interface SaveCloudCycleParams {
   cycleDate: string;
   stats: SavedCycleStats;
   payload: GFCForecastSaveData;
+  workspaceId?: ForecastWorkspaceId;
   workflowMetadata?: CycleMetadata;
   isReadOnly?: boolean;
   existingId?: string;
@@ -107,7 +109,7 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
   label: params.label,
   cycleDate: params.cycleDate,
   payloadJson: JSON.stringify(params.payload),
-  metadata: { ...metadata, ...(workflowMetadata ? { workflowMetadata } : {}) },
+  metadata: { ...metadata, ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}), ...(workflowMetadata ? { workflowMetadata } : {}) },
 });
 
 /** Returns the current Firebase token when a user is signed in. */
@@ -232,6 +234,7 @@ const normalizeStoredMetadata = ({
   return {
     id: readRequiredText(rawMetadata.id) ?? cycleId,
     userId: readRequiredText(rawMetadata.userId) ?? fallbackUserId,
+    workspaceId: getForecastWorkspace(rawMetadata.workspaceId as ForecastWorkspaceId)?.id ?? DEFAULT_FORECAST_WORKSPACE,
     label,
     cycleDate,
     createdAt: readTimestampString(rawMetadata.createdAt),
@@ -454,6 +457,7 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
     forecastDays: params.stats.forecastDays, totalOutlooks: params.stats.totalOutlooks,
     totalFeatures: params.stats.totalFeatures, isReadOnly: params.isReadOnly ?? false,
     payloadHash: computePayloadHash(params.payload),
+    workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
   };
   return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
 };

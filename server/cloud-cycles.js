@@ -1,7 +1,3 @@
-/**
- * Exposes authenticated server handlers for saving, listing, and deleting cloud forecast cycles.
- * This module owns request validation and Firebase boundary coordination; metadata normalization and token verification are delegated to shared helpers.
- */
 'use strict';
 
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
@@ -11,9 +7,7 @@ const MAX_CLOUD_CYCLES = 100;
 const MAX_PAYLOAD_BYTES = 750000;
 
 /** Returns the Firebase user for an authenticated cloud-cycle request. */
-const verifyUser = (req) => {
-  return verifyFirebaseToken(req);
-};
+const verifyUser = (req) => verifyFirebaseToken(req);
 
 /** Validates that a cloud-cycle identity belongs to the verified user. */
 const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;

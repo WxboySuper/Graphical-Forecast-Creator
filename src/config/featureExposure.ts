@@ -1,9 +1,3 @@
-/**
- * Feature-exposure policy: this module defines the registry and target-aware
- * decisions used to expose product surfaces and server-backed capabilities.
- * It is the client policy boundary; route rendering and server authorization
- * consume these decisions but do not duplicate them.
- */
 import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
 export type FeatureExposureMatrix = Record<BuildTarget, boolean>;
@@ -26,7 +20,9 @@ export type TemporaryFeatureExposureDefinition = FeatureExposureBase & {
 
 export type PermanentFeatureExposureDefinition = FeatureExposureBase & {
   temporary: false;
-} & ServerBackedMetadata;
+  serverBacked: false;
+  serverCapabilityKey?: never;
+};
 
 export type FeatureExposureDefinition =
   | TemporaryFeatureExposureDefinition
@@ -111,7 +107,9 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: false,
+    temporary: true,
+    removalCondition:
+      'Remove after Auto-TSTM client and server gates ship and the stable production rollout completes (#427). The v1.7 release exposes the completed workflow on every release target.',
     serverBacked: true,
     serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
     trackingIssue: 427,
@@ -120,7 +118,8 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: false,
+    temporary: true,
+    removalCondition: 'Remove after forecast workflow v2 replaces the current cycle workflow (#429).',
     serverBacked: false,
     trackingIssue: 429,
   },
@@ -128,7 +127,8 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: false,
+    temporary: true,
+    removalCondition: 'Remove after verification analytics relaunch reaches production (#430).',
     serverBacked: false,
     trackingIssue: 430,
   },
@@ -136,7 +136,8 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: false,
+    temporary: true,
+    removalCondition: 'Remove after custom layers and premium forecast products complete their production rollout (#431).',
     serverBacked: false,
     trackingIssue: 431,
   },
@@ -164,6 +165,25 @@ export const FEATURE_EXPOSURE_REGISTRY = {
       'Keep disabled on production until tropical workspace foundations are complete (#432).',
     serverBacked: false,
     trackingIssue: 432,
+  },
+  mesoscaleWorkspace: {
+    exposure: { ...ALL_TARGETS_OFF },
+    owner: 'WxboySuper',
+    addedDate: '2026-08-28',
+    temporary: true,
+    removalCondition:
+      'Remove after the Mesoscale Forecast workspace and provider contract complete their staged rollout (#919).',
+    serverBacked: false,
+    trackingIssue: 919,
+  },
+  winterWorkspace: {
+    exposure: { ...ALL_TARGETS_OFF },
+    owner: 'WxboySuper',
+    addedDate: '2026-08-28',
+    temporary: true,
+    removalCondition: 'Keep disabled until a future Winter workspace release is approved.',
+    serverBacked: false,
+    trackingIssue: 913,
   },
   collaborationRoom: {
     exposure: { ...ALL_TARGETS_OFF },

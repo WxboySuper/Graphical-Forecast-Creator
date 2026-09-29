@@ -188,10 +188,11 @@ service cloud.firestore {
       ]);
     }
 
-    function hasValidClientSettingsFields(data) {
+    function hasValidClientSettingsFields(data, allowLegacyBaseMapStyle) {
       return (!('darkMode' in data) || data.darkMode is bool) &&
         (!('baseMapStyle' in data) ||
-          ['osm', 'carto-light', 'carto-dark', 'esri-satellite', 'blank'].hasAny([data.baseMapStyle])) &&
+          ['osm', 'carto-light', 'esri-satellite', 'blank'].hasAny([data.baseMapStyle]) ||
+          (allowLegacyBaseMapStyle && data.baseMapStyle == 'carto-dark')) &&
         (!('stateBorders' in data) || data.stateBorders is bool) &&
         (!('counties' in data) || data.counties is bool) &&
         (!('ghostOutlooks' in data) || isValidGhostOutlooks(data.ghostOutlooks)) &&
@@ -267,7 +268,7 @@ service cloud.firestore {
 
     function isValidClientSettingsCreate(data) {
       return hasValidClientSettingsKeys(data) &&
-        hasValidClientSettingsFields(data) &&
+        hasValidClientSettingsFields(data, false) &&
         !('cloudCycles' in data);
     }
 
@@ -278,7 +279,9 @@ service cloud.firestore {
           'monitorSettings', 'createdAt', 'updatedAt', 'cloudCycles'
         ]) &&
         hasValidClientSettingsKeys(request.resource.data) &&
-        hasValidClientSettingsFields(request.resource.data) &&
+        hasValidClientSettingsFields(request.resource.data,
+          ('baseMapStyle' in resource.data && resource.data.baseMapStyle == 'carto-dark') &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['baseMapStyle'])) &&
         (
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['cloudCycles']) ||
           (('cloudCycles' in resource.data) && !('cloudCycles' in request.resource.data))

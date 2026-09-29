@@ -3,6 +3,8 @@
  * These helpers were moved out of OpenLayersForecastMap.tsx so map styling
  * concerns can be reviewed and tested without loading the React component.
  */
+import { apply } from 'ol-mapbox-style';
+import LayerGroup from 'ol/layer/Group';
 
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
 
@@ -34,7 +36,10 @@ import {
   createLabelOverlaySource,
   createTileSource,
   hideOverlay,
+  loadOpenFreeMapLayerGroups,
+  isCurrentOpenFreeMapRequest,
 } from './openLayersMapStyles';
+import type { OpenFreeMapStyleSet } from '../../lib/openFreeMap';
 
 type FeatureStub = {
   get: (key: string) => unknown;
@@ -43,6 +48,42 @@ type FeatureStub = {
 };
 
 describe('openLayersMapStyles', () => {
+  const applyMock = jest.mocked(apply);
+
+  afterEach(() => {
+    applyMock.mockReset();
+  });
+
+  test('loads base and reference groups through the lazy style adapter', async () => {
+    const styleSet = {
+      baseStyle: { version: 8, sources: {}, layers: [] },
+      overlayStyle: { version: 8, sources: {}, layers: [] },
+    } as OpenFreeMapStyleSet;
+
+    const result = await loadOpenFreeMapLayerGroups(styleSet);
+
+    expect(result.baseGroup).toBeTruthy();
+    expect(result.referenceGroup).toBeTruthy();
+    expect(applyMock).toHaveBeenNthCalledWith(1, result.baseGroup, styleSet.baseStyle);
+    expect(applyMock).toHaveBeenNthCalledWith(2, result.referenceGroup, styleSet.overlayStyle);
+  });
+
+  test('rejects when either style application fails', async () => {
+    const error = new Error('overlay style failed');
+    applyMock.mockImplementationOnce(async () => new LayerGroup()).mockRejectedValueOnce(error);
+    const styleSet = {
+      baseStyle: { version: 8, sources: {}, layers: [] },
+      overlayStyle: { version: 8, sources: {}, layers: [] },
+    } as OpenFreeMapStyleSet;
+
+    await expect(loadOpenFreeMapLayerGroups(styleSet)).rejects.toThrow(error);
+  });
+
+  test('accepts only the current style request', () => {
+    expect(isCurrentOpenFreeMapRequest(4, 4)).toBe(true);
+    expect(isCurrentOpenFreeMapRequest(4, 3)).toBe(false);
+  });
+
   test.each([
     { cigLevel: 'CIG1', strokeColor: '#000000', strokeWidth: 1, segments: 2 },
     { cigLevel: 'CIG2', strokeColor: '#111111', strokeWidth: 1.1, segments: 1 },
@@ -69,6 +110,7 @@ describe('openLayersMapStyles', () => {
     expect(toRgbaColor({ color: '#abc', alpha: 0.3 })).toBe('rgba(170, 187, 204, 0.3)');
     expect(toRgbaColor({ color: '#112233', alpha: 1 })).toBe('rgba(17, 34, 51, 1)');
     expect(toRgbaColor({ color: 'rgba(1,2,3,0.4)', alpha: 0.9 })).toBe('rgba(1,2,3,0.4)');
+    expect(toRgbaColor({ color: 'RGBA(1,2,3,0.4)', alpha: 0.9 })).toBe('RGBA(1,2,3,0.4)');
   });
 
   test('resolveFillOpacity defaults to 0.25 and resolveStrokeWidth honors the top layer', () => {
@@ -129,10 +171,14 @@ describe('openLayersMapStyles', () => {
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
     expect(createLabelOverlaySource('osm')).toBeTruthy();
-    expect(createLabelOverlaySource('carto-dark')).toBeTruthy();
     expect(createTileSource('osm')).toBeTruthy();
     expect(createTileSource('esri-satellite')).toBeTruthy();
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM
+  });
+
+  test('routes the retired dark style to Carto light sources', () => {
+    expect(createLabelOverlaySource('carto-dark')?.getUrls()?.[0]).toContain('light_only_labels');
+    expect(createTileSource('carto-dark').getUrls()?.[0]).toContain('light_nolabels');
   });
 
   test('hideOverlay clears the overlay position', () => {

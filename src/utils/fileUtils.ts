@@ -290,19 +290,11 @@ export const exportForecastToJson = (
   const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
   const jsonString = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
   
   const now = new Date();
   const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `gfc-forecast-${timestamp}.json`;
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadBlob(blob, filename);
 };
 
 /** Adds a non-empty discussion to the package using a collision-free entry name. */
@@ -381,16 +373,8 @@ export const downloadGfcPackage = async (
   addPackageDiscussions(zip, data, cycleMetadata);
 
   const blob = await zip.generateAsync({ type: 'blob' });
-  const url = URL.createObjectURL(blob);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   const filename = `gfc-${scope}-package-${timestamp}.zip`;
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  downloadBlob(blob, filename);
 };

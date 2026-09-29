@@ -6,14 +6,14 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-    "test": "node --test account-lifecycle.test.js billing-account-lifecycle.test.js billing-error-boundary.test.js billing-stripe-period.test.js billing-webhook-state.test.js billing-webhook.test.js cloud-cycles.test.js feature-capabilities.test.js metrics.test.js nginx-security-headers.test.js qs-dos.test.js lib/serverTarget.test.js lib/featureCapabilities.test.js server-stack.test.js tstm.test.js tstm-ingestion.test.js testing/featureExposureHarness.test.js testing/autoTstm.exposure.test.js lib/capabilityStatus.test.js sentry-tunnel.test.js"
+    "test": "node --test"
   },
   "dependencies": {
-    "@sentry/node": "^10.72.0",
+    "@sentry/node": "^10.75.0",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.6.2",
-    "firebase-admin": "^14.3.0",
-    "stripe": "^22.6.0"
+    "express-rate-limit": "^8.7.0",
+    "firebase-admin": "^14.4.0",
+    "stripe": "^22.6.2"
   },
   "overrides": {
     "http-proxy-agent": "^7.0.2",

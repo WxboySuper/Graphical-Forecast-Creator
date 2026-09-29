@@ -38,15 +38,36 @@ The PR must change the matching lane in `CHANGELOG.md` when the impact is `beta`
 
 The check compares the lane before and after the PR. Merely touching the changelog or changing a different lane does not satisfy the gate.
 
+For eligible same-repository PRs targeting `main` or `stable/X.Y.x`, a `beta` or
+`hotfix` decision is enough to request an automatic entry. The trusted
+`pull_request_target` changelog workflow runs a bounded, read-only OpenCode draft
+when the PR has not already changed `CHANGELOG.md`. OpenCode receives the PR
+title, description, bounded diff, and read-only repository checkout. It returns one to four factual bullets;
+deterministic code validates their format, section, size, selected lane, and
+current PR head before adding them and pushing a normal commit to the PR branch.
+The normal changelog policy then validates the generated entry. Setting `none`
+with a reason or `inherited` skips generation. PRs from forks, oversized diffs,
+inconclusive model results, stale revisions, or branch-protection push failures
+still require a human-authored entry or a corrected decision.
+
+The workflow runs as `pull_request_target` and checks out its scripts from the
+repository default branch before checking out PR content. PR checkout credentials
+are not persisted. The model receives no GitHub token and cannot edit files or
+run commands. Trusted metadata-preparation and publisher steps use `GH_PAT`
+only to update eligible PR metadata or authenticate fetch/push to the PR branch. Protected-branch rules, merges, releases, and
+deployments remain outside this job. Editing the PR description also starts the
+validation flow when a changelog declaration is added.
+
 ## Dependabot updates
 
-Dependabot is handled by the required CI workflow before changelog validation runs.
+The trusted changelog workflow prepares eligible Dependabot PR metadata. When it
+pushes a changelog commit, the updated revision triggers the required CI checks.
 
 1. The workflow identifies the dependency update.
 2. It updates the PR description with a managed changelog declaration.
 3. Runtime or security dependency changes receive a generated `Dependencies` entry in the correct changelog lane.
 4. Tooling-only updates receive `Changelog-Impact: none` and an automated reason.
-5. The workflow commits the changelog update, refreshes the PR ref, and only then runs the required governance check.
+5. The workflow commits the changelog update to the PR branch, which triggers the required governance check on the new revision.
 
 The automation is idempotent, so retries replace the managed declaration instead of adding duplicates.
 
@@ -61,6 +82,11 @@ Beta is now a release channel, not a branch. To create a beta:
 
 The workflow creates a prerelease. Its GitHub Release uses GitHub's native generated notes to show merged PRs between the previous beta tag and the selected ref, with categories from [`.github/release.yml`](../../.github/release.yml). The curated changelog remains the public product record and is linked from the release.
 
+After publishing, the workflow dispatches the bounded OpenCode changelog audit
+against `main`. If it finds a concrete missing user-facing entry, it opens a
+normal changelog-only PR for human review; it does not change the release just
+created or delay deployment.
+
 Publishing the prerelease activates the beta deployment workflow. A beta deployment can also be manually dispatched when an operator needs to deploy a selected ref.
 
 ## Stable major promotion
@@ -72,7 +98,7 @@ To promote the next-major line to production:
 3. Run **Bootstrap Stable Release Line** to create `stable/X.Y.x` at that exact approved main commit.
 4. Run **Create Stable Release** manually from the stable branch. If the branch still has the beta package version (for example `1.7.0-beta.114`), the workflow converts it to the stable version (`1.7.0`), commits that package update to the stable branch, and then creates the release.
 
-The stable GitHub Release starts with the curated changelog entry and may include GitHub's generated merged-PR notes afterward. Production deployment is activated by the published stable release.
+The stable GitHub Release starts with the curated changelog entry and may include GitHub's generated merged-PR notes afterward. Production deployment is activated by the published stable release. After publication, the workflow dispatches the same changelog audit against the selected `stable/X.Y.x` line; any corrective changelog update is proposed through a separate PR.
 
 The stable branch is now the immutable production family. New work can continue on `main` without changing what production runs.
 
@@ -144,6 +170,7 @@ when the stable changelog entry is carried forward.
 | `prepare-stable-promotion.yml` | Create a reviewed main promotion PR |
 | `bootstrap-stable-release.yml` | Create the immutable `stable/X.Y.x` branch from the approved main commit |
 | `release-stable.yml` | Create a stable or hotfix release |
+| `opencode-changelog-audit.yml` | Manually or weekly compare code changes with the Unreleased changelog and open a corrective PR when needed; manual runs can set `baseline_ref` to bound the range |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |
 | `deploy-main-to-vps.yml` | Deploy a published stable release or selected ref |
 | `forward-port-stable-fix.yml` | Carry stable fixes forward into `main` |

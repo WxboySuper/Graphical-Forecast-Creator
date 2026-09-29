@@ -1,9 +1,3 @@
-/**
- * Application shell: this module composes providers, global lifecycle hooks,
- * route definitions, lazy page boundaries, and top-level error handling. It
- * owns application composition but delegates state, feature exposure, auth,
- * and page behavior to their dedicated modules.
- */
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
@@ -39,6 +33,11 @@ import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/Priva
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
+import {
+  getDefaultForecastWorkspacePath,
+  resolveForecastWorkspacePath,
+  resolveLegacyForecastWorkspacePath,
+} from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -69,7 +68,7 @@ const ForecastLegacyRedirect = () => {
   const location = useLocation();
   return (
     <Navigate
-      to={{ pathname: '/forecast/severe', search: location.search, hash: location.hash }}
+      to={{ pathname: getDefaultForecastWorkspacePath(), search: location.search, hash: location.hash }}
       replace
     />
   );
@@ -80,14 +79,19 @@ const BETA_MODE = __GFC_BETA_MODE__;
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
+  const workspaceId = (
+    resolveForecastWorkspacePath(location.pathname)
+    ?? resolveLegacyForecastWorkspacePath(location.pathname)
+  )?.id ?? 'severe';
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
 
   // Enable account-scoped Auto-Save
-  useAutoSave(userId);
+  useAutoSave(userId, workspaceId);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
@@ -136,7 +140,7 @@ const AppRoutes: React.FC = () => {
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
           <Route index element={<ForecastLegacyRedirect />} />
-          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage /></Suspense>} />
+          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId="severe" /></Suspense>} />
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />

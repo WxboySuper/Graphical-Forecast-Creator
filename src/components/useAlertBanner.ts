@@ -12,6 +12,9 @@ export function useAlertBanner(configPath: string) {
 
   useEffect(() => {
     let active = true;
+    setConfig(DEFAULT_ALERT_BANNER_CONFIG);
+    setDismissed(false);
+
     fetch(configPath)
       .then((response) => {
         if (!response.ok) {
@@ -25,7 +28,9 @@ export function useAlertBanner(configPath: string) {
         setDismissed(false);
       })
       .catch(() => {
-        // Invalid or missing config should fail closed and keep the banner hidden.
+        if (!active) return;
+        setConfig(DEFAULT_ALERT_BANNER_CONFIG);
+        setDismissed(false);
       });
     return () => {
       active = false;

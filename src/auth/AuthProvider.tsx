@@ -1,11 +1,3 @@
-/**
- * Auth and profile boundary for the client application.
- *
- * This provider owns Firebase auth observation, local fixture accounts,
- * profile/settings hydration, and the auth actions exposed to route consumers.
- * Hosted persistence and billing remain behind their dedicated services and
- * entitlement provider; this module coordinates identity and account state.
- */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -22,67 +14,78 @@ import {
 } from 'firebase/auth';
 import {
   doc,
+  getDoc,
+  onSnapshot,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings, type OverlaysState } from '../store/overlaysSlice';
+import { applyOverlaySettings } from '../store/overlaysSlice';
+import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
-import { type MonitorSettings } from '../monitor/types';
+import type { MonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual } from '../monitor/types';
+import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
+  normalizeForecastUiVariant,
   readStoredForecastUiVariant,
   type ForecastUiVariant,
   writeStoredForecastUiVariant,
 } from '../utils/forecastUiVariant';
-import {
-  areUserSettingsEqual,
-  createSettingsSnapshot,
-  getSettingsUpdateError,
-  mergeUserSettingsDocument,
-  readRemoteSettings,
-  type UserSettingsDocument,
-} from './authSettings';
-import {
-  attachHostedSettingsSubscription,
-  runInitialHostedSync,
-  type SettingsSyncStatus,
-} from './authHostedSettings';
-import {
-  extractLocalUserFromData,
-  postLocalJson,
-  safeParseJson,
-} from './authLocalTransport';
-import { refreshHostedBetaAccess } from './hostedBetaAccess';
 
-export {
-  areUserSettingsEqual,
-  createProfilePayload,
-  createSettingsSnapshot,
-  getRemoteSeedPayload,
-  getSettingsSyncError,
-  getSettingsUpdateError,
-  mergeUserSettingsDocument,
-  readProfileBetaAccess,
-  readRemoteSettings,
-} from './authSettings';
-export type { BuildSettingsArgs, UserProfileDocument, UserSettingsDocument } from './authSettings';
-export {
-  attachHostedSettingsSubscription,
-  runInitialHostedSync,
-  seedOrApplySettings,
-  startSettingsSubscription,
-  syncProfileDocument,
-} from './authHostedSettings';
-export type { SettingsSyncStatus } from './authHostedSettings';
-export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
+/**
+ * Safely parse JSON from a Response. Returns parsed value or null on failure.
+ */
+export const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
+  try {
+    const parsed = await resp.json();
+    return parsed as T;
+  } catch {
+    return null;
+  }
+};
+
+/** Coerce unknown value to a plain record for safe property access. */
+export const asRecord = (value: unknown): Record<string, unknown> =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+
+/** Attempt to extract minimal local user fields from an unknown response. */
+export const extractLocalUserFromData = (data: unknown) => {
+  const rec = asRecord(data);
+  const uid = typeof rec.uid === 'string' ? rec.uid : 'local';
+  const email = typeof rec.email === 'string' ? rec.email : '';
+  const displayName = typeof rec.displayName === 'string' ? rec.displayName : '';
+  return {
+    uid,
+    email,
+    displayName,
+    providerData: [],
+  };
+};
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
+type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
+
+interface UserSettingsDocument {
+  darkMode: boolean;
+  baseMapStyle: OverlaysState['baseMapStyle'];
+  stateBorders: boolean;
+  counties: boolean;
+  ghostOutlooks: OverlaysState['ghostOutlooks'];
+  defaultForecasterName: string;
+  forecastUiVariant: ForecastUiVariant;
+  monitorSettings: MonitorSettings;
+}
+
+interface UserProfileDocument {
+  betaAccess?: boolean;
+}
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -173,6 +176,163 @@ export const deleteHostedAccount = async (
 
   await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
 };
+
+/** Builds the normalized settings document shape from current local state. */
+interface BuildSettingsArgs {
+  darkMode: boolean;
+  overlays: OverlaysState;
+  defaultForecasterName: string;
+  forecastUiVariant: ForecastUiVariant;
+  monitorSettings?: MonitorSettings;
+}
+/** Builds the normalized settings document shape from current local state. */
+export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDocument => {
+  const { darkMode, overlays, defaultForecasterName, forecastUiVariant, monitorSettings } = args;
+  return {
+    darkMode,
+    baseMapStyle: overlays.baseMapStyle,
+    stateBorders: overlays.stateBorders,
+    counties: overlays.counties,
+    ghostOutlooks: overlays.ghostOutlooks,
+    defaultForecasterName,
+    forecastUiVariant,
+    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
+  };
+};
+
+/** Validates a Firestore settings payload before the app applies it locally. */
+export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
+  if (!value) {
+    return null;
+  }
+
+  const {
+    darkMode,
+    baseMapStyle,
+    stateBorders,
+    counties,
+    ghostOutlooks,
+    defaultForecasterName,
+    forecastUiVariant,
+    monitorSettings,
+  } = value;
+
+  if (typeof darkMode !== 'boolean') {
+    return null;
+  }
+
+  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') {
+    return null;
+  }
+
+  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) {
+    return null;
+  }
+
+  if (!baseMapStyle || !ghostOutlooks) {
+    return null;
+  }
+
+  return {
+    darkMode,
+    baseMapStyle,
+    stateBorders,
+    counties,
+    ghostOutlooks,
+    defaultForecasterName,
+    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
+    monitorSettings: normalizeMonitorSettings(monitorSettings),
+  };
+};
+
+/** Creates the user profile payload written to Firestore on hosted sign-in. */
+export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
+  email: user.email ?? '',
+  displayName: user.displayName ?? '',
+  photoURL: user.photoURL ?? '',
+  providers: (user.providerData ?? []).map((provider) => provider.providerId),
+  updatedAt: serverTimestamp(),
+  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
+});
+
+/** Reads the current beta-access flag from one hosted profile document snapshot. */
+export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
+  Boolean(value?.betaAccess);
+
+/** Normalizes update-write failures into a user-facing sync error message. */
+export const getSettingsUpdateError = (error: unknown): string =>
+  error instanceof Error ? error.message : 'Unable to update synced settings right now.';
+
+/** Normalizes initial/settings hydration failures into a user-facing sync error message. */
+export const getSettingsSyncError = (error: unknown): string =>
+  error instanceof Error ? error.message : 'Unable to sync account settings right now.';
+
+/** Builds the payload used when seeding or repairing a remote settings document. */
+export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
+  ...settings,
+  updatedAt: serverTimestamp(),
+  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
+});
+
+type LocalPostRequestOptions = {
+  body?: unknown;
+  failureMessage: string;
+};
+
+/** Posts JSON to a local auth endpoint and normalizes non-ok responses into errors. */
+export const postLocalJson = async <TResponse = Record<string, unknown>>(
+  path: string,
+  { body, failureMessage }: LocalPostRequestOptions
+): Promise<TResponse> => {
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: 'include',
+  });
+
+  if (!resp.ok) {
+    const errorBody = (await safeParseJson<{ message?: string }>(resp)) ?? {};
+    throw new Error(errorBody.message ?? failureMessage);
+  }
+
+  return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
+};
+
+/** Compares hosted settings fields excluding updatedAt metadata. */
+const compareUserSettingsFields = (
+  left: UserSettingsDocument,
+  right: UserSettingsDocument,
+): boolean =>
+  left.darkMode === right.darkMode &&
+  left.baseMapStyle === right.baseMapStyle &&
+  left.stateBorders === right.stateBorders &&
+  left.counties === right.counties &&
+  left.defaultForecasterName === right.defaultForecasterName &&
+  left.forecastUiVariant === right.forecastUiVariant &&
+  JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
+  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
+
+/** True when two normalized settings payloads contain the same user-visible values. */
+export const areUserSettingsEqual = (
+  left: UserSettingsDocument | null,
+  right: UserSettingsDocument | null
+): boolean => {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return compareUserSettingsFields(left, right);
+};
+
+/** Applies a partial settings patch onto a normalized baseline document. */
+export const mergeUserSettingsDocument = (
+  base: UserSettingsDocument,
+  patch: Partial<UserSettingsDocument>,
+): UserSettingsDocument => ({
+  ...base,
+  ...patch,
+});
 
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
@@ -324,6 +484,163 @@ export const applySettingsToState = (
   lastSyncedSettingsRef.current = settings;
   setSyncedSettings(settings);
 };
+
+/** Creates or updates the hosted profile document while preserving the original creation timestamp. */
+export const syncProfileDocument = async (
+  profileRef: ReturnType<typeof doc>,
+  user: User
+): Promise<void> => {
+  const profileSnapshot = await getDoc(profileRef);
+  const needsCreatedAt =
+    !profileSnapshot.exists() || profileSnapshot.data()?.createdAt === undefined;
+  await setDoc(
+    profileRef,
+    {
+      ...createProfilePayload(user, { includeCreatedAt: needsCreatedAt }),
+    },
+    { merge: true }
+  );
+};
+
+/** Reuses remote settings when available or seeds Firestore from the current local settings snapshot. */
+export const seedOrApplySettings = async (opts: {
+  settingsRef: ReturnType<typeof doc>;
+  settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
+  localSettings: UserSettingsDocument;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  isActive: () => boolean;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+}): Promise<void> => {
+  const {
+    settingsRef,
+    settingsSnapshot,
+    localSettings,
+    applyRemoteSettings,
+    isActive,
+    lastSyncedSettingsRef,
+    setSyncedSettings,
+  } = opts;
+  const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
+
+  if (!isActive()) {
+    return;
+  }
+
+  if (remoteSettings) {
+    applyRemoteSettings(remoteSettings);
+    return;
+  }
+
+  await setDoc(
+    settingsRef,
+    getRemoteSeedPayload(localSettings, { includeCreatedAt: !settingsSnapshot.exists() }),
+    { merge: true }
+  );
+
+  if (!isActive()) {
+    return;
+  }
+
+  lastSyncedSettingsRef.current = localSettings;
+  setSyncedSettings(localSettings);
+};
+
+/** Starts the live Firestore listener that keeps hosted settings mirrored into local app state. */
+export const startSettingsSubscription = (opts: {
+  settingsRef: ReturnType<typeof doc>;
+  isActive: () => boolean;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+}): Unsubscribe =>
+  onSnapshot(
+    opts.settingsRef,
+    (snapshot) => {
+      const nextSettings = readRemoteSettings(snapshot.data() as Partial<UserSettingsDocument> | undefined);
+      if (!opts.isActive() || !nextSettings) {
+        return;
+      }
+
+      opts.applyRemoteSettings(nextSettings);
+      opts.setSettingsSyncStatus('synced');
+    },
+    (snapshotError) => {
+      if (opts.isActive()) {
+        opts.setSettingsSyncStatus('error');
+        opts.setError(snapshotError.message);
+      }
+    }
+  );
+
+/** Runs the initial hosted profile/settings sync before the live subscription takes over. */
+export const runInitialHostedSync = async (opts: {
+  profileRef: ReturnType<typeof doc>;
+  settingsRef: ReturnType<typeof doc>;
+  user: User;
+  buildLocalSettingsSnapshot: () => UserSettingsDocument;
+  applyRemoteSettings: (settings: UserSettingsDocument) => void;
+  isActive: () => boolean;
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
+  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
+  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+  hasInitializedSettingsRef: React.MutableRefObject<boolean>;
+}): Promise<Unsubscribe | undefined> => {
+  opts.setSettingsSyncStatus('syncing');
+
+  try {
+    await syncProfileDocument(opts.profileRef, opts.user);
+
+    const settingsSnapshot = await getDoc(opts.settingsRef);
+    const localSettings = opts.buildLocalSettingsSnapshot();
+    await seedOrApplySettings({
+      settingsRef: opts.settingsRef,
+      settingsSnapshot,
+      localSettings,
+      applyRemoteSettings: opts.applyRemoteSettings,
+      isActive: opts.isActive,
+      lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
+      setSyncedSettings: opts.setSyncedSettings,
+    });
+
+    if (!opts.isActive()) {
+      return undefined;
+    }
+
+    opts.hasInitializedSettingsRef.current = true;
+    opts.setSettingsSyncStatus('synced');
+
+    return startSettingsSubscription({
+      settingsRef: opts.settingsRef,
+      isActive: opts.isActive,
+      applyRemoteSettings: opts.applyRemoteSettings,
+      setSettingsSyncStatus: opts.setSettingsSyncStatus,
+      setError: opts.setError,
+    });
+  } catch (syncError) {
+    if (opts.isActive()) {
+      opts.setSettingsSyncStatus('error');
+      opts.setError(getSettingsSyncError(syncError));
+    }
+    return undefined;
+  }
+};
+
+/** Stores a late-created listener only while its effect is still active. */
+export const attachHostedSettingsSubscription = (
+  subscriptionPromise: Promise<Unsubscribe | undefined>,
+  isActive: () => boolean,
+  setSubscription: (unsubscribe: Unsubscribe) => void,
+): Promise<void> => subscriptionPromise.then((nextUnsubscribe) => {
+  if (!isActive()) {
+    nextUnsubscribe?.();
+    return;
+  }
+  if (nextUnsubscribe) {
+    setSubscription(nextUnsubscribe);
+  }
+});
 
 /**
  * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
@@ -508,6 +825,7 @@ async function localCredentialAction(
   deps: LocalAuthDeps
 ) {
   const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
+  deps.setError(null);
   const resp = await fetch(`/api/local/${action}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -948,16 +1266,39 @@ const useHostedAuthState = (): AuthContextValue => {
   }, [dispatch, status, user]);
 
   /** Refreshes the signed-in user's beta-access flag from the hosted profile document. */
-  const refreshBetaAccess = useCallback(
-    () =>
-      refreshHostedBetaAccess({
-        user,
-        requestIdRef: betaAccessRequestIdRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-      }),
-    [user],
-  );
+  const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    const hostedProfileUnavailable = !isHostedAuthEnabled || !db || !user;
+    if (hostedProfileUnavailable) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+
+    betaAccessRequestIdRef.current += 1;
+    const requestId = betaAccessRequestIdRef.current;
+    setBetaAccessLoading(true);
+
+    try {
+      const profileSnapshot = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
+      if (requestId !== betaAccessRequestIdRef.current) {
+        return;
+      }
+
+      setBetaAccess(
+        readProfileBetaAccess(profileSnapshot.data() as Partial<UserProfileDocument> | undefined)
+      );
+    } catch {
+      if (requestId !== betaAccessRequestIdRef.current) {
+        return;
+      }
+
+      setBetaAccess(false);
+    } finally {
+      if (requestId === betaAccessRequestIdRef.current) {
+        setBetaAccessLoading(false);
+      }
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!isHostedAuthEnabled || !db) {

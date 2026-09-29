@@ -1,14 +1,9 @@
-/**
- * Analytics metrics service: this module validates and aggregates account,
- * forecast, and product telemetry for the server metrics routes. It owns
- * metric storage/query coordination and leaves authentication, billing policy,
- * and HTTP response composition to their respective boundaries.
- */
 'use strict';
 
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
-const { registerMetricsRoutes: registerMetricsRoutesImpl } = require('./metricsRoutes');
+const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { verifyFirebaseToken } = require('./firebase-auth');
 
 const METRIC_EVENT_TYPES = new Set([
   'account_signup',
@@ -19,7 +14,29 @@ const METRIC_EVENT_TYPES = new Set([
   'cloud_cycle_saved',
   'cloud_cycle_loaded',
 ]);
+const BILLING_METRIC_EVENT_TYPES = new Set(['premium_upgrade', 'premium_cancellation']);
+const ACTIVE_DAY_EVENT_TYPES = new Set([
+  'cycle_saved',
+  'discussion_saved',
+  'verification_run',
+  'cloud_cycle_saved',
+]);
+const USER_METRIC_FIELDS = {
+  cycle_saved: 'cyclesCreated',
+  discussion_saved: 'discussionsWritten',
+  verification_run: 'verificationSessionsRun',
+  cloud_cycle_saved: 'cloudCyclesSaved',
+};
+const ADMIN_EVENT_FIELDS = {
+  account_signup: 'signups',
+  account_signin: 'signIns',
+  cloud_cycle_saved: 'cloudSaves',
+  cloud_cycle_loaded: 'cloudLoads',
+  premium_upgrade: 'upgrades',
+  premium_cancellation: 'cancellations',
+};
 const ADMIN_WINDOW_OPTIONS = new Set([7, 30]);
+const DEDUPE_TTL_DAYS = 35;
 const METRICS_RATE_LIMIT = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
@@ -85,29 +102,188 @@ const cacheStorageBytes = (value) => {
   };
 };
 
-const {
-  getDayKey, normalizeMetricEventType, normalizeBillingMetricEventType, readInstallationId,
-  hashInstallationId, createDedupeDocId, getDedupeExpiryDate,
-  getDefaultAdminDailyMetrics, buildNextUserMetrics, buildNextAdminDailyMetrics,
-  getLatestAdminSummaryValues, accumulateAdminWindowTotals,
-} = require('./metricsValues');
+/** Returns today's day key in UTC for admin and user metric rollups. */
+const getDayKey = (date = new Date()) => date.toISOString().slice(0, 10);
+
+/** Returns true when a string is one of the supported product-metric event types. */
+const normalizeMetricEventType = (value) =>
+  typeof value === 'string' && METRIC_EVENT_TYPES.has(value) ? value : null;
+
+/** Returns true when a string is one of the supported billing-metric event types. */
+const normalizeBillingMetricEventType = (value) =>
+  typeof value === 'string' && BILLING_METRIC_EVENT_TYPES.has(value) ? value : null;
+
+/** Returns a capped installation id only when the client provided a non-empty string. */
+const readInstallationId = (value) =>
+  typeof value === 'string' && value.trim() ? value.trim().slice(0, 256) : null;
+
+/** Returns the UTC day key that immediately precedes the given current day key. */
+const getPreviousDayKey = (dayKey) => {
+  const date = new Date(`${dayKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return getDayKey(date);
+};
+
+/** Hashes the local installation id so admin dedupe docs never store the raw browser identifier. */
+const hashInstallationId = (installationId) =>
+  crypto
+    .createHash('sha256')
+    .update(`${process.env.METRICS_HASH_SALT || ''}:${installationId}`)
+    .digest('hex');
+
+/** Returns the Firestore document id for one daily dedupe record. */
+const createDedupeDocId = (kind, dayKey, value) => `${kind}:${dayKey}:${value}`;
+
+/** Returns the TTL timestamp for a new dedupe doc. */
+const getDedupeExpiryDate = () => {
+  const expiresAt = new Date();
+  expiresAt.setUTCDate(expiresAt.getUTCDate() + DEDUPE_TTL_DAYS);
+  return expiresAt;
+};
+
+/** Returns the default progress-first user metrics document shape. */
+const getDefaultUserMetrics = (uid) => ({
+  uid,
+  activeDayStreak: 0,
+  totalActiveDays: 0,
+  cyclesCreated: 0,
+  cloudCyclesSaved: 0,
+  discussionsWritten: 0,
+  verificationSessionsRun: 0,
+  lastActiveDate: null,
+  updatedAt: new Date(),
+});
+
+/** Returns the default aggregate admin metrics document shape. */
+const getDefaultAdminDailyMetrics = () => ({
+  activeDevices: 0,
+  activeSignedInAccounts: 0,
+  signups: 0,
+  signIns: 0,
+  premiumSubscriptions: 0,
+  upgrades: 0,
+  cancellations: 0,
+  cloudSaves: 0,
+  cloudLoads: 0,
+  storageBytes: 0,
+  updatedAt: new Date(),
+});
+
+/** Returns true when the daily metric event maps to one of the aggregate admin counters. */
+const hasAdminEventField = (eventType) => Boolean(ADMIN_EVENT_FIELDS[eventType]);
+
+/** Returns true when a live-summary value should overwrite the stored daily aggregate field. */
+const shouldApplyLiveSummaryValue = (value) => typeof value === 'number';
+
+/** Applies one boolean-gated increment to an existing numeric aggregate field. */
+const incrementMetricField = (value, shouldIncrement) =>
+  shouldIncrement ? Number(value || 0) + 1 : Number(value || 0);
+
+/** Applies one event-mapped admin aggregate increment when the event has a tracked field. */
+const applyAdminEventIncrement = (nextMetrics, eventType) => {
+  const eventField = ADMIN_EVENT_FIELDS[eventType];
+  if (!hasAdminEventField(eventType) || !eventField) {
+    return nextMetrics;
+  }
+
+  return {
+    ...nextMetrics,
+    [eventField]: Number(nextMetrics[eventField] || 0) + 1,
+  };
+};
+
+/** Applies optional live-summary values onto the next admin daily metrics payload. */
+const applyLiveSummaryValues = (nextMetrics, { premiumSubscriptions, storageBytes }) => ({
+  ...nextMetrics,
+  ...(shouldApplyLiveSummaryValue(premiumSubscriptions)
+    ? { premiumSubscriptions }
+    : {}),
+  ...(shouldApplyLiveSummaryValue(storageBytes) ? { storageBytes } : {}),
+});
+
+/** True when the event should advance the user's active-day streak and total active-day count. */
+const countsAsActiveDay = (eventType) => ACTIVE_DAY_EVENT_TYPES.has(eventType);
+
+/** Builds the next user metrics state for the incoming event without double-counting the same active day. */
+const buildNextUserMetrics = ({ uid, existingData, eventType, dayKey }) => {
+  const nextMetrics = {
+    ...getDefaultUserMetrics(uid),
+    ...existingData,
+    uid,
+    updatedAt: new Date(),
+  };
+  const counterField = USER_METRIC_FIELDS[eventType];
+
+  if (counterField) {
+    nextMetrics[counterField] = Number(nextMetrics[counterField] || 0) + 1;
+  }
+
+  if (!countsAsActiveDay(eventType)) {
+    return nextMetrics;
+  }
+
+  if (nextMetrics.lastActiveDate === dayKey) {
+    return nextMetrics;
+  }
+
+  nextMetrics.totalActiveDays = Number(nextMetrics.totalActiveDays || 0) + 1;
+  nextMetrics.activeDayStreak =
+    nextMetrics.lastActiveDate === getPreviousDayKey(dayKey)
+      ? Number(nextMetrics.activeDayStreak || 0) + 1
+      : 1;
+  nextMetrics.lastActiveDate = dayKey;
+
+  return nextMetrics;
+};
+
+/** Builds the next daily admin metrics state after applying dedupe wins and aggregate event increments. */
+const buildNextAdminDailyMetrics = ({
+  existingData,
+  eventType,
+  storageBytes,
+  premiumSubscriptions,
+  incrementActiveDevices,
+  incrementActiveAccounts,
+}) => {
+  const nextMetrics = {
+    ...getDefaultAdminDailyMetrics(),
+    ...existingData,
+    activeDevices: incrementMetricField(existingData?.activeDevices, incrementActiveDevices),
+    activeSignedInAccounts: incrementMetricField(
+      existingData?.activeSignedInAccounts,
+      incrementActiveAccounts
+    ),
+    updatedAt: new Date(),
+  };
+
+  return applyLiveSummaryValues(
+    applyAdminEventIncrement(nextMetrics, eventType),
+    { premiumSubscriptions, storageBytes }
+  );
+};
+
+/** Returns the latest-day snapshot fields that are shown as current admin headline values. */
+const getLatestAdminSummaryValues = (latestMetrics, liveSummary) => ({
+  totalAccounts: typeof liveSummary.totalAccounts === 'number' ? liveSummary.totalAccounts : 0,
+  activeDevices: latestMetrics.activeDevices,
+  activeSignedInAccounts: latestMetrics.activeSignedInAccounts,
+  premiumSubscriptions: latestMetrics.premiumSubscriptions,
+  storageBytes: latestMetrics.storageBytes,
+});
+
+/** Adds one day's rollup values into the requested window totals. */
+const accumulateAdminWindowTotals = (totals, dayMetrics) => ({
+  ...totals,
+  signups: totals.signups + Number(dayMetrics.signups || 0),
+  signIns: totals.signIns + Number(dayMetrics.signIns || 0),
+  upgrades: totals.upgrades + Number(dayMetrics.upgrades || 0),
+  cancellations: totals.cancellations + Number(dayMetrics.cancellations || 0),
+  cloudSaves: totals.cloudSaves + Number(dayMetrics.cloudSaves || 0),
+  cloudLoads: totals.cloudLoads + Number(dayMetrics.cloudLoads || 0),
+});
 
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
-const verifyRequestUser = async (req) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !token) {
-    return null;
-  }
-
-  try {
-    return await adminAuth.verifyIdToken(token);
-  } catch {
-    return null;
-  }
-};
+const verifyRequestUser = (req) => verifyFirebaseToken(req);
 
 /** Returns the current server-side admin UID allowlist parsed from env. */
 const getAdminUidAllowlist = () =>
@@ -183,11 +359,10 @@ const readTotalAccounts = async (db) => {
   return countCollectionDocuments(db, 'userProfiles');
 };
 
-/** Returns the cached or freshly aggregated total account count. */
-const countTotalAccounts = () => {
+const countTotalAccounts = async () => {
   const db = getAdminDb();
   if (!db) {
-    return Promise.resolve(0);
+    return 0;
   }
 
   if (typeof totalAccountsCache.value === 'number' && Date.now() < totalAccountsCache.expiresAt) {
@@ -215,7 +390,7 @@ const ESTIMATED_CLOUD_CYCLE_METADATA_BYTES = 512;
  * Reads a bounded count for one collection without transferring documents.
  * Falls back to a capped scan when the emulator or test double lacks aggregate support.
  */
-async function countCollectionDocuments(db, collectionName) {
+const countCollectionDocuments = async (db, collectionName) => {
   try {
     const snapshot = await db.collection(collectionName).count().get();
     return typeof snapshot.data?.()?.count === 'number' ? snapshot.data().count : 0;
@@ -228,7 +403,7 @@ async function countCollectionDocuments(db, collectionName) {
     const docs = capped.docs || [];
     return docs.length === STORAGE_SCAN_LIMIT ? STORAGE_SCAN_LIMIT : docs.length;
   }
-}
+};
 
 /** Reads the bounded sum of cloud-cycle payload bytes without transferring documents. */
 const readCloudCyclePayloadBytes = async (db) => {
@@ -243,7 +418,7 @@ const readCloudCyclePayloadBytes = async (db) => {
 };
 
 /** Sums payloadBytes from a capped scan when the emulator or test double lacks aggregate support. */
-async function sumCappedPayloadBytes(db) {
+const sumCappedPayloadBytes = async (db) => {
   if (!db.collection('cloudCycles').limit) {
     return 0;
   }
@@ -253,7 +428,7 @@ async function sumCappedPayloadBytes(db) {
     (total, docSnapshot) => total + (Number(docSnapshot.data?.()?.payloadBytes) || 0),
     0
   );
-}
+};
 
 /** Estimates the current hosted Firestore storage footprint using bounded server-side aggregation. */
 const getCurrentStorageBytes = async () => {
@@ -674,13 +849,22 @@ const handleAdminMetrics = async (req, res) => {
 
 /** Registers the product-metrics ingestion and private admin metrics endpoints on the hosted-service server. */
 const registerMetricsRoutes = (app, express) => {
-  registerMetricsRoutesImpl({
-    app,
-    express,
-    metricsRateLimit: METRICS_RATE_LIMIT,
-    adminRateLimit: ADMIN_RATE_LIMIT,
-    handleMetricEvent,
-    handleAdminMetrics,
+  app.post('/api/metrics/event', METRICS_RATE_LIMIT, express.json({ limit: '2kb' }), async (req, res) => {
+    try {
+      await handleMetricEvent(req, res);
+    } catch (error) {
+      console.error('[metrics] event:error', error);
+      res.status(500).json({ error: 'Unable to record metrics right now.' });
+    }
+  });
+
+  app.get('/api/admin/metrics', ADMIN_RATE_LIMIT, async (req, res) => {
+    try {
+      await handleAdminMetrics(req, res);
+    } catch (error) {
+      console.error('[metrics] admin:error', error);
+      res.status(500).json({ error: 'Unable to read admin metrics right now.' });
+    }
   });
 };
 

@@ -1,12 +1,4 @@
 // @codescene(disable:"Code Duplication")
-/**
- * OpenLayers implementation of the forecast editor map.
- *
- * The component owns the live map instance and its interaction lifecycle while
- * delegating feature conversion, source reconciliation, layer construction,
- * and interaction policies to adjacent helpers. The forwarded handle exposes
- * the small imperative surface needed by the forecast page.
- */
 import {
   forwardRef,
   useEffect,
@@ -17,19 +9,42 @@ import {
 import "ol/ol.css";
 import OLMap from "ol/Map";
 import View from "ol/View";
+import LayerGroup from "ol/layer/Group";
+import TileLayer from "ol/layer/Tile";
+import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
+import OSM from "ol/source/OSM";
+import XYZ from "ol/source/XYZ";
 import GeoJSON from "ol/format/GeoJSON";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
+import type { FeatureLike } from "ol/Feature";
+import type OLFeature from "ol/Feature";
+import type Geometry from "ol/geom/Geometry";
+import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
+import { v4 as uuidv4 } from "uuid";
 import { Redo2, Undo2 } from "lucide-react";
-import { redoLastEdit, undoLastEdit } from "../../store/forecastSlice";
+import { captureException, captureMessage } from "@sentry/react";
+import {
+  addFeature,
+  addCustomFeature,
+  removeFeature,
+  removeCustomFeature,
+  redoLastEdit,
+  setMapView,
+  undoLastEdit,
+  updateFeature,
+  updateCustomFeature,
+} from "../../store/forecastSlice";
 
 import type { BaseMapStyle } from "../../store/overlaysSlice";
-import type { DayType } from "../../types/outlooks";
+import type { AppDispatch } from "../../store";
+import type { DayType, OutlookType } from "../../types/outlooks";
 import type { MapAdapterHandle } from "../../maps/contracts";
 import type {
   Feature as GeoJsonFeature,
+  GeoJsonProperties,
   Polygon,
   MultiPolygon,
 } from "geojson";
@@ -37,49 +52,256 @@ import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
 import CategoricalErrorBanner from "./CategoricalErrorBanner";
 import UnofficialBadge from "./UnofficialBadge";
-import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
+import {
+  getOpenFreeMapStyleSet,
+  isOpenFreeMapStyle,
+} from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
+  getFeatureIdentity,
+  toUpdatedGeoJsonFeature,
+  replaceLayerGroupLayers,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
+  getCustomFeatureIdentity,
+  toUpdatedCustomFeature,
+  toDrawnCustomFeature,
+  toTstmPreviewOlStyle,
   toGhostOlStyle,
+  createLabelOverlaySource,
+  createTileSource,
   hideOverlay,
+  TOP_OUTLINE_LAYER_Z_INDEX,
+  TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+  TOP_LABEL_LAYER_Z_INDEX,
+  GHOST_REFERENCE_LAYER_Z_INDEX,
+  loadOpenFreeMapLayerGroups,
+  isCurrentOpenFreeMapRequest,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
-import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
-import { createBlankLayerConfig, ensureBlankLayerLoaded } from "./openLayersBlankBasemap";
+import type { CustomCategoryStyle } from "../../types/customProducts";
+import {
+  BLANK_LAND_FILL_STYLE,
+  BLANK_LAND_OUTLINE_STYLE,
+  createBlankLayerConfig,
+  ensureBlankLayerLoaded,
+} from "./openLayersBlankBasemap";
 import {
   getForecastSourceDescriptorPlan,
+  reconcileFeatureSource,
   type FeatureSyncDescriptor,
+  type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
 import { isFeatureExposed } from "../../config/featureExposure";
 import { isPaintBucketOutlookType, type PaintBucketMode, type PaintBucketStepDirection } from "../../utils/paintBucket";
+import { handlePaintBucketMapClick } from "./paintBucketMapInteraction";
 import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
 import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
 import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMasking/trimOutlookData";
-import { PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
-import { syncTrimPreviewSource, syncTstmPreviewSource } from "./openLayersForecastPreviews";
-import { handleModifiedFeatures } from "./openLayersForecastFeatureHandlers";
-import { handleForecastDrawEnd } from "./openLayersForecastDrawHandlers";
-import {
-  applyForecastFeatureMetadata,
-  applyCustomFeatureMetadata,
-  createFeatureApplier,
-  reconcileForecastSource,
-} from "./openLayersForecastReconciliation";
-import {
-  syncMapViewFromOpenLayers,
-  syncOpenLayersViewFromState,
-  type ForecastMapView,
-} from "./openLayersForecastViewSync";
-import { handleForecastMapClick } from "./openLayersForecastClickHandlers";
-import { createForecastMapLayers, type ForecastMapLayerSet } from "./openLayersForecastLayerSetup";
-import { createForecastDeleteInteraction } from "./openLayersForecastDeleteInteraction";
-import { registerForecastEditInteractions } from "./openLayersForecastEditInteractions";
-export { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
-import { getCustomStyleSignature, removeDrawInteraction } from "./openLayersForecastUtilityHelpers";
+import { Fill, Stroke, Style as OlStyle } from "ol/style";
+import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
+
+const shouldHandlePaintBucketClick = (
+  paintBucketEnabled: boolean,
+  interactionMode: "pan" | "draw" | "delete" | "edit",
+  customMode: boolean,
+  activeOutlookType: string,
+): boolean => paintBucketEnabled
+  && interactionMode === "edit"
+  && !customMode
+  && isPaintBucketOutlookType(activeOutlookType);
+
+interface ForecastMapClickEvent {
+  pixel: number[];
+  coordinate: number[];
+  originalEvent: { shiftKey?: boolean };
+}
+
+const handleForecastMapClick = ({
+  map,
+  event,
+  mode,
+  paintBucketEnabled,
+  customMode,
+  activeOutlookType,
+  editBehavior,
+  stepDirection,
+  activeProbability,
+  currentDay,
+  vectorLayer,
+  catLayer,
+  dispatch,
+  overlay,
+  setFeedback,
+  setPopupInfo,
+}: {
+  map: OLMap;
+  event: ForecastMapClickEvent;
+  mode: "pan" | "draw" | "delete" | "edit";
+  paintBucketEnabled: boolean;
+  customMode: boolean;
+  activeOutlookType: string;
+  editBehavior: PaintBucketMode;
+  stepDirection: PaintBucketStepDirection;
+  activeProbability: string;
+  currentDay: DayType;
+  vectorLayer: VectorLayer | null;
+  catLayer: VectorLayer | null;
+  dispatch: AppDispatch;
+  overlay: Overlay | null;
+  setFeedback: (value: string | null) => void;
+  setPopupInfo: (value: { outlookType: string; probability: string; isSignificant: boolean } | null) => void;
+}): void => {
+  if (shouldHandlePaintBucketClick(paintBucketEnabled, mode, customMode, activeOutlookType)) {
+    setFeedback(null);
+    handlePaintBucketMapClick({
+      map,
+      pixel: event.pixel,
+      vectorLayer,
+      dispatch,
+      outlookType: activeOutlookType as OutlookType,
+      currentDay,
+      mode: editBehavior,
+      stepDirection,
+      shiftKey: Boolean(event.originalEvent.shiftKey),
+      activeProbability,
+      onNoOp: () => setFeedback(`Set mode: this polygon already uses ${activeProbability}.`),
+    });
+    return;
+  }
+
+  if (mode !== "pan") return;
+
+  const feature = map.forEachFeatureAtPixel(event.pixel, (candidate) => candidate, {
+    layerFilter: (layer) => layer === vectorLayer || layer === catLayer,
+  });
+  if (feature && overlay) {
+    const customIdentity = getCustomFeatureIdentity(feature);
+    const outlookType = customIdentity
+      ? (feature.get("customLayerTitle") as string || "Custom layer")
+      : feature.get("outlookType") as string;
+    const probability = customIdentity?.title ?? feature.get("probability") as string;
+    const isSignificant = feature.get("isSignificant") as boolean;
+    setPopupInfo({ outlookType, probability, isSignificant });
+    overlay.setPosition(event.coordinate);
+    return;
+  }
+
+  if (overlay) {
+    hideOverlay(overlay);
+    setPopupInfo(null);
+  }
+};
+
+/** Builds the style portion of a custom-feature reconciliation signature without serializing the style object. */
+export const getCustomStyleSignature = (style: CustomCategoryStyle, isTopLayer: boolean): string => [
+  style.fillColor,
+  style.fillOpacity,
+  style.strokeColor,
+  style.strokeOpacity,
+  style.strokeWidth,
+  style.hatch,
+  isTopLayer,
+].join("|");
+
+// OpenLayers 10.9.0 stores the delayed pointer callback in this private field:
+// https://github.com/openlayers/openlayers/blob/v10.9.0/src/ol/interaction/Draw.js#L740-L751
+// Recheck this workaround whenever `ol` is upgraded; remove it once upstream
+// guarantees that detaching Draw cancels the pending callback.
+type DrawWithPendingPointerMove = {
+  downTimeout_?: ReturnType<typeof setTimeout>;
+};
+
+/**
+ * OpenLayers Draw keeps a delayed pointer-move callback after removal.
+ * Cancel it before detaching so it cannot read map pixels after map teardown.
+ */
+export const removeDrawInteraction = (map: OLMap, interaction: Draw): void => {
+  const draw = interaction as unknown as DrawWithPendingPointerMove;
+  if (draw.downTimeout_ !== undefined) {
+    clearTimeout(draw.downTimeout_);
+    draw.downTimeout_ = undefined;
+  }
+
+  map.removeInteraction(interaction);
+};
+/** Applies preview styling and metadata before adding one OL feature to the preview source. */
+const addTstmPreviewOlFeature = (
+  item: OLFeature<Geometry>,
+  previewSource: VectorSource,
+  previewStyle: ReturnType<typeof toTstmPreviewOlStyle>,
+  featureId: string,
+): void => {
+  item.setStyle(previewStyle);
+  item.set("featureId", featureId);
+  item.set("outlookType", "categorical");
+  item.set("probability", "TSTM");
+  previewSource.addFeature(item);
+};
+
+const TRIM_PREVIEW_STYLE = new OlStyle({
+  fill: new Fill({ color: "rgba(0, 188, 212, 0.35)" }),
+  stroke: new Stroke({ color: "#00acc1", width: 2, lineDash: [8, 4] }),
+});
+
+/** Replaces trim-preview features on a dedicated overlay source. */
+const syncTrimPreviewSource = (
+  previewSource: VectorSource,
+  previewFeatures: GeoJsonFeature[],
+) => {
+  previewSource.clear();
+  const format = new GeoJSON();
+
+  previewFeatures.forEach((feature) => {
+    const olFeature = format.readFeature(feature, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
+    });
+
+    const applyPreview = (item: OLFeature<Geometry>) => {
+      item.setStyle(TRIM_PREVIEW_STYLE);
+      item.set("trimPreview", true);
+    };
+
+    if (Array.isArray(olFeature)) {
+      olFeature.forEach((item: FeatureLike) =>
+        applyPreview(item as OLFeature<Geometry>),
+      );
+      previewSource.addFeatures(olFeature as OLFeature<Geometry>[]);
+    } else {
+      applyPreview(olFeature as OLFeature<Geometry>);
+      previewSource.addFeature(olFeature as OLFeature<Geometry>);
+    }
+  });
+};
+
+/** Replaces Auto-TSTM preview features on a dedicated map source. */
+const syncTstmPreviewSource = (
+  previewSource: VectorSource,
+  tstmPreviewFeatures: GeoJsonFeature[],
+) => {
+  previewSource.clear();
+  const format = new GeoJSON();
+  const previewStyle = toTstmPreviewOlStyle();
+
+  tstmPreviewFeatures.forEach((feature) => {
+    const olFeature = format.readFeature(feature, {
+      dataProjection: "EPSG:4326",
+      featureProjection: "EPSG:3857",
+    });
+    const featureId = String(feature.id ?? "tstm-preview");
+
+    if (Array.isArray(olFeature)) {
+      olFeature.forEach((item: FeatureLike) =>
+        addTstmPreviewOlFeature(item as OLFeature<Geometry>, previewSource, previewStyle, featureId),
+      );
+    } else {
+      addTstmPreviewOlFeature(olFeature as OLFeature<Geometry>, previewSource, previewStyle, featureId);
+    }
+  });
+};
 
 type OpenLayersForecastMapProps = {
   tstmPreviewFeatures?: GeoJsonFeature[];
@@ -127,8 +349,8 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     } | null>(null);
     const [showDesktopLegend, setShowDesktopLegend] = useState(true);
     const [showMobileLegend, setShowMobileLegend] = useState(false);
-    const initialMapViewRef = useRef<ForecastMapView>(currentMapView);
-    const currentMapViewRef = useRef<ForecastMapView>(currentMapView);
+    const initialMapViewRef = useRef(currentMapView);
+    const currentMapViewRef = useRef(currentMapView);
     const popupRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<Overlay | null>(null);
     const interactionModeRef = useRef(interactionMode);
@@ -157,7 +379,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       currentDayRef.current = currentDay;
     }, [currentDay]);
 
-    /** Applies the configured trim strategy to a stored outlook feature. */
     const trimStoredOutlookFeature = async (
       feature: GeoJsonFeature,
     ): Promise<GeoJsonFeature> => {
@@ -219,28 +440,28 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
 
     const mapElementRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<OLMap | null>(null);
-    const tileLayerRef = useRef<ForecastMapLayerSet["tileLayer"] | null>(null);
-    const vectorBaseGroupRef = useRef<ForecastMapLayerSet["vectorBaseGroup"] | null>(null);
-    const vectorReferenceGroupRef = useRef<ForecastMapLayerSet["vectorReferenceGroup"] | null>(null);
+    const tileLayerRef = useRef<TileLayer<OSM | XYZ> | null>(null);
+    const vectorBaseGroupRef = useRef<LayerGroup | null>(null);
+    const vectorReferenceGroupRef = useRef<LayerGroup | null>(null);
     const vectorStyleRequestRef = useRef(0);
     const worldSourceRef = useRef<VectorSource>(new VectorSource());
-    const worldLayerRef = useRef<ForecastMapLayerSet["worldLayer"] | null>(null);
+    const worldLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const lakesSourceRef = useRef<VectorSource>(new VectorSource());
-    const lakesLayerRef = useRef<ForecastMapLayerSet["lakesLayer"] | null>(null);
+    const lakesLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const landSourceRef = useRef<VectorSource>(new VectorSource());
-    const landLayerRef = useRef<ForecastMapLayerSet["landLayer"] | null>(null);
-    const landOutlineLayerRef = useRef<ForecastMapLayerSet["landOutlineLayer"] | null>(null);
-    const labelLayerRef = useRef<ForecastMapLayerSet["labelLayer"] | null>(null);
+    const landLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const landOutlineLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const labelLayerRef = useRef<TileLayer<XYZ> | null>(null);
     const vectorSourceRef = useRef<VectorSource>(new VectorSource());
     const catSourceRef = useRef<VectorSource>(new VectorSource());
     const ghostSourceRef = useRef<VectorSource>(new VectorSource());
     const tstmPreviewSourceRef = useRef<VectorSource>(new VectorSource());
     const trimPreviewSourceRef = useRef<VectorSource>(new VectorSource());
-    const catLayerRef = useRef<ForecastMapLayerSet["catLayer"] | null>(null);
-    const ghostLayerRef = useRef<ForecastMapLayerSet["ghostLayer"] | null>(null);
-    const tstmPreviewLayerRef = useRef<ForecastMapLayerSet["tstmPreviewLayer"] | null>(null);
-    const trimPreviewLayerRef = useRef<ForecastMapLayerSet["trimPreviewLayer"] | null>(null);
-    const vectorLayerRef = useRef<ForecastMapLayerSet["vectorLayer"] | null>(null);
+    const catLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const ghostLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const tstmPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const trimPreviewLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+    const vectorLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
     const drawRef = useRef<Draw | null>(null);
     const modifyRef = useRef<Modify | null>(null);
     const catModifyRef = useRef<Modify | null>(null);
@@ -274,42 +495,125 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
     useEffect(() => {
       if (!mapElementRef.current || mapRef.current) return undefined;
 
-      const {
-        tileLayer,
-        vectorBaseGroup,
-        vectorReferenceGroup,
-        worldLayer,
-        lakesLayer,
-        landLayer,
-        landOutlineLayer,
-        catLayer,
-        ghostLayer,
-        tstmPreviewLayer,
-        trimPreviewLayer,
-        vectorLayer,
-        labelLayer,
-      } = createForecastMapLayers({
-        worldSource: worldSourceRef.current,
-        lakesSource: lakesSourceRef.current,
-        landSource: landSourceRef.current,
-        catSource: catSourceRef.current,
-        ghostSource: ghostSourceRef.current,
-        tstmPreviewSource: tstmPreviewSourceRef.current,
-        trimPreviewSource: trimPreviewSourceRef.current,
-        vectorSource: vectorSourceRef.current,
+      // CodeScene suppression is limited to this legacy async feature-sync coordinator.
+      // It batches categorical filtering, custom-feature conversion, and Redux updates;
+      // the paint-bucket click path is extracted and has no suppression.
+      // @codescene(disable:"Complex Method")
+      const handleModifiedFeatures = (
+        features: OLFeature<Geometry>[],
+        isCategorical: boolean,
+      ): void => {
+        const format = new GeoJSON();
+        const editDay = currentDayRef.current;
+        features.forEach((feature) => {
+          void (async () => {
+            try {
+              if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
+                return;
+              }
+
+              if (!isCategorical) {
+                const customFeature = toUpdatedCustomFeature(feature, format);
+                if (customFeature) {
+                  dispatch(updateCustomFeature(customFeature));
+                  return;
+                }
+              }
+
+              const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
+              if (!updatedFeature) {
+                return;
+              }
+
+              const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+              dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
+            } catch (error) {
+              captureException(error, { tags: { featureOperation: "modify-outlook" } });
+            }
+          })();
+        });
+      };
+
+      const tileLayer = new TileLayer({
+        source: new OSM({ crossOrigin: "anonymous" }),
       });
       tileLayerRef.current = tileLayer;
+      const vectorBaseGroup = new LayerGroup({
+        visible: false,
+        zIndex: 1,
+      });
       vectorBaseGroupRef.current = vectorBaseGroup;
+      const vectorReferenceGroup = new LayerGroup({
+        visible: false,
+        zIndex: TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+      });
       vectorReferenceGroupRef.current = vectorReferenceGroup;
+      // Blank base map layers: start hidden, only one (tile vs. world+lakes+land) will be visible at a time based on baseMapStyle.
+      const worldLayer = new VectorLayer({
+        source: worldSourceRef.current,
+        visible: false,
+        zIndex: 1,
+      });
       worldLayerRef.current = worldLayer;
+      // Lakes layer sits above world layer to provide better definition of coastlines and inland water bodies,
+      // especially when using blank basemap style.
+      const lakesLayer = new VectorLayer({
+        source: lakesSourceRef.current,
+        visible: false,
+        zIndex: 1.5,
+      });
       lakesLayerRef.current = lakesLayer;
+      // Land fill sits above world and lakes, below outlook polygons.
+      const landLayer = new VectorLayer({
+        source: landSourceRef.current,
+        visible: false,
+        zIndex: 2,
+        style: BLANK_LAND_FILL_STYLE,
+      });
       landLayerRef.current = landLayer;
+      // Land outlines sit above outlook polygons so borders remain visible.
+      const landOutlineLayer = new VectorLayer({
+        source: landSourceRef.current,
+        visible: false,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX,
+        style: BLANK_LAND_OUTLINE_STYLE,
+      });
       landOutlineLayerRef.current = landOutlineLayer;
+      // Categorical features stay in a dedicated source so their edit flow
+      // remains separate from probabilistic outlook layers.
+      const catLayer = new VectorLayer({
+        source: catSourceRef.current,
+        zIndex: 3,
+        opacity: 1,
+      });
       catLayerRef.current = catLayer;
+      const ghostLayer = new VectorLayer({
+        source: ghostSourceRef.current,
+        zIndex: GHOST_REFERENCE_LAYER_Z_INDEX,
+      });
       ghostLayerRef.current = ghostLayer;
+      const tstmPreviewLayer = new VectorLayer({
+        source: tstmPreviewSourceRef.current,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 5,
+      });
       tstmPreviewLayerRef.current = tstmPreviewLayer;
+      const trimPreviewLayer = new VectorLayer({
+        source: trimPreviewSourceRef.current,
+        zIndex: TOP_OUTLINE_LAYER_Z_INDEX + 6,
+      });
       trimPreviewLayerRef.current = trimPreviewLayer;
+      // Probabilistic/other features layer: separate source, normal per-feature opacity
+      const vectorLayer = new VectorLayer({
+        source: vectorSourceRef.current,
+        zIndex: 4,
+      });
       vectorLayerRef.current = vectorLayer;
+      // Place labels/cities above outlook polygons.
+      const labelLayer = new TileLayer({
+        source: createLabelOverlaySource("osm") ?? undefined,
+        visible: true,
+        zIndex: TOP_LABEL_LAYER_Z_INDEX,
+      });
       labelLayerRef.current = labelLayer;
 
       // Initialize the map with all layers, but only the tile layer visible by default.
@@ -342,12 +646,29 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }),
       });
 
-      map.on("moveend", () => syncMapViewFromOpenLayers({
-        map,
-        isApplyingExternalViewRef,
-        currentMapViewRef,
-        dispatch,
-      }));
+      map.on("moveend", () => {
+        if (isApplyingExternalViewRef.current) {
+          return;
+        }
+
+        const view = map.getView();
+        const center = view.getCenter();
+        if (!center) return;
+        const [lon, lat] = toLonLat(center);
+        const nextCenter: [number, number] = [lat, lon];
+        const nextZoom = view.getZoom() || 4;
+        const [stateLat, stateLon] = currentMapViewRef.current.center;
+        const stateZoom = currentMapViewRef.current.zoom;
+
+        const centerChanged =
+          Math.abs(stateLat - nextCenter[0]) > 0.000001 ||
+          Math.abs(stateLon - nextCenter[1]) > 0.000001;
+        const zoomChanged = Math.abs(stateZoom - nextZoom) > 0.000001;
+
+        if (centerChanged || zoomChanged) {
+          dispatch(setMapView({ center: nextCenter, zoom: nextZoom }));
+        }
+      });
 
       mapRef.current = map;
 
@@ -414,32 +735,122 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         });
       });
 
-      const editInteractions = registerForecastEditInteractions({
-        map,
-        vectorSource: vectorSourceRef.current,
-        catSource: catSourceRef.current,
-        ghostSource: ghostSourceRef.current,
-        isCustomMode: () => customModeRef.current,
-        activeCustomCategoryId: () => activeCustomCategoryRef.current?.id,
-        activeOutlookType: () => activeOutlookTypeRef.current,
-        activeProbability: () => activeProbabilityRef.current,
-        onModifyEnd: (features, isCategorical) => {
-          handleModifiedFeatures(features, isCategorical, {
-            currentDay: currentDayRef.current,
-            dispatch,
-            trimStoredOutlookFeature,
-          });
+      const modify = new Modify({
+        source: vectorSourceRef.current,
+        filter: (feature) => {
+          const customIdentity = getCustomFeatureIdentity(feature);
+          if (customIdentity) {
+            if (!customModeRef.current) {
+              return false;
+            }
+            return customIdentity.categoryId === activeCustomCategoryRef.current?.id;
+          }
+          return matchesPrecisionEditTier(
+            feature,
+            activeOutlookTypeRef.current,
+            activeProbabilityRef.current,
+          );
         },
+        deleteCondition: (event) =>
+          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
       });
-      modifyRef.current = editInteractions.modify;
-      catModifyRef.current = editInteractions.catModify;
-      snapRef.current = editInteractions.snap;
-      catSnapRef.current = editInteractions.catSnap;
-      ghostSnapRef.current = editInteractions.ghostSnap;
+
+      modify.on("modifyend", (event) => {
+        handleModifiedFeatures(
+          event.features.getArray() as OLFeature<Geometry>[],
+          false,
+        );
+      });
+      map.addInteraction(modify);
+      modifyRef.current = modify;
+
+      // Separate modify interaction for categorical layer to handle its unique properties
+      // and to prevent accidental edits of auto-generated categorical features.
+      const catModify = new Modify({
+        source: catSourceRef.current,
+        filter: (feature) => {
+          const derivedFrom = feature.get("derivedFrom") as string | undefined;
+          if (derivedFrom === "auto-generated") {
+            return false;
+          }
+          return matchesPrecisionEditTier(
+            feature,
+            "categorical",
+            activeProbabilityRef.current,
+          );
+        },
+        deleteCondition: (event) =>
+          singleClick(event) && (altKeyOnly(event) || shiftKeyOnly(event)),
+      });
+      catModify.on("modifyend", (event) => {
+        handleModifiedFeatures(
+          event.features.getArray() as OLFeature<Geometry>[],
+          true,
+        );
+      });
+      map.addInteraction(catModify);
+      catModifyRef.current = catModify;
+
+      const snap = new Snap({ source: vectorSourceRef.current });
+      map.addInteraction(snap);
+      snapRef.current = snap;
+
+      const catSnap = new Snap({ source: catSourceRef.current });
+      map.addInteraction(catSnap);
+      catSnapRef.current = catSnap;
+
+      const ghostSnap = new Snap({ source: ghostSourceRef.current });
+      map.addInteraction(ghostSnap);
+      ghostSnapRef.current = ghostSnap;
 
       // Limit delete picking to editable outlook layers so top overlays (state outlines/labels)
       // do not intercept clicks and prevent polygon deletion.
-      const select = createForecastDeleteInteraction({ vectorLayer, catLayer, dispatch });
+      const select = new Select({
+        condition: click,
+        layers: [vectorLayer, catLayer],
+      });
+      select.setActive(false);
+      select.on("select", (event) => {
+        const selected = event.selected[0];
+        if (!selected) {
+          return;
+        }
+
+        const outlookType = selected.get("outlookType") as string | undefined;
+        const derivedFrom = selected.get("derivedFrom") as string | undefined;
+
+        // Auto-generated categorical polygons are derived from probabilistic outlooks.
+        // Keep them read-only here; users should edit tornado/wind/hail/totalSevere
+        // (or draw/delete TSTM manually) and let auto-categorical regenerate.
+        if (outlookType === "categorical" && derivedFrom === "auto-generated") {
+          select.getFeatures().clear();
+          return;
+        }
+
+        const customIdentity = getCustomFeatureIdentity(selected);
+        if (customIdentity) {
+          dispatch(removeCustomFeature({ layerId: customIdentity.customLayerId, featureId: customIdentity.featureId }));
+          select.getFeatures().clear();
+          return;
+        }
+
+        const identity = getFeatureIdentity(selected);
+        if (!identity) {
+          select.getFeatures().clear();
+          return;
+        }
+
+        dispatch(
+          removeFeature({
+            outlookType: identity.outlookType as EditableOutlookType,
+            probability: identity.probability,
+            featureId: identity.featureId,
+          }),
+        );
+
+        select.getFeatures().clear();
+        return;
+      });
       map.addInteraction(select);
       selectRef.current = select;
 
@@ -553,8 +964,32 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       const map = mapRef.current;
       if (!map) return;
 
-      syncOpenLayersViewFromState({ map, currentMapView, isApplyingExternalViewRef });
-    }, [currentMapView]);
+      const view = map.getView();
+      const targetCenter = fromLonLat([
+        currentMapView.center[1],
+        currentMapView.center[0],
+      ]);
+      const currentCenter = view.getCenter();
+      const currentZoom = view.getZoom() || 4;
+
+      const centerChanged =
+        !currentCenter ||
+        Math.abs(currentCenter[0] - targetCenter[0]) > 0.01 ||
+        Math.abs(currentCenter[1] - targetCenter[1]) > 0.01;
+      const zoomChanged =
+        Math.abs(currentZoom - currentMapView.zoom) > 0.000001;
+
+      if (!centerChanged && !zoomChanged) {
+        return;
+      }
+
+      isApplyingExternalViewRef.current = true;
+      view.setCenter(targetCenter);
+      view.setZoom(currentMapView.zoom);
+      setTimeout(() => {
+        isApplyingExternalViewRef.current = false;
+      }, 0);
+    }, [currentMapView.center, currentMapView.zoom]);
 
     // Swap base tile source / blank land layer when style changes
     useEffect(() => {
@@ -579,6 +1014,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         !el
       )
         return;
+
+      // Every style change invalidates any OpenFreeMap request started by a
+      // previous selection, including a switch back to a raster or blank map.
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
 
       /** Ensure state boundaries remain available above outlook polygons in every map style. */
       const loadUsStatesBoundaries = () => {
@@ -631,15 +1071,45 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         landOutline.setVisible(true);
         labels.setVisible(false);
         el.style.backgroundColor = "";
-        loadOpenFreeMapBasemap({
-          style: baseMapStyle,
-          tile,
-          labels,
-          vectorBaseGroup,
-          vectorReferenceGroup,
-          requestRef: vectorStyleRequestRef,
-          logPrefix: "forecast-map",
-        });
+        vectorBaseGroup.setVisible(false);
+        vectorReferenceGroup.setVisible(false);
+        vectorBaseGroup.getLayers().clear();
+        vectorReferenceGroup.getLayers().clear();
+
+        getOpenFreeMapStyleSet(baseMapStyle)
+          .then(loadOpenFreeMapLayerGroups)
+          .then(({ baseGroup, referenceGroup }) => {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
+              return;
+            }
+
+            replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
+            replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
+            vectorBaseGroup.setVisible(true);
+            vectorReferenceGroup.setVisible(true);
+          })
+          .catch((error) => {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
+              return;
+            }
+
+            console.warn(
+              "[forecast-map] falling back to raster basemap after vector load failure",
+              {
+                baseMapStyle,
+                error,
+              },
+            );
+            vectorBaseGroup.getLayers().clear();
+            vectorReferenceGroup.getLayers().clear();
+            tile.setSource(createTileSource(baseMapStyle));
+            tile.setVisible(true);
+            const labelSource = createLabelOverlaySource(baseMapStyle);
+            if (labelSource) {
+              labels.setSource(labelSource);
+              labels.setVisible(true);
+            }
+          });
       } else {
         hideVectorBasemapGroups();
         tile.setVisible(true);
@@ -648,11 +1118,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         land.setVisible(false);
         landOutline.setVisible(true);
         el.style.backgroundColor = "";
-        applyRasterBasemap({
-          style: baseMapStyle as Exclude<BaseMapStyle, "blank">,
-          tile,
-          labels,
-        });
+        tile.setSource(
+          createTileSource(baseMapStyle as Exclude<BaseMapStyle, "blank">),
+        );
+        const labelSource = createLabelOverlaySource(
+          baseMapStyle as Exclude<BaseMapStyle, "blank">,
+        );
+        if (labelSource) {
+          labels.setSource(labelSource);
+          labels.setVisible(true);
+        } else {
+          labels.setVisible(false);
+        }
       }
     }, [baseMapStyle]);
 
@@ -682,20 +1159,61 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           ? catSourceRef.current
           : vectorSourceRef.current;
       const draw = new Draw({ source: drawSource, type: "Polygon" });
-      draw.on("drawend", (event) => handleForecastDrawEnd(event, {
-        currentDay: currentDayRef.current,
-        activeOutlookType: drawingState.activeOutlookType,
-        activeProbability: drawingState.activeProbability,
-        isSignificant: drawingState.isSignificant,
-        customMode,
-        activeCustomLayer,
-        activeCustomCategory,
-        trimGeometryForAutoDraw,
-        trimStrategy: outlookTrimStrategyRef.current,
-        trimAutoOnDraw: outlookTrimAutoOnDrawRef.current,
-        trimPreviewOnly: outlookTrimPreviewOnlyRef.current,
-        dispatch,
-      }));
+      draw.on("drawend", (event) => {
+        const format = new GeoJSON();
+        const olGeometry = event.feature.getGeometry();
+        if (!olGeometry) {
+          return;
+        }
+        const drawDay = currentDayRef.current;
+
+        void (async () => {
+          try {
+            const geometry = format.writeGeometryObject(olGeometry, {
+              dataProjection: "EPSG:4326",
+              featureProjection: "EPSG:3857",
+            });
+            const customFeature = toDrawnCustomFeature(
+              geometry as unknown as Geometry,
+              activeCustomLayer,
+              activeCustomCategory,
+              customMode,
+            );
+            if (customFeature) {
+              dispatch(addCustomFeature(customFeature));
+              return;
+            }
+
+            let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
+            if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
+              outlookGeometry = await trimGeometryForAutoDraw(
+                outlookGeometry,
+                outlookTrimStrategyRef.current,
+                outlookTrimAutoOnDrawRef.current,
+                outlookTrimPreviewOnlyRef.current,
+              );
+            }
+
+            if (!outlookGeometry) {
+              return;
+            }
+
+            const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
+              type: "Feature",
+              id: uuidv4(),
+              geometry: outlookGeometry,
+              properties: {
+                outlookType: drawingState.activeOutlookType,
+                probability: drawingState.activeProbability,
+                isSignificant: drawingState.isSignificant,
+              },
+            };
+            dispatch(addFeature({ feature, day: drawDay }));
+          } catch (error) {
+            captureException(error, { tags: { featureOperation: "draw-outlook" } });
+          }
+        })();
+      });
       map.addInteraction(draw);
       drawRef.current = draw;
 
@@ -760,20 +1278,19 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               dataProjection: "EPSG:4326",
               featureProjection: "EPSG:3857",
             }),
-              apply: createFeatureApplier(
+            apply: (item: OLFeature<Geometry>) => {
+              item.setStyle(
                 toOlStyle(
                   { outlookType, probability },
                   { isTopLayer, outlookOpacity },
                 ),
-                applyForecastFeatureMetadata,
-                {
-                  featureId: stableId,
-                  outlookType,
-                  probability,
-                  isSignificant: Boolean(feature.properties?.isSignificant),
-                  derivedFrom: feature.properties?.derivedFrom,
-                },
-              ),
+              );
+              item.set("featureId", stableId);
+              item.set("outlookType", outlookType);
+              item.set("probability", probability);
+              item.set("isSignificant", Boolean(feature.properties?.isSignificant));
+              item.set("derivedFrom", feature.properties?.derivedFrom);
+            },
             targetSource,
           };
         },
@@ -806,21 +1323,20 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: createFeatureApplier(
-                toCustomOlStyle(
-                  category,
-                  zIndex === highestCustomZIndex,
-                  zIndex,
-                ),
-                applyCustomFeatureMetadata,
-                {
-                  featureId: stableId,
-                  customLayerId: layer.id,
-                  customLayerTitle: layer.label,
-                  categoryId: category.id,
-                  title: category.label,
-                },
-              ),
+              apply: (item: OLFeature<Geometry>) => {
+                item.setStyle(
+                  toCustomOlStyle(
+                    category,
+                    zIndex === highestCustomZIndex,
+                    zIndex,
+                  ),
+                );
+                item.set("featureId", stableId);
+                item.set("customLayerId", layer.id);
+                item.set("customLayerTitle", layer.label);
+                item.set("categoryId", category.id);
+                item.set("title", category.label);
+              },
               targetSource: source,
             };
           })
@@ -857,17 +1373,16 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
                 dataProjection: "EPSG:4326",
                 featureProjection: "EPSG:3857",
               }),
-              apply: createFeatureApplier(
-                toGhostOlStyle({ outlookType, probability, isCategorical }),
-                applyForecastFeatureMetadata,
-                {
-                  featureId: stableId,
-                  outlookType,
-                  probability,
-                  isSignificant: Boolean(feature.properties?.isSignificant),
-                  derivedFrom: feature.properties?.derivedFrom,
-                },
-              ),
+              apply: (item: OLFeature<Geometry>) => {
+                item.setStyle(
+                  toGhostOlStyle({ outlookType, probability, isCategorical }),
+                );
+                item.set("featureId", stableId);
+                item.set("outlookType", outlookType);
+                item.set("probability", probability);
+                item.set("isSignificant", Boolean(feature.properties?.isSignificant));
+                item.set("derivedFrom", feature.properties?.derivedFrom);
+              },
               targetSource: ghostSource,
             });
           });
@@ -881,9 +1396,31 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-      reconcileForecastSource(source, sourceDescriptorPlan.source, "forecast");
-      reconcileForecastSource(catSource, sourceDescriptorPlan.categorical, "categorical");
-      reconcileForecastSource(ghostSource, ghostDescriptors, "ghost");
+      const reconcileSource = (
+        targetSource: VectorSource,
+        descriptors: FeatureSyncDescriptor[],
+        sourceName: string,
+      ): void => {
+        const stats: FeatureSyncStats = {
+          parsed: 0,
+          added: 0,
+          updated: 0,
+          removed: 0,
+          reused: 0,
+          skipped: 0,
+        };
+        reconcileFeatureSource(targetSource, descriptors, stats);
+        if (stats.skipped > 0) {
+          captureMessage("Forecast map skipped invalid geometry", {
+            level: "warning",
+            tags: { source: sourceName, reason: "invalid-geometry" },
+          });
+        }
+      };
+
+      reconcileSource(source, sourceDescriptorPlan.source, "forecast");
+      reconcileSource(catSource, sourceDescriptorPlan.categorical, "categorical");
+      reconcileSource(ghostSource, ghostDescriptors, "ghost");
     }, [
       serializedFeatures,
       outlookOpacity,
@@ -932,11 +1469,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           );
           syncTrimPreviewSource(trimPreviewSourceRef.current, previewFeatures);
         })
-        .catch(() => {
-          /* Reconciliation errors are reported through the source statistics. */
-        });
+        .catch(() => undefined);
 
-      return () => { // skipcq: JS-0045 -- React effects return this cleanup function intentionally.
+      return () => {
         cancelled = true;
       };
     }, [outlookTrimPreviewOnly, outlookTrimStrategy, outlooks]);
@@ -956,13 +1491,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("delete");
     };
 
-    /** Switches the forecast map into polygon-edit mode. */
     const handleSetModeEdit = () => {
       setInteractionMode("edit");
     };
 
     return (
-      <div className="map-container" translate="no"> {/* skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container. */}
+      <div className="map-container" translate="no">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
           <div

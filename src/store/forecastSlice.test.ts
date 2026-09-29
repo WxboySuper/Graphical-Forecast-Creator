@@ -4,6 +4,7 @@ import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
+  applyTrimmedCurrentDayOutlooks,
   copyFeaturesFromPrevious,
   importForecastCycle,
   importWorkflowPackage,
@@ -39,6 +40,8 @@ import reducer, {
   updateDiscussionDraft,
   migrateDiscussionDrafts,
   setAutoCategoricalError,
+  selectCurrentOutlooks,
+  selectOutlooksForDay,
   setOutlookOpacity,
   selectCurrentOutlookOpacity,
   toggleSignificant,
@@ -54,7 +57,6 @@ const createPolygon = (offset: number): Polygon => ({
     [offset, offset],
   ]],
 });
-
 interface FeatureOptions {
   outlookType: string;
   probability: string;
@@ -561,6 +563,29 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect(getTornadoFeatures(state)).toHaveLength(0);
     expect(selectCanRedo({ forecast: state } as never)).toBe(true);
+  });
+
+  test('trim undo snapshots the edited day when it is not active', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('day-1-feature', 0) }));
+    state = reducer(state, setForecastDay(2));
+    state = reducer(state, addFeature({ feature: createFeature('day-2-feature', 1) }));
+
+    state = reducer(state, applyTrimmedCurrentDayOutlooks({
+      day: 1,
+      cycleGeneration: state.cycleGeneration,
+      cycleDate: state.forecastCycle.cycleDate,
+      data: state.forecastCycle.days[1]!.data,
+      result: {
+        trimmedCount: 1,
+        removedCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        errors: [],
+      },
+    }));
+
+    expect(getUndoStack(state, 1)).toHaveLength(2);
+    expect(getUndoStack(state, 2)).toHaveLength(1);
   });
 
   test('auto categorical sync updates state without adding its own undo entry', () => {
@@ -1247,4 +1272,98 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 
+  describe('cycle session identity', () => {
+    it('tracks cycle generation across replacements, edits, and saved-cycle loads', () => {
+      const first = reducer(undefined, createOutlookUpdate());
+      const restored = reducer(first, restoreForecastCycle(first.forecastCycle));
+      const imported = reducer(restored, resetForecasts());
+      const started = reducer(imported, startBlankCycle({}));
+
+      expect(restored.cycleGeneration).toBe(2);
+      expect(imported.cycleGeneration).toBe(3);
+      expect(started.cycleGeneration).toBe(4);
+
+      let state = reducer(undefined, resetForecasts());
+      state = reducer(state, setForecastDay(1));
+      const generation = state.cycleGeneration;
+      state = reducer(state, setForecastDay(2));
+
+      expect(state.cycleGeneration).toBe(generation);
+
+      let savedCycleState = reducer(undefined, setForecastDay(1));
+      savedCycleState = reducer(savedCycleState, resetForecasts());
+      savedCycleState = reducer(savedCycleState, saveCurrentCycle({}));
+      const savedGeneration = savedCycleState.cycleGeneration;
+      savedCycleState = reducer(savedCycleState, resumeIncompleteCycle({ cycleId: savedCycleState.savedCycles[0].id }));
+
+      expect(savedCycleState.cycleGeneration).toBe(savedGeneration + 1);
+    });
+  });
+
+  describe('selector referential stability', () => {
+    const withForecast = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlooks>[0]);
+
+    it('selectCurrentOutlooks returns the same fallback reference for an absent current day', () => {
+      // Point currentDay at a day that has no entry so the selector must fall
+      // back to the shared empty reference rather than real day data.
+      const base = reducer(undefined, setForecastDay(1));
+      const absentDayState = {
+        ...base,
+        forecastCycle: { ...base.forecastCycle, currentDay: 5 as DayType },
+      };
+      const state = withForecast(absentDayState);
+      const first = selectCurrentOutlooks(state);
+      const second = selectCurrentOutlooks(state);
+      expect(first).toBe(second);
+    });
+
+    it('keeps fallback selectors referentially stable for all supported day shapes', () => {
+      const state = withForecast(reducer(undefined, setForecastDay(1)));
+      expect(selectOutlooksForDay(state, 2)).toBe(selectOutlooksForDay(state, 2));
+      expect(selectOutlooksForDay(state, 3)).toBe(selectOutlooksForDay(state, 3));
+      expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
+
+      const base = reducer(undefined, setForecastDay(1));
+      const unknownDayState = withForecast(base);
+      const fallback = selectOutlooksForDay(unknownDayState, 99 as DayType);
+
+      expect(fallback).toBeDefined();
+      expect(fallback['day4-8']).toBeInstanceOf(Map);
+      expect(fallback).toBe(selectOutlooksForDay(unknownDayState, 99 as DayType));
+    });
+
+    it('selectCurrentOutlooks returns a safe fallback for an unknown current day', () => {
+      const base = reducer(undefined, setForecastDay(1));
+      const state = withForecast({
+        ...base,
+        forecastCycle: { ...base.forecastCycle, currentDay: 99 as DayType },
+      });
+      const fallback = selectCurrentOutlooks(state);
+
+      expect(fallback).toBeDefined();
+      expect(fallback['day4-8']).toBeInstanceOf(Map);
+      expect(fallback).toBe(selectCurrentOutlooks(state));
+    });
+
+    it('does not expose the shared fallback as the current day data for a real day', () => {
+      const forecastState = reducer(undefined, setForecastDay(1));
+      const real = forecastState.forecastCycle.days[1]?.data;
+      expect(real).toBeDefined();
+      expect(selectCurrentOutlooks(withForecast(forecastState))).toBe(real);
+    });
+
+    it('throws when a consumer tries to mutate the shared fallback map', () => {
+      const base = reducer(undefined, setForecastDay(1));
+      const absentDayState = {
+        ...base,
+        forecastCycle: { ...base.forecastCycle, currentDay: 5 as DayType },
+      };
+      const fallback = selectCurrentOutlooks(withForecast(absentDayState));
+      const day48Map = fallback['day4-8']!;
+      expect(day48Map).toBeInstanceOf(Map);
+      expect(() => day48Map.set('30%', [])).toThrow(/read-only outlook map/);
+      expect(() => day48Map.clear()).toThrow(/read-only outlook map/);
+    });
+  });
 });
+

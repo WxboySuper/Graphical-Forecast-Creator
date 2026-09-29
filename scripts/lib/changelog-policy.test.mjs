@@ -48,7 +48,7 @@ test('allows a forward port to inherit its source changelog entry', () => {
   assert.equal(result.ok, true);
 });
 test('requires beta entries in the next-major lane on main', () => {
-  const result = evaluateLane('beta', '# Changelog\n\n### Stable 1.6.x hotfixes\n');
+  const result = evaluateLane('beta', '# Changelog\n\n### Stable 1.7.x hotfixes\n');
   assert.equal(result.ok, false);
   assert.match(result.reason, /Next major \/ beta/);
 });
@@ -56,7 +56,7 @@ test('requires beta entries in the next-major lane on main', () => {
 test('requires hotfix entries in the stable lane', () => {
   const result = evaluateLane('hotfix', '# Changelog\n\n### Next major / beta\n');
   assert.equal(result.ok, false);
-  assert.match(result.reason, /Stable 1.6.x hotfixes/);
+  assert.match(result.reason, /Stable 1.7.x hotfixes/);
 });
 
 test('requires the declared lane to change, not merely exist', () => {

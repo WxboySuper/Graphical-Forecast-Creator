@@ -5,5 +5,7 @@ branch, changelog, and feature-exposure workflows. Reusable logic belongs in
 `scripts/lib` so entry points remain small and testable.
 
 Run scripts through the package-manager command documented in `package.json`.
+Run `pnpm run test:scripts` to discover all script tests, including root-level
+integration tests and tests in `scripts/lib`.
 Scripts that write local artifacts should write only to ignored paths and make
 their output reproducible.

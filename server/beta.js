@@ -1,7 +1,3 @@
-/**
- * Beta server entry point. It configures the beta Express app, Firebase auth,
- * feature exposure, and request routes used by the beta deployment.
- */
 'use strict';
 
 const rateLimit = require('express-rate-limit');
@@ -26,9 +22,7 @@ const getBetaInviteToken = () => process.env.BETA_INVITE_TOKEN || '';
 const getBetaInvitePath = () => (process.env.BETA_INVITE_PATH || '').trim();
 
 /** Returns the verified Firebase user for authenticated beta-claim requests. */
-const verifyRequestUser = (req) => {
-  return verifyFirebaseToken(req);
-};
+const verifyRequestUser = (req) => verifyFirebaseToken(req);
 
 /** True when the beta-claim endpoint is ready to accept requests on this deployment. */
 const isBetaClaimConfigured = () => hasFirebaseAdminConfig() && Boolean(getBetaInviteToken());
@@ -62,27 +56,56 @@ const isValidInvitePath = (value) => {
   return typeof value === 'string' && value.trim() === expectedPath;
 };
 
-/** Writes beta access onto the current user's hosted profile document. */
+/**
+ * Grants beta access and makes the entitlement immediately effective.
+ *
+ * Beta access is represented in both collections because the profile flag
+ * controls beta eligibility while the entitlement document controls premium
+ * feature access. Keep the two writes together so a successful claim cannot
+ * leave the account in a partially activated state.
+ */
 const grantBetaAccess = async (uid) => {
   const db = getAdminDb();
   if (!db) {
     throw new Error('Firebase Admin is not configured for beta claims.');
   }
 
-  const profileRef = db.collection('userProfiles').doc(uid);
-  const profileSnapshot = await profileRef.get();
-  if (profileSnapshot.data()?.betaAccess === true) {
-    return;
-  }
+  await db.runTransaction(async (transaction) => {
+    const profileRef = db.collection('userProfiles').doc(uid);
+    const entitlementRef = db.collection('userEntitlements').doc(uid);
+    const profileSnapshot = await transaction.get(profileRef);
+    const entitlementSnapshot = await transaction.get(entitlementRef);
+    const profileData = profileSnapshot.data() || {};
+    const entitlementData = entitlementSnapshot.data() || {};
+    const now = new Date();
 
-  await profileRef.set(
-    {
-      betaAccess: true,
-      betaGrantedAt: new Date(),
-      betaInviteSource: 'discord',
-    },
-    { merge: true }
-  );
+    transaction.set(
+      profileRef,
+      {
+        betaAccess: true,
+        betaGrantedAt: profileData.betaGrantedAt ?? now,
+        betaInviteSource: profileData.betaInviteSource ?? 'discord',
+      },
+      { merge: true }
+    );
+    transaction.set(
+      entitlementRef,
+      {
+        uid,
+        betaOverrideActive: true,
+        premiumActive: true,
+        effectiveSource: 'beta_override',
+        planInterval: entitlementData.planInterval ?? null,
+        billingStatus: entitlementData.billingStatus ?? 'inactive',
+        stripeCustomerId: entitlementData.stripeCustomerId ?? null,
+        stripeSubscriptionId: entitlementData.stripeSubscriptionId ?? null,
+        cancelAtPeriodEnd: Boolean(entitlementData.cancelAtPeriodEnd),
+        currentPeriodEnd: entitlementData.currentPeriodEnd ?? null,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  });
 };
 
 /** Handles one authenticated beta invite claim request. */
@@ -120,4 +143,7 @@ const registerBetaRoutes = (app, express) => {
 
 module.exports = {
   registerBetaRoutes,
+  __testing: {
+    grantBetaAccess,
+  },
 };

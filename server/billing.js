@@ -1,38 +1,16 @@
-/**
- * Billing service: this module handles Stripe event interpretation,
- * entitlement persistence, and idempotent billing-side effects used by the
- * server routes. It owns provider integration and storage coordination while
- * route authentication and client presentation remain outside this boundary.
- */
 'use strict';
 
 const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
+const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
-const { registerBillingRoutes: registerBillingRoutesImpl } = require('./billingRoutes');
-const { getAdminAuth, getAdminDb } = require('./firebase-admin');
+const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getBearerToken } = require('./firebase-auth');
 const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cleanup');
-const {
-  createSubscriptionEntitlementWrite,
-  getCheckoutRefundTarget,
-} = require('./billingEntitlementBuilders');
-const {
-  createCheckoutMetadata,
-  getCheckoutCustomerEmail,
-  getCheckoutPriceId,
-  isCheckoutAvailable,
-  isPortalAvailable,
-} = require('./billingRouteHelpers');
-const { verifyRequestUser } = require('./billingRequestAuth');
-const {
-  buildCheckoutEntitlementWrite,
-  resolveAuthoritativeSubscription,
-  resolveInvoiceUid,
-} = require('./billingWebhookResolvers');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -94,6 +72,10 @@ const redactIdentifier = (value) => {
 
   return `...${value.slice(-4)}`;
 };
+
+/** Returns a Stripe-compatible customer email only when the decoded token actually includes one. */
+const getCheckoutCustomerEmail = (decodedToken) =>
+  typeof decodedToken.email === 'string' && decodedToken.email.trim() ? decodedToken.email : undefined;
 
 /** True when the user should retain premium access from Stripe state alone. */
 const isStripePremiumStatus = (billingStatus) => billingStatus === 'active' || billingStatus === 'trialing';
@@ -254,6 +236,51 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
   return result;
 };
 
+/** Extracts a verified Firebase user from the Authorization header. */
+const verifyRequestUser = async (req, res) => {
+  const token = getBearerToken(req);
+  const adminAuth = getAdminAuth();
+
+  if (!adminAuth || !hasFirebaseAdminConfig()) {
+    res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
+    return null;
+  }
+
+  if (!token) {
+    res.status(401).json({ error: 'Missing Firebase ID token.' });
+    return null;
+  }
+
+  try {
+    return await adminAuth.verifyIdToken(token);
+  } catch {
+    res.status(401).json({ error: 'Invalid Firebase ID token.' });
+    return null;
+  }
+};
+
+/** Creates the plan-specific Stripe checkout session for the verified user. */
+const isCheckoutAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.checkoutEnabled);
+
+/** Checks whether the Stripe customer portal is configured for this site. */
+const isPortalAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.hasBaseUrl);
+
+/** Resolves the Stripe price id for the selected billing plan. */
+const getCheckoutPriceId = (plan, billingConfig) => {
+  if (plan === 'monthly') {
+    return billingConfig.monthlyPriceId;
+  }
+
+  if (plan === 'annual') {
+    return billingConfig.annualPriceId;
+  }
+
+  return '';
+};
+
+/** Builds the checkout metadata shared between the session and subscription objects. */
+const createCheckoutMetadata = (uid, plan) => ({ uid, plan });
+
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const handleCheckout = async (req, res) => {
   const billingConfig = getBillingRuntimeConfig();
@@ -325,6 +352,96 @@ const handleBillingPortal = async (req, res) => {
   });
 
   res.json({ url: portal.url });
+};
+
+/** Maps Stripe recurring intervals into the entitlement interval shape. */
+const getPlanInterval = (interval) => (interval === 'year' ? 'annual' : 'monthly');
+
+/** Normalizes a Stripe API customer id into a nullable string. */
+const getStripeCustomerId = (value) => (typeof value === 'string' ? value : null);
+
+/** Normalizes a Stripe API subscription id into a nullable string. */
+const getStripeSubscriptionId = (value) => (typeof value === 'string' ? value : null);
+
+/** Converts Stripe unix timestamps into nullable JS dates. */
+const getStripeDate = (value) => (value ? new Date(value * 1000) : null);
+
+/** Builds the entitlement payload for a checkout completion event. */
+const createCheckoutEntitlementWrite = (session) => {
+  const uid = session.metadata?.uid || '';
+  const stripeCustomerId = getStripeCustomerId(session.customer);
+  const stripeSubscriptionId = getStripeSubscriptionId(session.subscription);
+
+  return {
+    uid,
+    stripeCustomerId,
+    stripeSubscriptionId,
+    payload: {
+      uid,
+      planInterval: session.metadata?.plan === 'annual' ? 'annual' : 'monthly',
+      billingStatus: 'active',
+      stripeCustomerId,
+      stripeSubscriptionId,
+      cancelAtPeriodEnd: false,
+      currentPeriodEnd: null,
+    },
+  };
+};
+
+/** Builds the entitlement payload for subscription lifecycle updates. */
+const getSubscriptionUid = (subscription) => subscription.metadata?.uid || '';
+
+/** Builds the nested payload for a subscription webhook entitlement update. */
+const createSubscriptionEntitlementPayload = (subscription, uid, stripeCustomerId) => ({
+  uid,
+  planInterval: getPlanInterval(subscription.items?.data?.[0]?.price?.recurring?.interval),
+  billingStatus: subscription.status || 'inactive',
+  stripeCustomerId,
+  stripeSubscriptionId: subscription.id,
+  cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
+  currentPeriodEnd: getStripeDate(getSubscriptionPeriodEndUnix(subscription)),
+});
+
+/** Builds the entitlement payload for subscription lifecycle updates. */
+const createSubscriptionEntitlementWrite = (subscription) => {
+  const uid = getSubscriptionUid(subscription);
+  const stripeCustomerId = getStripeCustomerId(subscription.customer);
+
+  return {
+    uid,
+    stripeCustomerId,
+    stripeSubscriptionId: subscription.id,
+    payload: createSubscriptionEntitlementPayload(subscription, uid, stripeCustomerId),
+  };
+};
+
+/** Returns the first usable Stripe ID from a list of expanded objects or plain IDs. */
+const getFirstStripeObjectId = (values) => values.map(getStripeObjectId).find(Boolean) || '';
+
+/** Finds the payment intent across Checkout and legacy/current invoice shapes. */
+const getCheckoutPaymentIntentId = (session, invoice, payments) =>
+  getFirstStripeObjectId([
+    session.payment_intent,
+    invoice?.payment_intent,
+    ...payments.map((payment) => payment?.payment?.payment_intent),
+  ]);
+
+/** Finds a charge-only payment across current and legacy invoice shapes. */
+const getCheckoutChargeId = (invoice, payments) =>
+  getFirstStripeObjectId([
+    ...payments.map((payment) => payment?.payment?.charge),
+    invoice?.charge,
+  ]);
+
+/** Finds the initial Checkout payment across Stripe's legacy and current invoice shapes. */
+const getCheckoutRefundTarget = (session, subscription) => {
+  const invoice = subscription?.latest_invoice;
+  const payments = invoice?.payments?.data || [];
+  const paymentIntent = getCheckoutPaymentIntentId(session, invoice, payments);
+  if (paymentIntent) return { payment_intent: paymentIntent };
+
+  const charge = getCheckoutChargeId(invoice, payments);
+  return charge ? { charge } : null;
 };
 
 /** Returns the UID only when this Checkout belongs to an account blocked from writes. */
@@ -412,6 +529,51 @@ const recordBillingMetricEventSafely = async (eventType) => {
   }
 };
 
+/** Resolves a subscription id or expanded object from a supported webhook payload. */
+const getInvoiceSubscription = (invoice) =>
+  invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
+
+/** Resolves a subscription id or expanded object from a supported webhook payload. */
+const getWebhookSubscription = (event) => {
+  const object = event.data.object;
+  if (event.type.startsWith('customer.subscription.')) {
+    return object;
+  }
+  if (event.type === 'checkout.session.completed') {
+    return object.subscription || null;
+  }
+  return getInvoiceSubscription(object);
+};
+
+/** Retrieves current Stripe lifecycle state for convenience events such as invoices. */
+const resolveAuthoritativeSubscription = (stripe, event) => {
+  const subscription = getWebhookSubscription(event);
+  if (!subscription) {
+    return null;
+  }
+  if (typeof subscription === 'object') {
+    return subscription;
+  }
+  return stripe.subscriptions.retrieve(subscription);
+};
+
+/** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
+const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
+  ...subscription,
+  metadata: {
+    ...(subscription.metadata || {}),
+    ...(subscription.metadata?.uid || !fallbackUid ? {} : { uid: fallbackUid }),
+  },
+});
+
+/** Builds the entitlement write from the checkout session's subscription or session data. */
+const buildCheckoutEntitlementWrite = async (stripe, event, session) => {
+  const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  return subscription
+    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
+    : createCheckoutEntitlementWrite(session);
+};
+
 /** Applies checkout completion using current subscription state when available. */
 const handleCheckoutSessionCompleted = async (event, stripe) => {
   const session = event.data.object;
@@ -436,6 +598,13 @@ const handleSubscriptionEvent = async (event) => {
     await recordBillingMetricEventSafely('premium_cancellation');
   }
 };
+
+/** Returns the UID from the subscription or invoice metadata. */
+const resolveInvoiceUid = (subscription, invoice) =>
+  getSubscriptionUid(subscription) ||
+  invoice.parent?.subscription_details?.metadata?.uid ||
+  invoice.subscription_details?.metadata?.uid ||
+  '';
 
 /** Checks whether an invoice belongs to a deleted account. */
 const isInvoiceForDeletedAccount = (subscription, invoice, customerId) => {
@@ -540,18 +709,33 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage, failureCode }) => asyn
 
 /** Registers the billing endpoints on the existing hosted-service Express app. */
 const registerBillingRoutes = (app, express) => {
-  registerBillingRoutesImpl({
-    app,
-    express,
+  app.get('/api/billing/config', handleBillingConfig);
+  app.post(
+    '/api/billing/webhook',
     webhookRateLimit,
+    express.raw({ type: 'application/json' }),
+    handleBillingWebhook
+  );
+  app.post(
+    '/api/billing/checkout',
     checkoutRateLimit,
+    express.json({ limit: '8kb' }),
+    wrapBillingJsonRoute({
+      handler: handleCheckout,
+      fallbackMessage: 'Unable to create checkout session.',
+      failureCode: 'billing_checkout_failed',
+    })
+  );
+  app.post(
+    '/api/billing/portal',
     portalRateLimit,
-    handleBillingConfig,
-    handleBillingWebhook,
-    handleCheckout,
-    handleBillingPortal,
-    wrapBillingJsonRoute,
-  });
+    express.json({ limit: '8kb' }),
+    wrapBillingJsonRoute({
+      handler: handleBillingPortal,
+      fallbackMessage: 'Unable to open the billing portal.',
+      failureCode: 'billing_portal_failed',
+    })
+  );
 };
 
 module.exports = {

@@ -6,7 +6,12 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { OutlookType } from '../types/outlooks';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
 
-export type BaseMapStyle = 'osm' | 'carto-light' | 'carto-dark' | 'esri-satellite' | 'blank';
+export type BaseMapStyle = 'osm' | 'carto-light' | 'esri-satellite' | 'blank';
+export type LegacyBaseMapStyle = 'carto-dark';
+
+/** Redirects the retired Carto dark basemap to the supported light style. */
+export const normalizeBaseMapStyle = (style: BaseMapStyle | LegacyBaseMapStyle): BaseMapStyle =>
+  style === 'carto-dark' ? 'carto-light' : style;
 
 export interface OverlaysState {
   stateBorders: boolean;
@@ -58,8 +63,8 @@ const overlaysSlice = createSlice({
     setOverlay: (state, action: PayloadAction<{ layer: 'stateBorders' | 'counties'; visible: boolean }>) => {
       state[action.payload.layer] = action.payload.visible;
     },
-    setBaseMapStyle: (state, action: PayloadAction<BaseMapStyle>) => {
-      state.baseMapStyle = action.payload;
+    setBaseMapStyle: (state, action: PayloadAction<BaseMapStyle | LegacyBaseMapStyle>) => {
+      state.baseMapStyle = normalizeBaseMapStyle(action.payload);
     },
     toggleGhostOutlook: (state, action: PayloadAction<OutlookType>) => {
       const outlookType = action.payload;
@@ -85,7 +90,9 @@ const overlaysSlice = createSlice({
       state.outlookTrimPreviewOnly = !state.outlookTrimPreviewOnly;
     },
     // @codescene(disable:"Complex Method")
-    applyOverlaySettings: (state, action: PayloadAction<Partial<OverlaysState>>) => {
+    applyOverlaySettings: (state, action: PayloadAction<
+      Partial<Omit<OverlaysState, 'baseMapStyle'>> & { baseMapStyle?: BaseMapStyle | LegacyBaseMapStyle }
+    >) => {
       const {
         stateBorders,
         counties,
@@ -105,7 +112,7 @@ const overlaysSlice = createSlice({
       }
 
       if (baseMapStyle) {
-        state.baseMapStyle = baseMapStyle;
+        state.baseMapStyle = normalizeBaseMapStyle(baseMapStyle);
       }
 
       if (outlookTrimStrategy) {
