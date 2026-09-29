@@ -29,7 +29,7 @@ to each.
 - **@turf/turf** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@types/geojson** ^7946.0.16 (root (pnpm)) — MIT — allowed
 - **@types/jest** ^30.0.0 (root (pnpm)) — MIT — allowed
-- **@types/node** ^26.6.1 (root (pnpm)) — MIT — allowed
+- **@types/node** ^26.6.2 (root (pnpm)) — MIT — allowed
 - **@types/react** 19.3.0 (root (pnpm)) — MIT — allowed
 - **@types/react-dom** 19.3.0 (root (pnpm)) — MIT — allowed
 - **@typescript/native** npm:typescript@^7.0.2 (root (pnpm)) — Apache-2.0 — allowed
@@ -47,7 +47,7 @@ to each.
 - **eslint-plugin-react-hooks** ^7.1.1 (root (pnpm)) — MIT — allowed
 - **eslint-plugin-testing-library** ^7.16.2 (root (pnpm)) — MIT — allowed
 - **firebase** ^12.19.0 (root (pnpm)) — Apache-2.0 — allowed
-- **firebase-tools** 15.28.2 (root (pnpm)) — MIT — allowed
+- **firebase-tools** 15.31.0 (root (pnpm)) — MIT — allowed
 - **gh-pages** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **globals** ^17.12.0 (root (pnpm)) — MIT — allowed
 - **html2canvas** ^1.4.1 (root (pnpm)) — MIT — allowed
@@ -56,23 +56,23 @@ to each.
 - **jest** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **jest-environment-jsdom** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **jszip** ^3.10.2 (root (pnpm)) — (MIT OR GPL-3.0-or-later) — allowed
-- **lucide-react** ^1.47.0 (root (pnpm)) — ISC — allowed
+- **lucide-react** ^1.48.0 (root (pnpm)) — ISC — allowed
 - **ol** ^10.10.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **ol-mapbox-style** ^13.5.1 (root (pnpm)) — BSD-2-Clause — allowed
 - **postcss** 8.5.28 (root (pnpm)) — MIT — allowed
 - **react** ^19.3.0 (root (pnpm)) — MIT — allowed
 - **react-dom** ^19.3.0 (root (pnpm)) — MIT — allowed
 - **react-redux** ^9.3.0 (root (pnpm)) — MIT — allowed
-- **react-router** ~8.3.1 (root (pnpm)) — MIT — allowed
+- **react-router** ~8.4.0 (root (pnpm)) — MIT — allowed
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
-- **rollup** >=4.63.3 (root (pnpm)) — MIT — allowed
+- **rollup** >=4.63.5 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.7.0 (root (pnpm)) — MIT — allowed
 - **tailwindcss** ^4.3.3 (root (pnpm)) — MIT — allowed
 - **typescript** npm:@typescript/typescript6@^6.0.2 (root (pnpm)) — Apache-2.0 — allowed
-- **typescript-eslint** ^8.70.0 (root (pnpm)) — MIT — allowed
+- **typescript-eslint** ^8.70.1 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.2 (root (pnpm)) — MIT — allowed
-- **vite** ^8.3.0 (root (pnpm)) — MIT — allowed
-- **yaml** 2.9.0 (root (pnpm)) — ISC — allowed
+- **vite** ^8.3.1 (root (pnpm)) — MIT — allowed
+- **yaml** 2.9.1 (root (pnpm)) — ISC — allowed
 - **@sentry/node** ^10.75.0 (server (npm)) — MIT — allowed
 - **express** ^5.2.1 (server (npm)) — MIT — allowed
 - **express-rate-limit** ^8.7.0 (server (npm)) — MIT — allowed

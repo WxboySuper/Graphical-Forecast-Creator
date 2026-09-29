@@ -6,6 +6,20 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 ## [Unreleased]
 
 ### Next major / beta
+#### Dependencies
+<!-- dependabot-automation -->
+
+- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
+- **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
+- **lucide-react:** ^1.47.0 → ^1.48.0
+- **react-router:** ~8.3.1 → ~8.4.0
+- **@types/node:** ^26.6.1 → ^26.6.2
+- **firebase-tools:** 15.28.2 → 15.31.0
+- **rollup:** >=4.63.3 → >=4.63.5
+- **typescript-eslint:** ^8.70.0 → ^8.70.1
+- **vite:** ^8.3.0 → ^8.3.1
+- **yaml:** 2.9.0 → 2.9.1
+
 
 #### Added
 
@@ -38,14 +52,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
 - **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
 
-#### Dependencies
-
-- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
-- **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
-
-#### Dependency summary
-<!-- dependabot-automation -->
-
+#
 ### Stable 1.7.x hotfixes
 
 <!-- Add production fixes for the next stable 1.7.x release here. -->
