@@ -1,6 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { listDependencyBumpsBetweenRefs, applyDependencyBumpsToChangelog } from './lib/dependabot-changelog.mjs';
+import { listDependencyBumpsBetweenRefs } from './lib/dependabot-changelog.mjs';
 import { parsePortBranch } from './lib/port-pr-policy.mjs';
 import { upsertManagedChangelogDeclaration } from './lib/changelog-automation.mjs';
 import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
@@ -11,7 +10,6 @@ const repository = process.env.GITHUB_REPOSITORY ?? '';
 const prNumber = Number(process.env.PR_NUMBER ?? 0);
 const authorLogin = process.env.PR_AUTHOR_LOGIN ?? '';
 const body = process.env.PR_BODY ?? '';
-const changelogPath = 'CHANGELOG.md';
 const isDependabot = authorLogin === 'dependabot[bot]' && headRef.startsWith('dependabot/');
 const port = parsePortBranch(headRef);
 
@@ -35,7 +33,6 @@ execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/
 
 const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);
 let declaration = null;
-let nextChangelog = null;
 
 if (isDependabot) {
   const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
@@ -46,10 +43,6 @@ if (isDependabot) {
     };
   } else {
     declaration = { impact: stableLine ? 'hotfix' : 'beta' };
-    execFileSync('git', ['checkout', '--detach', `origin/${headRef}`], { stdio: 'inherit' });
-    const changelog = readFileSync(changelogPath, 'utf8');
-    const lane = stableLine ? 'stable-hotfix' : 'next-major';
-    nextChangelog = applyDependencyBumpsToChangelog(changelog, bumps, lane);
   }
 } else {
   declaration = {
@@ -67,19 +60,4 @@ if (nextBody !== body) {
     { input: JSON.stringify({ body: nextBody }), stdio: ['pipe', 'inherit', 'inherit'] },
   );
   console.log(`Updated PR #${prNumber} changelog declaration before validation.`);
-}
-
-if (nextChangelog !== null) {
-  const currentHeadChangelog = readFileSync(changelogPath, 'utf8');
-  if (nextChangelog === currentHeadChangelog) {
-    console.log(`${changelogPath} already documents this dependency update.`);
-    process.exit(0);
-  }
-  writeFileSync(changelogPath, nextChangelog);
-  execFileSync('git', ['config', 'user.name', 'github-actions[bot]']);
-  execFileSync('git', ['config', 'user.email', 'github-actions[bot]@users.noreply.github.com']);
-  execFileSync('git', ['add', changelogPath]);
-  execFileSync('git', ['commit', '-m', 'chore: document automated dependency update'], { stdio: 'inherit' });
-  execFileSync('git', ['-c', gitAuth, 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
-  console.log(`Updated ${changelogPath} on ${headRef}.`);
 }

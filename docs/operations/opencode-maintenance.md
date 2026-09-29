@@ -170,15 +170,26 @@ script or local action. It removes tracked `.env` files and project OpenCode
 configuration, plugins, and hooks before starting the model.
 
 Generation requires exactly one `Changelog-Impact: beta` or `hotfix` decision
-and a diff that does not already change `CHANGELOG.md`. It is bounded to 80
-changed files, 90,000 diff characters, four entries, 450 characters per entry,
-and a 12-minute model timeout. Fork PRs, other decision values, oversized
-diffs, and inconclusive results do not produce automated edits; the changelog
-check remains the required gate. OpenCode has read-only repository tools and
-receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
-identity and head, then commits only `CHANGELOG.md`. The trusted automated
-preparation and publishing steps use `GH_PAT` for PR metadata updates or
-authenticated fetch/push. No checkout credential is persisted. The ordinary
+and a diff that does not already change `CHANGELOG.md`. Same-repository
+Dependabot PRs are included: a trusted preparation step classifies whether a
+dependency bump affects the product, writes only the changelog decision into
+the PR description, and then OpenCode investigates the full PR description,
+upstream release notes, dependency diff, and GFC usage. The preparation step
+does not write changelog entries. The complete PR description is passed as
+model context so Dependabot's release-note details are not truncated.
+
+Generation is bounded to 80 changed files, 90,000 diff characters, four
+entries, 450 characters per entry, and a 12-minute model timeout. Fork PRs,
+other decision values, oversized diffs, and inconclusive results do not
+produce automated edits; the changelog check remains the required gate.
+OpenCode has read-only repository tools and receives only
+`OPENCODE_API_KEY`. The trusted publisher rechecks the live PR identity and
+head, then commits only `CHANGELOG.md`. The preparation job's
+`GITHUB_TOKEN` can read contents and edit PR metadata; the publisher uses
+`GH_PAT` only for the generated branch update. No checkout credential is
+persisted. Large task prompts are attached to the checkout as a temporary file
+instead of being passed as a command-line argument, then removed when the
+runner exits. The ordinary
 `pull_request` CI workflow has read-only token permissions, no repository
 secrets, and no token environment passed to PR-controlled scripts. Human review
 and branch protection remain the merge boundary.

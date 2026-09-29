@@ -16,9 +16,12 @@ jobs:
   prepare-automated-changelog:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.pull_request.user.login == 'dependabot[bot]' || startsWith(github.head_ref, 'port/'))
+      !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Check out trusted default-branch tooling
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -58,13 +61,13 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
           PR_BODY: ${{ github.event.pull_request.body }}
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ github.token }}
         run: node "$GITHUB_WORKSPACE/_trusted/scripts/prepare-changelog-governance.mjs"
 
   generate-changelog:
+    needs: prepare-automated-changelog
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
       !github.event.pull_request.draft &&
       !startsWith(github.head_ref, 'port/')
     runs-on: ubuntu-latest
