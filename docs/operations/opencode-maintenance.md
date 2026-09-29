@@ -197,14 +197,11 @@ and a 12-minute model timeout. Fork PRs, other decision values, oversized
 diffs, and inconclusive results do not produce automated edits; the changelog
 check remains the required gate. Dependabot is accepted only when GitHub
 identifies `dependabot[bot]`, the head repository matches GFC, and the branch
-starts with `dependabot/`. The preparation job uses `GITHUB_TOKEN` with
-`contents: read` and `pull-requests: write` only to classify the dependency
-change and update the managed PR description block. OpenCode has read-only
-repository tools and
+starts with `dependabot/`. The trusted automated preparation and publishing
+steps use `GH_PAT` for PR metadata updates or authenticated fetch/push. OpenCode has read-only repository tools and
 receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
-identity and head, then commits only `CHANGELOG.md`. The trusted automated
-publisher uses `GH_PAT` only for the generated branch update. No checkout
-credential is persisted. The ordinary
+identity and head, then commits only `CHANGELOG.md`. No checkout credential
+is persisted. The ordinary
 `pull_request` CI workflow has read-only token permissions, no repository
 secrets, and no token environment passed to PR-controlled scripts. Human review
 and branch protection remain the merge boundary.
