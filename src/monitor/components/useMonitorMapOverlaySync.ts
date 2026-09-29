@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
+import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
@@ -25,8 +27,49 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
+  selectedAlert: NwsAlertDetails | null;
   onClearSelectedAlert: () => void;
 }
+
+/** Returns true when the selected alert is still present in the active collection. */
+export const isSelectedAlertInCollection = (
+  alertsCollection: NwsAlertFeatureCollection,
+  selectedAlert: NwsAlertDetails | null,
+): boolean => {
+  if (!selectedAlert) {
+    return true;
+  }
+
+  if (selectedAlert.detailUrl) {
+    return alertsCollection.features.some((feature) => {
+      const properties = (feature.properties ?? {}) as Record<string, unknown>;
+      if (resolveNwsAlertDetailUrl(properties) === selectedAlert.detailUrl) {
+        return true;
+      }
+      const featureId = typeof feature.id === 'string' ? feature.id : null;
+      return featureId !== null && featureId === selectedAlert.detailUrl;
+    });
+  }
+
+  const normalize = (value: unknown): string | null => {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  };
+
+  return alertsCollection.features.some((feature) => {
+    const properties = (feature.properties ?? {}) as Record<string, unknown>;
+    return (
+      (normalize(properties.event) ?? 'Weather alert') === selectedAlert.event &&
+      normalize(properties.headline) === selectedAlert.headline &&
+      normalize(properties.areaDesc) === selectedAlert.areaDesc &&
+      (normalize(properties.effective) ?? normalize(properties.onset)) === selectedAlert.effective &&
+      (normalize(properties.expires) ?? normalize(properties.ends)) === selectedAlert.expires
+    );
+  });
+};
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
 export const useMonitorMapOverlaySync = ({
@@ -38,6 +81,7 @@ export const useMonitorMapOverlaySync = ({
   mesoscaleDiscussions,
   alertsOpacity,
   refs,
+  selectedAlert,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
   useEffect(() => {
@@ -78,8 +122,13 @@ export const useMonitorMapOverlaySync = ({
   }, [mesoscaleDiscussions, refs.mesoscaleDiscussionLayerRef, refs.mesoscaleDiscussionSourceRef]);
 
   useEffect(() => {
-    onClearSelectedAlert();
-  }, [alertsCollection, onClearSelectedAlert]);
+    if (!selectedAlert) {
+      return;
+    }
+    if (!isSelectedAlertInCollection(alertsCollection, selectedAlert)) {
+      onClearSelectedAlert();
+    }
+  }, [alertsCollection, selectedAlert, onClearSelectedAlert]);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);
