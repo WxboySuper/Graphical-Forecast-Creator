@@ -109,79 +109,77 @@ const assertChangedFindingLine = (finding, changedLineNumbers = {}) => {
 };
 
 const parseReviewAssessments = (assessments, openThreads) => {
-  assertAssessmentCount(assessments, openThreads);
   const expected = new Set(openThreads.map((thread) => thread.id));
+  const accepted = new Map();
   const seen = new Set();
-  return assessments.map((assessment) => parseReviewAssessment(assessment, expected, seen));
+  for (const assessment of Array.isArray(assessments) ? assessments : []) {
+    if (!isNewExpectedReviewAssessment(assessment, expected, seen)) continue;
+    seen.add(assessment.threadId);
+    accepted.set(assessment.threadId, parseReviewAssessment(assessment));
+  }
+  const missing = openThreads.find((thread) => !accepted.has(thread.id));
+  if (missing) throw new Error('First-look output must assess every supplied open review thread before publishing.');
+  return openThreads.map((thread) => accepted.get(thread.id));
 };
 
-const assertAssessmentCount = (assessments, openThreads) => {
-  if (!Array.isArray(assessments)) throw invalidAssessmentCount();
-  if (assessments.length !== openThreads.length) throw invalidAssessmentCount();
+const isNewExpectedReviewAssessment = (assessment, expected, seen) => {
+  if (!assessment) return false;
+  if (!expected.has(assessment.threadId)) return false;
+  return !seen.has(assessment.threadId);
 };
 
-const invalidAssessmentCount = () => new Error('First-look output must assess each supplied open review thread exactly once.');
-
-const parseReviewAssessment = (assessment, expected, seen) => {
-  assertAssessmentIdentity(assessment, expected, seen);
-  assertAssessmentStatus(assessment.status);
-  seen.add(assessment.threadId);
-  return {
-    threadId: assessment.threadId,
-    status: assessment.status,
-    summary: boundedText(assessment.summary, 'review-comment summary'),
-  };
-};
-
-const assertAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment) throw invalidAssessmentIdentity();
-  if (!expected.has(assessment.threadId)) throw invalidAssessmentIdentity();
-  if (seen.has(assessment.threadId)) throw invalidAssessmentIdentity();
-};
-
-const invalidAssessmentIdentity = () => new Error('First-look review-thread assessments do not match the supplied open threads.');
+const parseReviewAssessment = (assessment) => ({
+  threadId: assessment.threadId,
+  status: assertAssessmentStatus(assessment.status),
+  summary: boundedText(assessment.summary, 'review-comment summary'),
+});
 
 const assertAssessmentStatus = (status) => {
   if (!ASSESSMENTS.has(status)) throw new Error('First-look review-thread status is invalid.');
+  return status;
 };
 
 const parsePriorFindingAssessments = (assessments, priorFindings) => {
-  assertPriorFindingAssessmentCount(assessments, priorFindings);
   const expected = new Set(priorFindings.map((finding) => finding.findingId));
-  const seen = new Set();
-  return assessments.map((assessment) => parsePriorFindingAssessment(assessment, expected, seen));
+  const accepted = collectValidPriorFindingAssessments(assessments, expected);
+  return priorFindings.map((finding) => assessmentOrUnclear(finding, accepted));
 };
 
-const assertPriorFindingAssessmentCount = (assessments, priorFindings) => {
-  if (!Array.isArray(assessments) || assessments.length !== priorFindings.length) {
-    throw new Error('First-look output must assess every previous finding exactly once.');
+const collectValidPriorFindingAssessments = (assessments, expected) => {
+  const accepted = new Map();
+  if (!Array.isArray(assessments)) return accepted;
+  for (const assessment of assessments) {
+    if (!isNewKnownFindingAssessment(assessment, expected, accepted)) continue;
+    const parsed = parsePriorFindingAssessment(assessment);
+    if (parsed) accepted.set(parsed.findingId, parsed);
+  }
+  return accepted;
+};
+
+const isNewKnownFindingAssessment = (assessment, expected, accepted) => {
+  if (!assessment) return false;
+  if (!expected.has(assessment.findingId)) return false;
+  return !accepted.has(assessment.findingId);
+};
+
+const parsePriorFindingAssessment = (assessment) => {
+  if (!PRIOR_FINDING_ASSESSMENTS.has(assessment.status)) return null;
+  try {
+    return {
+      findingId: assessment.findingId,
+      status: assessment.status,
+      summary: boundedText(assessment.summary, 'previous-finding summary'),
+    };
+  } catch {
+    return null;
   }
 };
 
-const parsePriorFindingAssessment = (assessment, expected, seen) => {
-  assertPriorFindingAssessmentIdentity(assessment, expected, seen);
-  assertPriorFindingAssessmentStatus(assessment.status);
-  seen.add(assessment.findingId);
-  return {
-    findingId: assessment.findingId,
-    status: assessment.status,
-    summary: boundedText(assessment.summary, 'previous-finding summary'),
-  };
-};
-
-const assertPriorFindingAssessmentIdentity = (assessment, expected, seen) => {
-  if (!assessment) throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  if (!expected.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-  if (seen.has(assessment.findingId)) {
-    throw new Error('First-look previous-finding assessments do not match the supplied findings.');
-  }
-};
-
-const assertPriorFindingAssessmentStatus = (status) => {
-  if (!PRIOR_FINDING_ASSESSMENTS.has(status)) throw new Error('First-look previous-finding status is invalid.');
-};
+const assessmentOrUnclear = (finding, accepted) => accepted.get(finding.findingId) ?? ({
+  findingId: finding.findingId,
+  status: 'unclear',
+  summary: 'This run did not provide a valid assessment; the earlier finding remains for human follow-up.',
+});
 
 /** Parse the reviewer's bounded JSON response before any PR comment is published. */
 export const parseOpenCodeFirstLookOutput = (raw, context) => {
@@ -206,15 +204,27 @@ const assertJsonObject = (result) => {
 };
 
 const parseReviewPayload = (result, context) => {
+  const prSummary = boundedList(result.prSummary, 'prSummary', { allowEmpty: false });
+  const latestChanges = boundedList(result.latestChanges, 'latestChanges');
+  const goodThings = parseGoodThings(result);
+  const badThings = parseFindings(result, context);
+  const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
+  const reviewCommentAssessments = parseContextReviewAssessments(result, context);
+  const unresolvedThreadAssessments = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
+  if (unresolvedThreadAssessments.length && badThings.length === 0) {
+    throw new Error('First-look output must include concrete findings when a review thread remains open or unclear after investigation.');
+  }
+  const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
+  const unresolvedPriorFindings = (context.priorFindings ?? []).filter((finding) => statusById.get(finding.findingId) !== 'resolved');
   return {
-    prSummary: boundedList(result.prSummary, 'prSummary', { allowEmpty: false }),
-    latestChanges: boundedList(result.latestChanges, 'latestChanges'),
-    goodThings: parseGoodThings(result),
-    badThings: parseFindings(result, context),
-    rating: parseRating(result.rating),
+    prSummary,
+    latestChanges,
+    goodThings,
+    badThings,
+    rating: normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
-    reviewCommentAssessments: parseContextReviewAssessments(result, context),
-    priorFindingAssessments: parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []),
+    reviewCommentAssessments,
+    priorFindingAssessments,
   };
 };
 
@@ -234,6 +244,12 @@ const parseRating = (rating) => {
 };
 
 const invalidRating = () => new Error('First-look rating must be an integer from 0 to 10.');
+
+const normalizeRating = (rating, findings) => {
+  if (findings.length === 0) return 10;
+  if (findings.every((finding) => finding.priority === 'P3')) return 9;
+  return Math.min(rating, 8);
+};
 
 const parseLinkedIssueAssessment = (result, context) => {
   const linkedIssues = Array.isArray(context.linkedIssues) ? context.linkedIssues : [];
@@ -331,6 +347,7 @@ export const mergeOpenCodeFirstLookResults = (previous, current) => {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
     badThings: findings,
+    rating: normalizeRating(current.rating, findings),
   };
 };
 
