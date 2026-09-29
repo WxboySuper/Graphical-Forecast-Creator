@@ -14,6 +14,60 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
 const BRANCH_PATTERN = /^[\w./-]+$/;
 export const RELEASE_NOTES_MODES = ['changelog', 'prs', 'changelog-and-prs'];
 
+/** Build the GitHub CLI arguments for a release and its portable Markdown notes asset. */
+export const buildGitHubReleaseCreateArgs = ({ tag, targetBranch, notesFile, prerelease }) => [
+  'release',
+  'create',
+  tag,
+  `${notesFile}#GFC-${tag}-release-notes.md`,
+  '--title',
+  tag,
+  '--notes-file',
+  notesFile,
+  '--target',
+  targetBranch,
+  ...(prerelease ? ['--prerelease'] : []),
+];
+
+/** Build an additive upload command for a release created before notes assets were added. */
+export const buildGitHubReleaseUploadArgs = ({ tag, notesFile }) => [
+  'release',
+  'upload',
+  tag,
+  `${notesFile}#GFC-${tag}-release-notes.md`,
+];
+
+const runGitHubCommand = (args, options) => execFileSync('gh', args, options);
+
+const githubReleaseExists = (tag, runCommand) => {
+  try {
+    runCommand(['release', 'view', tag], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const githubReleaseHasNotesAsset = (tag, runCommand) => {
+  const release = JSON.parse(runCommand(['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
+  return release.assets.some((asset) => asset.name === `GFC-${tag}-release-notes.md`);
+};
+
+const uploadReleaseNotesAssetIfMissing = ({ tag, notesFile, runCommand }) => {
+  if (githubReleaseHasNotesAsset(tag, runCommand)) return;
+  runCommand(buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });
+};
+
+/** Publish the generated public release body with a portable Markdown notes asset. */
+export const publishGitHubRelease = ({ tag, targetBranch, notesFile, prerelease, runCommand = runGitHubCommand }) => {
+  if (githubReleaseExists(tag, runCommand)) {
+    uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand });
+    return `GitHub release ${tag} already exists.`;
+  }
+  runCommand(buildGitHubReleaseCreateArgs({ tag, targetBranch, notesFile, prerelease }), { stdio: 'inherit' });
+  return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`;
+};
+
 /** Validate the user-provided release version and target ref. */
 export const validateReleaseInputs = ({ version, targetBranch }) => {
   if (!version || !VERSION_PATTERN.test(version)) {
@@ -103,39 +157,7 @@ const run = () => {
   writeFileSync(notesFile, `${section}\n`);
 
   const prerelease = hasBetaPrerelease(version);
-  /** Check whether the requested GitHub release already exists. */
-  const ghReleaseExists = () => {
-    try {
-      execFileSync('gh', ['release', 'view', tag], { stdio: 'ignore' });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  /** Create the requested GitHub release from the prepared notes file. */
-  const createGhRelease = () => {
-    const args = [
-      'release',
-      'create',
-      tag,
-      '--title',
-      tag,
-      '--notes-file',
-      notesFile,
-      '--target',
-      targetBranch,
-    ];
-    if (prerelease) args.push('--prerelease');
-    execFileSync('gh', args, { stdio: 'inherit' });
-  };
-
-  if (ghReleaseExists()) {
-    console.log(`GitHub release ${tag} already exists.`);
-  } else {
-    createGhRelease();
-    console.log(`Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`);
-  }
+  console.log(publishGitHubRelease({ tag, targetBranch, notesFile, prerelease }));
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

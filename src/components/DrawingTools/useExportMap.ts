@@ -1,11 +1,12 @@
-import { useState, useCallback, type RefObject } from 'react';
+import { useState, useCallback } from 'react';
 import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import type OLMap from 'ol/Map';
 import { ForecastMapHandle } from '../Map/ForecastMap';
+import type React from 'react';
 import type { MapAdapterHandle } from '../../maps/contracts';
 
 interface UseExportMapParams {
-  mapRef: RefObject<ForecastMapHandle | null>;
+  mapRef: React.RefObject<ForecastMapHandle | null>;
   isExportDisabled: boolean;
   addToast: (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
 }

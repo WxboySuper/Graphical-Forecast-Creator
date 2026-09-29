@@ -1,6 +1,6 @@
 export const CHANGELOG_LANE_HEADINGS = {
   'next-major': '### Next major / beta',
-  'stable-hotfix': '### Stable 1.6.x hotfixes',
+  'stable-hotfix': '### Stable 1.7.x hotfixes',
 };
 
 /** @param {string} lane @returns {string} */

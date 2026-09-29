@@ -35,10 +35,8 @@ const US_STATES_GEOJSON_URL = getGeoBoundarySource('usStates').url;
 let cachedUsStatesGeoJSON: object | null = null;
 
 /** Creates the monitor basemap tile source for the active theme. */
-export const createBaseSource = (darkMode: boolean) => new XYZ({
-  url: darkMode
-    ? 'https://{a-d}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png'
-    : 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
+export const createBaseSource = () => new XYZ({
+  url: 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
   attributions: '&copy; OpenStreetMap &copy; CARTO',
   crossOrigin: 'anonymous',
   maxZoom: 19,

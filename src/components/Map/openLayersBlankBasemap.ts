@@ -79,6 +79,9 @@ export const ensureBlankLayerLoaded = async (config: BlankLayerConfig) => {
   let geoJson = config.getCache();
   if (!geoJson) {
     const response = await fetch(config.url);
+    if (!response.ok) {
+      throw new Error(`Failed to load blank map layer: HTTP ${response.status}`);
+    }
     geoJson = (await response.json()) as object;
     config.setCache(geoJson);
   }

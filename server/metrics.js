@@ -1,7 +1,8 @@
 'use strict';
 
 const rateLimit = require('express-rate-limit');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
+const { verifyFirebaseToken } = require('./firebase-auth');
 
 const METRIC_EVENT_TYPES = new Set([
   'account_signup',
@@ -86,21 +87,7 @@ const {
 } = require('./metricsValues');
 
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
-const verifyRequestUser = async (req) => {
-  const authHeader = req.headers.authorization || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !token) {
-    return null;
-  }
-
-  try {
-    return await adminAuth.verifyIdToken(token);
-  } catch {
-    return null;
-  }
-};
+const verifyRequestUser = (req) => verifyFirebaseToken(req);
 
 /** Returns the current server-side admin UID allowlist parsed from env. */
 const getAdminUidAllowlist = () =>

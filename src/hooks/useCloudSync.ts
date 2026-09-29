@@ -5,6 +5,7 @@ import { serializeForecast } from '../utils/fileUtils';
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { UseCloudCyclesResult } from './useCloudCycles';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const SYNC_DEBOUNCE_MS = 5000; // 5 second debounce
 
@@ -77,6 +78,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata,
   setLastSyncedHash,
   currentHash,
+  workspaceId,
   isLatestRequest,
 }: {
   canSync: boolean;
@@ -89,6 +91,7 @@ const syncCurrentCloudCycle = async ({
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   setLastSyncedHash: (cloudId: string, hash: string) => void;
   currentHash: string;
+  workspaceId: ForecastWorkspaceId;
   isLatestRequest: () => boolean;
 }) => {
   if (!canSync || !currentCloud) {
@@ -99,7 +102,7 @@ const syncCurrentCloudCycle = async ({
     updateSyncState('saving', undefined, currentCloud.id);
 
     const stats = countForecastMetrics(forecastCycle);
-    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata);
+    const success = await saveCycle(currentCloud.label, cycleDate, stats, payload, workflowMetadata, { workspaceId });
 
     if (!success) {
       applyCloudSyncFailure({ isLatestRequest, updateSyncState, currentCloud, message: 'Failed to sync to cloud' });
@@ -120,6 +123,65 @@ const syncCurrentCloudCycle = async ({
 
 type CloudSyncInput = Pick<UseCloudCyclesResult, 'currentCloud' | 'updateSyncState' | 'saveCycle'>;
 
+type LastSyncedState = { cloudId: string; hash: string } | null;
+
+/** Returns true when the selected cycle matches the last synced cycle and hash. */
+const isSelectedCloudSynced = (
+  currentCloud: CloudSyncInput['currentCloud'],
+  lastSyncedState: LastSyncedState,
+  currentHash: string,
+): boolean =>
+  Boolean(currentCloud && lastSyncedState?.cloudId === currentCloud.id && isCurrentStateSynced(lastSyncedState.hash, currentHash));
+
+/** Tracks sync request generations so stale completions can be ignored after selection changes. */
+function useSyncRequestGeneration(canSync: boolean, currentCloudId: string | null) {
+  const syncGenerationRef = useRef(0);
+  useEffect(() => {
+    syncGenerationRef.current += 1;
+  }, [canSync, currentCloudId]);
+  return syncGenerationRef;
+}
+
+/** Defers a loaded-cycle sync marker until that cycle becomes the selected one. */
+function useDeferredCloudSyncMarker({
+  canSync,
+  currentCloud,
+  currentHash,
+  setLastSyncedState,
+}: {
+  canSync: boolean;
+  currentCloud: CloudSyncInput['currentCloud'];
+  currentHash: string;
+  setLastSyncedState: (state: { cloudId: string; hash: string }) => void;
+}) {
+  // Stores the cloud id together with the content hash captured when the marker
+  // ran, so later content changes cannot be marked as synced on activation.
+  const pendingSyncedCloudRef = useRef<{ cloudId: string; hash: string } | null>(null);
+
+  const markCurrentStateSynced = useCallback((cloudId?: string) => {
+    if (!canSync) return;
+    if (cloudId && currentCloud?.id !== cloudId) {
+      pendingSyncedCloudRef.current = { cloudId, hash: currentHash };
+      return;
+    }
+    if (currentCloud) setLastSyncedState({ cloudId: currentCloud.id, hash: currentHash });
+  }, [canSync, currentCloud, currentHash, setLastSyncedState]);
+
+  useEffect(() => {
+    const pending = pendingSyncedCloudRef.current;
+    if (!canSync || !currentCloud) {
+      pendingSyncedCloudRef.current = null;
+      return;
+    }
+    if (!pending || currentCloud.id !== pending.cloudId) return;
+    pendingSyncedCloudRef.current = null;
+    setLastSyncedState({ cloudId: pending.cloudId, hash: pending.hash });
+  }, [canSync, currentCloud, setLastSyncedState]);
+
+  return markCurrentStateSynced;
+}
+
+/** Owns debounced cloud-sync execution and exposes explicit sync controls. */
 const useCloudSyncOperations = ({
   canSync,
   currentCloud,
@@ -129,6 +191,7 @@ const useCloudSyncOperations = ({
   forecastCycle,
   workflowMetadata,
   currentHash,
+  workspaceId,
 }: {
   canSync: boolean;
   currentCloud: CloudSyncInput['currentCloud'];
@@ -138,10 +201,18 @@ const useCloudSyncOperations = ({
   forecastCycle: RootState['forecast']['forecastCycle'];
   workflowMetadata: RootState['forecast']['workflowMetadata'];
   currentHash: string;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const syncGenerationRef = useRef(0);
-  const [lastSyncedState, setLastSyncedState] = useState<{ cloudId: string; hash: string } | null>(null);
+  const syncGenerationRef = useSyncRequestGeneration(canSync, currentCloud?.id ?? null);
+  const [lastSyncedState, setLastSyncedState] = useState<LastSyncedState>(null);
+  const markCurrentStateSynced = useDeferredCloudSyncMarker({
+    canSync,
+    currentCloud,
+    currentHash,
+    setLastSyncedState: (state) => setLastSyncedState(state),
+  });
+
   const performSync = useCallback(async () => {
     const requestGeneration = ++syncGenerationRef.current;
     await syncCurrentCloudCycle({
@@ -153,11 +224,12 @@ const useCloudSyncOperations = ({
       cycleDate: forecastCycle.cycleDate,
       forecastCycle,
       workflowMetadata,
-       setLastSyncedHash: (cloudId, hash) => setLastSyncedState({ cloudId, hash }),
+      setLastSyncedHash: (cloudId, hash) => setLastSyncedState({ cloudId, hash }),
       currentHash,
+      workspaceId,
       isLatestRequest: () => syncGenerationRef.current === requestGeneration,
     });
-  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, updateSyncState, workflowMetadata]);
+  }, [canSync, currentCloud, currentHash, forecastCycle, saveCycle, serializedPayload, syncGenerationRef, updateSyncState, workflowMetadata, workspaceId]);
 
   useCloudSyncScheduling({
     canSync,
@@ -172,18 +244,16 @@ const useCloudSyncOperations = ({
     clearSyncTimeout(syncTimeoutRef);
     await performSync();
   }, [performSync]);
-  const markCurrentStateSynced = useCallback(() => {
-    if (canSync && currentCloud) setLastSyncedState({ cloudId: currentCloud.id, hash: currentHash });
-  }, [canSync, currentCloud, currentHash]);
 
   return {
-    isSynced: Boolean(currentCloud && lastSyncedState?.cloudId === currentCloud.id && isCurrentStateSynced(lastSyncedState.hash, currentHash)),
+    isSynced: isSelectedCloudSynced(currentCloud, lastSyncedState, currentHash),
     syncNow,
     markCurrentStateSynced,
   };
 };
 
-const useCloudSyncScheduling = ({
+/** Schedules a debounced save whenever the selected cycle has unsynced state. */
+function useCloudSyncScheduling({
   canSync,
   currentCloudId,
   currentHash,
@@ -197,7 +267,7 @@ const useCloudSyncScheduling = ({
   lastSyncedState: { cloudId: string; hash: string } | null;
   performSync: () => Promise<void>;
   syncTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
-}) => {
+}) {
   useEffect(() => {
     if (!canSync || !currentCloudId || (lastSyncedState?.cloudId === currentCloudId && isCurrentStateSynced(lastSyncedState.hash, currentHash))) {
       clearSyncTimeout(syncTimeoutRef);
@@ -215,10 +285,13 @@ const useCloudSyncScheduling = ({
       clearSyncTimeout(syncTimeoutRef);
     };
   }, [canSync, currentCloudId, currentHash, lastSyncedState, performSync, syncTimeoutRef]);
-};
+}
 
 /** Hook for managing automatic sync of the current forecast to cloud. */
-export const useCloudSync = (cloud: CloudSyncInput) => {
+export const useCloudSync = (
+  cloud: CloudSyncInput,
+  workspaceId: ForecastWorkspaceId = DEFAULT_FORECAST_WORKSPACE,
+) => {
   const { premiumActive } = useEntitlement();
   const currentCloud = cloud.currentCloud;
   const forecastCycle = useSelector((state: RootState) => state.forecast.forecastCycle);
@@ -239,6 +312,7 @@ export const useCloudSync = (cloud: CloudSyncInput) => {
     forecastCycle,
     workflowMetadata,
     currentHash,
+    workspaceId,
   });
 
   return { ...operations, currentCloud };

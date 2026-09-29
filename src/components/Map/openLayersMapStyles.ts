@@ -7,7 +7,7 @@ import Overlay from "ol/Overlay";
 import type { FeatureLike } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { v4 as uuidv4 } from "uuid";
-import type { BaseMapStyle } from "../../store/overlaysSlice";
+import type { BaseMapStyle, LegacyBaseMapStyle } from "../../store/overlaysSlice";
 import type { OpenFreeMapStyleSet } from "../../lib/openFreeMap";
 import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
 import type {
@@ -38,6 +38,10 @@ export const loadOpenFreeMapLayerGroups = async (
   ]);
   return { baseGroup, referenceGroup };
 };
+
+/** Keeps a completed style request from replacing a newer basemap selection. */
+export const isCurrentOpenFreeMapRequest = (currentRequestId: number, requestId: number): boolean =>
+  currentRequestId === requestId;
 
 interface FeatureIdentity {
   featureId: string;
@@ -94,6 +98,8 @@ interface HatchPatternInput {
   strokeWidth?: number;
 }
 
+const FUNCTION_COLOR_NOTATION_REGEX = /^(rgba?|hsla?)\(/i;
+
 const TOP_OUTLINE_LAYER_Z_INDEX = 1000;
 const TOP_VECTOR_REFERENCE_LAYER_Z_INDEX = 1050;
 const TOP_LABEL_LAYER_Z_INDEX = 1100;
@@ -114,11 +120,7 @@ export const toRgbaColor = ({ color, alpha }: RgbaInput): string => {
     return `rgba(255, 255, 255, ${alpha})`;
   }
 
-  if (color.startsWith("rgba(") || color.startsWith("hsla(")) {
-    return color;
-  }
-
-  if (color.startsWith("rgb(") || color.startsWith("hsl(")) {
+  if (FUNCTION_COLOR_NOTATION_REGEX.test(color)) {
     return color;
   }
 
@@ -471,7 +473,7 @@ export const toGhostOlStyle = ({
 
 // Creates a labels/places overlay source so cities and boundaries stay readable above polygons.
 export const createLabelOverlaySource = (
-  style: Exclude<BaseMapStyle, "blank">,
+  style: Exclude<BaseMapStyle, "blank"> | LegacyBaseMapStyle,
 ): XYZ | null => {
   switch (style) {
     case "osm":
@@ -482,15 +484,9 @@ export const createLabelOverlaySource = (
         crossOrigin: "anonymous",
       });
     case "carto-light":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
-        attributions: "&copy; OpenStreetMap &copy; CARTO",
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
     case "carto-dark":
       return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
+        url: "https://{a-d}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
         attributions: "&copy; OpenStreetMap &copy; CARTO",
         maxZoom: 19,
         crossOrigin: "anonymous",
@@ -509,7 +505,7 @@ export const createLabelOverlaySource = (
 
 // Helper to create tile source based on selected base map style
 export const createTileSource = (
-  style: Exclude<BaseMapStyle, "blank">,
+  style: Exclude<BaseMapStyle, "blank"> | LegacyBaseMapStyle,
 ): OSM | XYZ => {
   switch (style) {
     case "osm":
@@ -521,16 +517,9 @@ export const createTileSource = (
         crossOrigin: "anonymous",
       });
     case "carto-light":
-      return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
-        attributions:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        maxZoom: 19,
-        crossOrigin: "anonymous",
-      });
     case "carto-dark":
       return new XYZ({
-        url: "https://{a-d}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+        url: "https://{a-d}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",
         attributions:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
         maxZoom: 19,
@@ -540,7 +529,7 @@ export const createTileSource = (
       return new XYZ({
         url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
         attributions:
-          "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP",
+          "Tiles &copy; Esri &mdash; Source: Esri i-cubed USDA USGS AEX GeoEye Getmapping Aerogrid IGN IGP UPR-EGP",
         maxZoom: 19,
         crossOrigin: "anonymous",
       });

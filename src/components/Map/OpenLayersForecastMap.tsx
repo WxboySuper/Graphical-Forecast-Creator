@@ -19,7 +19,8 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
 import { fromLonLat, toLonLat } from "ol/proj";
 import Overlay from "ol/Overlay";
-import { type default as OLFeature, type FeatureLike } from "ol/Feature";
+import type { FeatureLike } from "ol/Feature";
+import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import { altKeyOnly, click, shiftKeyOnly, singleClick } from "ol/events/condition";
 import { v4 as uuidv4 } from "uuid";
@@ -51,11 +52,15 @@ import Legend from "./Legend";
 import StatusOverlay from "./StatusOverlay";
 import CategoricalErrorBanner from "./CategoricalErrorBanner";
 import UnofficialBadge from "./UnofficialBadge";
-import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
+import {
+  getOpenFreeMapStyleSet,
+  isOpenFreeMapStyle,
+} from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
   getFeatureIdentity,
   toUpdatedGeoJsonFeature,
+  replaceLayerGroupLayers,
   isDrawableOutlookType,
   toOlStyle,
   toCustomOlStyle,
@@ -65,14 +70,16 @@ import {
   toTstmPreviewOlStyle,
   toGhostOlStyle,
   createLabelOverlaySource,
+  createTileSource,
   hideOverlay,
   TOP_OUTLINE_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
   GHOST_REFERENCE_LAYER_Z_INDEX,
+  loadOpenFreeMapLayerGroups,
+  isCurrentOpenFreeMapRequest,
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
-import { applyRasterBasemap, loadOpenFreeMapBasemap } from "./openLayersBasemap";
 import type { CustomCategoryStyle } from "../../types/customProducts";
 import {
   BLANK_LAND_FILL_STYLE,
@@ -96,7 +103,6 @@ import { buildTrimmedOutlookPreviewFeatures } from "../../utils/outlookPolygonMa
 import { Fill, Stroke, Style as OlStyle } from "ol/style";
 import { matchesPrecisionEditTier, PAN_MODE_VERTEX_EDIT_HELP } from "./precisionPolygonEditing";
 
-/** Returns whether a click should be handled by the paint-bucket interaction. */
 const shouldHandlePaintBucketClick = (
   paintBucketEnabled: boolean,
   interactionMode: "pan" | "draw" | "delete" | "edit",
@@ -113,7 +119,6 @@ interface ForecastMapClickEvent {
   originalEvent: { shiftKey?: boolean };
 }
 
-/** Handles map clicks for forecast editing, drawing, and paint-bucket interactions. */
 const handleForecastMapClick = ({
   map,
   event,
@@ -255,7 +260,6 @@ const syncTrimPreviewSource = (
       featureProjection: "EPSG:3857",
     });
 
-    /** Marks a feature as part of the temporary trim preview. */
     const applyPreview = (item: OLFeature<Geometry>) => {
       item.setStyle(TRIM_PREVIEW_STYLE);
       item.set("trimPreview", true);
@@ -375,7 +379,6 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       currentDayRef.current = currentDay;
     }, [currentDay]);
 
-    /** Applies the configured trim strategy to a stored outlook feature. */
     const trimStoredOutlookFeature = async (
       feature: GeoJsonFeature,
     ): Promise<GeoJsonFeature> => {
@@ -503,27 +506,27 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         const format = new GeoJSON();
         const editDay = currentDayRef.current;
         features.forEach((feature) => {
-          (async () => {
+          void (async () => {
             try {
-            if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
-              return;
-            }
-
-            if (!isCategorical) {
-              const customFeature = toUpdatedCustomFeature(feature, format);
-              if (customFeature) {
-                dispatch(updateCustomFeature(customFeature));
+              if (isCategorical && feature.get("derivedFrom") === "auto-generated") {
                 return;
               }
-            }
 
-            const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
-            if (!updatedFeature) {
-              return;
-            }
+              if (!isCategorical) {
+                const customFeature = toUpdatedCustomFeature(feature, format);
+                if (customFeature) {
+                  dispatch(updateCustomFeature(customFeature));
+                  return;
+                }
+              }
 
-            const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
-            dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
+              const updatedFeature = toUpdatedGeoJsonFeature(feature, format, isCategorical);
+              if (!updatedFeature) {
+                return;
+              }
+
+              const trimmedFeature = await trimStoredOutlookFeature(updatedFeature);
+              dispatch(updateFeature({ feature: trimmedFeature, day: editDay }));
             } catch (error) {
               captureException(error, { tags: { featureOperation: "modify-outlook" } });
             }
@@ -1012,6 +1015,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       )
         return;
 
+      // Every style change invalidates any OpenFreeMap request started by a
+      // previous selection, including a switch back to a raster or blank map.
+      const requestId = vectorStyleRequestRef.current + 1;
+      vectorStyleRequestRef.current = requestId;
+
       /** Ensure state boundaries remain available above outlook polygons in every map style. */
       const loadUsStatesBoundaries = () => {
         ensureBlankLayerLoaded(createBlankLayerConfig("usStates", landSourceRef.current)).catch(() => {
@@ -1063,15 +1071,45 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         landOutline.setVisible(true);
         labels.setVisible(false);
         el.style.backgroundColor = "";
-        loadOpenFreeMapBasemap({
-          style: baseMapStyle,
-          tile,
-          labels,
-          vectorBaseGroup,
-          vectorReferenceGroup,
-          requestRef: vectorStyleRequestRef,
-          logPrefix: "forecast-map",
-        });
+        vectorBaseGroup.setVisible(false);
+        vectorReferenceGroup.setVisible(false);
+        vectorBaseGroup.getLayers().clear();
+        vectorReferenceGroup.getLayers().clear();
+
+        getOpenFreeMapStyleSet(baseMapStyle)
+          .then(loadOpenFreeMapLayerGroups)
+          .then(({ baseGroup, referenceGroup }) => {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
+              return;
+            }
+
+            replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
+            replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
+            vectorBaseGroup.setVisible(true);
+            vectorReferenceGroup.setVisible(true);
+          })
+          .catch((error) => {
+            if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
+              return;
+            }
+
+            console.warn(
+              "[forecast-map] falling back to raster basemap after vector load failure",
+              {
+                baseMapStyle,
+                error,
+              },
+            );
+            vectorBaseGroup.getLayers().clear();
+            vectorReferenceGroup.getLayers().clear();
+            tile.setSource(createTileSource(baseMapStyle));
+            tile.setVisible(true);
+            const labelSource = createLabelOverlaySource(baseMapStyle);
+            if (labelSource) {
+              labels.setSource(labelSource);
+              labels.setVisible(true);
+            }
+          });
       } else {
         hideVectorBasemapGroups();
         tile.setVisible(true);
@@ -1080,11 +1118,18 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         land.setVisible(false);
         landOutline.setVisible(true);
         el.style.backgroundColor = "";
-        applyRasterBasemap({
-          style: baseMapStyle as Exclude<BaseMapStyle, "blank">,
-          tile,
-          labels,
-        });
+        tile.setSource(
+          createTileSource(baseMapStyle as Exclude<BaseMapStyle, "blank">),
+        );
+        const labelSource = createLabelOverlaySource(
+          baseMapStyle as Exclude<BaseMapStyle, "blank">,
+        );
+        if (labelSource) {
+          labels.setSource(labelSource);
+          labels.setVisible(true);
+        } else {
+          labels.setVisible(false);
+        }
       }
     }, [baseMapStyle]);
 
@@ -1122,52 +1167,52 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         }
         const drawDay = currentDayRef.current;
 
-      (async () => {
+        void (async () => {
           try {
-          const geometry = format.writeGeometryObject(olGeometry, {
-            dataProjection: "EPSG:4326",
-            featureProjection: "EPSG:3857",
-          });
-          const customFeature = toDrawnCustomFeature(
-            geometry as unknown as Geometry,
-            activeCustomLayer,
-            activeCustomCategory,
-            customMode,
-          );
-          if (customFeature) {
-            dispatch(addCustomFeature(customFeature));
-            return;
-          }
-
-          let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
-          if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
-            outlookGeometry = await trimGeometryForAutoDraw(
-              outlookGeometry,
-              outlookTrimStrategyRef.current,
-              outlookTrimAutoOnDrawRef.current,
-              outlookTrimPreviewOnlyRef.current,
+            const geometry = format.writeGeometryObject(olGeometry, {
+              dataProjection: "EPSG:4326",
+              featureProjection: "EPSG:3857",
+            });
+            const customFeature = toDrawnCustomFeature(
+              geometry as unknown as Geometry,
+              activeCustomLayer,
+              activeCustomCategory,
+              customMode,
             );
-          }
+            if (customFeature) {
+              dispatch(addCustomFeature(customFeature));
+              return;
+            }
 
-          if (!outlookGeometry) {
-            return;
-          }
+            let outlookGeometry: Polygon | MultiPolygon | null = geometry as Polygon | MultiPolygon;
+            if (outlookGeometry.type === "Polygon" || outlookGeometry.type === "MultiPolygon") {
+              outlookGeometry = await trimGeometryForAutoDraw(
+                outlookGeometry,
+                outlookTrimStrategyRef.current,
+                outlookTrimAutoOnDrawRef.current,
+                outlookTrimPreviewOnlyRef.current,
+              );
+            }
 
-          const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
-            type: "Feature",
-            id: uuidv4(),
-            geometry: outlookGeometry,
-            properties: {
-              outlookType: drawingState.activeOutlookType,
-              probability: drawingState.activeProbability,
-              isSignificant: drawingState.isSignificant,
-            },
-          };
-          dispatch(addFeature({ feature, day: drawDay }));
+            if (!outlookGeometry) {
+              return;
+            }
+
+            const feature: GeoJsonFeature<Polygon | MultiPolygon, GeoJsonProperties> = {
+              type: "Feature",
+              id: uuidv4(),
+              geometry: outlookGeometry,
+              properties: {
+                outlookType: drawingState.activeOutlookType,
+                probability: drawingState.activeProbability,
+                isSignificant: drawingState.isSignificant,
+              },
+            };
+            dispatch(addFeature({ feature, day: drawDay }));
           } catch (error) {
             captureException(error, { tags: { featureOperation: "draw-outlook" } });
           }
-      })();
+        })();
       });
       map.addInteraction(draw);
       drawRef.current = draw;
@@ -1351,8 +1396,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         source,
         categoricalSource: catSource,
       });
-    /** Reconciles one OpenLayers source with the current Redux feature descriptors. */
-    const reconcileSource = (
+      const reconcileSource = (
         targetSource: VectorSource,
         descriptors: FeatureSyncDescriptor[],
         sourceName: string,
@@ -1425,11 +1469,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
           );
           syncTrimPreviewSource(trimPreviewSourceRef.current, previewFeatures);
         })
-        .catch(() => {
-          /* Reconciliation errors are reported through the source statistics. */
-        });
+        .catch(() => undefined);
 
-      return () => { // skipcq: JS-0045 -- React effects return this cleanup function intentionally.
+      return () => {
         cancelled = true;
       };
     }, [outlookTrimPreviewOnly, outlookTrimStrategy, outlooks]);
@@ -1449,13 +1491,12 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       setInteractionMode("delete");
     };
 
-    /** Switches the forecast map into polygon-edit mode. */
     const handleSetModeEdit = () => {
       setInteractionMode("edit");
     };
 
     return (
-      <div className="map-container" translate="no"> {/* skipcq: JS-0415 -- the toolbar is intentionally nested inside the map container. */}
+      <div className="map-container" translate="no">
         <div ref={mapElementRef} style={{ width: "100%", height: "100%" }} />
         <div className="map-toolbar-bottom-right">
           <div

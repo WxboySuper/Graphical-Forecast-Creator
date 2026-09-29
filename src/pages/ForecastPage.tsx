@@ -52,6 +52,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -478,6 +479,7 @@ const useKeyboardShortcuts = ({
 /** Returns the cloud-cycle restore callback and cloud-save action used by the forecast toolbar. */
 const useCloudForecastActions = ({
   addToast,
+  currentCloudId,
   currentMapView,
   forecastCycle,
   markAsCurrent,
@@ -487,10 +489,11 @@ const useCloudForecastActions = ({
   workflowMetadata,
 }: {
   addToast: AddToastFn;
+  currentCloudId: string | null;
   currentMapView: RootState['forecast']['currentMapView'];
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   markAsCurrent: UseCloudCyclesResult['markAsCurrent'];
-  markCurrentStateSynced: () => void;
+  markCurrentStateSynced: (cloudId?: string) => void;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
@@ -509,18 +512,30 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
+      const requestCloudId = currentCloudId ?? undefined;
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      let success: boolean;
+      try {
+        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+      } catch (error) {
+        // Stale save completions throw the server error so explicit callers see
+        // the actual failure. The hook keeps global and selection state scoped,
+        // so propagate the message for the toolbar modal without extra handling.
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Unable to save this forecast to the cloud right now.');
+      }
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');
       }
 
-      markCurrentStateSynced();
+      markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
   );
 
   return {
@@ -558,18 +573,21 @@ const renderCloudToolbar = ({
 );
 
 /** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
+// @codescene(disable:"Complex Method", disable:"Large Method")
 const useForecastPageWorkspace = ({
   dispatch,
   addToast,
   navigate,
   mapRef,
   onSaveForecast,
+  workspaceId,
 }: {
   dispatch: ShortcutDispatch;
   addToast: AddToastFn;
   navigate: ReturnType<typeof useNavigate>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   onSaveForecast: () => void;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
   const discussionDraftsByScope = useSelector((state: RootState) => state.forecast.discussionDraftsByScope);
@@ -584,7 +602,7 @@ const useForecastPageWorkspace = ({
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
   const { currentCloud, saveCycle, markAsCurrent, clearCurrent } = cloudCycles;
-  const cloudSync = useCloudSync(cloudCycles);
+  const cloudSync = useCloudSync(cloudCycles, workspaceId);
   const { markCurrentStateSynced } = cloudSync;
   const isExpiredPremium = !premiumActive && effectiveSource === 'stripe';
 
@@ -594,6 +612,7 @@ const useForecastPageWorkspace = ({
 
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
     addToast,
+    currentCloudId: currentCloud?.id ?? null,
     currentMapView,
     forecastCycle,
     markAsCurrent,
@@ -638,7 +657,7 @@ const useForecastPageWorkspace = ({
     currentMapView,
     workflowMetadata,
     onCloudCycleLoaded: handleCloudCycleLoaded,
-  }, user?.uid);
+  }, user?.uid, workspaceId);
   useControllerUnsavedChangesWarning(isSaved);
 
   const workspaceController = useForecastWorkspaceController({
@@ -695,7 +714,9 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC = () => {
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { addToast } = useOutletContext<PageContext>();
@@ -724,6 +745,7 @@ export const ForecastPage: React.FC = () => {
     navigate,
     mapRef,
     onSaveForecast: handleSave,
+    workspaceId,
   });
 
   if (emergencyMode) {

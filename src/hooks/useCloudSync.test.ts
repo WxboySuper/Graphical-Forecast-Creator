@@ -43,19 +43,28 @@ describe('useCloudSync', () => {
   const saveCycle = jest.fn();
   const updateSyncState = jest.fn();
 
+  // Test-only partial forecast slice. Selectors under test read only these
+  // three fields, so an unknown cast is justified instead of building a full store.
+  const mockForecastSelectorState = (
+    currentMapViewInput: typeof mapView,
+    currentWorkflowMetadataInput: typeof workflowMetadata = workflowMetadata,
+  ) => {
+    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
+      forecast: {
+        forecastCycle,
+        currentMapView: currentMapViewInput,
+        workflowMetadata: currentWorkflowMetadataInput,
+      },
+    } as unknown as RootState));
+  };
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     mockUseEntitlement.mockReturnValue({ premiumActive: true } as ReturnType<typeof useEntitlement>);
     mockSerializeForecast.mockReturnValue(payload as never);
     mockCountForecastMetrics.mockReturnValue({ forecastDays: 1, totalOutlooks: 2, totalFeatures: 3 });
-    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
-      forecast: {
-        forecastCycle,
-        currentMapView: mapView,
-        workflowMetadata,
-      },
-    } as RootState));
+    mockForecastSelectorState(mapView);
     saveCycle.mockResolvedValue(true);
   });
 
@@ -68,6 +77,36 @@ describe('useCloudSync', () => {
     saveCycle,
     updateSyncState,
   });
+
+  type SyncByIdProps = { id: string };
+  type SyncBySelectionProps = { currentCloud: ReturnType<typeof cloud>['currentCloud'] | null };
+
+  const renderSyncById = (initialId = 'cloud-1') =>
+    renderHook(({ id }: SyncByIdProps) => useCloudSync(cloud(id)), {
+      initialProps: { id: initialId },
+    });
+
+  const renderSyncBySelection = (initialCloud: SyncBySelectionProps['currentCloud'] | undefined) =>
+    renderHook<ReturnType<typeof useCloudSync>, SyncBySelectionProps>(({ currentCloud }) => useCloudSync({
+      ...cloud(),
+      currentCloud,
+    }), {
+      initialProps: { currentCloud: initialCloud ?? cloud().currentCloud },
+    });
+
+  const mockDeferredSave = () => {
+    let resolveSave: (value: boolean) => void = () => undefined;
+    saveCycle.mockImplementationOnce(() => new Promise<boolean>((resolve) => {
+      resolveSave = resolve;
+    }));
+    return { resolve: (value: boolean) => resolveSave(value) };
+  };
+
+  const mockQueuedSaves = () => {
+    const resolvers: Array<(value: boolean) => void> = [];
+    saveCycle.mockImplementation(() => new Promise<boolean>((resolve) => resolvers.push(resolve)));
+    return resolvers;
+  };
 
   it('debounces automatic saves and marks successful syncs', async () => {
     renderHook(() => useCloudSync(cloud()));
@@ -84,7 +123,7 @@ describe('useCloudSync', () => {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
-    }, payload, workflowMetadata);
+    }, payload, workflowMetadata, { workspaceId: 'severe' });
     expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
   });
 
@@ -100,7 +139,7 @@ describe('useCloudSync', () => {
         currentMapView: mapView,
         workflowMetadata: currentWorkflowMetadata,
       },
-    } as RootState));
+    } as unknown as RootState));
 
     const { result, rerender } = renderHook(() => useCloudSync(cloud()));
     await act(async () => {
@@ -179,10 +218,63 @@ describe('useCloudSync', () => {
     expect(result.current.isSynced).toBe(true);
   });
 
-  it('does not treat identical content as synced after switching cloud cycles', async () => {
-    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
-      initialProps: { id: 'cloud-1' },
+  it('defers a loaded-cycle sync marker until that cycle is selected', () => {
+    const { result, rerender } = renderSyncById();
+
+    act(() => {
+      result.current.markCurrentStateSynced('cloud-2');
     });
+    expect(result.current.isSynced).toBe(false);
+
+    rerender({ id: 'cloud-2' });
+
+    expect(result.current.isSynced).toBe(true);
+  });
+
+  it('does not mark later content as synced when a deferred marker activates', () => {
+    let currentMapView = mapView;
+    mockUseSelector.mockImplementation((selector: (state: RootState) => unknown) => selector({
+      forecast: {
+        forecastCycle,
+        currentMapView,
+        workflowMetadata,
+      },
+    } as unknown as RootState));
+    mockSerializeForecast.mockImplementation((_forecastCycle, mapViewInput) => ({
+      ...payload,
+      mapView: mapViewInput,
+    } as never));
+
+    const { result, rerender } = renderSyncById();
+
+    act(() => {
+      result.current.markCurrentStateSynced('cloud-2');
+    });
+    expect(result.current.isSynced).toBe(false);
+
+    currentMapView = { center: [3, 4], zoom: 6 };
+    rerender({ id: 'cloud-1' });
+    expect(result.current.isSynced).toBe(false);
+
+    rerender({ id: 'cloud-2' });
+
+    expect(result.current.isSynced).toBe(false);
+  });
+
+  it('drops a deferred marker when the cloud selection is cleared', () => {
+    const { result, rerender } = renderSyncBySelection(undefined);
+
+    act(() => {
+      result.current.markCurrentStateSynced('cloud-2');
+    });
+    rerender({ currentCloud: null });
+    rerender({ currentCloud: cloud('cloud-2').currentCloud });
+
+    expect(result.current.isSynced).toBe(false);
+  });
+
+  it('does not treat identical content as synced after switching cloud cycles', async () => {
+    const { result, rerender } = renderSyncById();
 
     await act(async () => {
       await result.current.syncNow();
@@ -199,13 +291,8 @@ describe('useCloudSync', () => {
   });
 
   it('keeps an out-of-order completion scoped to the cycle that started the save', async () => {
-    let resolveSave: ((value: boolean) => void) | undefined;
-    saveCycle.mockImplementationOnce(() => new Promise<boolean>((resolve) => {
-      resolveSave = resolve;
-    }));
-    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
-      initialProps: { id: 'cloud-1' },
-    });
+    const deferred = mockDeferredSave();
+    const { result, rerender } = renderSyncById();
 
     let pendingSync: Promise<void> | undefined;
     await act(async () => {
@@ -214,20 +301,37 @@ describe('useCloudSync', () => {
     });
     rerender({ id: 'cloud-2' });
     await act(async () => {
-      resolveSave?.(true);
+      deferred.resolve(true);
       await pendingSync;
     });
 
-    expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
+    expect(updateSyncState).not.toHaveBeenCalledWith('saved', undefined, 'cloud-1');
+    expect(result.current.isSynced).toBe(false);
+  });
+
+  it('ignores an in-flight completion after the cloud selection is cleared', async () => {
+    const deferred = mockDeferredSave();
+    const { result, rerender } = renderSyncBySelection(undefined);
+
+    let pendingSync: Promise<void> | undefined;
+    await act(async () => {
+      pendingSync = result.current.syncNow();
+      await Promise.resolve();
+    });
+    rerender({ currentCloud: null });
+
+    await act(async () => {
+      deferred.resolve(true);
+      await pendingSync;
+    });
+
+    expect(updateSyncState).not.toHaveBeenCalledWith('saved', undefined, 'cloud-1');
     expect(result.current.isSynced).toBe(false);
   });
 
   it('does not let an older completion replace a newer cycle synchronization', async () => {
-    const resolvers: Array<(value: boolean) => void> = [];
-    saveCycle.mockImplementation(() => new Promise<boolean>((resolve) => resolvers.push(resolve)));
-    const { result, rerender } = renderHook(({ id }: { id: string }) => useCloudSync(cloud(id)), {
-      initialProps: { id: 'cloud-1' },
-    });
+    const resolvers = mockQueuedSaves();
+    const { result, rerender } = renderSyncById();
 
     let firstSync: Promise<void> | undefined;
     await act(async () => {
