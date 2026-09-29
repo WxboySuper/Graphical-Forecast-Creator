@@ -22,6 +22,7 @@ beforeEach(() => {
 test('keeps production, beta, and all other hosts in separate zones', () => {
   expect(getProductAnalyticsZone('gfc.weatherboysuper.com')).toBe('production');
   expect(getProductAnalyticsZone('beta-gfc.weatherboysuper.com')).toBe('beta');
+  expect(getProductAnalyticsZone('beta.gfcweather.com')).toBe('beta');
   expect(getProductAnalyticsZone('localhost')).toBeNull();
 });
 

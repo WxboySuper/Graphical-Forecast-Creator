@@ -3,6 +3,7 @@ const LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY = 'gfc-workflow-analytics-enabled
 
 const PRODUCTION_HOSTNAME = 'gfc.weatherboysuper.com';
 const BETA_HOSTNAME = 'beta-gfc.weatherboysuper.com';
+const CLOUDFLARE_BETA_HOSTNAME = 'beta.gfcweather.com';
 
 export const PRODUCT_ANALYTICS_EVENTS = [
   'workflow_start', 'workflow_continue', 'workflow_derive', 'workflow_revise',
@@ -65,7 +66,7 @@ const hasAllowedProperties = (event: ProductAnalyticsEvent, properties?: Product
 export const getProductAnalyticsZone = (hostname?: string): AnalyticsZone | null => {
   const host = hostname ?? (typeof window === 'undefined' ? '' : window.location.hostname);
   if (host === PRODUCTION_HOSTNAME) return 'production';
-  if (host === BETA_HOSTNAME) return 'beta';
+  if (host === BETA_HOSTNAME || host === CLOUDFLARE_BETA_HOSTNAME) return 'beta';
   return null;
 };
 

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "gfc-beta",
+  "account_id": "3488c751e28fdbb1b31d95deac5e6cfd",
+  "main": "./beta-worker.mjs",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "beta.gfcweather.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "../build",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  },
+  "vars": {
+    "BETA_API_ORIGIN": "https://beta-gfc.weatherboysuper.com"
+  }
+}

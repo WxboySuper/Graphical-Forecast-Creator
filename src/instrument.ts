@@ -222,6 +222,7 @@ export function initSentry(): void {
       'localhost',
       /^https:\/\/gfc\.weatherboysuper\.com/,
       /^https:\/\/beta-gfc\.weatherboysuper\.com/,
+      /^https:\/\/beta\.gfcweather\.com/,
       /^\/api/,
     ],
   });
