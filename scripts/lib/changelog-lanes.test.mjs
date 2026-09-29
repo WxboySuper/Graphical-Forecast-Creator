@@ -7,7 +7,7 @@ import {
   findChangelogLaneBounds,
 } from './changelog-lanes.mjs';
 
-const sample = '# Changelog\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable 1.6.x hotfixes\n\n#### Fixed\n- Fix\n';
+const sample = '# Changelog\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable 1.7.x hotfixes\n\n#### Fixed\n- Fix\n';
 
 test('extracts one lane without including its sibling', () => {
   const lane = extractChangelogLane(sample, 'next-major');
@@ -16,7 +16,7 @@ test('extracts one lane without including its sibling', () => {
 });
 
 test('formats lane notes with the release version', () => {
-  assert.match(extractLaneReleaseNotes(sample, '1.6.31', 'stable-hotfix') ?? '', /v1\.6\.31/);
+  assert.match(extractLaneReleaseNotes(sample, '1.7.7', 'stable-hotfix') ?? '', /v1\.7\.7/);
 });
 
 test('shares lane headings and boundaries with lane consumers', () => {

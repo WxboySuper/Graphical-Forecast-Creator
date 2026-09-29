@@ -6,7 +6,7 @@
 
 ## 🌿 Branching & Workflow
 *   **Main Branch**: Next-major integration line. Any source branch may open a PR to `main`; required checks and review determine readiness.
-*   **Stable Branches**: Production maintenance lines use `stable/X.Y.x` (for example, `stable/1.6.x`). Production hotfixes start here, release here, and are forward-ported to `main`.
+*   **Stable Branches**: Production maintenance lines use `stable/X.Y.x` (for example, `stable/1.7.x`). Production hotfixes start here, release here, and are forward-ported to `main`.
 *   **Feature Branches**: Branch names are descriptive conventions, not merge gates.
 *   **Bugfix Branches**: `fix/[bug-description]` (e.g., `fix/map-flicker`).
 *   **Hotfix Branches**: `hotfix/[critical-fix]` from the current stable line.
