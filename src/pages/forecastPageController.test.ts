@@ -190,6 +190,7 @@ describe('forecastPageController', () => {
       saveCycle,
       clearCurrent,
       dispatch,
+      workspaceId: 'severe',
     })).resolves.toBe(false);
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
