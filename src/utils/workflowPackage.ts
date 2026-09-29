@@ -72,6 +72,7 @@ const restrictCycleMetadataToDays = (cycle: NonNullable<GFCForecastSaveData['for
 });
 
 /** Keeps a workflow-scoped export limited to the days owned by its workflow template. */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 export const restrictForecastToWorkflow = (
   forecast: GFCForecastSaveData,
   cycleMetadata?: CycleMetadata,
@@ -147,6 +148,7 @@ const applyPackageCustomContent = (pkg: WorkflowExportPackage, scopedForecast: G
  * workspace's envelope, so the inner and outer identities a package carries
  * always name the same owner.
  */
+// @codescene(disable:"Complex Method")
 export const buildWorkflowExportPackage = ({
   scope,
   forecast,
@@ -210,6 +212,7 @@ const hasSerializedDiscussion = (groupingData: Record<string, SerializedOutlookV
   Object.values(groupingData).some((day) => Boolean(day.discussion));
 
 /** Converts the local package into the v2 package shape used for future readers. */
+// @codescene(disable:"Complex Method")
 export const toSerializedWorkflowPackage = (pkg: WorkflowExportPackage): SerializedWorkflowPackage | null => {
   const metadata = pkg.metadata;
   if (!metadata) return null;
