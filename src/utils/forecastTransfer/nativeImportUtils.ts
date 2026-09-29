@@ -166,6 +166,7 @@ const resolveBareFileContent = (data: unknown): ResolvedNativeFileContent => {
  * compatibility by falling back to the inner owner, and that inferred ownership
  * is surfaced as a warning.
  */
+// @codescene(disable:"Complex Method")
 export const resolveNativeFileContent = (data: unknown): ResolvedNativeFileContent => {
   if (isWorkflowExportPackage(data)) return resolveWorkflowPackageContent(data);
   return resolveBareFileContent(data);

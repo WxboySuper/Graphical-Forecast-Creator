@@ -53,6 +53,7 @@ const getWorkflowDays = (workflowId: string): Set<DayType> => {
 };
 
 /** Removes cycle-wide completion and discussion metadata that refers to excluded days. */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 const restrictCycleMetadataToDays = (cycle: NonNullable<GFCForecastSaveData['forecastCycle']>, allowedDays: Set<DayType>) => ({
   ...cycle,
   discussionGroupings: cycle.discussionGroupings

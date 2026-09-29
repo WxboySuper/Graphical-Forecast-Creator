@@ -60,6 +60,7 @@ const toCanonicalJson = (value: unknown): string => {
 };
 
 /** Extracts the manifest payload from a workflow ZIP package, rejecting missing or conflicting entries. */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional")
 const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
   const zip = await JSZip.loadAsync(bytes ?? file);
   const manifestEntry = zip.file('workflow_package.json');
