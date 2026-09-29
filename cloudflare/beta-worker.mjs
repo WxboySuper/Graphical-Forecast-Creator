@@ -24,7 +24,13 @@ export default {
       return Response.json({ error: 'The beta API origin is invalid.' }, { status: 503 });
     }
 
-    if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) {
+    if (apiOrigin.protocol !== 'https:') {
+      return Response.json({ error: 'The beta API origin must be an HTTPS URL.' }, { status: 503 });
+    }
+    if (apiOrigin.username) {
+      return Response.json({ error: 'The beta API origin must be an HTTPS URL.' }, { status: 503 });
+    }
+    if (apiOrigin.password) {
       return Response.json({ error: 'The beta API origin must be an HTTPS URL.' }, { status: 503 });
     }
 

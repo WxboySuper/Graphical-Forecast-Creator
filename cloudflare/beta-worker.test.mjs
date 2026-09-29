@@ -55,7 +55,12 @@ test('proxies API paths, query strings, request bodies, and response status', as
 });
 
 test('rejects API origins that are missing, invalid, or not HTTPS', async () => {
-  for (const origin of [undefined, 'not a URL', 'http://beta.example.test']) {
+  for (const origin of [
+    undefined,
+    'not a URL',
+    'http://beta.example.test',
+    'https://user:pass@beta.example.test',
+  ]) {
     const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/tstm/latest'), {
       BETA_API_ORIGIN: origin,
       ASSETS: { fetch: () => assert.fail('Invalid API origin must not fetch assets') },
