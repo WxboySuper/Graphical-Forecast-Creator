@@ -4,7 +4,13 @@ const path = require('node:path');
 const test = require('node:test');
 
 const serverDirectory = __dirname;
+const repoRoot = path.join(serverDirectory, '..');
 const securityHeaders = fs.readFileSync(path.join(serverDirectory, 'gfc-security-headers.conf'), 'utf8');
+const staticHeaders = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
+
+test('public/_headers allows Firebase Google Sign-In scripts', () => {
+  assert.match(staticHeaders, /https:\/\/apis\.google\.com/);
+});
 
 for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
   test(`${filename} includes shared headers for server and assets`, () => {
@@ -34,6 +40,7 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
     assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
+    assert.match(securityHeaders, /https:\/\/apis\.google\.com/);
     assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
