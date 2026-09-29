@@ -538,7 +538,15 @@ const useCloudForecastActions = ({
       const requestCloudId = currentCloudId ?? undefined;
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
-      const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
+      let success: boolean;
+      try {
+        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Unable to save this forecast to the cloud right now.');
+      }
 
       if (!success) {
         throw new Error('Unable to save this forecast to the cloud right now.');
@@ -547,7 +555,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
+    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
   );
 
   return {

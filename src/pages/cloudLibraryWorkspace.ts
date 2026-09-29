@@ -40,6 +40,24 @@ export const filterCloudCyclesByWorkspace = (
 ): CloudCycleMetadata[] =>
   tabId === 'all' ? cycles : cycles.filter((cycle) => getCloudCycleWorkspaceId(cycle) === tabId);
 
+/** Resolves the display label for one tab, undefined for the combined All view. */
+export const getCloudLibraryTabLabel = (
+  tabs: CloudLibraryTab[],
+  tabId: CloudLibraryTabId,
+): string | undefined =>
+  tabId === 'all' ? undefined : tabs.find((tab) => tab.id === tabId)?.label;
+
+/** Resolves the editor route for one tab, keeping Custom on its legacy path. */
+export const getCloudLibraryWorkspacePath = (tabId: CloudLibraryTabId): string => {
+  if (tabId === 'all') return getDefaultForecastWorkspacePath();
+  const workspace = getForecastWorkspace(tabId);
+  if (!workspace) return getDefaultForecastWorkspacePath();
+  if (workspace.id === 'custom') {
+    return workspace.legacyPaths[0] ?? getDefaultForecastWorkspacePath();
+  }
+  return workspace.status === 'available' ? workspace.path : getDefaultForecastWorkspacePath();
+};
+
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */
 const getCloudLibraryEdgeTabId = (
   tabs: CloudLibraryTab[],
