@@ -39,7 +39,8 @@ const validateModelEntries = (result) => {
 /** Parse and bound the untrusted model response. */
 export const parseOpenCodeChangelogResult = (raw) => {
   const result = decodeModelResult(raw);
-  if (!result || !['complete', 'inconclusive'].includes(result.status)) throw new Error('OpenCode changelog status is invalid.');
+  if (!result || !['complete', 'inconclusive', 'no-change'].includes(result.status)) throw new Error('OpenCode changelog status is invalid.');
   if (result.status === 'inconclusive') return { status: 'inconclusive' };
+  if (result.status === 'no-change') return { status: 'no-change' };
   return { status: 'complete', section: result.section, entries: validateModelEntries(result) };
 };

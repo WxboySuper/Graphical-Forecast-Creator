@@ -20,7 +20,7 @@ test('GitHub extraheader rejects an empty token', () => {
   assert.throws(() => githubHttpExtraHeader(''), /GitHub token is required/);
 });
 
-test('changelog scripts share the validated GitHub auth header for fetch and push', () => {
+test('changelog reads and the trusted publisher use the validated GitHub auth header', () => {
   const preparation = readFileSync(path.join(repositoryRoot, 'scripts/prepare-changelog-governance.mjs'), 'utf8');
   const publisher = readFileSync(path.join(repositoryRoot, 'scripts/publish-opencode-changelog.mjs'), 'utf8');
 
@@ -29,7 +29,7 @@ test('changelog scripts share the validated GitHub auth header for fetch and pus
     assert.match(source, /const gitAuth = githubHttpExtraHeader\(token\)/);
     assert.match(source, /execFileSync\('git', \[\x27-c\x27, gitAuth, \x27fetch\x27/);
   }
-  assert.match(preparation, /execFileSync\('git', \[\x27-c\x27, gitAuth, \x27push\x27/);
+  assert.doesNotMatch(preparation, /execFileSync\('git', \[\x27-c\x27, gitAuth, \x27push\x27/);
   assert.match(publisher, /execFileSync\('git', \[\x27-c\x27, githubHttpExtraHeader\(token\), \x27push\x27/);
   assert.doesNotMatch(publisher, /git config --local .*extraheader/);
 });

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { listDependencyBumpsBetweenRefs } from './lib/dependabot-changelog.mjs';
+import { dependabotChangelogDeclaration, listDependencyBumpsBetweenRefs } from './lib/dependabot-changelog.mjs';
 import { parsePortBranch } from './lib/port-pr-policy.mjs';
 import { upsertManagedChangelogDeclaration } from './lib/changelog-automation.mjs';
 import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
@@ -33,17 +33,9 @@ execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/
 
 const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);
 let declaration = null;
-
 if (isDependabot) {
   const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
-  if (bumps.length === 0) {
-    declaration = {
-      impact: 'none',
-      reason: 'Automated dependency update changes CI or development tooling without product-facing behavior changes.',
-    };
-  } else {
-    declaration = { impact: stableLine ? 'hotfix' : 'beta' };
-  }
+  declaration = dependabotChangelogDeclaration(bumps, stableLine);
 } else {
   declaration = {
     impact: 'inherited',

@@ -115,17 +115,11 @@ const parseReviewAssessments = (assessments, openThreads) => {
   for (const assessment of Array.isArray(assessments) ? assessments : []) {
     if (!isNewExpectedReviewAssessment(assessment, expected, seen)) continue;
     seen.add(assessment.threadId);
-    try {
-      accepted.set(assessment.threadId, parseReviewAssessment(assessment));
-    } catch {
-      // Keep publishing the review when the model omits or malforms a thread assessment.
-    }
+    accepted.set(assessment.threadId, parseReviewAssessment(assessment));
   }
-  return openThreads.map((thread) => accepted.get(thread.id) ?? ({
-    threadId: thread.id,
-    status: 'unclear',
-    summary: 'This run did not provide a valid assessment; the review thread remains open for human follow-up.',
-  }));
+  const missing = openThreads.find((thread) => !accepted.has(thread.id));
+  if (missing) throw new Error('First-look output must assess every supplied open review thread before publishing.');
+  return openThreads.map((thread) => accepted.get(thread.id));
 };
 
 const isNewExpectedReviewAssessment = (assessment, expected, seen) => {
@@ -215,6 +209,11 @@ const parseReviewPayload = (result, context) => {
   const goodThings = parseGoodThings(result);
   const badThings = parseFindings(result, context);
   const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
+  const reviewCommentAssessments = parseContextReviewAssessments(result, context);
+  const unresolvedThreadAssessments = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
+  if (unresolvedThreadAssessments.length && badThings.length === 0) {
+    throw new Error('First-look output must include concrete findings when a review thread remains open or unclear after investigation.');
+  }
   const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
   const unresolvedPriorFindings = (context.priorFindings ?? []).filter((finding) => statusById.get(finding.findingId) !== 'resolved');
   return {
@@ -224,7 +223,7 @@ const parseReviewPayload = (result, context) => {
     badThings,
     rating: normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
-    reviewCommentAssessments: parseContextReviewAssessments(result, context),
+    reviewCommentAssessments,
     priorFindingAssessments,
   };
 };
