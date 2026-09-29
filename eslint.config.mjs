@@ -71,7 +71,7 @@ export default [
     },
   },
   {
-    files: ['server/**/*.js', 'scripts/**/*.js', '*.js', '*.cjs'],
+    files: ['server/**/*.js', 'scripts/**/*.js', 'scripts/**/*.cjs', '*.js', '*.cjs'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },

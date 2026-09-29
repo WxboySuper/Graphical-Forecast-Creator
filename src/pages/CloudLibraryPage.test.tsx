@@ -27,9 +27,19 @@ jest.mock("../hooks/useCloudCycles", () => ({
   useCloudCycles: jest.fn(),
 }));
 
+jest.mock("./cloudLibraryWorkspace", () => {
+  const actual = jest.requireActual("./cloudLibraryWorkspace");
+  return {
+    ...actual,
+    getCloudLibraryTabs: jest.fn(actual.getCloudLibraryTabs),
+  };
+});
+
 const mockUseAuth = jest.requireMock("../auth/AuthProvider").useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock("../billing/EntitlementProvider").useEntitlement as jest.Mock;
 const mockUseCloudCycles = jest.requireMock("../hooks/useCloudCycles").useCloudCycles as jest.Mock;
+const actualGetCloudLibraryTabs = jest.requireActual("./cloudLibraryWorkspace").getCloudLibraryTabs;
+const mockGetCloudLibraryTabs = jest.requireMock("./cloudLibraryWorkspace").getCloudLibraryTabs as jest.Mock;
 
 const makeStore = () =>
   configureStore({

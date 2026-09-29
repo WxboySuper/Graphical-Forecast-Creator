@@ -17,6 +17,7 @@ import {
   setActiveProbability,
   toggleSignificant,
   setEmergencyMode,
+  setForecastWorkspace,
   selectForecastCycle,
   selectCanRedo,
   selectCanUndo,
@@ -499,6 +500,7 @@ const useKeyboardShortcuts = ({
 /** Returns the cloud-cycle restore callback and cloud-save action used by the forecast toolbar. */
 const useCloudForecastActions = ({
   addToast,
+  currentCloudId,
   currentMapView,
   forecastCycle,
   markAsCurrent,
@@ -509,10 +511,11 @@ const useCloudForecastActions = ({
   workspaceId,
 }: {
   addToast: AddToastFn;
+  currentCloudId: string | null;
   currentMapView: RootState['forecast']['currentMapView'];
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   markAsCurrent: UseCloudCyclesResult['markAsCurrent'];
-  markCurrentStateSynced: () => void;
+  markCurrentStateSynced: (cloudId?: string) => void;
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
@@ -532,6 +535,7 @@ const useCloudForecastActions = ({
         throw new Error('Sign in to save forecasts to the cloud.');
       }
 
+      const requestCloudId = currentCloudId ?? undefined;
       const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
       const success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
@@ -540,7 +544,7 @@ const useCloudForecastActions = ({
         throw new Error('Unable to save this forecast to the cloud right now.');
       }
 
-      markCurrentStateSynced();
+      markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
     [addToast, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
@@ -620,6 +624,7 @@ const useForecastPageWorkspace = ({
 
   const { handleCloudCycleLoaded, handleSaveToCloud } = useCloudForecastActions({
     addToast,
+    currentCloudId: currentCloud?.id ?? null,
     currentMapView,
     forecastCycle,
     markAsCurrent,
@@ -725,6 +730,10 @@ const useForecastPageWorkspace = ({
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
 const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
+  // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
+  useEffect(() => {
+    dispatch(setForecastWorkspace(workspaceId));
+  }, [dispatch, workspaceId]);
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useOutletContext<PageContext>();

@@ -1,6 +1,5 @@
 /** Covers verification-specific paint and the mobile legend control. */
 
-import { jest } from '@jest/globals';
 import React from 'react';
 
 // Mock ol-mapbox-style to avoid loading ESM modules in tests

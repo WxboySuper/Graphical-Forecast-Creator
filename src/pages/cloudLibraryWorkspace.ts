@@ -4,6 +4,7 @@ import {
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { BuildTarget } from '../config/buildTarget';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
 
