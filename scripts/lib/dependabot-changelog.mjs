@@ -17,6 +17,17 @@ export const packageDirectoryLabel = (directory) => {
   return normalized.replace(/\/$/, '');
 };
 
+/** @param {Array<{ depType?: string }>} bumps */
+export const dependabotChangelogDeclaration = (bumps, stableLine) => {
+  if (bumps.some((bump) => bump.depType === 'dependencies')) {
+    return { impact: stableLine ? 'hotfix' : 'beta' };
+  }
+  return {
+    impact: 'none',
+    reason: 'Automated dependency update changes development tooling only; the changelog runner checks for user-facing impact.',
+  };
+};
+
 /**
  * @param {string} changelog
  * @param {number} afterStart
