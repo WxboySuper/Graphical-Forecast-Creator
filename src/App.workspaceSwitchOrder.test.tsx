@@ -1,8 +1,17 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { Outlet as MockOutlet } from 'react-router';
 import App from './App';
 import { store } from './store';
 import { setMapView, setForecastWorkspace } from './store/forecastSlice';
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __gfcRestoreEvents: string[] | undefined;
+}
+
+const getRestoreEvents = (): string[] => {
+  globalThis.__gfcRestoreEvents ??= [];
+  return globalThis.__gfcRestoreEvents;
+};
 
 // The ordering test drives the shipped App: real providers, real AppHooks, real
 // route tree. Only the heavy pages and shells are stubbed so the test can watch
@@ -40,22 +49,29 @@ jest.mock('./pages/ForecastPage', () => {
       // the workspace-scoped autosave as soon as the page mounts.
       useEffect(() => {
         const autosave = localStorage.getItem(getAutoSaveStorageKey(undefined, workspaceId));
-        mockRestoreEvents.push(`restore:${workspaceId}:${autosave ?? 'none'}`);
+        globalThis.__gfcRestoreEvents ??= [];
+        globalThis.__gfcRestoreEvents.push(`restore:${workspaceId}:${autosave ?? 'none'}`);
       }, [workspaceId]);
       return <div>Forecast editor mock {workspaceId}</div>;
     },
     default: () => null,
   };
 });
-jest.mock('./components/Layout', () => ({
-  AppLayout: () => (
-    <div>
-      <div>AppLayout Mock</div>
-      <MockOutlet />
-    </div>
-  ),
-}));
-jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
+jest.mock('./components/Layout', () => {
+  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
+  return {
+    AppLayout: () => (
+      <div>
+        <div>AppLayout Mock</div>
+        <Outlet />
+      </div>
+    ),
+  };
+});
+jest.mock('./components/Beta/BetaAccessGuard', () => {
+  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
+  return () => <Outlet />;
+});
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
   hasAcceptedToS: () => true,
@@ -68,7 +84,7 @@ jest.mock('./components/PrivacyPolicy/PrivacyPolicyModal', () => ({
 }));
 
 /** Ordered trace of the events the workspace-switch invariant depends on. */
-const mockRestoreEvents: string[] = [];
+const mockRestoreEvents = getRestoreEvents();
 
 const SEVERE_AUTOSAVE_KEY = 'forecastData';
 
@@ -77,7 +93,7 @@ describe('App workspace switch ordering', () => {
   let setItemSpy: jest.SpyInstance | null = null;
 
   beforeEach(() => {
-    mockRestoreEvents.length = 0;
+    getRestoreEvents().length = 0;
     localStorage.clear();
     sessionStorage.clear();
     store.dispatch(setForecastWorkspace('severe'));
