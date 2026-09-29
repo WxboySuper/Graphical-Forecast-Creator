@@ -8,8 +8,8 @@ module.exports = {
     '^.+\\.mjs$': require.resolve('babel-jest'),
   },
   transformIgnorePatterns: [
-    '<rootDir>/node_modules/.pnpm/(?!(react-router|cookie-es|uuid|@turf\\+.*|kdbush|geokdbush|tinyqueue|concaveman|point-in-polygon-hao|robust-predicates|rbush|quickselect|skmeans|marchingsquares|sweepline-intersections|d3-array|d3-geo|d3-voronoi|topojson-client|earcut|tslib|ol|firebase|@firebase\\+.*)@)',
-    'node_modules/(?!.pnpm|react-router|cookie-es|uuid|@turf|kdbush|geokdbush|tinyqueue|concaveman|point-in-polygon-hao|robust-predicates|rbush|quickselect|skmeans|marchingsquares|sweepline-intersections|d3-array|d3-geo|d3-voronoi|topojson-client|earcut|tslib|ol|firebase|@firebase)',
+    '<rootDir>/node_modules/.pnpm/(?!(react-router|@remix-run\\+.*|cookie-es|uuid|@turf\\+.*|kdbush|geokdbush|tinyqueue|concaveman|point-in-polygon-hao|robust-predicates|rbush|quickselect|skmeans|marchingsquares|sweepline-intersections|d3-array|d3-geo|d3-voronoi|topojson-client|earcut|tslib|ol|firebase|@firebase\\+.*)@)',
+    'node_modules/(?!.pnpm|react-router|@remix-run|cookie-es|uuid|@turf|kdbush|geokdbush|tinyqueue|concaveman|point-in-polygon-hao|robust-predicates|rbush|quickselect|skmeans|marchingsquares|sweepline-intersections|d3-array|d3-geo|d3-voronoi|topojson-client|earcut|tslib|ol|firebase|@firebase)',
   ],
   moduleNameMapper: {
     '\\.(css|less|sass|scss)$': 'identity-obj-proxy',
