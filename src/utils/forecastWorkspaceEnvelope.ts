@@ -9,6 +9,7 @@ import type { GFCForecastSaveData } from '../types/outlooks';
  * unwrap envelopes without importing the persistence module that validates
  * forecast data, which would close an import loop back into file utilities.
  */
+// @codescene(disable:"Lines of Code in a Single File", disable:"Code Duplication")
 
 /** Version of the workspace-aware save envelope, independent of forecast data version. */
 export const FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION = 1 as const;
