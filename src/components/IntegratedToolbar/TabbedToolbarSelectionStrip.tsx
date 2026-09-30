@@ -71,7 +71,7 @@ const TabbedToolbarSelectionStrip: React.FC<{
   showShortcuts?: boolean;
 }> = ({ controller, showToggle = true, showShortcuts = true }) => {
   return (
-    <div className="tabbed-integrated-toolbar__selection-strip flex min-w-0 items-center gap-2">
+    <div className="tabbed-integrated-toolbar__selection-strip flex shrink-0 items-center gap-2">
       <SelectionSwatch controller={controller} />
       {controller.activeProbabilisticHazard ? (
         <OutlookGeometryCopyControls

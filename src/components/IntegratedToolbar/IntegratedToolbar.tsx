@@ -417,7 +417,7 @@ const TabbedToolbarStripSection: React.FC<{
         </span>
       ) : null}
     </div>
-    <div className={cn('tabbed-integrated-toolbar__section-content flex min-h-0 min-w-0 flex-1 items-center', contentClassName)}>{children}</div>
+    <div className={cn('tabbed-integrated-toolbar__section-content flex items-center', contentClassName)}>{children}</div>
   </section>
 );
 
@@ -515,23 +515,39 @@ const TabbedToolbarTabRow: React.FC<{ children: React.ReactNode }> = ({ children
       role="group"
       aria-label="Toolbar controls"
     >
-      <div className="flex h-full w-max min-w-full items-stretch gap-3">{children}</div>
+      <div className="flex h-full w-max min-w-full items-stretch gap-2">{children}</div>
     </div>
   );
 };
 
 /** Small stat pill used to display compact numeric metadata. */
-const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="tabbed-integrated-toolbar__stat-pill rounded-xl border border-border/70 bg-muted/35 px-2.5 py-2">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground leading-none">{label}</p>
-    <p className="mt-1 text-xs font-black text-foreground">{value}</p>
+const TabbedToolbarStatPill: React.FC<{ label: string; value: string; compact?: boolean }> = ({
+  label,
+  value,
+  compact = false,
+}) => (
+  <div
+    className={cn(
+      'tabbed-integrated-toolbar__stat-pill shrink-0 rounded-xl border border-border/70 bg-muted/35',
+      compact ? 'px-2 py-1' : 'px-2.5 py-2',
+    )}
+  >
+    <p
+      className={cn(
+        'font-semibold uppercase text-muted-foreground leading-none',
+        compact ? 'text-[9px] tracking-[0.14em]' : 'text-[10px] tracking-[0.18em]',
+      )}
+    >
+      {label}
+    </p>
+    <p className={cn('font-black text-foreground', compact ? 'mt-0.5 text-[11px]' : 'mt-1 text-xs')}>{value}</p>
   </div>
 );
 
 /** Existing severe-weather controls, unchanged when custom products are unavailable. */
 const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <>
-    <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type w-[316px]">
+    <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type min-w-[316px] shrink-0">
       <div className="tabbed-integrated-toolbar__type-grid flex flex-wrap items-center gap-0.5">
         {controller.availableTypes.map((type) => (
           <TabbedToolbarTypeButton key={type} controller={controller} type={type} />
@@ -555,7 +571,7 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
       </div>
     </TabbedToolbarStripSection>
 
-    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[360px]">
+    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection min-w-[384px] shrink-0">
       <TabbedToolbarSelectionStrip controller={controller} showShortcuts={false} />
     </TabbedToolbarStripSection>
   </>
@@ -573,7 +589,7 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
 
   return (
     <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode">
+      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode shrink-0">
         <div className={cn('custom-product-toggle', storedMode === 'custom' && 'is-custom-mode')} role="radiogroup" aria-label="Drawing product" data-testid="custom-product-toggle">
           <span className="custom-product-toggle__indicator" aria-hidden="true" />
           {(['severe', 'custom'] as const).map((mode) => (
@@ -595,7 +611,7 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
           ))}
         </div>
       </TabbedToolbarStripSection>
-      <div key={storedMode} className="custom-product-mode-panel min-w-0 shrink-0 grow overflow-x-auto overflow-y-hidden">
+      <div key={storedMode} className="custom-product-mode-panel flex shrink-0 items-center gap-2">
         {storedMode === 'severe' ? (
           <SevereDrawControls controller={controller} />
         ) : (
@@ -649,15 +665,15 @@ const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = 
 
 /** Cycle date strip wrapper used in the Days tab. */
 const CycleDateStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date min-w-[296px] shrink-0">
+  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date min-w-[284px] shrink-0">
     <CycleDateControl controller={controller} />
   </TabbedToolbarStripSection>
 );
 
 /** Forecast days strip with prev/next and day buttons. */
 const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[566px] shrink-0">
-    <div className="flex shrink-0 items-center gap-2">
+  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[518px] shrink-0">
+    <div className="flex shrink-0 items-center gap-1.5">
       <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
@@ -674,7 +690,7 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
                 data-day={day}
                 onClick={controller.onDayButtonClick}
                 className={cn(
-                  'tabbed-integrated-toolbar__day-button relative h-10 min-w-[48px] rounded-xl border px-3 text-sm font-semibold transition-all',
+                  'tabbed-integrated-toolbar__day-button relative h-10 min-w-[40px] rounded-xl border px-2 text-sm font-semibold transition-all',
                   isActive
                     ? 'is-active border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20'
                     : 'border-transparent bg-transparent hover:bg-background'
@@ -698,11 +714,10 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
 const DayStatusStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const daysWithData = FORECAST_DAYS.filter((day) => hasDayOutlookData(controller.days, day)).length;
   return (
-    <TabbedToolbarStripSection label="Day Status" className="tabbed-integrated-toolbar__section--day-status min-w-[292px] shrink-0">
-      <div className="flex shrink-0 flex-nowrap items-center gap-2">
-        <TabbedToolbarStatPill label="Current" value={`Day ${controller.currentDay}`} />
-        <TabbedToolbarStatPill label="Data" value={`${daysWithData}/8`} />
-        <TabbedToolbarStatPill label="Jump" value="1-8" />
+    <TabbedToolbarStripSection label="Day Status" className="tabbed-integrated-toolbar__section--day-status min-w-[228px] shrink-0">
+      <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
+        <TabbedToolbarStatPill compact label="Current" value={`Day ${controller.currentDay}`} />
+        <TabbedToolbarStatPill compact label="Data" value={`${daysWithData}/8`} />
       </div>
     </TabbedToolbarStripSection>
   );
@@ -1182,7 +1197,7 @@ const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ control
   const [activeTab, setActiveTab] = React.useState<TabbedToolbarTabKey>('draw');
 
   return (
-    <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
+    <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[172px] overflow-hidden backdrop-blur">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabbedToolbarTabKey)} className="flex h-full flex-col">
         <TabbedIntegratedToolbarHeader controller={controller} activeTab={activeTab} onTabChange={setActiveTab} />
         <TabbedIntegratedToolbarTray controller={controller} autoTstmTools={autoTstmTools} />

@@ -164,7 +164,7 @@ const PopulationEstimateBeta: React.FC = () => {
 
   return (
     <>
-      <div className="flex min-w-[250px] flex-1 flex-col justify-between rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-1.5">
+      <div className="flex min-w-[250px] shrink-0 flex-col justify-between rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-1">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-violet-700 dark:text-violet-300" />
           <div>
@@ -176,7 +176,7 @@ const PopulationEstimateBeta: React.FC = () => {
           type="button"
           variant="outline"
           size="sm"
-          className="mt-2 h-8 justify-start gap-2 border-violet-500/40 bg-background"
+          className="mt-1 h-7 justify-start gap-2 border-violet-500/40 bg-background"
           onClick={handleEstimate}
           disabled={isLoading}
         >

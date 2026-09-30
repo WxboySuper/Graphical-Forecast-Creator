@@ -192,7 +192,7 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
     await user.click(screen.getByRole('tab', { name: /Days/i }));
 
     const forecastSection = document.querySelector('.tabbed-integrated-toolbar__section--days');
-    expect(forecastSection).toHaveClass('min-w-[566px]');
+    expect(forecastSection).toHaveClass('min-w-[518px]');
     expect(forecastSection?.querySelector('.tabbed-integrated-toolbar__day-strip')).not.toHaveClass('min-w-max');
   });
   /* eslint-enable testing-library/no-node-access */
