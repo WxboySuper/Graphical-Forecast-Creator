@@ -112,6 +112,26 @@ export type ToolbarLayoutCheckOptions = {
   requireDaysRowFits: boolean;
 };
 
+export const TOOLBAR_INTERACTIVE_CONTROL_SELECTOR = [
+  'button',
+  'input',
+  'select',
+  'textarea',
+  '[role="button"]',
+  '.tabbed-integrated-toolbar__stat-pill',
+  '.tabbed-integrated-toolbar__day-button',
+  '.tabbed-integrated-toolbar__type-button',
+  '.tabbed-integrated-toolbar__probability-button',
+  '.tabbed-integrated-toolbar__map-button',
+  '.tabbed-integrated-toolbar__ghost-layer-button',
+  '.tabbed-integrated-toolbar__action-tile',
+  '.custom-product-toggle__button',
+].join(',');
+
+export type GatherToolbarLayoutSnapshotArgs = {
+  interactiveSelector: string;
+};
+
 /** Runs layout rules against a DOM snapshot collected in the browser. */
 export const collectToolbarLayoutViolations = (
   snapshot: ToolbarLayoutSnapshot,
@@ -126,23 +146,9 @@ export const collectToolbarLayoutViolations = (
 /**
  * Self-contained browser function for Playwright evaluate (nested helpers are serialized with it).
  */
-export function gatherToolbarLayoutSnapshot(): ToolbarLayoutSnapshotResult {
-  const interactiveSelector = [
-    'button',
-    'input',
-    'select',
-    'textarea',
-    '[role="button"]',
-    '.tabbed-integrated-toolbar__stat-pill',
-    '.tabbed-integrated-toolbar__day-button',
-    '.tabbed-integrated-toolbar__type-button',
-    '.tabbed-integrated-toolbar__probability-button',
-    '.tabbed-integrated-toolbar__map-button',
-    '.tabbed-integrated-toolbar__ghost-layer-button',
-    '.tabbed-integrated-toolbar__action-tile',
-    '.custom-product-toggle__button',
-  ].join(',');
-
+export function gatherToolbarLayoutSnapshot({
+  interactiveSelector,
+}: GatherToolbarLayoutSnapshotArgs): ToolbarLayoutSnapshotResult {
   const toBox = (rect: DOMRect): BoxRect => ({
     left: rect.left,
     top: rect.top,
@@ -152,53 +158,47 @@ export function gatherToolbarLayoutSnapshot(): ToolbarLayoutSnapshotResult {
     height: rect.height,
   });
 
-  const isVisible = (element: Element): boolean => {
+  const isVisible = (element: Element) => {
     const style = window.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden') {
-      return false;
-    }
     const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
   };
 
   const toolbar = document.querySelector('.tabbed-integrated-toolbar');
-  if (!toolbar) {
-    return { ok: false, violation: { kind: 'missing-toolbar', detail: 'Tabbed toolbar root not found' } };
-  }
-
-  const activePanel = document.querySelector('.tabbed-integrated-toolbar__panel[data-state="active"]');
-  const row = activePanel?.querySelector('.tabbed-integrated-toolbar__row') as HTMLElement | null;
-  if (!row) {
-    return { ok: false, violation: { kind: 'missing-row', detail: 'Active tab row not found' } };
+  const row = document.querySelector(
+    '.tabbed-integrated-toolbar__panel[data-state="active"] .tabbed-integrated-toolbar__row',
+  ) as HTMLElement | null;
+  if (!toolbar || !row) {
+    return {
+      ok: false,
+      violation: {
+        kind: toolbar ? 'missing-row' : 'missing-toolbar',
+        detail: toolbar ? 'Active tab row not found' : 'Tabbed toolbar root not found',
+      },
+    };
   }
 
   const sections = Array.from(row.querySelectorAll('.tabbed-integrated-toolbar__section'));
-  const labels: ToolbarLayoutSnapshot['labels'] = [];
-  const neighborControls: ToolbarLayoutSnapshot['neighborControls'] = [];
-
-  sections.forEach((section, sectionIndex) => {
-    Array.from(section.querySelectorAll('.tabbed-integrated-toolbar__section-label')).forEach((label) => {
-      if (!isVisible(label)) return;
-      labels.push({
+  const labels = sections.flatMap((section, sectionIndex) =>
+    Array.from(section.querySelectorAll('.tabbed-integrated-toolbar__section-label'))
+      .filter(isVisible)
+      .map((label) => ({
         sectionIndex,
         text: label.textContent?.trim() ?? '',
         rect: toBox(label.getBoundingClientRect()),
-      });
-    });
-
-    Array.from(section.querySelectorAll(interactiveSelector)).forEach((control) => {
-      if (!isVisible(control)) return;
-      neighborControls.push({
+      })),
+  );
+  const neighborControls = sections.flatMap((section, sectionIndex) =>
+    Array.from(section.querySelectorAll(interactiveSelector))
+      .filter(isVisible)
+      .map((control) => ({
         sectionIndex,
         rect: toBox(control.getBoundingClientRect()),
-      });
-    });
-  });
-
+      })),
+  );
   const rowControlRects = Array.from(row.querySelectorAll(interactiveSelector))
     .filter(isVisible)
     .map((control) => toBox(control.getBoundingClientRect()));
-
   const toolbarControlRects = Array.from(toolbar.querySelectorAll(interactiveSelector))
     .filter(isVisible)
     .map((control) => toBox(control.getBoundingClientRect()));

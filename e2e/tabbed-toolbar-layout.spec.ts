@@ -3,6 +3,7 @@ import { prepareAppState } from './testSetup';
 import {
   collectToolbarLayoutViolations,
   gatherToolbarLayoutSnapshot,
+  TOOLBAR_INTERACTIVE_CONTROL_SELECTOR,
 } from './tabbedToolbarLayoutChecks';
 
 const LAYOUT_TOLERANCE_PX = 1;
@@ -44,7 +45,9 @@ const assertActiveTabToolbarLayout = async (
   page: Page,
   options: { requireDaysRowFits?: boolean },
 ) => {
-  const result = await page.evaluate(gatherToolbarLayoutSnapshot);
+  const result = await page.evaluate(gatherToolbarLayoutSnapshot, {
+    interactiveSelector: TOOLBAR_INTERACTIVE_CONTROL_SELECTOR,
+  });
   if (!result.ok) {
     expect([result.violation]).toEqual([]);
     return;
