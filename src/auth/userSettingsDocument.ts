@@ -54,6 +54,60 @@ export const mergeUserSettingsDocument = (
   ...patch,
 });
 
+const readBooleanField = (value: unknown): value is boolean => typeof value === 'boolean';
+
+const readDefaultForecasterName = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 100;
+
+const readBaseMapStyle = (
+  value: unknown,
+): value is UserSettingsDocument['baseMapStyle'] => Boolean(value);
+
+const readGhostOutlooks = (
+  value: unknown,
+): value is UserSettingsDocument['ghostOutlooks'] => Boolean(value);
+
+const USER_SETTINGS_FIELD_READERS: {
+  key: keyof UserSettingsDocument;
+  read: (partial: Partial<UserSettingsDocument>) => UserSettingsDocument[keyof UserSettingsDocument] | null;
+}[] = [
+  {
+    key: 'darkMode',
+    read: (partial) => (readBooleanField(partial.darkMode) ? partial.darkMode : null),
+  },
+  {
+    key: 'stateBorders',
+    read: (partial) => (readBooleanField(partial.stateBorders) ? partial.stateBorders : null),
+  },
+  {
+    key: 'counties',
+    read: (partial) => (readBooleanField(partial.counties) ? partial.counties : null),
+  },
+  {
+    key: 'defaultForecasterName',
+    read: (partial) => (readDefaultForecasterName(partial.defaultForecasterName)
+      ? partial.defaultForecasterName
+      : null),
+  },
+  {
+    key: 'baseMapStyle',
+    read: (partial) => (readBaseMapStyle(partial.baseMapStyle) ? partial.baseMapStyle : null),
+  },
+  {
+    key: 'ghostOutlooks',
+    read: (partial) => (readGhostOutlooks(partial.ghostOutlooks) ? partial.ghostOutlooks : null),
+  },
+  {
+    key: 'forecastUiVariant',
+    read: (partial) =>
+      normalizeForecastUiVariant(partial.forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
+  },
+  {
+    key: 'monitorSettings',
+    read: (partial) => normalizeMonitorSettings(partial.monitorSettings),
+  },
+];
+
 /** Validates a Firestore settings payload before the app applies it locally. */
 export const readRemoteSettings = (
   value: Partial<UserSettingsDocument> | undefined,
@@ -62,41 +116,14 @@ export const readRemoteSettings = (
     return null;
   }
 
-  const {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings,
-  } = value;
-
-  if (typeof darkMode !== 'boolean') {
-    return null;
+  const document = {} as UserSettingsDocument;
+  for (const { key, read } of USER_SETTINGS_FIELD_READERS) {
+    const fieldValue = read(value);
+    if (fieldValue === null) {
+      return null;
+    }
+    document[key] = fieldValue as never;
   }
 
-  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') {
-    return null;
-  }
-
-  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) {
-    return null;
-  }
-
-  if (!baseMapStyle || !ghostOutlooks) {
-    return null;
-  }
-
-  return {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
-    monitorSettings: normalizeMonitorSettings(monitorSettings),
-  };
+  return document;
 };

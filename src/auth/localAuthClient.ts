@@ -28,13 +28,7 @@ interface LocalAuthDeps {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
-/**
- * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
- * Extracts a minimal user shape and applies any remote settings into local Redux state.
- * This is intentionally defined outside the hook to keep useLocalAuthState's cyclomatic
- * complexity lower for code health tools.
- */
-export const initLocalAuthState = async (opts: {
+type InitLocalAuthStateOpts = {
   isActive: () => boolean;
   dispatch: ReturnType<typeof useDispatch>;
   currentDarkModeRef: React.MutableRefObject<boolean>;
@@ -47,41 +41,68 @@ export const initLocalAuthState = async (opts: {
   setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-}) => {
-  const {
-    isActive,
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSettingsSyncStatus,
-    setSyncedSettings,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-    lastSyncedSettingsRef,
-  } = opts;
+};
+
+const toLocalAuthDeps = (opts: InitLocalAuthStateOpts): LocalAuthDeps => ({
+  dispatch: opts.dispatch,
+  currentDarkModeRef: opts.currentDarkModeRef,
+  currentOverlaysRef: opts.currentOverlaysRef,
+  setUser: opts.setUser,
+  setStatus: opts.setStatus,
+  setSyncedSettings: opts.setSyncedSettings,
+  setSettingsSyncStatus: opts.setSettingsSyncStatus,
+  lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
+  setBetaAccess: opts.setBetaAccess,
+  setBetaAccessLoading: opts.setBetaAccessLoading,
+  setError: opts.setError,
+});
+
+const applyLocalTestAccountIfPresent = (opts: InitLocalAuthStateOpts): boolean => {
+  const localTestAccount = readLocalTestAccount();
+  if (!localTestAccount) {
+    return false;
+  }
+
+  applyLocalAuthData(
+    {
+      ...createLocalTestUser(localTestAccount),
+      betaAccess: true,
+    },
+    toLocalAuthDeps(opts),
+  );
+  return true;
+};
+
+const applySignedOutLocalAuthState = (opts: InitLocalAuthStateOpts): void => {
+  opts.setStatus('signed_out');
+  opts.setSettingsSyncStatus('idle');
+  opts.setUser(null);
+  opts.setSyncedSettings(null);
+  opts.setBetaAccess(false);
+  opts.setBetaAccessLoading(false);
+  opts.setError(null);
+};
+
+const applyLocalAuthInitFailure = (opts: InitLocalAuthStateOpts, err: unknown): void => {
+  opts.setStatus('error');
+  opts.setError(err instanceof Error ? err.message : 'Local auth initialization failed');
+  opts.setUser(null);
+  opts.setSyncedSettings(null);
+  opts.setBetaAccess(false);
+  opts.setBetaAccessLoading(false);
+};
+
+/**
+ * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
+ * Extracts a minimal user shape and applies any remote settings into local Redux state.
+ * This is intentionally defined outside the hook to keep useLocalAuthState's cyclomatic
+ * complexity lower for code health tools.
+ */
+export const initLocalAuthState = async (opts: InitLocalAuthStateOpts) => {
+  const { isActive } = opts;
 
   try {
-    const localTestAccount = readLocalTestAccount();
-    if (localTestAccount) {
-      applyLocalAuthData({
-        ...createLocalTestUser(localTestAccount),
-        betaAccess: true,
-      }, {
-        dispatch,
-        currentDarkModeRef,
-        currentOverlaysRef,
-        setUser,
-        setStatus,
-        setSyncedSettings,
-        setSettingsSyncStatus,
-        lastSyncedSettingsRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-        setError,
-      });
+    if (applyLocalTestAccountIfPresent(opts)) {
       return;
     }
 
@@ -89,40 +110,15 @@ export const initLocalAuthState = async (opts: {
     if (!isActive()) return;
 
     if (!resp.ok) {
-      setStatus('signed_out');
-      setSettingsSyncStatus('idle');
-      setUser(null);
-      setSyncedSettings(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      setError(null);
+      applySignedOutLocalAuthState(opts);
       return;
     }
 
     const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-
-    // Reuse shared local-auth application logic to keep the hook body concise.
-    applyLocalAuthData(data, {
-      dispatch,
-      currentDarkModeRef,
-      currentOverlaysRef,
-      setUser,
-      setStatus,
-      setSyncedSettings,
-      setSettingsSyncStatus,
-      lastSyncedSettingsRef,
-      setBetaAccess,
-      setBetaAccessLoading,
-      setError,
-    });
+    applyLocalAuthData(data, toLocalAuthDeps(opts));
   } catch (err) {
     if (!isActive()) return;
-    setStatus('error');
-    setError(err instanceof Error ? err.message : 'Local auth initialization failed');
-    setUser(null);
-    setSyncedSettings(null);
-    setBetaAccess(false);
-    setBetaAccessLoading(false);
+    applyLocalAuthInitFailure(opts, err);
   }
 };
 

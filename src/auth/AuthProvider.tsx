@@ -42,6 +42,7 @@ import {
   applySettingsToState,
   attachHostedSettingsSubscription,
   cancelPendingHostedSettingsWriteIntent,
+  isHostedSettingsWriteOwnerActive,
   runInitialHostedSync,
   scheduleHostedSettingsDocumentWrite,
   shouldSkipHostedSettingsDocumentWrite,
@@ -69,6 +70,7 @@ export {
   getRemoteSeedPayload,
   handleHostedSettingsFirestoreSnapshot,
   isUserSettingsDocumentFieldEqual,
+  isHostedSettingsWriteOwnerActive,
   runInitialHostedSync,
   scheduleHostedSettingsDocumentWrite,
   seedOrApplySettings,
@@ -548,6 +550,7 @@ const useHostedAuthState = (): AuthContextValue => {
   const settingsWriteSequenceRef = useRef(0);
   const supersededBaselineOneShotRef = useRef<UserSettingsDocument | null>(null);
   const hostedSyncUserUidRef = useRef<string | null>(null);
+  const hostedSyncSessionGenerationRef = useRef(0);
   const hostedUserSyncActiveRef = useRef(false);
   const betaAccessRequestIdRef = useRef(0);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
@@ -641,6 +644,7 @@ const useHostedAuthState = (): AuthContextValue => {
 
     let isActive = true;
     hostedUserSyncActiveRef.current = true;
+    hostedSyncSessionGenerationRef.current += 1;
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     const profileRef = doc(requireDb(), 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
@@ -801,6 +805,7 @@ const useHostedAuthState = (): AuthContextValue => {
 
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     const writeOwnerUid = user.uid;
+    const writeOwnerSessionGeneration = hostedSyncSessionGenerationRef.current;
 
     scheduleHostedSettingsDocumentWrite({
       nextSettings,
@@ -814,7 +819,13 @@ const useHostedAuthState = (): AuthContextValue => {
       supersededBaselineOneShotRef,
       writeOwnerUid,
       isWriteOwnerActive: () =>
-        hostedUserSyncActiveRef.current && hostedSyncUserUidRef.current === writeOwnerUid,
+        isHostedSettingsWriteOwnerActive(
+          hostedUserSyncActiveRef.current,
+          hostedSyncUserUidRef.current,
+          writeOwnerUid,
+          hostedSyncSessionGenerationRef.current,
+          writeOwnerSessionGeneration,
+        ),
       onPersisted: (settings) => {
         setSyncedSettings(settings);
         setSettingsSyncStatus('synced');

@@ -387,6 +387,18 @@ const executeDebouncedHostedSettingsWrite = (
     });
 };
 
+/** True when a debounced hosted settings write still belongs to the active sync session. */
+export const isHostedSettingsWriteOwnerActive = (
+  isSyncActive: boolean,
+  currentUserUid: string | null,
+  writeOwnerUid: string,
+  currentSessionGeneration: number,
+  writeOwnerSessionGeneration: number,
+): boolean =>
+  isSyncActive
+  && currentUserUid === writeOwnerUid
+  && currentSessionGeneration === writeOwnerSessionGeneration;
+
 /** Debounces hosted settings writes and tracks pending local intent for snapshot coalescing. */
 export const scheduleHostedSettingsDocumentWrite = ({
   nextSettings,

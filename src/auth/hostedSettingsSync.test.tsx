@@ -7,6 +7,7 @@ import {
   consumeSupersededBaselineOneShotIgnore,
   finalizeHostedSettingsWriteFailure,
   handleHostedSettingsFirestoreSnapshot,
+  isHostedSettingsWriteOwnerActive,
   scheduleHostedSettingsDocumentWrite,
   shouldIgnoreHostedSettingsSnapshot,
   shouldSkipHostedSettingsDocumentWrite,
@@ -101,6 +102,59 @@ describe('hosted settings sync', () => {
           },
         );
       },
+    };
+  };
+
+  const createHostedWriteTestBed = (options?: {
+    lastSynced?: ReturnType<typeof buildHostedSettingsFixture>;
+    writeOwnerUid?: string;
+    isWriteOwnerActive?: () => boolean;
+    onPersisted?: (settings: ReturnType<typeof buildHostedSettingsFixture>) => void;
+    onPersistError?: (error: unknown) => void;
+  }) => {
+    const baseline = options?.lastSynced ?? buildHostedSettingsFixture('osm');
+    const lastSyncedSettingsRef = { current: baseline };
+    const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
+    const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
+    const writeSequenceRef = { current: 0 };
+    const debounceRef = { current: null as number | null };
+    const supersededBaselineRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
+    const writeOwnerUid = options?.writeOwnerUid ?? 'user-1';
+    const isWriteOwnerActive = options?.isWriteOwnerActive ?? (() => true);
+    const onPersisted = options?.onPersisted ?? (() => undefined);
+    const onPersistError = options?.onPersistError ?? (() => undefined);
+
+    const scheduleWrite = (
+      nextSettings: ReturnType<typeof buildHostedSettingsFixture>,
+      debounceMs = 750,
+    ) => {
+      scheduleHostedSettingsDocumentWrite({
+        nextSettings,
+        debounceMs,
+        settingsRef: { path: 'settings' } as never,
+        lastSyncedSettingsRef,
+        pendingLocalSettingsIntentRef: pendingIntentRef,
+        inFlightHostedSettingsWriteRef: inFlightRef,
+        settingsWriteSequenceRef: writeSequenceRef,
+        pendingDebounceTimerRef: debounceRef,
+        supersededBaselineOneShotRef: supersededBaselineRef,
+        writeOwnerUid,
+        isWriteOwnerActive,
+        onPersisted,
+        onPersistError,
+      });
+    };
+
+    return {
+      baseline,
+      lastSyncedSettingsRef,
+      pendingIntentRef,
+      inFlightRef,
+      writeSequenceRef,
+      debounceRef,
+      supersededBaselineRef,
+      writeOwnerUid,
+      scheduleWrite,
     };
   };
 
@@ -420,47 +474,19 @@ describe('hosted settings sync', () => {
       const targetB = buildHostedSettingsFixture('carto-light');
       const targetC = buildHostedSettingsFixture('esri-satellite');
       const localOverlaysC = { ...TEST_OVERLAY_STATE, baseMapStyle: 'esri-satellite' as const };
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
       const dispatch = jest.fn();
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
+      const {
         lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
+        pendingIntentRef,
+        inFlightRef,
+        scheduleWrite,
+      } = createHostedWriteTestBed({ lastSynced: baseline });
+
+      scheduleWrite(targetB);
       jest.advanceTimersByTime(750);
       expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
 
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetC,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
+      scheduleWrite(targetC);
       expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
 
@@ -516,29 +542,15 @@ describe('hosted settings sync', () => {
       const baseline = buildHostedSettingsFixture('osm');
       const targetB = buildHostedSettingsFixture('carto-light');
       const localOverlaysA = { ...TEST_OVERLAY_STATE, baseMapStyle: 'osm' as const };
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
       const dispatch = jest.fn();
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
+      const {
         lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
+        pendingIntentRef,
+        inFlightRef,
+        scheduleWrite,
+      } = createHostedWriteTestBed({ lastSynced: baseline });
+
+      scheduleWrite(targetB);
       jest.advanceTimersByTime(750);
       expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
 
@@ -546,21 +558,7 @@ describe('hosted settings sync', () => {
         shouldSkipHostedSettingsDocumentWrite(baseline, baseline, inFlightRef.current),
       ).toBe(false);
 
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: baseline,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
+      scheduleWrite(baseline);
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('osm');
       expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
 
@@ -621,46 +619,14 @@ describe('hosted settings sync', () => {
       const baseline = buildHostedSettingsFixture('osm');
       const targetB = buildHostedSettingsFixture('carto-light');
       const targetC = buildHostedSettingsFixture('esri-satellite');
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
       const onPersistError = jest.fn();
+      const { pendingIntentRef, scheduleWrite } = createHostedWriteTestBed({ lastSynced: baseline, onPersistError });
 
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
+      scheduleWrite(targetB);
       jest.advanceTimersByTime(750);
 
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetC,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
+      scheduleWrite(targetC);
+      expect(onPersistError).not.toHaveBeenCalled();
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
 
       rejectB?.(new Error('write failed'));
@@ -887,6 +853,50 @@ describe('hosted settings sync', () => {
     );
   });
 
+  test('failed in-flight write from a prior sync session does not surface settings error after re-login', async () => {
+    jest.useFakeTimers();
+    try {
+      let rejectWrite: ((error: Error) => void) | undefined;
+      jest.mocked(setDoc).mockImplementation(
+        () => new Promise<void>((_, reject) => {
+          rejectWrite = reject;
+        }) as never,
+      );
+      const target = buildHostedSettingsFixture('carto-light');
+      const writeOwnerUid = 'user-a';
+      const writeOwnerSessionGeneration = 1;
+      let syncActive = true;
+      let currentSessionGeneration = 1;
+      const onPersistError = jest.fn();
+      const { scheduleWrite } = createHostedWriteTestBed({
+        onPersistError,
+        writeOwnerUid,
+        isWriteOwnerActive: () =>
+          isHostedSettingsWriteOwnerActive(
+            syncActive,
+            writeOwnerUid,
+            writeOwnerUid,
+            currentSessionGeneration,
+            writeOwnerSessionGeneration,
+          ),
+      });
+
+      scheduleWrite(target);
+      jest.advanceTimersByTime(750);
+
+      currentSessionGeneration = 2;
+      syncActive = true;
+
+      rejectWrite?.(new Error('stale session write failed'));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(onPersistError).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('setDoc completion after sign-out does not mutate hosted sync refs', async () => {
     jest.useFakeTimers();
     try {
@@ -896,43 +906,38 @@ describe('hosted settings sync', () => {
           resolveWrite = resolve;
         }) as never,
       );
-      const baseline = buildHostedSettingsFixture('osm');
       const target = buildHostedSettingsFixture('carto-light');
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const onPersisted = jest.fn();
-      let writeOwnerActive = true;
       const writeOwnerUid = 'user-a';
-      let currentUid = 'user-a';
+      const writeOwnerSessionGeneration = 1;
+      let syncActive = true;
+      let currentUid: string | null = 'user-a';
+      let currentSessionGeneration = 1;
+      const onPersisted = jest.fn();
+      const { baseline, lastSyncedSettingsRef, supersededBaselineRef, scheduleWrite } =
+        createHostedWriteTestBed({
+          onPersisted,
+          writeOwnerUid,
+          isWriteOwnerActive: () =>
+            isHostedSettingsWriteOwnerActive(
+              syncActive,
+              currentUid,
+              writeOwnerUid,
+              currentSessionGeneration,
+              writeOwnerSessionGeneration,
+            ),
+        });
 
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: target,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid,
-        isWriteOwnerActive: () => writeOwnerActive && currentUid === writeOwnerUid,
-        onPersisted,
-        onPersistError: () => undefined,
-      });
+      scheduleWrite(target);
 
       jest.advanceTimersByTime(750);
-      writeOwnerActive = false;
-      currentUid = 'user-b';
+      syncActive = false;
+      currentUid = null;
+      currentSessionGeneration = 2;
       resolveWrite?.();
       await Promise.resolve();
 
       expect(lastSyncedSettingsRef.current).toEqual(baseline);
-      expect(supersededOneShotRef.current).toBeNull();
+      expect(supersededBaselineRef.current).toBeNull();
       expect(onPersisted).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
