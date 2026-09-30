@@ -60,6 +60,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:tooling": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:test": "node scripts/check-test-types.mjs",
+    "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "docs:inventory": "node scripts/generate-repository-inventory.mjs",
