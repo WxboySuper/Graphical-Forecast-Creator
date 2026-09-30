@@ -2,7 +2,7 @@
 
 const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { getBaseUrl, getBillingRuntimeConfig } = require('./billing-config');
+const { getBaseUrl, getBillingReturnBaseUrl, getBillingRuntimeConfig } = require('./billing-config');
 
 const originalEnv = process.env;
 
@@ -26,6 +26,34 @@ describe('getBaseUrl', () => {
   it('never derives the base URL from request headers because getBaseUrl is env-only', () => {
     assert.equal(getBaseUrl.length, 0);
     assert.equal(getBaseUrl(), 'http://127.0.0.1:3000');
+  });
+});
+
+describe('getBillingReturnBaseUrl', () => {
+  beforeEach(() => resetEnv(['APP_BASE_URL', 'SERVER_TARGET', 'SENTRY_ENVIRONMENT']));
+
+  it('uses the Cloudflare beta origin when SERVER_TARGET is beta', () => {
+    process.env.SERVER_TARGET = 'beta';
+    process.env.APP_BASE_URL = 'https://beta-gfc.weatherboysuper.com';
+    const req = { headers: { origin: 'https://beta.gfcweather.com' } };
+    assert.equal(getBillingReturnBaseUrl(req), 'https://beta.gfcweather.com');
+  });
+
+  it('uses APP_BASE_URL when Origin matches the configured legacy beta host', () => {
+    process.env.SERVER_TARGET = 'beta';
+    process.env.APP_BASE_URL = 'https://beta-gfc.weatherboysuper.com';
+    const req = { headers: { origin: 'https://beta-gfc.weatherboysuper.com' } };
+    assert.equal(getBillingReturnBaseUrl(req), 'https://beta-gfc.weatherboysuper.com');
+  });
+
+  it('falls back to APP_BASE_URL when Origin is missing or not allowed', () => {
+    process.env.SERVER_TARGET = 'beta';
+    process.env.APP_BASE_URL = 'https://beta-gfc.weatherboysuper.com';
+    assert.equal(getBillingReturnBaseUrl({ headers: {} }), 'https://beta-gfc.weatherboysuper.com');
+    assert.equal(
+      getBillingReturnBaseUrl({ headers: { origin: 'https://evil.example' } }),
+      'https://beta-gfc.weatherboysuper.com'
+    );
   });
 });
 
