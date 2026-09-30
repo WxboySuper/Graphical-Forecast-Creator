@@ -12,6 +12,12 @@ export const getScriptSrcValue = (policy) => {
   return match[1].trim();
 };
 
+/** Returns true when the given CSP source appears in script-src. */
+export const scriptSrcAllowsSource = (policy, source) => {
+  const sources = getScriptSrcValue(policy).split(/\s+/).filter(Boolean);
+  return sources.includes(source);
+};
+
 /** Extracts the CSP policy string from a Cloudflare _headers block or nginx snippet. */
 export const extractContentSecurityPolicy = (source) => {
   const headersFileMatch = source.match(/Content-Security-Policy:\s*(.+)/);
