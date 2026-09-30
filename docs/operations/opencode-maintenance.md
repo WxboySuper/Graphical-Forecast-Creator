@@ -181,9 +181,14 @@ Collaborator PRs that declare a beta or hotfix impact also use OpenCode to
 draft an entry. The workflow checks out
 maintenance scripts from the
 repository default branch before it checks out the PR head. The PR checkout is
-input data only, with `persist-credentials: false`. The workflow executes no PR-provided
-script or local action. It removes tracked `.env` files and project OpenCode
-configuration, plugins, and hooks before starting the model.
+input data only, with `persist-credentials: false`. The workflow executes no
+PR-provided script or local action. It removes tracked `.env` files and
+project OpenCode configuration, plugins, and hooks before starting the model.
+OpenCode receives the complete PR description, including Dependabot's
+upstream release notes, instead of a truncated excerpt. The shared runner
+attaches large prompts from a temporary file in the sanitized checkout rather
+than passing the prompt as one command-line argument; it removes that file
+when the model exits.
 
 Generation requires exactly one eligible changelog declaration and a diff
 that does not already change `CHANGELOG.md`. It is bounded to 80
@@ -192,11 +197,11 @@ and a 12-minute model timeout. Fork PRs, other decision values, oversized
 diffs, and inconclusive results do not produce automated edits; the changelog
 check remains the required gate. Dependabot is accepted only when GitHub
 identifies `dependabot[bot]`, the head repository matches GFC, and the branch
-starts with `dependabot/`. OpenCode has read-only repository tools and
+starts with `dependabot/`. The trusted automated preparation and publishing
+steps use `GH_PAT` for PR metadata updates or authenticated fetch/push. OpenCode has read-only repository tools and
 receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
-identity and head, then commits only `CHANGELOG.md`. The trusted automated
-preparation and publishing steps use `GH_PAT` for PR metadata updates or
-authenticated fetch/push. No checkout credential is persisted. The ordinary
+identity and head, then commits only `CHANGELOG.md`. No checkout credential
+is persisted. The ordinary
 `pull_request` CI workflow has read-only token permissions, no repository
 secrets, and no token environment passed to PR-controlled scripts. Human review
 and branch protection remain the merge boundary.

@@ -149,7 +149,7 @@ Hosted monitoring includes:
 - Structured logs (`Sentry.logger.*`)
 - Server-side errors on the analytics API (`@sentry/node`)
 
-Session replay is **disabled**. `sendDefaultPii` is **false** (no IP/cookies in error payloads by default).
+Session replay is **disabled**. `dataCollection` explicitly opts out of PII (no user info, cookies, headers, bodies, or query params in error payloads by default).
 
 Create two Sentry projects (recommended):
 

@@ -204,8 +204,19 @@ export function initSentry(): void {
     tunnel: '/api/sentry-tunnel',
     environment: getEnvironment(),
     release: getRelease(),
-    sendDefaultPii: false,
-    enableLogs: true,
+    // Privacy-safe baseline (Sentry v11): replaces the removed `sendDefaultPii: false`.
+    // Explicit opt-outs preserve the v10 restrictive behavior instead of inheriting
+    // v11's more permissive dataCollection defaults. Note: `enableLogs` was removed
+    // in v11 — logs are sent when `Sentry.logger.*` is used.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: false, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+    },
     normalizeDepth: 10,
     beforeSend,
     integrations: [
