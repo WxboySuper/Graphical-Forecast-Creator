@@ -21,10 +21,18 @@ const newProductDisabled = (
   || editorOpen
   || (customProducts.userProducts ?? customProducts.products.filter((product) => !isBuiltInCustomProduct(product))).length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount;
 
-const WorkspaceNotices = ({ customProducts, applicationError }: { customProducts: UseCustomProductsResult; applicationError?: string | null }) => (
+const WorkspaceNotices = ({
+  customProducts,
+  applicationError,
+  editorOpen,
+}: {
+  customProducts: UseCustomProductsResult;
+  applicationError?: string | null;
+  editorOpen: boolean;
+}) => (
   <>
     {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Rainfall and Tropical AOI are built-in products available to everyone. Premium is only required to create or manage your own reusable products.</CardContent></Card> : null}
-    {customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
+    {!editorOpen && customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
     {applicationError ? <p role="alert" className="custom-product-error">{applicationError}</p> : null}
   </>
 );
@@ -101,7 +109,7 @@ const ProductsLibrary = ({
   if (customProducts.loading) return <div className="custom-products-empty">Loading reusable products…</div>;
   if (customProducts.products.length === 0 && editorOpen) return null;
   if (customProducts.products.length === 0) {
-    return <div className="custom-products-empty"><Layers3 className="h-10 w-10" /><h2>No reusable products yet</h2><p>Create a product with up to 6 ordered categories.</p></div>;
+    return <div className="custom-products-empty"><Layers3 className="h-10 w-10" /><h2>No reusable products yet</h2><p>Create a product with up to {CUSTOM_PRODUCT_LIMITS.categoriesPerProduct} ordered categories.</p></div>;
   }
   const pending = Boolean(customProducts.pendingAction) || editorOpen;
   return (
@@ -170,7 +178,7 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
         newDisabled={newProductDisabled(customProducts, editorOpen, user?.uid)}
         onNew={() => { setEditing(null); setCreating(true); }}
       />
-      <WorkspaceNotices customProducts={customProducts} applicationError={applicationError} />
+      <WorkspaceNotices customProducts={customProducts} applicationError={applicationError} editorOpen={editorOpen} />
       <WorkspaceEditors
         creating={creating}
         editing={editing}
