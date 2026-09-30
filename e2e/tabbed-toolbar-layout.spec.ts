@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
-import { collectToolbarLayoutViolations } from './tabbedToolbarLayoutChecks';
+import {
+  collectToolbarLayoutViolations,
+  gatherToolbarLayoutSnapshot,
+} from './tabbedToolbarLayoutChecks';
 
 const LAYOUT_TOLERANCE_PX = 1;
 
@@ -41,7 +44,13 @@ const assertActiveTabToolbarLayout = async (
   page: Page,
   options: { requireDaysRowFits?: boolean },
 ) => {
-  const violations = await page.evaluate(collectToolbarLayoutViolations, {
+  const result = await page.evaluate(gatherToolbarLayoutSnapshot);
+  if (!result.ok) {
+    expect([result.violation]).toEqual([]);
+    return;
+  }
+
+  const violations = collectToolbarLayoutViolations(result.snapshot, {
     tolerance: LAYOUT_TOLERANCE_PX,
     requireDaysRowFits: options.requireDaysRowFits ?? false,
   });
