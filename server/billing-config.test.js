@@ -11,6 +11,18 @@ function resetEnv(keys) {
   for (const key of keys) delete process.env[key];
 }
 
+function setupStripeBillingEnv({ appBaseUrl } = {}) {
+  process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
+  process.env.STRIPE_PRICE_MONTHLY = 'price_monthly';
+  process.env.STRIPE_PRICE_ANNUAL_STANDARD = 'price_annual';
+  process.env.FIREBASE_ADMIN_PROJECT_ID = 'project';
+  process.env.FIREBASE_ADMIN_CLIENT_EMAIL = 'email@test.com';
+  process.env.FIREBASE_ADMIN_PRIVATE_KEY = 'key';
+  if (appBaseUrl) {
+    process.env.APP_BASE_URL = appBaseUrl;
+  }
+}
+
 describe('getBaseUrl', () => {
   beforeEach(() => resetEnv(['APP_BASE_URL']));
 
@@ -70,27 +82,14 @@ describe('getBillingRuntimeConfig', () => {
   ]));
 
   it('checkoutEnabled is false when APP_BASE_URL is missing', () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
-    process.env.STRIPE_PRICE_MONTHLY = 'price_monthly';
-    process.env.STRIPE_PRICE_ANNUAL_STANDARD = 'price_annual';
-    process.env.FIREBASE_ADMIN_PROJECT_ID = 'project';
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL = 'email@test.com';
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY = 'key';
-
+    setupStripeBillingEnv();
     const config = getBillingRuntimeConfig();
     assert.equal(config.billingEnabled, true);
     assert.equal(config.checkoutEnabled, false);
   });
 
   it('checkoutEnabled is true when all config including APP_BASE_URL is present', () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test_fake';
-    process.env.STRIPE_PRICE_MONTHLY = 'price_monthly';
-    process.env.STRIPE_PRICE_ANNUAL_STANDARD = 'price_annual';
-    process.env.APP_BASE_URL = 'https://gfc.weatherboysuper.com';
-    process.env.FIREBASE_ADMIN_PROJECT_ID = 'project';
-    process.env.FIREBASE_ADMIN_CLIENT_EMAIL = 'email@test.com';
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY = 'key';
-
+    setupStripeBillingEnv({ appBaseUrl: 'https://gfc.weatherboysuper.com' });
     const config = getBillingRuntimeConfig();
     assert.equal(config.billingEnabled, true);
     assert.equal(config.checkoutEnabled, true);
