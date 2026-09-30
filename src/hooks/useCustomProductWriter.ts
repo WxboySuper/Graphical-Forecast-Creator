@@ -9,8 +9,16 @@ export type RunCustomProductWrite = (
   requiresPremium?: boolean,
 ) => Promise<boolean>;
 
-const mutationError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to update custom products.';
+const mutationError = (error: unknown): string => {
+  if (error instanceof Error) {
+    const code = (error as { code?: string }).code;
+    if (code === 'permission-denied') {
+      return 'Could not save this product. Check that every category has a valid label and style, then try again. If the problem continues, refresh and retry.';
+    }
+    return error.message;
+  }
+  return 'Unable to update custom products.';
+};
 
 /** Serializes entitlement-checked custom-product writes and reports their UI state. */
 export const useCustomProductWriter = ({

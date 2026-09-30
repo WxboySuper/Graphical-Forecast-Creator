@@ -7,12 +7,14 @@ export const CUSTOM_PRODUCTS_SCHEMA_VERSION = '1.0.0' as const;
 export const CUSTOM_PRODUCT_LIMITS = {
   productsPerAccount: 20,
   layersPerCollection: 12,
-  categoriesPerProduct: 12,
+  categoriesPerProduct: 6,
   featuresPerLayer: 500,
   polygonsPerFeature: 32,
   ringsPerPolygon: 64,
   coordinatesPerFeature: 10_000,
   labelLength: 64,
+  /** Matches hosted Firestore rules for custom category ids. */
+  categoryIdLength: 128,
 } as const;
 
 export type CustomLayerId = string & { readonly _brand: 'CustomLayerId' };

@@ -43,8 +43,21 @@ const WorkspaceEditors = ({
   stopEditing(): void;
 }) => (
   <>
-    {creating ? <CustomProductEditor onCancel={stopCreating} onSave={customProducts.createProduct} /> : null}
-    {editing ? <CustomProductEditor product={editing} onCancel={stopEditing} onSave={(draft) => customProducts.updateProduct(editing, draft)} /> : null}
+    {creating ? (
+      <CustomProductEditor
+        saveError={customProducts.error}
+        onCancel={stopCreating}
+        onSave={customProducts.createProduct}
+      />
+    ) : null}
+    {editing ? (
+      <CustomProductEditor
+        product={editing}
+        saveError={customProducts.error}
+        onCancel={stopEditing}
+        onSave={(draft) => customProducts.updateProduct(editing, draft)}
+      />
+    ) : null}
   </>
 );
 
@@ -88,7 +101,7 @@ const ProductsLibrary = ({
   if (customProducts.loading) return <div className="custom-products-empty">Loading reusable products…</div>;
   if (customProducts.products.length === 0 && editorOpen) return null;
   if (customProducts.products.length === 0) {
-    return <div className="custom-products-empty"><Layers3 className="h-10 w-10" /><h2>No reusable products yet</h2><p>Create a product with up to 12 ordered categories.</p></div>;
+    return <div className="custom-products-empty"><Layers3 className="h-10 w-10" /><h2>No reusable products yet</h2><p>Create a product with up to 6 ordered categories.</p></div>;
   }
   const pending = Boolean(customProducts.pendingAction) || editorOpen;
   return (

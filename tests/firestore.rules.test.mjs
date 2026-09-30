@@ -627,6 +627,20 @@ describe('customProducts security and lifecycle boundary', () => {
     ));
   });
 
+  test('allows three ordered categories on create', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    const baseCategory = customProduct().categories[0];
+    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
+    const thirdCategory = { ...baseCategory, id: 'high', label: 'High', order: 2 };
+    await assertSucceeds(setDoc(
+      aliceRef(),
+      customProduct({ categories: [baseCategory, secondCategory, thirdCategory] }),
+    ));
+  });
+
   test('rejects non-canonical, out-of-range, and impossible ISO timestamps', async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);

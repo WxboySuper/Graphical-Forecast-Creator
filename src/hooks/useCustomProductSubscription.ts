@@ -30,7 +30,6 @@ export const useCustomProductSubscription = (
     return repository.subscribe(userId, (nextProducts) => {
       setProducts(nextProducts);
       setLoading(false);
-      setError(null);
     }, (nextError) => {
       setError(nextError.message);
       setLoading(false);

@@ -38,58 +38,39 @@ service cloud.firestore {
     function isValidCustomCategoryStyle(style) {
       return style is map &&
         style.keys().hasOnly(['fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth', 'hatch']) &&
-        style.keys().hasAll(['fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth', 'hatch']) &&
         style.fillColor is string && style.fillColor.matches('^#[0-9A-Fa-f]{6}$') &&
-        isNumeric(style.fillOpacity) && style.fillOpacity >= 0 && style.fillOpacity <= 1 &&
         style.strokeColor is string && style.strokeColor.matches('^#[0-9A-Fa-f]{6}$') &&
+        isNumeric(style.fillOpacity) && style.fillOpacity >= 0 && style.fillOpacity <= 1 &&
         isNumeric(style.strokeOpacity) && style.strokeOpacity >= 0 && style.strokeOpacity <= 1 &&
         isNumeric(style.strokeWidth) && style.strokeWidth >= 0 && style.strokeWidth <= 8 &&
-        ['none', 'diagonal', 'reverse-diagonal', 'crosshatch'].hasAny([style.hatch]);
+        style.hatch is string;
     }
 
     function isValidCustomCategory(category, expectedOrder) {
       return category is map &&
         category.keys().hasOnly(['id', 'label', 'order', 'style']) &&
-        category.keys().hasAll(['id', 'label', 'order', 'style']) &&
         category.id is string && category.id.size() > 0 && category.id.size() <= 128 &&
         category.label is string && category.label.size() > 0 && category.label.size() <= 64 &&
-        category.order is int && category.order == expectedOrder &&
+        isNumeric(category.order) && category.order == expectedOrder &&
         isValidCustomCategoryStyle(category.style);
     }
 
     function isValidCustomCategories(value) {
-      return value is list && value.size() > 0 && value.size() <= 12 &&
-        (value.size() <= 0 || isValidCustomCategory(value[0], 0)) &&
-        (value.size() <= 1 || isValidCustomCategory(value[1], 1)) &&
-        (value.size() <= 2 || isValidCustomCategory(value[2], 2)) &&
-        (value.size() <= 3 || isValidCustomCategory(value[3], 3)) &&
-        (value.size() <= 4 || isValidCustomCategory(value[4], 4)) &&
-        (value.size() <= 5 || isValidCustomCategory(value[5], 5)) &&
-        (value.size() <= 6 || isValidCustomCategory(value[6], 6)) &&
-        (value.size() <= 7 || isValidCustomCategory(value[7], 7)) &&
-        (value.size() <= 8 || isValidCustomCategory(value[8], 8)) &&
-        (value.size() <= 9 || isValidCustomCategory(value[9], 9)) &&
-        (value.size() <= 10 || isValidCustomCategory(value[10], 10)) &&
-        (value.size() <= 11 || isValidCustomCategory(value[11], 11));
-    }
-
-    function customCategoryIds(value) {
-      return value.size() == 1 ? [value[0].id] :
-        value.size() == 2 ? [value[0].id, value[1].id] :
-        value.size() == 3 ? [value[0].id, value[1].id, value[2].id] :
-        value.size() == 4 ? [value[0].id, value[1].id, value[2].id, value[3].id] :
-        value.size() == 5 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id] :
-        value.size() == 6 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id] :
-        value.size() == 7 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id] :
-        value.size() == 8 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id, value[7].id] :
-        value.size() == 9 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id, value[7].id, value[8].id] :
-        value.size() == 10 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id, value[7].id, value[8].id, value[9].id] :
-        value.size() == 11 ? [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id, value[7].id, value[8].id, value[9].id, value[10].id] :
-        [value[0].id, value[1].id, value[2].id, value[3].id, value[4].id, value[5].id, value[6].id, value[7].id, value[8].id, value[9].id, value[10].id, value[11].id];
+      return value is list && value.size() > 0 && value.size() <= 6
+        && isValidCustomCategory(value[0], 0)
+        && (value.size() < 2 || isValidCustomCategory(value[1], 1))
+        && (value.size() < 3 || isValidCustomCategory(value[2], 2))
+        && (value.size() < 4 || isValidCustomCategory(value[3], 3))
+        && (value.size() < 5 || isValidCustomCategory(value[4], 4))
+        && (value.size() < 6 || isValidCustomCategory(value[5], 5));
     }
 
     function hasUniqueCustomCategoryIds(value) {
-      return customCategoryIds(value).toSet().size() == value.size();
+      return (value.size() < 2 || value[0].id != value[1].id)
+        && (value.size() < 3 || (value[0].id != value[2].id && value[1].id != value[2].id))
+        && (value.size() < 4 || (value[0].id != value[3].id && value[1].id != value[3].id && value[2].id != value[3].id))
+        && (value.size() < 5 || (value[0].id != value[4].id && value[1].id != value[4].id && value[2].id != value[4].id && value[3].id != value[4].id))
+        && (value.size() < 6 || (value[0].id != value[5].id && value[1].id != value[5].id && value[2].id != value[5].id && value[3].id != value[5].id && value[4].id != value[5].id));
     }
 
     function isValidCustomProductTimestamp(value) {

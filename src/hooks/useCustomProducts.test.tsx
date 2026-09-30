@@ -51,6 +51,27 @@ const product = {
   createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z',
 } as Parameters<ReturnType<typeof useCustomProducts>['deleteProduct']>[0];
 
+describe('useCustomProductWriter', () => {
+  test('maps Firestore permission-denied failures to a user-facing message', async () => {
+    const { useCustomProductWriter } = await import('./useCustomProductWriter');
+    const setError = jest.fn();
+    const { result } = renderHook(() => useCustomProductWriter({
+      userId: 'user-1',
+      premiumActive: true,
+      setError,
+    }));
+
+    const denied = Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+    await act(async () => {
+      const saved = await result.current.runWrite('create', undefined, async () => {
+        throw denied;
+      });
+      expect(saved).toBe(false);
+    });
+    expect(setError).toHaveBeenCalledWith(expect.stringContaining('Could not save this product.'));
+  });
+});
+
 describe('useCustomProducts', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -76,6 +97,30 @@ describe('useCustomProducts', () => {
 
     unmount();
     expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  test('keeps mutation errors visible after the live subscription refreshes', async () => {
+    const repository = makeRepository();
+    let onUpdate: ((products: unknown[]) => void) | undefined;
+    repository.subscribe.mockImplementation((_userId, update) => {
+      onUpdate = update;
+      update([]);
+      return jest.fn();
+    });
+    repository.create.mockRejectedValue(new Error('permission denied'));
+    mockGetRepository.mockReturnValue(repository);
+    const { result } = renderHook(() => useCustomProducts());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await expect(result.current.createProduct(draft as Parameters<typeof result.current.createProduct>[0])).resolves.toBe(false);
+    });
+    expect(result.current.error).toBe('permission denied');
+
+    act(() => {
+      onUpdate?.([]);
+    });
+    expect(result.current.error).toBe('permission denied');
   });
 
   test('blocks a second write while the first action is still pending', async () => {
