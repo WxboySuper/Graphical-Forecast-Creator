@@ -11,14 +11,14 @@ const staticHeaders = fs.readFileSync(path.join(repoRoot, 'public', '_headers'),
 const GOOGLE_SIGN_IN_SCRIPT_HOST = 'https://apis.google.com';
 
 test('public/_headers allows Firebase Google Sign-In scripts in script-src', async () => {
-  const { extractContentSecurityPolicy, getScriptSrcValue } = await import('./lib/csp-script-src.mjs');
+  const { extractContentSecurityPolicy, scriptSrcAllowsSource } = await import('./lib/csp-script-src.mjs');
   const policy = extractContentSecurityPolicy(staticHeaders);
-  assert.ok(getScriptSrcValue(policy).includes(GOOGLE_SIGN_IN_SCRIPT_HOST));
+  assert.ok(scriptSrcAllowsSource(policy, GOOGLE_SIGN_IN_SCRIPT_HOST));
 });
 
 for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
   test(`${filename} includes shared headers for server and assets`, async () => {
-    const { extractContentSecurityPolicy, getScriptSrcValue } = await import('./lib/csp-script-src.mjs');
+    const { extractContentSecurityPolicy, scriptSrcAllowsSource } = await import('./lib/csp-script-src.mjs');
     const config = fs.readFileSync(path.join(serverDirectory, filename), 'utf8');
     assert.equal(config.match(/include \/etc\/nginx\/snippets\/gfc-security-headers\.conf;/g)?.length, 2);
     assert.equal(securityHeaders.match(/^add_header /gm)?.length, 5);
@@ -46,7 +46,7 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
     assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
     const nginxPolicy = extractContentSecurityPolicy(securityHeaders);
-    assert.ok(getScriptSrcValue(nginxPolicy).includes(GOOGLE_SIGN_IN_SCRIPT_HOST));
+    assert.ok(scriptSrcAllowsSource(nginxPolicy, GOOGLE_SIGN_IN_SCRIPT_HOST));
     assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
