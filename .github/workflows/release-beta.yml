@@ -1,7 +1,9 @@
 name: Release | Beta
 
 # Beta releases are intentional snapshots of the next-major main line. Merging
-# into main never creates a release automatically; this workflow owns the monotonically increasing beta version and release tag.
+# into main never creates a release automatically; this workflow versions the
+# changelog, publishes a prerelease, deploys beta.gfcweather.com on Cloudflare
+# Workers, and smoke-tests the live site.
 on:
   workflow_dispatch:
     inputs:
@@ -9,6 +11,21 @@ on:
         description: 'Type RELEASE-BETA to create the prerelease'
         required: true
         type: string
+      version:
+        description: 'Optional explicit beta version (X.Y.Z-beta.N); leave blank to auto-increment'
+        required: false
+        default: ''
+        type: string
+      previous_tag:
+        description: 'Optional previous beta tag for generated release notes'
+        required: false
+        default: ''
+        type: string
+      dry_run:
+        description: 'Build and preview release notes without committing, tagging, or deploying'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: beta-release
@@ -18,8 +35,38 @@ permissions:
   contents: read
 
 jobs:
-  final_changelog_audit:
+  quality:
     if: inputs.confirmation == 'RELEASE-BETA'
+    name: Lint and test main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+  final_changelog_audit:
+    if: inputs.confirmation == 'RELEASE-BETA' && !inputs.dry_run
+    needs: quality
     name: Final changelog audit
     uses: ./.github/workflows/opencode-changelog-audit.yml
     with:
@@ -37,7 +84,7 @@ jobs:
   changelog_gate:
     name: Require clean changelog
     needs: final_changelog_audit
-    if: always()
+    if: inputs.confirmation == 'RELEASE-BETA' && !inputs.dry_run
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -57,15 +104,30 @@ jobs:
         run: node scripts/require-opencode-changelog-clean.mjs
 
   release:
-    needs: [final_changelog_audit, changelog_gate]
+    name: Version, changelog, and GitHub prerelease
+    needs: [quality, final_changelog_audit, changelog_gate]
+    if: >-
+      always() &&
+      inputs.confirmation == 'RELEASE-BETA' &&
+      needs.quality.result == 'success' &&
+      (
+        inputs.dry_run ||
+        (
+          needs.final_changelog_audit.result == 'success' &&
+          needs.changelog_gate.result == 'success'
+        )
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      dry_run: ${{ inputs.dry_run }}
     env:
       CONFIRMATION: ${{ inputs.confirmation }}
       AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      EXPLICIT_VERSION: ${{ inputs.version }}
     steps:
       - name: Require explicit confirmation
         run: |
@@ -86,44 +148,61 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: Calculate and commit next beta version
+      - name: Calculate next beta version
         id: version
+        env:
+          EXPLICIT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          if [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
+          if [ "$DRY_RUN" != "true" ] && [ -n "$AUDITED_HEAD" ] && [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
             echo "::error::main moved after the final changelog audit; rerun the release workflow." >&2
             exit 1
           fi
-          CURRENT=$(node -p "require('./package.json').version")
-          CURRENT_BETA=''
-          if [[ "$CURRENT" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-beta\.([0-9]+)$ ]]; then
-            BASE="${BASH_REMATCH[1]}"
-            CURRENT_BETA="${BASH_REMATCH[2]}"
-          elif [[ "$CURRENT" =~ ^([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            BASE="$CURRENT"
-          else
-            echo "::error::Unsupported main package version: $CURRENT" >&2
+          node --input-type=module - <<'NODE'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { calculateNextBetaVersion } from './scripts/lib/calculate-next-beta-version.mjs';
+
+          const explicit = process.env.EXPLICIT_VERSION?.trim() ?? '';
+          const current = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          const tags = execFileSync('git', ['tag', '--list', 'v*-beta.*'], { encoding: 'utf8' })
+            .split(/\r?\n/)
+            .filter(Boolean);
+          const taggedVersions = new Set(tags);
+          const { version, strategy } = calculateNextBetaVersion({
+            packageVersion: current,
+            betaTags: tags,
+            explicitVersion: explicit,
+            taggedVersions,
+          });
+          appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\nstrategy=${strategy}\n`);
+          console.log(`Selected beta version ${version} (${strategy}).`);
+          NODE
+
+      - name: Preview beta release files (dry run)
+        if: inputs.dry_run
+        run: node scripts/prepare-beta-release.mjs "${{ steps.version.outputs.version }}" --dry-run
+
+      - name: Prepare beta release commit
+        if: !inputs.dry_run
+        run: node scripts/prepare-beta-release.mjs "${{ steps.version.outputs.version }}"
+
+      - name: Commit release metadata to main
+        if: !inputs.dry_run
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package.json CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "::error::No release file changes were produced." >&2
             exit 1
           fi
-          git fetch --tags --force
-          LAST=$(git tag --list "v${BASE}-beta.*" | sed -E "s/^v${BASE}-beta\.([0-9]+)$/\1/" | sort -n | tail -1)
-          if [ -n "$CURRENT_BETA" ] && ! git rev-parse --verify --quiet "refs/tags/v${CURRENT}" >/dev/null \
-            && { [ -z "$LAST" ] || [ "$CURRENT_BETA" -ge "$LAST" ]; }; then
-            VERSION="$CURRENT"
-            echo "Retrying untagged beta version $VERSION without changing package.json."
-          else
-            NEXT=$(( ${LAST:-0} + 1 ))
-            VERSION="${BASE}-beta.${NEXT}"
-            npm version "$VERSION" --no-git-tag-version
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add package.json
-            git commit -m "chore(release): prepare ${VERSION}"
-            git push --force-with-lease="refs/heads/main:${GITHUB_SHA}" origin HEAD:main
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          git commit -m "chore(release): prepare ${{ steps.version.outputs.version }}"
+          git push --force-with-lease="refs/heads/main:${GITHUB_SHA}" origin HEAD:main
 
       - name: Validate beta package version
+        if: !inputs.dry_run
         run: |
           set -euo pipefail
           VERSION=$(node -p "require('./package.json').version")
@@ -133,49 +212,60 @@ jobs:
           fi
           echo "Releasing beta version $VERSION from main"
 
-      - name: Create GitHub prerelease
+      - name: Preview GitHub release notes (dry run)
+        if: inputs.dry_run
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: next-major
           RELEASE_NOTES_MODE: changelog-and-prs
-          PREVIOUS_TAG: ''
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
+          NOTES_FILE: beta-release-notes.md
+          DRY_RUN: true
+        run: |
+          set -euo pipefail
+          node scripts/prepare-beta-release.mjs "${{ steps.version.outputs.version }}"
+          node scripts/create-github-release.mjs "${{ steps.version.outputs.version }}" main
+          if [ -f beta-release-notes.md ]; then
+            echo '### Dry-run release notes preview' >> "$GITHUB_STEP_SUMMARY"
+            cat beta-release-notes.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          git checkout -- package.json CHANGELOG.md
+
+      - name: Create GitHub prerelease
+        if: !inputs.dry_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          CHANGELOG_FILE: CHANGELOG.md
+          CHANGELOG_LANE: next-major
+          RELEASE_NOTES_MODE: changelog-and-prs
+          PREVIOUS_TAG: ${{ inputs.previous_tag }}
           NOTES_FILE: beta-release-notes.md
         run: node scripts/create-github-release.mjs "${{ steps.version.outputs.version }}" main
 
   deploy:
+    name: Deploy beta Worker
     needs: release
-    concurrency:
-      group: deploy-beta
-      cancel-in-progress: false
+    if: needs.release.result == 'success' && !inputs.dry_run
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
-      RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
-
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
     steps:
       - name: Checkout release tag
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: v${{ needs.release.outputs.version }}
 
-      - name: Apply release version to deployment artifact
-        run: npm version "${{ needs.release.outputs.version }}" --no-git-tag-version --allow-same-version
-
       - name: Verify beta release tag and package version
-        env:
-          RELEASE_TAG: v${{ needs.release.outputs.version }}
         run: |
           set -euo pipefail
           PKG=$(node -p "require('./package.json').version")
-          if [ "v${PKG}" != "$RELEASE_TAG" ]; then
-            echo "::error::Release artifact version ${PKG} does not match ${RELEASE_TAG}" >&2
-            exit 1
-          fi
-          if ! printf '%s' "$PKG" | grep -Eq -- '-beta\.[0-9]+$'; then
-            echo "::error::Deploy Beta requires a -beta.N package.json version, got ${PKG}" >&2
+          if [ "v${PKG}" != "v${RELEASE_VERSION}" ]; then
+            echo "::error::Release artifact version ${PKG} does not match v${RELEASE_VERSION}" >&2
             exit 1
           fi
 
@@ -186,20 +276,15 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24.x'
-          cache: 'pnpm'
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Read app version
-        id: app_version
-        run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Build
+      - name: Build beta frontend
         run: pnpm run build
         env:
-          # Override the homepage so asset paths target the beta domain
-          PUBLIC_URL: https://beta-gfc.weatherboysuper.com
+          PUBLIC_URL: https://beta.gfcweather.com
           VITE_BUILD_TARGET: beta
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -209,93 +294,88 @@ jobs:
           VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
+          VITE_UMAMI_HOST: ${{ secrets.VITE_UMAMI_HOST }}
+          VITE_UMAMI_BETA_WEBSITE_ID: ${{ secrets.VITE_UMAMI_BETA_WEBSITE_ID }}
+          VITE_UMAMI_PRODUCTION_WEBSITE_ID: ${{ secrets.VITE_UMAMI_PRODUCTION_WEBSITE_ID }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          # Prevent ESLint warnings from failing the build (arc source-map noise etc.)
           CI: false
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.BETA_SSH_KEY }}
-
-      - name: Trust VPS host key
+      - name: Verify Sentry sourcemap publication
+        run: node scripts/verify-sentry-sourcemaps.mjs
         env:
-          SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
-          SSH_KNOWN_HOSTS: ${{ secrets.BETA_SSH_KNOWN_HOSTS }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-          else
-            for attempt in 1 2 3 4 5; do
-              if scan_output=$(ssh-keyscan -T 15 -p 22 -H "$SSH_HOST" 2>/tmp/ssh-keyscan.err) && [ -n "$scan_output" ]; then
-                printf '%s\n' "$scan_output" >> ~/.ssh/known_hosts
-                exit 0
-              fi
-              cat /tmp/ssh-keyscan.err >&2 || true
-              if [ "$attempt" -lt 5 ]; then
-                echo "ssh-keyscan attempt $attempt failed; retrying..." >&2
-                sleep $((attempt * 5))
-              fi
-            done
-            echo "ssh-keyscan failed after 5 attempts" >&2
-            exit 1
-          fi
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
 
-      - name: Deploy via rsync
-        run: |
-          rsync -avz --delete \
-            build/ root@${{ secrets.BETA_SSH_HOST }}:/var/www/gfc-beta/
+      - name: Deploy beta Worker and static assets
+        id: deploy
+        run: pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.beta.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy analytics server via rsync
-        run: |
-          rsync -avz --exclude='node_modules' --exclude='logs' \
-            server/ root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/
+      - name: Smoke test beta site
+        id: smoke
+        env:
+          BETA_ORIGIN: https://beta.gfcweather.com
+          EXPECTED_VERSION: ${{ needs.release.outputs.version }}
+        run: node scripts/smoke-test-beta-site.mjs
 
-      - name: Write beta analytics env file
+      - name: Print rollback command on smoke failure
+        if: failure() && steps.deploy.outcome == 'success'
         run: |
-          cat > beta-server.env <<EOF
-          PORT=3007
-          LOG_DIR=/opt/gfc-beta-analytics/logs
-          APP_BASE_URL=https://beta-gfc.weatherboysuper.com
-          SERVER_TARGET=beta
-          BETA_MODE=true
-          BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
-          BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}
-          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
-          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
-          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET=${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
-          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
-          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
-          STRIPE_PRICE_ANNUAL_PROMO=
-          STRIPE_PROMO_START=
-          STRIPE_PROMO_END=
-          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
-          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
-          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
-          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-          SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
-          SENTRY_ENVIRONMENT=beta
-          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
-          EOF
-          node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> beta-server.env
-          rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
+          echo "::error::Beta smoke test failed after deploy. Roll back with:"
+          echo "pnpm dlx wrangler@4 rollback --config cloudflare/wrangler.beta.jsonc"
+          echo "(Requires CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID locally or in CI.)"
 
-      - name: Install analytics dependencies and restart
-        run: |
-          ssh -o StrictHostKeyChecking=yes root@${{ secrets.BETA_SSH_HOST }} '
-            cd /opt/gfc-beta-analytics
-            npm install --omit=dev --quiet
-            mkdir -p /opt/gfc-beta-analytics/logs
-            if pm2 describe gfc-beta-analytics > /dev/null 2>&1; then
-              pm2 restart gfc-beta-analytics
-            else
-              pm2 start analytics.js --name gfc-beta-analytics
-            fi
-            pm2 save
-          '
+  dry_run_build:
+    name: Dry-run beta build
+    needs: release
+    if: needs.release.result == 'success' && inputs.dry_run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply dry-run version to the build artifact
+        run: npm version "${{ needs.release.outputs.version }}" --no-git-tag-version --allow-same-version
+
+      - name: Build beta frontend (dry run)
+        run: pnpm run build
+        env:
+          PUBLIC_URL: https://beta.gfcweather.com
+          VITE_BUILD_TARGET: beta
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_MODE: true
+          VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: beta
+          VITE_UMAMI_HOST: ${{ secrets.VITE_UMAMI_HOST }}
+          VITE_UMAMI_BETA_WEBSITE_ID: ${{ secrets.VITE_UMAMI_BETA_WEBSITE_ID }}
+          VITE_UMAMI_PRODUCTION_WEBSITE_ID: ${{ secrets.VITE_UMAMI_PRODUCTION_WEBSITE_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          CI: false

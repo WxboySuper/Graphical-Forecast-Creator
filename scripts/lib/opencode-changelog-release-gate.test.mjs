@@ -30,11 +30,19 @@ test('beta and stable release jobs require a clean final audit before creating r
     const workflow = readFileSync(new URL(filename, import.meta.url), 'utf8');
     assert.match(workflow, /final_changelog_audit:[\s\S]*?uses: \.\/\.github\/workflows\/opencode-changelog-audit\.yml/);
     assert.match(workflow, /changelog_gate:[\s\S]*?require-opencode-changelog-clean\.mjs/);
-    assert.match(workflow, /release:[\s\S]*?needs: \[final_changelog_audit, changelog_gate\]/);
+    assert.match(workflow, /needs: \[quality, final_changelog_audit, changelog_gate\]|needs: \[final_changelog_audit, changelog_gate\]/);
     assert.match(workflow, /AUDITED_HEAD:[\s\S]*?needs\.final_changelog_audit\.outputs\.head_sha/);
     assert.doesNotMatch(workflow, /Dispatch post-release changelog audit/);
     assert.match(workflow, /RELEASE_NOTES_MODE: changelog-and-prs/);
   }
+});
+
+test('beta release deploys to Cloudflare Workers instead of the retired VPS frontend', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/release-beta.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /wrangler\.beta\.jsonc/);
+  assert.match(workflow, /smoke-test-beta-site\.mjs/);
+  assert.doesNotMatch(workflow, /BETA_SSH_HOST/);
+  assert.doesNotMatch(workflow, /rsync/);
 });
 
 test('reusable changelog audit exports status and audited head and reads target source with trusted tools', () => {

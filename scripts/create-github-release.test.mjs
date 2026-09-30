@@ -76,6 +76,17 @@ test('publishes the generated Markdown notes with every GitHub release', () => {
   ]);
 });
 
+test('dry run writes notes without publishing', () => {
+  const changelog = '## [Unreleased]\n\n### Next major / beta\n\n#### Added\n- Beta item.\n';
+  const notes = buildReleaseNotes({
+    mode: 'changelog',
+    curatedNotes: buildCuratedNotes({ changelog, version: '1.8.0-beta.1', lane: 'next-major' }),
+    generatedNotes: '',
+    changelogUrl: 'https://github.com/example/repo/blob/main/CHANGELOG.md',
+  });
+  assert.match(notes, /Beta item/);
+});
+
 test('adds the portable notes asset to an existing release', () => {
   const commands = [];
   const runCommand = (args) => {

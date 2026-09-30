@@ -157,6 +157,11 @@ const run = () => {
   writeFileSync(notesFile, `${section}\n`);
 
   const prerelease = hasBetaPrerelease(version);
+  if (process.env.DRY_RUN === 'true') {
+    console.log(`Dry run: would publish GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`);
+    console.log(section);
+    return;
+  }
   console.log(publishGitHubRelease({ tag, targetBranch, notesFile, prerelease }));
 };
 

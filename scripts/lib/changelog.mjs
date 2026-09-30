@@ -71,7 +71,23 @@ const legacyReleaseNotes = (changelog, version) => {
  * @param {string} [lane] next-major or stable-hotfix
  * @returns {string | null}
  */
+/** @param {string} changelog @param {string} version @returns {string | null} */
+const extractExactVersionSection = (changelog, version) => {
+  const heading = `## v${version}`;
+  const start = changelog.indexOf(heading);
+  if (start === -1) return null;
+
+  const afterHeading = start + heading.length;
+  const rest = changelog.slice(afterHeading);
+  const nextSection = rest.search(/\n## /);
+  const body = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+  return body ? `${heading}\n\n${body}`.trim() : null;
+};
+
 export const extractReleaseNotes = (changelog, version, lane = '') => {
+  const exact = extractExactVersionSection(changelog, version);
+  if (exact) return exact;
+
   const laneNotes = RELEASE_LANES.has(lane)
     ? extractLaneReleaseNotes(changelog, version, lane)
     : null;

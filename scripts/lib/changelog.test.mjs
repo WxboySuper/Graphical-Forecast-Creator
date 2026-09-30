@@ -63,6 +63,28 @@ test('extracts the next-major lane for beta releases', () => {
   assert.doesNotMatch(notes ?? '', /Production fix/);
 });
 
+test('extractReleaseNotes prefers an exact version section after beta promotion', () => {
+  const changelog = `# Changelog
+
+## [Unreleased]
+
+### Next major / beta
+
+#### Added
+
+- WIP
+
+## v2.0.0-beta.2
+
+#### Added
+
+- Shipped beta feature
+`;
+  const notes = extractReleaseNotes(changelog, '2.0.0-beta.2', 'next-major');
+  assert.match(notes ?? '', /Shipped beta feature/);
+  assert.doesNotMatch(notes ?? '', /WIP/);
+});
+
 test('extracts the stable hotfix lane for production releases', () => {
   const lane = extractChangelogLane(
     '# Changelog\n\n### Next major / beta\n\n#### Added\n- New map\n\n### Stable 1.7.x hotfixes\n\n#### Fixed\n- Production fix\n',
