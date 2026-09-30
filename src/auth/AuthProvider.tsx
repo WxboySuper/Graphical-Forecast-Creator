@@ -567,6 +567,47 @@ export const cancelPendingHostedSettingsWriteIntent = (
   pendingLocalSettingsIntentRef.current = null;
 };
 
+/**
+ * True when local settings already match the acknowledgement baseline (in-flight write
+ * target when present, otherwise last synced). Used to avoid cancelling a revert while
+ * an older write is still in flight.
+ */
+export const shouldSkipHostedSettingsDocumentWrite = (
+  nextSettings: UserSettingsDocument,
+  lastSynced: UserSettingsDocument | null,
+  inFlightWrite: InFlightHostedSettingsWrite | null,
+): boolean => {
+  const comparisonBaseline = inFlightWrite?.target ?? lastSynced;
+  if (!comparisonBaseline) {
+    return false;
+  }
+  return areUserSettingsEqual(comparisonBaseline, nextSettings);
+};
+
+/** Clears or rebases pending intent after a failed hosted settings write. */
+export const finalizeHostedSettingsWriteFailure = (
+  pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>,
+  capturedWriteSequence: number,
+  isWriteOwnerActive: () => boolean,
+  onPersistError: (error: unknown) => void,
+  error: unknown,
+): void => {
+  const pending = pendingLocalSettingsIntentRef.current;
+  if (pending?.writeSequence === capturedWriteSequence) {
+    pendingLocalSettingsIntentRef.current = null;
+  } else if (pending && pending.writeSequence > capturedWriteSequence) {
+    const rebasedBaseline = lastSyncedSettingsRef.current ?? pending.baseline;
+    pendingLocalSettingsIntentRef.current = {
+      ...pending,
+      baseline: rebasedBaseline,
+    };
+  }
+  if (isWriteOwnerActive()) {
+    onPersistError(error);
+  }
+};
+
 /** Starts or updates the pending hosted write intent for a debounced settings save. */
 export const updatePendingHostedSettingsWriteTarget = (
   pendingWriteRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
@@ -679,8 +720,14 @@ export const scheduleHostedSettingsDocumentWrite = ({
       supersededBaselineOneShotRef.current = baseline;
       onPersisted(targetSettings, baseline);
     }).catch((error) => {
-      pendingLocalSettingsIntentRef.current = null;
-      onPersistError(error);
+      finalizeHostedSettingsWriteFailure(
+        pendingLocalSettingsIntentRef,
+        lastSyncedSettingsRef,
+        capturedWriteSequence,
+        isWriteOwnerActive,
+        onPersistError,
+        error,
+      );
     }).finally(() => {
       const inFlight = inFlightHostedSettingsWriteRef.current;
       if (inFlight?.writeSequence === capturedWriteSequence) {
@@ -1717,7 +1764,13 @@ const useHostedAuthState = (): AuthContextValue => {
       monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
     });
 
-    if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
+    if (
+      shouldSkipHostedSettingsDocumentWrite(
+        nextSettings,
+        lastSyncedSettingsRef.current,
+        inFlightHostedSettingsWriteRef.current,
+      )
+    ) {
       cancelPendingHostedSettingsWriteIntent(
         pendingDebounceTimerRef,
         pendingLocalSettingsIntentRef,
