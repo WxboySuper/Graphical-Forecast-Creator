@@ -23,7 +23,7 @@ test('actual scheduled publisher opens below-cutoff findings, keeps security hum
   const created = []
   let persisted
   const fs = {
-    readFileSync: file => file === 'state' ? JSON.stringify(contextData) :
+    readFileSync: file => file === 'state' ? JSON.stringify(persisted ?? contextData) :
       file === 'output' ? JSON.stringify({ status: 'complete', findings }) : 'source\n',
     existsSync: () => true,
   }
