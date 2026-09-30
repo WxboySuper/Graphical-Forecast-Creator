@@ -59,6 +59,15 @@ describe('customProductEditorModel', () => {
     expect(prepareProductDraft(raw).categories[1].label).toBe('Broken label');
   });
 
+  test('validateProductDraft rejects duplicate category ids', () => {
+    const draft = prepareProductDraft({
+      label: 'Dupes',
+      categories: [category('same-id', 0, 'One'), category('same-id', 1, 'Two')],
+    });
+
+    expect(validateProductDraft(draft)).toBe('Fix category labels and styles before saving.');
+  });
+
   test('validateProductDraft enforces the hosted category limit', () => {
     const categories = Array.from({ length: CUSTOM_PRODUCT_LIMITS.categoriesPerProduct + 1 }, (_, order) =>
       category(`cat-${order}`, order, `Category ${order + 1}`));

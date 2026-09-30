@@ -85,7 +85,10 @@ const customProduct = (overrides = {}) => ({
   ...overrides,
 });
 
-/** Build N valid ordered categories for custom product rules tests. */
+/** Must match CUSTOM_PRODUCT_LIMITS.categoriesPerProduct / firestore.rules category cap. */
+const CUSTOM_PRODUCT_CATEGORY_CAP = 12;
+
+/** Build N category entries for custom product rules tests. */
 const customProductCategories = (count) => {
   const base = customProduct().categories[0];
   return Array.from({ length: count }, (_, order) => ({
@@ -623,98 +626,40 @@ describe('customProducts security and lifecycle boundary', () => {
     await assertSucceeds(updateDoc(aliceRef(), { status: 'active', version: 3, updatedAt: '2026-07-17T02:00:00.000Z' }));
   });
 
-  test('rejects malformed styles, category order, duplicate IDs, and unknown fields', async () => {
+  test('rejects unknown top-level fields and oversized product names', async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);
       await setEntitlement(db, ALICE, true);
     });
-    const baseCategory = customProduct().categories[0];
     await assertFails(setDoc(aliceRef(), customProduct({ internalRole: 'admin' })));
-    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, order: 1 }] })));
-    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, style: { ...baseCategory.style, fillColor: 'red' } }] })));
-    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
-    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: [baseCategory, secondCategory] })));
-    await assertFails(setDoc(
-      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
-      customProduct({
-        id: 'product-logical-2',
-        categories: [baseCategory, { ...secondCategory, id: baseCategory.id }],
-      }),
-    ));
+    await assertFails(setDoc(aliceRef(), customProduct({ label: 'x'.repeat(65) })));
   });
 
-  test('allows three ordered categories on create', async () => {
+  test(`allows ${CUSTOM_PRODUCT_CATEGORY_CAP} categories on create and update`, async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);
       await setEntitlement(db, ALICE, true);
     });
-    const baseCategory = customProduct().categories[0];
-    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
-    const thirdCategory = { ...baseCategory, id: 'high', label: 'High', order: 2 };
-    await assertSucceeds(setDoc(
-      aliceRef(),
-      customProduct({ categories: [baseCategory, secondCategory, thirdCategory] }),
-    ));
-  });
-
-  test('allows six ordered categories on create and update at the rules cap', async () => {
-    await seed(async (db) => {
-      await enableCustomProducts(db);
-      await setEntitlement(db, ALICE, true);
-    });
-    const sixCategories = customProductCategories(6);
-    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: sixCategories })));
+    const maxCategories = customProductCategories(CUSTOM_PRODUCT_CATEGORY_CAP);
+    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: maxCategories })));
     await assertSucceeds(updateDoc(aliceRef(), {
-      label: 'Six categories',
-      categories: sixCategories,
+      label: 'Max categories',
+      categories: maxCategories,
       version: 2,
       updatedAt: '2026-07-17T01:00:00.000Z',
     }));
   });
 
-  test('rejects more than six categories, duplicate ids, invalid hatch, float order, and missing style keys', async () => {
+  test(`rejects more than ${CUSTOM_PRODUCT_CATEGORY_CAP} categories`, async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);
       await setEntitlement(db, ALICE, true);
     });
-    const baseCategory = customProduct().categories[0];
     await assertFails(setDoc(
       doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
-      customProduct({ id: 'product-logical-2', categories: customProductCategories(7) }),
-    ));
-    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
-    await assertFails(setDoc(
-      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-03'),
       customProduct({
-        id: 'product-logical-3',
-        categories: [baseCategory, { ...secondCategory, id: baseCategory.id }],
-      }),
-    ));
-    await assertFails(setDoc(
-      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-04'),
-      customProduct({
-        id: 'product-logical-4',
-        categories: [{ ...baseCategory, style: { ...baseCategory.style, hatch: 'dots' } }],
-      }),
-    ));
-    await assertFails(setDoc(
-      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-05'),
-      customProduct({
-        id: 'product-logical-5',
-        categories: [{ ...baseCategory, order: 0.5 }],
-      }),
-    ));
-    const incompleteStyle = {
-      fillColor: baseCategory.style.fillColor,
-      fillOpacity: baseCategory.style.fillOpacity,
-      strokeColor: baseCategory.style.strokeColor,
-      strokeOpacity: baseCategory.style.strokeOpacity,
-    };
-    await assertFails(setDoc(
-      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-06'),
-      customProduct({
-        id: 'product-logical-6',
-        categories: [{ ...baseCategory, style: incompleteStyle }],
+        id: 'product-logical-2',
+        categories: customProductCategories(CUSTOM_PRODUCT_CATEGORY_CAP + 1),
       }),
     ));
   });

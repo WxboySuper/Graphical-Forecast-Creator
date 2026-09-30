@@ -35,54 +35,9 @@ service cloud.firestore {
       ].hasAny([slotId]);
     }
 
-    function isValidCustomCategoryStyle(style) {
-      return style is map &&
-        style.keys().hasOnly(['fillColor', 'fillOpacity', 'strokeColor', 'strokeOpacity', 'strokeWidth', 'hatch']) &&
-        style.fillColor is string && style.fillColor.matches('^#[0-9A-Fa-f]{6}$') &&
-        isNumeric(style.fillOpacity) && style.fillOpacity >= 0 && style.fillOpacity <= 1 &&
-        style.strokeColor is string && style.strokeColor.matches('^#[0-9A-Fa-f]{6}$') &&
-        isNumeric(style.strokeOpacity) && style.strokeOpacity >= 0 && style.strokeOpacity <= 1 &&
-        isNumeric(style.strokeWidth) && style.strokeWidth >= 0 && style.strokeWidth <= 8 &&
-        ['none', 'diagonal', 'reverse-diagonal', 'crosshatch'].hasAny([style.hatch]);
-    }
-
-    function isValidCustomCategory(category, expectedOrder) {
-      return category is map &&
-        category.keys().hasOnly(['id', 'label', 'order', 'style']) &&
-        category.id is string && category.id.size() > 0 && category.id.size() <= 128 &&
-        category.label is string && category.label.size() > 0 && category.label.size() <= 64 &&
-        category.order is int && category.order == expectedOrder &&
-        isValidCustomCategoryStyle(category.style);
-    }
-
-    // Hosted writes hit Firestore's 1,000-expression cap before six fully validated
-    // categories. Use strict style checks for single-category products and lighter
-    // tail checks (hatch enum and order) when additional categories are present.
-    function isValidCustomCategoryTail(category, expectedOrder) {
-      return category is map &&
-        category.keys().hasOnly(['id', 'label', 'order', 'style']) &&
-        category.id is string && category.id.size() > 0 && category.id.size() <= 128 &&
-        category.label is string && category.label.size() > 0 && category.label.size() <= 64 &&
-        category.order is int && category.order == expectedOrder &&
-        category.style is map &&
-        ['none', 'diagonal', 'reverse-diagonal', 'crosshatch'].hasAny([category.style.hatch]);
-    }
-
+    // Keep in sync with CUSTOM_PRODUCT_LIMITS.categoriesPerProduct in src/types/customProducts.ts
     function isValidCustomCategories(value) {
-      return value is list && value.size() > 0 && value.size() <= 6
-        && (value.size() == 1 ? isValidCustomCategory(value[0], 0) : isValidCustomCategoryTail(value[0], 0))
-        && (value.size() < 2 || isValidCustomCategoryTail(value[1], 1))
-        && (value.size() < 3 || isValidCustomCategoryTail(value[2], 2))
-        && (value.size() < 4 || isValidCustomCategoryTail(value[3], 3))
-        && (value.size() < 5 || isValidCustomCategoryTail(value[4], 4))
-        && (value.size() < 6 || isValidCustomCategoryTail(value[5], 5));
-    }
-
-    function hasUniqueCustomCategoryIds(value) {
-      // Pairwise uniqueness is too expensive at six categories; adjacent checks fit the budget.
-      return (value.size() < 2 || value[0].id != value[1].id)
-        && (value.size() < 3 || value[1].id != value[2].id)
-        && (value.size() < 4 || value[2].id != value[3].id);
+      return value is list && value.size() > 0 && value.size() <= 12;
     }
 
     function isValidCustomProductTimestamp(value) {
@@ -101,7 +56,7 @@ service cloud.firestore {
         (!('description' in data) || (data.description is string && data.description.size() <= 500)) &&
         data.version is int && data.version >= 1 &&
         ['active', 'archived'].hasAny([data.status]) &&
-        isValidCustomCategories(data.categories) && hasUniqueCustomCategoryIds(data.categories) &&
+        isValidCustomCategories(data.categories) &&
         isValidCustomProductTimestamp(data.createdAt) &&
         isValidCustomProductTimestamp(data.updatedAt);
     }

@@ -21,7 +21,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
-- **Saved products:** Allow up to six reusable categories per hosted custom product, surface save failures in the editor, and keep Firestore rules within the evaluation budget while preserving category validation.
+- **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
 - **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.
 - **Beta analytics on Cloudflare:** Pass Umami build settings into the Cloudflare Workers beta deploy so opted-in visits can be counted.
