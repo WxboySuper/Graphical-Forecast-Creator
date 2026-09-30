@@ -6,7 +6,7 @@ const BETA_VERSION_PATTERN = /^([0-9]+\.[0-9]+\.[0-9]+)-beta\.([0-9]+)$/;
  * @param {string} version
  * @returns {{ base: string; beta: number } | null}
  */
-const parseBetaVersion = (version) => {
+export const parseBetaVersion = (version) => {
   const match = version.match(BETA_VERSION_PATTERN);
   if (!match) return null;
   return { base: match[1], beta: Number(match[2]) };
@@ -17,14 +17,41 @@ const parseBetaVersion = (version) => {
  * @param {string} base e.g. 1.8.0
  * @returns {number | null}
  */
-const betaNumberFromTag = (tag, base) => {
-  const match = tag.match(new RegExp(`^v${base.replace(/\./g, '\\.')}-beta\\.([0-9]+)$`));
-  return match ? Number(match[1]) : null;
+export const betaNumberFromTag = (tag, base) => {
+  const version = tag.startsWith('v') ? tag.slice(1) : tag;
+  const parsed = parseBetaVersion(version);
+  if (!parsed || parsed.base !== base) return null;
+  return parsed.beta;
+};
+
+const lastBetaNumberForBase = (betaTags, base) => {
+  const numbers = betaTags
+    .map((tag) => betaNumberFromTag(tag, base))
+    .filter((value) => value !== null);
+  if (!numbers.length) return undefined;
+  return numbers.sort((a, b) => a - b).at(-1);
+};
+
+const assertExplicitVersionAllowed = ({ explicit, tagSet, betaTags, base }) => {
+  if (tagSet.has(`v${explicit}`)) {
+    throw new Error(`Explicit beta version v${explicit} is already tagged.`);
+  }
+  const parsed = parseBetaVersion(explicit);
+  if (!parsed) {
+    throw new Error(`Explicit beta version must match X.Y.Z-beta.N, got "${explicit}".`);
+  }
+  if (parsed.base !== base) {
+    throw new Error(`Explicit beta version base ${parsed.base} does not match package base ${base}.`);
+  }
+  const lastTagged = lastBetaNumberForBase(betaTags, base);
+  if (lastTagged !== undefined && parsed.beta <= lastTagged) {
+    throw new Error(
+      `Explicit beta version ${explicit} must be newer than the latest tag (beta.${lastTagged} for ${base}).`,
+    );
+  }
 };
 
 /**
- * Resolve the beta version to release.
- *
  * @param {{
  *   packageVersion: string;
  *   betaTags: string[];
@@ -40,33 +67,25 @@ export const calculateNextBetaVersion = ({
   taggedVersions = null,
 }) => {
   const explicit = explicitVersion.trim();
-  if (explicit) {
-    if (!hasBetaPrerelease(explicit)) {
-      throw new Error(`Explicit beta version must match X.Y.Z-beta.N, got "${explicit}".`);
-    }
-    return { version: explicit, strategy: 'explicit' };
-  }
-
-  const parsed = parseBetaVersion(packageVersion);
-  let base;
-  let currentBeta = null;
-  if (parsed) {
-    base = parsed.base;
-    currentBeta = parsed.beta;
-  } else if (/^[0-9]+\.[0-9]+\.[0-9]+$/.test(packageVersion)) {
-    base = packageVersion;
-  } else {
+  const parsedPackage = parseBetaVersion(packageVersion);
+  const base = parsedPackage?.base
+    ?? (/^[0-9]+\.[0-9]+\.[0-9]+$/.test(packageVersion) ? packageVersion : null);
+  if (!base) {
     throw new Error(`Unsupported main package version: ${packageVersion}`);
   }
 
   const tagSet = taggedVersions ?? new Set(betaTags);
-  const tagsForBase = betaTags.filter((tag) => betaNumberFromTag(tag, base) !== null);
-  const lastTagged = tagsForBase
-    .map((tag) => betaNumberFromTag(tag, base))
-    .filter((value) => value !== null)
-    .sort((a, b) => a - b)
-    .at(-1);
+  const lastTagged = lastBetaNumberForBase(betaTags, base);
 
+  if (explicit) {
+    if (!hasBetaPrerelease(explicit)) {
+      throw new Error(`Explicit beta version must match X.Y.Z-beta.N, got "${explicit}".`);
+    }
+    assertExplicitVersionAllowed({ explicit, tagSet, betaTags, base });
+    return { version: explicit, strategy: 'explicit' };
+  }
+
+  const currentBeta = parsedPackage?.beta ?? null;
   if (
     currentBeta !== null
     && !tagSet.has(`v${packageVersion}`)

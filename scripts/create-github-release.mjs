@@ -11,11 +11,13 @@ import {
 } from './lib/release-notes.mjs';
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-beta\.\d+)?$/;
-const BRANCH_PATTERN = /^[\w./-]+$/;
+const TARGET_REF_PATTERN = /^(?:[\w./-]+|[0-9a-f]{40})$/;
 export const RELEASE_NOTES_MODES = ['changelog', 'prs', 'changelog-and-prs'];
 
 /** Build the GitHub CLI arguments for a release and its portable Markdown notes asset. */
-export const buildGitHubReleaseCreateArgs = ({ tag, targetBranch, notesFile, prerelease }) => [
+export const buildGitHubReleaseCreateArgs = ({
+  tag, targetRef, notesFile, prerelease, draft = false,
+}) => [
   'release',
   'create',
   tag,
@@ -25,8 +27,16 @@ export const buildGitHubReleaseCreateArgs = ({ tag, targetBranch, notesFile, pre
   '--notes-file',
   notesFile,
   '--target',
-  targetBranch,
+  targetRef,
   ...(prerelease ? ['--prerelease'] : []),
+  ...(draft ? ['--draft'] : []),
+];
+
+export const buildGitHubReleasePublishArgs = ({ tag }) => [
+  'release',
+  'edit',
+  tag,
+  '--draft=false',
 ];
 
 /** Build an additive upload command for a release created before notes assets were added. */
@@ -59,22 +69,32 @@ const uploadReleaseNotesAssetIfMissing = ({ tag, notesFile, runCommand }) => {
 };
 
 /** Publish the generated public release body with a portable Markdown notes asset. */
-export const publishGitHubRelease = ({ tag, targetBranch, notesFile, prerelease, runCommand = runGitHubCommand }) => {
+export const publishGitHubRelease = ({
+  tag, targetRef, notesFile, prerelease, draft = false, runCommand = runGitHubCommand,
+}) => {
   if (githubReleaseExists(tag, runCommand)) {
     uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand });
     return `GitHub release ${tag} already exists.`;
   }
-  runCommand(buildGitHubReleaseCreateArgs({ tag, targetBranch, notesFile, prerelease }), { stdio: 'inherit' });
-  return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}.`;
+  runCommand(buildGitHubReleaseCreateArgs({
+    tag, targetRef, notesFile, prerelease, draft,
+  }), { stdio: 'inherit' });
+  const draftLabel = draft ? ' (draft)' : '';
+  return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}${draftLabel}.`;
+};
+
+export const finalizeGitHubRelease = ({ tag, runCommand = runGitHubCommand }) => {
+  runCommand(buildGitHubReleasePublishArgs({ tag }), { stdio: 'inherit' });
+  return `Published GitHub release ${tag}.`;
 };
 
 /** Validate the user-provided release version and target ref. */
-export const validateReleaseInputs = ({ version, targetBranch }) => {
+export const validateReleaseInputs = ({ version, targetRef }) => {
   if (!version || !VERSION_PATTERN.test(version)) {
-    throw new Error('Usage: node scripts/create-github-release.mjs <semver-version> [target-branch]');
+    throw new Error('Usage: node scripts/create-github-release.mjs <semver-version> [target-ref]');
   }
-  if (!BRANCH_PATTERN.test(targetBranch)) {
-    throw new Error(`Invalid target branch: ${targetBranch}`);
+  if (!TARGET_REF_PATTERN.test(targetRef)) {
+    throw new Error(`Invalid target ref: ${targetRef}`);
   }
 };
 
@@ -100,11 +120,15 @@ export const buildReleaseNotes = ({ mode, curatedNotes, generatedNotes, changelo
 
 /** Execute the release workflow using the current process arguments and environment. */
 const run = () => {
+  if (process.argv[2] === 'finalize') {
+    runFinalizeGitHubRelease();
+    return;
+  }
   const version = process.argv[2];
-  const targetBranch = process.argv[3] ?? 'main';
+  const targetRef = process.argv[3] ?? 'main';
 
   try {
-    validateReleaseInputs({ version, targetBranch });
+    validateReleaseInputs({ version, targetRef });
   } catch (error) {
     console.error(error.message);
     process.exit(1);
@@ -140,7 +164,7 @@ const run = () => {
       generatedNotes = generateGitHubReleaseNotes({
         repository,
         tag,
-        targetBranch,
+        targetBranch: targetRef,
         previousTag,
         configurationPath: '.github/release.yml',
       });
@@ -151,7 +175,7 @@ const run = () => {
     }
   }
 
-  const changelogUrl = `https://github.com/${repository}/blob/${targetBranch}/${changelogPath}`;
+  const changelogUrl = `https://github.com/${repository}/blob/main/${changelogPath}`;
   const section = buildReleaseNotes({ mode, curatedNotes, generatedNotes, changelogUrl });
   const notesFile = process.env.NOTES_FILE ?? 'release-notes.md';
   writeFileSync(notesFile, `${section}\n`);
@@ -162,7 +186,22 @@ const run = () => {
     console.log(section);
     return;
   }
-  console.log(publishGitHubRelease({ tag, targetBranch, notesFile, prerelease }));
+  const draft = process.env.RELEASE_DRAFT === 'true';
+  console.log(publishGitHubRelease({ tag, targetRef, notesFile, prerelease, draft }));
+};
+
+export const runFinalizeGitHubRelease = () => {
+  const version = process.argv[3];
+  if (!version || !VERSION_PATTERN.test(version)) {
+    console.error('Usage: node scripts/create-github-release.mjs finalize <semver-version>');
+    process.exit(1);
+  }
+  const tag = `v${version}`;
+  if (process.env.DRY_RUN === 'true') {
+    console.log(`Dry run: would publish draft GitHub release ${tag}.`);
+    return;
+  }
+  console.log(finalizeGitHubRelease({ tag }));
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

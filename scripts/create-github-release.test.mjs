@@ -17,9 +17,10 @@ const releases = [
 ];
 
 test('validates release version and target ref inputs', () => {
-  assert.doesNotThrow(() => validateReleaseInputs({ version: '1.7.0-beta.1', targetBranch: 'main' }));
-  assert.throws(() => validateReleaseInputs({ version: 'latest', targetBranch: 'main' }), /Usage:/);
-  assert.throws(() => validateReleaseInputs({ version: '1.7.0', targetBranch: 'bad ref' }), /Invalid target branch/);
+  assert.doesNotThrow(() => validateReleaseInputs({ version: '1.7.0-beta.1', targetRef: 'main' }));
+  assert.doesNotThrow(() => validateReleaseInputs({ version: '1.7.0-beta.1', targetRef: 'a'.repeat(40) }));
+  assert.throws(() => validateReleaseInputs({ version: 'latest', targetRef: 'main' }), /Usage:/);
+  assert.throws(() => validateReleaseInputs({ version: '1.7.0', targetRef: 'bad ref' }), /Invalid target ref/);
 });
 
 test('skips release lookup for curated-only notes', () => {
@@ -64,13 +65,15 @@ test('composes the final release body from curated and generated notes', () => {
 test('publishes the generated Markdown notes with every GitHub release', () => {
   const args = buildGitHubReleaseCreateArgs({
     tag: 'v1.7.0-beta.2',
-    targetBranch: 'main',
+    targetRef: 'main',
     notesFile: 'beta-release-notes.md',
     prerelease: true,
+    draft: true,
   });
   assert.ok(args.includes('beta-release-notes.md#GFC-v1.7.0-beta.2-release-notes.md'));
   assert.ok(args.includes('--notes-file'));
   assert.ok(args.includes('--prerelease'));
+  assert.ok(args.includes('--draft'));
   assert.deepEqual(buildGitHubReleaseUploadArgs({ tag: 'v1.6.7', notesFile: 'stable-release-notes.md' }), [
     'release', 'upload', 'v1.6.7', 'stable-release-notes.md#GFC-v1.6.7-release-notes.md',
   ]);
@@ -96,7 +99,7 @@ test('adds the portable notes asset to an existing release', () => {
     return '';
   };
   const result = publishGitHubRelease({
-    tag: 'v1.6.7', targetBranch: 'stable/1.6.x', notesFile: 'stable-release-notes.md', prerelease: false, runCommand,
+    tag: 'v1.6.7', targetRef: 'stable/1.6.x', notesFile: 'stable-release-notes.md', prerelease: false, runCommand,
   });
   assert.equal(result, 'GitHub release v1.6.7 already exists.');
   assert.deepEqual(commands.at(-1), buildGitHubReleaseUploadArgs({ tag: 'v1.6.7', notesFile: 'stable-release-notes.md' }));
@@ -105,7 +108,7 @@ test('adds the portable notes asset to an existing release', () => {
 test('creates a release and attaches the same generated notes used for its public description', () => {
   const commands = [];
   const result = publishGitHubRelease({
-    tag: 'v1.7.0-beta.2', targetBranch: 'main', notesFile: 'beta-release-notes.md', prerelease: true,
+    tag: 'v1.7.0-beta.2', targetRef: 'main', notesFile: 'beta-release-notes.md', prerelease: true,
     runCommand: (args) => {
       commands.push(args);
       if (args.length === 3 && args[1] === 'view') throw new Error('release not found');
@@ -114,6 +117,6 @@ test('creates a release and attaches the same generated notes used for its publi
   });
   assert.equal(result, 'Created GitHub release v1.7.0-beta.2 (prerelease).');
   assert.deepEqual(commands.at(-1), buildGitHubReleaseCreateArgs({
-    tag: 'v1.7.0-beta.2', targetBranch: 'main', notesFile: 'beta-release-notes.md', prerelease: true,
+    tag: 'v1.7.0-beta.2', targetRef: 'main', notesFile: 'beta-release-notes.md', prerelease: true,
   }));
 });

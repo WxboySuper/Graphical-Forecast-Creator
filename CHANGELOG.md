@@ -16,7 +16,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Changed
 
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
-- **Beta releases:** Run the full beta cut (changelog audit, version, GitHub prerelease, Cloudflare deploy, and smoke tests) from one `release-beta` workflow with optional dry run.
+- **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
 
 - **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
