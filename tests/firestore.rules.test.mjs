@@ -85,6 +85,17 @@ const customProduct = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Build N valid ordered categories for custom product rules tests. */
+const customProductCategories = (count) => {
+  const base = customProduct().categories[0];
+  return Array.from({ length: count }, (_, order) => ({
+    ...base,
+    id: `category-${order}`,
+    label: `Category ${order}`,
+    order,
+  }));
+};
+
 /** Build a valid synchronized settings document. */
 const settings = (overrides = {}) => ({
   darkMode: false,
@@ -267,6 +278,11 @@ describe('userProfiles authorization', () => {
 describe('userSettings schema boundary', () => {
   test('allows the normalized settings shape', async () => {
     await assertSucceeds(setDoc(doc(dbFor(ALICE), 'userSettings', ALICE), settings()));
+  });
+
+  test('accepts a 150-character defaultForecasterName for prod client compatibility', async () => {
+    const ref = doc(dbFor(ALICE), 'userSettings', ALICE);
+    await assertSucceeds(setDoc(ref, settings({ defaultForecasterName: 'A'.repeat(150) })));
   });
 
   test('rejects unsupported and unbounded settings values', async () => {
@@ -638,6 +654,68 @@ describe('customProducts security and lifecycle boundary', () => {
     await assertSucceeds(setDoc(
       aliceRef(),
       customProduct({ categories: [baseCategory, secondCategory, thirdCategory] }),
+    ));
+  });
+
+  test('allows six ordered categories on create and update at the rules cap', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    const sixCategories = customProductCategories(6);
+    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: sixCategories })));
+    await assertSucceeds(updateDoc(aliceRef(), {
+      label: 'Six categories',
+      categories: sixCategories,
+      version: 2,
+      updatedAt: '2026-07-17T01:00:00.000Z',
+    }));
+  });
+
+  test('rejects more than six categories, duplicate ids, invalid hatch, float order, and missing style keys', async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    const baseCategory = customProduct().categories[0];
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
+      customProduct({ id: 'product-logical-2', categories: customProductCategories(7) }),
+    ));
+    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-03'),
+      customProduct({
+        id: 'product-logical-3',
+        categories: [baseCategory, { ...secondCategory, id: baseCategory.id }],
+      }),
+    ));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-04'),
+      customProduct({
+        id: 'product-logical-4',
+        categories: [{ ...baseCategory, style: { ...baseCategory.style, hatch: 'dots' } }],
+      }),
+    ));
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-05'),
+      customProduct({
+        id: 'product-logical-5',
+        categories: [{ ...baseCategory, order: 0.5 }],
+      }),
+    ));
+    const incompleteStyle = {
+      fillColor: baseCategory.style.fillColor,
+      fillOpacity: baseCategory.style.fillOpacity,
+      strokeColor: baseCategory.style.strokeColor,
+      strokeOpacity: baseCategory.style.strokeOpacity,
+    };
+    await assertFails(setDoc(
+      doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-06'),
+      customProduct({
+        id: 'product-logical-6',
+        categories: [{ ...baseCategory, style: incompleteStyle }],
+      }),
     ));
   });
 

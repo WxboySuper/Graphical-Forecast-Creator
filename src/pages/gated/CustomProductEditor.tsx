@@ -81,7 +81,7 @@ const CustomProductEditor = ({ product, saveError = null, onCancel, onSave }: Pr
   const feedback = validation ?? saveError;
 
   return (
-    <Card className="custom-product-editor-card">
+    <Card className="custom-product-editor-card" data-testid="custom-product-editor">
       <CardHeader>
         <EditorTitle product={product} />
         <CardDescription>Set the ordered categories that will be snapshotted into each new custom layer.</CardDescription>

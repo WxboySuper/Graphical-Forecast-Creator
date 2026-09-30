@@ -92,8 +92,8 @@ describe('CustomProductsPage', () => {
     render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
 
     await user.click(screen.getByRole('button', { name: /New product/i }));
-    const editor = screen.getByRole('heading', { name: /Create reusable product/i }).closest('.custom-product-editor-card');
-    expect(within(editor as HTMLElement).getByRole('alert')).toHaveTextContent('Could not save this product.');
+    expect(within(screen.getByTestId('custom-product-editor')).getByRole('alert'))
+      .toHaveTextContent('Could not save this product.');
   });
 
   test('duplicates, archives, deletes, and stages a product for the forecast', async () => {
