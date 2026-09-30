@@ -16,7 +16,7 @@ export const RELEASE_NOTES_MODES = ['changelog', 'prs', 'changelog-and-prs'];
 
 /** Build the GitHub CLI arguments for a release and its portable Markdown notes asset. */
 export const buildGitHubReleaseCreateArgs = ({
-  tag, targetRef, notesFile, prerelease, draft = false,
+  tag, targetRef, notesFile, prerelease, draft = false, verifyTag = false,
 }) => [
   'release',
   'create',
@@ -30,6 +30,7 @@ export const buildGitHubReleaseCreateArgs = ({
   targetRef,
   ...(prerelease ? ['--prerelease'] : []),
   ...(draft ? ['--draft'] : []),
+  ...(verifyTag ? ['--verify-tag'] : []),
 ];
 
 export const buildGitHubReleasePublishArgs = ({ tag }) => [
@@ -70,14 +71,14 @@ const uploadReleaseNotesAssetIfMissing = ({ tag, notesFile, runCommand }) => {
 
 /** Publish the generated public release body with a portable Markdown notes asset. */
 export const publishGitHubRelease = ({
-  tag, targetRef, notesFile, prerelease, draft = false, runCommand = runGitHubCommand,
+  tag, targetRef, notesFile, prerelease, draft = false, verifyTag = false, runCommand = runGitHubCommand,
 }) => {
   if (githubReleaseExists(tag, runCommand)) {
     uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand });
     return `GitHub release ${tag} already exists.`;
   }
   runCommand(buildGitHubReleaseCreateArgs({
-    tag, targetRef, notesFile, prerelease, draft,
+    tag, targetRef, notesFile, prerelease, draft, verifyTag,
   }), { stdio: 'inherit' });
   const draftLabel = draft ? ' (draft)' : '';
   return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}${draftLabel}.`;
@@ -187,7 +188,10 @@ const run = () => {
     return;
   }
   const draft = process.env.RELEASE_DRAFT === 'true';
-  console.log(publishGitHubRelease({ tag, targetRef, notesFile, prerelease, draft }));
+  const verifyTag = process.env.RELEASE_VERIFY_TAG === 'true';
+  console.log(publishGitHubRelease({
+    tag, targetRef, notesFile, prerelease, draft, verifyTag,
+  }));
 };
 
 export const runFinalizeGitHubRelease = () => {

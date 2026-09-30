@@ -10,39 +10,47 @@ const fetchStatus = async (url) => {
   return { status: response.status, body: await response.text() };
 };
 
-const checkOnce = async () => {
-  const origin = BETA_ORIGIN.replace(/\/$/, '');
-  const homeUrl = `${origin}/`;
-  const statusUrl = `${origin}/api/capabilities/status`;
-  const versionUrl = `${origin}/version.json`;
-
-  const home = await fetchStatus(homeUrl);
+const assertHomePage = (home) => {
   if (home.status !== 200) {
     throw new Error(`Beta home returned HTTP ${home.status} (expected 200).`);
   }
   if (!home.body.includes('<!DOCTYPE html') && !home.body.includes('<html')) {
     throw new Error('Beta home did not return HTML.');
   }
+};
 
-  const api = await fetchStatus(statusUrl);
+const assertCapabilitiesStatus = (api, statusUrl) => {
   if (api.status !== 200) {
     throw new Error(`Beta API ${statusUrl} returned HTTP ${api.status} (expected 200).`);
   }
+};
+
+const assertDeployedVersion = (versionResponse) => {
+  if (versionResponse.status !== 200) {
+    throw new Error(`version.json returned HTTP ${versionResponse.status} (expected 200).`);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(versionResponse.body);
+  } catch {
+    throw new Error('version.json is not valid JSON.');
+  }
+  if (payload.version !== EXPECTED_VERSION) {
+    throw new Error(`version.json has ${payload.version ?? 'no version'}; expected ${EXPECTED_VERSION}.`);
+  }
+};
+
+const checkOnce = async () => {
+  const origin = BETA_ORIGIN.replace(/\/$/, '');
+  const homeUrl = `${origin}/`;
+  const statusUrl = `${origin}/api/capabilities/status`;
+  const versionUrl = `${origin}/version.json`;
+
+  assertHomePage(await fetchStatus(homeUrl));
+  assertCapabilitiesStatus(await fetchStatus(statusUrl), statusUrl);
 
   if (EXPECTED_VERSION) {
-    const versionResponse = await fetchStatus(versionUrl);
-    if (versionResponse.status !== 200) {
-      throw new Error(`version.json returned HTTP ${versionResponse.status} (expected 200).`);
-    }
-    let payload;
-    try {
-      payload = JSON.parse(versionResponse.body);
-    } catch {
-      throw new Error('version.json is not valid JSON.');
-    }
-    if (payload.version !== EXPECTED_VERSION) {
-      throw new Error(`version.json has ${payload.version ?? 'no version'}; expected ${EXPECTED_VERSION}.`);
-    }
+    assertDeployedVersion(await fetchStatus(versionUrl));
   }
 };
 

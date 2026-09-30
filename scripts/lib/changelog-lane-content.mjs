@@ -1,8 +1,38 @@
 import { findChangelogLaneBounds } from './changelog-lanes.mjs';
 
+const COMMENT_START = '<!--';
+const COMMENT_END = '-->';
+
 /** @param {string} text */
-export const stripMarkdownComments = (text) =>
-  text.replace(/<!--[\s\S]*?-->/g, '').trim();
+const removeNextMarkdownComment = (text) => {
+  const start = text.indexOf(COMMENT_START);
+  if (start === -1) return text;
+  const end = text.indexOf(COMMENT_END, start + COMMENT_START.length);
+  if (end === -1) {
+    return `${text.slice(0, start)}${text.slice(start + COMMENT_START.length)}`;
+  }
+  return `${text.slice(0, start)}${text.slice(end + COMMENT_END.length)}`;
+};
+
+/** @param {string} text */
+export const stripMarkdownComments = (text) => {
+  let current = text;
+  let next = removeNextMarkdownComment(current);
+  while (next !== current) {
+    current = next;
+    next = removeNextMarkdownComment(current);
+  }
+  return current.trim();
+};
+
+/** @param {string} line */
+const isHeadingLine = (line) => /^#{1,6}\s/.test(line);
+
+/** @param {string} line */
+const isBulletLine = (line) => /^[-*]\s+\S/.test(line);
+
+/** @param {string} line */
+const isSubstantiveLine = (line) => line.length > 0 && !line.startsWith('#');
 
 /** @param {string} laneBody */
 export const laneHasReleaseContent = (laneBody) => {
@@ -11,12 +41,7 @@ export const laneHasReleaseContent = (laneBody) => {
   if (/No unreleased next-major changes/i.test(withoutComments)) return false;
 
   const lines = withoutComments.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  for (const line of lines) {
-    if (/^#{1,6}\s/.test(line)) continue;
-    if (/^[-*]\s+\S/.test(line)) return true;
-    if (line.length > 0 && !line.startsWith('#')) return true;
-  }
-  return false;
+  return lines.some((line) => isBulletLine(line) || isSubstantiveLine(line) && !isHeadingLine(line));
 };
 
 /** @param {string} changelog @param {'next-major' | 'stable-hotfix'} lane */

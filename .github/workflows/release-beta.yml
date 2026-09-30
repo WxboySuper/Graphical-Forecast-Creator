@@ -112,6 +112,8 @@ jobs:
     name: Resolve beta version
     needs: [quality, final_changelog_audit, changelog_gate]
     if: >-
+      !cancelled() &&
+      always() &&
       github.ref == 'refs/heads/main' &&
       inputs.confirmation == 'RELEASE-BETA' &&
       needs.quality.result == 'success' &&
@@ -209,7 +211,12 @@ jobs:
   pre_build:
     name: Pre-release build (no Sentry upload)
     needs: version_gate
-    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RELEASE-BETA' && needs.version_gate.result == 'success'
+    if: >-
+      !cancelled() &&
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      inputs.confirmation == 'RELEASE-BETA' &&
+      needs.version_gate.result == 'success'
     runs-on: ubuntu-latest
     env:
       RELEASE_VERSION: ${{ needs.version_gate.outputs.version }}
@@ -257,6 +264,8 @@ jobs:
     name: Commit version and create draft GitHub release
     needs: [version_gate, pre_build]
     if: >-
+      !cancelled() &&
+      always() &&
       github.ref == 'refs/heads/main' &&
       inputs.confirmation == 'RELEASE-BETA' &&
       needs.version_gate.result == 'success' &&
@@ -294,12 +303,31 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add package.json
           if git diff --cached --quiet; then
-            echo "::error::No package.json version change was produced." >&2
+            git fetch origin main
+            if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+              echo "::error::package.json is already ${RELEASE_VERSION} but HEAD is not origin/main; resolve manually." >&2
+              exit 1
+            fi
+            echo "No package.json change; reusing current main commit for v${RELEASE_VERSION}."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore(release): prepare ${RELEASE_VERSION}"
+            git push --force-with-lease="refs/heads/main:${GITHUB_SHA}" origin HEAD:main
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push release tag
+        env:
+          RELEASE_COMMIT_SHA: ${{ steps.release_commit.outputs.sha }}
+        run: |
+          set -euo pipefail
+          TAG="v${RELEASE_VERSION}"
+          if git rev-parse --verify --quiet "refs/tags/${TAG}" >/dev/null; then
+            echo "::error::Tag ${TAG} already exists locally." >&2
             exit 1
           fi
-          git commit -m "chore(release): prepare ${RELEASE_VERSION}"
-          git push --force-with-lease="refs/heads/main:${GITHUB_SHA}" origin HEAD:main
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git tag -a "$TAG" "$RELEASE_COMMIT_SHA" -m "$TAG"
+          git push origin "refs/tags/${TAG}"
 
       - name: Create draft GitHub prerelease
         env:
@@ -312,6 +340,7 @@ jobs:
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
           NOTES_FILE: beta-release-notes.md
           RELEASE_DRAFT: true
+          RELEASE_VERIFY_TAG: true
         run: node scripts/create-github-release.mjs "$RELEASE_VERSION" "$RELEASE_COMMIT_SHA"
 
   deploy:
@@ -449,39 +478,58 @@ jobs:
           fi
 
       - name: Deploy analytics server via rsync
+        env:
+          BETA_SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
         run: |
-          rsync -avz --exclude='node_modules' --exclude='logs' \
-            server/ root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/
+          rsync -avz --exclude='node_modules' --exclude='logs' --exclude='.env' \
+            server/ "root@${BETA_SSH_HOST}:/opt/gfc-beta-analytics/"
 
       - name: Write beta analytics env file
+        env:
+          BETA_SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
+          APP_VERSION: ${{ steps.app_version.outputs.value }}
+          BETA_INVITE_TOKEN: ${{ secrets.BETA_INVITE_TOKEN }}
+          BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
+          ADMIN_UID_ALLOWLIST: ${{ secrets.ADMIN_UID_ALLOWLIST }}
+          METRICS_HASH_SALT: ${{ secrets.METRICS_HASH_SALT }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          BETA_STRIPE_WEBHOOK_SECRET: ${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
+          STRIPE_PRICE_MONTHLY: ${{ secrets.STRIPE_PRICE_MONTHLY }}
+          STRIPE_PRICE_ANNUAL_STANDARD: ${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          FIREBASE_ADMIN_PROJECT_ID: ${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
+          FIREBASE_ADMIN_CLIENT_EMAIL: ${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
+          FIREBASE_ADMIN_PRIVATE_KEY: ${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: |
+          set -euo pipefail
           cat > beta-server.env <<EOF
           PORT=3007
           LOG_DIR=/opt/gfc-beta-analytics/logs
           APP_BASE_URL=https://beta-gfc.weatherboysuper.com
           SERVER_TARGET=beta
           BETA_MODE=true
-          BETA_INVITE_TOKEN=${{ secrets.BETA_INVITE_TOKEN }}
-          BETA_INVITE_PATH=${{ secrets.BETA_INVITE_PATH }}
-          ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
-          METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
-          STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET=${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
-          STRIPE_PRICE_MONTHLY=${{ secrets.STRIPE_PRICE_MONTHLY }}
-          STRIPE_PRICE_ANNUAL_STANDARD=${{ secrets.STRIPE_PRICE_ANNUAL_STANDARD }}
+          BETA_INVITE_TOKEN=${BETA_INVITE_TOKEN}
+          BETA_INVITE_PATH=${BETA_INVITE_PATH}
+          ADMIN_UID_ALLOWLIST=${ADMIN_UID_ALLOWLIST}
+          METRICS_HASH_SALT=${METRICS_HASH_SALT}
+          STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+          STRIPE_WEBHOOK_SECRET=${BETA_STRIPE_WEBHOOK_SECRET}
+          STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY}
+          STRIPE_PRICE_ANNUAL_STANDARD=${STRIPE_PRICE_ANNUAL_STANDARD}
           STRIPE_PRICE_ANNUAL_PROMO=
           STRIPE_PROMO_START=
           STRIPE_PROMO_END=
-          FIREBASE_ADMIN_PROJECT_ID=${{ secrets.FIREBASE_ADMIN_PROJECT_ID }}
-          FIREBASE_ADMIN_CLIENT_EMAIL=${{ secrets.FIREBASE_ADMIN_CLIENT_EMAIL }}
-          FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
-          SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-          SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          FIREBASE_ADMIN_PROJECT_ID=${FIREBASE_ADMIN_PROJECT_ID}
+          FIREBASE_ADMIN_CLIENT_EMAIL=${FIREBASE_ADMIN_CLIENT_EMAIL}
+          FIREBASE_ADMIN_PRIVATE_KEY=${FIREBASE_ADMIN_PRIVATE_KEY}
+          SENTRY_DSN=${SENTRY_DSN}
+          SENTRY_BROWSER_DSN=${VITE_SENTRY_DSN}
           SENTRY_ENVIRONMENT=beta
-          SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.value }}
+          SENTRY_RELEASE=graphical-forecast-creator@${APP_VERSION}
           EOF
           node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> beta-server.env
-          rsync -avz beta-server.env root@${{ secrets.BETA_SSH_HOST }}:/opt/gfc-beta-analytics/.env
+          rsync -avz --chmod=F600 beta-server.env "root@${BETA_SSH_HOST}:/opt/gfc-beta-analytics/.env"
 
       - name: Install analytics dependencies and restart
         run: |

@@ -69,11 +69,13 @@ test('publishes the generated Markdown notes with every GitHub release', () => {
     notesFile: 'beta-release-notes.md',
     prerelease: true,
     draft: true,
+    verifyTag: true,
   });
   assert.ok(args.includes('beta-release-notes.md#GFC-v1.7.0-beta.2-release-notes.md'));
   assert.ok(args.includes('--notes-file'));
   assert.ok(args.includes('--prerelease'));
   assert.ok(args.includes('--draft'));
+  assert.ok(args.includes('--verify-tag'));
   assert.deepEqual(buildGitHubReleaseUploadArgs({ tag: 'v1.6.7', notesFile: 'stable-release-notes.md' }), [
     'release', 'upload', 'v1.6.7', 'stable-release-notes.md#GFC-v1.6.7-release-notes.md',
   ]);
