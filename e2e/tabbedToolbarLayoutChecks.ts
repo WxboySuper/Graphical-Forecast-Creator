@@ -161,7 +161,7 @@ export function gatherToolbarLayoutSnapshot({
   const isVisible = (element: Element) => {
     const style = window.getComputedStyle(element);
     const rect = element.getBoundingClientRect();
-    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width * rect.height > 0;
   };
 
   const toolbar = document.querySelector('.tabbed-integrated-toolbar');
@@ -171,10 +171,9 @@ export function gatherToolbarLayoutSnapshot({
   if (!toolbar || !row) {
     return {
       ok: false,
-      violation: {
-        kind: toolbar ? 'missing-row' : 'missing-toolbar',
-        detail: toolbar ? 'Active tab row not found' : 'Tabbed toolbar root not found',
-      },
+      violation: toolbar
+        ? { kind: 'missing-row', detail: 'Active tab row not found' }
+        : { kind: 'missing-toolbar', detail: 'Tabbed toolbar root not found' },
     };
   }
 
@@ -184,7 +183,7 @@ export function gatherToolbarLayoutSnapshot({
       .filter(isVisible)
       .map((label) => ({
         sectionIndex,
-        text: label.textContent?.trim() ?? '',
+        text: (label.textContent ?? '').trim(),
         rect: toBox(label.getBoundingClientRect()),
       })),
   );
