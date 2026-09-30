@@ -35,7 +35,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Autosave restore:** Ignore invalid snapshot timestamps so a malformed save cannot block a valid newer snapshot.
 - **Deployment action selection:** Treat the automatic choice as a request to use the release manifest.
 - **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
-- **Base map selection:** Stop hosted settings sync from reverting a newly chosen basemap when a stale Firestore snapshot arrives before the debounced save completes.
+- **Base map selection:** Ignore Firestore local-write echoes and stale pre-change snapshots while a debounced settings save is pending, so hosted sync cannot revert an in-progress basemap choice.
 - **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
 - **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
 - **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
