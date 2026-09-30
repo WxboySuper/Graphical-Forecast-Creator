@@ -8,12 +8,17 @@ const repoRoot = path.join(serverDirectory, '..');
 const securityHeaders = fs.readFileSync(path.join(serverDirectory, 'gfc-security-headers.conf'), 'utf8');
 const staticHeaders = fs.readFileSync(path.join(repoRoot, 'public', '_headers'), 'utf8');
 
-test('public/_headers allows Firebase Google Sign-In scripts', () => {
-  assert.match(staticHeaders, /https:\/\/apis\.google\.com/);
+const GOOGLE_SIGN_IN_SCRIPT_HOST = 'https://apis.google.com';
+
+test('public/_headers allows Firebase Google Sign-In scripts in script-src', async () => {
+  const { extractContentSecurityPolicy, getScriptSrcValue } = await import('./lib/csp-script-src.mjs');
+  const policy = extractContentSecurityPolicy(staticHeaders);
+  assert.match(getScriptSrcValue(policy), new RegExp(GOOGLE_SIGN_IN_SCRIPT_HOST.replace(/\./g, '\\.')));
 });
 
 for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
-  test(`${filename} includes shared headers for server and assets`, () => {
+  test(`${filename} includes shared headers for server and assets`, async () => {
+    const { extractContentSecurityPolicy, getScriptSrcValue } = await import('./lib/csp-script-src.mjs');
     const config = fs.readFileSync(path.join(serverDirectory, filename), 'utf8');
     assert.equal(config.match(/include \/etc\/nginx\/snippets\/gfc-security-headers\.conf;/g)?.length, 2);
     assert.equal(securityHeaders.match(/^add_header /gm)?.length, 5);
@@ -40,7 +45,11 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
     assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
-    assert.match(securityHeaders, /https:\/\/apis\.google\.com/);
+    const nginxPolicy = extractContentSecurityPolicy(securityHeaders);
+    assert.match(
+      getScriptSrcValue(nginxPolicy),
+      new RegExp(GOOGLE_SIGN_IN_SCRIPT_HOST.replace(/\./g, '\\.'))
+    );
     assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
