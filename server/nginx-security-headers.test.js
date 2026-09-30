@@ -13,7 +13,7 @@ const GOOGLE_SIGN_IN_SCRIPT_HOST = 'https://apis.google.com';
 test('public/_headers allows Firebase Google Sign-In scripts in script-src', async () => {
   const { extractContentSecurityPolicy, getScriptSrcValue } = await import('./lib/csp-script-src.mjs');
   const policy = extractContentSecurityPolicy(staticHeaders);
-  assert.match(getScriptSrcValue(policy), new RegExp(GOOGLE_SIGN_IN_SCRIPT_HOST.replace(/\./g, '\\.')));
+  assert.ok(getScriptSrcValue(policy).includes(GOOGLE_SIGN_IN_SCRIPT_HOST));
 });
 
 for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
@@ -39,17 +39,14 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
       "manifest-src 'self'",
       "media-src 'self'",
     ]) {
-      assert.match(securityHeaders, new RegExp(directive.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+      assert.ok(securityHeaders.includes(directive), `missing CSP directive fragment: ${directive}`);
     }
     assert.match(securityHeaders, /https:\/\/identitytoolkit\.googleapis\.com/);
     assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
     assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
     const nginxPolicy = extractContentSecurityPolicy(securityHeaders);
-    assert.match(
-      getScriptSrcValue(nginxPolicy),
-      new RegExp(GOOGLE_SIGN_IN_SCRIPT_HOST.replace(/\./g, '\\.'))
-    );
+    assert.ok(getScriptSrcValue(nginxPolicy).includes(GOOGLE_SIGN_IN_SCRIPT_HOST));
     assert.doesNotMatch(securityHeaders, /report-only/i);
   });
 }
