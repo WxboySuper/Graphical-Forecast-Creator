@@ -179,7 +179,7 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
     expect(sections.length).toBeGreaterThan(0);
 
     sections.forEach((section) => {
-      expect(section).toHaveClass('overflow-hidden');
+      expect(section).toHaveClass('overflow-x-clip');
       expect(section).toHaveClass('shrink-0');
       expect(section.querySelector('.tabbed-integrated-toolbar__section-label-column')).toBeTruthy();
     });
@@ -192,7 +192,7 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
     await user.click(screen.getByRole('tab', { name: /Days/i }));
 
     const forecastSection = document.querySelector('.tabbed-integrated-toolbar__section--days');
-    expect(forecastSection).toHaveClass('min-w-[572px]');
+    expect(forecastSection).toHaveClass('min-w-[566px]');
     expect(forecastSection?.querySelector('.tabbed-integrated-toolbar__day-strip')).not.toHaveClass('min-w-max');
   });
   /* eslint-enable testing-library/no-node-access */

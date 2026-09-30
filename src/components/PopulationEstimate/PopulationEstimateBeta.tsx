@@ -164,7 +164,7 @@ const PopulationEstimateBeta: React.FC = () => {
 
   return (
     <>
-      <div className="flex min-w-[250px] flex-1 flex-col justify-between rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+      <div className="flex min-w-[250px] flex-1 flex-col justify-between rounded-xl border border-violet-500/30 bg-violet-500/5 px-3 py-1.5">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-violet-700 dark:text-violet-300" />
           <div>

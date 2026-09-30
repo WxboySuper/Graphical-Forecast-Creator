@@ -92,9 +92,23 @@
 .tabbed-integrated-toolbar__section-content {
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+}
+
+@media (min-width: 641px) {
+  .tabbed-integrated-toolbar__section--type .tabbed-integrated-toolbar__type-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px;
+    width: 100%;
+  }
+
+  .tabbed-integrated-toolbar__section--type .tabbed-integrated-toolbar__type-button {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .tabbed-integrated-toolbar__action-group {

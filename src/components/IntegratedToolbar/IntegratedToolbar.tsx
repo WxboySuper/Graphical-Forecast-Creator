@@ -408,7 +408,7 @@ const TabbedToolbarStripSection: React.FC<{
   contentClassName?: string;
   children: React.ReactNode;
 }> = ({ label, hint, className, contentClassName, children }) => (
-  <section className={cn('tabbed-integrated-toolbar__section flex h-full shrink-0 items-center gap-2.5 overflow-hidden border-r border-border/70 pr-3 last:border-r-0 last:pr-0', className)}>
+  <section className={cn('tabbed-integrated-toolbar__section flex h-full shrink-0 items-center gap-2.5 overflow-x-clip overflow-y-visible border-r border-border/70 pr-3 last:border-r-0 last:pr-0', className)}>
     <div className="tabbed-integrated-toolbar__section-label-column flex shrink-0 flex-col justify-center">
       <span className="tabbed-integrated-toolbar__section-label text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 leading-tight">{label}</span>
       {hint ? (
@@ -532,7 +532,7 @@ const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ lab
 const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <>
     <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type w-[316px]">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="tabbed-integrated-toolbar__type-grid flex flex-wrap items-center gap-0.5">
         {controller.availableTypes.map((type) => (
           <TabbedToolbarTypeButton key={type} controller={controller} type={type} />
         ))}
@@ -649,14 +649,14 @@ const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = 
 
 /** Cycle date strip wrapper used in the Days tab. */
 const CycleDateStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date min-w-[300px] shrink-0">
+  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date min-w-[296px] shrink-0">
     <CycleDateControl controller={controller} />
   </TabbedToolbarStripSection>
 );
 
 /** Forecast days strip with prev/next and day buttons. */
 const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[572px] shrink-0">
+  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[566px] shrink-0">
     <div className="flex shrink-0 items-center gap-2">
       <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1}>
         <ChevronLeft className="h-4 w-4" />
