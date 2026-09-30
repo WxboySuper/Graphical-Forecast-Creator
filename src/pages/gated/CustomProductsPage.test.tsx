@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import type { CustomCategoryId, HostedCustomProduct } from '../../types/customProducts';
@@ -36,6 +36,8 @@ const result = (overrides = {}) => ({
   products: [],
   loading: false,
   error: null,
+  loadError: null,
+  clearSaveError: jest.fn(),
   premiumActive: true,
   pendingAction: null,
   createProduct: jest.fn().mockResolvedValue(true),
@@ -72,6 +74,7 @@ describe('CustomProductsPage', () => {
     expect(swatch).toHaveStyle({ borderColor: 'rgba(18, 52, 86, 0.4)', borderWidth: '4px' });
     expect(swatch?.style.backgroundImage).toContain('rgba(18, 52, 86, 0.4)');
     await user.click(screen.getByRole('button', { name: /Add category/i }));
+    await user.click(screen.getByRole('button', { name: /Add category/i }));
     await user.click(screen.getByRole('button', { name: /Move Category 2 up/i }));
     await user.click(screen.getByRole('button', { name: /Create product/i }));
 
@@ -79,6 +82,20 @@ describe('CustomProductsPage', () => {
       label: 'Fire weather',
       categories: expect.arrayContaining([expect.objectContaining({ label: 'Elevated' })]),
     }));
+    const submitted = customProducts.createProduct.mock.calls[0]?.[0] as { categories: unknown[] };
+    expect(submitted.categories).toHaveLength(3);
+    expect(submitted.categories.map((category) => (category as { order: number }).order)).toEqual([0, 1, 2]);
+  });
+
+  test('shows hosted save failures inside the editor', async () => {
+    const user = userEvent.setup();
+    const customProducts = result({ error: 'Could not save this product.' });
+    mockUseCustomProducts.mockReturnValue(customProducts);
+    render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
+
+    await user.click(screen.getByRole('button', { name: /New product/i }));
+    expect(within(screen.getByTestId('custom-product-editor')).getByRole('alert'))
+      .toHaveTextContent('Could not save this product.');
   });
 
   test('duplicates, archives, deletes, and stages a product for the forecast', async () => {

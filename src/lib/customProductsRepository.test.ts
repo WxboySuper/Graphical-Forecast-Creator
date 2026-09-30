@@ -6,6 +6,8 @@ import {
   normalizeCustomProductCategories,
   type CustomProductDraft,
 } from './customProductsRepository';
+import { findOpenProductSlot } from './firestoreCustomProductsRepository';
+import { hostedProductUpdatedAt } from './customProductRepositoryModel';
 import {
   clearCustomProductForecastHandoff,
   consumeCustomProductForecastHandoff,
@@ -40,10 +42,40 @@ describe('customProductsRepository', () => {
     sessionStorage.clear();
   });
 
+  test('bumps hosted updatedAt past the previous revision for Firestore updates', () => {
+    const previous = '2026-07-17T12:00:00.000Z';
+    expect(hostedProductUpdatedAt(previous, previous)).toBe('2026-07-17T12:00:00.001Z');
+    expect(Date.parse(hostedProductUpdatedAt(previous, previous))).toBeGreaterThan(Date.parse(previous));
+  });
+
   test('reserves fixed Firestore document slots separately from logical product ids', () => {
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS).toHaveLength(20);
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS[0]).toBe('product-01');
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS[19]).toBe('product-20');
+  });
+
+  test('findOpenProductSlot treats malformed documents as occupying their slot', () => {
+    expect(findOpenProductSlot(['product-01'])).toBe('product-02');
+    expect(findOpenProductSlot(CUSTOM_PRODUCT_DOCUMENT_SLOTS.slice(0, 19))).toBe('product-20');
+    expect(() => findOpenProductSlot(CUSTOM_PRODUCT_DOCUMENT_SLOTS)).toThrow(/limit reached/i);
+  });
+
+  test('persists products with three or more categories', async () => {
+    const triple = draft('Triple category');
+    triple.categories = [
+      category('Test1', 0),
+      category('Test2', 1),
+      category('Test3', 2),
+    ];
+    const created = await localCustomProductsRepository.create('user-1', triple);
+    expect(created.categories).toHaveLength(3);
+    expect(created.categories.map(({ label }) => label)).toEqual(['Test1', 'Test2', 'Test3']);
+
+    triple.label = 'Triple category revised';
+    triple.categories.push(category('Test4', 3));
+    const updated = await localCustomProductsRepository.update('user-1', created, triple);
+    expect(updated.categories).toHaveLength(4);
+    expect(updated.version).toBe(2);
   });
 
   test('normalizes category order without retaining mutable style references', () => {
