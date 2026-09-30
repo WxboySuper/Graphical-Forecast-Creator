@@ -1,16 +1,21 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { CustomProductsRepository } from '../lib/customProductsRepository';
+import type { HostedCustomProduct } from '../types/customProducts';
 import { useCustomProductSubscription } from './useCustomProductSubscription';
 
 const makeRepository = (): CustomProductsRepository & {
-  emitUpdate: (products: unknown[]) => void;
+  emitUpdate: (products: HostedCustomProduct[]) => void;
   emitError: (error: Error) => void;
 } => {
-  let onUpdate: ((products: unknown[]) => void) | undefined;
+  let onUpdate: ((products: HostedCustomProduct[]) => void) | undefined;
   let onError: ((error: Error) => void) | undefined;
   return {
     list: jest.fn(),
-    subscribe: jest.fn((_userId, update, error) => {
+    subscribe: jest.fn((
+      _userId: string,
+      update: (products: HostedCustomProduct[]) => void,
+      error?: (nextError: Error) => void,
+    ) => {
       onUpdate = update;
       onError = error;
       return jest.fn();

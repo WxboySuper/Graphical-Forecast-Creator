@@ -151,6 +151,7 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
 
   const editorOpen = creating || Boolean(editing);
   const openEditor = (product: HostedCustomProduct) => {
+    customProducts.clearSaveError();
     setCreating(false);
     setEditing(product);
   };
@@ -177,15 +178,15 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
         builtInCount={(customProducts.builtInProducts ?? customProducts.products.filter(isBuiltInCustomProduct)).length}
         activeCount={activeCount}
         newDisabled={newProductDisabled(customProducts, editorOpen, user?.uid)}
-        onNew={() => { setEditing(null); setCreating(true); }}
+        onNew={() => { customProducts.clearSaveError(); setEditing(null); setCreating(true); }}
       />
       <WorkspaceNotices customProducts={customProducts} applicationError={applicationError} editorOpen={editorOpen} />
       <WorkspaceEditors
         creating={creating}
         editing={editing}
         customProducts={customProducts}
-        stopCreating={() => setCreating(false)}
-        stopEditing={() => setEditing(null)}
+        stopCreating={() => { customProducts.clearSaveError(); setCreating(false); }}
+        stopEditing={() => { customProducts.clearSaveError(); setEditing(null); }}
       />
       <ProductsLibrary customProducts={customProducts} editorOpen={editorOpen} onEdit={openEditor} onUse={useProduct} />
     </main>

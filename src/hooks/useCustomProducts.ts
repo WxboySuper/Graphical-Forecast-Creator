@@ -24,6 +24,7 @@ export interface UseCustomProductsResult {
   setProductStatus(product: HostedCustomProduct, status: HostedCustomProductStatus): Promise<boolean>;
   deleteProduct(product: HostedCustomProduct): Promise<boolean>;
   useProduct(product: HostedCustomProduct): OneOffCustomLayer | null;
+  clearSaveError(): void;
 }
 
 /** Composes subscription and mutation hooks for the gated reusable-product page. */
@@ -50,5 +51,6 @@ export const useCustomProducts = (): UseCustomProductsResult => {
     userProducts,
     ...actions,
     premiumActive,
+    clearSaveError: () => setSaveError(null),
   };
 };

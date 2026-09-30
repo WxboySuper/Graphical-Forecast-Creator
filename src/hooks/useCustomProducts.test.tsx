@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { getCustomProductsRepository } from '../lib/customProductsRepository';
+import type { HostedCustomProduct } from '../types/customProducts';
 import { useCustomProducts } from './useCustomProducts';
 
 jest.mock('../auth/AuthProvider', () => ({ useAuth: jest.fn() }));
@@ -19,8 +20,13 @@ const mockGetRepository = getCustomProductsRepository as jest.MockedFunction<typ
 
 const makeRepository = () => ({
   list: jest.fn(),
-  subscribe: jest.fn((_userId, onUpdate) => {
+  subscribe: jest.fn((
+    _userId: string,
+    onUpdate: (products: HostedCustomProduct[]) => void,
+    onError?: (error: Error) => void,
+  ) => {
     onUpdate([]);
+    void onError;
     return jest.fn();
   }),
   create: jest.fn().mockResolvedValue({}),
@@ -99,10 +105,32 @@ describe('useCustomProducts', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
+  test('clearSaveError resets mutation errors', async () => {
+    const repository = makeRepository();
+    repository.create.mockRejectedValue(new Error('Save failed'));
+    mockGetRepository.mockReturnValue(repository);
+    const { result } = renderHook(() => useCustomProducts());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await expect(result.current.createProduct(draft as Parameters<typeof result.current.createProduct>[0])).resolves.toBe(false);
+    });
+    expect(result.current.error).toBe('Save failed');
+
+    act(() => {
+      result.current.clearSaveError();
+    });
+    expect(result.current.error).toBeNull();
+  });
+
   test('clears load errors on subscription refresh without clearing save errors', async () => {
     const repository = makeRepository();
-    let onUpdate: ((products: unknown[]) => void) | undefined;
-    repository.subscribe.mockImplementation((_userId, update, error) => {
+    let onUpdate: ((products: HostedCustomProduct[]) => void) | undefined;
+    repository.subscribe.mockImplementation((
+      _userId: string,
+      update: (products: HostedCustomProduct[]) => void,
+      error?: (nextError: Error) => void,
+    ) => {
       onUpdate = update;
       error?.(new Error('Failed to load reusable products.'));
       return jest.fn();
@@ -131,10 +159,15 @@ describe('useCustomProducts', () => {
 
   test('keeps mutation errors visible after the live subscription refreshes', async () => {
     const repository = makeRepository();
-    let onUpdate: ((products: unknown[]) => void) | undefined;
-    repository.subscribe.mockImplementation((_userId, update) => {
+    let onUpdate: ((products: HostedCustomProduct[]) => void) | undefined;
+    repository.subscribe.mockImplementation((
+      _userId: string,
+      update: (products: HostedCustomProduct[]) => void,
+      onError?: (error: Error) => void,
+    ) => {
       onUpdate = update;
       update([]);
+      void onError;
       return jest.fn();
     });
     repository.create.mockRejectedValue(new Error('permission denied'));

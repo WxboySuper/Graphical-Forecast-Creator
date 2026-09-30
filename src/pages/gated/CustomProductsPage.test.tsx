@@ -36,6 +36,8 @@ const result = (overrides = {}) => ({
   products: [],
   loading: false,
   error: null,
+  loadError: null,
+  clearSaveError: jest.fn(),
   premiumActive: true,
   pendingAction: null,
   createProduct: jest.fn().mockResolvedValue(true),
