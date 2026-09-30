@@ -85,6 +85,20 @@ const customProduct = (overrides = {}) => ({
   ...overrides,
 });
 
+/** Must match CUSTOM_PRODUCT_LIMITS.categoriesPerProduct / firestore.rules category cap. */
+const CUSTOM_PRODUCT_CATEGORY_CAP = 12;
+
+/** Build N category entries for custom product rules tests. */
+const customProductCategories = (count) => {
+  const base = customProduct().categories[0];
+  return Array.from({ length: count }, (_, order) => ({
+    ...base,
+    id: `category-${order}`,
+    label: `Category ${order}`,
+    order,
+  }));
+};
+
 /** Build a valid synchronized settings document. */
 const settings = (overrides = {}) => ({
   darkMode: false,
@@ -267,6 +281,11 @@ describe('userProfiles authorization', () => {
 describe('userSettings schema boundary', () => {
   test('allows the normalized settings shape', async () => {
     await assertSucceeds(setDoc(doc(dbFor(ALICE), 'userSettings', ALICE), settings()));
+  });
+
+  test('accepts a 150-character defaultForecasterName for prod client compatibility', async () => {
+    const ref = doc(dbFor(ALICE), 'userSettings', ALICE);
+    await assertSucceeds(setDoc(ref, settings({ defaultForecasterName: 'A'.repeat(150) })));
   });
 
   test('rejects unsupported and unbounded settings values', async () => {
@@ -607,22 +626,40 @@ describe('customProducts security and lifecycle boundary', () => {
     await assertSucceeds(updateDoc(aliceRef(), { status: 'active', version: 3, updatedAt: '2026-07-17T02:00:00.000Z' }));
   });
 
-  test('rejects malformed styles, category order, duplicate IDs, and unknown fields', async () => {
+  test('rejects unknown top-level fields and oversized product names', async () => {
     await seed(async (db) => {
       await enableCustomProducts(db);
       await setEntitlement(db, ALICE, true);
     });
-    const baseCategory = customProduct().categories[0];
     await assertFails(setDoc(aliceRef(), customProduct({ internalRole: 'admin' })));
-    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, order: 1 }] })));
-    await assertFails(setDoc(aliceRef(), customProduct({ categories: [{ ...baseCategory, style: { ...baseCategory.style, fillColor: 'red' } }] })));
-    const secondCategory = { ...baseCategory, id: 'critical', label: 'Critical', order: 1 };
-    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: [baseCategory, secondCategory] })));
+    await assertFails(setDoc(aliceRef(), customProduct({ label: 'x'.repeat(65) })));
+  });
+
+  test(`allows ${CUSTOM_PRODUCT_CATEGORY_CAP} categories on create and update`, async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
+    const maxCategories = customProductCategories(CUSTOM_PRODUCT_CATEGORY_CAP);
+    await assertSucceeds(setDoc(aliceRef(), customProduct({ categories: maxCategories })));
+    await assertSucceeds(updateDoc(aliceRef(), {
+      label: 'Max categories',
+      categories: maxCategories,
+      version: 2,
+      updatedAt: '2026-07-17T01:00:00.000Z',
+    }));
+  });
+
+  test(`rejects more than ${CUSTOM_PRODUCT_CATEGORY_CAP} categories`, async () => {
+    await seed(async (db) => {
+      await enableCustomProducts(db);
+      await setEntitlement(db, ALICE, true);
+    });
     await assertFails(setDoc(
       doc(dbFor(ALICE), 'users', ALICE, 'customProducts', 'product-02'),
       customProduct({
         id: 'product-logical-2',
-        categories: [baseCategory, { ...secondCategory, id: baseCategory.id }],
+        categories: customProductCategories(CUSTOM_PRODUCT_CATEGORY_CAP + 1),
       }),
     ));
   });

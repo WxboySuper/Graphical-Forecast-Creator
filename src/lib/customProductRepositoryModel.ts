@@ -15,9 +15,21 @@ export const normalizeCustomProductCategories = (
   categories: CustomCategoryTemplate[],
 ): CustomCategoryTemplate[] => categories.map((category, order) => ({
   ...category,
+  label: category.label.trim(),
   order,
   style: { ...category.style },
 }));
+
+/** Firestore updates require updatedAt to advance strictly past the stored revision. */
+export const hostedProductUpdatedAt = (
+  previousUpdatedAt: string,
+  candidate = new Date().toISOString(),
+): string => {
+  const previousMs = Date.parse(previousUpdatedAt);
+  const candidateMs = Date.parse(candidate);
+  if (candidateMs > previousMs) return candidate;
+  return new Date(previousMs + 1).toISOString();
+};
 
 const descriptionFields = (description?: string) => {
   const trimmed = description?.trim();
@@ -64,7 +76,7 @@ export const reviseProduct = (
     description: draft.description?.trim() || undefined,
     categories: normalizeCustomProductCategories(draft.categories),
     status,
-  });
+  }, hostedProductUpdatedAt(product.updatedAt));
   if (!draft.description?.trim()) delete revised.description;
   return assertValidProduct(revised);
 };
