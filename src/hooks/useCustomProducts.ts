@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { HostedCustomProduct, HostedCustomProductStatus, OneOffCustomLayer } from '../types/customProducts';
@@ -12,7 +12,10 @@ export interface UseCustomProductsResult {
   builtInProducts: HostedCustomProduct[];
   userProducts: HostedCustomProduct[];
   loading: boolean;
+  /** Mutation / handoff failures surfaced in the editor (or page banner when no editor is open). */
   error: string | null;
+  /** Live subscription load failures; never shown inside the editor. */
+  loadError: string | null;
   premiumActive: boolean;
   pendingAction: { action: string; productId?: string } | null;
   createProduct(draft: CustomProductDraft): Promise<boolean>;
@@ -28,17 +31,20 @@ export const useCustomProducts = (): UseCustomProductsResult => {
   const { user } = useAuth();
   const { premiumActive } = useEntitlement();
   const repository = useMemo(getCustomProductsRepository, []);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const subscription = useCustomProductSubscription(repository, user?.uid);
   const builtInProducts = useMemo(listBuiltInCustomProducts, []);
   const actions = useCustomProductActions({
     repository,
     userId: user?.uid,
     premiumActive,
-    setError: subscription.setError,
+    setError: setSaveError,
   });
   const userProducts = subscription.state.products;
   return {
     ...subscription.state,
+    error: saveError,
+    loadError: subscription.state.loadError,
     products: [...builtInProducts, ...userProducts],
     builtInProducts,
     userProducts,

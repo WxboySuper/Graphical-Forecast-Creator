@@ -99,6 +99,36 @@ describe('useCustomProducts', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
+  test('clears load errors on subscription refresh without clearing save errors', async () => {
+    const repository = makeRepository();
+    let onUpdate: ((products: unknown[]) => void) | undefined;
+    repository.subscribe.mockImplementation((_userId, update, error) => {
+      onUpdate = update;
+      error?.(new Error('Failed to load reusable products.'));
+      return jest.fn();
+    });
+    repository.create.mockRejectedValue(new Error('Save failed'));
+    mockGetRepository.mockReturnValue(repository);
+    const { result } = renderHook(() => useCustomProducts());
+    await waitFor(() => expect(result.current.loadError).toBe('Failed to load reusable products.'));
+
+    act(() => {
+      onUpdate?.([]);
+    });
+    await waitFor(() => expect(result.current.loadError).toBeNull());
+
+    await act(async () => {
+      await expect(result.current.createProduct(draft as Parameters<typeof result.current.createProduct>[0])).resolves.toBe(false);
+    });
+    expect(result.current.error).toBe('Save failed');
+
+    act(() => {
+      onUpdate?.([]);
+    });
+    expect(result.current.error).toBe('Save failed');
+    expect(result.current.loadError).toBeNull();
+  });
+
   test('keeps mutation errors visible after the live subscription refreshes', async () => {
     const repository = makeRepository();
     let onUpdate: ((products: unknown[]) => void) | undefined;

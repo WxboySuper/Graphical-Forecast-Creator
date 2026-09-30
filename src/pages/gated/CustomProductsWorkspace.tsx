@@ -32,6 +32,7 @@ const WorkspaceNotices = ({
 }) => (
   <>
     {!customProducts.premiumActive ? <Card className="custom-product-notice"><CardContent>Rainfall and Tropical AOI are built-in products available to everyone. Premium is only required to create or manage your own reusable products.</CardContent></Card> : null}
+    {customProducts.loadError ? <p role="alert" className="custom-product-error">{customProducts.loadError}</p> : null}
     {!editorOpen && customProducts.error ? <p role="alert" className="custom-product-error">{customProducts.error}</p> : null}
     {applicationError ? <p role="alert" className="custom-product-error">{applicationError}</p> : null}
   </>

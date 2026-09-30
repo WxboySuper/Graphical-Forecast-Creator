@@ -13,7 +13,7 @@ const mutationError = (error: unknown): string => {
   if (error instanceof Error) {
     const code = (error as { code?: string }).code;
     if (code === 'permission-denied') {
-      return 'Could not save this product. Check that every category has a valid label and style, then try again. If the problem continues, refresh and retry.';
+      return 'Could not save this product. The product may be invalid or too large, premium or hosted access may be missing, or you may have reached the product limit. Check your categories and account, then try again.';
     }
     return error.message;
   }

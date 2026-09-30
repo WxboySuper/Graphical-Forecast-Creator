@@ -6,6 +6,7 @@ import {
   normalizeCustomProductCategories,
   type CustomProductDraft,
 } from './customProductsRepository';
+import { findOpenProductSlot } from './firestoreCustomProductsRepository';
 import { hostedProductUpdatedAt } from './customProductRepositoryModel';
 import {
   clearCustomProductForecastHandoff,
@@ -51,6 +52,12 @@ describe('customProductsRepository', () => {
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS).toHaveLength(20);
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS[0]).toBe('product-01');
     expect(CUSTOM_PRODUCT_DOCUMENT_SLOTS[19]).toBe('product-20');
+  });
+
+  test('findOpenProductSlot treats malformed documents as occupying their slot', () => {
+    expect(findOpenProductSlot(['product-01'])).toBe('product-02');
+    expect(findOpenProductSlot(CUSTOM_PRODUCT_DOCUMENT_SLOTS.slice(0, 19))).toBe('product-20');
+    expect(() => findOpenProductSlot(CUSTOM_PRODUCT_DOCUMENT_SLOTS)).toThrow(/limit reached/i);
   });
 
   test('persists products with three or more categories', async () => {
