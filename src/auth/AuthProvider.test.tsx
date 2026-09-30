@@ -6,16 +6,6 @@ import {
   applySettingsToState,
   areOverlaySettingsEqual,
   areUserSettingsEqual,
-  coalesceRemoteSettingsWithPendingLocal,
-  cancelPendingHostedSettingsWriteIntent,
-  consumeSupersededBaselineOneShotIgnore,
-  finalizeHostedSettingsWriteFailure,
-  handleHostedSettingsFirestoreSnapshot,
-  scheduleHostedSettingsDocumentWrite,
-  shouldIgnoreHostedSettingsSnapshot,
-  shouldSkipHostedSettingsDocumentWrite,
-  type PendingHostedSettingsWrite,
-  type InFlightHostedSettingsWrite,
   asRecord,
   canSyncHostedUserDocuments,
   clearDeletedAccountSession,
@@ -24,7 +14,6 @@ import {
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
-  getRemoteSeedPayload,
   getSettingsSyncError,
   getSettingsUpdateError,
   initLocalAuthState,
@@ -35,24 +24,25 @@ import {
   localUpdateSyncedSettings,
   postLocalJson,
   readProfileBetaAccess,
-  runInitialHostedSync,
-  attachHostedSettingsSubscription,
   readRemoteSettings,
   safeParseJson,
-  seedOrApplySettings,
-  startSettingsSubscription,
-  syncProfileDocument,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
+import {
+  attachHostedSettingsSubscription,
+  getRemoteSeedPayload,
+  runInitialHostedSync,
+  seedOrApplySettings,
+  startSettingsSubscription,
+  syncProfileDocument,
+} from './hostedSettingsSync';
 import { queueProductMetric } from '../utils/productMetrics';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 import type { OverlaysState } from '../store/overlaysSlice';
-import { applyOverlaySettings } from '../store/overlaysSlice';
-import { setDarkMode } from '../store/themeSlice';
 
 const TEST_OVERLAY_STATE: OverlaysState = {
   baseMapStyle: 'osm',
@@ -261,864 +251,6 @@ describe('AuthProvider Utils', () => {
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
   });
 
-  const buildHostedSettingsFixture = (baseMapStyle: OverlaysState['baseMapStyle']) =>
-    createSettingsSnapshot({
-      darkMode: false,
-      overlays: { ...TEST_OVERLAY_STATE, baseMapStyle },
-      defaultForecasterName: 'Forecaster',
-      forecastUiVariant: 'workspace_dock',
-    });
-
-  test('coalesceRemoteSettingsWithPendingLocal keeps pending basemap when remote is stale', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const target = buildHostedSettingsFixture('carto-light');
-    const coalesced = coalesceRemoteSettingsWithPendingLocal(baseline, {
-      baseline,
-      target,
-      writeSequence: 1,
-    });
-    expect(coalesced.baseMapStyle).toBe('carto-light');
-  });
-
-  test('coalesceRemoteSettingsWithPendingLocal still applies another device field while basemap write is pending', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const target = buildHostedSettingsFixture('carto-light');
-    const remoteFromOtherDevice = { ...baseline, counties: true };
-    const coalesced = coalesceRemoteSettingsWithPendingLocal(remoteFromOtherDevice, {
-      baseline,
-      target,
-      writeSequence: 1,
-    });
-    expect(coalesced.baseMapStyle).toBe('carto-light');
-    expect(coalesced.counties).toBe(true);
-  });
-
-  test('consumeSupersededBaselineOneShotIgnore ignores only the first matching stale echo', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
-    let oneShot: PendingHostedSettingsWrite['baseline'] | null = baseline;
-    const clearOneShot = () => {
-      oneShot = null;
-    };
-
-    expect(consumeSupersededBaselineOneShotIgnore(baseline, oneShot, clearOneShot)).toBe(true);
-    expect(oneShot).toBeNull();
-    expect(consumeSupersededBaselineOneShotIgnore(baseline, oneShot, clearOneShot)).toBe(false);
-    expect(consumeSupersededBaselineOneShotIgnore(acknowledged, baseline, () => undefined)).toBe(false);
-  });
-
-  test('after one-shot stale echo is consumed, another device can revert basemap to the old value', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
-    const oneShotRef = { current: baseline as PendingHostedSettingsWrite['baseline'] | null };
-    const dispatch = jest.fn();
-    const lastSyncedSettingsRef = { current: acknowledged };
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => baseline, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => oneShotRef.current,
-        clearSupersededBaselineOneShot: () => {
-          oneShotRef.current = null;
-        },
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: localOverlays },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-    expect(dispatch).not.toHaveBeenCalled();
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => baseline, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => oneShotRef.current,
-        clearSupersededBaselineOneShot: () => {
-          oneShotRef.current = null;
-        },
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: localOverlays },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-
-    expect(dispatch).toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
-    );
-  });
-
-  test('coalesceRemoteSettingsWithPendingLocal ignores superseded in-flight write targets', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const inFlightB = buildHostedSettingsFixture('carto-light');
-    const targetC = buildHostedSettingsFixture('esri-satellite');
-    const coalesced = coalesceRemoteSettingsWithPendingLocal(
-      inFlightB,
-      {
-        baseline,
-        target: targetC,
-        writeSequence: 2,
-      },
-      inFlightB,
-    );
-    expect(coalesced.baseMapStyle).toBe('esri-satellite');
-  });
-
-  test('regression: raw stale remote without coalesce reverts pending basemap', () => {
-    const staleRemote = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
-    const dispatch = jest.fn();
-
-    applySettingsToState(staleRemote, {
-      currentDarkModeRef: { current: false },
-      currentOverlaysRef: { current: localOverlays },
-      dispatch,
-      setSyncedSettings: jest.fn(),
-      lastSyncedSettingsRef: { current: acknowledged },
-    });
-
-    expect(dispatch).toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
-    );
-  });
-
-  test('handleHostedSettingsFirestoreSnapshot keeps pending basemap when stale remote arrives', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const target = buildHostedSettingsFixture('carto-light');
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
-    const dispatch = jest.fn();
-    const lastSyncedSettingsRef = { current: baseline };
-    const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-    const pendingIntentRef = {
-      current: {
-        baseline,
-        target,
-        writeSequence: 1,
-      },
-    };
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => baseline, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => pendingIntentRef.current,
-        getInFlightHostedSettingsWrite: () => inFlightRef.current,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings, options) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: localOverlays },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          }, options);
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-
-    expect(dispatch).not.toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
-    );
-  });
-
-  test('handleHostedSettingsFirestoreSnapshot applies another device change when nothing is pending', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const remoteUpdate = { ...baseline, counties: true };
-    const dispatch = jest.fn();
-    const lastSyncedSettingsRef = { current: baseline };
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => remoteUpdate, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: TEST_OVERLAY_STATE },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-
-    expect(dispatch).toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ counties: true })),
-    );
-  });
-
-  test('shouldIgnoreHostedSettingsSnapshot skips Firestore local-write echoes', () => {
-    expect(shouldIgnoreHostedSettingsSnapshot({ hasPendingWrites: true })).toBe(true);
-    expect(shouldIgnoreHostedSettingsSnapshot({ hasPendingWrites: false })).toBe(false);
-  });
-
-  test('debounced hosted write survives stale snapshot after setDoc starts', async () => {
-    jest.useFakeTimers();
-    try {
-      let resolveWrite: (() => void) | undefined;
-      const setDocSpy = jest.mocked(setDoc).mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveWrite = resolve;
-        }) as never,
-      );
-      const baseline = buildHostedSettingsFixture('osm');
-      const target = buildHostedSettingsFixture('carto-light');
-      const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededBaselineRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const dispatch = jest.fn();
-      const active = true;
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: target,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededBaselineRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => active,
-        onPersisted: (settings) => {
-          lastSyncedSettingsRef.current = settings;
-        },
-        onPersistError: () => undefined,
-      });
-
-      jest.advanceTimersByTime(750);
-      expect(setDocSpy).toHaveBeenCalled();
-      expect(pendingIntentRef.current).not.toBeNull();
-
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => baseline, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => active,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
-          clearSupersededBaselineOneShot: () => {
-            supersededBaselineRef.current = null;
-          },
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlays },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
-
-      expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
-      );
-
-      resolveWrite?.();
-      await Promise.resolve();
-      expect(pendingIntentRef.current).toBeNull();
-      expect(lastSyncedSettingsRef.current?.baseMapStyle).toBe('carto-light');
-      expect(supersededBaselineRef.current?.baseMapStyle).toBe('osm');
-
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => baseline, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => active,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
-          clearSupersededBaselineOneShot: () => {
-            supersededBaselineRef.current = null;
-          },
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlays },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
-
-      expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('in-flight B confirmation snapshot does not revert newer local C selection', async () => {
-    jest.useFakeTimers();
-    try {
-      let resolveB: (() => void) | undefined;
-      const setDocSpy = jest.mocked(setDoc).mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveB = resolve;
-        }) as never,
-      );
-      const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
-      const targetC = buildHostedSettingsFixture('esri-satellite');
-      const localOverlaysC = { ...TEST_OVERLAY_STATE, baseMapStyle: 'esri-satellite' as const };
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const dispatch = jest.fn();
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
-      jest.advanceTimersByTime(750);
-      expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetC,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
-      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
-      expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
-
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => targetB, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => true,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => null,
-          clearSupersededBaselineOneShot: jest.fn(),
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlaysC },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
-
-      expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
-      );
-
-      resolveB?.();
-      await Promise.resolve();
-
-      jest.advanceTimersByTime(750);
-      await Promise.resolve();
-      expect(setDocSpy).toHaveBeenLastCalledWith(
-        { path: 'settings' },
-        expect.objectContaining({ baseMapStyle: 'esri-satellite' }),
-        { merge: true },
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('in-flight B confirmation does not apply when user reverts to A before B resolves', async () => {
-    jest.useFakeTimers();
-    try {
-      let resolveB: (() => void) | undefined;
-      const setDocSpy = jest.mocked(setDoc).mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveB = resolve;
-        }) as never,
-      );
-      const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
-      const localOverlaysA = { ...TEST_OVERLAY_STATE, baseMapStyle: 'osm' as const };
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const dispatch = jest.fn();
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
-      jest.advanceTimersByTime(750);
-      expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
-
-      expect(
-        shouldSkipHostedSettingsDocumentWrite(baseline, baseline, inFlightRef.current),
-      ).toBe(false);
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: baseline,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError: () => undefined,
-      });
-      expect(pendingIntentRef.current?.target.baseMapStyle).toBe('osm');
-      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
-
-      resolveB?.();
-      await Promise.resolve();
-
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => targetB, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => true,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => null,
-          clearSupersededBaselineOneShot: jest.fn(),
-          applyRemoteSettings: (settings, options) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlaysA },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            }, options);
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
-
-      expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
-      );
-
-      jest.advanceTimersByTime(750);
-      await Promise.resolve();
-      expect(setDocSpy).toHaveBeenLastCalledWith(
-        { path: 'settings' },
-        expect.objectContaining({ baseMapStyle: 'osm' }),
-        { merge: true },
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('failed in-flight B write keeps pending C and still persists C', async () => {
-    jest.useFakeTimers();
-    try {
-      let rejectB: ((error: Error) => void) | undefined;
-      let setDocCallCount = 0;
-      const setDocSpy = jest.mocked(setDoc).mockImplementation(() => {
-        setDocCallCount += 1;
-        if (setDocCallCount === 1) {
-          return new Promise<void>((_, reject) => {
-            rejectB = reject;
-          }) as never;
-        }
-        return Promise.resolve() as never;
-      });
-      const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
-      const targetC = buildHostedSettingsFixture('esri-satellite');
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const onPersistError = jest.fn();
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
-      jest.advanceTimersByTime(750);
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetC,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
-      expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
-
-      rejectB?.(new Error('write failed'));
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(onPersistError).toHaveBeenCalledTimes(1);
-      expect(pendingIntentRef.current?.writeSequence).toBe(2);
-      expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
-      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('osm');
-
-      jest.advanceTimersByTime(750);
-      await Promise.resolve();
-      expect(setDocSpy).toHaveBeenLastCalledWith(
-        { path: 'settings' },
-        expect.objectContaining({ baseMapStyle: 'esri-satellite' }),
-        { merge: true },
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('failed in-flight B still allows C write when sync status is already error', async () => {
-    jest.useFakeTimers();
-    try {
-      let rejectB: ((error: Error) => void) | undefined;
-      let setDocCallCount = 0;
-      const setDocSpy = jest.mocked(setDoc).mockImplementation(() => {
-        setDocCallCount += 1;
-        if (setDocCallCount === 1) {
-          return new Promise<void>((_, reject) => {
-            rejectB = reject;
-          }) as never;
-        }
-        return Promise.resolve() as never;
-      });
-      const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
-      const targetC = buildHostedSettingsFixture('esri-satellite');
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      let settingsSyncStatus: 'error' | 'synced' = 'error';
-      const onPersistError = jest.fn(() => {
-        settingsSyncStatus = 'error';
-      });
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetB,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
-      jest.advanceTimersByTime(750);
-
-      expect(
-        shouldSkipHostedSettingsDocumentWrite(targetC, baseline, inFlightRef.current),
-      ).toBe(false);
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: targetC,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid: 'user-1',
-        isWriteOwnerActive: () => true,
-        onPersisted: () => undefined,
-        onPersistError,
-      });
-
-      rejectB?.(new Error('write failed'));
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(settingsSyncStatus).toBe('error');
-      expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
-
-      jest.advanceTimersByTime(750);
-      await Promise.resolve();
-      expect(setDocSpy).toHaveBeenLastCalledWith(
-        { path: 'settings' },
-        expect.objectContaining({ baseMapStyle: 'esri-satellite' }),
-        { merge: true },
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  test('finalizeHostedSettingsWriteFailure rebases newer pending intent after failed write', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
-    const targetC = buildHostedSettingsFixture('esri-satellite');
-    const lastSyncedSettingsRef = { current: baseline };
-    const pendingRef = {
-      current: {
-        baseline: targetB,
-        target: targetC,
-        writeSequence: 2,
-      } satisfies PendingHostedSettingsWrite,
-    };
-    const onPersistError = jest.fn();
-
-    finalizeHostedSettingsWriteFailure(
-      pendingRef,
-      lastSyncedSettingsRef,
-      1,
-      () => true,
-      onPersistError,
-      new Error('failed'),
-    );
-
-    expect(pendingRef.current?.target.baseMapStyle).toBe('esri-satellite');
-    expect(pendingRef.current?.baseline.baseMapStyle).toBe('osm');
-    expect(onPersistError).toHaveBeenCalledTimes(1);
-  });
-
-  test('coalesced remote dark mode keeps lastSynced on raw remote during basemap debounce', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
-    const remoteDarkMode = { ...baseline, darkMode: true };
-    const dispatch = jest.fn();
-    const lastSyncedSettingsRef = { current: baseline };
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
-    const pendingIntentRef = {
-      current: {
-        baseline,
-        target: targetB,
-        writeSequence: 1,
-      },
-    };
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => remoteDarkMode, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => pendingIntentRef.current,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings, options) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: localOverlays },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          }, options);
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-
-    expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
-    expect(lastSyncedSettingsRef.current?.darkMode).toBe(true);
-    expect(lastSyncedSettingsRef.current?.baseMapStyle).toBe('osm');
-    expect(areUserSettingsEqual(lastSyncedSettingsRef.current, targetB)).toBe(false);
-  });
-
-  test('debounce cancel when local matches synced clears pending intent (A to B to A)', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
-    const pendingRef = {
-      current: {
-        baseline,
-        target: targetB,
-        writeSequence: 1,
-      } satisfies PendingHostedSettingsWrite,
-    };
-    const debounceRef = { current: 99 as number };
-
-    cancelPendingHostedSettingsWriteIntent(debounceRef, pendingRef);
-    expect(pendingRef.current).toBeNull();
-    expect(debounceRef.current).toBeNull();
-  });
-
-  test('after pending intent is cleared, remote dark mode changes do not coalesce basemap', () => {
-    const baseline = buildHostedSettingsFixture('osm');
-    const remoteDarkMode = { ...baseline, darkMode: true };
-    const dispatch = jest.fn();
-    const lastSyncedSettingsRef = { current: baseline };
-
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => remoteDarkMode, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: TEST_OVERLAY_STATE },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
-
-    expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
-    expect(dispatch).not.toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
-    );
-  });
-
-  test('setDoc completion after sign-out does not mutate hosted sync refs', async () => {
-    jest.useFakeTimers();
-    try {
-      let resolveWrite: (() => void) | undefined;
-      jest.mocked(setDoc).mockImplementation(
-        () => new Promise<void>((resolve) => {
-          resolveWrite = resolve;
-        }) as never,
-      );
-      const baseline = buildHostedSettingsFixture('osm');
-      const target = buildHostedSettingsFixture('carto-light');
-      const lastSyncedSettingsRef = { current: baseline };
-      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
-      const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
-      const writeSequenceRef = { current: 0 };
-      const debounceRef = { current: null as number | null };
-      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
-      const onPersisted = jest.fn();
-      let writeOwnerActive = true;
-      const writeOwnerUid = 'user-a';
-      let currentUid = 'user-a';
-
-      scheduleHostedSettingsDocumentWrite({
-        nextSettings: target,
-        debounceMs: 750,
-        settingsRef: { path: 'settings' } as never,
-        lastSyncedSettingsRef,
-        pendingLocalSettingsIntentRef: pendingIntentRef,
-        inFlightHostedSettingsWriteRef: inFlightRef,
-        settingsWriteSequenceRef: writeSequenceRef,
-        pendingDebounceTimerRef: debounceRef,
-        supersededBaselineOneShotRef: supersededOneShotRef,
-        writeOwnerUid,
-        isWriteOwnerActive: () => writeOwnerActive && currentUid === writeOwnerUid,
-        onPersisted,
-        onPersistError: () => undefined,
-      });
-
-      jest.advanceTimersByTime(750);
-      writeOwnerActive = false;
-      currentUid = 'user-b';
-      resolveWrite?.();
-      await Promise.resolve();
-
-      expect(lastSyncedSettingsRef.current).toEqual(baseline);
-      expect(supersededOneShotRef.current).toBeNull();
-      expect(onPersisted).not.toHaveBeenCalled();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
   test('local post helper and auth utility fallbacks normalize errors', async () => {
     expect(() => disabledAuthAction()).toThrow(/Hosted accounts are not enabled/);
     expect(getDefaultContextValue()).toEqual(expect.objectContaining({ status: 'disabled', hostedAuthEnabled: false }));
@@ -1323,251 +455,253 @@ describe('AuthProvider Utils', () => {
     expect(errorDeps.setStatus).toHaveBeenCalledWith('error');
     expect(errorDeps.setError).toHaveBeenCalledWith('offline');
   });
+});
 
-  test('syncProfileDocument includes createdAt when the profile is new', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+describe('AuthProvider hosted settings integration', () => {
+    test('syncProfileDocument includes createdAt when the profile is new', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => false,
-      data: () => undefined,
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
-      { merge: true }
-    );
-  });
-
-  test('syncProfileDocument preserves the creation timestamp on an existing profile', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => ({ createdAt: { __serverTimestamp: true } }),
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({
+      getDocSpy.mockResolvedValueOnce({
+        exists: () => false,
+        data: () => undefined,
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
         email: 'user@example.com',
         displayName: 'User',
         photoURL: '',
-        providers: [],
-        updatedAt: expect.anything(),
-      }),
-      { merge: true }
-    );
-    expect(setDocSpy.mock.calls.at(-1)?.[1]).not.toHaveProperty('createdAt');
-  });
-
-  test('syncProfileDocument backfills createdAt on a legacy profile missing it', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => ({ email: 'user@example.com' }),
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
-      { merge: true }
-    );
-  });
-
-  test('seedOrApplySettings reuses the remote settings when present', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
-    jest.mocked(setDoc).mockClear();
-
-    await seedOrApplySettings({
-      settingsRef: { path: 'settings' } as never,
-      settingsSnapshot: { data: () => settings, exists: () => true } as never,
-      localSettings: { ...settings, defaultForecasterName: 'Local' },
-      applyRemoteSettings,
-      isActive: () => true,
-      lastSyncedSettingsRef,
-      setSyncedSettings,
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
+        { merge: true }
+      );
     });
-    expect(applyRemoteSettings).toHaveBeenCalledWith(settings);
-    expect(setDoc).not.toHaveBeenCalled();
-  });
 
-  test('seedOrApplySettings seeds Firestore when the settings are missing', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
+    test('syncProfileDocument preserves the creation timestamp on an existing profile', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    await seedOrApplySettings({
-      settingsRef: { path: 'settings' } as never,
-      settingsSnapshot: { data: () => undefined, exists: () => false } as never,
-      localSettings: settings,
-      applyRemoteSettings,
-      isActive: () => true,
-      lastSyncedSettingsRef,
-      setSyncedSettings,
-    });
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'settings' },
-      expect.objectContaining({ defaultForecasterName: 'Remote', createdAt: expect.anything() }),
-      { merge: true }
-    );
-    expect(setSyncedSettings).toHaveBeenCalledWith(settings);
-  });
-
-  test('startSettingsSubscription applies snapshots, normalizes errors, and unsubscribes', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const onSnapshotSpy = jest.mocked(onSnapshot);
-    const applyRemoteSettings = jest.fn();
-    let snapshotHandler: ((snapshot: { data: () => typeof settings; metadata: { hasPendingWrites: boolean } }) => void) | null = null;
-    let errorHandler: ((error: Error) => void) | null = null;
-    const unsubscribe = jest.fn();
-    onSnapshotSpy.mockImplementation((ref, next, error) => {
-      snapshotHandler = next as typeof snapshotHandler;
-      errorHandler = error as typeof errorHandler;
-      return unsubscribe;
-    });
-    const setSettingsSyncStatus = jest.fn();
-    const setError = jest.fn();
-    const subscription = startSettingsSubscription({
-      settingsRef: { path: 'settings' } as never,
-      isActive: () => true,
-      getPendingLocalWrite: () => null,
-      getInFlightHostedSettingsWrite: () => null,
-      getSupersededBaselineOneShot: () => null,
-      clearSupersededBaselineOneShot: jest.fn(),
-      lastSyncedSettingsRef: { current: null },
-      applyRemoteSettings,
-      setSettingsSyncStatus,
-      setError,
-    });
-    expect(snapshotHandler).not.toBeNull();
-    if (!snapshotHandler) {
-      throw new Error('Expected snapshot handler to be registered');
-    }
-    snapshotHandler({ data: () => settings, metadata: { hasPendingWrites: false } });
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(errorHandler).not.toBeNull();
-    if (!errorHandler) {
-      throw new Error('Expected error handler to be registered');
-    }
-    errorHandler(new Error('listener failed'));
-    expect(setError).toHaveBeenCalledWith('listener failed');
-    subscription();
-    expect(unsubscribe).toHaveBeenCalled();
-  });
-
-  test('runInitialHostedSync syncs the profile, seeds settings, and subscribes', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const getDocSpy = jest.mocked(getDoc);
-    getDocSpy
-      .mockResolvedValueOnce({
+      getDocSpy.mockResolvedValueOnce({
         exists: () => true,
-        data: () => ({ email: 'user@example.com', createdAt: { __serverTimestamp: true } }),
-      } as never)
-      .mockResolvedValueOnce({ data: () => undefined, exists: () => false } as never);
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
-    const setSettingsSyncStatus = jest.fn();
-    const setError = jest.fn();
-    const hasInitializedSettingsRef = { current: false };
-    const unsubscribeResult = await runInitialHostedSync({
-      profileRef: { path: 'profile' } as never,
-      settingsRef: { path: 'settings' } as never,
-      user: { uid: 'user-1', email: 'user@example.com', displayName: 'User', photoURL: '', providerData: [] } as never,
-      buildLocalSettingsSnapshot: () => settings,
-      applyRemoteSettings,
-      isActive: () => true,
-      getPendingLocalWrite: () => null,
-      getInFlightHostedSettingsWrite: () => null,
-      getSupersededBaselineOneShot: () => null,
-      clearSupersededBaselineOneShot: jest.fn(),
-      lastSyncedSettingsRef,
-      setSyncedSettings,
-      setSettingsSyncStatus,
-      setError,
-      hasInitializedSettingsRef,
+        data: () => ({ createdAt: { __serverTimestamp: true } }),
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
+        email: 'user@example.com',
+        displayName: 'User',
+        photoURL: '',
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({
+          email: 'user@example.com',
+          displayName: 'User',
+          photoURL: '',
+          providers: [],
+          updatedAt: expect.anything(),
+        }),
+        { merge: true }
+      );
+      expect(setDocSpy.mock.calls.at(-1)?.[1]).not.toHaveProperty('createdAt');
     });
-    expect(hasInitializedSettingsRef.current).toBe(true);
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('syncing');
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(typeof unsubscribeResult).toBe('function');
-  });
 
-  test('cleans up a listener that resolves after hosted settings cleanup', async () => {
-    const unsubscribe = jest.fn();
-    const setSubscription = jest.fn();
-    let active = true;
+    test('syncProfileDocument backfills createdAt on a legacy profile missing it', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    const subscriptionPromise = Promise.resolve(unsubscribe);
-    const handoff = attachHostedSettingsSubscription(subscriptionPromise, () => active, setSubscription);
-    active = false;
+      getDocSpy.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ email: 'user@example.com' }),
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
+        email: 'user@example.com',
+        displayName: 'User',
+        photoURL: '',
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
+        { merge: true }
+      );
+    });
 
-    await handoff;
+    test('seedOrApplySettings reuses the remote settings when present', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+      jest.mocked(setDoc).mockClear();
 
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-    expect(setSubscription).not.toHaveBeenCalled();
-  });
+      await seedOrApplySettings({
+        settingsRef: { path: 'settings' } as never,
+        settingsSnapshot: { data: () => settings, exists: () => true } as never,
+        localSettings: { ...settings, defaultForecasterName: 'Local' },
+        applyRemoteSettings,
+        isActive: () => true,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+      });
+      expect(applyRemoteSettings).toHaveBeenCalledWith(settings);
+      expect(setDoc).not.toHaveBeenCalled();
+    });
+
+    test('seedOrApplySettings seeds Firestore when the settings are missing', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+
+      await seedOrApplySettings({
+        settingsRef: { path: 'settings' } as never,
+        settingsSnapshot: { data: () => undefined, exists: () => false } as never,
+        localSettings: settings,
+        applyRemoteSettings,
+        isActive: () => true,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+      });
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'settings' },
+        expect.objectContaining({ defaultForecasterName: 'Remote', createdAt: expect.anything() }),
+        { merge: true }
+      );
+      expect(setSyncedSettings).toHaveBeenCalledWith(settings);
+    });
+
+    test('startSettingsSubscription applies snapshots, normalizes errors, and unsubscribes', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const onSnapshotSpy = jest.mocked(onSnapshot);
+      const applyRemoteSettings = jest.fn();
+      let snapshotHandler: ((snapshot: { data: () => typeof settings; metadata: { hasPendingWrites: boolean } }) => void) | null = null;
+      let errorHandler: ((error: Error) => void) | null = null;
+      const unsubscribe = jest.fn();
+      onSnapshotSpy.mockImplementation((ref, next, error) => {
+        snapshotHandler = next as typeof snapshotHandler;
+        errorHandler = error as typeof errorHandler;
+        return unsubscribe;
+      });
+      const setSettingsSyncStatus = jest.fn();
+      const setError = jest.fn();
+      const subscription = startSettingsSubscription({
+        settingsRef: { path: 'settings' } as never,
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getInFlightHostedSettingsWrite: () => null,
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
+        lastSyncedSettingsRef: { current: null },
+        applyRemoteSettings,
+        setSettingsSyncStatus,
+        setError,
+      });
+      expect(snapshotHandler).not.toBeNull();
+      if (!snapshotHandler) {
+        throw new Error('Expected snapshot handler to be registered');
+      }
+      snapshotHandler({ data: () => settings, metadata: { hasPendingWrites: false } });
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+      expect(errorHandler).not.toBeNull();
+      if (!errorHandler) {
+        throw new Error('Expected error handler to be registered');
+      }
+      errorHandler(new Error('listener failed'));
+      expect(setError).toHaveBeenCalledWith('listener failed');
+      subscription();
+      expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    test('runInitialHostedSync syncs the profile, seeds settings, and subscribes', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const getDocSpy = jest.mocked(getDoc);
+      getDocSpy
+        .mockResolvedValueOnce({
+          exists: () => true,
+          data: () => ({ email: 'user@example.com', createdAt: { __serverTimestamp: true } }),
+        } as never)
+        .mockResolvedValueOnce({ data: () => undefined, exists: () => false } as never);
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+      const setSettingsSyncStatus = jest.fn();
+      const setError = jest.fn();
+      const hasInitializedSettingsRef = { current: false };
+      const unsubscribeResult = await runInitialHostedSync({
+        profileRef: { path: 'profile' } as never,
+        settingsRef: { path: 'settings' } as never,
+        user: { uid: 'user-1', email: 'user@example.com', displayName: 'User', photoURL: '', providerData: [] } as never,
+        buildLocalSettingsSnapshot: () => settings,
+        applyRemoteSettings,
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getInFlightHostedSettingsWrite: () => null,
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        setError,
+        hasInitializedSettingsRef,
+      });
+      expect(hasInitializedSettingsRef.current).toBe(true);
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('syncing');
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+      expect(typeof unsubscribeResult).toBe('function');
+    });
+
+    test('cleans up a listener that resolves after hosted settings cleanup', async () => {
+      const unsubscribe = jest.fn();
+      const setSubscription = jest.fn();
+      let active = true;
+
+      const subscriptionPromise = Promise.resolve(unsubscribe);
+      const handoff = attachHostedSettingsSubscription(subscriptionPromise, () => active, setSubscription);
+      active = false;
+
+      await handoff;
+
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+      expect(setSubscription).not.toHaveBeenCalled();
+    });
 });
 
 describe('AuthProvider local credential edge cases', () => {

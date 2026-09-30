@@ -11,22 +11,27 @@ test.describe('Forecast base map controls', () => {
 
     await page.getByRole('tab', { name: 'Layers' }).click();
 
-    const weatherButton = page.getByRole('button', { name: 'Weather Blank' });
-    const lightButton = page.getByRole('button', { name: 'Light' });
     const streetsButton = page.getByRole('button', { name: 'OpenStreetMap' });
+    const lightButton = page.getByRole('button', { name: 'Light' });
+    const weatherButton = page.getByRole('button', { name: 'Weather Blank' });
 
+    await expect(streetsButton).toHaveClass(/is-active/);
+    await expect(lightButton).not.toHaveClass(/is-active/);
+    await expect(weatherButton).not.toHaveClass(/is-active/);
+
+    await lightButton.click();
+    await expect(lightButton).toHaveClass(/is-active/);
+    await expect(streetsButton).not.toHaveClass(/is-active/);
+    await expect(weatherButton).not.toHaveClass(/is-active/);
+
+    await weatherButton.click();
     await expect(weatherButton).toHaveClass(/is-active/);
+    await expect(lightButton).not.toHaveClass(/is-active/);
+    await expect(streetsButton).not.toHaveClass(/is-active/);
 
     await lightButton.click();
     await expect(lightButton).toHaveClass(/is-active/);
     await expect(weatherButton).not.toHaveClass(/is-active/);
-
-    await streetsButton.click();
-    await expect(streetsButton).toHaveClass(/is-active/);
-    await expect(lightButton).not.toHaveClass(/is-active/);
-
-    await lightButton.click();
-    await expect(lightButton).toHaveClass(/is-active/);
     await expect(streetsButton).not.toHaveClass(/is-active/);
   });
 });

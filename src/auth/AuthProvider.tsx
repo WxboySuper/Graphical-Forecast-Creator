@@ -15,73 +15,87 @@ import {
 import {
   doc,
   getDoc,
-  onSnapshot,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import type { RootState } from '../store';
-import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
-import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
-import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
+import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual } from '../monitor/types';
-import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
+import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
-  normalizeForecastUiVariant,
   readStoredForecastUiVariant,
   type ForecastUiVariant,
   writeStoredForecastUiVariant,
 } from '../utils/forecastUiVariant';
+import type { UserSettingsDocument } from './userSettingsDocument';
+import {
+  areUserSettingsEqual,
+  mergeUserSettingsDocument,
+} from './userSettingsDocument';
+import { getSettingsUpdateError } from './authSyncErrors';
+import {
+  applySettingsToState,
+  attachHostedSettingsSubscription,
+  cancelPendingHostedSettingsWriteIntent,
+  runInitialHostedSync,
+  scheduleHostedSettingsDocumentWrite,
+  shouldSkipHostedSettingsDocumentWrite,
+  type ApplyHostedSettingsOptions,
+  type ApplySettingsContext,
+  type InFlightHostedSettingsWrite,
+  type PendingHostedSettingsWrite,
+} from './hostedSettingsSync';
 
-/**
- * Safely parse JSON from a Response. Returns parsed value or null on failure.
- */
-export const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
-  try {
-    const parsed = await resp.json();
-    return parsed as T;
-  } catch {
-    return null;
-  }
-};
+export type { UserSettingsDocument } from './userSettingsDocument';
+export {
+  areUserSettingsEqual,
+  mergeUserSettingsDocument,
+  readRemoteSettings,
+} from './userSettingsDocument';
+export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
+export {
+  applySettingsToState,
+  areOverlaySettingsEqual,
+  attachHostedSettingsSubscription,
+  cancelPendingHostedSettingsWriteIntent,
+  coalesceRemoteSettingsWithPendingLocal,
+  consumeSupersededBaselineOneShotIgnore,
+  finalizeHostedSettingsWriteFailure,
+  getRemoteSeedPayload,
+  handleHostedSettingsFirestoreSnapshot,
+  isUserSettingsDocumentFieldEqual,
+  runInitialHostedSync,
+  scheduleHostedSettingsDocumentWrite,
+  seedOrApplySettings,
+  shouldIgnoreHostedSettingsSnapshot,
+  shouldSkipHostedSettingsDocumentWrite,
+  startSettingsSubscription,
+  syncProfileDocument,
+  updatePendingHostedSettingsWriteTarget,
+  type ApplyHostedSettingsOptions,
+  type ApplySettingsContext,
+  type HostedSettingsSnapshotMetadata,
+  type InFlightHostedSettingsWrite,
+  type PendingHostedSettingsWrite,
+} from './hostedSettingsSync';
 
-/** Coerce unknown value to a plain record for safe property access. */
-export const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-
-/** Attempt to extract minimal local user fields from an unknown response. */
-export const extractLocalUserFromData = (data: unknown) => {
-  const rec = asRecord(data);
-  const uid = typeof rec.uid === 'string' ? rec.uid : 'local';
-  const email = typeof rec.email === 'string' ? rec.email : '';
-  const displayName = typeof rec.displayName === 'string' ? rec.displayName : '';
-  return {
-    uid,
-    email,
-    displayName,
-    providerData: [],
-  };
-};
+import { safeParseJson } from './authCommon';
+import {
+  initLocalAuthState,
+  localRefreshBetaAccess,
+  localSignInWithEmail,
+  localSignOutUser,
+  localSignUpWithEmail,
+  localUpdateSyncedSettings,
+} from './localAuthClient';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
-
-interface UserSettingsDocument {
-  darkMode: boolean;
-  baseMapStyle: OverlaysState['baseMapStyle'];
-  stateBorders: boolean;
-  counties: boolean;
-  ghostOutlooks: OverlaysState['ghostOutlooks'];
-  defaultForecasterName: string;
-  forecastUiVariant: ForecastUiVariant;
-  monitorSettings: MonitorSettings;
-}
 
 interface UserProfileDocument {
   betaAccess?: boolean;
@@ -200,51 +214,6 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
   };
 };
 
-/** Validates a Firestore settings payload before the app applies it locally. */
-export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
-  if (!value) {
-    return null;
-  }
-
-  const {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant,
-    monitorSettings,
-  } = value;
-
-  if (typeof darkMode !== 'boolean') {
-    return null;
-  }
-
-  if (typeof stateBorders !== 'boolean' || typeof counties !== 'boolean') {
-    return null;
-  }
-
-  if (typeof defaultForecasterName !== 'string' || defaultForecasterName.length > 100) {
-    return null;
-  }
-
-  if (!baseMapStyle || !ghostOutlooks) {
-    return null;
-  }
-
-  return {
-    darkMode,
-    baseMapStyle,
-    stateBorders,
-    counties,
-    ghostOutlooks,
-    defaultForecasterName,
-    forecastUiVariant: normalizeForecastUiVariant(forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
-    monitorSettings: normalizeMonitorSettings(monitorSettings),
-  };
-};
-
 /** Creates the user profile payload written to Firestore on hosted sign-in. */
 export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
   email: user.email ?? '',
@@ -259,80 +228,21 @@ export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boo
 export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
   Boolean(value?.betaAccess);
 
-/** Normalizes update-write failures into a user-facing sync error message. */
-export const getSettingsUpdateError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to update synced settings right now.';
-
-/** Normalizes initial/settings hydration failures into a user-facing sync error message. */
-export const getSettingsSyncError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to sync account settings right now.';
-
-/** Builds the payload used when seeding or repairing a remote settings document. */
-export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
-  ...settings,
-  updatedAt: serverTimestamp(),
-  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
-});
-
-type LocalPostRequestOptions = {
-  body?: unknown;
-  failureMessage: string;
-};
-
-/** Posts JSON to a local auth endpoint and normalizes non-ok responses into errors. */
-export const postLocalJson = async <TResponse = Record<string, unknown>>(
-  path: string,
-  { body, failureMessage }: LocalPostRequestOptions
-): Promise<TResponse> => {
-  const resp = await fetch(path, {
-    method: 'POST',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const errorBody = (await safeParseJson<{ message?: string }>(resp)) ?? {};
-    throw new Error(errorBody.message ?? failureMessage);
-  }
-
-  return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
-};
-
-/** Compares hosted settings fields excluding updatedAt metadata. */
-const compareUserSettingsFields = (
-  left: UserSettingsDocument,
-  right: UserSettingsDocument,
-): boolean =>
-  left.darkMode === right.darkMode &&
-  left.baseMapStyle === right.baseMapStyle &&
-  left.stateBorders === right.stateBorders &&
-  left.counties === right.counties &&
-  left.defaultForecasterName === right.defaultForecasterName &&
-  left.forecastUiVariant === right.forecastUiVariant &&
-  JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
-  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
-
-/** True when two normalized settings payloads contain the same user-visible values. */
-export const areUserSettingsEqual = (
-  left: UserSettingsDocument | null,
-  right: UserSettingsDocument | null
-): boolean => {
-  if (!left || !right) {
-    return left === right;
-  }
-
-  return compareUserSettingsFields(left, right);
-};
-
-/** Applies a partial settings patch onto a normalized baseline document. */
-export const mergeUserSettingsDocument = (
-  base: UserSettingsDocument,
-  patch: Partial<UserSettingsDocument>,
-): UserSettingsDocument => ({
-  ...base,
-  ...patch,
-});
+export {
+  asRecord,
+  extractLocalUserFromData,
+  postLocalJson,
+  safeParseJson,
+} from './authCommon';
+export {
+  applyLocalAuthData,
+  initLocalAuthState,
+  localRefreshBetaAccess,
+  localSignInWithEmail,
+  localSignOutUser,
+  localSignUpWithEmail,
+  localUpdateSyncedSettings,
+} from './localAuthClient';
 
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
@@ -430,762 +340,7 @@ const persistHostedSettingsUpdate = async (
   }
 };
 
-/** True when the current overlay state already matches the incoming synced overlay values. */
-export const areOverlaySettingsEqual = (
-  current: OverlaysState,
-  incoming: Pick<UserSettingsDocument, 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks'>
-): boolean =>
-  current.baseMapStyle === incoming.baseMapStyle &&
-  current.stateBorders === incoming.stateBorders &&
-  current.counties === incoming.counties &&
-  JSON.stringify(current.ghostOutlooks) === JSON.stringify(incoming.ghostOutlooks);
 
-/** Tracks an in-flight debounced settings write so stale snapshots can be ignored safely. */
-export interface PendingHostedSettingsWrite {
-  writeSequence: number;
-  baseline: UserSettingsDocument;
-  target: UserSettingsDocument;
-}
-
-export interface HostedSettingsSnapshotMetadata {
-  hasPendingWrites: boolean;
-}
-
-const USER_SETTINGS_DOCUMENT_KEYS: (keyof UserSettingsDocument)[] = [
-  'darkMode',
-  'baseMapStyle',
-  'stateBorders',
-  'counties',
-  'ghostOutlooks',
-  'defaultForecasterName',
-  'forecastUiVariant',
-  'monitorSettings',
-];
-
-/** Compares one normalized settings field between two documents. */
-export const isUserSettingsDocumentFieldEqual = (
-  key: keyof UserSettingsDocument,
-  left: UserSettingsDocument[keyof UserSettingsDocument],
-  right: UserSettingsDocument[keyof UserSettingsDocument],
-): boolean => {
-  if (key === 'ghostOutlooks') {
-    return JSON.stringify(left) === JSON.stringify(right);
-  }
-  if (key === 'monitorSettings') {
-    return areMonitorSettingsEqual(
-      left as UserSettingsDocument['monitorSettings'],
-      right as UserSettingsDocument['monitorSettings'],
-    );
-  }
-  return left === right;
-};
-
-/** Tracks a hosted settings document currently being written to Firestore. */
-export interface InFlightHostedSettingsWrite {
-  writeSequence: number;
-  target: UserSettingsDocument;
-}
-
-/**
- * While a local write is pending, keep locally edited fields on the pending target when the
- * remote snapshot still carries the pre-change value or an in-flight write target that was
- * superseded by a newer local selection.
- */
-export const coalesceRemoteSettingsWithPendingLocal = (
-  remote: UserSettingsDocument,
-  pendingWrite: PendingHostedSettingsWrite,
-  inFlightWriteTarget: UserSettingsDocument | null = null,
-): UserSettingsDocument => {
-  const { baseline, target } = pendingWrite;
-  const coalesced: UserSettingsDocument = { ...remote };
-
-  for (const key of USER_SETTINGS_DOCUMENT_KEYS) {
-    if (isUserSettingsDocumentFieldEqual(key, baseline[key], target[key])) {
-      continue;
-    }
-    if (isUserSettingsDocumentFieldEqual(key, remote[key], baseline[key])) {
-      coalesced[key] = target[key] as never;
-      continue;
-    }
-    if (
-      inFlightWriteTarget
-      && isUserSettingsDocumentFieldEqual(key, remote[key], inFlightWriteTarget[key])
-    ) {
-      coalesced[key] = target[key] as never;
-    }
-  }
-
-  return coalesced;
-};
-
-/** Firestore local-write echoes should not overwrite Redux; the UI already reflects the edit. */
-export const shouldIgnoreHostedSettingsSnapshot = (
-  metadata: HostedSettingsSnapshotMetadata,
-): boolean => metadata.hasPendingWrites;
-
-/** Applies pending-local coalescing before hosted settings are merged into Redux. */
-export const resolveHostedSettingsFromSnapshot = (
-  remote: UserSettingsDocument,
-  pendingWrite: PendingHostedSettingsWrite | null,
-  inFlightWriteTarget: UserSettingsDocument | null = null,
-): UserSettingsDocument =>
-  pendingWrite
-    ? coalesceRemoteSettingsWithPendingLocal(remote, pendingWrite, inFlightWriteTarget)
-    : remote;
-
-/**
- * Ignores at most one post-write snapshot that still matches the superseded baseline
- * (cached echo). Any other snapshot clears the guard so another device can apply.
- */
-export const consumeSupersededBaselineOneShotIgnore = (
-  remote: UserSettingsDocument,
-  oneShotBaseline: UserSettingsDocument | null,
-  clearOneShot: () => void,
-): boolean => {
-  if (!oneShotBaseline) {
-    return false;
-  }
-
-  if (areUserSettingsEqual(remote, oneShotBaseline)) {
-    clearOneShot();
-    return true;
-  }
-
-  clearOneShot();
-  return false;
-};
-
-/** Clears a debounced hosted settings write and its pending local intent. */
-export const cancelPendingHostedSettingsWriteIntent = (
-  pendingDebounceTimerRef: React.MutableRefObject<number | null>,
-  pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
-): void => {
-  if (pendingDebounceTimerRef.current) {
-    window.clearTimeout(pendingDebounceTimerRef.current);
-    pendingDebounceTimerRef.current = null;
-  }
-  pendingLocalSettingsIntentRef.current = null;
-};
-
-/**
- * True when local settings already match the acknowledgement baseline (in-flight write
- * target when present, otherwise last synced). Used to avoid cancelling a revert while
- * an older write is still in flight.
- */
-export const shouldSkipHostedSettingsDocumentWrite = (
-  nextSettings: UserSettingsDocument,
-  lastSynced: UserSettingsDocument | null,
-  inFlightWrite: InFlightHostedSettingsWrite | null,
-): boolean => {
-  const comparisonBaseline = inFlightWrite?.target ?? lastSynced;
-  if (!comparisonBaseline) {
-    return false;
-  }
-  return areUserSettingsEqual(comparisonBaseline, nextSettings);
-};
-
-/** Clears or rebases pending intent after a failed hosted settings write. */
-export const finalizeHostedSettingsWriteFailure = (
-  pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>,
-  capturedWriteSequence: number,
-  isWriteOwnerActive: () => boolean,
-  onPersistError: (error: unknown) => void,
-  error: unknown,
-): void => {
-  const pending = pendingLocalSettingsIntentRef.current;
-  if (pending?.writeSequence === capturedWriteSequence) {
-    pendingLocalSettingsIntentRef.current = null;
-  } else if (pending && pending.writeSequence > capturedWriteSequence) {
-    const rebasedBaseline = lastSyncedSettingsRef.current ?? pending.baseline;
-    pendingLocalSettingsIntentRef.current = {
-      ...pending,
-      baseline: rebasedBaseline,
-    };
-  }
-  if (isWriteOwnerActive()) {
-    onPersistError(error);
-  }
-};
-
-/** Starts or updates the pending hosted write intent for a debounced settings save. */
-export const updatePendingHostedSettingsWriteTarget = (
-  pendingWriteRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
-  writeSequenceRef: React.MutableRefObject<number>,
-  lastSynced: UserSettingsDocument | null,
-  nextTarget: UserSettingsDocument,
-  inFlightWriteTarget: UserSettingsDocument | null,
-): PendingHostedSettingsWrite => {
-  const nextSequence = writeSequenceRef.current + 1;
-  writeSequenceRef.current = nextSequence;
-  const baselineForNewIntent = inFlightWriteTarget ?? lastSynced ?? nextTarget;
-
-  const existing = pendingWriteRef.current;
-  if (existing) {
-    const updated: PendingHostedSettingsWrite = {
-      baseline: inFlightWriteTarget ?? existing.baseline,
-      target: nextTarget,
-      writeSequence: nextSequence,
-    };
-    pendingWriteRef.current = updated;
-    return updated;
-  }
-
-  const created: PendingHostedSettingsWrite = {
-    baseline: baselineForNewIntent,
-    target: nextTarget,
-    writeSequence: nextSequence,
-  };
-  pendingWriteRef.current = created;
-  return created;
-};
-
-export interface ScheduleHostedSettingsWriteArgs {
-  nextSettings: UserSettingsDocument;
-  debounceMs: number;
-  settingsRef: ReturnType<typeof doc>;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>;
-  inFlightHostedSettingsWriteRef: React.MutableRefObject<InFlightHostedSettingsWrite | null>;
-  settingsWriteSequenceRef: React.MutableRefObject<number>;
-  pendingDebounceTimerRef: React.MutableRefObject<number | null>;
-  supersededBaselineOneShotRef: React.MutableRefObject<UserSettingsDocument | null>;
-  writeOwnerUid: string;
-  isWriteOwnerActive: () => boolean;
-  onPersisted: (settings: UserSettingsDocument, supersededBaseline: UserSettingsDocument) => void;
-  onPersistError: (error: unknown) => void;
-}
-
-/** Debounces hosted settings writes and tracks pending local intent for snapshot coalescing. */
-export const scheduleHostedSettingsDocumentWrite = ({
-  nextSettings,
-  debounceMs,
-  settingsRef,
-  lastSyncedSettingsRef,
-  pendingLocalSettingsIntentRef,
-  inFlightHostedSettingsWriteRef,
-  settingsWriteSequenceRef,
-  pendingDebounceTimerRef,
-  supersededBaselineOneShotRef,
-  isWriteOwnerActive,
-  onPersisted,
-  onPersistError,
-}: ScheduleHostedSettingsWriteArgs): void => {
-  if (pendingDebounceTimerRef.current) {
-    window.clearTimeout(pendingDebounceTimerRef.current);
-  }
-
-  const inFlightWriteTarget = inFlightHostedSettingsWriteRef.current?.target ?? null;
-  const pendingWrite = updatePendingHostedSettingsWriteTarget(
-    pendingLocalSettingsIntentRef,
-    settingsWriteSequenceRef,
-    lastSyncedSettingsRef.current,
-    nextSettings,
-    inFlightWriteTarget,
-  );
-
-  pendingDebounceTimerRef.current = window.setTimeout(() => {
-    pendingDebounceTimerRef.current = null;
-    const { writeSequence, target: targetSettings, baseline } = pendingWrite;
-    const capturedWriteSequence = writeSequence;
-
-    const existingInFlight = inFlightHostedSettingsWriteRef.current;
-    if (!existingInFlight || existingInFlight.writeSequence <= capturedWriteSequence) {
-      inFlightHostedSettingsWriteRef.current = {
-        writeSequence: capturedWriteSequence,
-        target: targetSettings,
-      };
-    }
-
-    setDoc(
-      settingsRef,
-      {
-        ...targetSettings,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true },
-    ).then(() => {
-      if (!isWriteOwnerActive()) {
-        return;
-      }
-      if (capturedWriteSequence !== settingsWriteSequenceRef.current) {
-        return;
-      }
-      const currentPending = pendingLocalSettingsIntentRef.current;
-      if (!currentPending || currentPending.writeSequence !== capturedWriteSequence) {
-        return;
-      }
-      pendingLocalSettingsIntentRef.current = null;
-      lastSyncedSettingsRef.current = targetSettings;
-      supersededBaselineOneShotRef.current = baseline;
-      onPersisted(targetSettings, baseline);
-    }).catch((error) => {
-      finalizeHostedSettingsWriteFailure(
-        pendingLocalSettingsIntentRef,
-        lastSyncedSettingsRef,
-        capturedWriteSequence,
-        isWriteOwnerActive,
-        onPersistError,
-        error,
-      );
-    }).finally(() => {
-      const inFlight = inFlightHostedSettingsWriteRef.current;
-      if (inFlight?.writeSequence === capturedWriteSequence) {
-        inFlightHostedSettingsWriteRef.current = null;
-      }
-    });
-  }, debounceMs);
-};
-
-/** Normalizes one Firestore settings snapshot before it is applied to Redux. */
-export const handleHostedSettingsFirestoreSnapshot = (
-  snapshot: {
-    data: () => Partial<UserSettingsDocument> | undefined;
-    metadata: HostedSettingsSnapshotMetadata;
-  },
-  opts: {
-    isActive: () => boolean;
-    getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-    getInFlightHostedSettingsWrite: () => InFlightHostedSettingsWrite | null;
-    getSupersededBaselineOneShot: () => UserSettingsDocument | null;
-    clearSupersededBaselineOneShot: () => void;
-    applyRemoteSettings: (settings: UserSettingsDocument, options?: ApplyHostedSettingsOptions) => void;
-    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  },
-): void => {
-  if (shouldIgnoreHostedSettingsSnapshot(snapshot.metadata)) {
-    return;
-  }
-
-  const remoteSettings = readRemoteSettings(snapshot.data());
-  if (!opts.isActive() || !remoteSettings) {
-    return;
-  }
-
-  if (
-    consumeSupersededBaselineOneShotIgnore(
-      remoteSettings,
-      opts.getSupersededBaselineOneShot(),
-      opts.clearSupersededBaselineOneShot,
-    )
-  ) {
-    return;
-  }
-
-  const pendingWrite = opts.getPendingLocalWrite();
-  const inFlightWriteTarget = opts.getInFlightHostedSettingsWrite()?.target ?? null;
-  const resolvedSettings = resolveHostedSettingsFromSnapshot(
-    remoteSettings,
-    pendingWrite,
-    inFlightWriteTarget,
-  );
-  const wasCoalesced = Boolean(
-    pendingWrite && !areUserSettingsEqual(resolvedSettings, remoteSettings),
-  );
-  opts.applyRemoteSettings(
-    resolvedSettings,
-    wasCoalesced ? { lastSyncedDocument: remoteSettings } : undefined,
-  );
-  opts.setSettingsSyncStatus('synced');
-};
-
-interface ApplySettingsContext {
-  currentDarkModeRef: React.MutableRefObject<boolean>,
-  currentOverlaysRef: React.MutableRefObject<OverlaysState>,
-  dispatch: ReturnType<typeof useDispatch>,
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>,
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>,
-}
-
-export interface ApplyHostedSettingsOptions {
-  /** When coalescing, keep Firestore acknowledgement on the raw remote payload. */
-  lastSyncedDocument?: UserSettingsDocument;
-}
-
-/** Applies a validated settings document into Redux plus local hosted-auth state. */
-export const applySettingsToState = (
-  settings: UserSettingsDocument,
-  context: ApplySettingsContext,
-  options?: ApplyHostedSettingsOptions,
-) => {
-  const {
-    currentDarkModeRef,
-    currentOverlaysRef,
-    dispatch,
-    setSyncedSettings,
-    lastSyncedSettingsRef,
-  } = context;
-
-  const nextLastSynced = options?.lastSyncedDocument ?? settings;
-
-  if (areUserSettingsEqual(lastSyncedSettingsRef.current, settings)) {
-    if (
-      options?.lastSyncedDocument
-      && !areUserSettingsEqual(lastSyncedSettingsRef.current, options.lastSyncedDocument)
-    ) {
-      lastSyncedSettingsRef.current = options.lastSyncedDocument;
-    }
-    return;
-  }
-
-  if (settings.darkMode !== currentDarkModeRef.current) {
-    dispatch(setDarkMode(settings.darkMode));
-  }
-
-  if (
-    !areOverlaySettingsEqual(currentOverlaysRef.current, {
-      baseMapStyle: settings.baseMapStyle,
-      stateBorders: settings.stateBorders,
-      counties: settings.counties,
-      ghostOutlooks: settings.ghostOutlooks,
-    })
-  ) {
-    dispatch(
-      applyOverlaySettings({
-        baseMapStyle: settings.baseMapStyle,
-        stateBorders: settings.stateBorders,
-        counties: settings.counties,
-        ghostOutlooks: settings.ghostOutlooks,
-      })
-    );
-  }
-
-  writeStoredForecastUiVariant(settings.forecastUiVariant);
-  dispatch(applyMonitorSettings(settings.monitorSettings));
-  lastSyncedSettingsRef.current = nextLastSynced;
-  setSyncedSettings(settings);
-};
-
-/** Creates or updates the hosted profile document while preserving the original creation timestamp. */
-export const syncProfileDocument = async (
-  profileRef: ReturnType<typeof doc>,
-  user: User
-): Promise<void> => {
-  const profileSnapshot = await getDoc(profileRef);
-  const needsCreatedAt =
-    !profileSnapshot.exists() || profileSnapshot.data()?.createdAt === undefined;
-  await setDoc(
-    profileRef,
-    {
-      ...createProfilePayload(user, { includeCreatedAt: needsCreatedAt }),
-    },
-    { merge: true }
-  );
-};
-
-/** Reuses remote settings when available or seeds Firestore from the current local settings snapshot. */
-export const seedOrApplySettings = async (opts: {
-  settingsRef: ReturnType<typeof doc>;
-  settingsSnapshot: Awaited<ReturnType<typeof getDoc>>;
-  localSettings: UserSettingsDocument;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  isActive: () => boolean;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-}): Promise<void> => {
-  const {
-    settingsRef,
-    settingsSnapshot,
-    localSettings,
-    applyRemoteSettings,
-    isActive,
-    lastSyncedSettingsRef,
-    setSyncedSettings,
-  } = opts;
-  const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
-
-  if (!isActive()) {
-    return;
-  }
-
-  if (remoteSettings) {
-    applyRemoteSettings(remoteSettings);
-    return;
-  }
-
-  await setDoc(
-    settingsRef,
-    getRemoteSeedPayload(localSettings, { includeCreatedAt: !settingsSnapshot.exists() }),
-    { merge: true }
-  );
-
-  if (!isActive()) {
-    return;
-  }
-
-  lastSyncedSettingsRef.current = localSettings;
-  setSyncedSettings(localSettings);
-};
-
-/** Starts the live Firestore listener that keeps hosted settings mirrored into local app state. */
-export const startSettingsSubscription = (opts: {
-  settingsRef: ReturnType<typeof doc>;
-  isActive: () => boolean;
-  getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-  getInFlightHostedSettingsWrite: () => InFlightHostedSettingsWrite | null;
-  getSupersededBaselineOneShot: () => UserSettingsDocument | null;
-  clearSupersededBaselineOneShot: () => void;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-}): Unsubscribe =>
-  onSnapshot(
-    opts.settingsRef,
-    (snapshot) => {
-      handleHostedSettingsFirestoreSnapshot(
-        {
-          data: () => snapshot.data() as Partial<UserSettingsDocument> | undefined,
-          metadata: { hasPendingWrites: snapshot.metadata.hasPendingWrites },
-        },
-        {
-          isActive: opts.isActive,
-          getPendingLocalWrite: opts.getPendingLocalWrite,
-          getInFlightHostedSettingsWrite: opts.getInFlightHostedSettingsWrite,
-          getSupersededBaselineOneShot: opts.getSupersededBaselineOneShot,
-          clearSupersededBaselineOneShot: opts.clearSupersededBaselineOneShot,
-          applyRemoteSettings: opts.applyRemoteSettings,
-          setSettingsSyncStatus: opts.setSettingsSyncStatus,
-        },
-      );
-    },
-    (snapshotError) => {
-      if (opts.isActive()) {
-        opts.setSettingsSyncStatus('error');
-        opts.setError(snapshotError.message);
-      }
-    }
-  );
-
-/** Runs the initial hosted profile/settings sync before the live subscription takes over. */
-export const runInitialHostedSync = async (opts: {
-  profileRef: ReturnType<typeof doc>;
-  settingsRef: ReturnType<typeof doc>;
-  user: User;
-  buildLocalSettingsSnapshot: () => UserSettingsDocument;
-  applyRemoteSettings: (settings: UserSettingsDocument) => void;
-  isActive: () => boolean;
-  getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-  getInFlightHostedSettingsWrite: () => InFlightHostedSettingsWrite | null;
-  getSupersededBaselineOneShot: () => UserSettingsDocument | null;
-  clearSupersededBaselineOneShot: () => void;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  hasInitializedSettingsRef: React.MutableRefObject<boolean>;
-}): Promise<Unsubscribe | undefined> => {
-  opts.setSettingsSyncStatus('syncing');
-
-  try {
-    await syncProfileDocument(opts.profileRef, opts.user);
-
-    const settingsSnapshot = await getDoc(opts.settingsRef);
-    const localSettings = opts.buildLocalSettingsSnapshot();
-    await seedOrApplySettings({
-      settingsRef: opts.settingsRef,
-      settingsSnapshot,
-      localSettings,
-      applyRemoteSettings: opts.applyRemoteSettings,
-      isActive: opts.isActive,
-      lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
-      setSyncedSettings: opts.setSyncedSettings,
-    });
-
-    if (!opts.isActive()) {
-      return undefined;
-    }
-
-    opts.hasInitializedSettingsRef.current = true;
-    opts.setSettingsSyncStatus('synced');
-
-    return startSettingsSubscription({
-      settingsRef: opts.settingsRef,
-      isActive: opts.isActive,
-      getPendingLocalWrite: opts.getPendingLocalWrite,
-      getInFlightHostedSettingsWrite: opts.getInFlightHostedSettingsWrite,
-      getSupersededBaselineOneShot: opts.getSupersededBaselineOneShot,
-      clearSupersededBaselineOneShot: opts.clearSupersededBaselineOneShot,
-      lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
-      applyRemoteSettings: opts.applyRemoteSettings,
-      setSettingsSyncStatus: opts.setSettingsSyncStatus,
-      setError: opts.setError,
-    });
-  } catch (syncError) {
-    if (opts.isActive()) {
-      opts.setSettingsSyncStatus('error');
-      opts.setError(getSettingsSyncError(syncError));
-    }
-    return undefined;
-  }
-};
-
-/** Stores a late-created listener only while its effect is still active. */
-export const attachHostedSettingsSubscription = (
-  subscriptionPromise: Promise<Unsubscribe | undefined>,
-  isActive: () => boolean,
-  setSubscription: (unsubscribe: Unsubscribe) => void,
-): Promise<void> => subscriptionPromise.then((nextUnsubscribe) => {
-  if (!isActive()) {
-    nextUnsubscribe?.();
-    return;
-  }
-  if (nextUnsubscribe) {
-    setSubscription(nextUnsubscribe);
-  }
-});
-
-/**
- * Initializes local-only auth state by probing the dev server's /api/local/profile endpoint.
- * Extracts a minimal user shape and applies any remote settings into local Redux state.
- * This is intentionally defined outside the hook to keep useLocalAuthState's cyclomatic
- * complexity lower for code health tools.
- */
-export const initLocalAuthState = async (opts: {
-  isActive: () => boolean;
-  dispatch: ReturnType<typeof useDispatch>;
-  currentDarkModeRef: React.MutableRefObject<boolean>;
-  currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
-  setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  setError: React.Dispatch<React.SetStateAction<string | null>>;
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-}) => {
-  const {
-    isActive,
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSettingsSyncStatus,
-    setSyncedSettings,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-    lastSyncedSettingsRef,
-  } = opts;
-
-  try {
-    const localTestAccount = readLocalTestAccount();
-    if (localTestAccount) {
-      applyLocalAuthData({
-        ...createLocalTestUser(localTestAccount),
-        betaAccess: true,
-      }, {
-        dispatch,
-        currentDarkModeRef,
-        currentOverlaysRef,
-        setUser,
-        setStatus,
-        setSyncedSettings,
-        setSettingsSyncStatus,
-        lastSyncedSettingsRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-        setError,
-      });
-      return;
-    }
-
-    const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
-    if (!isActive()) return;
-
-    if (!resp.ok) {
-      setStatus('signed_out');
-      setSettingsSyncStatus('idle');
-      setUser(null);
-      setSyncedSettings(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      setError(null);
-      return;
-    }
-
-    const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-
-    // Reuse shared local-auth application logic to keep the hook body concise.
-    applyLocalAuthData(data, {
-      dispatch,
-      currentDarkModeRef,
-      currentOverlaysRef,
-      setUser,
-      setStatus,
-      setSyncedSettings,
-      setSettingsSyncStatus,
-      lastSyncedSettingsRef,
-      setBetaAccess,
-      setBetaAccessLoading,
-      setError,
-    });
-  } catch (err) {
-    if (!isActive()) return;
-    setStatus('error');
-    setError(err instanceof Error ? err.message : 'Local auth initialization failed');
-    setUser(null);
-    setSyncedSettings(null);
-    setBetaAccess(false);
-    setBetaAccessLoading(false);
-  }
-};
-
-/** Shared helper to apply a local auth response into application state. */
-export function applyLocalAuthData(
-  data: Record<string, unknown>,
-  {
-    dispatch,
-    currentDarkModeRef,
-    currentOverlaysRef,
-    setUser,
-    setStatus,
-    setSyncedSettings,
-    setSettingsSyncStatus,
-    lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
-    setError,
-  }: {
-    dispatch: ReturnType<typeof useDispatch>;
-    currentDarkModeRef: React.MutableRefObject<boolean>;
-    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
-    setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
-    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
-) {
-  const localUser = extractLocalUserFromData(data) as unknown as User;
-
-  setUser(localUser);
-  setStatus('signed_in');
-
-  const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-  if (remoteSettings) {
-    applySettingsToState(remoteSettings, {
-      currentDarkModeRef,
-      currentOverlaysRef,
-      dispatch,
-      setSyncedSettings,
-      lastSyncedSettingsRef,
-    });
-    setSettingsSyncStatus('synced');
-  } else {
-    setSyncedSettings(null);
-    setSettingsSyncStatus('idle');
-  }
-
-  setBetaAccess(Boolean(data.betaAccess));
-  setBetaAccessLoading(false);
-  setError(null);
-}
 
 /** Returns the no-config auth context used for intentionally local-only deployments. */
 export const getDefaultContextValue = (): AuthContextValue => ({
@@ -1208,140 +363,6 @@ export const getDefaultContextValue = (): AuthContextValue => ({
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
 /** Local-only auth action helpers (extracted to reduce hook complexity) */
-/** Local API route and metric suffix selected by the public credential wrappers. */
-type LocalCredentialAction = 'signin' | 'signup';
-
-/** Post a local credential action and apply its response to the shared auth state. */
-async function localCredentialAction(
-  action: LocalCredentialAction,
-  creds: { email: string; password: string },
-  deps: LocalAuthDeps
-) {
-  const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
-  deps.setError(null);
-  const resp = await fetch(`/api/local/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: failureMessage };
-    deps.setError(body.message ?? failureMessage);
-    throw new Error(body.message ?? failureMessage);
-  }
-
-  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-  const localUser = extractLocalUserFromData(data) as unknown as User;
-  applyLocalAuthData(data, deps);
-  queueProductMetric({ event: action === 'signin' ? 'account_signin' : 'account_signup', user: localUser });
-}
-
-/** Local-only sign in helper: posts to /api/local/signin and applies returned auth data to state. */
-export const localSignInWithEmail = (creds: { email: string; password: string }, deps: LocalAuthDeps) =>
-  localCredentialAction('signin', creds, deps);
-
-/** Local-only sign up helper: posts to /api/local/signup and applies returned auth data to state. */
-export const localSignUpWithEmail = (creds: { email: string; password: string }, deps: LocalAuthDeps) =>
-  localCredentialAction('signup', creds, deps);
-
-/** Local-only sign out helper: invalidates local session and clears local state. */
-export const localSignOutUser = async (deps: {
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
-  setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
-  setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-}) => {
-  const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus, setBetaAccess } = deps;
-  const fixtureActive = Boolean(readLocalTestAccount());
-  if (fixtureActive && auth) {
-    try {
-      await signOut(auth);
-    } catch {
-      // Fixture sign-out must still clear the local session if hosted auth is unavailable.
-    }
-  }
-  try {
-    await postLocalJson('/api/local/signout', { failureMessage: 'Unable to sign out right now.' });
-  } catch {
-    // ignore local sign out errors
-  }
-
-  setUser(null);
-  clearLocalTestAccount();
-  setStatus('signed_out');
-  setSyncedSettings(null);
-  setSettingsSyncStatus('idle');
-  setBetaAccess(false);
-};
-
-/** Refresh local-only beta access flag by querying /api/local/profile. */
-export const localRefreshBetaAccess = async (deps: {
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-}) => {
-  const { setBetaAccess, setBetaAccessLoading } = deps;
-  setBetaAccessLoading(true);
-
-  try {
-    const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
-    if (!resp.ok) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-    setBetaAccess(Boolean(data.betaAccess));
-  } catch {
-    setBetaAccess(false);
-  } finally {
-    setBetaAccessLoading(false);
-  }
-};
-
-/** Update remote synced settings for local-only auth. */
-export const localUpdateSyncedSettings = async (
-  settings: Partial<UserSettingsDocument>,
-  deps: {
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-    currentDarkModeRef: React.MutableRefObject<boolean>;
-    currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-    dispatch: ReturnType<typeof useDispatch>;
-    setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-    lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-    setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  }
-) => {
-  const { setError, currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef, setSettingsSyncStatus } = deps;
-  setError(null);
-
-  let data: Record<string, unknown>;
-  try {
-    data = await postLocalJson<Record<string, unknown>>('/api/local/profile', {
-      body: { settings },
-      failureMessage: 'Unable to update synced settings right now.',
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to update synced settings right now.';
-    setError(message);
-    throw error instanceof Error ? error : new Error(message);
-  }
-
-  const remoteSettings = readRemoteSettings(data.settings as Partial<UserSettingsDocument> | undefined);
-  if (remoteSettings) {
-    applySettingsToState(remoteSettings, {
-      currentDarkModeRef,
-      currentOverlaysRef,
-      dispatch,
-      setSyncedSettings,
-      lastSyncedSettingsRef,
-    });
-    setSettingsSyncStatus('synced');
-  }
-};
 
 /** Provides local-only auth state and actions for dev servers. */
 interface LocalAuthDeps {
