@@ -12,9 +12,35 @@ test('rejects malformed DSNs and prefers the browser DSN', () => { assert.equal(
 
 const setupRoute = () => { process.env.SENTRY_BROWSER_DSN = 'https://key@o123.ingest.us.sentry.io/456'; let handler; const app = { post: (...args) => { handler = args.at(-1); } }; registerSentryTunnelRoutes(app, { raw: () => () => undefined }, () => () => undefined); return handler; };
 const createRequest = () => { const listeners = new Map(); return { body: validEnvelope, destroyed: false, once: (event, callback) => listeners.set(event, callback), removeListener: (event) => listeners.delete(event), emit: (event) => listeners.get(event)?.() }; };
-const createResponse = () => ({ destroyed: false, headersSent: false, statusCode: null, status(code) { this.statusCode = code; return this; }, end() {}, once() {}, removeListener() {} });
+const createResponse = () => { const listeners = new Map(); return { destroyed: false, headersSent: false, writableFinished: false, statusCode: null, status(code) { this.statusCode = code; return this; }, end() {}, once: (event, callback) => listeners.set(event, callback), removeListener: (event) => listeners.delete(event), emit: (event) => listeners.get(event)?.() }; };
 
 test('returns 504 when upstream aborts at the timeout', async () => { mock.timers.enable({ apis: ['setTimeout'] }); const route = setupRoute(); const request = createRequest(); const response = createResponse(); global.fetch = (_url, options) => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))); const pending = route(request, response); mock.timers.tick(5000); await pending; assert.equal(response.statusCode, 504); });
 test('passes through healthy upstream status and cleans up', async () => { const route = setupRoute(); const request = createRequest(); const response = createResponse(); global.fetch = async () => ({ status: 202 }); await route(request, response); assert.equal(response.statusCode, 202); });
 test('returns 500 for non-timeout upstream failures', async () => { const route = setupRoute(); const request = createRequest(); const response = createResponse(); global.fetch = async () => { throw new Error('upstream down'); }; await route(request, response); assert.equal(response.statusCode, 500); });
-test('aborts upstream and does not write after client disconnect', async () => { const route = setupRoute(); const request = createRequest(); const response = createResponse(); response.destroyed = true; let aborted = false; global.fetch = (_url, options) => new Promise((_resolve, reject) => { options.signal.addEventListener('abort', () => { aborted = true; reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); }); request.emit('close'); }); await route(request, response); assert.equal(aborted, true); assert.equal(response.statusCode, null); });
+test('aborts upstream and does not write after client disconnect', async () => { const route = setupRoute(); const request = createRequest(); const response = createResponse(); let aborted = false; global.fetch = (_url, options) => new Promise((_resolve, reject) => { options.signal.addEventListener('abort', () => { aborted = true; reject(Object.assign(new Error('aborted'), { name: 'AbortError' })); }); response.destroyed = true; response.emit('close'); }); await route(request, response); assert.equal(aborted, true); assert.equal(response.statusCode, null); });
+test('does not abort upstream when the request stream closes after the body is read', async () => { const route = setupRoute(); const request = createRequest(); const response = createResponse(); let aborted = false; global.fetch = (_url, options) => new Promise((resolve) => { options.signal.addEventListener('abort', () => { aborted = true; }); request.destroyed = true; request.emit('close'); setImmediate(() => resolve({ status: 200 })); }); await route(request, response); assert.equal(aborted, false); assert.equal(response.statusCode, 200); });
+test('forwards a real HTTP envelope without 504 (regression: req close after body read)', async () => {
+  const express = require('express');
+  const { rateLimit } = require('express-rate-limit');
+  const http = require('node:http');
+  process.env.SENTRY_BROWSER_DSN = 'https://key@o123.ingest.us.sentry.io/456';
+  let aborted = false;
+  global.fetch = (_url, options) => new Promise((resolve) => {
+    options.signal.addEventListener('abort', () => { aborted = true; });
+    setTimeout(() => resolve({ status: 200 }), 50);
+  });
+  const app = express();
+  registerSentryTunnelRoutes(app, express, rateLimit);
+  const server = await new Promise((resolve) => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
+  try {
+    const status = await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: server.address().port, method: 'POST', path: '/api/sentry-tunnel', headers: { 'Content-Type': 'application/x-sentry-envelope' } }, (res) => { res.resume(); resolve(res.statusCode); });
+      req.on('error', reject);
+      req.end(validEnvelope);
+    });
+    assert.equal(status, 200);
+    assert.equal(aborted, false);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

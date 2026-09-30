@@ -25,6 +25,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
 - **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.
 - **Beta analytics on Cloudflare:** Pass Umami build settings into the Cloudflare Workers beta deploy so opted-in visits can be counted.
+- **Sentry tunnel:** Stop aborting upstream fetches when the request stream closes after the body is read on Node 24, which had caused every forwarded envelope to return 504.
 - **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
 - **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
 - **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
@@ -37,6 +38,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
 - **Base map selection:** Ignore Firestore local-write echoes and stale pre-change snapshots while a debounced settings save is pending, so hosted sync cannot revert an in-progress basemap choice.
 - **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
+- **Tabbed forecast toolbar:** Stop section labels, day controls, layer chips, and custom draw panels from overlapping at desktop widths around 1024px by enforcing section minimum widths, clipping overflow, and horizontal scrolling in each tab row.
 - **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
 - **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
 
