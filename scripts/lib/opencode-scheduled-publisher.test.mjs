@@ -53,4 +53,18 @@ test('actual scheduled publisher opens below-cutoff findings, keeps security hum
   assert.equal(persisted.state.lastAttempt.status, 'complete')
   await run()
   assert.equal(created.length, 3, 'reported fingerprints prevent duplicate issues')
+  persisted = undefined
+  contextData.category = 'audit-weekly'
+  contextData.state = { jobs: {}, reported: {}, lastAttempt: { status: 'started' } }
+  findings.splice(0, findings.length,
+    { ...findings[1], title: 'Eligible low-score bug', confidence: 0.85 },
+    { ...findings[1], title: 'Missing confidence bug', confidence: null },
+    { ...findings[1], title: 'Invalid confidence bug', confidence: 7 },
+  )
+  await run()
+  assert.equal(created.length, 6)
+  assert.ok(created.slice(3).every(issue => issue.labels.includes('opencode-audit-eligible')))
+  assert.ok(created[4].body.includes('Confidence: not supplied'))
+  assert.ok(created[5].body.includes('Confidence: not supplied'))
+  assert.equal(persisted.state.lastAttempt.status, 'complete')
 })
