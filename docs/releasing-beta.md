@@ -49,9 +49,9 @@ Concurrency group: `beta-release`.
 | Situation | What to do |
 | --- | --- |
 | Worker deploy failed after the tag exists | Run **Deploy beta to Cloudflare Workers** with `ref=vX.Y.Z-beta.N`, or `wrangler rollback` for the Worker. |
-| VPS API deploy failed | Re-run only the API steps manually, or run **Deploy beta to Cloudflare Workers** is **not** enough for API—use SSH/rsync from the workflow’s `deploy_beta_api` job as a template. Do **not** rerun the full **Release \| Beta** workflow unless you intend to cut a **new** version. |
+| VPS API deploy failed | Re-run the `deploy_beta_api` steps manually (rsync `server/` excluding `.env`, upload `.env` with mode 600, pm2 restart). Do **not** rerun **Release \| Beta**—that cuts a new version. Worker-only redeploy does not update the API. |
 | Smoke tests failed | Fix the site, redeploy with `deploy-beta-workers.yml` and `ref=vX.Y.Z-beta.N`. Worker rollback command is logged in the workflow. |
-| Draft GitHub release left open | After fixing deploy, either let a successful run reach **publish_release**, or in GitHub **Releases** publish the draft manually, or delete the draft if abandoning that version. |
+| Draft GitHub release left open | Redeploy with `deploy-beta-workers.yml` and `ref=vX.Y.Z-beta.N`, confirm smoke tests pass, then publish the draft in GitHub **Releases**, or delete the draft if abandoning that version. Do **not** rerun **Release \| Beta** to publish. |
 | Tag exists but release abandoned | Delete the erroneous tag and draft release in GitHub before retrying the same version. |
 
 The git tag is created **before** deploy (when the draft release is created), so `ref=v<version>` recovery works even while the GitHub release is still a draft.
