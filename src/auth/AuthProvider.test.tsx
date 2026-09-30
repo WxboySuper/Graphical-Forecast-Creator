@@ -7,10 +7,11 @@ import {
   areOverlaySettingsEqual,
   areUserSettingsEqual,
   coalesceRemoteSettingsWithPendingLocal,
+  cancelPendingHostedSettingsWriteIntent,
+  consumeSupersededBaselineOneShotIgnore,
   handleHostedSettingsFirestoreSnapshot,
   scheduleHostedSettingsDocumentWrite,
   shouldIgnoreHostedSettingsSnapshot,
-  shouldIgnoreSupersededHostedSettingsSnapshot,
   type PendingHostedSettingsWrite,
   asRecord,
   canSyncHostedUserDocuments,
@@ -48,6 +49,7 @@ import monitorReducer from '../store/monitorSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
+import { setDarkMode } from '../store/themeSlice';
 
 const TEST_OVERLAY_STATE: OverlaysState = {
   baseMapStyle: 'osm',
@@ -288,11 +290,76 @@ describe('AuthProvider Utils', () => {
     expect(coalesced.counties).toBe(true);
   });
 
-  test('shouldIgnoreSupersededHostedSettingsSnapshot ignores cached pre-change payloads', () => {
+  test('consumeSupersededBaselineOneShotIgnore ignores only the first matching stale echo', () => {
     const baseline = buildHostedSettingsFixture('osm');
     const acknowledged = buildHostedSettingsFixture('carto-light');
-    expect(shouldIgnoreSupersededHostedSettingsSnapshot(baseline, baseline)).toBe(true);
-    expect(shouldIgnoreSupersededHostedSettingsSnapshot(acknowledged, baseline)).toBe(false);
+    let oneShot: PendingHostedSettingsWrite['baseline'] | null = baseline;
+    const clearOneShot = () => {
+      oneShot = null;
+    };
+
+    expect(consumeSupersededBaselineOneShotIgnore(baseline, oneShot, clearOneShot)).toBe(true);
+    expect(oneShot).toBeNull();
+    expect(consumeSupersededBaselineOneShotIgnore(baseline, oneShot, clearOneShot)).toBe(false);
+    expect(consumeSupersededBaselineOneShotIgnore(acknowledged, baseline, () => undefined)).toBe(false);
+  });
+
+  test('after one-shot stale echo is consumed, another device can revert basemap to the old value', () => {
+    const baseline = buildHostedSettingsFixture('osm');
+    const acknowledged = buildHostedSettingsFixture('carto-light');
+    const oneShotRef = { current: baseline as PendingHostedSettingsWrite['baseline'] | null };
+    const dispatch = jest.fn();
+    const lastSyncedSettingsRef = { current: acknowledged };
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+
+    handleHostedSettingsFirestoreSnapshot(
+      { data: () => baseline, metadata: { hasPendingWrites: false } },
+      {
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getSupersededBaselineOneShot: () => oneShotRef.current,
+        clearSupersededBaselineOneShot: () => {
+          oneShotRef.current = null;
+        },
+        applyRemoteSettings: (settings) => {
+          applySettingsToState(settings, {
+            currentDarkModeRef: { current: false },
+            currentOverlaysRef: { current: localOverlays },
+            dispatch,
+            setSyncedSettings: jest.fn(),
+            lastSyncedSettingsRef,
+          });
+        },
+        setSettingsSyncStatus: jest.fn(),
+      },
+    );
+    expect(dispatch).not.toHaveBeenCalled();
+
+    handleHostedSettingsFirestoreSnapshot(
+      { data: () => baseline, metadata: { hasPendingWrites: false } },
+      {
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getSupersededBaselineOneShot: () => oneShotRef.current,
+        clearSupersededBaselineOneShot: () => {
+          oneShotRef.current = null;
+        },
+        applyRemoteSettings: (settings) => {
+          applySettingsToState(settings, {
+            currentDarkModeRef: { current: false },
+            currentOverlaysRef: { current: localOverlays },
+            dispatch,
+            setSyncedSettings: jest.fn(),
+            lastSyncedSettingsRef,
+          });
+        },
+        setSettingsSyncStatus: jest.fn(),
+      },
+    );
+
+    expect(dispatch).toHaveBeenCalledWith(
+      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
+    );
   });
 
   test('regression: raw stale remote without coalesce reverts pending basemap', () => {
@@ -333,8 +400,8 @@ describe('AuthProvider Utils', () => {
       {
         isActive: () => true,
         getPendingLocalWrite: () => pendingIntentRef.current,
-        getSupersededSettingsBaseline: () => null,
-        clearSupersededSettingsBaseline: jest.fn(),
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
         applyRemoteSettings: (settings) => {
           applySettingsToState(settings, {
             currentDarkModeRef: { current: false },
@@ -364,8 +431,8 @@ describe('AuthProvider Utils', () => {
       {
         isActive: () => true,
         getPendingLocalWrite: () => null,
-        getSupersededSettingsBaseline: () => null,
-        clearSupersededSettingsBaseline: jest.fn(),
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
         applyRemoteSettings: (settings) => {
           applySettingsToState(settings, {
             currentDarkModeRef: { current: false },
@@ -417,8 +484,9 @@ describe('AuthProvider Utils', () => {
         pendingLocalSettingsIntentRef: pendingIntentRef,
         settingsWriteSequenceRef: writeSequenceRef,
         pendingDebounceTimerRef: debounceRef,
-        supersededSettingsBaselineRef: supersededBaselineRef,
-        isActive: () => active,
+        supersededBaselineOneShotRef: supersededBaselineRef,
+        writeOwnerUid: 'user-1',
+        isWriteOwnerActive: () => active,
         onPersisted: (settings) => {
           lastSyncedSettingsRef.current = settings;
         },
@@ -434,8 +502,8 @@ describe('AuthProvider Utils', () => {
         {
           isActive: () => active,
           getPendingLocalWrite: () => pendingIntentRef.current,
-          getSupersededSettingsBaseline: () => supersededBaselineRef.current,
-          clearSupersededSettingsBaseline: () => {
+          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
+          clearSupersededBaselineOneShot: () => {
             supersededBaselineRef.current = null;
           },
           applyRemoteSettings: (settings) => {
@@ -466,8 +534,8 @@ describe('AuthProvider Utils', () => {
         {
           isActive: () => active,
           getPendingLocalWrite: () => pendingIntentRef.current,
-          getSupersededSettingsBaseline: () => supersededBaselineRef.current,
-          clearSupersededSettingsBaseline: () => {
+          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
+          clearSupersededBaselineOneShot: () => {
             supersededBaselineRef.current = null;
           },
           applyRemoteSettings: (settings) => {
@@ -486,6 +554,105 @@ describe('AuthProvider Utils', () => {
       expect(dispatch).not.toHaveBeenCalledWith(
         applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
       );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('debounce cancel when local matches synced clears pending intent (A to B to A)', () => {
+    const baseline = buildHostedSettingsFixture('osm');
+    const targetB = buildHostedSettingsFixture('carto-light');
+    const pendingRef = {
+      current: {
+        baseline,
+        target: targetB,
+        writeSequence: 1,
+      } satisfies PendingHostedSettingsWrite,
+    };
+    const debounceRef = { current: 99 as number };
+
+    cancelPendingHostedSettingsWriteIntent(debounceRef, pendingRef);
+    expect(pendingRef.current).toBeNull();
+    expect(debounceRef.current).toBeNull();
+  });
+
+  test('after pending intent is cleared, remote dark mode changes do not coalesce basemap', () => {
+    const baseline = buildHostedSettingsFixture('osm');
+    const remoteDarkMode = { ...baseline, darkMode: true };
+    const dispatch = jest.fn();
+    const lastSyncedSettingsRef = { current: baseline };
+
+    handleHostedSettingsFirestoreSnapshot(
+      { data: () => remoteDarkMode, metadata: { hasPendingWrites: false } },
+      {
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
+        applyRemoteSettings: (settings) => {
+          applySettingsToState(settings, {
+            currentDarkModeRef: { current: false },
+            currentOverlaysRef: { current: TEST_OVERLAY_STATE },
+            dispatch,
+            setSyncedSettings: jest.fn(),
+            lastSyncedSettingsRef,
+          });
+        },
+        setSettingsSyncStatus: jest.fn(),
+      },
+    );
+
+    expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
+    expect(dispatch).not.toHaveBeenCalledWith(
+      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
+    );
+  });
+
+  test('setDoc completion after sign-out does not mutate hosted sync refs', async () => {
+    jest.useFakeTimers();
+    try {
+      let resolveWrite: (() => void) | undefined;
+      jest.mocked(setDoc).mockImplementation(
+        () => new Promise<void>((resolve) => {
+          resolveWrite = resolve;
+        }) as never,
+      );
+      const baseline = buildHostedSettingsFixture('osm');
+      const target = buildHostedSettingsFixture('carto-light');
+      const lastSyncedSettingsRef = { current: baseline };
+      const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
+      const writeSequenceRef = { current: 0 };
+      const debounceRef = { current: null as number | null };
+      const supersededOneShotRef = { current: null as PendingHostedSettingsWrite['baseline'] | null };
+      const onPersisted = jest.fn();
+      let writeOwnerActive = true;
+      const writeOwnerUid = 'user-a';
+      let currentUid = 'user-a';
+
+      scheduleHostedSettingsDocumentWrite({
+        nextSettings: target,
+        debounceMs: 750,
+        settingsRef: { path: 'settings' } as never,
+        lastSyncedSettingsRef,
+        pendingLocalSettingsIntentRef: pendingIntentRef,
+        settingsWriteSequenceRef: writeSequenceRef,
+        pendingDebounceTimerRef: debounceRef,
+        supersededBaselineOneShotRef: supersededOneShotRef,
+        writeOwnerUid,
+        isWriteOwnerActive: () => writeOwnerActive && currentUid === writeOwnerUid,
+        onPersisted,
+        onPersistError: () => undefined,
+      });
+
+      jest.advanceTimersByTime(750);
+      writeOwnerActive = false;
+      currentUid = 'user-b';
+      resolveWrite?.();
+      await Promise.resolve();
+
+      expect(lastSyncedSettingsRef.current).toEqual(baseline);
+      expect(supersededOneShotRef.current).toBeNull();
+      expect(onPersisted).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
@@ -855,8 +1022,8 @@ describe('AuthProvider Utils', () => {
       settingsRef: { path: 'settings' } as never,
       isActive: () => true,
       getPendingLocalWrite: () => null,
-      getSupersededSettingsBaseline: () => null,
-      clearSupersededSettingsBaseline: jest.fn(),
+      getSupersededBaselineOneShot: () => null,
+      clearSupersededBaselineOneShot: jest.fn(),
       lastSyncedSettingsRef: { current: null },
       applyRemoteSettings,
       setSettingsSyncStatus,
@@ -910,8 +1077,8 @@ describe('AuthProvider Utils', () => {
       applyRemoteSettings,
       isActive: () => true,
       getPendingLocalWrite: () => null,
-      getSupersededSettingsBaseline: () => null,
-      clearSupersededSettingsBaseline: jest.fn(),
+      getSupersededBaselineOneShot: () => null,
+      clearSupersededBaselineOneShot: jest.fn(),
       lastSyncedSettingsRef,
       setSyncedSettings,
       setSettingsSyncStatus,

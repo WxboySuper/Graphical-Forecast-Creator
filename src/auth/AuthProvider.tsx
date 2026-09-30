@@ -517,14 +517,38 @@ export const resolveHostedSettingsFromSnapshot = (
   pendingWrite ? coalesceRemoteSettingsWithPendingLocal(remote, pendingWrite) : remote;
 
 /**
- * Ignores a cached Firestore payload that exactly matches the pre-change settings document
- * superseded by a recently completed local write.
+ * Ignores at most one post-write snapshot that still matches the superseded baseline
+ * (cached echo). Any other snapshot clears the guard so another device can apply.
  */
-export const shouldIgnoreSupersededHostedSettingsSnapshot = (
+export const consumeSupersededBaselineOneShotIgnore = (
   remote: UserSettingsDocument,
-  supersededBaseline: UserSettingsDocument | null,
-): boolean =>
-  Boolean(supersededBaseline && areUserSettingsEqual(remote, supersededBaseline));
+  oneShotBaseline: UserSettingsDocument | null,
+  clearOneShot: () => void,
+): boolean => {
+  if (!oneShotBaseline) {
+    return false;
+  }
+
+  if (areUserSettingsEqual(remote, oneShotBaseline)) {
+    clearOneShot();
+    return true;
+  }
+
+  clearOneShot();
+  return false;
+};
+
+/** Clears a debounced hosted settings write and its pending local intent. */
+export const cancelPendingHostedSettingsWriteIntent = (
+  pendingDebounceTimerRef: React.MutableRefObject<number | null>,
+  pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>,
+): void => {
+  if (pendingDebounceTimerRef.current) {
+    window.clearTimeout(pendingDebounceTimerRef.current);
+    pendingDebounceTimerRef.current = null;
+  }
+  pendingLocalSettingsIntentRef.current = null;
+};
 
 /** Starts or updates the pending hosted write intent for a debounced settings save. */
 export const updatePendingHostedSettingsWriteTarget = (
@@ -564,8 +588,9 @@ export interface ScheduleHostedSettingsWriteArgs {
   pendingLocalSettingsIntentRef: React.MutableRefObject<PendingHostedSettingsWrite | null>;
   settingsWriteSequenceRef: React.MutableRefObject<number>;
   pendingDebounceTimerRef: React.MutableRefObject<number | null>;
-  supersededSettingsBaselineRef: React.MutableRefObject<UserSettingsDocument | null>;
-  isActive: () => boolean;
+  supersededBaselineOneShotRef: React.MutableRefObject<UserSettingsDocument | null>;
+  writeOwnerUid: string;
+  isWriteOwnerActive: () => boolean;
   onPersisted: (settings: UserSettingsDocument, supersededBaseline: UserSettingsDocument) => void;
   onPersistError: (error: unknown) => void;
 }
@@ -579,8 +604,8 @@ export const scheduleHostedSettingsDocumentWrite = ({
   pendingLocalSettingsIntentRef,
   settingsWriteSequenceRef,
   pendingDebounceTimerRef,
-  supersededSettingsBaselineRef,
-  isActive,
+  supersededBaselineOneShotRef,
+  isWriteOwnerActive,
   onPersisted,
   onPersistError,
 }: ScheduleHostedSettingsWriteArgs): void => {
@@ -598,6 +623,7 @@ export const scheduleHostedSettingsDocumentWrite = ({
   pendingDebounceTimerRef.current = window.setTimeout(() => {
     pendingDebounceTimerRef.current = null;
     const { writeSequence, target: targetSettings, baseline } = pendingWrite;
+    const capturedWriteSequence = writeSequence;
 
     setDoc(
       settingsRef,
@@ -607,21 +633,22 @@ export const scheduleHostedSettingsDocumentWrite = ({
       },
       { merge: true },
     ).then(() => {
-      if (!isActive()) {
+      if (!isWriteOwnerActive()) {
         return;
       }
-      if (writeSequence !== settingsWriteSequenceRef.current) {
+      if (capturedWriteSequence !== settingsWriteSequenceRef.current) {
         return;
       }
       const currentPending = pendingLocalSettingsIntentRef.current;
-      if (!currentPending || currentPending.writeSequence !== writeSequence) {
+      if (!currentPending || currentPending.writeSequence !== capturedWriteSequence) {
         return;
       }
       pendingLocalSettingsIntentRef.current = null;
       lastSyncedSettingsRef.current = targetSettings;
-      supersededSettingsBaselineRef.current = baseline;
+      supersededBaselineOneShotRef.current = baseline;
       onPersisted(targetSettings, baseline);
     }).catch((error) => {
+      pendingLocalSettingsIntentRef.current = null;
       onPersistError(error);
     });
   }, debounceMs);
@@ -636,8 +663,8 @@ export const handleHostedSettingsFirestoreSnapshot = (
   opts: {
     isActive: () => boolean;
     getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-    getSupersededSettingsBaseline: () => UserSettingsDocument | null;
-    clearSupersededSettingsBaseline: () => void;
+    getSupersededBaselineOneShot: () => UserSettingsDocument | null;
+    clearSupersededBaselineOneShot: () => void;
     applyRemoteSettings: (settings: UserSettingsDocument) => void;
     setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   },
@@ -651,15 +678,18 @@ export const handleHostedSettingsFirestoreSnapshot = (
     return;
   }
 
-  if (shouldIgnoreSupersededHostedSettingsSnapshot(remoteSettings, opts.getSupersededSettingsBaseline())) {
+  if (
+    consumeSupersededBaselineOneShotIgnore(
+      remoteSettings,
+      opts.getSupersededBaselineOneShot(),
+      opts.clearSupersededBaselineOneShot,
+    )
+  ) {
     return;
   }
 
   const pendingWrite = opts.getPendingLocalWrite();
   const resolvedSettings = resolveHostedSettingsFromSnapshot(remoteSettings, pendingWrite);
-  if (opts.getSupersededSettingsBaseline()) {
-    opts.clearSupersededSettingsBaseline();
-  }
   opts.applyRemoteSettings(resolvedSettings);
   opts.setSettingsSyncStatus('synced');
 };
@@ -783,8 +813,8 @@ export const startSettingsSubscription = (opts: {
   settingsRef: ReturnType<typeof doc>;
   isActive: () => boolean;
   getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-  getSupersededSettingsBaseline: () => UserSettingsDocument | null;
-  clearSupersededSettingsBaseline: () => void;
+  getSupersededBaselineOneShot: () => UserSettingsDocument | null;
+  clearSupersededBaselineOneShot: () => void;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
@@ -801,8 +831,8 @@ export const startSettingsSubscription = (opts: {
         {
           isActive: opts.isActive,
           getPendingLocalWrite: opts.getPendingLocalWrite,
-          getSupersededSettingsBaseline: opts.getSupersededSettingsBaseline,
-          clearSupersededSettingsBaseline: opts.clearSupersededSettingsBaseline,
+          getSupersededBaselineOneShot: opts.getSupersededBaselineOneShot,
+          clearSupersededBaselineOneShot: opts.clearSupersededBaselineOneShot,
           applyRemoteSettings: opts.applyRemoteSettings,
           setSettingsSyncStatus: opts.setSettingsSyncStatus,
         },
@@ -825,8 +855,8 @@ export const runInitialHostedSync = async (opts: {
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
   isActive: () => boolean;
   getPendingLocalWrite: () => PendingHostedSettingsWrite | null;
-  getSupersededSettingsBaseline: () => UserSettingsDocument | null;
-  clearSupersededSettingsBaseline: () => void;
+  getSupersededBaselineOneShot: () => UserSettingsDocument | null;
+  clearSupersededBaselineOneShot: () => void;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
@@ -861,8 +891,8 @@ export const runInitialHostedSync = async (opts: {
       settingsRef: opts.settingsRef,
       isActive: opts.isActive,
       getPendingLocalWrite: opts.getPendingLocalWrite,
-      getSupersededSettingsBaseline: opts.getSupersededSettingsBaseline,
-      clearSupersededSettingsBaseline: opts.clearSupersededSettingsBaseline,
+      getSupersededBaselineOneShot: opts.getSupersededBaselineOneShot,
+      clearSupersededBaselineOneShot: opts.clearSupersededBaselineOneShot,
       lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
       applyRemoteSettings: opts.applyRemoteSettings,
       setSettingsSyncStatus: opts.setSettingsSyncStatus,
@@ -1381,7 +1411,9 @@ const useHostedAuthState = (): AuthContextValue => {
   const pendingDebounceTimerRef = useRef<number | null>(null);
   const pendingLocalSettingsIntentRef = useRef<PendingHostedSettingsWrite | null>(null);
   const settingsWriteSequenceRef = useRef(0);
-  const supersededSettingsBaselineRef = useRef<UserSettingsDocument | null>(null);
+  const supersededBaselineOneShotRef = useRef<UserSettingsDocument | null>(null);
+  const hostedSyncUserUidRef = useRef<string | null>(null);
+  const hostedUserSyncActiveRef = useRef(false);
   const betaAccessRequestIdRef = useRef(0);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
@@ -1402,6 +1434,10 @@ const useHostedAuthState = (): AuthContextValue => {
   useEffect(() => {
     currentMonitorSettingsRef.current = monitorSettings;
   }, [monitorSettings]);
+
+  useEffect(() => {
+    hostedSyncUserUidRef.current = user?.uid ?? null;
+  }, [user]);
 
   useEffect(function subscribeToHostedAuthState() {
     if (!isHostedAuthEnabled || !auth) {
@@ -1452,12 +1488,12 @@ const useHostedAuthState = (): AuthContextValue => {
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
       pendingLocalSettingsIntentRef.current = null;
-      settingsWriteSequenceRef.current = 0;
-      supersededSettingsBaselineRef.current = null;
-      if (pendingDebounceTimerRef.current) {
-        window.clearTimeout(pendingDebounceTimerRef.current);
-        pendingDebounceTimerRef.current = null;
-      }
+      supersededBaselineOneShotRef.current = null;
+      cancelPendingHostedSettingsWriteIntent(
+        pendingDebounceTimerRef,
+        pendingLocalSettingsIntentRef,
+      );
+      hostedUserSyncActiveRef.current = false;
       setSyncedSettings(null);
       setBetaAccess(false);
       setBetaAccessLoading(false);
@@ -1468,6 +1504,7 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     let isActive = true;
+    hostedUserSyncActiveRef.current = true;
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     const profileRef = doc(requireDb(), 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
@@ -1501,9 +1538,9 @@ const useHostedAuthState = (): AuthContextValue => {
       applyRemoteSettings,
       isActive: () => isActive,
       getPendingLocalWrite: () => pendingLocalSettingsIntentRef.current,
-      getSupersededSettingsBaseline: () => supersededSettingsBaselineRef.current,
-      clearSupersededSettingsBaseline: () => {
-        supersededSettingsBaselineRef.current = null;
+      getSupersededBaselineOneShot: () => supersededBaselineOneShotRef.current,
+      clearSupersededBaselineOneShot: () => {
+        supersededBaselineOneShotRef.current = null;
       },
       lastSyncedSettingsRef,
       setSyncedSettings,
@@ -1518,14 +1555,14 @@ const useHostedAuthState = (): AuthContextValue => {
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupHostedUserSync() {
       isActive = false;
+      hostedUserSyncActiveRef.current = false;
       hasInitializedSettingsRef.current = false;
       pendingLocalSettingsIntentRef.current = null;
-      settingsWriteSequenceRef.current = 0;
-      supersededSettingsBaselineRef.current = null;
-      if (pendingDebounceTimerRef.current) {
-        window.clearTimeout(pendingDebounceTimerRef.current);
-        pendingDebounceTimerRef.current = null;
-      }
+      supersededBaselineOneShotRef.current = null;
+      cancelPendingHostedSettingsWriteIntent(
+        pendingDebounceTimerRef,
+        pendingLocalSettingsIntentRef,
+      );
       unsubscribeSettings?.();
     };
   }, [dispatch, status, user]);
@@ -1609,10 +1646,15 @@ const useHostedAuthState = (): AuthContextValue => {
     });
 
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, nextSettings)) {
+      cancelPendingHostedSettingsWriteIntent(
+        pendingDebounceTimerRef,
+        pendingLocalSettingsIntentRef,
+      );
       return;
     }
 
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
+    const writeOwnerUid = user.uid;
 
     scheduleHostedSettingsDocumentWrite({
       nextSettings,
@@ -1622,8 +1664,10 @@ const useHostedAuthState = (): AuthContextValue => {
       pendingLocalSettingsIntentRef,
       settingsWriteSequenceRef,
       pendingDebounceTimerRef,
-      supersededSettingsBaselineRef,
-      isActive: () => Boolean(user && canSyncHostedUserDocuments(user)),
+      supersededBaselineOneShotRef,
+      writeOwnerUid,
+      isWriteOwnerActive: () =>
+        hostedUserSyncActiveRef.current && hostedSyncUserUidRef.current === writeOwnerUid,
       onPersisted: (settings) => {
         setSyncedSettings(settings);
         setSettingsSyncStatus('synced');
@@ -1636,10 +1680,10 @@ const useHostedAuthState = (): AuthContextValue => {
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return function cleanupPendingSettingsWrite() {
-      if (pendingDebounceTimerRef.current) {
-        window.clearTimeout(pendingDebounceTimerRef.current);
-        pendingDebounceTimerRef.current = null;
-      }
+      cancelPendingHostedSettingsWriteIntent(
+        pendingDebounceTimerRef,
+        pendingLocalSettingsIntentRef,
+      );
     };
   }, [darkMode, monitorSettings, overlays, settingsSyncStatus, status, syncedSettings?.defaultForecasterName, syncedSettings?.forecastUiVariant, syncedSettings?.monitorSettings, user]);
 
