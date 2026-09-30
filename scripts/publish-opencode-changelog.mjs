@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { CHANGELOG_LANE_HEADINGS, parseChangelogDeclaration, changelogLaneHeadingForBase } from './lib/changelog-policy.mjs';
-import { addOpenCodeChangelogEntries, parseOpenCodeChangelogResult } from './lib/opencode-changelog.mjs';
+import { addOpenCodeChangelogEntries, assertOpenCodeChangelogResultEligible, parseOpenCodeChangelogResult } from './lib/opencode-changelog.mjs';
+import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'PR_NUMBER', 'BASE_REF', 'HEAD_REF', 'EXPECTED_HEAD_SHA', 'EXPECTED_BODY_SHA', 'EXPECTED_TITLE_SHA', 'OPENCODE_OUTPUT_PATH', 'GH_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error(`${key} is required.`);
@@ -19,18 +20,24 @@ const hash = (value) => createHash('sha256').update(value ?? '').digest('hex');
 if (pull.head?.sha !== expectedSha || pull.head?.ref !== headRef || pull.base?.ref !== baseRef || pull.head?.repo?.full_name?.toLowerCase() !== repository.toLowerCase() || hash(pull.body) !== process.env.EXPECTED_BODY_SHA || hash(pull.title) !== process.env.EXPECTED_TITLE_SHA) {
   throw new Error('PR identity or head revision changed during changelog generation; retry against the latest revision.');
 }
-if (!['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pull.author_association)) throw new Error('PR author is not eligible for autonomous changelog generation.');
+const isDependabot = pull.user?.login === 'dependabot[bot]' && pull.head?.repo?.full_name?.toLowerCase() === repository.toLowerCase() && headRef.startsWith('dependabot/');
+if (!isDependabot && !['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pull.author_association)) throw new Error('PR author is not eligible for autonomous changelog generation.');
 const declaration = parseChangelogDeclaration(pull.body ?? '');
-if (!declaration.ok || !['beta', 'hotfix'].includes(declaration.impact)) throw new Error('The live PR description must declare exactly one beta or hotfix changelog impact.');
+const allowedImpacts = isDependabot ? ['beta', 'hotfix', 'none'] : ['beta', 'hotfix'];
+if (!declaration.ok || !allowedImpacts.includes(declaration.impact)) throw new Error('The live PR description must declare exactly one eligible changelog impact.');
 
 const result = parseOpenCodeChangelogResult(readFileSync(outputPath, 'utf8'));
-if (result.status !== 'complete') throw new Error('OpenCode could not produce a sufficiently grounded changelog entry; add it manually and rerun CI.');
+assertOpenCodeChangelogResultEligible(result, { isDependabot, impact: declaration.impact });
+if (result.status === 'no-change') {
+  process.stdout.write(`Confirmed no user-facing changelog entry is needed for Dependabot PR #${prNumber}.\n`);
+  process.exit(0);
+}
 
 const fetchRef = (ref) => {
   if (!/^(main|stable\/\d+\.\d+\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');
   return `refs/heads/${ref}:refs/remotes/origin/${ref}`;
 };
-const gitAuth = `http.https://github.com/.extraheader=AUTHORIZATION basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+const gitAuth = githubHttpExtraHeader(token);
 execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', fetchRef(baseRef), fetchRef(headRef)], { stdio: 'inherit' });
 const actualSha = execFileSync('git', ['rev-parse', `origin/${headRef}`], { encoding: 'utf8' }).trim();
 if (actualSha !== expectedSha) throw new Error('PR branch advanced while the changelog was being generated; refusing to publish stale content.');
@@ -49,6 +56,5 @@ execFileSync('git', ['config', 'user.email', '41898282+github-actions[bot]@users
 execFileSync('git', ['add', '--', 'CHANGELOG.md']);
 execFileSync('git', ['diff', '--cached', '--check'], { stdio: 'inherit' });
 execFileSync('git', ['commit', '-m', `docs: generate changelog entry for PR #${prNumber}`], { stdio: 'inherit' });
-const authorization = `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
-execFileSync('git', ['-c', `http.https://github.com/.extraheader=${authorization}`, 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
+execFileSync('git', ['-c', githubHttpExtraHeader(token), 'push', 'origin', `HEAD:refs/heads/${headRef}`], { stdio: 'inherit' });
 process.stdout.write(`Generated a ${result.section.toLowerCase()} changelog entry for PR #${prNumber}.\n`);

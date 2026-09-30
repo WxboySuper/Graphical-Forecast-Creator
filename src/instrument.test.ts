@@ -30,7 +30,7 @@ describe('instrument', () => {
     });
   });
 
-  it('initializes Sentry with tracing and logging when a DSN is configured', () => {
+  it('initializes Sentry with tracing when a DSN is configured', () => {
     jest.isolateModules(() => {
       globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
       globalScope.__GFC_SENTRY_ENVIRONMENT__ = 'production';
@@ -43,8 +43,15 @@ describe('instrument', () => {
           tunnel: '/api/sentry-tunnel',
           environment: 'production',
           release: 'graphical-forecast-creator@1.0.0',
-          sendDefaultPii: false,
-          enableLogs: true,
+          dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: { request: false, response: false },
+            httpBodies: [],
+            urlQueryParams: false,
+            genAI: { inputs: false, outputs: false },
+            databaseQueryData: false,
+          },
           normalizeDepth: 10,
           beforeSend: expect.any(Function),
           tracesSampleRate: 0.1,
