@@ -97,9 +97,9 @@ export const OutlookTrimToolbarSection: React.FC<{ controller: ForecastWorkspace
   }
 
   return (
-    <section className="tabbed-integrated-toolbar__section tabbed-integrated-toolbar__section--trim flex h-full w-[132px] shrink-0 items-center gap-2 border-r border-border/70 pr-2">
-      <div className="flex w-[74px] shrink-0 flex-col justify-center">
-        <span className="tabbed-integrated-toolbar__section-label text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/80 leading-tight">Trim to land</span>
+    <section className="tabbed-integrated-toolbar__section tabbed-integrated-toolbar__section--trim flex h-full min-w-[148px] shrink-0 items-center gap-2.5 overflow-hidden border-r border-border/70 pr-3">
+      <div className="tabbed-integrated-toolbar__section-label-column flex shrink-0 flex-col justify-center">
+        <span className="tabbed-integrated-toolbar__section-label text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 leading-tight">Trim to land</span>
         <span className="tabbed-integrated-toolbar__section-hint mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">Optional</span>
       </div>
       <div className="tabbed-integrated-toolbar__section-content flex min-h-0 min-w-0 flex-1 items-center">
