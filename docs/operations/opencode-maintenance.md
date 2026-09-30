@@ -15,7 +15,7 @@ change as a PR. A human reviews and merges every PR.
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
 | PR changelog draft | `pull_request_target` activity for eligible PRs, including every same-repository Dependabot PR | Dependabot changes get deterministic dependency changelog preparation on every event, regardless of PR description. Eligible collaborator PRs use bounded OpenCode drafting. |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
-| Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
+| Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
 | Weekly deep audit | Sunday at 06:43 UTC | Rotating maintenance category and code area; at most eight issues |
@@ -25,8 +25,7 @@ change as a PR. A human reviews and merges every PR.
 Scheduled investigations run even when earlier runs found nothing. A complete
 empty result advances that job's rotation. Failed and inconclusive results do
 not advance it. High investigation frequency is intentional. Finding creation
-requires concrete evidence, a valid file and line, an impact description, and a
-high confidence score. Existing fingerprints suppress repeat issues.
+requires concrete evidence, a valid file and line, an impact description. Existing fingerprints suppress repeat issues.
 
 Each model workspace uses Git sparse checkout to omit every tracked `.env` or
 `.env.*` file except `.env.example`. This applies to review, triage, scheduled,
@@ -47,7 +46,7 @@ security finding.
 The weekly audit rotates through bugs, architecture, incomplete work, dead
 paths, error handling, verification, documentation, API correctness, and
 reliability. The monthly audit covers broader cross-cutting concerns. These
-audits can create several verified issues in one run. Neither audit implements
+audits can create several reported issues in one run. Neither audit implements
 its findings. The Monday dependency review runs in the evening after
 Dependabot's Monday activity. It reads current alerts and open Dependabot PR
 context, but never upgrades or merges a dependency.
@@ -269,7 +268,7 @@ and retries failed setup or model runs no more than once every six hours.
 
 Security inspections and weekly/monthly deep audits use `opencode-go/glm-5.3-flash`; other maintenance jobs use `opencode-go/muse-spark-1.3-contributor`. The workflow selects the model from the scheduled category. Finding limits are three for daily jobs, five for the dependency review, eight
 for weekly audits, and twelve for monthly audits. A candidate still needs a
-valid repository path and line, evidence, impact, a high confidence score, and
+valid repository path and line, evidence, impact, and
 a fingerprint not present in the existing issue backlog. OpenCode's CLI is
 installed from the exact npm package version `opencode-ai@1.18.32`. Update the
 version deliberately after reviewing a release.
@@ -338,3 +337,8 @@ Actions settings without affecting the others:
 The manual comment-driven workflow in `opencode.yml` remains a separate,
 maintainer-requested path. The bounded research workflow can also be disabled
 independently in Actions.
+
+Model confidence is informational. Scheduled publishers do not discard concrete
+findings based on a numeric confidence cutoff. Audit issues are reports for
+investigation, not proof of a defect. The implementation worker rechecks eligible
+findings before editing; security and dependency findings remain human-only.

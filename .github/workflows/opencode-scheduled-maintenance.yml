@@ -201,11 +201,11 @@ jobs:
             }
 
             const limits = {
-              'bug-hunt': { maxFindings: 3, confidence: 0.96, timeout: 15 * 60 * 1000 },
-              'security-daily': { maxFindings: 3, confidence: 0.97, timeout: 20 * 60 * 1000 },
-              'dependency-weekly': { maxFindings: 5, confidence: 0.96, timeout: 25 * 60 * 1000 },
-              'audit-weekly': { maxFindings: 8, confidence: 0.94, timeout: 60 * 60 * 1000 },
-              'audit-monthly': { maxFindings: 12, confidence: 0.93, timeout: 100 * 60 * 1000 },
+              'bug-hunt': { maxFindings: 3, timeout: 15 * 60 * 1000 },
+              'security-daily': { maxFindings: 3, timeout: 20 * 60 * 1000 },
+              'dependency-weekly': { maxFindings: 5, timeout: 25 * 60 * 1000 },
+              'audit-weekly': { maxFindings: 8, timeout: 60 * 60 * 1000 },
+              'audit-monthly': { maxFindings: 12, timeout: 100 * 60 * 1000 },
             }[category]
             const scopeLine = scope ? `Limit code inspection to ${scope}.` : 'Inspect the repository across relevant directories.'
             const promptContext = { category, period, scope, focus, alerts, dependencyPulls, state }
@@ -331,7 +331,7 @@ jobs:
             const highRiskPath = /(^|\/)(billing|auth|authorization|security|entitlement|payment|stripe|deploy|deployment|secrets?)(\/|\.|$)/i
             let createdCount = 0
             for (const finding of result.findings) {
-              if (result.status !== 'complete' || Number(finding.confidence) < contextData.limits.confidence) continue
+              if (result.status !== 'complete') continue
               const title = String(finding.title ?? '').trim()
               const summary = String(finding.summary ?? '').trim()
               const evidence = String(finding.evidence ?? '').trim()
@@ -340,7 +340,7 @@ jobs:
               const line = Number(finding.line)
               const kind = String(finding.kind ?? '').toLowerCase()
               if (!title || !summary || !evidence || title.length > 180 || summary.length > 3000 || evidence.length > 3000) continue
-              if (!Number.isFinite(confidence) || confidence < contextData.limits.confidence) continue
+              if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) throw new Error('Finding confidence must be between 0 and 1.')
               if (!file || path.isAbsolute(file) || file.split('/').includes('..') || !fs.existsSync(file)) continue
               if (!Number.isInteger(line) || line < 1 || line > fs.readFileSync(file, 'utf8').split(/\r?\n/).length) continue
               const fingerprint = crypto.createHash('sha256')
@@ -360,13 +360,14 @@ jobs:
                 repo: context.repo.repo,
                 title: `[OpenCode ${contextData.category}] ${title}`,
                 labels: issueLabels,
-                body: `${summary}\n\nEvidence: ${evidence}\n\nLocation: \`${file}:${line}\`\n\nCategory: \`${kind}\`\nConfidence: ${confidence.toFixed(2)}\n\nThis is a verified maintenance finding. Please confirm it before making changes. ${workerEligible ? 'It is eligible for a bounded implementation worker, which will open a PR for human review.' : 'This finding requires maintainer-led implementation.'}\n\n${marker}`,
+                body: `${summary}\n\nEvidence: ${evidence}\n\nLocation: \`${file}:${line}\`\n\nCategory: \`${kind}\`\nConfidence: ${confidence.toFixed(2)}\n\nThis is a model-reported maintenance finding for investigation. Confirm the evidence and impact before making changes. ${workerEligible ? 'It is eligible for a bounded implementation worker, which will open a PR for human review.' : 'This finding requires maintainer-led implementation.'}\n\n${marker}`,
               })
               contextData.state.reported ??= {}
               contextData.state.reported[fingerprint] = { issueMarker: marker, workerEligible }
               createdCount += 1
             }
 
+            core.info('Published ' + createdCount + ' issues from ' + result.findings.length + ' reported findings. Confidence is informational.')
             const state = applyScheduledResult(contextData, result, context.sha, new Date().toISOString(), createdCount)
             if (result.status === 'complete') state.jobs[contextData.category].lastFocus = contextData.focus
             const body = `${stateMarker}\n${JSON.stringify(state)}`
