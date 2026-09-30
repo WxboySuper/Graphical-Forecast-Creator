@@ -78,7 +78,11 @@ export const useMonitorMapOverlaySync = ({
   }, [mesoscaleDiscussions, refs.mesoscaleDiscussionLayerRef, refs.mesoscaleDiscussionSourceRef]);
 
   useEffect(() => {
-    onClearSelectedAlert();
+    // Animation advances swap in a new non-empty collection each tick; only
+    // clear the selected-alert popup when there is nothing left to show.
+    if (alertsCollection.features.length === 0) {
+      onClearSelectedAlert();
+    }
   }, [alertsCollection, onClearSelectedAlert]);
 
   useEffect(() => {
