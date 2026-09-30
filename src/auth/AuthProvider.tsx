@@ -445,15 +445,53 @@ interface ApplySettingsContext {
   currentOverlaysRef: React.MutableRefObject<OverlaysState>,
   dispatch: ReturnType<typeof useDispatch>,
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>,
-  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>
+  lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>,
+  buildLocalSettingsSnapshot?: () => UserSettingsDocument,
 }
+
+/**
+ * True when a Firestore snapshot still reflects the last acknowledged settings while local UI
+ * state has moved ahead (for example during a debounced basemap write). Applying it would
+ * revert in-progress local changes.
+ */
+export const isStaleRemoteSettingsSnapshot = (
+  remote: UserSettingsDocument,
+  lastSynced: UserSettingsDocument | null,
+  localSnapshot: UserSettingsDocument,
+): boolean =>
+  Boolean(
+    lastSynced
+    && areUserSettingsEqual(lastSynced, remote)
+    && !areUserSettingsEqual(localSnapshot, remote),
+  );
 
 /** Applies a validated settings document into Redux plus local hosted-auth state. */
 export const applySettingsToState = (
   settings: UserSettingsDocument,
-  { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef }: ApplySettingsContext
+  context: ApplySettingsContext,
 ) => {
+  const {
+    currentDarkModeRef,
+    currentOverlaysRef,
+    dispatch,
+    setSyncedSettings,
+    lastSyncedSettingsRef,
+    buildLocalSettingsSnapshot,
+  } = context;
+
   if (areUserSettingsEqual(lastSyncedSettingsRef.current, settings)) {
+    return;
+  }
+
+  const localSnapshot = buildLocalSettingsSnapshot?.() ?? createSettingsSnapshot({
+    darkMode: currentDarkModeRef.current,
+    overlays: currentOverlaysRef.current,
+    defaultForecasterName: settings.defaultForecasterName,
+    forecastUiVariant: settings.forecastUiVariant,
+    monitorSettings: settings.monitorSettings,
+  });
+
+  if (isStaleRemoteSettingsSnapshot(settings, lastSyncedSettingsRef.current, localSnapshot)) {
     return;
   }
 
@@ -1215,13 +1253,6 @@ const useHostedAuthState = (): AuthContextValue => {
     const settingsRef = doc(requireDb(), 'userSettings', user.uid);
     const profileRef = doc(requireDb(), 'userProfiles', user.uid);
     let unsubscribeSettings: Unsubscribe | undefined;
-    const settingsApplyContext: ApplySettingsContext = {
-      currentDarkModeRef,
-      currentOverlaysRef,
-      dispatch,
-      setSyncedSettings,
-      lastSyncedSettingsRef,
-    };
 
     /** Captures the current local settings so they can seed a missing cloud document. */
     const buildLocalSettingsSnapshot = (): UserSettingsDocument =>
@@ -1232,6 +1263,15 @@ const useHostedAuthState = (): AuthContextValue => {
         forecastUiVariant: readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
         monitorSettings: currentMonitorSettingsRef.current,
       });
+
+    const settingsApplyContext: ApplySettingsContext = {
+      currentDarkModeRef,
+      currentOverlaysRef,
+      dispatch,
+      setSyncedSettings,
+      lastSyncedSettingsRef,
+      buildLocalSettingsSnapshot,
+    };
 
     /** Applies validated remote settings into Redux and local auth state. */
     const applyRemoteSettings = (settings: UserSettingsDocument) =>
@@ -1353,8 +1393,6 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     pendingSettingsWriteRef.current = window.setTimeout(() => {
-      lastSyncedSettingsRef.current = nextSettings;
-
       setDoc(
         settingsRef,
         {
@@ -1362,8 +1400,11 @@ const useHostedAuthState = (): AuthContextValue => {
           updatedAt: serverTimestamp(),
         },
         { merge: true }
-      ).catch((syncError) => {
-        lastSyncedSettingsRef.current = null;
+      ).then(() => {
+        lastSyncedSettingsRef.current = nextSettings;
+        setSyncedSettings(nextSettings);
+        setSettingsSyncStatus('synced');
+      }).catch((syncError) => {
         setSettingsSyncStatus('error');
         setError(getSettingsUpdateError(syncError));
       }).finally(() => {

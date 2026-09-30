@@ -6,6 +6,7 @@ import {
   applySettingsToState,
   areOverlaySettingsEqual,
   areUserSettingsEqual,
+  isStaleRemoteSettingsSnapshot,
   asRecord,
   canSyncHostedUserDocuments,
   clearDeletedAccountSession,
@@ -243,6 +244,62 @@ describe('AuthProvider Utils', () => {
       lastSyncedSettingsRef,
     });
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
+  });
+
+  test('isStaleRemoteSettingsSnapshot detects pending local basemap changes', () => {
+    const syncedOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'osm' as const };
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+    const lastSynced = createSettingsSnapshot({
+      darkMode: false,
+      overlays: syncedOverlays,
+      defaultForecasterName: 'Forecaster',
+      forecastUiVariant: 'workspace_dock',
+    });
+    const remote = lastSynced;
+    const localSnapshot = createSettingsSnapshot({
+      darkMode: false,
+      overlays: localOverlays,
+      defaultForecasterName: 'Forecaster',
+      forecastUiVariant: 'workspace_dock',
+    });
+
+    expect(isStaleRemoteSettingsSnapshot(remote, lastSynced, localSnapshot)).toBe(true);
+    expect(isStaleRemoteSettingsSnapshot(localSnapshot, lastSynced, localSnapshot)).toBe(false);
+    expect(isStaleRemoteSettingsSnapshot(
+      { ...lastSynced, counties: true },
+      lastSynced,
+      localSnapshot,
+    )).toBe(false);
+  });
+
+  test('applySettingsToState ignores stale remote snapshots while local basemap is pending', () => {
+    const syncedOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'osm' as const };
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'esri-satellite' as const };
+    const lastSynced = createSettingsSnapshot({
+      darkMode: false,
+      overlays: syncedOverlays,
+      defaultForecasterName: 'Forecaster',
+      forecastUiVariant: 'workspace_dock',
+    });
+    const dispatch = jest.fn();
+    const setSyncedSettings = jest.fn();
+
+    applySettingsToState(lastSynced, {
+      currentDarkModeRef: { current: false },
+      currentOverlaysRef: { current: localOverlays },
+      dispatch,
+      setSyncedSettings,
+      lastSyncedSettingsRef: { current: lastSynced },
+      buildLocalSettingsSnapshot: () => createSettingsSnapshot({
+        darkMode: false,
+        overlays: localOverlays,
+        defaultForecasterName: 'Forecaster',
+        forecastUiVariant: 'workspace_dock',
+      }),
+    });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(setSyncedSettings).not.toHaveBeenCalled();
   });
 
   test('local post helper and auth utility fallbacks normalize errors', async () => {
