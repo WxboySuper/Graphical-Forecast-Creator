@@ -75,19 +75,19 @@ try {
   };
 
   let output = '';
-  try {
-    output = run(baseInvocation, [...attachedFiles, promptFile]);
-  } catch (error) {
-    if (!repairFirstLook) throw error;
-    output = runRepairPass('', error.message);
-  }
-
-  if (repairFirstLook) {
+  let repairReason = '';
+  const maxAttempts = repairFirstLook ? 3 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
-      parseOpenCodeFirstLookOutput(output, reviewContext);
-    } catch (validationError) {
-      output = runRepairPass(output, validationError.message);
-      parseOpenCodeFirstLookOutput(output, reviewContext);
+      output = attempt === 0
+        ? run(baseInvocation, [...attachedFiles, promptFile])
+        : runRepairPass(output, repairReason);
+      if (repairFirstLook) parseOpenCodeFirstLookOutput(output, reviewContext);
+      repairReason = '';
+      break;
+    } catch (error) {
+      if (!repairFirstLook || attempt === maxAttempts - 1) throw error;
+      repairReason = error.message;
     }
   }
   writeFileSync(outputPath, output, 'utf8');
