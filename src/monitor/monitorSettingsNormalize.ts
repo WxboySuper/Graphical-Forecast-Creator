@@ -36,8 +36,14 @@ const readSite = (value: unknown, fallback: string): string => {
     return fallback;
   }
 
-  const normalized = value.trim().toUpperCase();
-  return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
+  // Mirror monitorSlice setRadarSite cleaning so values round-trip through
+  // applyMonitorSettings/storage hydration instead of reverting to default.
+  const cleaned = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (!cleaned) {
+    return '';
+  }
+
+  return cleaned.startsWith('K') ? cleaned : `K${cleaned}`.slice(0, 4);
 };
 
 const isLatLonPair = (center: unknown): center is [number, number] =>
