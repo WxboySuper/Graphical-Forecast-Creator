@@ -76,6 +76,10 @@ test('rejects malformed event streams, missing assistant text, and invalid first
   assert.throws(() => extractFinalAssistantText('progress\nnot json'), /invalid JSON event stream/);
   assert.throws(() => extractFinalAssistantText('{"type":"step_finish"}'), /no assistant text/);
   assert.throws(() => parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', 'No JSON was returned.')), { format: 'json' }), context), /did not contain a JSON object/);
-  assert.throws(() => parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', '{"summary":[]}\nThis is not the final object.')), { format: 'json' }), context), /did not contain a JSON object/);
+  const trailing = `${JSON.stringify(expected)}\nThis is not the final object.`;
+  assert.deepEqual(
+    parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', trailing)), { format: 'json' }), context),
+    expected,
+  );
   assert.throws(() => extractFinalAssistantText(''), /no output/);
 });

@@ -61,11 +61,10 @@ const findJsonObjectAfterPrefix = (text) => {
 
 const readValidObjectAt = (text, start) => {
   const end = findObjectEnd(text, start);
-  if (end < 0 || !hasOnlyWhitespaceAfter(text, end)) return null;
+  if (end < 0) return null;
   const candidate = text.slice(start, end + 1);
   return isJsonObject(candidate) ? candidate : null;
 };
-const hasOnlyWhitespaceAfter = (text, index) => !text.slice(index + 1).trim();
 
 const isJsonObject = (text) => {
   try {

@@ -49,10 +49,12 @@ export const buildGitHubReleaseUploadArgs = ({ tag, notesFile }) => [
   `${notesFile}#GFC-${tag}-release-notes.md`,
 ];
 
+/** Invoke the GitHub CLI and return stdout (used by release helpers and tests). */
 function runGitHubCommand(args, options) {
   return execFileSync('gh', args, options);
 }
 
+/** Return whether `gh release view` succeeds for the tag. */
 function githubReleaseExists(tag, runCommand) {
   try {
     runCommand(['release', 'view', tag], { stdio: 'ignore' });
@@ -62,11 +64,13 @@ function githubReleaseExists(tag, runCommand) {
   }
 }
 
+/** Return whether the portable Markdown notes asset is already attached. */
 function githubReleaseHasNotesAsset(tag, runCommand) {
   const release = JSON.parse(runCommand(['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
   return release.assets.some((asset) => asset.name === `GFC-${tag}-release-notes.md`);
 }
 
+/** Upload the notes asset when an existing release predates the portable attachment. */
 function uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand }) {
   if (githubReleaseHasNotesAsset(tag, runCommand)) return;
   runCommand(buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });

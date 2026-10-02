@@ -6,15 +6,18 @@ const EXPECTED_VERSION = process.env.EXPECTED_VERSION ?? '';
 const MAX_ATTEMPTS = Number(process.env.SMOKE_ATTEMPTS ?? 6);
 const RETRY_DELAY_MS = Number(process.env.SMOKE_RETRY_DELAY_MS ?? 10_000);
 
+/** Pause between smoke retries. */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Fetch a URL and return HTTP status plus response body text. */
 async function fetchStatus(url) {
   const response = await fetch(url, { redirect: 'follow' });
   return { status: response.status, body: await response.text() };
 }
 
+/** Require the beta shell to respond with HTML and HTTP 200. */
 function assertHomePage(home) {
   if (home.status !== 200) {
     throw new Error(`Beta home returned HTTP ${home.status} (expected 200).`);
@@ -24,12 +27,14 @@ function assertHomePage(home) {
   }
 }
 
+/** Require the capabilities status endpoint to return HTTP 200. */
 function assertCapabilitiesStatus(api, statusUrl) {
   if (api.status !== 200) {
     throw new Error(`Beta API ${statusUrl} returned HTTP ${api.status} (expected 200).`);
   }
 }
 
+/** Require version.json to match EXPECTED_VERSION when configured. */
 function assertDeployedVersion(versionResponse) {
   if (versionResponse.status !== 200) {
     throw new Error(`version.json returned HTTP ${versionResponse.status} (expected 200).`);
@@ -45,6 +50,7 @@ function assertDeployedVersion(versionResponse) {
   }
 }
 
+/** Run all smoke assertions once against the configured beta origin. */
 async function checkOnce() {
   const origin = BETA_ORIGIN.replace(/\/$/, '');
   const homeUrl = `${origin}/`;
@@ -59,6 +65,7 @@ async function checkOnce() {
   }
 }
 
+/** Retry smoke checks until success or MAX_ATTEMPTS is exhausted. */
 async function run() {
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
