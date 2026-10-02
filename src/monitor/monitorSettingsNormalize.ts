@@ -37,7 +37,13 @@ const readSite = (value: unknown, fallback: string): string => {
   }
 
   const normalized = value.trim().toUpperCase();
-  return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
+  // Accept the partial typing states produced by setRadarSite ('' / 'K' / 'KT' / full site)
+  // so round-tripping through applyMonitorSettings/storage hydration does not revert to fallback.
+  if (normalized === '' || /^K[A-Z0-9]{0,3}$/.test(normalized)) {
+    return normalized;
+  }
+
+  return fallback;
 };
 
 const isLatLonPair = (center: unknown): center is [number, number] =>
