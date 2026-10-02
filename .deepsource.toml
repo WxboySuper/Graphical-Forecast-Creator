@@ -7,6 +7,7 @@ exclude_patterns = [
   "scripts/lib/github-paginate.test.mjs",
   "scripts/lib/pr-ci-label-state.test.mjs",
   "scripts/lib/opencode-first-look-workflow.test.mjs",
+  "scripts/lib/opencode-workflow-queue.test.mjs",
   "scripts/lib/opencode-first-look-context-guard.test.mjs",
   "scripts/lib/opencode-first-look-context-guard.mjs",
   "scripts/lib/opencode-first-look-publish.mjs",
