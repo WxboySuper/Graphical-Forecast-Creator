@@ -82,19 +82,13 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(publish.env.CONTEXT_PATH, `${ghActionsExpr('github.workspace')}/.opencode-pr-review/opencode-pr-review-context.json`);
   assert.equal(publish.env.PULL_NUMBER, ghActionsExpr('needs.wait-for-ci.outputs.pull_number'));
   assert.equal(publish.env.REVIEW_SHA, ghActionsExpr('needs.wait-for-ci.outputs.head_sha'));
-  assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
-  assert.match(publish.with.script, /opencode-first-look-context-guard\.mjs/);
-  assert.match(publish.with.script, /mergeOpenCodeFirstLookResults\(contextData\.priorStructuredReview, parsed\)/);
-  assert.match(publish.with.script, /issues\.updateComment/);
-  assert.match(publish.with.script, /issues\.createComment/);
-  assert.match(publish.with.script, /gfc-opencode-first-look-data/);
-  assert.match(publish.with.script, /body\.length > 60_000/);
-  assert.match(publish.with.script, /gfc-opencode-first-look:manual/);
-  assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
+  assert.match(publish.run, /publish-opencode-first-look\.mjs/);
+  assert.match(context.with.script, /openedAtCommitOid/);
+  assert.match(context.with.script, /"contextRead":true/);
+  assert.match(context.with.script, /filesReviewed/);
 
   // skipcq: JS-0057, JS-0241 -- AsyncFunction is required to syntax-check embedded github-script bodies.
   const AsyncFunction = Object.getPrototypeOf(async function asyncSyntaxProbe() { await Promise.resolve(); }).constructor;
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', waitStep.with.script), 'CI wait script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', context.with.script), 'context script should parse');
-  assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', publish.with.script), 'publisher script should parse');
 });

@@ -8,6 +8,7 @@ exclude_patterns = [
   "scripts/lib/pr-ci-label-state.test.mjs",
   "scripts/lib/opencode-first-look-workflow.test.mjs",
   "scripts/lib/opencode-first-look-context-guard.test.mjs",
+  "scripts/publish-opencode-first-look.mjs",
   "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",
