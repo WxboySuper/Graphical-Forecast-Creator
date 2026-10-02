@@ -1,15 +1,21 @@
+/**
+ * Post-deploy smoke checks for the beta site (HTML shell, API status, optional version.json).
+ */
 const BETA_ORIGIN = process.env.BETA_ORIGIN ?? 'https://beta.gfcweather.com';
 const EXPECTED_VERSION = process.env.EXPECTED_VERSION ?? '';
 const MAX_ATTEMPTS = Number(process.env.SMOKE_ATTEMPTS ?? 6);
 const RETRY_DELAY_MS = Number(process.env.SMOKE_RETRY_DELAY_MS ?? 10_000);
 
+/** @param {number} ms */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** @param {string} url */
 const fetchStatus = async (url) => {
   const response = await fetch(url, { redirect: 'follow' });
   return { status: response.status, body: await response.text() };
 };
 
+/** @param {{ status: number; body: string }} home */
 const assertHomePage = (home) => {
   if (home.status !== 200) {
     throw new Error(`Beta home returned HTTP ${home.status} (expected 200).`);
@@ -19,12 +25,14 @@ const assertHomePage = (home) => {
   }
 };
 
+/** @param {{ status: number }} api @param {string} statusUrl */
 const assertCapabilitiesStatus = (api, statusUrl) => {
   if (api.status !== 200) {
     throw new Error(`Beta API ${statusUrl} returned HTTP ${api.status} (expected 200).`);
   }
 };
 
+/** @param {{ status: number; body: string }} versionResponse */
 const assertDeployedVersion = (versionResponse) => {
   if (versionResponse.status !== 200) {
     throw new Error(`version.json returned HTTP ${versionResponse.status} (expected 200).`);
@@ -40,6 +48,7 @@ const assertDeployedVersion = (versionResponse) => {
   }
 };
 
+/** Hit beta origin endpoints once; throws when any assertion fails. */
 const checkOnce = async () => {
   const origin = BETA_ORIGIN.replace(/\/$/, '');
   const homeUrl = `${origin}/`;
@@ -54,6 +63,7 @@ const checkOnce = async () => {
   }
 };
 
+/** Retry smoke checks until success or attempts are exhausted. */
 const run = async () => {
   let lastError;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {

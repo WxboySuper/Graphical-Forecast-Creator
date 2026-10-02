@@ -33,6 +33,7 @@ export const buildGitHubReleaseCreateArgs = ({
   ...(verifyTag ? ['--verify-tag'] : []),
 ];
 
+/** Build the GitHub CLI arguments that publish a draft release. */
 export const buildGitHubReleasePublishArgs = ({ tag }) => [
   'release',
   'edit',
@@ -84,6 +85,7 @@ export const publishGitHubRelease = ({
   return `Created GitHub release ${tag}${prerelease ? ' (prerelease)' : ''}${draftLabel}.`;
 };
 
+/** Mark an existing draft release as published (non-draft). */
 export const finalizeGitHubRelease = ({ tag, runCommand = runGitHubCommand }) => {
   runCommand(buildGitHubReleasePublishArgs({ tag }), { stdio: 'inherit' });
   return `Published GitHub release ${tag}.`;
@@ -118,6 +120,21 @@ export const buildCuratedNotes = ({ changelog, version, lane }) =>
 /** Compose the final GitHub Release body from curated and generated notes. */
 export const buildReleaseNotes = ({ mode, curatedNotes, generatedNotes, changelogUrl }) =>
   composeReleaseNotes({ mode, curatedNotes, generatedNotes, changelogUrl });
+
+/** CLI entry for `finalize <semver>` after smoke tests pass. */
+export const runFinalizeGitHubRelease = () => {
+  const version = process.argv[3];
+  if (!version || !VERSION_PATTERN.test(version)) {
+    console.error('Usage: node scripts/create-github-release.mjs finalize <semver-version>');
+    process.exit(1);
+  }
+  const tag = `v${version}`;
+  if (process.env.DRY_RUN === 'true') {
+    console.log(`Dry run: would publish draft GitHub release ${tag}.`);
+    return;
+  }
+  console.log(finalizeGitHubRelease({ tag }));
+};
 
 /** Execute the release workflow using the current process arguments and environment. */
 const run = () => {
@@ -192,20 +209,6 @@ const run = () => {
   console.log(publishGitHubRelease({
     tag, targetRef, notesFile, prerelease, draft, verifyTag,
   }));
-};
-
-export const runFinalizeGitHubRelease = () => {
-  const version = process.argv[3];
-  if (!version || !VERSION_PATTERN.test(version)) {
-    console.error('Usage: node scripts/create-github-release.mjs finalize <semver-version>');
-    process.exit(1);
-  }
-  const tag = `v${version}`;
-  if (process.env.DRY_RUN === 'true') {
-    console.log(`Dry run: would publish draft GitHub release ${tag}.`);
-    return;
-  }
-  console.log(finalizeGitHubRelease({ tag }));
 };
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -94,6 +94,7 @@ test('dry run writes notes without publishing', () => {
 
 test('adds the portable notes asset to an existing release', () => {
   const commands = [];
+  // skipcq: JS-D1001 — test double records gh invocations inline
   const runCommand = (args) => {
     commands.push(args);
     if (args.length === 3 && args[1] === 'view') return '';

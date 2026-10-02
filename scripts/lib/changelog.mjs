@@ -64,13 +64,6 @@ const legacyReleaseNotes = (changelog, version) => {
   return `## v${version}\n\n${body}`.trim();
 };
 
-/**
- * Notes body for a GitHub Release tag (stable or beta prerelease).
- * @param {string} changelog
- * @param {string} version e.g. 1.6.0 or 1.6.0-beta.2
- * @param {string} [lane] next-major or stable-hotfix
- * @returns {string | null}
- */
 /** @param {string} changelog @param {string} version @returns {string | null} */
 const extractExactVersionSection = (changelog, version) => {
   const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -86,6 +79,13 @@ const extractExactVersionSection = (changelog, version) => {
   return body ? `${heading}\n\n${body}`.trim() : null;
 };
 
+/**
+ * Notes body for a GitHub Release tag (stable or beta prerelease).
+ * @param {string} changelog
+ * @param {string} version e.g. 1.6.0 or 1.6.0-beta.2
+ * @param {string} [lane] next-major or stable-hotfix
+ * @returns {string | null}
+ */
 export const extractReleaseNotes = (changelog, version, lane = '') => {
   const exact = extractExactVersionSection(changelog, version);
   if (exact) return exact;
