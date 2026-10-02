@@ -61,16 +61,30 @@ try {
     return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
   };
 
-  let output = run(baseInvocation, [...attachedFiles, promptFile]);
+  const runRepairPass = (firstOutput, reason) => {
+    const repairPromptFile = join(promptDirectory, 'repair-task.md');
+    const firstOutputFile = join(promptDirectory, 'first-attempt.json');
+    writeFileSync(firstOutputFile, firstOutput ?? '', 'utf8');
+    writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(reason, reviewContext), 'utf8');
+    return run(
+      'Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.',
+      [...attachedFiles, promptFile, repairPromptFile, firstOutputFile],
+    );
+  };
+
+  let output;
+  try {
+    output = run(baseInvocation, [...attachedFiles, promptFile]);
+  } catch (error) {
+    if (!repairFirstLook) throw error;
+    output = runRepairPass('', error.message);
+  }
+
   if (repairFirstLook) {
     try {
       parseOpenCodeFirstLookOutput(output, reviewContext);
     } catch (validationError) {
-      const repairPromptFile = join(promptDirectory, 'repair-task.md');
-      const firstOutputFile = join(promptDirectory, 'first-attempt.json');
-      writeFileSync(firstOutputFile, output, 'utf8');
-      writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(validationError.message, reviewContext), 'utf8');
-      output = run('Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.', [...attachedFiles, promptFile, repairPromptFile, firstOutputFile]);
+      output = runRepairPass(output, validationError.message);
       parseOpenCodeFirstLookOutput(output, reviewContext);
     }
   }

@@ -49,26 +49,28 @@ export const buildGitHubReleaseUploadArgs = ({ tag, notesFile }) => [
   `${notesFile}#GFC-${tag}-release-notes.md`,
 ];
 
-const runGitHubCommand = (args, options) => execFileSync('gh', args, options);
+function runGitHubCommand(args, options) {
+  return execFileSync('gh', args, options);
+}
 
-const githubReleaseExists = (tag, runCommand) => {
+function githubReleaseExists(tag, runCommand) {
   try {
     runCommand(['release', 'view', tag], { stdio: 'ignore' });
     return true;
   } catch {
     return false;
   }
-};
+}
 
-const githubReleaseHasNotesAsset = (tag, runCommand) => {
+function githubReleaseHasNotesAsset(tag, runCommand) {
   const release = JSON.parse(runCommand(['release', 'view', tag, '--json', 'assets'], { encoding: 'utf8' }));
   return release.assets.some((asset) => asset.name === `GFC-${tag}-release-notes.md`);
-};
+}
 
-const uploadReleaseNotesAssetIfMissing = ({ tag, notesFile, runCommand }) => {
+function uploadReleaseNotesAssetIfMissing({ tag, notesFile, runCommand }) {
   if (githubReleaseHasNotesAsset(tag, runCommand)) return;
   runCommand(buildGitHubReleaseUploadArgs({ tag, notesFile }), { stdio: 'inherit' });
-};
+}
 
 /** Publish the generated public release body with a portable Markdown notes asset. */
 export const publishGitHubRelease = ({
