@@ -4,6 +4,7 @@ import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
 import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
+import { applyPublicationGuards } from './lib/opencode-first-look-context-guard.mjs';
 import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
@@ -70,16 +71,21 @@ try {
   };
 
   let output = run(baseInvocation, [...attachedFiles, promptFile]);
+  const validateFirstLook = (raw) => {
+    const rawResult = JSON.parse(raw);
+    const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
+    return applyPublicationGuards(parsed, rawResult, reviewContext);
+  };
   if (repairFirstLook) {
     try {
-      parseOpenCodeFirstLookOutput(output, reviewContext);
+      validateFirstLook(output);
     } catch (validationError) {
       const repairPromptFile = join(promptDirectory, 'repair-task.md');
       const firstOutputFile = join(promptDirectory, 'first-attempt.json');
       writeFileSync(firstOutputFile, output, 'utf8');
       writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(validationError.message, reviewContext), 'utf8');
       output = run('Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.', [...attachedFiles, promptFile, repairPromptFile, firstOutputFile]);
-      parseOpenCodeFirstLookOutput(output, reviewContext);
+      validateFirstLook(output);
     }
   }
   writeFileSync(outputPath, output, 'utf8');
