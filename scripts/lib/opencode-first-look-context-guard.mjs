@@ -1,3 +1,4 @@
+/** Guards against publishing first-look reviews when the model never read the PR diff/context. */
 const REVIEW_WITHOUT_CONTEXT_PATTERNS = [
   /blocked by tool permissions/i,
   /opencode-pr-review-context\.json is blocked/i,
