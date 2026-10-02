@@ -14,11 +14,13 @@ export function extractFinalAssistantText(stdout, { format = 'text' } = {}) {
   return format === 'json' ? extractJsonAssistantResponse(finalText) : finalText;
 }
 
+/** Validate stdout and response format before parsing OpenCode events. */
 function assertExtractionInput(stdout, format) {
   if (typeof stdout !== 'string' || !stdout.trim()) throw new Error('OpenCode returned no output.');
   if (!['text', 'json'].includes(format)) throw new Error('OpenCode response format must be text or json.');
 }
 
+/** Reassemble the final assistant message from streamed text parts. */
 function readFinalAssistantMessage(stdout) {
   const events = stdout.trim().split(/\r?\n/).map(parseEvent);
   const textEvents = events.filter(isTextEvent);
@@ -29,6 +31,7 @@ function readFinalAssistantMessage(stdout) {
   return finalText;
 }
 
+/** Merge incremental text parts that share a message id. */
 function collectMessageParts(events, messageId) {
   const parts = new Map();
   events.forEach((event, index) => {
@@ -42,6 +45,7 @@ function collectMessageParts(events, messageId) {
   return [...parts.values()];
 }
 
+/** Parse the first JSON object embedded in the assistant message. */
 function extractJsonAssistantResponse(text) {
   const candidate = unwrapJsonFence(text.trim());
   const directResult = isJsonObject(candidate) ? candidate : findJsonObjectAfterPrefix(candidate);
@@ -49,6 +53,7 @@ function extractJsonAssistantResponse(text) {
   throw new Error('OpenCode final assistant message did not contain a JSON object.');
 }
 
+/** Scan for a JSON object after optional leading prose. */
 function findJsonObjectAfterPrefix(text) {
   let from = 0;
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -61,6 +66,7 @@ function findJsonObjectAfterPrefix(text) {
   return null;
 }
 
+/** Return a JSON object substring when braces balance at `start`. */
 function readValidObjectAt(text, start) {
   const end = findObjectEnd(text, start);
   if (end < 0) return null;
@@ -68,6 +74,7 @@ function readValidObjectAt(text, start) {
   return isJsonObject(candidate) ? candidate : null;
 }
 
+/** Return whether `text` parses to a non-array object. */
 function isJsonObject(text) {
   try {
     const parsed = JSON.parse(text);
@@ -77,11 +84,13 @@ function isJsonObject(text) {
   }
 }
 
+/** Strip a trailing Markdown JSON fence when present. */
 function unwrapJsonFence(text) {
   const match = text.match(/(?:^|\r?\n)```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```\s*$/i);
   return match ? match[1].trim() : text;
 }
 
+/** Find the closing brace index for an object starting at `start`. */
 function findObjectEnd(text, start) {
   const state = { depth: 0, inString: false, escaped: false };
   for (let index = start; index < text.length; index++) {
@@ -97,21 +106,25 @@ function findObjectEnd(text, start) {
   return -1;
 }
 
+/** Update string-literal scanner state for brace matching. */
 function advanceStringState(character, state) {
   if (state.escaped) state.escaped = false;
   else if (character === '\\') state.escaped = true;
   else if (character === '"') state.inString = false;
 }
 
+/** Decrement object depth and report when the outer object closes. */
 function closeObject(state) {
   state.depth--;
   return state.depth === 0;
 }
 
+/** Parse one OpenCode JSON event line. */
 function parseEvent(line) {
   try { return JSON.parse(line); } catch { throw new Error('OpenCode returned an invalid JSON event stream.'); }
 }
 
+/** Return whether an event carries assistant text payload. */
 function isTextEvent(event) {
   return event?.type === 'text'
     && event.part?.type === 'text'
