@@ -20,14 +20,14 @@ const runner = steps.find((step) => step.name === 'Run read-only review');
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
-  assert.isUndefined(workflow.on.workflow_run);
-  assert.isUndefined(workflow.concurrency, 'CI waiting must not hold the shared OpenCode queue');
-  assert.isUndefined(waitJob.concurrency, 'the CI waiter must run outside the model queue');
+  assert.ok(workflow.on.workflow_run === undefined);
+  assert.ok(workflow.concurrency === undefined, 'CI waiting must not hold the shared OpenCode queue');
+  assert.ok(waitJob.concurrency === undefined, 'the CI waiter must run outside the model queue');
   assert.equal(workflow.jobs.review.needs, 'wait-for-ci');
   assert.deepEqual(workflow.jobs.review.concurrency, { group: 'gfc-opencode-maintenance-queue', queue: 'max' });
   assert.equal(waitJob.permissions['pull-requests'], 'read');
   assert.equal(waitJob.permissions.actions, 'read');
-  assert.isUndefined(workflow.jobs.review.permissions.actions);
+  assert.ok(workflow.jobs.review.permissions.actions === undefined);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
