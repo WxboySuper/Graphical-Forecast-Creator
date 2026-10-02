@@ -56,9 +56,8 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
     'pull-requests': 'read',
     actions: 'read',
   });
-  assert.equal(publisher.with['github-token'], '${{ github.token }}');
-  assert.doesNotMatch(publisher.with['github-token'], /GH_PAT/);
-  assert.match(publisher.with.script, /github\.rest\.issues\.createComment/);
-  assert.match(publisher.with.script, /github\.rest\.issues\.updateComment/);
-  assert.doesNotMatch(publisher.with.script, /github\.rest\.pulls\.createReview/);
+  assert.equal(publisher.env.GH_TOKEN, '${{ github.token }}');
+  assert.doesNotMatch(publisher.env.GH_TOKEN, /GH_PAT/);
+  assert.match(publisher.run, /publish-opencode-first-look\.mjs/);
+  assert.doesNotMatch(source, /pulls\.createReview/);
 });
