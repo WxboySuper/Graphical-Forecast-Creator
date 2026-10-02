@@ -517,13 +517,17 @@ jobs:
             const pullNumber = Number(process.env.PULL_NUMBER)
             const expectedSha = process.env.REVIEW_SHA
             const summaryMarker = '<!-- gfc-opencode-first-look-summary -->'
-            const { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment, renderOpenCodeFirstLookUnavailableComment } = await import(
+            const { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } = await import(
               pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-first-look-output.mjs')).href,
+            )
+            const { assertFirstLookReviewUsedSuppliedContext, renderOpenCodeFirstLookUnavailableComment } = await import(
+              pathToFileURL(path.join(process.env.GITHUB_WORKSPACE, 'scripts/lib/opencode-first-look-context-guard.mjs')).href,
             )
             const contextData = JSON.parse(fs.readFileSync(process.env.CONTEXT_PATH, 'utf8'))
             let parsed
             try {
               parsed = parseOpenCodeFirstLookOutput(fs.readFileSync(process.env.OUTPUT_PATH, 'utf8'), contextData)
+              assertFirstLookReviewUsedSuppliedContext(parsed, contextData)
               if (contextData.priorStructuredReview) {
                 parsed = mergeOpenCodeFirstLookResults(contextData.priorStructuredReview, parsed)
               }

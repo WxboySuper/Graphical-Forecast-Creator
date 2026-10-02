@@ -3,6 +3,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
+import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
+import { assertFirstLookReviewUsedSuppliedContext } from './lib/opencode-first-look-context-guard.mjs';
+import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
 const outputPath = process.env.OPENCODE_OUTPUT_PATH;
@@ -57,10 +60,31 @@ try {
     timeout: timeoutMs,
   });
 
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    process.stderr.write(result.stderr ?? '');
-    throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
+    if (result.error) throw result.error;
+    if (result.status !== 0) {
+      process.stderr.write(result.stderr ?? '');
+      throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
+    }
+    return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
+  };
+
+  let output = run(baseInvocation, [...attachedFiles, promptFile]);
+  const validateFirstLook = (raw) => {
+    const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
+    assertFirstLookReviewUsedSuppliedContext(parsed, reviewContext);
+    return parsed;
+  };
+  if (repairFirstLook) {
+    try {
+      validateFirstLook(output);
+    } catch (validationError) {
+      const repairPromptFile = join(promptDirectory, 'repair-task.md');
+      const firstOutputFile = join(promptDirectory, 'first-attempt.json');
+      writeFileSync(firstOutputFile, output, 'utf8');
+      writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(validationError.message, reviewContext), 'utf8');
+      output = run('Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.', [...attachedFiles, promptFile, repairPromptFile, firstOutputFile]);
+      validateFirstLook(output);
+    }
   }
   const output = extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
   writeFileSync(outputPath, output, 'utf8');
