@@ -20,14 +20,14 @@ const runner = steps.find((step) => step.name === 'Run read-only review');
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
   assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
-  assert.equal(workflow.on.workflow_run, undefined);
-  assert.equal(workflow.concurrency, undefined, 'CI waiting must not hold the shared OpenCode queue');
-  assert.equal(waitJob.concurrency, undefined, 'the CI waiter must run outside the model queue');
+  assert.isUndefined(workflow.on.workflow_run);
+  assert.isUndefined(workflow.concurrency, 'CI waiting must not hold the shared OpenCode queue');
+  assert.isUndefined(waitJob.concurrency, 'the CI waiter must run outside the model queue');
   assert.equal(workflow.jobs.review.needs, 'wait-for-ci');
   assert.deepEqual(workflow.jobs.review.concurrency, { group: 'gfc-opencode-maintenance-queue', queue: 'max' });
   assert.equal(waitJob.permissions['pull-requests'], 'read');
   assert.equal(waitJob.permissions.actions, 'read');
-  assert.equal(workflow.jobs.review.permissions.actions, undefined);
+  assert.isUndefined(workflow.jobs.review.permissions.actions);
   assert.equal(workflow.jobs.review.permissions.contents, 'read');
   assert.equal(workflow.jobs.review.permissions['pull-requests'], 'write');
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
@@ -92,7 +92,8 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(publish.with.script, /gfc-opencode-first-look:manual/);
   assert.doesNotMatch(publish.with.script, /pulls\.createReview/);
 
-  const AsyncFunction = Object.getPrototypeOf(async function noop() {}).constructor;
+  // skipcq: JS-0057, JS-0241 -- AsyncFunction is required to syntax-check embedded github-script bodies.
+  const AsyncFunction = Object.getPrototypeOf(async function asyncSyntaxProbe() { await Promise.resolve(); }).constructor;
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', waitStep.with.script), 'CI wait script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', context.with.script), 'context script should parse');
   assert.doesNotThrow(() => new AsyncFunction('github', 'context', 'core', 'require', publish.with.script), 'publisher script should parse');
