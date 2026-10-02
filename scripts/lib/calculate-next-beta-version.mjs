@@ -77,11 +77,20 @@ export const rejectExplicitNotNewerThanLatestTag = (parsed, lastTagged, explicit
   }
 };
 
+/** @param {string} left @param {string} right */
+const sameBetaBase = (left, right) => {
+  const leftParsed = parseBetaVersion(left);
+  const rightParsed = parseBetaVersion(right);
+  if (!leftParsed || !rightParsed) return false;
+  return leftParsed.base === rightParsed.base;
+};
+
 /** @param {string} explicit @param {string} packageVersion */
 export const rejectExplicitLowerThanPackageVersion = (explicit, packageVersion) => {
+  if (!sameBetaBase(explicit, packageVersion)) return;
   const explicitParsed = parseBetaVersion(explicit);
   const packageParsed = parseBetaVersion(packageVersion);
-  if (!explicitParsed || !packageParsed || explicitParsed.base !== packageParsed.base) return;
+  if (!explicitParsed || !packageParsed) return;
   if (explicitParsed.beta < packageParsed.beta) {
     throw new Error(
       `Explicit beta version ${explicit} must not be lower than package.json (${packageVersion}).`,
