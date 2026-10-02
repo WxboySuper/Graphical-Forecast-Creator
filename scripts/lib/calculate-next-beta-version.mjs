@@ -77,11 +77,24 @@ export const rejectExplicitNotNewerThanLatestTag = (parsed, lastTagged, explicit
   }
 };
 
-/** @param {{ explicit: string; tagSet: Set<string>; betaTags: string[]; base: string }} input */
-export const validateExplicitBetaVersion = ({ explicit, tagSet, betaTags, base }) => {
+/** @param {string} explicit @param {string} packageVersion */
+export const rejectExplicitLowerThanPackageVersion = (explicit, packageVersion) => {
+  const explicitParsed = parseBetaVersion(explicit);
+  const packageParsed = parseBetaVersion(packageVersion);
+  if (!explicitParsed || !packageParsed || explicitParsed.base !== packageParsed.base) return;
+  if (explicitParsed.beta < packageParsed.beta) {
+    throw new Error(
+      `Explicit beta version ${explicit} must not be lower than package.json (${packageVersion}).`,
+    );
+  }
+};
+
+/** @param {{ explicit: string; packageVersion: string; tagSet: Set<string>; betaTags: string[]; base: string }} input */
+export const validateExplicitBetaVersion = ({ explicit, packageVersion, tagSet, betaTags, base }) => {
   rejectInvalidExplicitBetaShape(explicit);
   rejectTaggedExplicitVersion(explicit, tagSet);
   const parsed = rejectExplicitBaseMismatch(explicit, base);
+  rejectExplicitLowerThanPackageVersion(explicit, packageVersion);
   const lastTagged = lastBetaNumberForBase(betaTags, base);
   rejectExplicitNotNewerThanLatestTag(parsed, lastTagged, explicit, base);
 };
@@ -120,7 +133,7 @@ export const calculateNextBetaVersion = ({
   const lastTagged = lastBetaNumberForBase(betaTags, base);
 
   if (explicit) {
-    validateExplicitBetaVersion({ explicit, tagSet, betaTags, base });
+    validateExplicitBetaVersion({ explicit, packageVersion, tagSet, betaTags, base });
     return { version: explicit, strategy: 'explicit' };
   }
 

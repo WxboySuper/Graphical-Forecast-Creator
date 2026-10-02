@@ -53,3 +53,14 @@ test('calculateNextBetaVersion rejects an explicit version that is not newer tha
     /newer than the latest tag/,
   );
 });
+
+test('calculateNextBetaVersion rejects an explicit version lower than package.json', () => {
+  assert.throws(
+    () => calculateNextBetaVersion({
+      packageVersion: '1.8.0-beta.5',
+      betaTags: ['v1.8.0-beta.3'],
+      explicitVersion: '1.8.0-beta.4',
+    }),
+    /must not be lower than package\.json/,
+  );
+});

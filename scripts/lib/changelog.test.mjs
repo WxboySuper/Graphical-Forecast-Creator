@@ -63,6 +63,26 @@ test('extracts the next-major lane for beta releases', () => {
   assert.doesNotMatch(notes ?? '', /Production fix/);
 });
 
+test('extractReleaseNotes matches exact version headings only', () => {
+  const changelog = `# Changelog
+
+## v2.0.0-beta.20
+
+#### Added
+
+- Newer beta line.
+
+## v2.0.0-beta.2
+
+#### Added
+
+- Target beta line.
+`;
+  const notes = extractReleaseNotes(changelog, '2.0.0-beta.2');
+  assert.match(notes ?? '', /Target beta line/);
+  assert.doesNotMatch(notes ?? '', /Newer beta line/);
+});
+
 test('extractReleaseNotes prefers an exact version section after beta promotion', () => {
   const changelog = `# Changelog
 

@@ -73,10 +73,12 @@ const legacyReleaseNotes = (changelog, version) => {
  */
 /** @param {string} changelog @param {string} version @returns {string | null} */
 const extractExactVersionSection = (changelog, version) => {
-  const heading = `## v${version}`;
-  const start = changelog.indexOf(heading);
-  if (start === -1) return null;
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = changelog.match(new RegExp(`^## v${escaped}$`, 'm'));
+  if (!match || match.index === undefined) return null;
 
+  const heading = match[0];
+  const start = match.index;
   const afterHeading = start + heading.length;
   const rest = changelog.slice(afterHeading);
   const nextSection = rest.search(/\n## /);

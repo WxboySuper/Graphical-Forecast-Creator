@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-beta-workers
+  group: beta-release
   cancel-in-progress: false
 
 jobs:
