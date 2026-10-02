@@ -21,7 +21,7 @@ export function readFirstLookModelOutput(outputPath) {
 }
 
 export function prepareFirstLookPublication(rawOutput, contextData) {
-  let rawResult;
+  let rawResult = null;
   try {
     rawResult = JSON.parse(rawOutput);
   } catch {

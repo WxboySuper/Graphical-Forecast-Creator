@@ -71,7 +71,8 @@ try {
   };
 
   let output = run(baseInvocation, [...attachedFiles, promptFile]);
-  const validateFirstLook = (raw) => {
+  // skipcq: JS-D1001 -- validates first-look JSON before the repair pass writes output.
+  function validateFirstLook(raw) {
     const rawResult = JSON.parse(raw);
     const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
     return applyPublicationGuards(parsed, rawResult, reviewContext);
