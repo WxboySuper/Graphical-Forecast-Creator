@@ -80,7 +80,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(publish.env.PULL_NUMBER, '${{ needs.wait-for-ci.outputs.pull_number }}');
   assert.equal(publish.env.REVIEW_SHA, '${{ needs.wait-for-ci.outputs.head_sha }}');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
-  assert.match(publish.with.script, /renderOpenCodeFirstLookUnavailableComment/);
+  assert.match(publish.with.script, /opencode-first-look-context-guard\.mjs/);
   assert.match(publish.with.script, /mergeOpenCodeFirstLookResults\(contextData\.priorStructuredReview, parsed\)/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);
