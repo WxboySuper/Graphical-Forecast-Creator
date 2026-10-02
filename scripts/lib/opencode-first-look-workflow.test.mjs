@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 
 const { parse } = createRequire(import.meta.url)('yaml');
 
+/** Build a literal GitHub Actions expression string without `${{` template-literal syntax. */
+const ghActionsExpr = (expression) => ['$', '{{ ', expression, ' }}'].join('');
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const workflow = parse(readFileSync(path.join(repositoryRoot, '.github/workflows/opencode-first-look.yml'), 'utf8'));
 const waitJob = workflow.jobs['wait-for-ci'];
@@ -30,7 +33,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
-  assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ github.workspace }}/.opencode-pr-review/opencode-pr-review-context.json');
+  assert.equal(runner.env.OPENCODE_FILE_PATHS, `${ghActionsExpr('github.workspace')}/.opencode-pr-review/opencode-pr-review-context.json`);
   assert.equal(runner.env.OPENCODE_REPAIR_FIRST_LOOK, 'true', 'incomplete model output gets one bounded completion pass before publication');
   assert.match(context.with.script, /PR review context must be written inside the OpenCode workspace/);
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
@@ -54,9 +57,9 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /gfc-opencode-first-look-summary/);
   assert.match(context.with.script, /compare\/\{basehead\}/);
   assert.match(context.with.script, /changedLineNumbers/);
-  assert.equal(context.env.PULL_NUMBER, '${{ needs.wait-for-ci.outputs.pull_number }}');
-  assert.equal(context.env.REVIEW_SHA, '${{ needs.wait-for-ci.outputs.head_sha }}');
-  assert.equal(context.env.CI_RUN_URL, '${{ needs.wait-for-ci.outputs.ci_run_url }}');
+  assert.equal(context.env.PULL_NUMBER, ghActionsExpr('needs.wait-for-ci.outputs.pull_number'));
+  assert.equal(context.env.REVIEW_SHA, ghActionsExpr('needs.wait-for-ci.outputs.head_sha'));
+  assert.equal(context.env.CI_RUN_URL, ghActionsExpr('needs.wait-for-ci.outputs.ci_run_url'));
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
@@ -76,9 +79,9 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(waitJob.outputs.run, /steps\.wait\.outputs\.run/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
-  assert.equal(publish.env.CONTEXT_PATH, '${{ github.workspace }}/.opencode-pr-review/opencode-pr-review-context.json');
-  assert.equal(publish.env.PULL_NUMBER, '${{ needs.wait-for-ci.outputs.pull_number }}');
-  assert.equal(publish.env.REVIEW_SHA, '${{ needs.wait-for-ci.outputs.head_sha }}');
+  assert.equal(publish.env.CONTEXT_PATH, `${ghActionsExpr('github.workspace')}/.opencode-pr-review/opencode-pr-review-context.json`);
+  assert.equal(publish.env.PULL_NUMBER, ghActionsExpr('needs.wait-for-ci.outputs.pull_number'));
+  assert.equal(publish.env.REVIEW_SHA, ghActionsExpr('needs.wait-for-ci.outputs.head_sha'));
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
   assert.match(publish.with.script, /opencode-first-look-context-guard\.mjs/);
   assert.match(publish.with.script, /mergeOpenCodeFirstLookResults\(contextData\.priorStructuredReview, parsed\)/);

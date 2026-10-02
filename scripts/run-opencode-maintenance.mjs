@@ -70,21 +70,21 @@ try {
   };
 
   let output = run(baseInvocation, [...attachedFiles, promptFile]);
-  const validateFirstLook = (raw) => {
+  function validateFirstLookOutput(raw) {
     const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
     assertFirstLookReviewUsedSuppliedContext(parsed, reviewContext);
     return parsed;
-  };
+  }
   if (repairFirstLook) {
     try {
-      validateFirstLook(output);
+      validateFirstLookOutput(output);
     } catch (validationError) {
       const repairPromptFile = join(promptDirectory, 'repair-task.md');
       const firstOutputFile = join(promptDirectory, 'first-attempt.json');
       writeFileSync(firstOutputFile, output, 'utf8');
       writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(validationError.message, reviewContext), 'utf8');
       output = run('Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.', [...attachedFiles, promptFile, repairPromptFile, firstOutputFile]);
-      validateFirstLook(output);
+      validateFirstLookOutput(output);
     }
   }
   writeFileSync(outputPath, output, 'utf8');

@@ -9,6 +9,7 @@ const REVIEW_WITHOUT_CONTEXT_PATTERNS = [
   /comment bodies and diff inaccessible/i,
 ];
 
+/** Collect user-visible review strings for blocked-context detection. */
 function collectReviewTextFields(result) {
   const chunks = [
     ...(result.prSummary ?? []),
