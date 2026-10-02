@@ -30,10 +30,11 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(workflow.jobs.review.permissions.issues, 'read');
   assert.equal(workflow.jobs.review.permissions.checks, 'read');
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
-  assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
+  assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ github.workspace }}/.opencode-pr-review/opencode-pr-review-context.json');
   assert.equal(runner.env.OPENCODE_REPAIR_FIRST_LOOK, 'true', 'incomplete model output gets one bounded completion pass before publication');
-  assert.match(runner.run, /run-opencode-first-look-maintenance\.mjs/);
+  assert.match(context.with.script, /PR review context must be written inside the OpenCode workspace/);
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
+  assert.ok(steps.some((step) => step.name === 'Verify PR review context is readable in the OpenCode workspace'));
   const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);
   assert.ok(promptBlock, 'review prompt should be a separate bounded string');
   assert.doesNotMatch(promptBlock[1], /JSON\.stringify\(contextData\)/);
@@ -75,10 +76,11 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(waitJob.outputs.run, /steps\.wait\.outputs\.run/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');
-  assert.equal(publish.env.CONTEXT_PATH, '${{ runner.temp }}/opencode-pr-review-context.json');
+  assert.equal(publish.env.CONTEXT_PATH, '${{ github.workspace }}/.opencode-pr-review/opencode-pr-review-context.json');
   assert.equal(publish.env.PULL_NUMBER, '${{ needs.wait-for-ci.outputs.pull_number }}');
   assert.equal(publish.env.REVIEW_SHA, '${{ needs.wait-for-ci.outputs.head_sha }}');
   assert.match(publish.with.script, /parseOpenCodeFirstLookOutput/);
+  assert.match(publish.with.script, /renderOpenCodeFirstLookUnavailableComment/);
   assert.match(publish.with.script, /mergeOpenCodeFirstLookResults\(contextData\.priorStructuredReview, parsed\)/);
   assert.match(publish.with.script, /issues\.updateComment/);
   assert.match(publish.with.script, /issues\.createComment/);

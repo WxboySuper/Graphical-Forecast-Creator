@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
 
@@ -25,6 +25,19 @@ const attachedFiles = (process.env.OPENCODE_FILE_PATHS ?? '')
   .split(/\r?\n/)
   .map((file) => file.trim())
   .filter(Boolean);
+const repairFirstLook = process.env.OPENCODE_REPAIR_FIRST_LOOK === 'true';
+const contextPath = attachedFiles.find((file) => file.endsWith('opencode-pr-review-context.json'));
+if (repairFirstLook && (!contextPath || responseFormat !== 'json')) {
+  throw new Error('First-look repair requires JSON output and an attached PR review context.');
+}
+const reviewContext = repairFirstLook ? JSON.parse(readFileSync(contextPath, 'utf8')) : null;
+if (contextPath) {
+  const workspaceRoot = resolve(process.cwd());
+  const resolvedContextPath = resolve(contextPath);
+  if (!resolvedContextPath.startsWith(`${workspaceRoot}${sep}`)) {
+    throw new Error('PR review context must live inside the OpenCode workspace.');
+  }
+}
 
 const env = modelEnvironment(process.env);
 const promptDirectory = mkdtempSync(join(process.cwd(), '.opencode-task-'));
