@@ -36,8 +36,16 @@ const readSite = (value: unknown, fallback: string): string => {
     return fallback;
   }
 
-  const normalized = value.trim().toUpperCase();
-  return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
+  // Mirror setRadarSite cleaning so working/partial values round-trip
+  // through applyMonitorSettings/storage hydration instead of reverting
+  // to the default. Partial K-prefixed ids (e.g. "K", "KT") are kept
+  // while typing; wms.ts still requires a full K + 3 chars to render.
+  const cleaned = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (!cleaned) {
+    return '';
+  }
+
+  return cleaned.startsWith('K') ? cleaned : `K${cleaned}`.slice(0, 4);
 };
 
 const isLatLonPair = (center: unknown): center is [number, number] =>

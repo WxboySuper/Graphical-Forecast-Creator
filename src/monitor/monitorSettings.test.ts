@@ -48,6 +48,20 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('preserves working radar site values when settings are re-applied', () => {
+    for (const input of ['K', 'KT', 'KTL', 'KTLX', 'Tula', 'OKC ', 'ktlx']) {
+      const working = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite(input)).radarSite;
+      expect(normalizeMonitorSettings({ radarSite: working }).radarSite).toBe(working);
+      expect(normalizeMonitorSettings({ radarSite: input }).radarSite).toBe(working);
+    }
+  });
+
+  test('preserves cleared radar site input instead of reverting to default', () => {
+    const working = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite('   ')).radarSite;
+    expect(working).toBe('');
+    expect(normalizeMonitorSettings({ radarSite: working }).radarSite).toBe('');
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));
