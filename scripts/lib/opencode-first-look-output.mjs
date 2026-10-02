@@ -3,6 +3,16 @@ const MAX_BULLETS = 6;
 const MAX_TEXT_LENGTH = 900;
 const ASSESSMENTS = new Set(['addressed', 'still-open', 'unclear']);
 const PRIOR_FINDING_ASSESSMENTS = new Set(['resolved', 'still-open', 'unclear']);
+const REVIEW_WITHOUT_CONTEXT_PATTERNS = [
+  /blocked by tool permissions/i,
+  /opencode-pr-review-context\.json is blocked/i,
+  /PR diff unavailable/i,
+  /Full diff was inaccessible/i,
+  /diff inaccessible/i,
+  /context file.*blocked/i,
+  /comment bodies and PR diff unavailable/i,
+  /comment bodies and diff inaccessible/i,
+];
 
 const boundedText = (value, name) => {
   assertTextType(value, name);
@@ -210,6 +220,7 @@ const parseReviewPayload = (result, context) => {
   const badThings = parseFindings(result, context);
   const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
   const reviewCommentAssessments = parseContextReviewAssessments(result, context);
+  assertReviewUsedSuppliedContext(result, context);
   const unresolvedThreadAssessments = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
   if (unresolvedThreadAssessments.length && badThings.length === 0) {
     throw new Error('First-look output must include concrete findings when a review thread remains open or unclear after investigation.');
@@ -267,6 +278,43 @@ const assertNoLinkedIssueAssessment = (result) => {
 const parseContextReviewAssessments = (result, context) => {
   const openThreads = Array.isArray(context.openReviewThreads) ? context.openReviewThreads : [];
   return parseReviewAssessments(result.reviewCommentAssessments, openThreads);
+};
+
+const collectReviewTextFields = (result) => {
+  const chunks = [
+    ...(result.prSummary ?? []),
+    ...(result.latestChanges ?? []),
+    ...(result.goodThings ?? []),
+    ...(result.badThings ?? []).flatMap((finding) => [finding.title, finding.evidence, finding.impact]),
+    ...(result.reviewCommentAssessments ?? []).map((assessment) => assessment.summary),
+    ...(result.priorFindingAssessments ?? []).map((assessment) => assessment.summary),
+    result.linkedIssueAssessment,
+  ];
+  return chunks.filter((value) => typeof value === 'string');
+};
+
+const assertReviewUsedSuppliedContext = (result, context) => {
+  if (!Array.isArray(context.files) || context.files.length === 0) return;
+  const haystack = collectReviewTextFields(result).join('\n');
+  for (const pattern of REVIEW_WITHOUT_CONTEXT_PATTERNS) {
+    if (pattern.test(haystack)) {
+      throw new Error('First-look review did not read the supplied PR context; refusing to publish a score.');
+    }
+  }
+};
+
+/** Render a replaceable comment when the reviewer could not use the supplied PR diff/context. */
+export const renderOpenCodeFirstLookUnavailableComment = (context, reason) => {
+  const ciLine = context.ci?.url
+    ? `- Checks | CI: ${context.ci.url}${context.ci.conclusion ? ` (${context.ci.conclusion})` : ''}`
+    : null;
+  return [
+    '## OpenCode first-look review unavailable',
+    reason,
+    '',
+    'This revision was not scored because the reviewer could not read the supplied PR diff/context.',
+    ...(ciLine ? ['', '## CI status', ciLine] : []),
+  ].join('\n');
 };
 
 /** Render a compact, consistent PR comment. Conditional sections come from GitHub context. */

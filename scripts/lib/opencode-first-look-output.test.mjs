@@ -91,6 +91,14 @@ test('requires complete open-thread assessments before publishing', () => {
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, reviewCommentAssessments: [] }), withThreads), /assess every supplied open review thread/);
 });
 
+test('rejects reviews that admit the PR diff/context was inaccessible', () => {
+  const withDiff = { ...context, files: [{ path: 'src/a.ts', patch: '+fix' }], changedFilePaths: ['src/a.ts'] };
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    prSummary: ['Full diff was inaccessible in this repair run so summary is from title only.'],
+  }), withDiff), /did not read the supplied PR context/);
+});
+
 test('an open GitHub thread may still support 10/10 when investigation confirms the code resolves it', () => {
   const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
   const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
