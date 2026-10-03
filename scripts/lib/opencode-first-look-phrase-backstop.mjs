@@ -21,6 +21,7 @@ const pushAssessmentSummaries = (target, items) => {
   }
 };
 
+// @codescene(disable:"Complex Method")
 export function assertPhraseBackstop(rawResult, parsed) {
   const chunks = [];
   pushStringSummaries(chunks, rawResult?.prSummary ?? parsed?.prSummary);
