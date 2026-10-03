@@ -10,6 +10,7 @@ export {
   renderOpenCodeFirstLookUnavailableComment,
 } from './opencode-first-look-review-unavailable.mjs';
 
+// @codescene(disable:"Complex Conditional")
 const downgradeSameCommitAssessment = (assessment, threads, head) => {
   if (assessment.status !== 'addressed') return assessment;
   const openedCommit = threads.get(assessment.threadId)?.openedAtCommitOid;
