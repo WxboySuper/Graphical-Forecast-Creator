@@ -3,8 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
-import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
-import { applyPublicationGuards } from './lib/opencode-first-look-context-guard.mjs';
+import { validateFirstLookRepairOutput } from './lib/opencode-first-look-publish.mjs';
 import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
@@ -70,23 +69,20 @@ try {
     return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
   };
 
-  let output = run(baseInvocation, [...attachedFiles, promptFile]);
-  // skipcq: JS-D1001 -- validates first-look JSON before the repair pass writes output.
-  function validateFirstLook(raw) {
-    const rawResult = JSON.parse(raw);
-    const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
-    return applyPublicationGuards(parsed, rawResult, reviewContext);
+  const validateFirstLook = (raw) => {
+    validateFirstLookRepairOutput(raw, reviewContext);
   };
   if (repairFirstLook) {
     try {
-      validateFirstLook(output);
-    } catch (validationError) {
-      const repairPromptFile = join(promptDirectory, 'repair-task.md');
-      const firstOutputFile = join(promptDirectory, 'first-attempt.json');
-      writeFileSync(firstOutputFile, output, 'utf8');
-      writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(validationError.message, reviewContext), 'utf8');
-      output = run('Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.', [...attachedFiles, promptFile, repairPromptFile, firstOutputFile]);
-      validateFirstLook(output);
+      output = attempt === 0
+        ? run(baseInvocation, [...attachedFiles, promptFile])
+        : runRepairPass(output, repairReason);
+      if (repairFirstLook) validateFirstLookRepairOutput(output, reviewContext);
+      repairReason = '';
+      break;
+    } catch (error) {
+      if (!repairFirstLook || attempt === maxAttempts - 1) throw error;
+      repairReason = error.message;
     }
   }
   const output = extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
