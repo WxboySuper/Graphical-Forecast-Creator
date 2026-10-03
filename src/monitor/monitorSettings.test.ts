@@ -48,6 +48,29 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('preserves partial and cleared radar sites through normalize (round-trip)', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'KT' }).radarSite).toBe('KT');
+    expect(normalizeMonitorSettings({ radarSite: 'K' }).radarSite).toBe('K');
+    expect(normalizeMonitorSettings({ radarSite: '' }).radarSite).toBe('');
+    // Full round-trip: setRadarSite output must survive normalize/storage hydration.
+    for (const input of ['KT', 'K', '', 'KTLX', 'OKC ', 'Tula']) {
+      const state = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite(input));
+      expect(normalizeMonitorSettings({ radarSite: state.radarSite }).radarSite).toBe(state.radarSite);
+    }
+  });
+
+  test('mirrors setRadarSite cleaning when normalizing radar sites', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'tlx' }).radarSite).toBe('KTLX');
+    expect(normalizeMonitorSettings({ radarSite: 'OKC ' }).radarSite).toBe('KOKC');
+    expect(normalizeMonitorSettings({ radarSite: 'Tula' }).radarSite).toBe('KTUL');
+    expect(normalizeMonitorSettings({ radarSite: 'ktlx!!!' }).radarSite).toBe('KTLX');
+  });
+
+  test('falls back to default radar site for non-string values', () => {
+    expect(normalizeMonitorSettings({}).radarSite).toBe(DEFAULT_MONITOR_SETTINGS.radarSite);
+    expect(normalizeMonitorSettings({ radarSite: 123 }).radarSite).toBe(DEFAULT_MONITOR_SETTINGS.radarSite);
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));
