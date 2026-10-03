@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment } from './opencode-first-look-output.mjs';
-import {
+import { mergeOpenCodeFirstLookResults, parseOpenCodeFirstLookOutput, renderOpenCodeFirstLookComment,
   applyPublicationGuards,
   FirstLookReviewUnavailableError,
   isFirstLookReviewUnavailableError,
   renderOpenCodeFirstLookUnavailableComment,
-} from './opencode-first-look-context-guard.mjs';
+} from './opencode-first-look-output.mjs';
 
 const summaryMarker = '<!-- gfc-opencode-first-look-summary -->';
 

@@ -9,7 +9,6 @@ exclude_patterns = [
   "scripts/lib/opencode-first-look-workflow.test.mjs",
   "scripts/lib/opencode-workflow-queue.test.mjs",
   "scripts/lib/opencode-first-look-context-guard.test.mjs",
-  "scripts/lib/opencode-first-look-context-guard.mjs",
   "scripts/lib/opencode-first-look-publish.mjs",
   "scripts/publish-opencode-first-look.mjs",
   "server/**/*.test.js",

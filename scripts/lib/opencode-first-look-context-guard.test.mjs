@@ -5,7 +5,7 @@ import {
   applyThreadCommitPlausibility,
   FirstLookReviewUnavailableError,
   renderOpenCodeFirstLookUnavailableComment,
-} from './opencode-first-look-context-guard.mjs';
+} from './opencode-first-look-output.mjs';
 import { prepareFirstLookPublication, readFirstLookModelOutput, wrapFirstLookPublicationError } from './opencode-first-look-publish.mjs';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
