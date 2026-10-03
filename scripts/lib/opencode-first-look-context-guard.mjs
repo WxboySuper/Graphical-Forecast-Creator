@@ -1,5 +1,4 @@
 /** Guards against publishing first-look reviews when the model never read the PR diff/context. */
-// @codescene(disable:"Complex Method", disable:"Complex Conditional", disable:"Overall Code Complexity")
 
 const CONTEXT_ACCESS_BACKSTOP_PATTERNS = [
   /blocked by tool permissions/i,
@@ -20,17 +19,26 @@ export class FirstLookReviewUnavailableError extends Error {
 export const isFirstLookReviewUnavailableError = (error) =>
   error instanceof FirstLookReviewUnavailableError || error?.name === 'FirstLookReviewUnavailableError';
 
+function stringSummaryChunks(values) {
+  return (values ?? []).filter((value) => typeof value === 'string');
+}
+
+function assessmentSummaries(items) {
+  return stringSummaryChunks((items ?? []).map((item) => item?.summary));
+}
+
 /** Collect summary and assessment text for the phrase backstop (never finding evidence). */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional", disable:"Overall Code Complexity")
 function collectSummaryAssessmentText(rawResult, parsed) {
-  const chunks = [
-    ...(rawResult?.prSummary ?? parsed?.prSummary ?? []),
-    ...(rawResult?.latestChanges ?? parsed?.latestChanges ?? []),
-    ...(rawResult?.goodThings ?? parsed?.goodThings ?? []),
-    ...(rawResult?.reviewCommentAssessments ?? []).map((item) => item?.summary),
-    ...(rawResult?.priorFindingAssessments ?? []).map((item) => item?.summary),
-    rawResult?.linkedIssueAssessment ?? parsed?.linkedIssueAssessment,
+  const linked = rawResult?.linkedIssueAssessment ?? parsed?.linkedIssueAssessment;
+  return [
+    ...stringSummaryChunks(rawResult?.prSummary ?? parsed?.prSummary),
+    ...stringSummaryChunks(rawResult?.latestChanges ?? parsed?.latestChanges),
+    ...stringSummaryChunks(rawResult?.goodThings ?? parsed?.goodThings),
+    ...assessmentSummaries(rawResult?.reviewCommentAssessments),
+    ...assessmentSummaries(rawResult?.priorFindingAssessments),
+    ...(typeof linked === 'string' ? [linked] : []),
   ];
-  return chunks.filter((value) => typeof value === 'string');
 }
 
 function assertPhraseBackstop(rawResult, parsed) {
