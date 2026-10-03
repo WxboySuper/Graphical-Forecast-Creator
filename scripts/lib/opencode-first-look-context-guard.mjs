@@ -92,6 +92,7 @@ function assertContextReadFlag(rawResult) {
 }
 
 /** Same-revision threads cannot be marked addressed without a later commit. */
+// @codescene(disable:"Complex Conditional")
 export function applyThreadCommitPlausibility(assessments, context) {
   const threads = new Map((context.openReviewThreads ?? []).map((thread) => [thread.id, thread]));
   return assessments.map((assessment) => {
