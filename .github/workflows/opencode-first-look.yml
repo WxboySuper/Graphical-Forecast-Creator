@@ -500,7 +500,7 @@ jobs:
         run: node scripts/run-opencode-maintenance.mjs
 
       - name: Publish first-look result
-        if: steps.context.outputs.run == 'true'
+        if: ${{ !cancelled() && steps.context.outputs.run == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}

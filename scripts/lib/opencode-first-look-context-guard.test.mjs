@@ -78,6 +78,61 @@ test('downgrades addressed assessments for threads opened on the reviewed commit
   assert.equal(adjusted[0].status, 'unclear');
 });
 
+test('same-commit thread downgrades publish P2 findings instead of unavailable', () => {
+  const head = 'abc1234567890123456789012345678901234567890';
+  const threadContext = {
+    head,
+    changedFilePaths: ['scripts/a.mjs'],
+    files: [{ path: 'scripts/a.mjs', patch: '+x' }],
+    openReviewThreads: [{
+      id: 'thread-1',
+      path: 'scripts/a.mjs',
+      line: 12,
+      openedAtCommitOid: head,
+    }],
+  };
+  const parsed = applyPublicationGuards({
+    ...baseParsed,
+    rating: 10,
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary: 'Looks fixed.' }],
+  }, rawWithCoverage, threadContext);
+  assert.equal(parsed.rating, 8);
+  assert.equal(parsed.badThings.length, 1);
+  assert.equal(parsed.badThings[0].title, 'Open review thread on this commit not verified as addressed');
+  assert.equal(parsed.badThings[0].path, 'scripts/a.mjs');
+  assert.equal(parsed.badThings[0].line, 12);
+});
+
+test('same-commit downgrade uses null path when thread file is outside the PR diff', () => {
+  const head = 'abc1234567890123456789012345678901234567890';
+  const parsed = applyPublicationGuards({
+    ...baseParsed,
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary: 'Looks fixed.' }],
+  }, rawWithCoverage, {
+    head,
+    changedFilePaths: ['scripts/a.mjs'],
+    files: [{ path: 'scripts/a.mjs' }],
+    openReviewThreads: [{
+      id: 'thread-1',
+      path: 'README.md',
+      line: 3,
+      openedAtCommitOid: head,
+    }],
+  });
+  assert.equal(parsed.badThings[0].path, null);
+  assert.equal(parsed.badThings[0].line, null);
+});
+
+test('still-open threads without findings remain unavailable', () => {
+  assert.throws(
+    () => applyPublicationGuards({
+      ...baseParsed,
+      reviewCommentAssessments: [{ threadId: 'thread-1', status: 'still-open', summary: 'Still broken.' }],
+    }, rawWithCoverage, context),
+    (error) => error instanceof FirstLookReviewUnavailableError,
+  );
+});
+
 test('readFirstLookModelOutput wraps missing output files', () => {
   assert.throws(() => readFirstLookModelOutput('/tmp/does-not-exist-opencode-review-output.md'), /did not produce a review output file/);
 });
