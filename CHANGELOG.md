@@ -53,6 +53,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
 - **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
+- **firebase-admin:** 14.4.0 → 14.5.0 (`server`)
 
 #### Dependency summary
 <!-- dependabot-automation -->
