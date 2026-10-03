@@ -15,6 +15,7 @@ exclude_patterns = [
   "scripts/lib/opencode-first-look-phrase-backstop.mjs",
   "scripts/lib/opencode-first-look-publish.mjs",
   "scripts/publish-opencode-first-look.mjs",
+  "scripts/lib/opencode-cli-output.test.mjs",
   "server/**/*.test.js",
   "src/**/*.test.ts",
   "src/**/*.test.tsx",

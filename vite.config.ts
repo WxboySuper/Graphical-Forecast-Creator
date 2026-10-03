@@ -64,7 +64,18 @@ export default defineConfig(({ mode }) => {
       __GFC_UMAMI_PRODUCTION_WEBSITE_ID__: JSON.stringify(env.VITE_UMAMI_PRODUCTION_WEBSITE_ID ?? ''),
       __GFC_UMAMI_BETA_WEBSITE_ID__: JSON.stringify(env.VITE_UMAMI_BETA_WEBSITE_ID ?? ''),
     },
-    plugins: [react(), ...sentryPlugins],
+    plugins: [
+      react(),
+      {
+        name: 'gfc-emit-version-json',
+        closeBundle() {
+          const outPath = path.resolve(__dirname, 'build', 'version.json');
+          fs.mkdirSync(path.dirname(outPath), { recursive: true });
+          fs.writeFileSync(outPath, `${JSON.stringify({ version: pkg.version })}\n`);
+        },
+      },
+      ...sentryPlugins,
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
