@@ -1,0 +1,57 @@
+# Forecast workspace route and state decisions
+
+Issue: [#914](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/914)
+Implemented in: #1456
+Base doc: [Forecast workspace boundaries](./forecast-workspace-boundaries.md)
+
+This record pins down what #1456 actually built. The base doc describes the planned v1.8 layout. This one describes the working subset and the rules the code now enforces.
+
+## Routes
+
+- `/forecast/severe` is the available editor. `/forecast` redirects there and keeps query parameters and hash.
+- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor. Issue #914 ships the route contract, so staging and production keep the workspace on the unavailable-workspace page instead of opening a second production editor.
+- `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
+- `/custom-products` stays a separate library route gated by `customProducts`. It is not a legacy Forecast editor path.
+- Canonical matching tolerates trailing slashes. Non-forecast pages leave Redux workspace ownership alone instead of resetting it to Severe.
+
+## State ownership
+
+- The URL selects the workspace. App-level code syncs Redux `workspaceId` from the route.
+- A real workspace switch clears the prior document, undo state, discussion drafts, and workflow state. Saved-cycle history is kept.
+- The editor subtree remounts per workspace so the selected cloud cycle cannot leak from one owner to another.
+- ForecastPage waits for Redux ownership to match the route before running restore effects. This stops a late reset from erasing the target workspace restore.
+
+## Persistence
+
+- Autosave keys, day-rollover saves, editor cloud saves, and restore keys carry the owning workspace.
+- A pending debounced save flushes to its original workspace before a scope change. A deliberate fresh start clears both signed-in and anonymous copies.
+- Sign-in migrates anonymous autosaves per workspace. A non-Severe draft is never promoted into Severe.
+- Every new cloud record requires `workspaceId`. Library tabs filter on it. Legacy records without an id read as Severe.
+
+## Cloud handoff
+
+- A staged custom-product handoff names its destination workspace. The forecast editor consumes it only when it is mounted as that workspace, so a Custom product can never land in Severe. The library hands off to `/forecast/custom`.
+- Cloud loads classify the payload with the production validators before anything is written. An already enveloped payload is reused as is, an envelope that names another workspace is rejected, malformed input throws instead of being wrapped as forecast data, and a Custom record's save classifies as Custom rather than Severe.
+- A workspace can open cloud payloads only when it has a registered editor route for the current build target. That is Severe everywhere and Custom where `customWorkspace` is on. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
+- A handoff that reaches the wrong editor is a user-visible error. The pending session stays staged under the workspace that owns it, the editor shows an error toast, and local restore still runs, so a handoff waiting for another editor is neither deleted nor allowed to hide this workspace's own session. Its owner opens or clears it on a later mount.
+- A malformed or unknown pending handoff is cleared with an invalid-session error, and local restore still runs. Absence alone is not treated as corruption.
+- Pre-workspace `cloudCyclePayload` / `cloudCycleMeta` keys are adopted on mount. A key that already names the mounting account moves into that account's workspace slot, so a pending load survives sign-in. Unscoped leftovers move into the anonymous slot and never into an account scope, because nothing in them says which account staged them. Migration drops a value that will not parse or classify; clearing never does.
+- A legacy handoff only moves into a completely free slot. An already staged payload is newer and wins, so the legacy copy goes with it. A free payload slot whose metadata slot is occupied keeps the legacy pair for a later mount instead of writing a payload next to someone else's metadata, whether or not the legacy pair has metadata of its own. Migration never overwrites a staged value.
+- Clearing one workspace clears its workspace-scoped keys, and the unscoped legacy pair only when its payload classifies to that workspace. Clearing Severe therefore leaves a staged Custom handoff in place, and a meta entry with no payload or a payload that will not classify stays put because neither can be attributed to the workspace being cleared.
+
+## Exposure
+
+- `src/config/forecastWorkspaces.ts` owns the workspace list. `src/routing/forecastWorkspaceRoutes.ts` owns route resolution and the exposed-route list. App registers routes from that list.
+- Every non-Severe workspace owns its own exposure key. The Custom editor route reads `customWorkspace`, which is off on staging and production, so the library feature gate cannot open a production workspace route by accident.
+- Future workspace modules stay behind route loaders. The shell never imports them at module scope.
+
+## Follow-ups, not in scope
+
+- Full workspace switcher stays with #917.
+- Custom UI move and compatibility redirect stay with #915.
+- Discussion embedding and `/discussion` handoff stay with #916.
+- Mesoscale registration stays with #919.
+
+## Browser coverage
+
+- `e2e/forecast-workspace-navigation.spec.ts` covers direct navigation, refresh, back/forward, and a dirty SPA switch across the restore gate. It passed locally.

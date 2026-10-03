@@ -1,6 +1,7 @@
 import type { Feature, Polygon } from 'geojson';
-import type { DayType } from '../types/outlooks';
+import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
+import { getFirstExposedOutlookType } from '../config/productExposureSelectors';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
@@ -48,6 +49,10 @@ import reducer, {
   setOutlookOpacity,
   selectCurrentOutlookOpacity,
   toggleSignificant,
+  setMapView,
+  setActiveProbability,
+  setCustomEditorMode,
+  selectCustomLayer,
 } from './forecastSlice';
 
 const createPolygon = (offset: number): Polygon => ({
@@ -394,6 +399,73 @@ describe('forecastSlice undo/redo', () => {
       savedCycles: [{ ...state.savedCycles[0], workspaceId: 'not-a-workspace' } as never],
     };
     expect(reducer(withMalformed, loadSavedCycle(legacyId)).workspaceId).toBe('custom');
+  });
+
+  test('resets the stale document when the route switches workspaces', () => {
+    let state = reducer(undefined, saveCurrentCycle({ label: 'Severe cycle' }));
+    const severeCycle = state.forecastCycle;
+    state = reducer(state, setForecastWorkspace('custom'));
+
+    expect(state.workspaceId).toBe('custom');
+    expect(state.forecastCycle).not.toBe(severeCycle);
+    expect(state.savedCycles).toHaveLength(1);
+    expect(state.isSaved).toBe(false);
+
+    // Re-dispatching the active workspace is a no-op and keeps the document.
+    const beforeNoop = state.forecastCycle;
+    state = reducer(state, setForecastWorkspace('custom'));
+    expect(state.forecastCycle).toBe(beforeNoop);
+  });
+
+  test('resets editor, map, and completion state when the route switches workspaces', () => {
+    let state = reducer(undefined, setMapView({ center: [10, 20], zoom: 9 }));
+    state = reducer(state, setActiveProbability('15%'));
+    state = reducer(state, toggleSignificant());
+    state = reducer(state, setCustomEditorMode('custom'));
+    state = reducer(state, selectCustomLayer('layer-1'));
+    state = reducer(state, validateCompletion());
+
+    expect(state.currentMapView).toEqual({ center: [10, 20], zoom: 9 });
+    expect(state.drawingState).toEqual({ activeOutlookType: 'tornado', activeProbability: '15%', isSignificant: true });
+    expect(state.customEditor.mode).toBe('custom');
+    expect(state.completionValidation.showCompletionModal).toBe(true);
+
+    state = reducer(state, setForecastWorkspace('custom'));
+
+    expect(state.currentMapView).toEqual({ center: [39.8283, -98.5795], zoom: 4 });
+    expect(state.drawingState).toEqual({ activeOutlookType: getFirstExposedOutlookType(), activeProbability: '2%', isSignificant: false });
+    // The Custom workspace opens in its own editor instead of Severe's defaults.
+    expect(state.customEditor).toEqual({ mode: 'custom', activeLayerId: null, activeCategoryId: null });
+    expect(state.completionValidation).toEqual({ lastResult: null, showCompletionModal: false, omittedDays: {} });
+
+    state = reducer(state, setForecastWorkspace('severe'));
+
+    expect(state.customEditor).toEqual({ mode: 'severe', activeLayerId: null, activeCategoryId: null });
+    expect(state.drawingState).toEqual({ activeOutlookType: getFirstExposedOutlookType(), activeProbability: '2%', isSignificant: false });
+  });
+
+  test('keeps discussion drafts with their own workspace across switches', () => {
+    const severeDraft = { mode: 'diy' as const, diyContent: 'Severe draft' } as DiscussionData;
+    const customDraft = { mode: 'diy' as const, diyContent: 'Custom draft' } as DiscussionData;
+
+    let state = reducer(undefined, updateDiscussionDraft({ scopeId: 'day1', draft: severeDraft }));
+    expect(state.discussionDraftsByScope.day1).toEqual(severeDraft);
+
+    // Switching away parks the drafts instead of dropping them, and the new
+    // workspace starts with no draft of its own.
+    state = reducer(state, setForecastWorkspace('custom'));
+    expect(state.discussionDraftsByScope).toEqual({});
+
+    state = reducer(state, updateDiscussionDraft({ scopeId: 'day1', draft: customDraft }));
+    expect(state.discussionDraftsByScope.day1).toEqual(customDraft);
+
+    // Switching back hands Severe its draft, and Custom keeps its own on the
+    // next round trip.
+    state = reducer(state, setForecastWorkspace('severe'));
+    expect(state.discussionDraftsByScope.day1).toEqual(severeDraft);
+
+    state = reducer(state, setForecastWorkspace('custom'));
+    expect(state.discussionDraftsByScope.day1).toEqual(customDraft);
   });
 
   test('memoizes workspace cycle selection across unrelated state changes', () => {

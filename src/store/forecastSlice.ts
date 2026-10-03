@@ -37,6 +37,7 @@ import {
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
+import { getFirstExposedOutlookType } from '../config/productExposureSelectors';
 
 const getSavedCycleWorkspaceId = (cycle: Pick<SavedCycle, 'workspaceId'>): ForecastWorkspaceId =>
   getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
@@ -95,6 +96,8 @@ export interface ForecastState {
   historyByDay: Partial<Record<DayType, ForecastHistoryStacks>>;
   /** Unsaved discussion editor drafts, keyed by grouping id so shared owner days cannot collide. */
   discussionDraftsByScope: Record<string, DiscussionData>;
+  /** Drafts parked for the workspaces that are not mounted, keyed by workspace id. */
+  discussionDraftsByWorkspace: Partial<Record<ForecastWorkspaceId, Record<string, DiscussionData>>>;
   /** v2 workflow metadata for the active cycle (optional, present when loaded from a workflow package). */
   workflowMetadata?: CycleMetadata;
   /** v2 workflow template metadata (optional, present when the editor is in workflow mode). */
@@ -359,6 +362,27 @@ const normalizeCycleWorkspace = (cycle: SavedCycle): SavedCycle => ({
   workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
 });
 
+/**
+ * Returns the tool and custom-editor defaults one workspace starts from.
+ * The outlook type comes from build-target exposure and the custom editor only
+ * opens in custom mode for the workspace that owns custom layers, so a switch
+ * never seeds Severe's defaults into another product.
+ */
+const createWorkspaceEditorDefaults = (
+  workspaceId: ForecastWorkspaceId,
+): Pick<ForecastState, 'drawingState' | 'customEditor'> => ({
+  drawingState: {
+    activeOutlookType: getFirstExposedOutlookType(),
+    activeProbability: '2%',
+    isSignificant: false,
+  },
+  customEditor: {
+    mode: workspaceId === 'custom' ? 'custom' : 'severe',
+    activeLayerId: null,
+    activeCategoryId: null,
+  },
+});
+
 const initialState: ForecastState = {
   cycleGeneration: 1,
   workspaceId: DEFAULT_FORECAST_WORKSPACE,
@@ -369,17 +393,7 @@ const initialState: ForecastState = {
     currentDay: 1,
     cycleDate: INITIAL_CYCLE_DATE
   },
-  drawingState: {
-    // Start with tornado for Day 1/2 (default day)
-    activeOutlookType: 'tornado',
-    activeProbability: '2%',
-    isSignificant: false
-  },
-  customEditor: {
-    mode: 'severe',
-    activeLayerId: null,
-    activeCategoryId: null,
-  },
+  ...createWorkspaceEditorDefaults(DEFAULT_FORECAST_WORKSPACE),
   currentMapView: {
     center: [39.8283, -98.5795],
     zoom: 4
@@ -390,6 +404,7 @@ const initialState: ForecastState = {
   lifetimeCycleStats: { totalCyclesMade: 0, totalForecastsMade: 0 },
   historyByDay: {},
   discussionDraftsByScope: {},
+  discussionDraftsByWorkspace: {},
   completionValidation: {
     lastResult: null,
     showCompletionModal: false,
@@ -1050,9 +1065,50 @@ export const forecastSlice = createSlice({
 
     // Cycle History Management
     setForecastWorkspace: (state, action: PayloadAction<ForecastWorkspaceId>) => {
-      if (getForecastWorkspace(action.payload)) {
-        state.workspaceId = action.payload;
+      const nextWorkspace = getForecastWorkspace(action.payload);
+      if (!nextWorkspace || nextWorkspace.id === state.workspaceId) {
+        return;
       }
+      const previousWorkspaceId = state.workspaceId;
+      state.workspaceId = nextWorkspace.id;
+      // Drafts belong to the workspace that wrote them: park the outgoing
+      // workspace's drafts and hand back the ones this workspace left behind,
+      // so switching away and back never drops unpublished discussion text.
+      state.discussionDraftsByWorkspace = {
+        ...state.discussionDraftsByWorkspace,
+        [previousWorkspaceId]: state.discussionDraftsByScope,
+      };
+      state.discussionDraftsByScope = state.discussionDraftsByWorkspace[nextWorkspace.id] ?? {};
+      // Switching products must not leak the previous document or undo stacks
+      // into the new workspace. ForecastPage restores the target workspace
+      // autosave or cloud payload on top of this blank slate.
+      const now = readActionTimestamp(action);
+      const today = getActionLocalCalendarDate(action);
+      state.forecastCycle = {
+        days: {
+          1: createEmptyOutlook(1, now),
+        },
+        currentDay: 1,
+        cycleDate: today,
+      };
+      clearHistory(state);
+      state.isSaved = false;
+      state.outlookVersionSnapshots = [];
+      state.workflowMetadata = undefined;
+      state.workflowTemplate = undefined;
+      state.isWorkflowActive = false;
+      state.lastTrimResult = null;
+      state.autoCategoricalError = null;
+      // Editor-owned state belongs to the workspace too: camera, active tool
+      // settings, custom-layer selection, and the completion dialog all reset to
+      // the new workspace's own defaults so the mount never starts Severe's
+      // tools in another product.
+      state.currentMapView = { center: [39.8283, -98.5795], zoom: 4 };
+      const editorDefaults = createWorkspaceEditorDefaults(nextWorkspace.id);
+      state.drawingState = editorDefaults.drawingState;
+      state.customEditor = editorDefaults.customEditor;
+      state.completionValidation = { lastResult: null, showCompletionModal: false, omittedDays: {} };
+      invalidateCompletionAcknowledgement(state);
     },
 
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
