@@ -1,3 +1,5 @@
+import { parseOpenCodeFirstLookOutput } from './opencode-first-look-output.mjs';
+
 /** Build the bounded OpenCode CLI invocation. */
 export function openCodeRunArguments(model, prompt, files = []) {
   return [
@@ -8,10 +10,10 @@ export function openCodeRunArguments(model, prompt, files = []) {
 }
 
 /** Extract the final assistant message from OpenCode's --format json event stream. */
-export function extractFinalAssistantText(stdout, { format = 'text' } = {}) {
+export function extractFinalAssistantText(stdout, { format = 'text', firstLookContext } = {}) {
   assertExtractionInput(stdout, format);
   const finalText = readFinalAssistantMessage(stdout);
-  return format === 'json' ? extractJsonAssistantResponse(finalText) : finalText;
+  return format === 'json' ? extractJsonAssistantResponse(finalText, { firstLookContext }) : finalText;
 }
 
 /** Validate stdout and response format before parsing OpenCode events. */
@@ -45,25 +47,54 @@ function collectMessageParts(events, messageId) {
   return [...parts.values()];
 }
 
-/** Parse the first JSON object embedded in the assistant message. */
-function extractJsonAssistantResponse(text) {
+/** Parse the review JSON object embedded in the assistant message. */
+function extractJsonAssistantResponse(text, { firstLookContext } = {}) {
   const candidate = unwrapJsonFence(text.trim());
-  const directResult = isJsonObject(candidate) ? candidate : findJsonObjectAfterPrefix(candidate);
-  if (directResult) return directResult;
+  if (isJsonObject(candidate) && !looksLikeEmbeddedExampleBeforeMoreJson(candidate, text)) {
+    return candidate;
+  }
+  const objects = collectValidObjects(candidate);
+  const selected = selectReviewJsonObject(objects, firstLookContext);
+  if (selected) return selected;
   throw new Error('OpenCode final assistant message did not contain a JSON object.');
 }
 
-/** Scan for a JSON object after optional leading prose. */
-function findJsonObjectAfterPrefix(text) {
+/** Whole-message JSON is authoritative unless the raw text contains a later object. */
+function looksLikeEmbeddedExampleBeforeMoreJson(candidate, rawText) {
+  const trimmed = rawText.trim();
+  if (trimmed === candidate) return false;
+  const afterCandidate = trimmed.indexOf(candidate) + candidate.length;
+  return trimmed.indexOf('{', afterCandidate) >= 0;
+}
+
+/** Collect every balanced top-level JSON object in document order. */
+function collectValidObjects(text) {
+  const objects = [];
   let from = 0;
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let scan = 0; scan < 500; scan++) {
     const start = text.indexOf('{', from);
-    if (start < 0) return null;
+    if (start < 0) break;
     const candidate = readValidObjectAt(text, start);
-    if (candidate) return candidate;
+    if (candidate) objects.push(candidate);
     from = start + 1;
   }
-  return null;
+  return objects;
+}
+
+/** Prefer the first object that parses as first-look output, otherwise the last valid object. */
+function selectReviewJsonObject(objects, firstLookContext) {
+  if (!objects.length) return null;
+  if (firstLookContext !== undefined) {
+    for (const candidate of objects) {
+      try {
+        parseOpenCodeFirstLookOutput(candidate, firstLookContext);
+        return candidate;
+      } catch {
+        // Keep scanning; earlier prose may include example JSON objects.
+      }
+    }
+  }
+  return objects.at(-1);
 }
 
 /** Return a JSON object substring when braces balance at `start`. */

@@ -66,7 +66,10 @@ try {
       process.stderr.write(result.stderr ?? '');
       throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
     }
-    return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
+    return extractFinalAssistantText(result.stdout ?? '', {
+      format: responseFormat,
+      ...(repairFirstLook ? { firstLookContext: reviewContext } : {}),
+    });
   };
 
   /** Re-run OpenCode with repair instructions when JSON output is missing or invalid. */
