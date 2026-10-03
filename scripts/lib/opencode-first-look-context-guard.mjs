@@ -10,19 +10,20 @@ export {
   renderOpenCodeFirstLookUnavailableComment,
 } from './opencode-first-look-review-unavailable.mjs';
 
+const downgradeSameCommitAssessment = (assessment, threads, head) => {
+  if (assessment.status !== 'addressed') return assessment;
+  const openedCommit = threads.get(assessment.threadId)?.openedAtCommitOid;
+  if (!openedCommit || !head || openedCommit !== head) return assessment;
+  return {
+    ...assessment,
+    status: 'unclear',
+    summary: 'Thread was opened on the reviewed commit; mark addressed only after a later commit changes the cited code.',
+  };
+};
+
 export function applyThreadCommitPlausibility(assessments, context) {
   const threads = new Map((context.openReviewThreads ?? []).map((thread) => [thread.id, thread]));
-  const head = context.head;
-  return assessments.map((assessment) => {
-    if (assessment.status !== 'addressed') return assessment;
-    const openedCommit = threads.get(assessment.threadId)?.openedAtCommitOid;
-    if (!openedCommit || !head || openedCommit !== head) return assessment;
-    return {
-      ...assessment,
-      status: 'unclear',
-      summary: 'Thread was opened on the reviewed commit; mark addressed only after a later commit changes the cited code.',
-    };
-  });
+  return assessments.map((assessment) => downgradeSameCommitAssessment(assessment, threads, context.head));
 }
 
 export function applyPublicationGuards(parsed, rawResult, context) {
