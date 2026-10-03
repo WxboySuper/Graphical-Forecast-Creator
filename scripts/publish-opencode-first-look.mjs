@@ -8,7 +8,7 @@ import {
   readFirstLookModelOutput,
   wrapFirstLookPublicationError,
 } from './lib/opencode-first-look-publish.mjs';
-import { parseGhApiPaginatedResponse } from './lib/gh-api-paginate.mjs';
+import { buildGhApiSlurpPaginateArgs, parseGhApiPaginatedResponse } from './lib/gh-api-paginate.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'PULL_NUMBER', 'REVIEW_SHA', 'REVIEW_KIND', 'REVIEW_REQUEST_ID', 'OUTPUT_PATH', 'CONTEXT_PATH', 'GH_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error(`${key} is required.`);
@@ -42,14 +42,11 @@ if (pull.head.sha !== expectedSha) {
   process.exit(0);
 }
 
-const listIssueComments = () => parseGhApiPaginatedResponse(execFileSync('gh', [
-  'api',
-  `repos/${repository}/issues/${pullNumber}/comments`,
-  '--paginate',
-  '--slurp',
-  '-q',
-  'per_page=100',
-], { encoding: 'utf8', env: apiEnv }));
+const listIssueComments = () => parseGhApiPaginatedResponse(execFileSync(
+  'gh',
+  buildGhApiSlurpPaginateArgs(`repos/${repository}/issues/${pullNumber}/comments`),
+  { encoding: 'utf8', env: apiEnv },
+));
 
 const comments = listIssueComments();
 const summaryComment = findFirstLookSummaryComment(comments);

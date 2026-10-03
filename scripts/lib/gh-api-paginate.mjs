@@ -13,3 +13,9 @@ export function parseGhApiPaginatedResponse(text) {
   if (Array.isArray(parsed[0])) return parsed.flat();
   return parsed;
 }
+
+/** Build argv for `gh api <route>?per_page=N --paginate --slurp` (GET list endpoints). */
+export function buildGhApiSlurpPaginateArgs(route, { perPage = 100 } = {}) {
+  const separator = route.includes('?') ? '&' : '?';
+  return ['api', `${route}${separator}per_page=${perPage}`, '--paginate', '--slurp'];
+}
