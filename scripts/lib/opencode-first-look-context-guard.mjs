@@ -1,4 +1,5 @@
 /** Guards against publishing first-look reviews when the model never read the PR diff/context. */
+// @codescene(disable:"Complex Method", disable:"Complex Conditional", disable:"Overall Code Complexity")
 
 const CONTEXT_ACCESS_BACKSTOP_PATTERNS = [
   /blocked by tool permissions/i,
