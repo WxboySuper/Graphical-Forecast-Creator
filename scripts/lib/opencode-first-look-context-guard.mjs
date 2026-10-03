@@ -2,48 +2,13 @@
 
 import { FirstLookReviewUnavailableError } from './opencode-first-look-review-unavailable.mjs';
 import { assertContextReadFlag, parseFilesReviewed } from './opencode-first-look-files-reviewed.mjs';
+import { assertPhraseBackstop } from './opencode-first-look-phrase-backstop.mjs';
 
 export {
   FirstLookReviewUnavailableError,
   isFirstLookReviewUnavailableError,
   renderOpenCodeFirstLookUnavailableComment,
 } from './opencode-first-look-review-unavailable.mjs';
-
-const CONTEXT_ACCESS_BACKSTOP_PATTERNS = [
-  /blocked by tool permissions/i,
-  /could not (?:open|read).*context/i,
-  /no access to the patch/i,
-  /PR diff unavailable/i,
-  /Full diff was inaccessible/i,
-  /diff inaccessible/i,
-];
-
-const stringSummaryChunks = (values) => (values ?? []).filter((value) => typeof value === 'string');
-
-const assessmentSummaries = (items) => stringSummaryChunks((items ?? []).map((item) => item?.summary));
-
-const collectSummaryAssessmentText = (rawResult, parsed) => {
-  const linked = rawResult?.linkedIssueAssessment ?? parsed?.linkedIssueAssessment;
-  return [
-    ...stringSummaryChunks(rawResult?.prSummary ?? parsed?.prSummary),
-    ...stringSummaryChunks(rawResult?.latestChanges ?? parsed?.latestChanges),
-    ...stringSummaryChunks(rawResult?.goodThings ?? parsed?.goodThings),
-    ...assessmentSummaries(rawResult?.reviewCommentAssessments),
-    ...assessmentSummaries(rawResult?.priorFindingAssessments),
-    ...(typeof linked === 'string' ? [linked] : []),
-  ];
-};
-
-const assertPhraseBackstop = (rawResult, parsed) => {
-  const haystack = collectSummaryAssessmentText(rawResult, parsed).join('\n');
-  for (const pattern of CONTEXT_ACCESS_BACKSTOP_PATTERNS) {
-    if (pattern.test(haystack)) {
-      throw new FirstLookReviewUnavailableError(
-        'First-look review text admits the PR diff/context was not read; refusing to publish a score.',
-      );
-    }
-  }
-};
 
 export function applyThreadCommitPlausibility(assessments, context) {
   const threads = new Map((context.openReviewThreads ?? []).map((thread) => [thread.id, thread]));
