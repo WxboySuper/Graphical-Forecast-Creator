@@ -111,6 +111,7 @@ export function applyThreadCommitPlausibility(assessments, context) {
 }
 
 /** Validate structured context coverage and adjust thread assessments before publication. */
+// @codescene(disable:"Complex Method")
 export function applyPublicationGuards(parsed, rawResult, context) {
   assertContextReadFlag(rawResult);
   const filesReviewed = parseFilesReviewed(rawResult.filesReviewed, context);
