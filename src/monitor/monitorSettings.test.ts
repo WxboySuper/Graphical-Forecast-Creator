@@ -48,6 +48,20 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('normalize preserves in-progress radar site ids through re-apply/hydration', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'KT' }).radarSite).toBe('KT');
+    expect(normalizeMonitorSettings({ radarSite: 'K' }).radarSite).toBe('K');
+    expect(normalizeMonitorSettings({ radarSite: '' }).radarSite).toBe('');
+    expect(normalizeMonitorSettings({ radarSite: 'ktlx' }).radarSite).toBe('KTLX');
+    expect(normalizeMonitorSettings({}).radarSite).toBe(DEFAULT_MONITOR_SETTINGS.radarSite);
+  });
+
+  test('normalize applies the same site cleanup as setRadarSite', () => {
+    const fromSlice = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite('tula')).radarSite;
+    expect(fromSlice).toBe('KTUL');
+    expect(normalizeMonitorSettings({ radarSite: 'tula' }).radarSite).toBe(fromSlice);
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));
