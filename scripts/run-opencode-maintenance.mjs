@@ -69,10 +69,22 @@ try {
     return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
   };
 
-  const validateFirstLook = (raw) => {
-    validateFirstLookRepairOutput(raw, reviewContext);
+  /** Re-run OpenCode with repair instructions when JSON output is missing or invalid. */
+  const runRepairPass = (firstOutput, reason) => {
+    const repairPromptFile = join(promptDirectory, 'repair-task.md');
+    const firstOutputFile = join(promptDirectory, 'first-attempt.json');
+    writeFileSync(firstOutputFile, firstOutput ?? '', 'utf8');
+    writeFileSync(repairPromptFile, buildFirstLookRepairPrompt(reason, reviewContext), 'utf8');
+    return run(
+      'Read the attached repair task, original task, PR context, and first response. Finish and correct the review; return only the complete JSON object.',
+      [...attachedFiles, promptFile, repairPromptFile, firstOutputFile],
+    );
   };
-  if (repairFirstLook) {
+
+  let output = '';
+  let repairReason = '';
+  const maxAttempts = repairFirstLook ? 3 : 1;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     try {
       output = attempt === 0
         ? run(baseInvocation, [...attachedFiles, promptFile])
