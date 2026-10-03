@@ -69,10 +69,6 @@ try {
     return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
   };
 
-  const validateFirstLook = (raw) => {
-    validateFirstLookRepairOutput(raw, reviewContext);
-  };
-
   /** Re-run OpenCode with repair instructions when JSON output is missing or invalid. */
   const runRepairPass = (firstOutput, reason) => {
     const repairPromptFile = join(promptDirectory, 'repair-task.md');
