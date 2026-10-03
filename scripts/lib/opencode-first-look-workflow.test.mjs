@@ -83,6 +83,11 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.equal(publish.env.PULL_NUMBER, ghActionsExpr('needs.wait-for-ci.outputs.pull_number'));
   assert.equal(publish.env.REVIEW_SHA, ghActionsExpr('needs.wait-for-ci.outputs.head_sha'));
   assert.match(publish.run, /publish-opencode-first-look\.mjs/);
+  assert.equal(
+    publish.if,
+    ghActionsExpr("!cancelled() && steps.context.outputs.run == 'true'"),
+    'publish must run after a failed review step so unavailable comments replace stale scores',
+  );
   assert.match(context.with.script, /openedAtCommitOid/);
   assert.match(context.with.script, /"contextRead":true/);
   assert.match(context.with.script, /filesReviewed/);

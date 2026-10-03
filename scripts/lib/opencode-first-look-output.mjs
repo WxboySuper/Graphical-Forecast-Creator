@@ -357,7 +357,9 @@ const uniqueBy = (items, key) => [...new Map(items.map((item) => [key(item), ite
 const uniqueStrings = (items) => [...new Set(items)];
 
 const renderFindings = (findings) => findings.length ? findings.map((finding) => {
-  const location = finding.line ? `${finding.path}:${finding.line}` : finding.path;
+  const location = finding.path
+    ? (finding.line ? `${finding.path}:${finding.line}` : finding.path)
+    : 'review thread';
   return `- **[${finding.priority}] ${finding.title}** (${location}) Evidence: ${finding.evidence} Impact: ${finding.impact}`;
 }) : ['- No actionable findings.'];
 
