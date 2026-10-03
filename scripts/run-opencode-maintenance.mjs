@@ -3,8 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
-import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
-import { applyPublicationGuards } from './lib/opencode-first-look-context-guard.mjs';
+import { validateFirstLookRepairOutput } from './lib/opencode-first-look-publish.mjs';
 import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
@@ -71,9 +70,7 @@ try {
   };
 
   const validateFirstLook = (raw) => {
-    const rawResult = JSON.parse(raw);
-    const parsed = parseOpenCodeFirstLookOutput(raw, reviewContext);
-    applyPublicationGuards(parsed, rawResult, reviewContext);
+    validateFirstLookRepairOutput(raw, reviewContext);
   };
 
   /** Re-run OpenCode with repair instructions when JSON output is missing or invalid. */
@@ -96,7 +93,7 @@ try {
       output = attempt === 0
         ? run(baseInvocation, [...attachedFiles, promptFile])
         : runRepairPass(output, repairReason);
-      if (repairFirstLook) validateFirstLook(output);
+      if (repairFirstLook) validateFirstLookRepairOutput(output, reviewContext);
       repairReason = '';
       break;
     } catch (error) {

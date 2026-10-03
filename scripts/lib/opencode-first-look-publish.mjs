@@ -35,6 +35,11 @@ export function prepareFirstLookPublication(rawOutput, contextData) {
   return parsed;
 }
 
+/** Validate repair-pass JSON through the same guards used at publication time. */
+export function validateFirstLookRepairOutput(rawOutput, contextData) {
+  prepareFirstLookPublication(rawOutput, contextData);
+}
+
 export function buildFirstLookSummaryBody(parsed, contextData, { expectedSha, reviewKind, requestId }) {
   const review = renderOpenCodeFirstLookComment(parsed, contextData);
   const marker = reviewKind === 'manual'
