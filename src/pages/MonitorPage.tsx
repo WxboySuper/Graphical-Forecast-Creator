@@ -25,7 +25,7 @@ import {
   setSatelliteProduct,
   setReferenceLayerEnabled,
 } from '../store/monitorSlice';
-import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
+import { selectForecastCycle, selectSavedCyclesForActiveWorkspace } from '../store/forecastSlice';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
@@ -110,7 +110,7 @@ const useMonitorPageSources = ({
   const didApplyHandoffSource = useRef(false);
   const settings = useSelector((state: RootState) => state.monitor);
   const currentCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector(selectSavedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const { cycles: cloudCycles, loading: cloudCyclesLoading } = useCloudCycles();
   const { premiumActive } = useEntitlement();
   const { sites: radarSiteOptions, loading: radarSitesLoading, error: radarSitesError } = useRadarSiteOptions();
