@@ -48,6 +48,26 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('preserves partial radar site ids through normalize round-trip', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'KT' }).radarSite).toBe('KT');
+    expect(normalizeMonitorSettings({ radarSite: 'K' }).radarSite).toBe('K');
+    expect(normalizeMonitorSettings({ radarSite: 'KTL' }).radarSite).toBe('KTL');
+    expect(normalizeMonitorSettings({ radarSite: '' }).radarSite).toBe('');
+    expect(normalizeMonitorSettings({ radarSite: ' ktlx ' }).radarSite).toBe('KTLX');
+  });
+
+  test('falls back for radar site ids without a K prefix', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'TULA' }).radarSite).toBe(
+      DEFAULT_MONITOR_SETTINGS.radarSite,
+    );
+    expect(normalizeMonitorSettings({ radarSite: 'OKC' }).radarSite).toBe(
+      DEFAULT_MONITOR_SETTINGS.radarSite,
+    );
+    expect(normalizeMonitorSettings({ radarSite: 'KTLXX' }).radarSite).toBe(
+      DEFAULT_MONITOR_SETTINGS.radarSite,
+    );
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));
