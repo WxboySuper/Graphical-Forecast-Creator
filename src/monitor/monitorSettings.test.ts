@@ -48,6 +48,18 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('preserves partial and cleared radar sites through normalization round-trip', () => {
+    for (const site of ['', 'K', 'KT', 'KTL', 'KTLX']) {
+      const state = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite(site));
+      expect(normalizeMonitorSettings(state).radarSite).toBe(state.radarSite);
+      expect(normalizeMonitorSettings({ radarSite: site }).radarSite).toBe(site === '' ? '' : site.toUpperCase());
+    }
+
+    expect(normalizeMonitorSettings({ radarSite: 'TULSA!' }).radarSite).toBe(
+      DEFAULT_MONITOR_SETTINGS.radarSite,
+    );
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));
