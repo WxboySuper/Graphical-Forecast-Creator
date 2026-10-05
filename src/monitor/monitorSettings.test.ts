@@ -48,6 +48,29 @@ describe('monitor settings', () => {
     expect(state.radarSite).toBe('KT');
   });
 
+  test('round-trips partial and cleared radar sites through normalization', () => {
+    for (const input of ['K', 'KT', 'KTL', 'KTLX', '']) {
+      const working = monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite(input)).radarSite;
+      expect(normalizeMonitorSettings({ radarSite: working }).radarSite).toBe(working);
+    }
+
+    expect(normalizeMonitorSettings({ radarSite: 'KT' }).radarSite).toBe('KT');
+    expect(normalizeMonitorSettings({ radarSite: '' }).radarSite).toBe('');
+  });
+
+  test('cleans radar sites the same way when normalizing', () => {
+    expect(normalizeMonitorSettings({ radarSite: 'ktlx' }).radarSite).toBe('KTLX');
+    expect(normalizeMonitorSettings({ radarSite: ' tlx ' }).radarSite).toBe(
+      monitorReducer(DEFAULT_MONITOR_SETTINGS, setRadarSite(' tlx ')).radarSite,
+    );
+    expect(normalizeMonitorSettings({ radarSite: 'K-TLX!' }).radarSite).toBe('KTLX');
+  });
+
+  test('falls back for unusable radar site values', () => {
+    expect(normalizeMonitorSettings({ radarSite: '!!!' }).radarSite).toBe(DEFAULT_MONITOR_SETTINGS.radarSite);
+    expect(normalizeMonitorSettings({ radarSite: 42 }).radarSite).toBe(DEFAULT_MONITOR_SETTINGS.radarSite);
+  });
+
   test('coerces radar product when switching source mode', () => {
     const state = monitorReducer(undefined, { type: 'init' });
     const siteState = monitorReducer(state, setRadarMode('site'));

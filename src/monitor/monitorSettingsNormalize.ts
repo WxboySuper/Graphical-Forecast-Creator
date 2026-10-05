@@ -36,8 +36,19 @@ const readSite = (value: unknown, fallback: string): string => {
     return fallback;
   }
 
-  const normalized = value.trim().toUpperCase();
-  return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
+  // Keep storage hydration / applyMonitorSettings stable with setRadarSite,
+  // which preserves partial ids (e.g. "KT") and a cleared field ("") while
+  // typing. Full ids are still required before a radar layer is built.
+  if (value.trim() === '') {
+    return '';
+  }
+
+  const cleaned = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (!cleaned) {
+    return fallback;
+  }
+
+  return cleaned.startsWith('K') ? cleaned : `K${cleaned}`.slice(0, 4);
 };
 
 const isLatLonPair = (center: unknown): center is [number, number] =>
