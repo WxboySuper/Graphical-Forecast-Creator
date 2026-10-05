@@ -251,8 +251,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/lib"
           cp scripts/run-opencode-maintenance.mjs "$RUNNER_TEMP/run-opencode-maintenance.mjs"
-          cp scripts/lib/opencode-cli-output.mjs scripts/lib/opencode-env.cjs "$RUNNER_TEMP/lib/"
           cp scripts/lib/opencode-maintenance-state.cjs "$RUNNER_TEMP/opencode-maintenance-state.cjs"
+          while IFS= read -r libFile; do
+            cp "scripts/lib/${libFile}" "$RUNNER_TEMP/lib/"
+          done < <(node scripts/lib/opencode-maintenance-runner-deps.cjs)
           if [[ "$CATEGORY" == "bug-hunt" ]]; then
             OPENCODE_WORKSPACE_SCOPE="$SCOPE" node scripts/prepare-opencode-workspace.mjs
           else

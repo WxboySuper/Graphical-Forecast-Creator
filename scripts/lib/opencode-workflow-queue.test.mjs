@@ -62,3 +62,16 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
   assert.match(publisher.with.script, /github\.rest\.issues\.updateComment/);
   assert.doesNotMatch(publisher.with.script, /github\.rest\.pulls\.createReview/);
 });
+
+test('audit issue worker uses GH_PAT to push branches and open implementation PRs', () => {
+  const workflow = parse(readFileSync(new URL('../../.github/workflows/opencode-audit-issue-worker.yml', import.meta.url), 'utf8'));
+  const publish = workflow.jobs.implement.steps.find((step) => step.name === 'Push the branch, open a PR, and request first-look review');
+  const model = workflow.jobs.implement.steps.find((step) => step.name === 'Run bounded audit implementation');
+
+  assert.ok(publish);
+  assert.ok(model);
+  assert.equal(publish.env.GH_TOKEN, '${{ secrets.GH_PAT }}');
+  assert.equal(model.env.GH_TOKEN, undefined);
+  assert.equal(model.env.GH_PAT, undefined);
+  assert.match(publish.run, /publish-opencode-audit-pr\.mjs/);
+});

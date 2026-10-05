@@ -242,7 +242,7 @@ jobs:
       - name: Push the branch, open a PR, and request first-look review
         if: steps.select.outputs.run == 'true' && steps.validate.outputs.needs_human == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           AUDIT_ISSUE_NUMBER: ${{ steps.select.outputs.issue_number }}
           AUDIT_BRANCH: ${{ steps.select.outputs.branch }}
