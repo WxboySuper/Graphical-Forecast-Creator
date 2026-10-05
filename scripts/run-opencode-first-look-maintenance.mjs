@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
-import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
+import { validateFirstLookRepairOutput } from './lib/opencode-first-look-publish.mjs';
 import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
 const promptPath = process.env.OPENCODE_PROMPT_PATH;
@@ -32,6 +32,11 @@ const attachedFiles = (process.env.OPENCODE_FILE_PATHS ?? '')
   .filter(Boolean);
 const contextPath = attachedFiles.find((file) => file.endsWith('opencode-pr-review-context.json'));
 if (!contextPath) throw new Error('First-look repair requires an attached PR review context.');
+const workspaceRoot = resolve(process.cwd());
+const resolvedContextPath = resolve(contextPath);
+if (!resolvedContextPath.startsWith(`${workspaceRoot}${sep}`)) {
+  throw new Error('PR review context must live inside the OpenCode workspace.');
+}
 const reviewContext = JSON.parse(readFileSync(contextPath, 'utf8'));
 
 const env = modelEnvironment(process.env);
@@ -59,7 +64,10 @@ try {
       process.stderr.write(result.stderr ?? '');
       throw new Error(`OpenCode exited with status ${result.status ?? 'unknown'}.`);
     }
-    return extractFinalAssistantText(result.stdout ?? '', { format: responseFormat });
+    return extractFinalAssistantText(result.stdout ?? '', {
+      format: responseFormat,
+      firstLookContext: reviewContext,
+    });
   };
 
   /** Re-run OpenCode with repair instructions when JSON output is missing or invalid. */
@@ -81,7 +89,7 @@ try {
       output = attempt === 0
         ? run(baseInvocation, [...attachedFiles, promptFile])
         : runRepairPass(output, repairReason);
-      parseOpenCodeFirstLookOutput(output, reviewContext);
+      validateFirstLookRepairOutput(output, reviewContext);
       repairReason = '';
       break;
     } catch (error) {
