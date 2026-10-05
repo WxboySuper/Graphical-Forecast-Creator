@@ -94,7 +94,11 @@ test('ignores example JSON in prose and extracts the final first-look review obj
     'Final review JSON:',
     reviewJson,
   ].join('\n');
-  const extracted = extractFinalAssistantText(stream(textEvent('final', prose)), { format: 'json', firstLookContext: context });
+  const extracted = extractFinalAssistantText(stream(textEvent('final', prose)), {
+    format: 'json',
+    firstLookContext: context,
+    validateFirstLookObject: parseOpenCodeFirstLookOutput,
+  });
   assert.deepEqual(parseOpenCodeFirstLookOutput(extracted, context), expected);
   assert.deepEqual(
     parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', prose)), { format: 'json' }), context),

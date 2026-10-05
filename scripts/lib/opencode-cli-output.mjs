@@ -1,5 +1,3 @@
-import { parseOpenCodeFirstLookOutput } from './opencode-first-look-output.mjs';
-
 /** Build the bounded OpenCode CLI invocation. */
 export function openCodeRunArguments(model, prompt, files = []) {
   return [
@@ -10,10 +8,12 @@ export function openCodeRunArguments(model, prompt, files = []) {
 }
 
 /** Extract the final assistant message from OpenCode's --format json event stream. */
-export function extractFinalAssistantText(stdout, { format = 'text', firstLookContext } = {}) {
+export function extractFinalAssistantText(stdout, { format = 'text', firstLookContext, validateFirstLookObject } = {}) {
   assertExtractionInput(stdout, format);
   const finalText = readFinalAssistantMessage(stdout);
-  return format === 'json' ? extractJsonAssistantResponse(finalText, { firstLookContext }) : finalText;
+  return format === 'json'
+    ? extractJsonAssistantResponse(finalText, { firstLookContext, validateFirstLookObject })
+    : finalText;
 }
 
 /** Validate stdout and response format before parsing OpenCode events. */
@@ -48,13 +48,13 @@ function collectMessageParts(events, messageId) {
 }
 
 /** Parse the review JSON object embedded in the assistant message. */
-function extractJsonAssistantResponse(text, { firstLookContext } = {}) {
+function extractJsonAssistantResponse(text, { firstLookContext, validateFirstLookObject } = {}) {
   const candidate = unwrapJsonFence(text.trim());
   if (isJsonObject(candidate) && !looksLikeEmbeddedExampleBeforeMoreJson(candidate, text)) {
     return candidate;
   }
   const objects = collectValidObjects(candidate);
-  const selected = selectReviewJsonObject(objects, firstLookContext);
+  const selected = selectReviewJsonObject(objects, firstLookContext, validateFirstLookObject);
   if (selected) return selected;
   throw new Error('OpenCode final assistant message did not contain a JSON object.');
 }
@@ -82,12 +82,12 @@ function collectValidObjects(text) {
 }
 
 /** Prefer the first object that parses as first-look output, otherwise the last valid object. */
-function selectReviewJsonObject(objects, firstLookContext) {
+function selectReviewJsonObject(objects, firstLookContext, validateFirstLookObject) {
   if (!objects.length) return null;
-  if (firstLookContext !== undefined) {
+  if (firstLookContext !== undefined && typeof validateFirstLookObject === 'function') {
     for (const candidate of objects) {
       try {
-        parseOpenCodeFirstLookOutput(candidate, firstLookContext);
+        validateFirstLookObject(candidate, firstLookContext);
         return candidate;
       } catch {
         // Keep scanning; earlier prose may include example JSON objects.

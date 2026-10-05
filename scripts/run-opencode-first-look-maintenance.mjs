@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { modelEnvironment } from './lib/opencode-env.cjs';
 import { extractFinalAssistantText, openCodeRunArguments } from './lib/opencode-cli-output.mjs';
+import { parseOpenCodeFirstLookOutput } from './lib/opencode-first-look-output.mjs';
 import { validateFirstLookRepairOutput } from './lib/opencode-first-look-publish.mjs';
 import { buildFirstLookRepairPrompt } from './lib/opencode-first-look-retry.mjs';
 
@@ -67,6 +68,7 @@ try {
     return extractFinalAssistantText(result.stdout ?? '', {
       format: responseFormat,
       firstLookContext: reviewContext,
+      validateFirstLookObject: parseOpenCodeFirstLookOutput,
     });
   };
 
