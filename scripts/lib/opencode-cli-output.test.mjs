@@ -83,3 +83,25 @@ test('rejects malformed event streams, missing assistant text, and invalid first
   );
   assert.throws(() => extractFinalAssistantText(''), /no output/);
 });
+
+test('ignores example JSON in prose and extracts the final first-look review object', () => {
+  const example = '{"contextRead":true,"filesReviewed":["example/path"],"note":"illustrative only"}';
+  const reviewJson = JSON.stringify(expected);
+  const prose = [
+    'Use a shape like this example (not your final answer):',
+    example,
+    '',
+    'Final review JSON:',
+    reviewJson,
+  ].join('\n');
+  const extracted = extractFinalAssistantText(stream(textEvent('final', prose)), {
+    format: 'json',
+    firstLookContext: context,
+    validateFirstLookObject: parseOpenCodeFirstLookOutput,
+  });
+  assert.deepEqual(parseOpenCodeFirstLookOutput(extracted, context), expected);
+  assert.deepEqual(
+    parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', prose)), { format: 'json' }), context),
+    expected,
+  );
+});
