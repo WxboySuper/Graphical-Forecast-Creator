@@ -32,6 +32,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   const context = steps.find((step) => step.name === 'Prepare bounded PR context');
   assert.equal(runner.env.OPENCODE_FILE_PATHS, '${{ runner.temp }}/opencode-pr-review-context.json');
   assert.equal(runner.env.OPENCODE_REPAIR_FIRST_LOOK, 'true', 'incomplete model output gets one bounded completion pass before publication');
+  assert.match(runner.run, /run-opencode-first-look-maintenance\.mjs/);
   assert.match(context.with.script, /Read the attached opencode-pr-review-context\.json completely/);
   const promptBlock = context.with.script.match(/const prompt = \[([\s\S]*?)\n\s*\]\.filter/);
   assert.ok(promptBlock, 'review prompt should be a separate bounded string');
