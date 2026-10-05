@@ -467,7 +467,7 @@ jobs:
           OPENCODE_OUTPUT_PATH: ${{ runner.temp }}/opencode-pr-review-output.md
           OPENCODE_RESPONSE_FORMAT: json
           OPENCODE_REPAIR_FIRST_LOOK: 'true'
-        run: node scripts/run-opencode-maintenance.mjs
+        run: node scripts/run-opencode-first-look-maintenance.mjs
 
       - name: Publish first-look result
         if: steps.context.outputs.run == 'true'

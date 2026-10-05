@@ -13,12 +13,12 @@ const scriptsRoot = path.join(repositoryRoot, 'scripts');
 
 test('bug-hunt runner lib closure includes every module imported by run-opencode-maintenance.mjs', () => {
   const basenames = maintenanceRunnerLibBasenames(scriptsRoot);
-  assert.deepEqual(basenames, [
-    'opencode-cli-output.mjs',
-    'opencode-env.cjs',
-    'opencode-first-look-output.mjs',
-    'opencode-first-look-retry.mjs',
-  ]);
+  assert.deepEqual(basenames, ['opencode-cli-output.mjs', 'opencode-env.cjs']);
+});
+
+test('shared maintenance runner does not import first-look repair modules', () => {
+  const source = readFileSync(path.join(scriptsRoot, 'run-opencode-maintenance.mjs'), 'utf8');
+  assert.doesNotMatch(source, /opencode-first-look/);
 });
 
 test('scheduled maintenance copies the full runner lib closure into RUNNER_TEMP', () => {
