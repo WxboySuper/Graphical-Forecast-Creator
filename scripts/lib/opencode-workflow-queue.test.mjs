@@ -70,8 +70,9 @@ test('audit issue worker uses GH_PAT to push branches and open implementation PR
 
   assert.ok(publish);
   assert.ok(model);
-  assert.equal(publish.env.GH_TOKEN, '${{ secrets.GH_PAT }}');
-  assert.equal(model.env.GH_TOKEN, undefined);
-  assert.equal(model.env.GH_PAT, undefined);
+  const ghPatSecretRef = '$' + '{{ secrets.GH_PAT }}';
+  assert.equal(publish.env.GH_TOKEN, ghPatSecretRef);
+  assert.equal(model.env?.GH_TOKEN, null);
+  assert.equal(model.env?.GH_PAT, null);
   assert.match(publish.run, /publish-opencode-audit-pr\.mjs/);
 });
