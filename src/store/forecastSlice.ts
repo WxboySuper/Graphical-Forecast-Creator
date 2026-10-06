@@ -38,6 +38,7 @@ import {
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
 
+/** Resolves the workspace that owns a saved cycle, treating missing or invalid IDs as legacy Severe. */
 const getSavedCycleWorkspaceId = (cycle: Pick<SavedCycle, 'workspaceId'>): ForecastWorkspaceId =>
   getForecastWorkspace(cycle.workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
 
