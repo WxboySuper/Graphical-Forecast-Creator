@@ -6,7 +6,9 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent } from '../../components/ui/card';
 import { useCustomProducts, type UseCustomProductsResult } from '../../hooks/useCustomProducts';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct, type OneOffCustomLayer } from '../../types/customProducts';
-import { consumeCustomProductForecastHandoff } from '../../lib/customProductHandoff';
+import { discardCustomProductForecastHandoff } from '../../lib/customProductHandoff';
+import { getForecastWorkspacePath, isForecastWorkspaceRouteAvailable } from '../../routing/forecastWorkspaceRoutes';
+import { getForecastWorkspace } from '../../config/forecastWorkspaces';
 import { isBuiltInCustomProduct } from '../../lib/builtInCustomProducts';
 import CustomProductCard from './CustomProductCard';
 import CustomProductEditor from './CustomProductEditor';
@@ -156,19 +158,26 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
     setEditing(product);
   };
   const useProduct = (product: HostedCustomProduct) => {
+    if (!onProductUse && !isForecastWorkspaceRouteAvailable('custom', getForecastWorkspace('custom'))) {
+      // Staging without a route would leave a handoff nothing can ever consume,
+      // so the product stays put until the Custom workspace exists on this target.
+      setApplicationError('Custom forecast is not available yet. Your product was not loaded.');
+      return;
+    }
     const layer = customProducts.useProduct(product);
     if (!layer) return;
     if (onProductUse) {
+      // The editor already applied the layer inline, so the staged copy is a
+      // duplicate that must be dropped rather than consumed by a later mount.
+      discardCustomProductForecastHandoff();
       if (onProductUse(layer)) {
-        consumeCustomProductForecastHandoff(customProducts.premiumActive || isBuiltInCustomProduct(product));
         setApplicationError(null);
       } else {
-        consumeCustomProductForecastHandoff(customProducts.premiumActive || isBuiltInCustomProduct(product));
         setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
       }
       return;
     }
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath('custom'));
   };
 
   return (
