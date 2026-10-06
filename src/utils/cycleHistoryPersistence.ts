@@ -9,6 +9,11 @@ import { countForecastMetrics } from './forecastMetrics';
 import { normalizeForecastCycle } from './outlookMapCoercion';
 import type { ForecastCycle, GFCForecastSaveData, CycleMetadata } from '../types/outlooks';
 import { getScopedStorageKey, getStorageScope } from './storageScope';
+import {
+  DEFAULT_FORECAST_WORKSPACE,
+  resolveForecastWorkspaceId,
+  type ForecastWorkspaceId,
+} from '../config/forecastWorkspaces';
 
 const CYCLE_HISTORY_KEY = 'gfc-cycle-history';
 const LEGACY_CYCLE_HISTORY_KEY = CYCLE_HISTORY_KEY;
@@ -22,6 +27,7 @@ interface PersistedSavedCycle {
   label?: string;
   forecastData: GFCForecastSaveData;
   stats?: SavedCycleStats;
+  workspaceId?: ForecastWorkspaceId;
   /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
   workflowMetadata?: CycleMetadata;
 }
@@ -39,6 +45,7 @@ const toPersistedSavedCycle = (cycle: SavedCycle): PersistedSavedCycle => ({
   label: cycle.label,
   forecastData: serializeForecast(cycle.forecastCycle, STORAGE_MAP_VIEW, cycle.workflowMetadata),
   stats: cycle.stats,
+  workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
   workflowMetadata: cycle.workflowMetadata,
 });
 
@@ -53,6 +60,7 @@ const fromPersistedSavedCycle = (cycle: PersistedSavedCycle): SavedCycle => {
     label: cycle.label,
     forecastCycle,
     stats: cycle.stats ?? countForecastMetrics(forecastCycle),
+    workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
     workflowMetadata: cycle.workflowMetadata,
   };
 };
@@ -65,6 +73,7 @@ const fromLegacySavedCycle = (cycle: {
   label?: string;
   forecastCycle: ForecastCycle;
   stats?: SavedCycleStats;
+  workflowMetadata?: CycleMetadata;
 }): SavedCycle => {
   const forecastCycle = normalizeForecastCycle(cycle.forecastCycle);
 
@@ -75,6 +84,11 @@ const fromLegacySavedCycle = (cycle: {
     label: cycle.label,
     forecastCycle,
     stats: cycle.stats ?? countForecastMetrics(forecastCycle),
+    workspaceId: DEFAULT_FORECAST_WORKSPACE,
+    // Preserve top-level workflow session when a legacy record carries it. Embedded
+    // forecastData.cycleMetadata is deliberately not recovered here: deserializeForecast
+    // is cycle-only by contract, and the persistence envelope keeps workflow state top-level.
+    workflowMetadata: cycle.workflowMetadata,
   };
 };
 
