@@ -6,6 +6,95 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 ## [Unreleased]
 
 ### Next major / beta
+#### Dependencies
+<!-- dependabot-automation -->
+
+- **@sentry/react:** ^10.72.0 → ^10.74.0
+- **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
+- **@testing-library/react:** ^16.2.0 → ^16.3.3
+- **@testing-library/user-event:** ^14.6.6 → ^14.6.7
+- **@types/node:** ^26.4.0 → ^26.5.1
+- **@types/react-dom:** 19.2.5 → 19.3.0
+- **firebase:** ^12.18.0 → ^12.19.0
+- **immer:** ^11.1.16 → ^11.1.18
+- **lucide-react:** ^1.35.0 → ^1.45.0
+- **ol-mapbox-style:** ^13.4.2 → ^13.4.3
+- **react-router:** ^8.3.0 → ^8.3.1
+- **rollup:** >=4.62.4 → >=4.63.1
+- **uuid:** ^14.0.1 → ^14.0.2
+- **web-vitals:** ^6.1.0 → ^6.2.1
+- **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
+- **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
+- **babel-jest:** ^30.5.0 → ^30.5.1
+- **esbuild:** ^0.28.1 → ^0.28.2
+- **eslint-plugin-jest:** ^29.16.0 → ^29.16.5
+- **firebase-tools:** 15.26.0 → 15.28.2
+- **globals:** ^17.11.0 → ^17.12.0
+- **jest:** ^30.5.0 → ^30.5.1
+- **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
+- **typescript-eslint:** ^8.68.0 → ^8.70.0
+- **vite:** ^8.2.1 → ^8.3.0
+- **@sentry/node:** ^10.69.0 → ^10.73.0 (`server`)
+- **firebase-admin:** ^14.2.0 → ^14.3.0 (`server`)
+- **express-rate-limit:** ^8.6.2 → ^8.7.0 (`server`)
+- **stripe:** ^22.4.0 → ^22.6.1 (`server`)
+- **Paint bucket editing prototype:** Add beta-gated Step and Set editing for existing probabilistic outlook polygons, with undo/redo support.
+- **Population estimate prototype:** Add a beta-gated WorldPop estimate for the population inside the active day's active-hazard outlook polygons.
+- **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves/loads to the active workspace, and add a beta-gated Custom workspace at `/forecast/custom`.
+
+<!-- Continue next-major work here after this stable line is cut. -->
+
+
+#### Fixed
+
+- **Production deployment action fallback:** Treat the manual workflow's `auto` option as a request to use the release manifest instead of rejecting it as an invalid deploy action.
+- **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
+- **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
+- **Forecast map basemap:** Restore vendored weather-map geometry on nested forecast routes and prevent delayed basemap loads from undoing a newer map selection.
+- **Dependency security:** Pin patched ranges for browserslist, fast-uri, qs, uuid, and @opentelemetry/core.
+- **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
+- **Auto-categorical recovery:** Reset timed-out geometry workers, preserve the newest probabilistic edit for a follow-up derivation, and prevent repeated retries of unchanged failed geometry.
+- Precision polygon editing now scopes vertex changes to the selected outlook tier and records multi-vertex edits as one undo step.
+- **Beta invite claims:** Activate premium access atomically when users claim a beta invite, preserve existing Stripe fields, and repair entitlement records for users already marked as beta-enabled.
+
+- **jszip:** ^3.10.1 → ^3.10.2
+- **react:** ^19.2.8 → ^19.3.0
+- **react-dom:** ^19.2.8 → ^19.3.0
+- **@babel/core:** ^8.0.1 → ^8.0.5
+- **@babel/parser:** ^8.0.1 → ^8.0.5
+- **@babel/preset-env:** ^8.0.2 → ^8.0.5
+- **@playwright/test:** ^1.62.1 → ^1.63.0
+- **@types/react:** 19.2.18 → 19.3.0
+- **autoprefixer:** ^10.5.4 → ^10.5.6
+- **postcss:** 8.5.26 → 8.5.28
+
+## v1.7.0
+
+#### Dependencies
+
+<!-- dependabot-automation -->
+
+- **@testing-library/user-event:** ^14.6.1 → ^14.6.3
+- **@types/leaflet:** ^1.9.16 → ^1.9.22
+- **@types/node:** ^26.1.1 → ^26.1.2
+- **@types/react:** 19.2.17 → 19.2.18
+- **@types/react-dom:** 19.2.3 → 19.2.4
+- **rollup:** >=4.62.3 → >=4.62.4
+- **@playwright/test:** ^1.62.0 → ^1.62.1
+- **@vitejs/plugin-react:** ^6.0.4 → ^6.0.5
+- **postcss:** 8 → 8.5.26
+- **@turf/difference:** ^7.3.4 → ^7.4.0
+- **@turf/helpers:** ^7.3.5 → ^7.4.0
+- **@turf/turf:** ^7.3.4 → ^7.4.0
+- **firebase:** ^12.16.0 → ^12.17.1
+- **immer:** ^11.1.15 → ^11.1.16
+- **lucide-react:** ^1.27.0 → ^1.30.0
+- **ol:** ^10.9.0 → ^10.10.0
+- **web-vitals:** ^6.0.1 → ^6.1.0
+- **firebase-tools:** 15.25.1 → 15.26.0
+- **vite:** ^8.1.5 → ^8.2.1
+- **express-rate-limit:** ^8.6.1 → ^8.6.2 (`server`)
+- **stripe:** ^22.3.2 → ^22.4.0 (`server`)
 
 #### Added
 

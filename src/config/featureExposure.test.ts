@@ -71,6 +71,7 @@ describe('featureExposure registry', () => {
       'tropicalWorkspace',
       'mesoscaleWorkspace',
       'winterWorkspace',
+      'customWorkspace',
       'collaborationRoom',
       'paintBucketTool',
       'kmzExport',

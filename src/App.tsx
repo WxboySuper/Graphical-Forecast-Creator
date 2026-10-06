@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
-import { store } from './store';
-import { setActiveOutlookType, setEmergencyMode } from './store/forecastSlice';
+import { store, type RootState } from './store';
+import { setActiveOutlookType, setEmergencyMode, setForecastWorkspace } from './store/forecastSlice';
 import useAutoCategorical from './hooks/useAutoCategorical';
 import './App.css';
 
@@ -35,9 +35,11 @@ import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
-  resolveForecastWorkspacePath,
-  resolveLegacyForecastWorkspacePath,
+  getExposedForecastWorkspaceRoutes,
+  getUnavailableForecastWorkspaceRoutes,
+  resolveRouteForecastWorkspace,
 } from './routing/forecastWorkspaceRoutes';
+import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWorkspacePage';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
 // independent of the map/editor and secondary workflow chunks.
@@ -82,16 +84,29 @@ const AppHooks = () => {
   const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
-  const workspaceId = (
-    resolveForecastWorkspacePath(location.pathname)
-    ?? resolveLegacyForecastWorkspacePath(location.pathname)
-  )?.id ?? 'severe';
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  // Only forecast routes own workspace identity. Generic pages (/, /cloud,
+  // /discussion, unregistered paths) leave the active forecast workspace alone
+  // so visiting them never thrashes autosave or Redux ownership back to Severe.
+  const routeWorkspace = resolveRouteForecastWorkspace(location.pathname);
+  const workspaceId = routeWorkspace?.id ?? activeWorkspaceId;
 
   // Use the auto categorical hook to generate categorical outlooks
   useAutoCategorical();
 
   // Enable account-scoped Auto-Save
   useAutoSave(userId, workspaceId);
+
+  // Keep Redux workspace ownership aligned with the canonical URL so local
+  // history and future workspace-specific UI consume the same identity.
+  // setForecastWorkspace resets stale forecastCycle/history/discussion drafts
+  // when the route actually switches products; ForecastPage restores the
+  // target workspace autosave or cloud payload on top of that blank slate.
+  useEffect(() => {
+    if (routeWorkspace && routeWorkspace.id !== activeWorkspaceId) {
+      dispatch(setForecastWorkspace(routeWorkspace.id));
+    }
+  }, [activeWorkspaceId, dispatch, routeWorkspace]);
 
   // Pause Firestore while the tab sleeps (Safari IndexedDB recovery)
   useFirestoreSleepRecovery();
@@ -140,7 +155,20 @@ const AppRoutes: React.FC = () => {
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
           <Route index element={<ForecastLegacyRedirect />} />
-          <Route path="severe" element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId="severe" /></Suspense>} />
+          {getExposedForecastWorkspaceRoutes().map((route) => (
+            <Route
+              key={route.id}
+              path={route.routePath}
+              element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={route.id} /></Suspense>}
+            />
+          ))}
+          {getUnavailableForecastWorkspaceRoutes().map((route) => (
+            <Route
+              key={`unavailable-${route.id}`}
+              path={route.routePath}
+              element={<UnavailableForecastWorkspacePage workspaceId={route.id} />}
+            />
+          ))}
         </Route>
         <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
