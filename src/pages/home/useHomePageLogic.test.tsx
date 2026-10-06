@@ -164,6 +164,29 @@ describe('useHomePageLogic', () => {
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
   });
 
+  test('exposes only active-workspace cycles to Home', () => {
+    const initialState = forecastReducer(undefined, { type: '@@INIT' });
+    const severeCycle: SavedCycle = {
+      id: 'severe-cycle',
+      timestamp: '2026-03-27T12:00:00Z',
+      cycleDate: '2026-03-27',
+      forecastCycle: initialState.forecastCycle,
+      stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+      workspaceId: 'severe',
+    };
+    const customCycle: SavedCycle = {
+      ...severeCycle,
+      id: 'custom-cycle',
+      label: 'Custom cycle',
+      workspaceId: 'custom',
+    };
+    const store = buildStore({ workspaceId: 'custom', savedCycles: [severeCycle, customCycle] });
+
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    expect(result.current.savedCycles.map((cycle) => cycle.id)).toEqual(['custom-cycle']);
+  });
+
   test('ignores malformed quick-start and recent-cycle clicks', () => {
     const store = buildStore({
       savedCycles: [
