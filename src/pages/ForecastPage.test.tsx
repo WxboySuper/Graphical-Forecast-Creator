@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router';
@@ -31,7 +31,7 @@ import ForecastPage, {
   readStoredDayValue,
   writeStoredDayValue,
 } from './ForecastPage';
-import forecastReducer from '../store/forecastSlice';
+import forecastReducer, { saveCurrentCycle } from '../store/forecastSlice';
 import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
@@ -141,6 +141,23 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+  });
+
+  test('publishes the route workspace to Redux so saves are workspace-tagged', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage workspaceId="custom" />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    expect(store.getState().forecast.workspaceId).toBe('custom');
+    act(() => {
+      store.dispatch(saveCurrentCycle({ label: 'Route save' }));
+    });
+    expect(store.getState().forecast.savedCycles[0]?.workspaceId).toBe('custom');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
