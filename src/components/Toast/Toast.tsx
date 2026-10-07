@@ -14,7 +14,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [onClose, message, type]);
 
   return (
     <div className={`toast toast-${type}`}>

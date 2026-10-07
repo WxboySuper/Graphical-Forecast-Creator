@@ -26,6 +26,27 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  test('restarts the auto-dismiss timer when the message updates', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="Original" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    rerender(<Toast message="Updated" onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('clears timeout on unmount', () => {
     const onClose = jest.fn();
     const { unmount } = render(<Toast message="Unmount" onClose={onClose} />);
