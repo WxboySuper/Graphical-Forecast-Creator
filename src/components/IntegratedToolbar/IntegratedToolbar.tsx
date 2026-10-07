@@ -182,7 +182,7 @@ const ToolbarForecastDaySection: React.FC<{ controller: ForecastWorkspaceControl
             onClick={controller.onStartDateEdit}
             className="px-2 py-1 text-xs rounded border border-border bg-secondary hover:bg-accent transition-colors focus:outline-none select-none"
           >
-            {new Date(controller.cycleDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            {new Date(`${controller.cycleDate}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </button>
         )}
       </div>
