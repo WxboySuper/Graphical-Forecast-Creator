@@ -49,6 +49,11 @@ import {
   runInitialHostedSync,
   type SettingsSyncStatus,
 } from './authHostedSettings';
+import {
+  extractLocalUserFromData,
+  postLocalJson,
+  safeParseJson,
+} from './authLocalTransport';
 
 export {
   areUserSettingsEqual,
@@ -70,36 +75,7 @@ export {
   syncProfileDocument,
 } from './authHostedSettings';
 export type { SettingsSyncStatus } from './authHostedSettings';
-
-/**
- * Safely parse JSON from a Response. Returns parsed value or null on failure.
- */
-export const safeParseJson = async <T = unknown>(resp: Response): Promise<T | null> => {
-  try {
-    const parsed = await resp.json();
-    return parsed as T;
-  } catch {
-    return null;
-  }
-};
-
-/** Coerce unknown value to a plain record for safe property access. */
-export const asRecord = (value: unknown): Record<string, unknown> =>
-  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-
-/** Attempt to extract minimal local user fields from an unknown response. */
-export const extractLocalUserFromData = (data: unknown) => {
-  const rec = asRecord(data);
-  const uid = typeof rec.uid === 'string' ? rec.uid : 'local';
-  const email = typeof rec.email === 'string' ? rec.email : '';
-  const displayName = typeof rec.displayName === 'string' ? rec.displayName : '';
-  return {
-    uid,
-    email,
-    displayName,
-    providerData: [],
-  };
-};
+export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 
@@ -191,31 +167,6 @@ export const deleteHostedAccount = async (
   }
 
   await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
-};
-
-type LocalPostRequestOptions = {
-  body?: unknown;
-  failureMessage: string;
-};
-
-/** Posts JSON to a local auth endpoint and normalizes non-ok responses into errors. */
-export const postLocalJson = async <TResponse = Record<string, unknown>>(
-  path: string,
-  { body, failureMessage }: LocalPostRequestOptions
-): Promise<TResponse> => {
-  const resp = await fetch(path, {
-    method: 'POST',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const errorBody = (await safeParseJson<{ message?: string }>(resp)) ?? {};
-    throw new Error(errorBody.message ?? failureMessage);
-  }
-
-  return (await safeParseJson<TResponse>(resp)) ?? ({} as TResponse);
 };
 
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
@@ -540,9 +491,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   refreshBetaAccess: disabledAuthAction,
 });
 
-/** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
-/** Local-only auth action helpers (extracted to reduce hook complexity) */
-/** Local API route and metric suffix selected by the public credential wrappers. */
+/** Local-only auth action helpers (extracted to reduce hook complexity). */
 type LocalCredentialAction = 'signin' | 'signup';
 
 /** Post a local credential action and apply its response to the shared auth state. */
@@ -553,20 +502,18 @@ async function localCredentialAction(
 ) {
   const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
   deps.setError(null);
-  const resp = await fetch(`/api/local/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds),
-    credentials: 'include',
-  });
-
-  if (!resp.ok) {
-    const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: failureMessage };
-    deps.setError(body.message ?? failureMessage);
-    throw new Error(body.message ?? failureMessage);
+  let data: Record<string, unknown>;
+  try {
+    data = await postLocalJson<Record<string, unknown>>(`/api/local/${action}`, {
+      body: creds,
+      failureMessage,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : failureMessage;
+    deps.setError(message);
+    throw error instanceof Error ? error : new Error(message);
   }
 
-  const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
   const localUser = extractLocalUserFromData(data) as unknown as User;
   applyLocalAuthData(data, deps);
   queueProductMetric({ event: action === 'signin' ? 'account_signin' : 'account_signup', user: localUser });
