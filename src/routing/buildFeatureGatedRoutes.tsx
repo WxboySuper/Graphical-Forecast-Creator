@@ -1,9 +1,10 @@
-import { lazy, Suspense, type ComponentType, type LazyExoticComponent, type ReactElement } from 'react';
+import { Suspense, type ComponentType, type LazyExoticComponent, type ReactElement } from 'react';
 import { Route } from 'react-router';
 import type { BuildTarget } from '../config/buildTarget';
 import { getBuildTarget } from '../config/buildTarget';
 import { isFeatureExposedOnTarget } from '../config/featureExposure';
 import { GATED_ROUTE_DEFINITIONS, type GatedRouteDefinition } from '../config/featureSurfaces';
+import { lazyWithReload } from './lazyWithReload';
 
 const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
@@ -14,7 +15,7 @@ const getLazyPage = (definition: GatedRouteDefinition): LazyExoticComponent<Comp
     return cached;
   }
 
-  const lazyPage = lazy(definition.loadPage);
+  const lazyPage = lazyWithReload(definition.path, definition.loadPage);
   lazyPageCache.set(definition.path, lazyPage);
   return lazyPage;
 };
