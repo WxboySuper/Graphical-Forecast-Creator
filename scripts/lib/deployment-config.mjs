@@ -82,6 +82,20 @@ function mergeServerEnv(baseConfig, overrideConfig) {
   };
 }
 
+/** Merges a shared config with an environment override and validates the result. */
+export function mergeDeploymentConfigs(baseConfig, overrideConfig) {
+  if (!isPlainObject(baseConfig) || !isPlainObject(overrideConfig)) {
+    throw new Error('Deployment configs must be JSON objects.');
+  }
+
+  return normalizeDeploymentConfig({
+    serverEnv: {
+      ...(isPlainObject(baseConfig.serverEnv) ? baseConfig.serverEnv : {}),
+      ...(isPlainObject(overrideConfig.serverEnv) ? overrideConfig.serverEnv : {}),
+    },
+  });
+}
+
 /** Validates one env key and returns it unchanged for map construction. */
 function normalizeServerEnvKey(key) {
   if (!ENV_KEY_PATTERN.test(key)) {
