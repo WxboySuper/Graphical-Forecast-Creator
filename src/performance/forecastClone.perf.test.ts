@@ -1,7 +1,7 @@
 import type { Feature } from 'geojson';
 import { cloneJsonValue } from '../store/cloneJsonValue';
 import forecastReducer, { addFeature, setOutlookOpacity } from '../store/forecastSlice';
-import { measure, reportComparison } from './benchmarkUtils';
+import { measure, reportComparison } from '../testing/benchmarkUtils';
 
 /**
  * Pinned copy of the pre-PERF-01 algorithm used as the benchmark baseline.
