@@ -44,7 +44,8 @@ describe('useMonitorNwsAlertsRefresh', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('ignores a refresh that resolves after the hook is disabled', async () => {    let resolveRequest: ((value: typeof collection) => void) | undefined;
+  test('ignores a refresh that resolves after the hook is disabled', async () => {
+    let resolveRequest: ((value: typeof collection) => void) | undefined;
     jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockImplementation(
       () => new Promise((resolve) => { resolveRequest = resolve; }),
     );
@@ -70,7 +71,6 @@ describe('useMonitorNwsAlertsRefresh', () => {
     expect(setRawFrames).not.toHaveBeenCalled();
     expect(setFetchedAt).not.toHaveBeenCalled();
   });
-
   test('surfaces a polling failure instead of swallowing it', async () => {
     jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockRejectedValue(new Error('offline'));
     const setRawFrames = jest.fn();
