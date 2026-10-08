@@ -20,12 +20,3 @@ test('shared maintenance runner does not import first-look repair modules', () =
   const source = readFileSync(path.join(scriptsRoot, 'run-opencode-maintenance.mjs'), 'utf8');
   assert.doesNotMatch(source, /opencode-first-look/);
 });
-
-test('scheduled maintenance copies the full runner lib closure into RUNNER_TEMP', () => {
-  const workflow = readFileSync(
-    path.join(repositoryRoot, '.github/workflows/opencode-scheduled-maintenance.yml'),
-    'utf8',
-  );
-  assert.match(workflow, /node scripts\/lib\/opencode-maintenance-runner-deps\.cjs/);
-  assert.match(workflow, /cp "scripts\/lib\/\$\{libFile\}" "\$RUNNER_TEMP\/lib\/"/);
-});

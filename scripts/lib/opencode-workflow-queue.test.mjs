@@ -9,9 +9,13 @@ const workflowFiles = [
   '../../.github/workflows/opencode.yml',
   '../../.github/workflows/opencode-first-look.yml',
   '../../.github/workflows/opencode-issue-triage.yml',
-  '../../.github/workflows/opencode-scheduled-maintenance.yml',
   '../../.github/workflows/opencode-changelog-audit.yml',
   '../../.github/workflows/opencode-changelog-pr.yml',
+];
+// Maintenance automations below migrated completely to T3 scheduled tasks
+// (GFC Report contract); the workflows must stay deleted.
+const migratedWorkflows = [
+  '../../.github/workflows/opencode-scheduled-maintenance.yml',
   '../../.github/workflows/opencode-audit-issue-worker.yml',
   '../../.github/workflows/opencode-research.yml',
 ];
@@ -63,15 +67,12 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
   assert.doesNotMatch(source, /pulls\.createReview/);
 });
 
-test('audit issue worker uses GH_PAT to push branches and open implementation PRs', () => {
-  const workflow = parse(readFileSync(new URL('../../.github/workflows/opencode-audit-issue-worker.yml', import.meta.url), 'utf8'));
-  const publish = workflow.jobs.implement.steps.find((step) => step.name === 'Push the branch, open a PR, and request first-look review');
-  const model = workflow.jobs.implement.steps.find((step) => step.name === 'Run bounded audit implementation');
-
-  assert.ok(publish);
-  assert.ok(model);
-  assert.match(publish.env.GH_TOKEN, /^\$\{\{\s*secrets\.GH_PAT\s*\}\}$/);
-  assert.ok(!('GH_TOKEN' in (model.env ?? {})));
-  assert.ok(!('GH_PAT' in (model.env ?? {})));
-  assert.match(publish.run, /publish-opencode-audit-pr\.mjs/);
+test('migrated maintenance workflows stay deleted because T3 is the sole runner', () => {
+  for (const workflowFile of migratedWorkflows) {
+    assert.throws(
+      () => readFileSync(new URL(workflowFile, import.meta.url), 'utf8'),
+      /ENOENT/,
+      `${workflowFile} must stay deleted: T3 scheduled tasks own this automation`,
+    );
+  }
 });
