@@ -23,6 +23,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
 - **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
 - **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.

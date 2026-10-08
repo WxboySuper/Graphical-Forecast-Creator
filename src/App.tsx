@@ -32,6 +32,7 @@ import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
+import { lazyWithReload } from './routing/lazyWithReload';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
@@ -40,13 +41,24 @@ import {
 } from './routing/forecastWorkspaceRoutes';
 
 // Heavy feature routes are lazy-loaded so the application shell stays small and
-// independent of the map/editor and secondary workflow chunks.
-const ForecastPage = lazy(() => import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage })));
-const DiscussionPage = lazy(() => import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage })));
-const VerificationPage = lazy(() => import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage })));
-const MonitorPage = lazy(() => import('./pages/MonitorPage').then((module) => ({ default: module.MonitorPage })));
-const CloudLibraryPage = lazy(() => import('./pages/CloudLibraryPage'));
-const AdminPage = lazy(() => import('./pages/AdminPage').then((module) => ({ default: module.AdminPage })));
+// independent of the map/editor and secondary workflow chunks. Each route reloads
+// once on a stale-asset chunk failure (GFC-WEB-16) to pick up fresh hashes.
+const ForecastPage = lazyWithReload('forecast', () =>
+  import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
+);
+const DiscussionPage = lazyWithReload('discussion', () =>
+  import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage }))
+);
+const VerificationPage = lazyWithReload('verification', () =>
+  import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
+);
+const MonitorPage = lazyWithReload('monitor', () =>
+  import('./pages/MonitorPage').then((module) => ({ default: module.MonitorPage }))
+);
+const CloudLibraryPage = lazyWithReload('cloud', () => import('./pages/CloudLibraryPage'));
+const AdminPage = lazyWithReload('admin', () =>
+  import('./pages/AdminPage').then((module) => ({ default: module.AdminPage }))
+);
 
 const FeatureExposureDiagnosticsPage = __GFC_DEV_MODE__
   ? lazy(() =>
