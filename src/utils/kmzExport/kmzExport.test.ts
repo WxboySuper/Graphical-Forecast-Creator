@@ -105,6 +105,16 @@ describe('kmzExport', () => {
     expect(tornadoOnly.find((feature) => feature.probabilityKey === 'CIG2')?.fillColor).toBe('#000000');
   });
 
+  test('significant-threat features use the base probability color instead of gray', () => {
+    const features = collectKmzExportFeatures({
+      forecastCycle: buildForecast(),
+      options: { scope: 'current-day', day: 1, outlookTypes: ['tornado'] },
+    });
+    const significant = features.find((feature) => feature.probabilityKey === '30%#');
+    expect(significant?.isSignificant).toBe(true);
+    expect(significant?.fillColor).toBe('#FF80FF');
+  });
+
   test('buildStructuredKmlDocument emits placemarks with ExtendedData', () => {
     const forecast = buildForecast();
     const kml = buildStructuredKmlDocument({
