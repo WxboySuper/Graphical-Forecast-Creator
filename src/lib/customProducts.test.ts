@@ -1,5 +1,4 @@
-import type { HostedCustomProduct, CustomCategoryTemplate, OneOffCustomLayer } from '../types/customProducts';
-import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION, type HostedCustomProduct, type CustomCategoryTemplate, type OneOffCustomLayer } from '../types/customProducts';
 import {
   asCustomLayerId,
   asCustomProductId,
