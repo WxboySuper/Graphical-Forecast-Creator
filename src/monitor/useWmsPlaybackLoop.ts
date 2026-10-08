@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import {
   advancePlaybackFrame,
   snapToLatestFrame,
@@ -13,6 +12,7 @@ interface WmsPlaybackLoopOptions {
   setPlayback: Dispatch<SetStateAction<{ radar: LayerPlaybackState; satellite: LayerPlaybackState }>>;
 }
 
+/** Advances radar and satellite playback while animation is enabled. */
 export const useWmsPlaybackLoop = ({
   shouldAnimate,
   frameSignature,

@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { captureExpectedMonitorReferenceFailure } from '../instrument';
 import {
@@ -26,11 +25,13 @@ export interface MonitorReferenceLayersState {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
 }
 
+/** Returns an empty reference-layer collection. */
 const emptyCollection = (): MonitorMesoscaleDiscussionCollection => ({
   type: 'FeatureCollection',
   features: [],
 });
 
+/** Builds status metadata for a monitor reference layer. */
 const createMeta = ({
   status,
   sourceName,
@@ -60,6 +61,7 @@ const createMeta = ({
   error,
 });
 
+/** Creates the initial reference-layer state before loading. */
 const createInitialState = (): MonitorReferenceLayersState => ({
   spcMesoscaleDiscussion: createMeta({
     status: 'idle',
@@ -70,9 +72,11 @@ const createInitialState = (): MonitorReferenceLayersState => ({
   mesoscaleDiscussions: emptyCollection(),
 });
 
+/** Returns whether a value can be parsed as a valid instant. */
 const isParseableInstant = (value: string | undefined): value is string =>
   typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
 
+/** Finds the latest valid time in a reference-layer collection. */
 const latestValidTime = (collection: MonitorMesoscaleDiscussionCollection): string | null => {
   const validTimes = collection.features
     .map(({ properties }) => properties.validTo ?? properties.validFrom)
@@ -83,6 +87,7 @@ const latestValidTime = (collection: MonitorMesoscaleDiscussionCollection): stri
 
 type MetaDetails = Partial<Pick<MonitorReferenceLayerMeta, 'fetchedAt' | 'validTime' | 'itemCount' | 'error'>>;
 
+/** Builds SPC metadata using the shared reference-layer status shape. */
 const createSpcMeta = (status: MonitorReferenceLayerStatus, details: MetaDetails = {}): MonitorReferenceLayerMeta => createMeta({
   status,
   sourceName: SPC_MESOSCALE_DISCUSSION_SOURCE.sourceName,
@@ -91,6 +96,7 @@ const createSpcMeta = (status: MonitorReferenceLayerStatus, details: MetaDetails
   ...details,
 });
 
+/** Emits a throttled user notification for a reference-layer failure. */
 const notifyReferenceFailure = (message: string, addToast?: AddToastFn): void => {
   const now = Date.now();
   const sourceId = SPC_MESOSCALE_DISCUSSION_SOURCE.id;
@@ -108,9 +114,11 @@ interface UseMonitorReferenceLayersArgs {
 
 type SetReferenceState = Dispatch<SetStateAction<MonitorReferenceLayersState>>;
 
+/** Returns whether the cached response is still within its freshness window. */
 const isFresh = (fetchedAt: number, refreshToken: number): boolean =>
   Date.now() - fetchedAt <= REFERENCE_CACHE_TTL_MS && refreshToken === 0;
 
+/** Loads SPC reference data and updates the hook state. */
 const startSpcReferenceEffect = ({
   enabled,
   refreshToken,
