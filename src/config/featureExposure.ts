@@ -20,9 +20,7 @@ export type TemporaryFeatureExposureDefinition = FeatureExposureBase & {
 
 export type PermanentFeatureExposureDefinition = FeatureExposureBase & {
   temporary: false;
-  serverBacked: false;
-  serverCapabilityKey?: never;
-};
+} & ServerBackedMetadata;
 
 export type FeatureExposureDefinition =
   | TemporaryFeatureExposureDefinition
@@ -107,9 +105,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: true,
-    removalCondition:
-      'Remove after Auto-TSTM client and server gates ship and the stable production rollout completes (#427). The v1.7 release exposes the completed workflow on every release target.',
+    temporary: false,
     serverBacked: true,
     serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
     trackingIssue: 427,
