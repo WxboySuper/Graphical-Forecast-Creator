@@ -73,21 +73,9 @@ The automation is idempotent, so retries replace the managed declaration instead
 
 ## Beta releases
 
-Beta is now a release channel, not a branch. To create a beta:
+Beta is a release channel on `main`, not a branch. Use **Release | Beta** (`release-beta.yml`) for the full cut: OpenCode changelog audit, version and changelog promotion, GitHub prerelease, Cloudflare Workers deploy to `beta.gfcweather.com`, and smoke tests. See [releasing-beta.md](../releasing-beta.md) for UI, API, rollback, and secrets.
 
-1. Merge the desired work into `main`.
-2. Open **Create Beta Release** under Actions.
-3. Select the `main` ref or an immutable commit and type `RELEASE-BETA`.
-4. Optionally provide the previous beta tag when automatic detection should be overridden.
-
-The workflow creates a prerelease. Its GitHub Release uses GitHub's native generated notes to show merged PRs between the previous beta tag and the selected ref, with categories from [`.github/release.yml`](../.github/release.yml). The curated changelog remains the public product record and is linked from the release.
-
-After publishing, the workflow dispatches the bounded OpenCode changelog audit
-against `main`. If it finds a concrete missing user-facing entry, it opens a
-normal changelog-only PR for human review; it does not change the release just
-created or delay deployment.
-
-Publishing the prerelease activates the beta deployment workflow. A beta deployment can also be manually dispatched when an operator needs to deploy a selected ref.
+For redeploying an existing ref without a new version, use **Deploy beta to Cloudflare Workers**.
 
 ## Stable major promotion
 

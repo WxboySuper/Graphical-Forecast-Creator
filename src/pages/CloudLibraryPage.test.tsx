@@ -66,6 +66,7 @@ const renderPage = (store = makeStore()) =>
 
 describe("CloudLibraryPage", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/");
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
     mockGetCloudLibraryTabs.mockReset();
@@ -397,7 +398,6 @@ describe("CloudLibraryPage", () => {
         ],
       })
     );
-
     renderPage();
     expect(screen.getByRole("tab", { name: /All 2/i })).toHaveAttribute("tabindex", "0");
     expect(screen.getByRole("tab", { name: /Severe 1/i })).toHaveAttribute("tabindex", "-1");
@@ -527,5 +527,97 @@ describe("CloudLibraryPage", () => {
   it("exposes the registered custom-products route for the Custom workspace", () => {
     expect(getForecastWorkspaceByLegacyPath("/custom-products")?.id).toBe("custom");
     expect(getExposedGatedRoutePaths()).toContain("/custom-products");
+  });
+
+  it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+    window.history.replaceState({}, "", "/cloud-library?workspace=custom&source=bookmark");
+
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /All 2/i }));
+    expect(window.location.search).toBe("?source=bookmark");
+  });
+
+  it("normalizes a malformed workspace param to All without losing unrelated params", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+    window.history.replaceState({}, "", "/cloud-library?workspace=bogus&source=bookmark");
+    const entriesBefore = window.history.length;
+
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: /All 2/i })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(window.location.search).toBe("?source=bookmark"));
+    expect(window.history.length).toBe(entriesBefore);
+    expect(screen.getByText("Severe save")).toBeInTheDocument();
+    expect(screen.getByText("Custom save")).toBeInTheDocument();
+  });
+
+  it("pushes history for explicit tab clicks so Back returns to the prior tab", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+    window.history.replaceState({}, "", "/cloud-library");
+    const entriesBefore = window.history.length;
+
+    renderPage();
+    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
+
+    expect(window.location.search).toBe("?workspace=custom");
+    expect(window.history.length).toBe(entriesBefore + 1);
+  });
+
+  it("replaces history for keyboard walks so Arrow/Home/End do not pollute Back", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [
+          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
+          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
+        ],
+      })
+    );
+    window.history.replaceState({}, "", "/cloud-library");
+    const entriesBefore = window.history.length;
+
+    renderPage();
+    const allTab = screen.getByRole("tab", { name: /All 2/i });
+    allTab.focus();
+    fireEvent.keyDown(allTab, { key: "ArrowRight" });
+
+    expect(window.location.search).toBe("?workspace=severe");
+    expect(window.history.length).toBe(entriesBefore);
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: /Severe 1/i }), { key: "ArrowRight" });
+    expect(window.location.search).toBe("?workspace=custom");
+    expect(window.history.length).toBe(entriesBefore);
+
+    fireEvent.keyDown(screen.getByRole("tab", { name: /Custom 1/i }), { key: "Home" });
+    expect(window.location.search).toBe("");
+    expect(window.history.length).toBe(entriesBefore);
   });
 });

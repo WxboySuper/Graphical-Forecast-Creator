@@ -1,5 +1,8 @@
 name: Deploy beta to Cloudflare Workers
 
+# Emergency redeploy of an existing main commit or v*-beta.* tag. Normal beta cuts
+# should use release-beta.yml (version, changelog, GitHub prerelease, deploy, smoke test).
+
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-beta-workers
+  group: beta-release
   cancel-in-progress: false
 
 jobs:
