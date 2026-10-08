@@ -38,6 +38,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Autosave restore:** Ignore invalid snapshot timestamps so a malformed save cannot block a valid newer snapshot.
 - **Deployment action selection:** Treat the automatic choice as a request to use the release manifest.
 - **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
+- **Base map selection:** Ignore Firestore local-write echoes and stale pre-change snapshots while a debounced settings save is pending, so hosted sync cannot revert an in-progress basemap choice.
 - **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
 - **Tabbed forecast toolbar:** Stop section labels, day controls, layer chips, and custom draw panels from overlapping at desktop widths around 1024px by enforcing section minimum widths, clipping overflow, and horizontal scrolling in each tab row.
 - **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.

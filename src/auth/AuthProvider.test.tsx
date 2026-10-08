@@ -14,7 +14,6 @@ import {
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
-  getRemoteSeedPayload,
   getSettingsSyncError,
   getSettingsUpdateError,
   initLocalAuthState,
@@ -25,16 +24,19 @@ import {
   localUpdateSyncedSettings,
   postLocalJson,
   readProfileBetaAccess,
-  runInitialHostedSync,
-  attachHostedSettingsSubscription,
   readRemoteSettings,
   safeParseJson,
-  seedOrApplySettings,
-  startSettingsSubscription,
-  syncProfileDocument,
   AuthProvider,
   useAuth,
 } from './AuthProvider';
+import {
+  attachHostedSettingsSubscription,
+  getRemoteSeedPayload,
+  runInitialHostedSync,
+  seedOrApplySettings,
+  startSettingsSubscription,
+  syncProfileDocument,
+} from './hostedSettingsSync';
 import { queueProductMetric } from '../utils/productMetrics';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
@@ -112,6 +114,10 @@ const waitForAuthEffects = async (delay = 100) => {
 };
 
 describe('AuthProvider Utils', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   test('local sign-out failure does not turn completed server deletion into a failure', async () => {
     const clearLocalState = jest.fn();
     await expect(clearDeletedAccountSession(
@@ -449,242 +455,253 @@ describe('AuthProvider Utils', () => {
     expect(errorDeps.setStatus).toHaveBeenCalledWith('error');
     expect(errorDeps.setError).toHaveBeenCalledWith('offline');
   });
+});
 
-  test('syncProfileDocument includes createdAt when the profile is new', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+describe('AuthProvider hosted settings integration', () => {
+    test('syncProfileDocument includes createdAt when the profile is new', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => false,
-      data: () => undefined,
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
-      { merge: true }
-    );
-  });
-
-  test('syncProfileDocument preserves the creation timestamp on an existing profile', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => ({ createdAt: { __serverTimestamp: true } }),
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({
+      getDocSpy.mockResolvedValueOnce({
+        exists: () => false,
+        data: () => undefined,
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
         email: 'user@example.com',
         displayName: 'User',
         photoURL: '',
-        providers: [],
-        updatedAt: expect.anything(),
-      }),
-      { merge: true }
-    );
-    expect(setDocSpy.mock.calls.at(-1)?.[1]).not.toHaveProperty('createdAt');
-  });
-
-  test('syncProfileDocument backfills createdAt on a legacy profile missing it', async () => {
-    const getDocSpy = jest.mocked(getDoc);
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-
-    getDocSpy.mockResolvedValueOnce({
-      exists: () => true,
-      data: () => ({ email: 'user@example.com' }),
-    } as never);
-    await syncProfileDocument({ path: 'profile' } as never, {
-      email: 'user@example.com',
-      displayName: 'User',
-      photoURL: '',
-      providerData: [],
-    } as never);
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'profile' },
-      expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
-      { merge: true }
-    );
-  });
-
-  test('seedOrApplySettings reuses the remote settings when present', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
-    jest.mocked(setDoc).mockClear();
-
-    await seedOrApplySettings({
-      settingsRef: { path: 'settings' } as never,
-      settingsSnapshot: { data: () => settings, exists: () => true } as never,
-      localSettings: { ...settings, defaultForecasterName: 'Local' },
-      applyRemoteSettings,
-      isActive: () => true,
-      lastSyncedSettingsRef,
-      setSyncedSettings,
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
+        { merge: true }
+      );
     });
-    expect(applyRemoteSettings).toHaveBeenCalledWith(settings);
-    expect(setDoc).not.toHaveBeenCalled();
-  });
 
-  test('seedOrApplySettings seeds Firestore when the settings are missing', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
+    test('syncProfileDocument preserves the creation timestamp on an existing profile', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    await seedOrApplySettings({
-      settingsRef: { path: 'settings' } as never,
-      settingsSnapshot: { data: () => undefined, exists: () => false } as never,
-      localSettings: settings,
-      applyRemoteSettings,
-      isActive: () => true,
-      lastSyncedSettingsRef,
-      setSyncedSettings,
-    });
-    expect(setDocSpy).toHaveBeenCalledWith(
-      { path: 'settings' },
-      expect.objectContaining({ defaultForecasterName: 'Remote', createdAt: expect.anything() }),
-      { merge: true }
-    );
-    expect(setSyncedSettings).toHaveBeenCalledWith(settings);
-  });
-
-  test('startSettingsSubscription applies snapshots, normalizes errors, and unsubscribes', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const onSnapshotSpy = jest.mocked(onSnapshot);
-    const applyRemoteSettings = jest.fn();
-    let snapshotHandler: ((snapshot: { data: () => typeof settings }) => void) | null = null;
-    let errorHandler: ((error: Error) => void) | null = null;
-    const unsubscribe = jest.fn();
-    onSnapshotSpy.mockImplementation((ref, next, error) => {
-      snapshotHandler = next as typeof snapshotHandler;
-      errorHandler = error as typeof errorHandler;
-      return unsubscribe;
-    });
-    const setSettingsSyncStatus = jest.fn();
-    const setError = jest.fn();
-    const subscription = startSettingsSubscription({
-      settingsRef: { path: 'settings' } as never,
-      isActive: () => true,
-      applyRemoteSettings,
-      setSettingsSyncStatus,
-      setError,
-    });
-    expect(snapshotHandler).not.toBeNull();
-    if (!snapshotHandler) {
-      throw new Error('Expected snapshot handler to be registered');
-    }
-    snapshotHandler({ data: () => settings });
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(errorHandler).not.toBeNull();
-    if (!errorHandler) {
-      throw new Error('Expected error handler to be registered');
-    }
-    errorHandler(new Error('listener failed'));
-    expect(setError).toHaveBeenCalledWith('listener failed');
-    subscription();
-    expect(unsubscribe).toHaveBeenCalled();
-  });
-
-  test('runInitialHostedSync syncs the profile, seeds settings, and subscribes', async () => {
-    const settings = {
-      darkMode: false,
-      baseMapStyle: 'osm' as const,
-      stateBorders: true,
-      counties: false,
-      ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
-      defaultForecasterName: 'Remote',
-      forecastUiVariant: 'workspace_dock' as const,
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
-    };
-    const getDocSpy = jest.mocked(getDoc);
-    getDocSpy
-      .mockResolvedValueOnce({
+      getDocSpy.mockResolvedValueOnce({
         exists: () => true,
-        data: () => ({ email: 'user@example.com', createdAt: { __serverTimestamp: true } }),
-      } as never)
-      .mockResolvedValueOnce({ data: () => undefined, exists: () => false } as never);
-    const applyRemoteSettings = jest.fn();
-    const setSyncedSettings = jest.fn();
-    const lastSyncedSettingsRef = { current: null };
-    const setSettingsSyncStatus = jest.fn();
-    const setError = jest.fn();
-    const hasInitializedSettingsRef = { current: false };
-    const unsubscribeResult = await runInitialHostedSync({
-      profileRef: { path: 'profile' } as never,
-      settingsRef: { path: 'settings' } as never,
-      user: { uid: 'user-1', email: 'user@example.com', displayName: 'User', photoURL: '', providerData: [] } as never,
-      buildLocalSettingsSnapshot: () => settings,
-      applyRemoteSettings,
-      isActive: () => true,
-      lastSyncedSettingsRef,
-      setSyncedSettings,
-      setSettingsSyncStatus,
-      setError,
-      hasInitializedSettingsRef,
+        data: () => ({ createdAt: { __serverTimestamp: true } }),
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
+        email: 'user@example.com',
+        displayName: 'User',
+        photoURL: '',
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({
+          email: 'user@example.com',
+          displayName: 'User',
+          photoURL: '',
+          providers: [],
+          updatedAt: expect.anything(),
+        }),
+        { merge: true }
+      );
+      expect(setDocSpy.mock.calls.at(-1)?.[1]).not.toHaveProperty('createdAt');
     });
-    expect(hasInitializedSettingsRef.current).toBe(true);
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('syncing');
-    expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(typeof unsubscribeResult).toBe('function');
-  });
 
-  test('cleans up a listener that resolves after hosted settings cleanup', async () => {
-    const unsubscribe = jest.fn();
-    const setSubscription = jest.fn();
-    let active = true;
+    test('syncProfileDocument backfills createdAt on a legacy profile missing it', async () => {
+      const getDocSpy = jest.mocked(getDoc);
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
 
-    const subscriptionPromise = Promise.resolve(unsubscribe);
-    const handoff = attachHostedSettingsSubscription(subscriptionPromise, () => active, setSubscription);
-    active = false;
+      getDocSpy.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ email: 'user@example.com' }),
+      } as never);
+      await syncProfileDocument({ path: 'profile' } as never, {
+        email: 'user@example.com',
+        displayName: 'User',
+        photoURL: '',
+        providerData: [],
+      } as never);
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'profile' },
+        expect.objectContaining({ email: 'user@example.com', createdAt: expect.anything() }),
+        { merge: true }
+      );
+    });
 
-    await handoff;
+    test('seedOrApplySettings reuses the remote settings when present', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+      jest.mocked(setDoc).mockClear();
 
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-    expect(setSubscription).not.toHaveBeenCalled();
-  });
+      await seedOrApplySettings({
+        settingsRef: { path: 'settings' } as never,
+        settingsSnapshot: { data: () => settings, exists: () => true } as never,
+        localSettings: { ...settings, defaultForecasterName: 'Local' },
+        applyRemoteSettings,
+        isActive: () => true,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+      });
+      expect(applyRemoteSettings).toHaveBeenCalledWith(settings);
+      expect(setDoc).not.toHaveBeenCalled();
+    });
+
+    test('seedOrApplySettings seeds Firestore when the settings are missing', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+
+      await seedOrApplySettings({
+        settingsRef: { path: 'settings' } as never,
+        settingsSnapshot: { data: () => undefined, exists: () => false } as never,
+        localSettings: settings,
+        applyRemoteSettings,
+        isActive: () => true,
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+      });
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'settings' },
+        expect.objectContaining({ defaultForecasterName: 'Remote', createdAt: expect.anything() }),
+        { merge: true }
+      );
+      expect(setSyncedSettings).toHaveBeenCalledWith(settings);
+    });
+
+    test('startSettingsSubscription applies snapshots, normalizes errors, and unsubscribes', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const onSnapshotSpy = jest.mocked(onSnapshot);
+      const applyRemoteSettings = jest.fn();
+      let snapshotHandler: ((snapshot: { data: () => typeof settings; metadata: { hasPendingWrites: boolean } }) => void) | null = null;
+      let errorHandler: ((error: Error) => void) | null = null;
+      const unsubscribe = jest.fn();
+      onSnapshotSpy.mockImplementation((ref, next, error) => {
+        snapshotHandler = next as typeof snapshotHandler;
+        errorHandler = error as typeof errorHandler;
+        return unsubscribe;
+      });
+      const setSettingsSyncStatus = jest.fn();
+      const setError = jest.fn();
+      const subscription = startSettingsSubscription({
+        settingsRef: { path: 'settings' } as never,
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getInFlightHostedSettingsWrite: () => null,
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
+        lastSyncedSettingsRef: { current: null },
+        applyRemoteSettings,
+        setSettingsSyncStatus,
+        setError,
+      });
+      expect(snapshotHandler).not.toBeNull();
+      if (!snapshotHandler) {
+        throw new Error('Expected snapshot handler to be registered');
+      }
+      snapshotHandler({ data: () => settings, metadata: { hasPendingWrites: false } });
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+      expect(errorHandler).not.toBeNull();
+      if (!errorHandler) {
+        throw new Error('Expected error handler to be registered');
+      }
+      errorHandler(new Error('listener failed'));
+      expect(setError).toHaveBeenCalledWith('listener failed');
+      subscription();
+      expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    test('runInitialHostedSync syncs the profile, seeds settings, and subscribes', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'osm' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const getDocSpy = jest.mocked(getDoc);
+      getDocSpy
+        .mockResolvedValueOnce({
+          exists: () => true,
+          data: () => ({ email: 'user@example.com', createdAt: { __serverTimestamp: true } }),
+        } as never)
+        .mockResolvedValueOnce({ data: () => undefined, exists: () => false } as never);
+      const applyRemoteSettings = jest.fn();
+      const setSyncedSettings = jest.fn();
+      const lastSyncedSettingsRef = { current: null };
+      const setSettingsSyncStatus = jest.fn();
+      const setError = jest.fn();
+      const hasInitializedSettingsRef = { current: false };
+      const unsubscribeResult = await runInitialHostedSync({
+        profileRef: { path: 'profile' } as never,
+        settingsRef: { path: 'settings' } as never,
+        user: { uid: 'user-1', email: 'user@example.com', displayName: 'User', photoURL: '', providerData: [] } as never,
+        buildLocalSettingsSnapshot: () => settings,
+        applyRemoteSettings,
+        isActive: () => true,
+        getPendingLocalWrite: () => null,
+        getInFlightHostedSettingsWrite: () => null,
+        getSupersededBaselineOneShot: () => null,
+        clearSupersededBaselineOneShot: jest.fn(),
+        lastSyncedSettingsRef,
+        setSyncedSettings,
+        setSettingsSyncStatus,
+        setError,
+        hasInitializedSettingsRef,
+      });
+      expect(hasInitializedSettingsRef.current).toBe(true);
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('syncing');
+      expect(setSettingsSyncStatus).toHaveBeenCalledWith('synced');
+      expect(typeof unsubscribeResult).toBe('function');
+    });
+
+    test('cleans up a listener that resolves after hosted settings cleanup', async () => {
+      const unsubscribe = jest.fn();
+      const setSubscription = jest.fn();
+      let active = true;
+
+      const subscriptionPromise = Promise.resolve(unsubscribe);
+      const handoff = attachHostedSettingsSubscription(subscriptionPromise, () => active, setSubscription);
+      active = false;
+
+      await handoff;
+
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+      expect(setSubscription).not.toHaveBeenCalled();
+    });
 });
 
 describe('AuthProvider local credential edge cases', () => {
