@@ -50,6 +50,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **App libraries:** Update Redux Toolkit to 2.13.0, Sentry React to 11.3.0, Lucide React to 1.50.0, and React Router to 8.4.0 to keep forecast state management, error reporting, icons, and app navigation compatible with current releases.
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
 - **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
