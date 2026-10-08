@@ -53,6 +53,10 @@ const isEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
  * Explicit workspace identity always wins. Legacy payloads are checked as
  * Severe first so a valid Severe save containing custom layers is never
  * reclassified as Custom merely because it contains those layers.
+ *
+ * This intentionally does not reuse resolveForecastWorkspaceId: an explicit but
+ * unknown workspaceId must reject as 'unknown-workspace' instead of falling
+ * back to Severe, so corrupt envelopes cannot silently open in the wrong workspace.
  */
 export const classifyForecastWorkspacePayload = (
   value: unknown,

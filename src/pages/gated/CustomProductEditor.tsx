@@ -12,12 +12,14 @@ import {
   emptyProductDraft,
   newCategory,
   normalizeDraftOrder,
+  prepareProductDraft,
   productDraft,
   validateProductDraft,
 } from './customProductEditorModel';
 
 interface Props {
   product?: HostedCustomProduct;
+  saveError?: string | null;
   onCancel(): void;
   onSave(draft: CustomProductDraft): Promise<boolean>;
 }
@@ -31,8 +33,8 @@ const EditorTitle = ({ product }: { product?: HostedCustomProduct }) => (
 
 const PreviewTitle = ({ label }: { label: string }) => <h3>{label || 'Untitled product'}</h3>;
 
-const ValidationMessage = ({ validation }: { validation: string | null }) =>
-  validation ? <p className="custom-product-error">{validation}</p> : null;
+const ValidationMessage = ({ message }: { message: string | null }) =>
+  message ? <p role="alert" className="custom-product-error">{message}</p> : null;
 
 const SaveLabel = ({ saving, product }: { saving: boolean; product?: HostedCustomProduct }) =>
   saving ? 'Saving…' : product ? 'Save changes' : 'Create product';
@@ -43,7 +45,7 @@ const moveCategory = (categories: CustomCategoryTemplate[], index: number, direc
   return normalizeDraftOrder(reordered);
 };
 
-const CustomProductEditor = ({ product, onCancel, onSave }: Props) => {
+const CustomProductEditor = ({ product, saveError = null, onCancel, onSave }: Props) => {
   const [draft, setDraft] = useState(() => initialDraft(product));
   const [saving, setSaving] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
@@ -56,25 +58,30 @@ const CustomProductEditor = ({ product, onCancel, onSave }: Props) => {
     ...current,
     categories: normalizeDraftOrder(current.categories.filter((_, candidate) => candidate !== index)),
   }));
-  const addCategory = () => setDraft((current) => ({
-    ...current,
-    categories: [...current.categories, newCategory(current.categories.length)],
-  }));
+  const addCategory = () => setDraft((current) => {
+    const categories = normalizeDraftOrder(current.categories);
+    return {
+      ...current,
+      categories: [...categories, newCategory(categories.length)],
+    };
+  });
   const submit = async () => {
-    const error = validateProductDraft(draft);
+    const prepared = prepareProductDraft(draft);
+    const error = validateProductDraft(prepared);
     if (error) {
       setValidation(error);
       return;
     }
     setSaving(true);
     setValidation(null);
-    const saved = await onSave(draft);
+    const saved = await onSave(prepared);
     setSaving(false);
     if (saved) onCancel();
   };
+  const feedback = validation ?? saveError;
 
   return (
-    <Card className="custom-product-editor-card">
+    <Card className="custom-product-editor-card" data-testid="custom-product-editor">
       <CardHeader>
         <EditorTitle product={product} />
         <CardDescription>Set the ordered categories that will be snapshotted into each new custom layer.</CardDescription>
@@ -103,7 +110,7 @@ const CustomProductEditor = ({ product, onCancel, onSave }: Props) => {
           <PreviewTitle label={draft.label} />
           <CustomProductPreview categories={draft.categories} />
         </aside>
-        <ValidationMessage validation={validation} />
+        <ValidationMessage message={feedback} />
         <div className="custom-product-editor-footer">
           <Button variant="ghost" onClick={onCancel}>Cancel</Button>
           <Button onClick={submit} disabled={saving}><SaveLabel saving={saving} product={product} /></Button>

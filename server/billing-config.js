@@ -1,6 +1,9 @@
 'use strict';
 
 const { hasFirebaseAdminConfig } = require('./firebase-admin');
+const { getServerTarget } = require('./lib/serverTarget');
+
+const CLOUDFLARE_BETA_ORIGIN = 'https://beta.gfcweather.com';
 
 const MONTHLY_DISPLAY_PRICE = '$3/month';
 const ANNUAL_PROMO_DISPLAY_PRICE = '$25/year';
@@ -20,8 +23,49 @@ const parseDateEnv = (value) => {
 const getAnnualPromoPriceId = () => process.env.STRIPE_PRICE_ANNUAL_PROMO || '';
 
 /** Returns the public base URL used for Stripe return links. */
-const getBaseUrl = () =>
-  process.env.APP_BASE_URL || 'http://127.0.0.1:3000';
+const getBaseUrl = (env = process.env) =>
+  env.APP_BASE_URL || 'http://127.0.0.1:3000';
+
+/** Normalizes a URL or Origin header value into an origin string. */
+const normalizeOrigin = (value) => {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
+/** Returns the browser origins that may receive Stripe billing return URLs. */
+const getAllowedBillingReturnOrigins = (env = process.env) => {
+  const origins = new Set();
+  const configuredOrigin = normalizeOrigin(env.APP_BASE_URL);
+  if (configuredOrigin) {
+    origins.add(configuredOrigin);
+  }
+
+  if (getServerTarget(env) === 'beta') {
+    origins.add(CLOUDFLARE_BETA_ORIGIN);
+  }
+
+  return origins;
+};
+
+/**
+ * Resolves the public base URL for Stripe return links.
+ * Honors the request Origin when it matches an allowed beta or configured host.
+ */
+const getBillingReturnBaseUrl = (req, env = process.env) => {
+  const requestOrigin = normalizeOrigin(req?.headers?.origin);
+  if (requestOrigin && getAllowedBillingReturnOrigins(env).has(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return getBaseUrl(env);
+};
 
 /** True when the annual intro pricing window is currently active. */
 const isAnnualPromoActive = () => {
@@ -98,6 +142,7 @@ const getPublicBillingConfig = () => {
 
 module.exports = {
   getBaseUrl,
+  getBillingReturnBaseUrl,
   getBillingRuntimeConfig,
   getPublicBillingConfig,
   isAnnualPromoActive,

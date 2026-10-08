@@ -35,7 +35,7 @@ export const isCustomCategoryStyle = (value: unknown): value is CustomCategorySt
 /** Validates one bounded ordered category definition. */
 export const isCustomCategoryTemplate = (value: unknown): value is CustomCategoryTemplate => {
   if (!isRecord(value) || !hasOnlyKeys(value, ['id', 'label', 'order', 'style'])) return false;
-  return isBoundedText(value.id, CUSTOM_PRODUCT_LIMITS.labelLength)
+  return isBoundedText(value.id, CUSTOM_PRODUCT_LIMITS.categoryIdLength)
     && isBoundedText(value.label, CUSTOM_PRODUCT_LIMITS.labelLength)
     && isNonNegativeInteger(value.order)
     && isCustomCategoryStyle(value.style);

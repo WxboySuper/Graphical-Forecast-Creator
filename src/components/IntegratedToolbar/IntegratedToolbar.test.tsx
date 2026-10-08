@@ -159,6 +159,45 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
   );
 });
 
+describe('TabbedIntegratedToolbar layout scaffolding', () => {
+  /* eslint-disable testing-library/no-node-access -- verifies scroll container DOM structure */
+  test('tab row scrolls horizontally with a non-shrinking section track', () => {
+    renderToolbar('tabbed');
+
+    const row = document.querySelector('.tabbed-integrated-toolbar__row');
+    expect(row).toHaveClass('overflow-x-auto');
+
+    const track = row?.firstElementChild;
+    expect(track).toHaveClass('w-max');
+    expect(track).toHaveClass('min-w-full');
+  });
+
+  test('toolbar sections contain labels and content without shared shrink classes', () => {
+    renderToolbar('tabbed');
+
+    const sections = document.querySelectorAll('.tabbed-integrated-toolbar__section');
+    expect(sections.length).toBeGreaterThan(0);
+
+    sections.forEach((section) => {
+      expect(section).toHaveClass('overflow-x-clip');
+      expect(section).toHaveClass('shrink-0');
+      expect(section.querySelector('.tabbed-integrated-toolbar__section-label-column')).toBeTruthy();
+    });
+  });
+
+  test('Days tab forecast strip reserves enough width for all day controls', async () => {
+    const user = userEvent.setup();
+    renderToolbar('tabbed');
+
+    await user.click(screen.getByRole('tab', { name: /Days/i }));
+
+    const forecastSection = document.querySelector('.tabbed-integrated-toolbar__section--days');
+    expect(forecastSection).toHaveClass('min-w-[518px]');
+    expect(forecastSection?.querySelector('.tabbed-integrated-toolbar__day-strip')).not.toHaveClass('min-w-max');
+  });
+  /* eslint-enable testing-library/no-node-access */
+});
+
 describe('custom Draw mode exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
