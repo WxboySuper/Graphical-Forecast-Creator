@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import type { StormReport } from '../../types/stormReports';
-import type { ProductKind } from '../../utils/verificationV2';
-import { relevantReportTypes } from '../../utils/verificationV2';
+import { relevantReportTypes, type ProductKind } from '../../utils/verificationV2';
 
 interface ReportTableProps {
   reports: StormReport[];
