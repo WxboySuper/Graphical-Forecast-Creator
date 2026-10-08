@@ -78,7 +78,7 @@ type CategoricalConversion = {
 };
 
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
-  const normalizedProbability = probability.replace(/[#]/g, '%');
+  const normalizedProbability = probability.replace(/[#]/g, '');
   return rules.find((rule) =>
     rule.probabilities.includes(normalizedProbability) && rule.cigs.includes(cig)
   )?.risk ?? 'TSTM';
