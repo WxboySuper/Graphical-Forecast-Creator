@@ -45,6 +45,8 @@ describe('useMonitorNwsAlertsRefresh', () => {
   });
 
   test('ignores a refresh that resolves after the hook is disabled', async () => {    let resolveRequest: ((value: typeof collection) => void) | undefined;
+  test('ignores a refresh that resolves after the hook is disabled', async () => {
+    let resolveRequest: ((value: typeof collection) => void) | undefined;
     jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockImplementation(
       () => new Promise((resolve) => { resolveRequest = resolve; }),
     );
