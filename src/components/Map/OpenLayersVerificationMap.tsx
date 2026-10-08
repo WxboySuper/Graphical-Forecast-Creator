@@ -41,25 +41,23 @@ import {
 } from "ol/style";
 import Legend from "./Legend";
 import UnofficialBadge from "./UnofficialBadge";
-import {
-  getOpenFreeMapStyleSet,
-  isOpenFreeMapStyle,
-} from "../../lib/openFreeMap";
+import { isOpenFreeMapStyle } from "../../lib/openFreeMap";
 import "./ForecastMap.css";
 import {
   createHatchPattern,
   createLabelOverlaySource,
   createTileSource,
-  replaceLayerGroupLayers,
   resolveFillOpacity,
   resolveStrokeWidth,
   toRgbaColor,
   TOP_OUTLINE_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   TOP_LABEL_LAYER_Z_INDEX,
-  loadOpenFreeMapLayerGroups,
-  isCurrentOpenFreeMapRequest,
 } from "./openLayersMapStyles";
+import {
+  beginOpenFreeMapBasemapRequest,
+  loadOpenFreeMapBasemap,
+} from "./openLayersBasemap";
 import { ReportType } from "../../types/stormReports";
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from "../../utils/stormReportColors";
 import type { DatEvidence } from "../../utils/dat";
@@ -469,6 +467,10 @@ const OpenLayersVerificationMap = forwardRef<
     )
       return;
 
+    // Every style change invalidates any OpenFreeMap request started by a
+    // previous selection, including a switch back to a raster or blank map.
+    const requestId = beginOpenFreeMapBasemapRequest(vectorStyleRequestRef);
+
     /**
      * Load US state boundary features into the `landSourceRef` if they
      * are not already present. This creates the state outline layer
@@ -531,9 +533,6 @@ const OpenLayersVerificationMap = forwardRef<
     }
 
     if (isOpenFreeMapStyle(baseMapStyle)) {
-      const requestId = vectorStyleRequestRef.current + 1;
-      vectorStyleRequestRef.current = requestId;
-
       tile.setVisible(false);
       land.setVisible(false);
       landOutline.setVisible(true);
@@ -544,41 +543,16 @@ const OpenLayersVerificationMap = forwardRef<
       vectorBaseGroup.getLayers().clear();
       vectorReferenceGroup.getLayers().clear();
 
-      getOpenFreeMapStyleSet(baseMapStyle)
-        .then(loadOpenFreeMapLayerGroups)
-        .then(({ baseGroup, referenceGroup }) => {
-          if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
-            return;
-          }
-
-          replaceLayerGroupLayers(vectorBaseGroup, baseGroup);
-          replaceLayerGroupLayers(vectorReferenceGroup, referenceGroup);
-          vectorBaseGroup.setVisible(true);
-          vectorReferenceGroup.setVisible(true);
-        })
-        .catch((error) => {
-          if (!isCurrentOpenFreeMapRequest(vectorStyleRequestRef.current, requestId)) {
-            return;
-          }
-
-          console.warn(
-            "[verification-map] falling back to raster basemap after vector load failure",
-            {
-              baseMapStyle,
-              error,
-            },
-          );
-          vectorBaseGroup.getLayers().clear();
-          vectorReferenceGroup.getLayers().clear();
-          tile.setSource(createTileSource(baseMapStyle));
-          tile.setVisible(true);
-          const labelSource =
-            createLabelOverlaySource(baseMapStyle);
-          if (labelSource) {
-            labels.setSource(labelSource);
-            labels.setVisible(true);
-          }
-        });
+      loadOpenFreeMapBasemap({
+        style: baseMapStyle,
+        tile,
+        labels,
+        vectorBaseGroup,
+        vectorReferenceGroup,
+        requestRef: vectorStyleRequestRef,
+        requestId,
+        logPrefix: "verification-map",
+      });
     } else {
       hideVectorBasemapGroups();
       tile.setVisible(true);
