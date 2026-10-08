@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -17,11 +17,11 @@ import {
   filterCloudCyclesByWorkspace,
   getCloudCycleWorkspaceId,
   getCloudCycleWorkspaceLabel,
+  getCloudLibraryTabFromSearchParams,
   getCloudLibraryTabs,
   getCloudLibraryTabLabel,
   getCloudLibraryWorkspacePath,
   getNextCloudLibraryTabId,
-  resolveActiveCloudLibraryTab,
   type CloudLibraryTab,
   type CloudLibraryTabId,
 } from './cloudLibraryWorkspace';
@@ -600,7 +600,7 @@ const handleTabKeyDown = (
   options: {
     tabs: CloudLibraryTab[];
     tabId: CloudLibraryTabId;
-    onTabChange: (tabId: CloudLibraryTabId) => void;
+    onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
     onPendingFocus: (tabId: CloudLibraryTabId) => void;
   },
 ): void => {
@@ -610,7 +610,7 @@ const handleTabKeyDown = (
   if (nextId === null || nextId === tabId) return;
   event.preventDefault();
   onPendingFocus(nextId);
-  onTabChange(nextId);
+  onTabChange(nextId, { replaceHistory: true });
 };
 
 /** One roving tab button inside the workspace tablist. */
@@ -619,7 +619,7 @@ const CloudLibraryTabButton: React.FC<{
   tabs: CloudLibraryTab[];
   isActive: boolean;
   tabRefs: React.RefObject<Map<CloudLibraryTabId, HTMLButtonElement>>;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
   onPendingFocus: (tabId: CloudLibraryTabId) => void;
 }> = ({ tab, tabs, isActive, tabRefs, onTabChange, onPendingFocus }) => (
   <Button
@@ -649,7 +649,7 @@ const CloudLibraryTabButton: React.FC<{
 const CloudLibraryTabs: React.FC<{
   tabs: CloudLibraryTab[];
   activeTab: CloudLibraryTabId;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({ tabs, activeTab, onTabChange }) => {
   const tabRefs = useRef(new Map<CloudLibraryTabId, HTMLButtonElement>());
   const pendingFocus = useRef<CloudLibraryTabId | null>(null);
@@ -699,7 +699,7 @@ const CloudLibraryMainCard: React.FC<{
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({
   loading,
   cycles,
@@ -787,7 +787,7 @@ const CloudLibrarySignedInLayout: React.FC<{
   onLoadCycle: (cycleId: string) => Promise<void>;
   onDeleteCycle: (cycleId: string) => Promise<void>;
   onRenameCycle: (cycleId: string, newLabel: string) => Promise<void>;
-  onTabChange: (tabId: CloudLibraryTabId) => void;
+  onTabChange: (tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => void;
 }> = ({
   premiumActive,
   isExpiredPremium,
@@ -927,28 +927,48 @@ const useCloudLibraryActions = ({
   };
 };
 
+const useCloudLibraryWorkspaceNavigation = (cycles: CloudCycleMetadata[]) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const buildTarget = getBuildTarget();
+  const tabs = useMemo(() => getCloudLibraryTabs(cycles, buildTarget), [cycles, buildTarget]);
+  const activeTab = useMemo(() => getCloudLibraryTabFromSearchParams(searchParams, tabs), [searchParams, tabs]);
+
+  /** Normalizes malformed workspace params to the canonical All URL without adding history. */
+  useEffect(() => {
+    if (searchParams.get('workspace') === null || activeTab !== 'all') return;
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('workspace');
+    setSearchParams(nextSearchParams, { replace: true });
+  }, [activeTab, searchParams, setSearchParams]);
+
+  const visibleCycles = useMemo(
+    () => filterCloudCyclesByWorkspace(cycles, activeTab),
+    [activeTab, cycles]
+  );
+  const handleTabChange = useCallback((tabId: CloudLibraryTabId, options?: { replaceHistory?: boolean }) => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (tabId === 'all') {
+      nextSearchParams.delete('workspace');
+    } else {
+      nextSearchParams.set('workspace', tabId);
+    }
+    if (options?.replaceHistory) {
+      setSearchParams(nextSearchParams, { replace: true });
+    } else {
+      setSearchParams(nextSearchParams);
+    }
+  }, [searchParams, setSearchParams]);
+
+  return { tabs, activeTab, visibleCycles, handleTabChange };
+};
+
 /** Production-facing page for loading and managing cloud-hosted cycles. */
 const CloudLibraryPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { premiumActive, effectiveSource } = useEntitlement();
   const { cycles, loading, error, loadCycle, deleteCycle, renameCycle, refreshCycles } = useCloudCycles();
-  const [activeTab, setActiveTab] = useState<CloudLibraryTabId>('all');
-  const buildTarget = getBuildTarget();
-  const tabs = useMemo(() => getCloudLibraryTabs(cycles, buildTarget), [cycles, buildTarget]);
-  const effectiveActiveTab = resolveActiveCloudLibraryTab(tabs, activeTab);
-
-  /** Resets selection to All when exposure changes remove the selected workspace. */
-  useEffect(() => {
-    if (effectiveActiveTab !== activeTab) {
-      setActiveTab(effectiveActiveTab);
-    }
-  }, [effectiveActiveTab, activeTab]);
-
-  const visibleCycles = useMemo(
-    () => filterCloudCyclesByWorkspace(cycles, effectiveActiveTab),
-    [effectiveActiveTab, cycles]
-  );
+  const { tabs, activeTab, visibleCycles, handleTabChange } = useCloudLibraryWorkspaceNavigation(cycles);
   const {
     message,
     handleLoadCycle,
@@ -970,8 +990,8 @@ const CloudLibraryPage: React.FC = () => {
     () => `${visibleCycles.length} cloud cycle${visibleCycles.length === 1 ? '' : 's'}`,
     [visibleCycles.length],
   );
-  const workspaceLabel = getCloudLibraryTabLabel(tabs, effectiveActiveTab);
-  const workspacePath = getCloudLibraryWorkspacePath(effectiveActiveTab);
+  const workspaceLabel = getCloudLibraryTabLabel(tabs, activeTab);
+  const workspacePath = getCloudLibraryWorkspacePath(activeTab);
 
   if (!user) {
     return <SignedOutGate />;
@@ -991,7 +1011,7 @@ const CloudLibraryPage: React.FC = () => {
           loading={loading}
           cycles={visibleCycles}
           tabs={tabs}
-          activeTab={effectiveActiveTab}
+          activeTab={activeTab}
           workspaceLabel={workspaceLabel}
           workspacePath={workspacePath}
           canWrite={canWrite}
@@ -999,7 +1019,7 @@ const CloudLibraryPage: React.FC = () => {
           onLoadCycle={handleLoadCycle}
           onDeleteCycle={handleDeleteCycle}
           onRenameCycle={handleRenameCycle}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
         />
       </div>
     </div>
