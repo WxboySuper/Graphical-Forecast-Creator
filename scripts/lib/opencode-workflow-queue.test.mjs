@@ -52,6 +52,7 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
     issues: 'read',
     'pull-requests': 'write',
     checks: 'read',
+    actions: 'read',
   });
   assert.deepEqual(workflow.jobs['wait-for-ci'].permissions, {
     'pull-requests': 'read',
