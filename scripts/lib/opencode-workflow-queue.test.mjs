@@ -16,21 +16,22 @@ const workflowFiles = [
   '../../.github/workflows/opencode-research.yml',
 ];
 const queueGroup = 'gfc-opencode-maintenance-queue';
+const ghActionsExpr = (expression) => ['$', '{{ ', expression, ' }}'].join('');
 
 test('every OpenCode workflow shares the single bounded concurrency queue', () => {
-  for (const file of workflowFiles.filter((file) => !file.endsWith('opencode-first-look.yml'))) {
-    const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+  for (const workflowFile of workflowFiles.filter((candidate) => !candidate.endsWith('opencode-first-look.yml'))) {
+    const source = readFileSync(new URL(workflowFile, import.meta.url), 'utf8');
     assert.match(
       source,
       new RegExp(`^concurrency:\\r?\\n[ ]{2}group: ${queueGroup}\\r?\\n[ ]{2}queue: max$`, 'm'),
-      `${file} must join the shared queue`,
+      `${workflowFile} must join the shared queue`,
     );
-    assert.doesNotMatch(source, /^[ ]{2}cancel-in-progress: true$/m, `${file} must not cancel a running invocation`);
+    assert.doesNotMatch(source, /^[ ]{2}cancel-in-progress: true$/m, `${workflowFile} must not cancel a running invocation`);
   }
 
   const firstLook = parse(readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8'));
-  assert.equal(firstLook.concurrency, undefined, 'CI waiting must stay outside the OpenCode queue');
-  assert.equal(firstLook.jobs['wait-for-ci'].concurrency, undefined);
+  assert.ok(firstLook.concurrency === undefined, 'CI waiting must stay outside the OpenCode queue');
+  assert.ok(firstLook.jobs['wait-for-ci'].concurrency === undefined);
   assert.deepEqual(firstLook.jobs.review.concurrency, { group: queueGroup, queue: 'max' });
 });
 
@@ -56,9 +57,21 @@ test('first-look reviews publish one bot comment with read-only issue and pull-r
     'pull-requests': 'read',
     actions: 'read',
   });
-  assert.equal(publisher.with['github-token'], '${{ github.token }}');
-  assert.doesNotMatch(publisher.with['github-token'], /GH_PAT/);
-  assert.match(publisher.with.script, /github\.rest\.issues\.createComment/);
-  assert.match(publisher.with.script, /github\.rest\.issues\.updateComment/);
-  assert.doesNotMatch(publisher.with.script, /github\.rest\.pulls\.createReview/);
+  assert.equal(publisher.env.GH_TOKEN, ghActionsExpr('github.token'));
+  assert.doesNotMatch(publisher.env.GH_TOKEN, /GH_PAT/);
+  assert.match(publisher.run, /publish-opencode-first-look\.mjs/);
+  assert.doesNotMatch(source, /pulls\.createReview/);
+});
+
+test('audit issue worker uses GH_PAT to push branches and open implementation PRs', () => {
+  const workflow = parse(readFileSync(new URL('../../.github/workflows/opencode-audit-issue-worker.yml', import.meta.url), 'utf8'));
+  const publish = workflow.jobs.implement.steps.find((step) => step.name === 'Push the branch, open a PR, and request first-look review');
+  const model = workflow.jobs.implement.steps.find((step) => step.name === 'Run bounded audit implementation');
+
+  assert.ok(publish);
+  assert.ok(model);
+  assert.match(publish.env.GH_TOKEN, /^\$\{\{\s*secrets\.GH_PAT\s*\}\}$/);
+  assert.ok(!('GH_TOKEN' in (model.env ?? {})));
+  assert.ok(!('GH_PAT' in (model.env ?? {})));
+  assert.match(publish.run, /publish-opencode-audit-pr\.mjs/);
 });

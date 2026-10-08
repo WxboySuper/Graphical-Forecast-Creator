@@ -14,7 +14,7 @@ const expected = {
   latestChanges: [],
   goodThings: [],
   badThings: [],
-  rating: 8,
+  rating: 10,
   linkedIssueAssessment: null,
   reviewCommentAssessments: [],
   priorFindingAssessments: [],
@@ -76,6 +76,32 @@ test('rejects malformed event streams, missing assistant text, and invalid first
   assert.throws(() => extractFinalAssistantText('progress\nnot json'), /invalid JSON event stream/);
   assert.throws(() => extractFinalAssistantText('{"type":"step_finish"}'), /no assistant text/);
   assert.throws(() => parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', 'No JSON was returned.')), { format: 'json' }), context), /did not contain a JSON object/);
-  assert.throws(() => parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', '{"summary":[]}\nThis is not the final object.')), { format: 'json' }), context), /did not contain a JSON object/);
+  const trailing = `${JSON.stringify(expected)}\nThis is not the final object.`;
+  assert.deepEqual(
+    parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', trailing)), { format: 'json' }), context),
+    expected,
+  );
   assert.throws(() => extractFinalAssistantText(''), /no output/);
+});
+
+test('ignores example JSON in prose and extracts the final first-look review object', () => {
+  const example = '{"contextRead":true,"filesReviewed":["example/path"],"note":"illustrative only"}';
+  const reviewJson = JSON.stringify(expected);
+  const prose = [
+    'Use a shape like this example (not your final answer):',
+    example,
+    '',
+    'Final review JSON:',
+    reviewJson,
+  ].join('\n');
+  const extracted = extractFinalAssistantText(stream(textEvent('final', prose)), {
+    format: 'json',
+    firstLookContext: context,
+    validateFirstLookObject: parseOpenCodeFirstLookOutput,
+  });
+  assert.deepEqual(parseOpenCodeFirstLookOutput(extracted, context), expected);
+  assert.deepEqual(
+    parseOpenCodeFirstLookOutput(extractFinalAssistantText(stream(textEvent('final', prose)), { format: 'json' }), context),
+    expected,
+  );
 });

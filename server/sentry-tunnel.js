@@ -65,18 +65,21 @@ function clientEndpointMatchesConfigured(clientEndpoint, configuredEndpoint) {
   );
 }
 
-const attachUpstreamAbortHandlers = (req, res, controller) => {
-  const abortIfDisconnected = () => {
-    if (req.destroyed || res.destroyed) {
+/**
+ * Aborts the upstream fetch only when the client connection goes away before we respond.
+ * Listening on the request 'close' event is wrong: Node emits it as soon as the request body
+ * has been fully consumed (express.raw), which aborted every forward and returned 504.
+ */
+const attachUpstreamAbortHandlers = (res, controller) => {
+  const abortIfClientGone = () => {
+    if (!res.writableFinished) {
       controller.abort();
     }
   };
-  req.once('close', abortIfDisconnected);
-  res.once('close', abortIfDisconnected);
+  res.once('close', abortIfClientGone);
 
   return () => {
-    req.removeListener('close', abortIfDisconnected);
-    res.removeListener('close', abortIfDisconnected);
+    res.removeListener('close', abortIfClientGone);
   };
 };
 
@@ -86,10 +89,10 @@ const endResponseIfWritable = (res, status) => {
   }
 };
 
-const forwardSentryEnvelope = async (targetUrl, req, res, envelopeBody) => {
+const forwardSentryEnvelope = async (targetUrl, res, envelopeBody) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SENTRY_UPSTREAM_TIMEOUT_MS);
-  const removeAbortHandlers = attachUpstreamAbortHandlers(req, res, controller);
+  const removeAbortHandlers = attachUpstreamAbortHandlers(res, controller);
 
   try {
     const upstream = await fetch(targetUrl, {
@@ -124,7 +127,7 @@ const createSentryTunnelHandler = (targetUrl, configuredEndpoint) => async (req,
       return;
     }
 
-    await forwardSentryEnvelope(targetUrl, req, res, envelopeBody);
+    await forwardSentryEnvelope(targetUrl, res, envelopeBody);
   } catch (err) {
     console.error('[analytics] sentry tunnel failed:', err);
     endResponseIfWritable(res, 500);

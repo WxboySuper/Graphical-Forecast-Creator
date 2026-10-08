@@ -408,16 +408,16 @@ const TabbedToolbarStripSection: React.FC<{
   contentClassName?: string;
   children: React.ReactNode;
 }> = ({ label, hint, className, contentClassName, children }) => (
-  <section className={cn('tabbed-integrated-toolbar__section flex h-full shrink-0 items-center gap-2 border-r border-border/70 pr-2 last:border-r-0 last:pr-0', className)}>
-    <div className="flex w-[74px] shrink-0 flex-col justify-center">
-      <span className="tabbed-integrated-toolbar__section-label text-[10px] font-semibold uppercase tracking-[0.22em] text-primary/80 leading-tight">{label}</span>
+  <section className={cn('tabbed-integrated-toolbar__section flex h-full shrink-0 items-center gap-2.5 overflow-x-clip overflow-y-visible border-r border-border/70 pr-3 last:border-r-0 last:pr-0', className)}>
+    <div className="tabbed-integrated-toolbar__section-label-column flex shrink-0 flex-col justify-center">
+      <span className="tabbed-integrated-toolbar__section-label text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/80 leading-tight">{label}</span>
       {hint ? (
         <span className="tabbed-integrated-toolbar__section-hint mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground leading-tight">
           {hint}
         </span>
       ) : null}
     </div>
-    <div className={cn('tabbed-integrated-toolbar__section-content flex min-h-0 min-w-0 flex-1 items-center', contentClassName)}>{children}</div>
+    <div className={cn('tabbed-integrated-toolbar__section-content flex items-center', contentClassName)}>{children}</div>
   </section>
 );
 
@@ -515,24 +515,40 @@ const TabbedToolbarTabRow: React.FC<{ children: React.ReactNode }> = ({ children
       role="group"
       aria-label="Toolbar controls"
     >
-      <div className="flex h-full min-w-max items-stretch gap-2">{children}</div>
+      <div className="flex h-full w-max min-w-full items-stretch gap-2">{children}</div>
     </div>
   );
 };
 
 /** Small stat pill used to display compact numeric metadata. */
-const TabbedToolbarStatPill: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="tabbed-integrated-toolbar__stat-pill rounded-xl border border-border/70 bg-muted/35 px-2.5 py-2">
-    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground leading-none">{label}</p>
-    <p className="mt-1 text-xs font-black text-foreground">{value}</p>
+const TabbedToolbarStatPill: React.FC<{ label: string; value: string; compact?: boolean }> = ({
+  label,
+  value,
+  compact = false,
+}) => (
+  <div
+    className={cn(
+      'tabbed-integrated-toolbar__stat-pill shrink-0 rounded-xl border border-border/70 bg-muted/35',
+      compact ? 'px-2 py-1' : 'px-2.5 py-2',
+    )}
+  >
+    <p
+      className={cn(
+        'font-semibold uppercase text-muted-foreground leading-none',
+        compact ? 'text-[9px] tracking-[0.14em]' : 'text-[10px] tracking-[0.18em]',
+      )}
+    >
+      {label}
+    </p>
+    <p className={cn('font-black text-foreground', compact ? 'mt-0.5 text-[11px]' : 'mt-1 text-xs')}>{value}</p>
   </div>
 );
 
 /** Existing severe-weather controls, unchanged when custom products are unavailable. */
 const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <>
-    <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type w-[316px]">
-      <div className="flex flex-wrap items-center gap-1.5">
+    <TabbedToolbarStripSection label="Outlook Type" hint="T / W / H / C" className="tabbed-integrated-toolbar__section--type min-w-[316px] shrink-0">
+      <div className="tabbed-integrated-toolbar__type-grid flex flex-wrap items-center gap-0.5">
         {controller.availableTypes.map((type) => (
           <TabbedToolbarTypeButton key={type} controller={controller} type={type} />
         ))}
@@ -542,7 +558,7 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
     <TabbedToolbarStripSection
       label={controller.activeOutlookType === 'categorical' ? 'Risk Scale' : 'Probability Scale'}
       hint="Arrow Keys"
-      className="tabbed-integrated-toolbar__section--probability min-w-[500px] flex-1"
+      className="tabbed-integrated-toolbar__section--probability min-w-[500px] shrink-0 grow"
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {controller.probabilities.map((probability) => (
@@ -555,7 +571,7 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
       </div>
     </TabbedToolbarStripSection>
 
-    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection w-[360px]">
+    <TabbedToolbarStripSection label="Current Selection" className="tabbed-integrated-toolbar__section--selection min-w-[384px] shrink-0">
       <TabbedToolbarSelectionStrip controller={controller} showShortcuts={false} />
     </TabbedToolbarStripSection>
   </>
@@ -573,7 +589,7 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
 
   return (
     <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode">
+      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode shrink-0">
         <div className={cn('custom-product-toggle', storedMode === 'custom' && 'is-custom-mode')} role="radiogroup" aria-label="Drawing product" data-testid="custom-product-toggle">
           <span className="custom-product-toggle__indicator" aria-hidden="true" />
           {(['severe', 'custom'] as const).map((mode) => (
@@ -595,12 +611,12 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
           ))}
         </div>
       </TabbedToolbarStripSection>
-      <div key={storedMode} className="custom-product-mode-panel">
+      <div key={storedMode} className="custom-product-mode-panel flex shrink-0 items-center gap-2">
         {storedMode === 'severe' ? (
           <SevereDrawControls controller={controller} />
         ) : (
           <>
-            <TabbedToolbarStripSection label="Library" className="w-[184px]">
+            <TabbedToolbarStripSection label="Library" className="min-w-[184px] shrink-0">
               <CustomProductsDialog />
             </TabbedToolbarStripSection>
             <CustomDrawPanel />
@@ -649,20 +665,20 @@ const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = 
 
 /** Cycle date strip wrapper used in the Days tab. */
 const CycleDateStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date w-[300px]">
+  <TabbedToolbarStripSection label="Cycle Date" className="tabbed-integrated-toolbar__section--date min-w-[284px] shrink-0">
     <CycleDateControl controller={controller} />
   </TabbedToolbarStripSection>
 );
 
 /** Forecast days strip with prev/next and day buttons. */
 const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
-  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days w-[510px]">
-    <div className="flex items-center gap-2">
+  <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[518px] shrink-0">
+    <div className="flex shrink-0 items-center gap-1.5">
       <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1}>
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <div className="min-w-0 flex-1">
-        <div className="tabbed-integrated-toolbar__day-strip flex min-w-max items-center gap-1 rounded-2xl p-1">
+      <div className="shrink-0">
+        <div className="tabbed-integrated-toolbar__day-strip flex shrink-0 items-center gap-1 rounded-2xl p-1">
           {FORECAST_DAYS.map((day) => {
             const isActive = controller.currentDay === day;
             const hasData = hasDayOutlookData(controller.days, day);
@@ -674,7 +690,7 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
                 data-day={day}
                 onClick={controller.onDayButtonClick}
                 className={cn(
-                  'tabbed-integrated-toolbar__day-button relative h-10 min-w-[48px] rounded-xl border px-3 text-sm font-semibold transition-all',
+                  'tabbed-integrated-toolbar__day-button relative h-10 min-w-[40px] rounded-xl border px-2 text-sm font-semibold transition-all',
                   isActive
                     ? 'is-active border-primary bg-primary text-primary-foreground shadow-md shadow-primary/20'
                     : 'border-transparent bg-transparent hover:bg-background'
@@ -698,11 +714,10 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
 const DayStatusStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
   const daysWithData = FORECAST_DAYS.filter((day) => hasDayOutlookData(controller.days, day)).length;
   return (
-    <TabbedToolbarStripSection label="Day Status" className="tabbed-integrated-toolbar__section--day-status w-[280px]">
-      <div className="flex flex-wrap items-center gap-2">
-        <TabbedToolbarStatPill label="Current" value={`Day ${controller.currentDay}`} />
-        <TabbedToolbarStatPill label="Data" value={`${daysWithData}/8`} />
-        <TabbedToolbarStatPill label="Jump" value="1-8" />
+    <TabbedToolbarStripSection label="Day Status" className="tabbed-integrated-toolbar__section--day-status min-w-[228px] shrink-0">
+      <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
+        <TabbedToolbarStatPill compact label="Current" value={`Day ${controller.currentDay}`} />
+        <TabbedToolbarStatPill compact label="Data" value={`${daysWithData}/8`} />
       </div>
     </TabbedToolbarStripSection>
   );
@@ -722,7 +737,7 @@ const TabbedToolbarDaysTab: React.FC<{ controller: ForecastWorkspaceController }
 /** Layers tab exposing ghost layers and base map options. */
 const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <TabbedToolbarTabRow>
-    <TabbedToolbarStripSection label="Ghost Layers" hint={`Day ${controller.currentDay}`} className="tabbed-integrated-toolbar__section--ghost-layers min-w-[560px] flex-1">
+    <TabbedToolbarStripSection label="Ghost Layers" hint={`Day ${controller.currentDay}`} className="tabbed-integrated-toolbar__section--ghost-layers min-w-[560px] shrink-0 lg:min-w-[620px]">
       {controller.ghostTypes.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {controller.ghostTypes.map((type) => {
@@ -772,8 +787,8 @@ const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController
       )}
     </TabbedToolbarStripSection>
 
-    <TabbedToolbarStripSection label="Base Map" className="tabbed-integrated-toolbar__section--base-map w-[330px]">
-      <div className="flex flex-wrap items-center gap-2">
+    <TabbedToolbarStripSection label="Base Map" className="tabbed-integrated-toolbar__section--base-map min-w-[330px] shrink-0">
+      <div className="flex shrink-0 flex-nowrap items-center gap-2">
         {FORECAST_BASE_MAP_OPTIONS.map((option) => {
           const isActive = controller.baseMapStyle === option.value;
           return (
@@ -797,8 +812,9 @@ const TabbedToolbarLayersTab: React.FC<{ controller: ForecastWorkspaceController
       </div>
     </TabbedToolbarStripSection>
 
-    <OutlookTrimToolbarSection controller={controller} /><TabbedToolbarStripSection label="Layer Status" className="tabbed-integrated-toolbar__section--layer-status w-[250px]">
-      <div className="flex flex-wrap items-center gap-2">
+    <OutlookTrimToolbarSection controller={controller} />
+    <TabbedToolbarStripSection label="Layer Status" className="tabbed-integrated-toolbar__section--layer-status min-w-[268px] shrink-0">
+      <div className="flex shrink-0 flex-nowrap items-center gap-2">
         <TabbedToolbarStatPill label="Visible" value={`${controller.visibleGhostOutlooks.length}`} />
         <TabbedToolbarStatPill label="Editing" value={outlookLabels[controller.activeOutlookType]} />
         <TabbedToolbarStatPill label="Selected" value={controller.activeProbability} />
@@ -941,11 +957,11 @@ const TabbedToolbarActionGroup: React.FC<{
   return (
     <div
       className={cn(
-        'tabbed-integrated-toolbar__action-group flex items-center gap-2',
+        'tabbed-integrated-toolbar__action-group flex shrink-0 flex-nowrap items-center gap-2.5',
         tone === 'danger' && 'tabbed-integrated-toolbar__action-group--danger'
       )}
     >
-      <span className="tabbed-integrated-toolbar__action-group-label">
+      <span className="tabbed-integrated-toolbar__action-group-label shrink-0">
         {label}
       </span>
       <div className="flex flex-wrap items-center gap-2">
@@ -970,8 +986,8 @@ const TabbedToolbarToolsTab: React.FC<{
 
   return (
     <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Workspace Actions" className="tabbed-integrated-toolbar__section--workspace-actions min-w-[760px] flex-1">
-        <div className="tabbed-integrated-toolbar__action-groups flex flex-wrap items-center gap-2">
+      <TabbedToolbarStripSection label="Workspace Actions" className="tabbed-integrated-toolbar__section--workspace-actions min-w-[760px] shrink-0">
+        <div className="tabbed-integrated-toolbar__action-groups flex flex-wrap items-center gap-x-3 gap-y-2">
           <TabbedToolbarActionGroup label="History" items={historyItems} />
           <TabbedToolbarActionGroup label="File" items={fileItems} />
           <TabbedToolbarActionGroup label="Complete" items={completionItems} />
@@ -979,8 +995,8 @@ const TabbedToolbarToolsTab: React.FC<{
         </div>
       </TabbedToolbarStripSection>
 
-      <TabbedToolbarStripSection label="Cloud & Context" className="tabbed-integrated-toolbar__section--cloud-context w-[260px]">
-        <div className="flex flex-wrap items-center gap-2">
+      <TabbedToolbarStripSection label="Cloud & Context" className="tabbed-integrated-toolbar__section--cloud-context min-w-[268px] shrink-0">
+        <div className="flex shrink-0 flex-nowrap items-center gap-2">
           <TabbedToolbarStatPill label="State" value={controller.isSaved ? 'Saved' : 'Unsaved'} />
           {autoTstmTools}
           {controller.cloudTools ?? (
@@ -989,7 +1005,7 @@ const TabbedToolbarToolsTab: React.FC<{
         </div>
       </TabbedToolbarStripSection>
       {isFeatureExposed('populationEstimate') ? (
-        <TabbedToolbarStripSection label="Beta research" className="w-[300px]">
+        <TabbedToolbarStripSection label="Beta research" className="min-w-[300px] shrink-0">
           <PopulationEstimateBeta />
         </TabbedToolbarStripSection>
       ) : null}
@@ -1181,7 +1197,7 @@ const TabbedIntegratedToolbarBody: React.FC<IntegratedToolbarProps> = ({ control
   const [activeTab, setActiveTab] = React.useState<TabbedToolbarTabKey>('draw');
 
   return (
-    <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[168px] overflow-hidden backdrop-blur">
+    <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[172px] overflow-hidden backdrop-blur">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabbedToolbarTabKey)} className="flex h-full flex-col">
         <TabbedIntegratedToolbarHeader controller={controller} activeTab={activeTab} onTabChange={setActiveTab} />
         <TabbedIntegratedToolbarTray controller={controller} autoTstmTools={autoTstmTools} />

@@ -13,6 +13,8 @@ export const CUSTOM_PRODUCT_LIMITS = {
   ringsPerPolygon: 64,
   coordinatesPerFeature: 10_000,
   labelLength: 64,
+  /** Matches hosted Firestore rules for custom category ids. */
+  categoryIdLength: 128,
 } as const;
 
 export type CustomLayerId = string & { readonly _brand: 'CustomLayerId' };

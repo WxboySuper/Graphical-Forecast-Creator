@@ -15,10 +15,19 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
+- **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
+- **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
+
 - **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
 
 #### Fixed
 
+- **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
+- **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
+- **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.
+- **Beta analytics on Cloudflare:** Pass Umami build settings into the Cloudflare Workers beta deploy so opted-in visits can be counted.
+- **Sentry tunnel:** Stop aborting upstream fetches when the request stream closes after the body is read on Node 24, which had caused every forwarded envelope to return 504.
 - **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
 - **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
 - **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
@@ -30,6 +39,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Deployment action selection:** Treat the automatic choice as a request to use the release manifest.
 - **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
 - **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
+- **Tabbed forecast toolbar:** Stop section labels, day controls, layer chips, and custom draw panels from overlapping at desktop widths around 1024px by enforcing section minimum widths, clipping overflow, and horizontal scrolling in each tab row.
 - **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
 - **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
 
@@ -40,6 +50,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
 - **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
 - **firebase-admin:** 14.4.0 → 14.5.0 (`server`)

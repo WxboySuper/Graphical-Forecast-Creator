@@ -81,11 +81,17 @@ const writeRevision = (
   return revised;
 });
 
-const findOpenSlot = (records: FirestoreProductRecord[]): string => {
-  const occupied = new Set(records.map(({ slotId }) => slotId));
+/** Picks the first open slot from any occupied document ids (including malformed docs the client skips). */
+export const findOpenProductSlot = (occupiedSlotIds: Iterable<string>): string => {
+  const occupied = new Set(occupiedSlotIds);
   const slot = CUSTOM_PRODUCT_DOCUMENT_SLOTS.find((candidate) => !occupied.has(candidate));
   if (!slot) throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
   return slot;
+};
+
+const readOccupiedSlots = async (userId: string): Promise<Set<string>> => {
+  const snapshot = await getDocs(collectionRef(userId));
+  return new Set(snapshot.docs.map((item) => item.id));
 };
 
 export const firestoreCustomProductsRepository: CustomProductsRepository = {
@@ -99,7 +105,7 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
     }, (error) => onError?.(error));
   },
   async create(userId, draft) {
-    const slot = findOpenSlot(await readRecords(userId));
+    const slot = findOpenProductSlot(await readOccupiedSlots(userId));
     const product = createHostedProduct({ id: uuidv4(), userId, draft });
     await runTransaction(requireDb(), async (transaction) => {
       const reference = productRef(userId, slot);

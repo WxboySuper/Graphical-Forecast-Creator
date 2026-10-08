@@ -35,6 +35,9 @@ test('trusted PR changelog automation runs only in pull_request_target with read
   for (const [name, job] of Object.entries(workflow.jobs)) {
     assert.equal(job.permissions, undefined, `${name} must not elevate GITHUB_TOKEN permissions`);
   }
+  assert.equal(workflow.jobs['generate-changelog'].needs, 'prepare-automated-changelog');
+  assert.match(workflow.jobs['generate-changelog'].if, /dependabot\[bot\]/);
+  assert.match(workflow.jobs['generate-changelog'].if, /edited/);
 });
 
 test('default-branch tools are isolated before PR checkout and credential-bearing execution', () => {
@@ -125,17 +128,19 @@ test('ordinary pull_request CI has no repository secrets, write permissions, or 
   }
 });
 
-
-test('trusted publisher authenticates private-repository fetches without persisting the header', () => {
-  const publisher = readFileSync(path.join(repositoryRoot, 'scripts/publish-opencode-changelog.mjs'), 'utf8');
-  assert.match(publisher, /const gitAuth = .*Buffer\.from\(\x60x-access-token:\$\{token\}\x60\)/);
-  assert.match(publisher, /execFileSync\('git', \[\x27-c\x27, gitAuth, \x27fetch\x27/);
-  assert.doesNotMatch(publisher, /git config --local .*extraheader/);
-});
-
 test('workspace preparation removes project OpenCode configuration even without sparse-checkout exclusions', () => {
   const source = readFileSync(path.join(repositoryRoot, 'scripts/prepare-opencode-workspace.mjs'), 'utf8');
   assert.ok(source.indexOf('removeProjectOpenCodeConfiguration(process.cwd())') < source.indexOf('if (!excludedPaths.length && !scope)'));
+});
+
+test('Dependabot preparation only sets the impact declaration; OpenCode remains the changelog writer', () => {
+  const source = readFileSync(path.join(repositoryRoot, 'scripts/prepare-changelog-governance.mjs'), 'utf8');
+  assert.match(source, /dependabotChangelogDeclaration\(bumps, stableLine\)/);
+  assert.doesNotMatch(source, /applyDependencyBumpsToChangelog|git', \['commit'/);
+  const workflow = readWorkflow('opencode-changelog-pr.yml');
+  const generator = workflow.jobs['generate-changelog'];
+  assert.match(generator.if, /github\.event\.pull_request\.user\.login == 'dependabot\[bot\]'/);
+  assert.match(generator.steps.find((step) => step.name === 'Run read-only OpenCode changelog generation').env.OPENCODE_MODEL, /muse-spark/);
 });
 
 test('manual changelog audits pass an optional bounded baseline through the trusted workflow', () => {

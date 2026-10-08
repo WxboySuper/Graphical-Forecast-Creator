@@ -7,7 +7,11 @@ const { getSubscriptionPeriodEndUnix } = require('./billing-stripe-period');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
 const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getBearerToken } = require('./firebase-auth');
-const { getBaseUrl, getBillingRuntimeConfig, getPublicBillingConfig } = require('./billing-config');
+const {
+  getBillingReturnBaseUrl,
+  getBillingRuntimeConfig,
+  getPublicBillingConfig,
+} = require('./billing-config');
 const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cleanup');
@@ -307,7 +311,7 @@ const handleCheckout = async (req, res) => {
     return;
   }
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = getBillingReturnBaseUrl(req);
   const metadata = createCheckoutMetadata(decodedToken.uid, plan);
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -348,7 +352,7 @@ const handleBillingPortal = async (req, res) => {
 
   const portal = await stripe.billingPortal.sessions.create({
     customer: entitlementData.stripeCustomerId,
-    return_url: `${getBaseUrl()}/account`,
+    return_url: `${getBillingReturnBaseUrl(req)}/account`,
   });
 
   res.json({ url: portal.url });

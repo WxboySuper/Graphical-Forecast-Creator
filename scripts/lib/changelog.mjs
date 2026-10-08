@@ -64,6 +64,21 @@ const legacyReleaseNotes = (changelog, version) => {
   return `## v${version}\n\n${body}`.trim();
 };
 
+/** @param {string} changelog @param {string} version @returns {string | null} */
+const extractExactVersionSection = (changelog, version) => {
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = changelog.match(new RegExp(`^## v${escaped}$`, 'm'));
+  if (!match || match.index === undefined) return null;
+
+  const heading = match[0];
+  const start = match.index;
+  const afterHeading = start + heading.length;
+  const rest = changelog.slice(afterHeading);
+  const nextSection = rest.search(/\n## /);
+  const body = (nextSection === -1 ? rest : rest.slice(0, nextSection)).trim();
+  return body ? `${heading}\n\n${body}`.trim() : null;
+};
+
 /**
  * Notes body for a GitHub Release tag (stable or beta prerelease).
  * @param {string} changelog
@@ -72,6 +87,9 @@ const legacyReleaseNotes = (changelog, version) => {
  * @returns {string | null}
  */
 export const extractReleaseNotes = (changelog, version, lane = '') => {
+  const exact = extractExactVersionSection(changelog, version);
+  if (exact) return exact;
+
   const laneNotes = RELEASE_LANES.has(lane)
     ? extractLaneReleaseNotes(changelog, version, lane)
     : null;

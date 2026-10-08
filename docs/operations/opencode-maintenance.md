@@ -11,11 +11,11 @@ change as a PR. A human reviews and merges every PR.
 
 | Job | Trigger | Work and output |
 | --- | --- | --- |
-| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | The same queued run waits up to 45 minutes for matching `Checks | CI`, then writes or updates one summary comment. It stops if the PR head changes. |
+| PR first-look | PR opened, new commits, reopened, ready for review; owner can comment `/review-opencode` | Same-repository collaborator, audit-worker, and Dependabot PRs wait up to 45 minutes for matching `Checks | CI`, then write or update one summary comment. It stops if the PR head changes. |
 | Issue triage | A non-bot issue opens | Code-backed context or one focused request for missing information |
-| PR changelog draft | Trusted `pull_request_target` activity for an eligible PR | Default-branch tooling drafts a bounded factual entry; the trusted publisher validates and commits it to the PR branch |
+| PR changelog draft | `pull_request_target` activity for eligible PRs, including every same-repository Dependabot PR | Dependabot changes get deterministic dependency changelog preparation on every event, regardless of PR description. Eligible collaborator PRs use bounded OpenCode drafting. |
 | Changelog audit | Manual dispatch, weekly Friday schedule, required beta/stable release preflight | Compare actual changes with the release lane; create a correction PR when needed and block publication until clean |
-| Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three high-confidence issues |
+| Daily bug hunt | Daily at 06:11 UTC | Rotating source area; at most three issues |
 | Daily security inspection | Daily at 07:23 UTC | Rotating security focus and source area; at most three issues |
 | Dependency review | Monday at 23:31 UTC | Open Dependabot alerts, PRs, lockfile changes, and code use; at most five issues |
 | Weekly deep audit | Sunday at 06:43 UTC | Rotating maintenance category and code area; at most eight issues |
@@ -25,8 +25,7 @@ change as a PR. A human reviews and merges every PR.
 Scheduled investigations run even when earlier runs found nothing. A complete
 empty result advances that job's rotation. Failed and inconclusive results do
 not advance it. High investigation frequency is intentional. Finding creation
-requires concrete evidence, a valid file and line, an impact description, and a
-high confidence score. Existing fingerprints suppress repeat issues.
+requires concrete evidence, a valid file and line, an impact description. Existing fingerprints suppress repeat issues.
 
 Each model workspace uses Git sparse checkout to omit every tracked `.env` or
 `.env.*` file except `.env.example`. This applies to review, triage, scheduled,
@@ -47,7 +46,7 @@ security finding.
 The weekly audit rotates through bugs, architecture, incomplete work, dead
 paths, error handling, verification, documentation, API correctness, and
 reliability. The monthly audit covers broader cross-cutting concerns. These
-audits can create several verified issues in one run. Neither audit implements
+audits can create several reported issues in one run. Neither audit implements
 its findings. The Monday dependency review runs in the evening after
 Dependabot's Monday activity. It reads current alerts and open Dependabot PR
 context, but never upgrades or merges a dependency.
@@ -103,8 +102,10 @@ the merge boundary. The workflow never merges a PR.
 
 The first-look review uses `pull_request_target` but checks out the trusted
 default branch and reads PR content through the GitHub API. It skips forks,
-drafts, stale revisions, and untrusted authors. It caps the diff at 30 files
-and 2,000 patch characters per file. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
+drafts, stale revisions, and untrusted authors. It admits Dependabot only when
+the REST API identifies `dependabot[bot]` and the same-repository branch starts
+with `dependabot/`. The model reviews the package changes, affected code, and
+completed CI results, including failures. Its default `GITHUB_TOKEN` can read contents, issues, PRs, and
 checks. The publishing step uses the job's `GITHUB_TOKEN` with only
 `pull-requests: write`, so GitHub posts the review as `github-actions[bot]`.
 The model never receives that token. It can only read, list, and search the
@@ -162,26 +163,57 @@ gets deployment or release permissions. No job can change repository settings
 or branch protection. Protected branches remain guarded by repository rules;
 all merges are human decisions.
 
-PR changelog generation runs in `.github/workflows/opencode-changelog-pr.yml`
-on `pull_request_target`. The workflow checks out maintenance scripts from the
+PR changelog handling runs in `.github/workflows/opencode-changelog-pr.yml`
+on `pull_request_target`. Every same-repository Dependabot PR enters the
+trusted preparation job without needing a changelog declaration in its
+description. Preparation classifies runtime dependency bumps as beta or
+hotfix, and development-tooling-only bumps as none. It updates only the
+managed PR description block. The dependent OpenCode job then investigates
+every Dependabot PR, including draft PRs, and decides whether an entry is
+needed. A no-change result is accepted only for a Dependabot PR declared none.
+Runtime dependency changes require a grounded entry or the job fails for
+maintainer follow-up. Generated changes go through the same trusted publisher
+as collaborator PRs. The normal PR synchronize event sees the existing
+CHANGELOG.md diff and does not generate a duplicate entry. Dependabot body-edit
+events are skipped because the opened/synchronize run waits for preparation.
+Collaborator PRs that declare a beta or hotfix impact also use OpenCode to
+draft an entry. The workflow checks out
+maintenance scripts from the
 repository default branch before it checks out the PR head. The PR checkout is
-input data only, with `persist-credentials: false`. The workflow executes no PR-provided
-script or local action. It removes tracked `.env` files and project OpenCode
-configuration, plugins, and hooks before starting the model.
+input data only, with `persist-credentials: false`. The workflow executes no
+PR-provided script or local action. It removes tracked `.env` files and
+project OpenCode configuration, plugins, and hooks before starting the model.
+OpenCode receives the complete PR description, including Dependabot's
+upstream release notes, instead of a truncated excerpt. The shared runner
+attaches large prompts from a temporary file in the sanitized checkout rather
+than passing the prompt as one command-line argument; it removes that file
+when the model exits.
 
-Generation requires exactly one `Changelog-Impact: beta` or `hotfix` decision
-and a diff that does not already change `CHANGELOG.md`. It is bounded to 80
+Generation requires exactly one eligible changelog declaration and a diff
+that does not already change `CHANGELOG.md`. It is bounded to 80
 changed files, 90,000 diff characters, four entries, 450 characters per entry,
 and a 12-minute model timeout. Fork PRs, other decision values, oversized
 diffs, and inconclusive results do not produce automated edits; the changelog
-check remains the required gate. OpenCode has read-only repository tools and
+check remains the required gate. Dependabot is accepted only when GitHub
+identifies `dependabot[bot]`, the head repository matches GFC, and the branch
+starts with `dependabot/`. The trusted automated preparation and publishing
+steps use `GH_PAT` for PR metadata updates or authenticated fetch/push. OpenCode has read-only repository tools and
 receives only `OPENCODE_API_KEY`. The trusted publisher rechecks the live PR
-identity and head, then commits only `CHANGELOG.md`. The trusted automated
-preparation and publishing steps use `GH_PAT` for PR metadata updates or
-authenticated fetch/push. No checkout credential is persisted. The ordinary
+identity and head, then commits only `CHANGELOG.md`. No checkout credential
+is persisted. The ordinary
 `pull_request` CI workflow has read-only token permissions, no repository
 secrets, and no token environment passed to PR-controlled scripts. Human review
 and branch protection remain the merge boundary.
+
+First-look reviews inspect each supplied open review thread against the current
+code and tests. An open GitHub thread does not by itself mean the code concern
+is unresolved. A technically addressed concern may still receive 10/10 while
+GitHub awaits a reviewer to resolve the thread. The parser rejects missing or
+invalid thread assessments, and it refuses to publish a clean score when the
+reviewer says a concern remains open or unclear without reporting a concrete
+finding. The workflow paginates through all review threads and comments rather
+than sampling the first page. If GitHub cannot return the complete history, the
+review job stops before publishing a score.
 The flat changelog audit is available as **Maintenance | OpenCode changelog
 audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
 Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and
@@ -241,7 +273,7 @@ and retries failed setup or model runs no more than once every six hours.
 
 Security inspections and weekly/monthly deep audits use `opencode-go/glm-5.3-flash`; other maintenance jobs use `opencode-go/muse-spark-1.3-contributor`. The workflow selects the model from the scheduled category. Finding limits are three for daily jobs, five for the dependency review, eight
 for weekly audits, and twelve for monthly audits. A candidate still needs a
-valid repository path and line, evidence, impact, a high confidence score, and
+valid repository path and line, evidence, impact, and
 a fingerprint not present in the existing issue backlog. OpenCode's CLI is
 installed from the exact npm package version `opencode-ai@1.18.32`. Update the
 version deliberately after reviewing a release.
@@ -310,3 +342,8 @@ Actions settings without affecting the others:
 The manual comment-driven workflow in `opencode.yml` remains a separate,
 maintainer-requested path. The bounded research workflow can also be disabled
 independently in Actions.
+
+Model confidence is informational. Scheduled publishers do not discard concrete
+findings based on a numeric confidence cutoff. Audit issues are reports for
+investigation, not proof of a defect. The implementation worker rechecks eligible
+findings before editing; security and dependency findings remain human-only.

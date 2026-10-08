@@ -36,7 +36,18 @@ function buildSentryInitOptions() {
     dsn,
     environment: getSentryEnvironment(),
     release: getSentryRelease(),
-    sendDefaultPii: false,
+    // Privacy-safe baseline (Sentry v11): `sendDefaultPii` was removed in v11.
+    // Explicit `dataCollection` opt-outs preserve the restrictive behavior on
+    // both v10 (>=10.57) and v11 instead of inheriting v11's permissive defaults.
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: false, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+    },
     tracesSampleRate: getTracesSampleRate(),
   };
 }
