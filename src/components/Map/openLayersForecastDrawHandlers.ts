@@ -8,7 +8,7 @@ import { addCustomFeature, addFeature } from "../../store/forecastSlice";
 import type { DayType } from "../../types/outlooks";
 import type { CustomCategoryTemplate, OneOffCustomLayer } from "../../types/customProducts";
 import type { LandMaskStrategy } from "../../utils/outlookPolygonMasking/types";
-import { toDrawnCustomFeature } from "./openLayersMapStyles";
+import { isPolygonOrMultiPolygon, toDrawnCustomFeature } from "./openLayersMapStyles";
 
 export interface DrawnFeatureHandlerOptions {
   currentDay: DayType;
@@ -41,13 +41,13 @@ export const handleForecastDrawEnd = (
 
   (async () => {
     try {
-      const geometryObject = format.writeGeometryObject(geometry, {
+      const geometryObject: unknown = format.writeGeometryObject(geometry, {
         dataProjection: "EPSG:4326",
         featureProjection: "EPSG:3857",
       });
-      if (geometryObject.type !== "Polygon" && geometryObject.type !== "MultiPolygon") return;
+      if (!isPolygonOrMultiPolygon(geometryObject)) return;
       const customFeature = toDrawnCustomFeature(
-        geometryObject as unknown as Geometry,
+        geometryObject,
         options.activeCustomLayer,
         options.activeCustomCategory,
         options.customMode,
@@ -57,7 +57,7 @@ export const handleForecastDrawEnd = (
         return;
       }
 
-      let outlookGeometry: Polygon | MultiPolygon | null = geometryObject as Polygon | MultiPolygon;
+      let outlookGeometry: Polygon | MultiPolygon | null = geometryObject;
       outlookGeometry = await options.trimGeometryForAutoDraw(
         outlookGeometry,
         options.trimStrategy,
