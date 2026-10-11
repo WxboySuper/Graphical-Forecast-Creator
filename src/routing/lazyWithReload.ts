@@ -32,14 +32,19 @@ const hasReloadedFor = (chunkKey: string): boolean => {
   }
 };
 
-/** Records that this chunk used its one reload this session. */
-const markReloadedFor = (chunkKey: string): void => {
+/**
+ * Records that this chunk used its one reload this session. Returns false when
+ * storage is unavailable or blocked, in which case the caller must not reload.
+ */
+const markReloadedFor = (chunkKey: string): boolean => {
   try {
-    sessionStorage?.setItem(RELOAD_GUARD_PREFIX + chunkKey, '1');
+    if (typeof sessionStorage === 'undefined') {
+      return false;
+    }
+    sessionStorage.setItem(RELOAD_GUARD_PREFIX + chunkKey, '1');
+    return true;
   } catch {
-    // Storage can be blocked (private mode, disabled cookies). Reload anyway;
-    // the worst case is one extra reload attempt, not a loop, since a second
-    // failure without the guard still throws below once navigation settles.
+    return false;
   }
 };
 
@@ -61,7 +66,12 @@ export const lazyWithReload = <T extends ComponentType<any>>(
       if (!isChunkLoadError(error) || hasReloadedFor(chunkKey)) {
         throw error;
       }
-      markReloadedFor(chunkKey);
+      // Without a persisted guard a persistently failing chunk would reload on
+      // every page load (notably when storage is blocked), so surface the error
+      // to the boundary instead.
+      if (!markReloadedFor(chunkKey)) {
+        throw error;
+      }
       reload();
       // Suspend on this attempt; the reloaded page takes over from here.
       // The executor intentionally never settles the promise.

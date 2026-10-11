@@ -93,6 +93,31 @@ describe('lazyWithReload', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
+  test('throws to the boundary instead of reloading when storage is blocked', async () => {
+    const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    const getItem = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('denied');
+    });
+    try {
+      const reload = jest.fn();
+      const Page = lazyWithReload(
+        'forecast',
+        () => Promise.reject(new Error('Unable to preload CSS for https://gfc.weatherboysuper.com/assets/ForecastMap-abc.css')),
+        reload
+      );
+
+      renderSuspended(<Page />);
+
+      expect(await screen.findByText('Something went wrong')).toBeInTheDocument();
+      expect(reload).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+      getItem.mockRestore();
+    }
+  });
+
   test('does not reload on ordinary component errors', async () => {
     const reload = jest.fn();
     const Page = lazyWithReload('forecast', () => Promise.reject(new Error('render bug')), reload);
