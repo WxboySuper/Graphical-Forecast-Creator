@@ -44,8 +44,7 @@ describe('useMonitorNwsAlertsRefresh', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('ignores a refresh that resolves after the hook is disabled', async () => {
-    let resolveRequest: ((value: typeof collection) => void) | undefined;
+  test('ignores a refresh that resolves after the hook is disabled', async () => {    let resolveRequest: ((value: typeof collection) => void) | undefined;
     jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockImplementation(
       () => new Promise((resolve) => { resolveRequest = resolve; }),
     );
@@ -70,5 +69,60 @@ describe('useMonitorNwsAlertsRefresh', () => {
 
     expect(setRawFrames).not.toHaveBeenCalled();
     expect(setFetchedAt).not.toHaveBeenCalled();
+  });
+
+  test('surfaces a polling failure instead of swallowing it', async () => {
+    jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockRejectedValue(new Error('offline'));
+    const setRawFrames = jest.fn();
+    const setFetchedAt = jest.fn();
+    const onError = jest.fn();
+
+    renderHook(() => useMonitorNwsAlertsRefresh({
+      enabled: true,
+      animationEnabled: true,
+      animationSpeedMs: 1_000,
+      setRawFrames,
+      setFetchedAt,
+      onError,
+    }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    expect(setRawFrames).not.toHaveBeenCalled();
+    expect(setFetchedAt).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith('NWS alert refresh failed; showing last available data.');
+  });
+
+  test('clears a previous polling failure once a refresh succeeds', async () => {
+    let rejectRequest: ((reason: unknown) => void) | undefined;
+    let resolveRequest: ((value: typeof collection) => void) | undefined;
+    const fetchSpy = jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts')
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectRequest = reject; }))
+      .mockImplementation(() => new Promise((resolve) => { resolveRequest = resolve; }));
+    const onError = jest.fn();
+
+    renderHook(() => useMonitorNwsAlertsRefresh({
+      enabled: true,
+      animationEnabled: true,
+      animationSpeedMs: 1_000,
+      setRawFrames: jest.fn(),
+      setFetchedAt: jest.fn(),
+      onError,
+    }));
+
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+      rejectRequest?.(new Error('offline'));
+    });
+    expect(onError).toHaveBeenCalledWith('NWS alert refresh failed; showing last available data.');
+
+    await act(async () => {
+      jest.advanceTimersByTime(15_000);
+      resolveRequest?.(collection);
+    });
+    expect(onError).toHaveBeenLastCalledWith(null);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });
