@@ -14,8 +14,22 @@ export function parseGhApiPaginatedResponse(text) {
   return parsed;
 }
 
-/** Build argv for `gh api <route>?per_page=N --paginate --slurp` (GET list endpoints). */
+/** Build argv for `gh api <route> --method <VERB> [-f key=value...]` (GET list endpoints). */
 export function buildGhApiSlurpPaginateArgs(route, { perPage = 100 } = {}) {
   const separator = route.includes('?') ? '&' : '?';
   return ['api', `${route}${separator}per_page=${perPage}`, '--paginate', '--slurp'];
+}
+
+/**
+ * Build argv for a single `gh api` call. `gh api` takes exactly ONE endpoint
+ * argument; the HTTP verb goes behind `--method` (GET is the default).
+ * Keeps the method out of the positional args so `gh` never sees
+ * `gh api GET <route>` ("accepts 1 arg(s), received 2").
+ */
+export function buildGhApiArgs(route, fields = {}, method = 'GET') {
+  const args = ['api', '--method', method, route];
+  for (const [key, value] of Object.entries(fields)) {
+    args.push('-f', `${key}=${value}`);
+  }
+  return args;
 }
