@@ -23,6 +23,7 @@ export const isChunkLoadError = (error: unknown): boolean => {
   return CHUNK_LOAD_PATTERN.test(message);
 };
 
+/** Reports whether this chunk already used its one reload this session. */
 const hasReloadedFor = (chunkKey: string): boolean => {
   try {
     return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(RELOAD_GUARD_PREFIX + chunkKey) === '1';
@@ -31,6 +32,7 @@ const hasReloadedFor = (chunkKey: string): boolean => {
   }
 };
 
+/** Records that this chunk used its one reload this session. */
 const markReloadedFor = (chunkKey: string): void => {
   try {
     sessionStorage?.setItem(RELOAD_GUARD_PREFIX + chunkKey, '1');
@@ -62,6 +64,7 @@ export const lazyWithReload = <T extends ComponentType<any>>(
       markReloadedFor(chunkKey);
       reload();
       // Suspend on this attempt; the reloaded page takes over from here.
-      return new Promise<{ default: T }>(() => {});
+      // The executor intentionally never settles the promise.
+      return new Promise<{ default: T }>(() => undefined);
     })
   );
