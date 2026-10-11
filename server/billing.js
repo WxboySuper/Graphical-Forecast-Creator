@@ -4,8 +4,7 @@ const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
-const { getBearerToken } = require('./firebase-auth');
+const { getAdminAuth, getAdminDb } = require('./firebase-admin');
 const {
   getBillingReturnBaseUrl,
   getBillingRuntimeConfig,
@@ -17,7 +16,6 @@ const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cl
 const {
   createSubscriptionEntitlementWrite,
   getCheckoutRefundTarget,
-  getSubscriptionUid,
 } = require('./billing-entitlement-builders');
 const {
   createCheckoutMetadata,
