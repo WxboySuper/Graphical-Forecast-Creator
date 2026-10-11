@@ -39,7 +39,8 @@ concurrency:
         || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
-          && startsWith(github.event.comment.body, '/ocr')))
+          && startsWith(github.event.comment.body, '/ocr')
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
         && format('gfc-ocr-trial-{0}', github.event.pull_request.number || github.event.issue.number)
         || format('gfc-ocr-trial-noop-{0}', github.run_id)
     }}
@@ -84,7 +85,7 @@ jobs:
 
       - name: Run OCR review with Muse Spark
         id: ocr
-        uses: alibaba/open-code-review@main
+        uses: alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4 # main as of 2026-10-10
         with:
           llm_url: ${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/responses' }}
           llm_auth_token: ${{ secrets.OPENCODE_API_KEY }}
@@ -107,6 +108,11 @@ jobs:
         if: always()
         run: |
           {
-            echo "OCR trial posted. Compare with the first-look comment on the same PR.";
+            echo "OCR trial outcome=${{ steps.ocr.outcome }}.";
+            if [ "${{ steps.ocr.outcome }}" = "success" ]; then
+              echo "OCR trial posted. Compare with the first-look comment on the same PR.";
+            else
+              echo "OCR trial did NOT post (outcome=${{ steps.ocr.outcome }}). No comparison available for this run.";
+            fi
             echo "inline=${{ steps.ocr.outputs.comments_inline }} total=${{ steps.ocr.outputs.comments_total }} failed=${{ steps.ocr.outputs.comments_failed }} summary=${{ steps.ocr.outputs.summary_comment_url }}";
           } >> "$GITHUB_STEP_SUMMARY"
