@@ -117,7 +117,7 @@ export const applyWmsLayer = (
 };
 
 /** Loads and styles US state outlines into the monitor reference source. */
-export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean) => {
+export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean | (() => boolean)) => {
   if (source.getFeatures().length > 0) {
     return;
   }
@@ -135,7 +135,10 @@ export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolea
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857',
   });
-  const style = createStateOutlineStyle(darkMode);
+  // Resolve the theme after the fetch completes, not at call time: a theme
+  // toggle while the GeoJSON is in flight would otherwise bake the stale
+  // theme into features that no later effect re-styles.
+  const style = createStateOutlineStyle(typeof darkMode === 'function' ? darkMode() : darkMode);
   features.forEach((feature) => {
     if ('setStyle' in feature && typeof feature.setStyle === 'function') {
       feature.setStyle(style);

@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
 import Overlay from 'ol/Overlay';
@@ -257,6 +257,11 @@ export const useMonitorMapBootstrap = ({
   onSelectAlert,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
+  // Live theme for async outline loading: the mount-only effect below captures
+  // props once, but loadUsStateOutlines styles features when its fetch
+  // resolves, so it must read the theme at resolve time via this ref.
+  const darkModeRef = useRef(darkMode);
+  darkModeRef.current = darkMode;
 
   useEffect(() => {
     if (!mapElementRef.current) {
@@ -274,7 +279,7 @@ export const useMonitorMapBootstrap = ({
     map.on('pointermove', pointerMove.handle);
     attachMonitorMapPopup(map, refs);
     assignMonitorMapRefs(refs, map, layers);
-    loadUsStateOutlines(refs.stateOutlineSourceRef.current, darkMode).catch(() => undefined);
+    loadUsStateOutlines(refs.stateOutlineSourceRef.current, () => darkModeRef.current).catch(() => undefined);
     loadVectorReferenceStyle(refs);
 
     return () => {
