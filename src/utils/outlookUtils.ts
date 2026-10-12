@@ -71,10 +71,16 @@ type CategoricalRule = {
   risk: CategoricalRiskLevel;
 };
 
+type NormalizedCategoricalProbability = {
+  probability: string;
+  significant: boolean;
+};
+
 type CategoricalConversion = {
   probability: unknown;
   cig: unknown;
   rules: readonly CategoricalRule[];
+  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
 };
 
 const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
@@ -87,6 +93,28 @@ const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
 };
 const DEFAULT_CATEGORICAL_RISK: CategoricalRiskLevel = 'TSTM';
 
+const TORNADO_SIGNIFICANT_RISKS: Readonly<Record<string, CategoricalRiskLevel>> = {
+  '10%': 'ENH',
+  '15%': 'MDT',
+  '30%': 'HIGH',
+  '45%': 'HIGH',
+  '60%': 'HIGH',
+};
+
+const WIND_SIGNIFICANT_RISKS: Readonly<Record<string, CategoricalRiskLevel>> = {
+  '15%': 'SLGT',
+  '30%': 'ENH',
+  '45%': 'MDT',
+  '60%': 'HIGH',
+};
+
+const HAIL_SIGNIFICANT_RISKS: Readonly<Record<string, CategoricalRiskLevel>> = {
+  '15%': 'SLGT',
+  '30%': 'ENH',
+  '45%': 'MDT',
+  '60%': 'MDT',
+};
+
 const CIG_SIGNIFICANCE_RANK: Readonly<Record<CIGLevel, number>> = {
   CIG0: 0,
   CIG1: 1,
@@ -95,33 +123,39 @@ const CIG_SIGNIFICANCE_RANK: Readonly<Record<CIGLevel, number>> = {
 };
 
 /** Normalizes percent and significant-marker probability inputs for rule lookup. */
-function normalizeCategoricalProbability(probability: unknown): string | undefined {
+function normalizeCategoricalProbability(probability: unknown): NormalizedCategoricalProbability | undefined {
   if (typeof probability !== 'string') {
     return undefined;
   }
 
-  const compactProbability = probability.trim().replace(/\s+/g, '');
+  const compactProbability = probability.trim();
   if (compactProbability.length === 0) {
     return undefined;
   }
-
-  if (/^#\d+%$/.test(compactProbability)) {
-    return compactProbability.slice(1);
-  }
-  if (!/^\d+%?#?$/.test(compactProbability)) {
+  if (/\s/.test(compactProbability)) {
     return undefined;
   }
 
-  const withoutSignificantMarker = compactProbability.replace(/#$/, '');
-  return withoutSignificantMarker.endsWith('%')
-    ? withoutSignificantMarker
-    : `${withoutSignificantMarker}%`;
+  const prefixMarker = compactProbability.match(/^#(\d+)%?$/);
+  if (prefixMarker) {
+    return { probability: `${prefixMarker[1]}%`, significant: true };
+  }
+
+  const suffixMarker = compactProbability.match(/^(\d+)(?:%#|#)$/);
+  if (suffixMarker) {
+    return { probability: `${suffixMarker[1]}%`, significant: true };
+  }
+
+  const plainProbability = compactProbability.match(/^(\d+)%$/);
+  return plainProbability
+    ? { probability: compactProbability, significant: false }
+    : undefined;
 }
 
 /** Returns whether a rule has a CIG mapping no more significant than the target. */
 function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: number): boolean {
   for (const ruleCig of ruleCigs) {
-    const ruleCigRank = (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[ruleCig];
+    const ruleCigRank: number | undefined = CIG_SIGNIFICANCE_RANK[ruleCig];
     if (ruleCigRank !== undefined && ruleCigRank <= targetCigRank) {
       return true;
     }
@@ -129,33 +163,40 @@ function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: n
   return false;
 }
 
-/** Keeps the more significant categorical risk when multiple fallback rules apply. */
+/** Keeps the higher risk, treating an absent accumulated value as the first candidate. */
 function higherCategoricalRisk(
   current: CategoricalRiskLevel | undefined,
   candidate: CategoricalRiskLevel,
 ): CategoricalRiskLevel {
-  if (current === undefined) {
+  if (current === undefined || CATEGORICAL_RISK_RANK[candidate] > CATEGORICAL_RISK_RANK[current]) {
     return candidate;
   }
-  return maxCategoricalRisk(current, candidate);
+  return current;
 }
 
-/** Returns the higher of two categorical risk levels using the shared rank table. */
-function maxCategoricalRisk(a: CategoricalRiskLevel, b: CategoricalRiskLevel): CategoricalRiskLevel {
-  return CATEGORICAL_RISK_RANK[a] >= CATEGORICAL_RISK_RANK[b] ? a : b;
-}
-
-/** Finds an exact rule or a CIG-aware fallback for a normalized probability. */
+/** Uses a documented significant risk when present, otherwise the highest eligible CIG mapping. */
 function findCategoricalRisk(
-  normalizedProbability: string,
+  normalized: NormalizedCategoricalProbability,
   cig: unknown,
   rules: readonly CategoricalRule[],
+  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
 ): CategoricalRiskLevel {
-  const targetCigRank = typeof cig === 'string'
-    ? (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[cig]
+  const normalizedCig = typeof cig === 'string'
+    ? cig.trim().toUpperCase()
+    : undefined;
+  const cigKey = normalizedCig === '' || cig === null ? 'CIG0' : normalizedCig;
+  const targetCigRank = cigKey !== undefined
+    ? (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[cigKey]
     : undefined;
   if (targetCigRank === undefined) {
     return DEFAULT_CATEGORICAL_RISK;
+  }
+
+  const significantRisk = normalized.significant
+    ? significantRisks?.[normalized.probability]
+    : undefined;
+  if (significantRisk !== undefined) {
+    return significantRisk;
   }
 
   // Use a defined lower-significance CIG rule when this probability has no
@@ -163,7 +204,7 @@ function findCategoricalRisk(
   // from a rule that applies only to a more significant hatch.
   let fallbackRisk: CategoricalRiskLevel | undefined;
   for (const rule of rules) {
-    if (!rule.probabilities.includes(normalizedProbability)) {
+    if (!rule.probabilities.includes(normalized.probability)) {
       continue;
     }
 
@@ -177,17 +218,17 @@ function findCategoricalRisk(
 }
 
 /** Converts a probability/CIG pair to a categorical risk, defaulting invalid input to TSTM. */
-function categorizeProbability({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel {
+function categorizeProbability({ probability, cig, rules, significantRisks }: CategoricalConversion): CategoricalRiskLevel {
   const normalizedProbability = normalizeCategoricalProbability(probability);
   if (normalizedProbability === undefined) {
     return DEFAULT_CATEGORICAL_RISK;
   }
-  return findCategoricalRisk(normalizedProbability, cig, rules);
+  return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks);
 }
 
 type CategoricalInput = {
-  probability: unknown;
-  cig?: unknown;
+  probability: string;
+  cig?: CIGLevel;
 };
 
 const CIG_01 = ['CIG0', 'CIG1'] as const;
@@ -240,17 +281,17 @@ const HAIL_RULES: readonly CategoricalRule[] = [
 
 /** Convert tornado probability to categorical risk level. */
 export function tornadoToCategorical({ probability, cig = 'CIG0' }: CategoricalInput): CategoricalRiskLevel {
-  return categorizeProbability({ probability, cig, rules: TORNADO_RULES });
+  return categorizeProbability({ probability, cig, rules: TORNADO_RULES, significantRisks: TORNADO_SIGNIFICANT_RISKS });
 }
 
 /** Convert wind probability to categorical risk level. */
 export function windToCategorical({ probability, cig = 'CIG0' }: CategoricalInput): CategoricalRiskLevel {
-  return categorizeProbability({ probability, cig, rules: WIND_RULES });
+  return categorizeProbability({ probability, cig, rules: WIND_RULES, significantRisks: WIND_SIGNIFICANT_RISKS });
 }
 
 /** Convert hail probability to categorical risk level. */
 export function hailToCategorical({ probability, cig = 'CIG0' }: CategoricalInput): CategoricalRiskLevel {
-  return categorizeProbability({ probability, cig, rules: HAIL_RULES });
+  return categorizeProbability({ probability, cig, rules: HAIL_RULES, significantRisks: HAIL_SIGNIFICANT_RISKS });
 }
 
 /** Convert Day 3 total severe probability using the SPC combined-risk table. */
@@ -259,9 +300,9 @@ export function totalSevereToCategorical({ probability, cig = 'CIG0' }: Categori
 }
 
 /**
- * Determines if a probability string represents a significant threat
- * @param input The probability string to check
- * @returns True if it's a significant threat (contains #), false otherwise
+ * Determines if a probability represents a significant threat.
+ * @param probability The probability value to check. Non-strings return false.
+ * @returns True if the probability contains #, false otherwise.
  */
 export function isSignificantThreat({ probability }: Pick<CategoricalInput, 'probability'>): boolean {
   return typeof probability === 'string' && probability.includes('#');
@@ -290,9 +331,7 @@ export function getHighestCategoricalRisk({
 
   if (candidates.length === 0) return DEFAULT_CATEGORICAL_RISK;
 
-  return candidates.reduce((best, current) => (
-    maxCategoricalRisk(best, current)
-  ), candidates[0]);
+  return candidates.reduce((best, current) => higherCategoricalRisk(best, current), candidates[0]);
 }
 
 /**

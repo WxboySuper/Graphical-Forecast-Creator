@@ -44,18 +44,25 @@ describe('outlookUtils extra', () => {
 
   test('significant probability markers do not break categorical conversion', () => {
     expect(tornadoToCategorical({ probability: '30%#', cig: 'CIG3' })).toBe('HIGH');
-    expect(tornadoToCategorical({ probability: '#15%', cig: 'CIG1' })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '#15%', cig: 'CIG1' })).toBe('MDT');
     expect(tornadoToCategorical({ probability: '30#', cig: 'CIG3' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: ' 15% ', cig: 'CIG1' })).toBe('ENH');
-    expect(tornadoToCategorical({ probability: ' 10 %# ', cig: 'CIG1' })).toBe('ENH');
-    expect(tornadoToCategorical({ probability: '30', cig: 'CIG3' })).toBe('HIGH');
+    expect(tornadoToCategorical({ probability: '15#', cig: 'CIG0' })).toBe('MDT');
+    expect(tornadoToCategorical({ probability: '#15%', cig: 'CIG0' })).toBe('MDT');
+    expect(windToCategorical({ probability: '45#', cig: 'CIG0' })).toBe('MDT');
+    expect(hailToCategorical({ probability: '60#', cig: 'CIG0' })).toBe('MDT');
   });
 
   test('malformed probability and CIG values fail safely to TSTM', () => {
-    expect(tornadoToCategorical({ probability: undefined })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: undefined as unknown as string })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1#5%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '#' })).toBe('TSTM');
-    expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '30' })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '1 5%' })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '15%', cig: null as unknown as CIGLevel })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '15%', cig: '' as CIGLevel })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '15%', cig: ' cig1 ' as CIGLevel })).toBe('ENH');
   });
 
   test('categorical risk does not decrease as CIG significance increases', () => {
@@ -124,8 +131,8 @@ describe('outlookUtils extra', () => {
   test('isSignificantThreat detects # marker', () => {
     expect(isSignificantThreat({ probability: '#15%' })).toBe(true);
     expect(isSignificantThreat({ probability: '15%' })).toBe(false);
-    expect(isSignificantThreat({ probability: undefined })).toBe(false);
-    expect(isSignificantThreat({ probability: 15 })).toBe(false);
+    expect(isSignificantThreat({ probability: undefined as unknown as string })).toBe(false);
+    expect(isSignificantThreat({ probability: 15 as unknown as string })).toBe(false);
   });
 
   test('getHighestCategoricalRisk returns the worst of available', () => {
