@@ -404,6 +404,7 @@ jobs:
               return;
             }
             core.info('OCR gate clean: review completed with no findings and no unresolved reviewer threads.');
+            }
 
       - name: Trial summary
         if: always()
