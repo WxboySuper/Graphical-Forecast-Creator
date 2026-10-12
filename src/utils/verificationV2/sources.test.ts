@@ -68,14 +68,14 @@ describe('source loaders', () => {
       mockFetch('');
       const reports = await loadReportsForDate('2024-05-06');
       expect(reports).toEqual([]);
-      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/240506_rpts_raw.csv');
+      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/240506_rpts_filtered.csv');
     });
 
     test('routes null to today\'s SPC reports feed', async () => {
       mockFetch('');
       const reports = await loadReportsForDate(null);
       expect(reports).toEqual([]);
-      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/today.csv');
+      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/today_filtered.csv');
     });
 
     const beforeBoundary = new Date('2026-08-09T11:59:59.999Z');
@@ -85,37 +85,37 @@ describe('source loaders', () => {
         label: 'the current SPC report day before 12Z (ISO)',
         date: '2026-08-08',
         now: beforeBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/today.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/today_filtered.csv',
       },
       {
         label: 'the current SPC report day before 12Z (YYMMDD)',
         date: '260808',
         now: beforeBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/today.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/today_filtered.csv',
       },
       {
         label: 'the previous SPC report day before 12Z (ISO)',
         date: '2026-08-07',
         now: beforeBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/yesterday.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv',
       },
       {
         label: 'the previous SPC report day before 12Z (YYMMDD)',
         date: '260807',
         now: beforeBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/yesterday.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv',
       },
       {
         label: 'the current SPC report day at 12Z',
         date: '2026-08-09',
         now: atBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/today.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/today_filtered.csv',
       },
       {
         label: 'the previous SPC report day at 12Z',
         date: '2026-08-08',
         now: atBoundary,
-        url: 'https://www.spc.noaa.gov/climo/reports/yesterday.csv',
+        url: 'https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv',
       },
     ];
 
@@ -138,7 +138,7 @@ describe('source loaders', () => {
       expect(reports).toEqual([]);
       const archiveDate = iso.slice(2).replace(/-/g, '');
       expect(global.fetch).toHaveBeenCalledWith(
-        `https://www.spc.noaa.gov/climo/reports/${archiveDate}_rpts_raw.csv`
+        `https://www.spc.noaa.gov/climo/reports/${archiveDate}_rpts_filtered.csv`
       );
     });
 

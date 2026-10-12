@@ -4,12 +4,12 @@ import { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
 export { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
-export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today.csv';
+export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today_filtered.csv';
 
-export const SPC_YESTERDAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/yesterday.csv';
+export const SPC_YESTERDAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv';
 
 const archiveUrlForDate = (date: string): string =>
-  `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`;
+  `https://www.spc.noaa.gov/climo/reports/${date}_rpts_filtered.csv`;
 
 const isValidCalendarDate = (date: Date, year: number, month: number, day: number): boolean =>
   [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
