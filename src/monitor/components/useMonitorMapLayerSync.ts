@@ -29,7 +29,6 @@ interface UseMonitorMapLayerSyncArgs {
 /** Coordinates WMS and vector overlay synchronization for the monitor map. */
 export const useMonitorMapLayerSync = (args: UseMonitorMapLayerSyncArgs) => {
   useMonitorMapWmsSync({
-    darkMode: args.darkMode,
     radarLayer: args.radarLayer,
     radarOpacity: args.radarOpacity,
     satelliteLayer: args.satelliteLayer,
