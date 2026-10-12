@@ -92,6 +92,11 @@ jobs:
           llm_model: ${{ vars.OCR_LLM_MODEL || 'muse-spark-1.3-contributor' }}
           llm_use_anthropic: 'false'
           llm_protocol: ${{ vars.OCR_LLM_PROTOCOL || 'openai-responses' }}
+          # Muse Spark speaks the OpenAI Responses API, which rejects the
+          # action's default Anthropic-style extra_body
+          # ({"thinking": {"type": "disabled"}}) with HTTP 400 on every
+          # request (run 38203212106: 5/5 failed). Send an empty object.
+          llm_extra_body: '{}'
           language: English
           effort: high
           review_task_timeout: '20'
