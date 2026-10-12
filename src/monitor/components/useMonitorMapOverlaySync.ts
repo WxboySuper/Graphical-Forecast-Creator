@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
+import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
@@ -25,7 +27,19 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
+  selectedAlert: NwsAlertDetails | null;
+  onClearSelectedAlert: () => void;
 }
+
+/** Matches the selected alert against a collection by canonical detail URL. */
+const containsAlertId = (collection: NwsAlertFeatureCollection, id: string): boolean =>
+  collection.features.some((feature) => {
+    if (feature.id === id) {
+      return true;
+    }
+    const properties = (feature.properties ?? {}) as Record<string, unknown>;
+    return resolveNwsAlertDetailUrl(properties) === id;
+  });
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
 export const useMonitorMapOverlaySync = ({
@@ -37,7 +51,11 @@ export const useMonitorMapOverlaySync = ({
   mesoscaleDiscussions,
   alertsOpacity,
   refs,
+  selectedAlert,
+  onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
+  const selectedId = selectedAlert?.detailUrl ?? null;
+  const consecutiveMissesRef = useRef(0);
   useEffect(() => {
     const style = createStateOutlineStyle(darkMode);
     refs.stateOutlineSourceRef.current.getFeatures().forEach((feature) => feature.setStyle(style));
@@ -75,10 +93,30 @@ export const useMonitorMapOverlaySync = ({
     refs.mesoscaleDiscussionLayerRef.current?.setVisible(mesoscaleDiscussions.features.length > 0);
   }, [mesoscaleDiscussions, refs.mesoscaleDiscussionLayerRef, refs.mesoscaleDiscussionSourceRef]);
 
-  // The selected alert popup is intentionally never cleared here. Clearing on
-  // alertsCollection change dismissed the popup on every animation frame tick,
-  // category toggle, and refresh. The popup stays until the user dismisses it
-  // (close button or map click), the map unmounts, or a new alert is selected.
+  // Dismissal paths (popup close button, map click, unmount, new selection) live
+  // in useMonitorOlMap/useMonitorMapBootstrap; here the selection is dropped
+  // only after two consecutive collections miss the selected alert id. A
+  // single miss is tolerated so one animation frame, category toggle, or
+  // refresh without the alert does not yank the popup (issue #1595), while a
+  // genuinely expired or cancelled alert is still dismissed.
+  useEffect(() => {
+    consecutiveMissesRef.current = 0;
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      return;
+    }
+    if (containsAlertId(alertsCollection, selectedId)) {
+      consecutiveMissesRef.current = 0;
+      return;
+    }
+    consecutiveMissesRef.current += 1;
+    if (consecutiveMissesRef.current >= 2) {
+      consecutiveMissesRef.current = 0;
+      onClearSelectedAlert();
+    }
+  }, [alertsCollection, selectedId, onClearSelectedAlert]);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);

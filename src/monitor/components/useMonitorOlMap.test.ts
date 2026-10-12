@@ -78,54 +78,66 @@ const makeArgs = (alertsCollection: NwsAlertFeatureCollection) =>
     alertsCollection,
     alertsOpacity: 1,
     mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
-    mapElementRef: { current: document.createElement('div') } as RefObject<HTMLDivElement | null>,
+    mapElementRef: { current: globalThis.document.createElement('div') } as RefObject<
+      HTMLDivElement | null
+    >,
   }) as Parameters<typeof useMonitorOlMap>[0];
 
-describe('useMonitorOlMap selected alert retention', () => {
+const lastLayerSyncArgs = () => jest.mocked(useMonitorMapLayerSync).mock.calls.at(-1)?.[0];
+
+describe('useMonitorOlMap selected alert wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('keeps the selected alert popup open across animation frame collection changes', () => {
+  it('renders the popup and forwards the selection to the layer sync', () => {
+    renderHook(({ alertsCollection }) => useMonitorOlMap(makeArgs(alertsCollection)), {
+      initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') },
+    });
+
+    // Mount with no selection clears the empty popup container once.
+    expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(1);
+    expect(lastLayerSyncArgs()?.selectedAlert).toBeNull();
+
+    const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
+    act(() => {
+      onSelectAlert(selectedDetails);
+    });
+
+    expect(renderMonitorAlertPopup).toHaveBeenLastCalledWith(
+      expect.any(HTMLElement),
+      selectedDetails,
+      expect.any(Function),
+    );
+    expect(lastLayerSyncArgs()?.selectedAlert).toBe(selectedDetails);
+  });
+
+  it('keeps the same selection object across collection changes for dismissal tracking', () => {
     const first = makeCollection('https://api.weather.gov/alerts/abc');
-    // New collection identity, as produced on every animation tick.
-    const second = makeCollection('https://api.weather.gov/alerts/abc');
+    const second = makeCollection('https://api.weather.gov/alerts/other');
 
     const { rerender } = renderHook(
       ({ alertsCollection }) => useMonitorOlMap(makeArgs(alertsCollection)),
       { initialProps: { alertsCollection: first } },
     );
 
-    // Mount with no selection clears the empty popup container once.
-    expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(1);
-
     const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
     act(() => {
       onSelectAlert(selectedDetails);
     });
-    expect(renderMonitorAlertPopup).toHaveBeenCalledTimes(1);
-    expect(renderMonitorAlertPopup).toHaveBeenLastCalledWith(
-      expect.any(HTMLElement),
-      selectedDetails,
-      expect.any(Function),
-    );
 
     rerender({ alertsCollection: second });
 
-    // The popup is retained: nothing clears or re-renders it on collection change.
-    expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(1);
-    expect(renderMonitorAlertPopup).toHaveBeenCalledTimes(1);
-
-    // The new collection still reaches the layer sync for map rendering.
-    const lastLayerSyncArgs = jest.mocked(useMonitorMapLayerSync).mock.calls.at(-1)?.[0];
-    expect(lastLayerSyncArgs?.alertsCollection).toBe(second);
+    const forwarded = lastLayerSyncArgs();
+    expect(forwarded?.alertsCollection).toBe(second);
+    expect(forwarded?.selectedAlert).toBe(selectedDetails);
+    expect(typeof forwarded?.onClearSelectedAlert).toBe('function');
   });
 
-  it('still dismisses the popup when the user closes it or clicks elsewhere', () => {
-    const { rerender } = renderHook(
-      ({ alertsCollection }) => useMonitorOlMap(makeArgs(alertsCollection)),
-      { initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') } },
-    );
+  it('dismisses the popup when the user closes it or clicks elsewhere', () => {
+    renderHook(({ alertsCollection }) => useMonitorOlMap(makeArgs(alertsCollection)), {
+      initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') },
+    });
 
     const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
     act(() => {
@@ -137,8 +149,6 @@ describe('useMonitorOlMap selected alert retention', () => {
       onSelectAlert(null);
     });
     expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(2);
-
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
-    expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(2);
+    expect(lastLayerSyncArgs()?.selectedAlert).toBeNull();
   });
 });

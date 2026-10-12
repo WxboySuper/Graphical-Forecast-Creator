@@ -1,5 +1,6 @@
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import type { WmsLayerConfig } from '../wms';
@@ -23,6 +24,8 @@ interface UseMonitorMapLayerSyncArgs {
   alertsOpacity: number;
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   refs: MonitorMapRefs;
+  selectedAlert: NwsAlertDetails | null;
+  onClearSelectedAlert: () => void;
 }
 
 /** Coordinates WMS and vector overlay synchronization for the monitor map. */
@@ -43,5 +46,7 @@ export const useMonitorMapLayerSync = (args: UseMonitorMapLayerSyncArgs) => {
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     alertsOpacity: args.alertsOpacity,
     refs: args.refs,
+    selectedAlert: args.selectedAlert,
+    onClearSelectedAlert: args.onClearSelectedAlert,
   });
 };
