@@ -227,13 +227,21 @@ const parseReviewPayload = (result, context) => {
   }
   const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
   const unresolvedPriorFindings = (context.priorFindings ?? []).filter((finding) => statusById.get(finding.findingId) !== 'resolved');
+  const suppliedRating = parseRating(result.rating);
+  const normalizedRating = normalizeRating(suppliedRating, [...badThings, ...unresolvedPriorFindings]);
   return {
     prSummary,
     latestChanges,
     goodThings,
     badThings,
     droppedFindings,
-    rating: capRatingForDrops(normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]), droppedFindings, badThings),
+    // Preserve a low supplied score when findings were omitted: normalizeRating
+    // returns 10 for an empty list, which must not raise a bad review.
+    rating: capRatingForDrops(
+      droppedFindings.length ? Math.min(suppliedRating, normalizedRating) : normalizedRating,
+      droppedFindings,
+      badThings,
+    ),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments,
     priorFindingAssessments,
@@ -247,12 +255,14 @@ const parseFindings = (result, context) => {
   return partitionFindingLocations(findings, context);
 };
 
+/** Priorities that force the hard rating cap when a finding with them is omitted. */
+const isHotPriority = (item) => item.priority === 'P0' || item.priority === 'P1';
+
 /** A review with omitted findings is never perfect: P0/P1 drops cap hard,
  * P3-only drops cap light, anything else caps like a P2. */
 const capRatingForDrops = (rating, droppedFindings, findings = []) => {
   if (!droppedFindings.length) return rating;
-  const isHot = (item) => item.priority === 'P0' || item.priority === 'P1';
-  if (droppedFindings.some(isHot)) return Math.min(rating, 5);
+  if (droppedFindings.some(isHotPriority)) return Math.min(rating, 5);
   if (droppedFindings.every((item) => item.priority === 'P3') && findings.every((item) => item.priority === 'P3')) {
     return Math.min(rating, 9);
   }
@@ -349,12 +359,14 @@ const renderCoverageSection = (result, context) => {
   return lines.length ? ['', '## Review coverage', ...lines.map((line) => `- ${line}`)] : [];
 };
 
+/** Escape model-controlled text before it reaches markdown output. */
 const escapeCoverageText = (value) => String(value ?? '')
-  .replace(/[\r\n]+/g, ' ')
-  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|]/g, '\\$&');
+  .replace(/[\r\n]+/gu, ' ')
+  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|]/gu, '\\$&');
 
+/** One coverage line per omitted finding; titles/paths are already single-line and bounded. */
 const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => (
-  'Omitted finding "' + escapeCoverageText(dropped.title) + '" (' + escapeCoverageText(dropped.path) + '): reported location was not in the PR diff.'
+  `Omitted finding "${escapeCoverageText(dropped.title)}" (${escapeCoverageText(dropped.path)}): reported location was not in the PR diff.`
 ));
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length

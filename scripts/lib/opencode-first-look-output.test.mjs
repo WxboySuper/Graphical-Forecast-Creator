@@ -112,6 +112,7 @@ test('merged follow-ups retain omitted findings and keep the score capped', () =
 });
 
 test('omitted critical findings cap harder, omitted polish caps lighter', () => {
+  /** Builds a finding drifted off the diff for the given priority. */
   const drift = (priority) => ({
     priority, title: 'Drifted', path: 'src/a.ts', line: 99, evidence: 'Evidence', impact: 'Impact',
   });
@@ -128,6 +129,16 @@ test('omitted critical findings cap harder, omitted polish caps lighter', () => 
   );
   assert.equal(polish.badThings.length, 0);
   assert.equal(polish.rating, 9);
+});
+
+test('omitted findings never raise a low supplied score', () => {
+  const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 2, badThings: [finding] }), {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
+  });
+  assert.equal(parsed.badThings.length, 0);
+  assert.equal(parsed.droppedFindings.length, 1);
+  assert.equal(parsed.rating, 2);
 });
 
 test('requires complete open-thread assessments before publishing', () => {
