@@ -93,21 +93,64 @@ const CIG_SIGNIFICANCE_RANK: Readonly<Record<CIGLevel, number>> = {
   CIG3: 3,
 };
 
-const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
-  if (typeof probability !== 'string' || probability.trim().length === 0) {
-    return 'TSTM';
+/** Normalizes percent and significant-marker probability inputs for rule lookup. */
+function normalizeCategoricalProbability(probability: unknown): string | undefined {
+  if (typeof probability !== 'string') {
+    return undefined;
   }
 
+  const trimmedProbability = probability.trim();
+  if (trimmedProbability.length === 0) {
+    return undefined;
+  }
+
+  const strippedProbability = trimmedProbability.replace(/#/g, '').trim();
+  if (strippedProbability.length === 0) {
+    return undefined;
+  }
+  if (!trimmedProbability.includes('#')) {
+    return strippedProbability;
+  }
+  if (strippedProbability.endsWith('%')) {
+    return strippedProbability;
+  }
+  return `${strippedProbability}%`;
+}
+
+/** Returns whether a rule has a CIG mapping no more significant than the target. */
+function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: number): boolean {
+  for (const ruleCig of ruleCigs) {
+    if (CIG_SIGNIFICANCE_RANK[ruleCig] <= targetCigRank) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Keeps the more significant categorical risk when multiple fallback rules apply. */
+function higherCategoricalRisk(
+  current: CategoricalRiskLevel | undefined,
+  candidate: CategoricalRiskLevel,
+): CategoricalRiskLevel {
+  if (current === undefined) {
+    return candidate;
+  }
+  if (CATEGORICAL_RISK_RANK[candidate] > CATEGORICAL_RISK_RANK[current]) {
+    return candidate;
+  }
+  return current;
+}
+
+/** Finds an exact rule or a CIG-aware fallback for a normalized probability. */
+function findCategoricalRisk(
+  normalizedProbability: string,
+  cig: CIGLevel,
+  rules: readonly CategoricalRule[],
+): CategoricalRiskLevel {
   const targetCigRank = CIG_SIGNIFICANCE_RANK[cig];
   if (targetCigRank === undefined) {
     return 'TSTM';
   }
-
-  const trimmedProbability = probability.trim();
-  const strippedProbability = trimmedProbability.replace(/#/g, '').trim();
-  const normalizedProbability = trimmedProbability.includes('#') && !strippedProbability.endsWith('%')
-    ? `${strippedProbability}%`
-    : strippedProbability;
 
   // Use a defined lower-significance CIG rule when this probability has no
   // exact mapping. This preserves monotonic risk without promoting low CIGs
@@ -122,17 +165,23 @@ const categorizeProbability = ({ probability, cig, rules }: CategoricalConversio
       return rule.risk;
     }
 
-    const appliesAtOrBelowTarget = rule.cigs.some((ruleCig) => CIG_SIGNIFICANCE_RANK[ruleCig] <= targetCigRank);
-    if (
-      appliesAtOrBelowTarget &&
-      (fallbackRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[fallbackRisk])
-    ) {
-      fallbackRisk = rule.risk;
+    if (!ruleAppliesAtOrBelowCig(rule.cigs, targetCigRank)) {
+      continue;
     }
+    fallbackRisk = higherCategoricalRisk(fallbackRisk, rule.risk);
   }
 
   return fallbackRisk ?? 'TSTM';
-};
+}
+
+/** Converts a probability/CIG pair to a categorical risk, defaulting invalid input to TSTM. */
+function categorizeProbability({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel {
+  const normalizedProbability = normalizeCategoricalProbability(probability);
+  if (normalizedProbability === undefined) {
+    return 'TSTM';
+  }
+  return findCategoricalRisk(normalizedProbability, cig, rules);
+}
 
 type CategoricalInput = {
   probability: string;
