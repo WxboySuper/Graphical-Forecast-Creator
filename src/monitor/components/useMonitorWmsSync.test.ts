@@ -68,73 +68,23 @@ describe('Monitor WMS sync', () => {
     expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(2);
   });
 
-  it('does not re-apply the satellite WMS layer on a theme toggle', () => {
+  it.each([
+    ['satellite', useMonitorSatelliteWmsSync, satelliteLayer, 0.68, 'satelliteLayerRef', 'satelliteLayerKeyRef'],
+    ['radar', useMonitorRadarWmsSync, radarLayer, 0.72, 'radarLayerRef', 'radarLayerKeyRef'],
+  ] as const)('re-applies the %s WMS layer when its config changes', (_name, useSync, layer, opacity, layerRef, keyRef) => {
     const refs = {
-      satelliteLayerRef: { current: tileLayer },
-      satelliteLayerKeyRef: { current: null },
+      [layerRef]: { current: tileLayer },
+      [keyRef]: { current: null },
     } as unknown as ReturnType<typeof useMonitorMapRefs>;
 
     const { rerender } = renderHook(
-      ({ opacity }) => useMonitorSatelliteWmsSync(satelliteLayer, opacity, refs),
-      { initialProps: { opacity: 0.68 } },
+      ({ config }) => useSync(config, opacity, refs),
+      { initialProps: { config: layer } },
     );
 
     expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
 
-    // Theme changes arrive via other props in real usage; opacity stands in
-    // for any unrelated re-render. Only WMS-relevant inputs re-apply.
-    rerender({ opacity: 0.68 });
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-applies the satellite WMS layer when its config changes', () => {
-    const refs = {
-      satelliteLayerRef: { current: tileLayer },
-      satelliteLayerKeyRef: { current: null },
-    } as unknown as ReturnType<typeof useMonitorMapRefs>;
-
-    const { rerender } = renderHook(
-      ({ layer }) => useMonitorSatelliteWmsSync(layer, 0.68, refs),
-      { initialProps: { layer: satelliteLayer } },
-    );
-
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
-
-    rerender({ layer: { ...satelliteLayer, latestTime: '2026-06-02T13:00:00Z' } });
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not re-apply the radar WMS layer on a theme toggle', () => {
-    const refs = {
-      radarLayerRef: { current: tileLayer },
-      radarLayerKeyRef: { current: null },
-    } as unknown as ReturnType<typeof useMonitorMapRefs>;
-
-    const { rerender } = renderHook(
-      ({ opacity }) => useMonitorRadarWmsSync(radarLayer, opacity, refs),
-      { initialProps: { opacity: 0.72 } },
-    );
-
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
-
-    rerender({ opacity: 0.72 });
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-applies the radar WMS layer when its config changes', () => {
-    const refs = {
-      radarLayerRef: { current: tileLayer },
-      radarLayerKeyRef: { current: null },
-    } as unknown as ReturnType<typeof useMonitorMapRefs>;
-
-    const { rerender } = renderHook(
-      ({ layer }) => useMonitorRadarWmsSync(layer, 0.72, refs),
-      { initialProps: { layer: radarLayer } },
-    );
-
-    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(1);
-
-    rerender({ layer: { ...radarLayer, latestTime: '2026-06-02T13:00:00Z' } });
+    rerender({ config: { ...layer, latestTime: '2026-06-02T13:00:00Z' } });
     expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(2);
   });
 
