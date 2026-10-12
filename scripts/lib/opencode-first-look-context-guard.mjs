@@ -1,7 +1,7 @@
 /** Guards against publishing first-look reviews when the model never read the PR diff/context. */
 
 import { FirstLookReviewUnavailableError } from './opencode-first-look-review-unavailable.mjs';
-import { hasActionableFindings } from './opencode-first-look-output.mjs';
+import { changedPathSet, hasActionableFindings } from './opencode-first-look-output.mjs';
 import { assertContextReadFlag, parseFilesReviewed } from './opencode-first-look-files-reviewed.mjs';
 import { assertPhraseBackstop } from './opencode-first-look-phrase-backstop.mjs';
 
@@ -30,9 +30,6 @@ export function applyThreadCommitPlausibility(assessments, context) {
   const threads = new Map((context.openReviewThreads ?? []).map((thread) => [thread.id, thread]));
   return assessments.map((assessment) => downgradeSameCommitAssessment(assessment, threads, context.head));
 }
-
-const changedPathSet = (context) =>
-  new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
 
 const isSameCommitDowngrade = (before, after) =>
   before?.status === 'addressed'

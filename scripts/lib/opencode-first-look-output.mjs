@@ -93,8 +93,14 @@ const assertFindingLine = (line) => {
 /** Split findings into locatable ones and ones whose path/line drifted off the PR diff.
  * Drifted findings are reported (not thrown) so one bad location cannot kill
  * the whole review; the rating cap and coverage note keep it honest. */
+/** Union of every known changed path; tolerant of stale or partial sources. */
+export const changedPathSet = (context) => new Set([
+  ...(Array.isArray(context.changedFilePaths) ? context.changedFilePaths : []),
+  ...((Array.isArray(context.files) ? context.files : []).map((file) => file.path)),
+]);
+
 const partitionFindingLocations = (findings, context) => {
-  const paths = new Set([...(context.changedFilePaths ?? []), ...(context.files?.map((file) => file.path) ?? [])]);
+  const paths = changedPathSet(context);
   const lineMap = context.changedLineNumbers ?? {};
   const valid = [];
   const dropped = [];
@@ -103,7 +109,7 @@ const partitionFindingLocations = (findings, context) => {
       dropped.push({ ...finding, reason: 'path' });
       continue;
     }
-    const rawLines = Object.hasOwn(lineMap, finding.path) ? lineMap[finding.path] : undefined;
+    const rawLines = Object.prototype.hasOwnProperty.call(lineMap, finding.path) ? lineMap[finding.path] : undefined;
     const lines = Array.isArray(rawLines) ? rawLines : [];
     if (finding.line !== null && !lines.includes(finding.line)) {
       dropped.push({ ...finding, reason: 'line' });
@@ -115,8 +121,8 @@ const partitionFindingLocations = (findings, context) => {
 };
 
 /** True when the review has anything actionable: a locatable finding or a recorded drop. */
-export const hasActionableFindings = (badThings, droppedFindings) => (
-  badThings.length > 0 || droppedFindings.length > 0
+export const hasActionableFindings = (badThings = [], droppedFindings = []) => (
+  (badThings ?? []).length > 0 || (droppedFindings ?? []).length > 0
 );
 
 const parseReviewAssessments = (assessments, openThreads) => {
@@ -263,9 +269,10 @@ const isHotPriority = (item) => item.priority === 'P0' || item.priority === 'P1'
 const capRatingForDrops = (rating, droppedFindings, findings = []) => {
   if (!droppedFindings.length) return rating;
   if (droppedFindings.some(isHotPriority)) return Math.min(rating, 5);
-  if (droppedFindings.every((item) => item.priority === 'P3') && findings.every((item) => item.priority === 'P3')) {
-    return Math.min(rating, 9);
-  }
+  const allP3 = (items) => items.every((item) => item.priority === 'P3');
+  // The light cap needs at least one locatable finding: drops-only output
+  // must not reach the merge threshold on vacuous truth.
+  if (findings.length > 0 && allP3(droppedFindings) && allP3(findings)) return Math.min(rating, 9);
   return Math.min(rating, 8);
 };
 
@@ -362,12 +369,15 @@ const renderCoverageSection = (result, context) => {
 /** Escape model-controlled text before it reaches markdown output. */
 const escapeCoverageText = (value) => String(value ?? '')
   .replace(/[\r\n]+/gu, ' ')
-  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|]/gu, '\\$&');
+  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|'"~\-]/gu, '\\$&');
 
 /** One coverage line per omitted finding; titles/paths are already single-line and bounded. */
-const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => (
-  `Omitted finding "${escapeCoverageText(dropped.title)}" (${escapeCoverageText(dropped.path)}): reported location was not in the PR diff.`
-));
+const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => {
+  const location = dropped.line == null
+    ? escapeCoverageText(dropped.path)
+    : `${escapeCoverageText(dropped.path)}:${dropped.line}`;
+  return `Omitted finding [${escapeCoverageText(dropped.priority)}] "${escapeCoverageText(dropped.title)}" (${location}, ${dropped.reason}-drift): reported location was not in the PR diff.`;
+});
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length
   ? renderLinkedIssues(result, context.linkedIssues)
@@ -386,14 +396,22 @@ const renderPriorFindingSection = (result, context) => context.priorFindings?.le
 
 /** Carry prior findings forward only when the reviewer says they remain open or unclear. */
 export const mergeOpenCodeFirstLookResults = (previous, current) => {
-  const statusById = new Map(current.priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
-  const retainedPrevious = previous.badThings.filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
-  const findings = uniqueBy([...current.badThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
-  const droppedFindings = uniqueBy(
-    [...(previous.droppedFindings ?? []), ...(current.droppedFindings ?? [])],
+  const priorAssessments = Array.isArray(current.priorFindingAssessments) ? current.priorFindingAssessments : [];
+  const statusById = new Map(priorAssessments.map((assessment) => [assessment.findingId, assessment.status]));
+  const retainedPrevious = (Array.isArray(previous.badThings) ? previous.badThings : [])
+    .filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
+  const currentBadThings = Array.isArray(current.badThings) ? current.badThings : [];
+  const findings = uniqueBy([...currentBadThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
+  const priorDrops = Array.isArray(previous.droppedFindings) ? previous.droppedFindings : [];
+  const currentDrops = Array.isArray(current.droppedFindings) ? current.droppedFindings : [];
+  const allDropped = uniqueBy(
+    [...priorDrops, ...currentDrops],
     (dropped) => [dropped.priority, dropped.title, dropped.path, dropped.line, dropped.reason].join(':'),
-  ).slice(0, MAX_BULLETS);
-  const rating = capRatingForDrops(normalizeRating(current.rating, findings), droppedFindings, findings);
+  );
+  // Cap on the full union before slicing: a critical drop past the display
+  // cap must still sink the score.
+  const rating = capRatingForDrops(normalizeRating(current.rating, findings), allDropped, findings);
+  const droppedFindings = allDropped.slice(0, MAX_BULLETS);
   return {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
