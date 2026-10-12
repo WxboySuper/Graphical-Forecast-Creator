@@ -45,6 +45,13 @@ describe('outlookUtils extra', () => {
   test('significant probability markers do not break categorical conversion', () => {
     expect(tornadoToCategorical({ probability: '30%#', cig: 'CIG3' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '#15%', cig: 'CIG1' })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '30#', cig: 'CIG3' })).toBe('HIGH');
+    expect(tornadoToCategorical({ probability: ' 15% ', cig: 'CIG1' })).toBe('ENH');
+  });
+
+  test('malformed probability and CIG values fail safely to TSTM', () => {
+    expect(tornadoToCategorical({ probability: undefined as unknown as string })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
   });
 
   test('categorical risk does not decrease as CIG significance increases', () => {

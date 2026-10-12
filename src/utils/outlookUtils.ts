@@ -77,7 +77,7 @@ type CategoricalConversion = {
   rules: readonly CategoricalRule[];
 };
 
-const CATEGORICAL_RISK_RANK: Record<CategoricalRiskLevel, number> = {
+const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
   TSTM: 0,
   MRGL: 1,
   SLGT: 2,
@@ -86,22 +86,47 @@ const CATEGORICAL_RISK_RANK: Record<CategoricalRiskLevel, number> = {
   HIGH: 5,
 };
 
-const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
-  const normalizedProbability = probability.replace(/#/g, '');
-  const probabilityRules = rules.filter((rule) => rule.probabilities.includes(normalizedProbability));
-  /** Finds the mapped risk for this probability and CIG level, when one exists. */
-  const findRisk = (targetCig: CIGLevel) => probabilityRules.find((rule) => rule.cigs.includes(targetCig))?.risk;
-  const mappedRisk = findRisk(cig);
+const CIG_SIGNIFICANCE_RANK: Readonly<Record<CIGLevel, number>> = {
+  CIG0: 0,
+  CIG1: 1,
+  CIG2: 2,
+  CIG3: 3,
+};
 
-  if (mappedRisk !== undefined) {
-    return mappedRisk;
+const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
+  if (typeof probability !== 'string' || probability.trim().length === 0) {
+    return 'TSTM';
   }
 
-  // Use the highest defined risk for this probability so a missing CIG rule
-  // cannot lower the category relative to a more significant mapped CIG.
+  const targetCigRank = CIG_SIGNIFICANCE_RANK[cig];
+  if (targetCigRank === undefined) {
+    return 'TSTM';
+  }
+
+  const trimmedProbability = probability.trim();
+  const strippedProbability = trimmedProbability.replace(/#/g, '').trim();
+  const normalizedProbability = trimmedProbability.includes('#') && !strippedProbability.endsWith('%')
+    ? `${strippedProbability}%`
+    : strippedProbability;
+
+  // Use a defined lower-significance CIG rule when this probability has no
+  // exact mapping. This preserves monotonic risk without promoting low CIGs
+  // from a rule that applies only to a more significant hatch.
   let fallbackRisk: CategoricalRiskLevel | undefined;
-  for (const rule of probabilityRules) {
-    if (fallbackRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[fallbackRisk]) {
+  for (const rule of rules) {
+    if (!rule.probabilities.includes(normalizedProbability)) {
+      continue;
+    }
+
+    if (rule.cigs.includes(cig)) {
+      return rule.risk;
+    }
+
+    const appliesAtOrBelowTarget = rule.cigs.some((ruleCig) => CIG_SIGNIFICANCE_RANK[ruleCig] <= targetCigRank);
+    if (
+      appliesAtOrBelowTarget &&
+      (fallbackRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[fallbackRisk])
+    ) {
       fallbackRisk = rule.risk;
     }
   }
@@ -207,15 +232,6 @@ export function getHighestCategoricalRisk({
   wind: windProb,
   hail: hailProb,
 }: AvailableProbabilities = {}): CategoricalRiskLevel {
-  const riskValues: { [key in CategoricalRiskLevel]: number } = {
-    TSTM: 0,
-    MRGL: 1,
-    SLGT: 2,
-    ENH: 3,
-    MDT: 4,
-    HIGH: 5
-  };
-
   const candidates: CategoricalRiskLevel[] = [];
   if (tornadoProb) candidates.push(tornadoToCategorical({ probability: tornadoProb }));
   if (windProb) candidates.push(windToCategorical({ probability: windProb }));
@@ -224,7 +240,7 @@ export function getHighestCategoricalRisk({
   if (candidates.length === 0) return 'TSTM';
 
   return candidates.reduce((best, current) => (
-    riskValues[current] > riskValues[best] ? current : best
+    CATEGORICAL_RISK_RANK[current] > CATEGORICAL_RISK_RANK[best] ? current : best
   ), candidates[0]);
 }
 
