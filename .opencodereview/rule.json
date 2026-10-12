@@ -2,32 +2,32 @@
   "rules": [
     {
       "path": "src/**/*.ts",
-      "rule": "GFC frontend review. Be detailed and blunt. Check: React 19 patterns (no stale closures, correct hook deps, no setState during render), Redux Toolkit slice correctness (Immer misuse, non-serializable state), OpenLayers map logic (projection mistakes, layer leaks, unremoved listeners), regressions in forecast/monitor/verify flows, null or undefined derefs on weather data, auth-gated premium features leaking to free users, user-visible error handling (no silent failures, no raw stack traces to users). Flag missing tests only when a specific changed behavior has no coverage. Every finding needs file, line, evidence, and user impact.",
+      "rule": "GFC frontend review. Be maximally strict and picky: file every substantiated issue, including nits, and mark low-severity items low rather than suppressing them. Check: React 19 correctness (stale closures, wrong hook deps, setState during render), Redux Toolkit and Immer misuse, non-serializable state, OpenLayers correctness (projection mistakes, layer leaks, unremoved listeners), any forecast/monitor/verify regression risk, any possible null or undefined deref on weather data, any premium-gated path reachable by free users, every user-visible error-handling gap (silent failure, swallowed error, raw stack trace to users), plus maintainability nits (dead code, duplicated logic, confusing names, changed behavior without test coverage). Every finding needs file, line, evidence, and user impact. Scope findings to the diff and code it directly affects; do not invent problems in untouched code.",
       "merge_system_rule": true
     },
     {
       "path": "src/**/*.tsx",
-      "rule": "GFC component review. Be detailed and blunt. Check: accessibility basics (labels, keyboard access, focus management), uncontrolled versus controlled inputs, expensive renders without memoization where the diff shows new props churn, broken mobile layouts only if the diff touches responsive code, copy or tone that confuses meteorologists or students. No praise for routine JSX. No invented a11y concerns on untouched code.",
+      "rule": "GFC component review. Be maximally strict and picky: file every substantiated issue, including polish nits, as low severity or higher. Check: accessibility (labels, keyboard access, focus management), controlled versus uncontrolled inputs, wasteful renders and missing memoization, responsive breakage, and any copy that could confuse meteorologists or students. Scope findings to the diff and code it directly affects; do not invent problems in untouched code.",
       "merge_system_rule": true
     },
     {
       "path": "server/**/*.js",
-      "rule": "GFC backend review. Be strict. Check: auth and authorization on every new route, Firestore rule alignment (server must not trust client writes the rules deny), Stripe webhook verification, secret handling (no logging of keys, tokens, or PII), input validation on all client-supplied payloads, error paths that leak internals. Treat any auth or injection gap as critical.",
+      "rule": "GFC backend review. Be maximally strict. Check: auth and authorization on every new or touched route, Firestore rule alignment (server must not trust client writes the rules deny), Stripe webhook verification, secret handling (no logging of keys, tokens, or PII), input validation on all client-supplied payloads, error paths that leak internals, plus reliability and maintainability nits. Treat any auth, injection, or secret-handling gap as critical. Every finding needs file, line, evidence, and user impact.",
       "merge_system_rule": true
     },
     {
       "path": "scripts/**/*.mjs",
-      "rule": "GFC automation review. These scripts run in CI with GitHub tokens. Check: shell injection via interpolated PR titles or branch names, correct gh api usage (gh api takes ONE endpoint arg, method via --method flag), pagination completeness, stale-SHA races, secrets leaking into logs. This repo already broke once on gh api arg order, so flag any gh invocation that deviates from gh api <route> --method <VERB>.",
+      "rule": "GFC automation review. Be maximally strict: flag every deviation, however small. These scripts run in CI with GitHub tokens. Check: shell injection via interpolated PR titles or branch names, correct gh api usage (gh api takes ONE endpoint arg, method via --method flag), pagination completeness, stale-SHA races, secrets leaking into logs, plus robustness nits (quoting, set -euo pipefail discipline, clear error messages).",
       "merge_system_rule": true
     },
     {
       "path": ".github/workflows/**",
-      "rule": "GFC workflow review. Check: pull_request_target safety (never checkout untrusted PR head, only base plus fetched diff), minimal permissions per job, pinned action SHAs, concurrency groups that do not cancel unrelated reviewers (this repo runs OpenCode first-look and OCR side by side), secrets only from secrets context, no echo of tokens. Flag any workflow change that widens permissions or executes PR code.",
+      "rule": "GFC workflow review. Be maximally strict. Check: pull_request_target safety (never checkout untrusted PR head, only base plus fetched diff), minimal permissions per job, pinned action SHAs, timeouts, concurrency groups that do not cancel unrelated reviewers (this repo runs OpenCode first-look and OCR side by side), secrets only from secrets context, no echo of tokens, plus hygiene nits. Flag any permission widening or execution of PR code as critical.",
       "merge_system_rule": true
     },
     {
       "path": "**/*.md",
-      "rule": "Docs review. Flag stale user docs and CHANGELOG.md only when the code diff changes user-facing behavior, commands, or config and the docs were not updated in the same PR. Do not nitpick prose style.",
+      "rule": "Docs review. Flag any user doc or CHANGELOG.md that the code diff leaves stale, plus confusing wording, broken links, or stale examples in touched docs. Do not rewrite prose for taste, but do flag anything a user could misread.",
       "merge_system_rule": true
     }
   ]
