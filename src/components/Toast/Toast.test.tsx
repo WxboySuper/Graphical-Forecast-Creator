@@ -29,11 +29,14 @@ describe('Toast', () => {
   test('restarts the auto-dismiss timer when the message updates', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" onClose={onClose} />);
+    const originalMessage = screen.getByText('Original');
 
     act(() => {
       jest.advanceTimersByTime(2500);
     });
     rerender(<Toast message="Updated" onClose={onClose} />);
+    expect(screen.getByText('Updated')).not.toBe(originalMessage);
+    expect(screen.getByText('Updated')).toHaveClass('toast-message');
     act(() => {
       jest.advanceTimersByTime(2500);
     });
@@ -44,6 +47,73 @@ describe('Toast', () => {
       jest.advanceTimersByTime(500);
     });
 
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not restart the timer for a type-only update', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="Notice" type="info" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    rerender(<Toast message="Notice" type="success" onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('uses the latest onClose callback without restarting the timer', () => {
+    const originalOnClose = jest.fn();
+    const updatedOnClose = jest.fn();
+    const { rerender } = render(<Toast message="Notice" onClose={originalOnClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    rerender(<Toast message="Notice" onClose={updatedOnClose} />);
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(originalOnClose).not.toHaveBeenCalled();
+    expect(updatedOnClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('caps the lifetime when the message keeps updating', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="Update 0" onClose={onClose} />);
+
+    for (let elapsed = 2500; elapsed < 30000; elapsed += 2500) {
+      act(() => {
+        jest.advanceTimersByTime(2500);
+      });
+      rerender(<Toast message={`Update ${elapsed}`} onClose={onClose} />);
+    }
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('pauses while focused and can be dismissed with the keyboard', () => {
+    const onClose = jest.fn();
+    render(<Toast message="Accessible notice" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    screen.getByRole('button', { name: 'Dismiss notification' }).focus();
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    screen.getByRole('button', { name: 'Dismiss notification' }).click();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -70,6 +140,7 @@ describe('ToastManager', () => {
     
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
   });
 
   test('calls onDismiss when toast closes', () => {

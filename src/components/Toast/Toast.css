@@ -21,16 +21,34 @@
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 12px 20px;
   border-radius: 4px;
   color: white;
   font-size: 0.9rem;
   font-weight: 500;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  animation: slideIn 0.3s ease forwards;
   pointer-events: all;
   min-width: 200px;
   text-align: center;
+}
+
+.toast-message {
+  display: block;
+  flex: 1;
+  animation: slideIn 0.3s ease forwards;
+}
+
+.toast-dismiss {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 
 .toast-info {
