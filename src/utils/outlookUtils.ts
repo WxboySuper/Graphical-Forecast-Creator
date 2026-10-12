@@ -89,6 +89,7 @@ const CATEGORICAL_RISK_RANK: Record<CategoricalRiskLevel, number> = {
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
   const normalizedProbability = probability.replace(/#/g, '');
   const probabilityRules = rules.filter((rule) => rule.probabilities.includes(normalizedProbability));
+  /** Finds the mapped risk for this probability and CIG level, when one exists. */
   const findRisk = (targetCig: CIGLevel) => probabilityRules.find((rule) => rule.cigs.includes(targetCig))?.risk;
   const mappedRisk = findRisk(cig);
 
@@ -98,13 +99,12 @@ const categorizeProbability = ({ probability, cig, rules }: CategoricalConversio
 
   // Use the highest defined risk for this probability so a missing CIG rule
   // cannot lower the category relative to a more significant mapped CIG.
-  const fallbackRisk = probabilityRules.reduce<CategoricalRiskLevel | undefined>(
-    (highestRisk, rule) =>
-      highestRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[highestRisk]
-        ? rule.risk
-        : highestRisk,
-    undefined,
-  );
+  let fallbackRisk: CategoricalRiskLevel | undefined;
+  for (const rule of probabilityRules) {
+    if (fallbackRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[fallbackRisk]) {
+      fallbackRisk = rule.risk;
+    }
+  }
 
   return fallbackRisk ?? 'TSTM';
 };
