@@ -66,12 +66,48 @@ test('rejects missing required sections, invalid ratings, and hallucinated linke
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [{ priority: 'P4' }] }), context), /P0, P1, P2, or P3/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
   const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+  const badPath = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/b.ts'], changedLineNumbers: { 'src/b.ts': [9] },
-  }), /path must be a changed PR file/);
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+  });
+  assert.equal(badPath.badThings.length, 0);
+  assert.deepEqual(badPath.droppedFindings, [{ title: 'Issue', path: 'src/a.ts', reason: 'path' }]);
+  assert.equal(badPath.rating, 8);
+  const badLineContext = {
     ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
-  }), /line must be an added line/);
+  };
+  const badLine = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), badLineContext);
+  assert.equal(badLine.badThings.length, 0);
+  assert.deepEqual(badLine.droppedFindings, [{ title: 'Issue', path: 'src/a.ts', reason: 'line' }]);
+  const rendered = renderOpenCodeFirstLookComment(badLine, badLineContext);
+  assert.match(rendered, /Omitted finding “Issue” \(src\/a\.ts\): reported location was not in the PR diff\./);
+});
+
+test('open threads with only drifted findings still publish with a capped rating', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
+  const driftedContext = {
+    ...withThread, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    badThings: [finding],
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'still-open', summary: 'The concern remains.' }],
+  }), driftedContext);
+  assert.equal(parsed.badThings.length, 0);
+  assert.equal(parsed.droppedFindings.length, 1);
+  assert.ok(parsed.rating <= 8);
+  const rendered = renderOpenCodeFirstLookComment(parsed, driftedContext);
+  assert.match(rendered, /Omitted finding/);
+  assert.match(rendered, /Still open/);
+});
+
+test('merged follow-ups retain omitted findings and keep the score capped', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [], droppedFindings: [{ title: 'Old drift', path: 'src/a.ts', reason: 'line' }] },
+    { ...result, badThings: [], droppedFindings: [], rating: 10 },
+  );
+  assert.equal(merged.droppedFindings.length, 1);
+  assert.equal(merged.rating, 8);
 });
 
 test('requires complete open-thread assessments before publishing', () => {

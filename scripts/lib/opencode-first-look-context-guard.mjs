@@ -71,7 +71,7 @@ export function applyPublicationGuards(parsed, rawResult, context) {
   const downgradeFindings = buildSameCommitDowngradeFindings(beforeAssessments, reviewCommentAssessments, context);
   const badThings = [...parsed.badThings, ...downgradeFindings];
   const unresolved = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
-  if (unresolved.length && badThings.length === 0) {
+  if (unresolved.length && badThings.length === 0 && (parsed.droppedFindings ?? []).length === 0) {
     throw new FirstLookReviewUnavailableError(
       'First-look output must include concrete findings when a review thread remains open or unclear after investigation.',
     );

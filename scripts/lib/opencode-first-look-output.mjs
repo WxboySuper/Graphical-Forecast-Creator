@@ -90,22 +90,26 @@ const assertFindingLine = (line) => {
   if (line < 1) throw new Error('First-look finding line must be a positive integer or null.');
 };
 
-const validateFindingLocations = (findings, context) => {
+/** Split findings into locatable ones and ones whose path/line drifted off the PR diff.
+ * Drifted findings are reported (not thrown) so one bad location cannot kill
+ * the whole review; the rating cap and coverage note keep it honest. */
+const partitionFindingLocations = (findings, context) => {
   const paths = new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
+  const valid = [];
+  const dropped = [];
   for (const finding of findings) {
-    assertChangedFindingPath(finding, paths);
-    assertChangedFindingLine(finding, context.changedLineNumbers);
+    if (!paths.has(finding.path)) {
+      dropped.push({ title: finding.title, path: finding.path, reason: 'path' });
+      continue;
+    }
+    const lines = context.changedLineNumbers?.[finding.path] ?? [];
+    if (finding.line !== null && !lines.includes(finding.line)) {
+      dropped.push({ title: finding.title, path: finding.path, reason: 'line' });
+      continue;
+    }
+    valid.push(finding);
   }
-};
-
-const assertChangedFindingPath = (finding, paths) => {
-  if (!paths.has(finding.path)) throw new Error('First-look finding path must be a changed PR file.');
-};
-
-const assertChangedFindingLine = (finding, changedLineNumbers = {}) => {
-  if (finding.line === null) return;
-  const lines = changedLineNumbers[finding.path] ?? [];
-  if (!lines.includes(finding.line)) throw new Error('First-look finding line must be an added line in the supplied PR diff, or null.');
+  return { valid, dropped };
 };
 
 const parseReviewAssessments = (assessments, openThreads) => {
@@ -207,11 +211,11 @@ const parseReviewPayload = (result, context) => {
   const prSummary = boundedList(result.prSummary, 'prSummary', { allowEmpty: false });
   const latestChanges = boundedList(result.latestChanges, 'latestChanges');
   const goodThings = parseGoodThings(result);
-  const badThings = parseFindings(result, context);
+  const { valid: badThings, dropped: droppedFindings } = parseFindings(result, context);
   const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
   const reviewCommentAssessments = parseContextReviewAssessments(result, context);
   const unresolvedThreadAssessments = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
-  if (unresolvedThreadAssessments.length && badThings.length === 0) {
+  if (unresolvedThreadAssessments.length && badThings.length === 0 && droppedFindings.length === 0) {
     throw new Error('First-look output must include concrete findings when a review thread remains open or unclear after investigation.');
   }
   const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
@@ -221,7 +225,8 @@ const parseReviewPayload = (result, context) => {
     latestChanges,
     goodThings,
     badThings,
-    rating: normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]),
+    droppedFindings,
+    rating: capRatingForDrops(normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]), droppedFindings),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments,
     priorFindingAssessments,
@@ -232,9 +237,13 @@ const parseGoodThings = (result) => boundedList(result.goodThings, 'goodThings')
 
 const parseFindings = (result, context) => {
   const findings = boundedFindings(result.badThings);
-  validateFindingLocations(findings, context);
-  return findings;
+  return partitionFindingLocations(findings, context);
 };
+
+/** A review with omitted findings is never perfect: cap it like a P2. */
+const capRatingForDrops = (rating, droppedFindings) => (
+  droppedFindings.length ? Math.min(rating, 8) : rating
+);
 
 const parseRating = (rating) => {
   if (!Number.isInteger(rating)) throw invalidRating();
@@ -313,15 +322,23 @@ const renderReviewAssessment = (result) => [
 ];
 
 const renderReviewSections = (result, context) => [
-  ...renderCoverageSection(context),
+  ...renderCoverageSection(context, result),
   ...renderLinkedIssueSection(result, context),
   ...renderReviewThreadSection(result, context),
   ...renderPriorFindingSection(result, context),
 ];
 
-const renderCoverageSection = (context) => context.diffTruncationReasons?.length
-  ? ['', '## Review coverage', ...context.diffTruncationReasons.map((reason) => `- ${reason}`)]
-  : [];
+const renderCoverageSection = (context, result) => {
+  const lines = [
+    ...(context.diffTruncationReasons ?? []),
+    ...renderDroppedFindingNotes(result?.droppedFindings ?? []),
+  ];
+  return lines.length ? ['', '## Review coverage', ...lines.map((line) => `- ${line}`)] : [];
+};
+
+const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => (
+  `Omitted finding “${dropped.title}” (${dropped.path}): reported location was not in the PR diff.`
+));
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length
   ? renderLinkedIssues(result, context.linkedIssues)
@@ -343,11 +360,17 @@ export const mergeOpenCodeFirstLookResults = (previous, current) => {
   const statusById = new Map(current.priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
   const retainedPrevious = previous.badThings.filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
   const findings = uniqueBy([...current.badThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
+  const droppedFindings = uniqueBy(
+    [...(previous.droppedFindings ?? []), ...(current.droppedFindings ?? [])],
+    (dropped) => `${dropped.title}:${dropped.path}`,
+  );
+  const rating = capRatingForDrops(normalizeRating(current.rating, findings), droppedFindings);
   return {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
     badThings: findings,
-    rating: normalizeRating(current.rating, findings),
+    droppedFindings,
+    rating,
   };
 };
 
