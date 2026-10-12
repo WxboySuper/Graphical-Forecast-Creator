@@ -160,7 +160,7 @@ jobs:
                   }
                 }
               };
-              for (let page = 1; page <= 10; page++) {
+              for (let page = 1; page <= 20; page++) {
                 const { data: existing } = await listPage(page);
                 const match = existing.find((item) =>
                   item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
@@ -186,13 +186,13 @@ jobs:
                 // mark the existing comment stale instead of posting anew.
                 const stale = await findDigestComment(prNumber);
                 if (stale) {
-                    const prior = String(stale.body || '').split(MARKER).slice(1).join(MARKER).trim();
+                    const prior = String(stale.body || '').split(MARKER).slice(1).join(MARKER).replace(/<details>[\s\S]*?<\/details>/g, '').trim();
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: stale.id,
                     body: MARKER + '\n## OCR review digest \u2014 stale\n\n'
-                     + 'Latest run did not complete; prior findings preserved below.\n\nFull log: ' + process.env.DIGEST_RUN_URL
+                     + 'Latest run did not complete; prior findings preserved below.\n\nFull log: ' + esc(process.env.DIGEST_RUN_URL || '')
                      + (prior ? '\n\n<details><summary>Previous digest</summary>\n\n' + prior + '\n\n</details>' : ''),
                   });
                   core.info('OCR digest marked stale.');
@@ -259,7 +259,7 @@ jobs:
               if (comments.length > 20) lines.push(`- …and ${comments.length - 20} more (see inline threads)`);
               lines.push(
                 '',
-                `Cost: ${esc(tokens)} tokens in ${esc(elapsed)}. Full log: ${process.env.DIGEST_RUN_URL}`,
+                `Cost: ${esc(tokens)} tokens in ${esc(elapsed)}. Full log: ${esc(process.env.DIGEST_RUN_URL || '')}`,
               );
 
               const body = `${MARKER}\n${lines.join('\n')}`;
@@ -364,7 +364,12 @@ jobs:
               return null;
             };
             const MAX_PAGES = 20;
-            for (let page = 0; page < MAX_PAGES; page++) {
+            // Two passes: GitHub needs a moment to index just-posted threads,
+            // so a clean first pass waits 20s and re-checks before passing.
+            for (let pass = 0; pass < 2; pass++) {
+              openBotThreads = 0;
+              cursor = null;
+              for (let page = 0; page < MAX_PAGES; page++) {
               const data = await queryThreads(cursor);
               if (!data) return;
               const connection = data?.repository?.pullRequest?.reviewThreads;
@@ -388,6 +393,11 @@ jobs:
                 core.setFailed('OCR gate hit the thread pagination cap; failing closed.');
                 return;
               }
+            }
+            if (openBotThreads === 0 && pass === 0) {
+              core.info('OCR gate first pass clean; waiting 20s for indexing, then re-checking.');
+              await sleep(20000);
+              continue;
             }
             if (openBotThreads > 0) {
               core.setFailed(`${openBotThreads} unresolved reviewer thread(s) remain on PR #${prNumber}. Resolve every inline comment before merging.`);
