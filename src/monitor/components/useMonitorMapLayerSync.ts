@@ -1,5 +1,6 @@
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import type { NwsAlertDetails } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import type { WmsLayerConfig } from '../wms';
@@ -24,6 +25,7 @@ interface UseMonitorMapLayerSyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   refs: MonitorMapRefs;
   onClearSelectedAlert: () => void;
+  selectedAlert?: NwsAlertDetails | null;
 }
 
 /** Coordinates WMS and vector overlay synchronization for the monitor map. */

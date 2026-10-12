@@ -83,6 +83,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     refs,
     onClearSelectedAlert: clearSelectedAlert,
+    selectedAlert,
   });
 
 };
