@@ -369,7 +369,7 @@ const renderCoverageSection = (result, context) => {
 /** Escape model-controlled text before it reaches markdown output. */
 const escapeCoverageText = (value) => String(value ?? '')
   .replace(/[\r\n]+/gu, ' ')
-  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|'"~\-]/gu, '\\$&');
+  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|'"~-]/gu, '\\$&');
 
 /** One coverage line per omitted finding; titles/paths are already single-line and bounded. */
 const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => {
