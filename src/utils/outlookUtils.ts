@@ -72,8 +72,8 @@ type CategoricalRule = {
 };
 
 type CategoricalConversion = {
-  probability: string;
-  cig: CIGLevel;
+  probability: unknown;
+  cig: unknown;
   rules: readonly CategoricalRule[];
 };
 
@@ -85,6 +85,7 @@ const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
   MDT: 4,
   HIGH: 5,
 };
+const DEFAULT_CATEGORICAL_RISK: CategoricalRiskLevel = 'TSTM';
 
 const CIG_SIGNIFICANCE_RANK: Readonly<Record<CIGLevel, number>> = {
   CIG0: 0,
@@ -99,28 +100,29 @@ function normalizeCategoricalProbability(probability: unknown): string | undefin
     return undefined;
   }
 
-  const trimmedProbability = probability.trim();
-  if (trimmedProbability.length === 0) {
+  const compactProbability = probability.trim().replace(/\s+/g, '');
+  if (compactProbability.length === 0) {
     return undefined;
   }
 
-  const strippedProbability = trimmedProbability.replace(/#/g, '').trim();
-  if (strippedProbability.length === 0) {
+  if (/^#\d+%$/.test(compactProbability)) {
+    return compactProbability.slice(1);
+  }
+  if (!/^\d+%?#?$/.test(compactProbability)) {
     return undefined;
   }
-  if (!trimmedProbability.includes('#')) {
-    return strippedProbability;
-  }
-  if (strippedProbability.endsWith('%')) {
-    return strippedProbability;
-  }
-  return `${strippedProbability}%`;
+
+  const withoutSignificantMarker = compactProbability.replace(/#$/, '');
+  return withoutSignificantMarker.endsWith('%')
+    ? withoutSignificantMarker
+    : `${withoutSignificantMarker}%`;
 }
 
 /** Returns whether a rule has a CIG mapping no more significant than the target. */
 function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: number): boolean {
   for (const ruleCig of ruleCigs) {
-    if (CIG_SIGNIFICANCE_RANK[ruleCig] <= targetCigRank) {
+    const ruleCigRank = (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[ruleCig];
+    if (ruleCigRank !== undefined && ruleCigRank <= targetCigRank) {
       return true;
     }
   }
@@ -135,21 +137,25 @@ function higherCategoricalRisk(
   if (current === undefined) {
     return candidate;
   }
-  if (CATEGORICAL_RISK_RANK[candidate] > CATEGORICAL_RISK_RANK[current]) {
-    return candidate;
-  }
-  return current;
+  return maxCategoricalRisk(current, candidate);
+}
+
+/** Returns the higher of two categorical risk levels using the shared rank table. */
+function maxCategoricalRisk(a: CategoricalRiskLevel, b: CategoricalRiskLevel): CategoricalRiskLevel {
+  return CATEGORICAL_RISK_RANK[a] >= CATEGORICAL_RISK_RANK[b] ? a : b;
 }
 
 /** Finds an exact rule or a CIG-aware fallback for a normalized probability. */
 function findCategoricalRisk(
   normalizedProbability: string,
-  cig: CIGLevel,
+  cig: unknown,
   rules: readonly CategoricalRule[],
 ): CategoricalRiskLevel {
-  const targetCigRank = CIG_SIGNIFICANCE_RANK[cig];
+  const targetCigRank = typeof cig === 'string'
+    ? (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[cig]
+    : undefined;
   if (targetCigRank === undefined) {
-    return 'TSTM';
+    return DEFAULT_CATEGORICAL_RISK;
   }
 
   // Use a defined lower-significance CIG rule when this probability has no
@@ -161,31 +167,27 @@ function findCategoricalRisk(
       continue;
     }
 
-    if (rule.cigs.includes(cig)) {
-      return rule.risk;
-    }
-
     if (!ruleAppliesAtOrBelowCig(rule.cigs, targetCigRank)) {
       continue;
     }
     fallbackRisk = higherCategoricalRisk(fallbackRisk, rule.risk);
   }
 
-  return fallbackRisk ?? 'TSTM';
+  return fallbackRisk ?? DEFAULT_CATEGORICAL_RISK;
 }
 
 /** Converts a probability/CIG pair to a categorical risk, defaulting invalid input to TSTM. */
 function categorizeProbability({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel {
   const normalizedProbability = normalizeCategoricalProbability(probability);
   if (normalizedProbability === undefined) {
-    return 'TSTM';
+    return DEFAULT_CATEGORICAL_RISK;
   }
   return findCategoricalRisk(normalizedProbability, cig, rules);
 }
 
 type CategoricalInput = {
-  probability: string;
-  cig?: CIGLevel;
+  probability: unknown;
+  cig?: unknown;
 };
 
 const CIG_01 = ['CIG0', 'CIG1'] as const;
@@ -262,7 +264,7 @@ export function totalSevereToCategorical({ probability, cig = 'CIG0' }: Categori
  * @returns True if it's a significant threat (contains #), false otherwise
  */
 export function isSignificantThreat({ probability }: Pick<CategoricalInput, 'probability'>): boolean {
-  return probability.includes('#');
+  return typeof probability === 'string' && probability.includes('#');
 }
 
 /**
@@ -286,10 +288,10 @@ export function getHighestCategoricalRisk({
   if (windProb) candidates.push(windToCategorical({ probability: windProb }));
   if (hailProb) candidates.push(hailToCategorical({ probability: hailProb }));
 
-  if (candidates.length === 0) return 'TSTM';
+  if (candidates.length === 0) return DEFAULT_CATEGORICAL_RISK;
 
   return candidates.reduce((best, current) => (
-    CATEGORICAL_RISK_RANK[current] > CATEGORICAL_RISK_RANK[best] ? current : best
+    maxCategoricalRisk(best, current)
   ), candidates[0]);
 }
 
