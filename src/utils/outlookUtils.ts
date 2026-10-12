@@ -163,6 +163,23 @@ function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: n
   return false;
 }
 
+/** Resolves CIG labels from stored data, using CIG0 for absent or empty values. */
+function getTargetCigRank(cig: unknown): number | undefined {
+  const normalizedCig = typeof cig === 'string' ? cig.trim().toUpperCase() : undefined;
+  const cigKey = normalizedCig === '' || cig === null ? 'CIG0' : normalizedCig;
+  return cigKey === undefined
+    ? undefined
+    : (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[cigKey];
+}
+
+/** Finds a documented category for a significant probability marker. */
+function getSignificantCategoricalRisk(
+  normalized: NormalizedCategoricalProbability,
+  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
+): CategoricalRiskLevel | undefined {
+  return normalized.significant ? significantRisks?.[normalized.probability] : undefined;
+}
+
 /** Keeps the higher risk, treating an absent accumulated value as the first candidate. */
 function higherCategoricalRisk(
   current: CategoricalRiskLevel | undefined,
@@ -174,6 +191,25 @@ function higherCategoricalRisk(
   return current;
 }
 
+/** Finds the highest mapped risk at or below the target CIG. */
+function findCigFallbackRisk(
+  probability: string,
+  targetCigRank: number,
+  rules: readonly CategoricalRule[],
+): CategoricalRiskLevel | undefined {
+  let fallbackRisk: CategoricalRiskLevel | undefined;
+  for (const rule of rules) {
+    if (!rule.probabilities.includes(probability)) {
+      continue;
+    }
+    if (!ruleAppliesAtOrBelowCig(rule.cigs, targetCigRank)) {
+      continue;
+    }
+    fallbackRisk = higherCategoricalRisk(fallbackRisk, rule.risk);
+  }
+  return fallbackRisk;
+}
+
 /** Uses a documented significant risk when present, otherwise the highest eligible CIG mapping. */
 function findCategoricalRisk(
   normalized: NormalizedCategoricalProbability,
@@ -181,20 +217,12 @@ function findCategoricalRisk(
   rules: readonly CategoricalRule[],
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
 ): CategoricalRiskLevel {
-  const normalizedCig = typeof cig === 'string'
-    ? cig.trim().toUpperCase()
-    : undefined;
-  const cigKey = normalizedCig === '' || cig === null ? 'CIG0' : normalizedCig;
-  const targetCigRank = cigKey !== undefined
-    ? (CIG_SIGNIFICANCE_RANK as Readonly<Record<string, number>>)[cigKey]
-    : undefined;
+  const targetCigRank = getTargetCigRank(cig);
   if (targetCigRank === undefined) {
     return DEFAULT_CATEGORICAL_RISK;
   }
 
-  const significantRisk = normalized.significant
-    ? significantRisks?.[normalized.probability]
-    : undefined;
+  const significantRisk = getSignificantCategoricalRisk(normalized, significantRisks);
   if (significantRisk !== undefined) {
     return significantRisk;
   }
@@ -202,19 +230,7 @@ function findCategoricalRisk(
   // Use a defined lower-significance CIG rule when this probability has no
   // exact mapping. This preserves monotonic risk without promoting low CIGs
   // from a rule that applies only to a more significant hatch.
-  let fallbackRisk: CategoricalRiskLevel | undefined;
-  for (const rule of rules) {
-    if (!rule.probabilities.includes(normalized.probability)) {
-      continue;
-    }
-
-    if (!ruleAppliesAtOrBelowCig(rule.cigs, targetCigRank)) {
-      continue;
-    }
-    fallbackRisk = higherCategoricalRisk(fallbackRisk, rule.risk);
-  }
-
-  return fallbackRisk ?? DEFAULT_CATEGORICAL_RISK;
+  return findCigFallbackRisk(normalized.probability, targetCigRank, rules) ?? DEFAULT_CATEGORICAL_RISK;
 }
 
 /** Converts a probability/CIG pair to a categorical risk, defaulting invalid input to TSTM. */
