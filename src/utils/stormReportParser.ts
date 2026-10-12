@@ -4,20 +4,33 @@ import { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
 export { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
-export const SPC_TODAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/today_filtered.csv';
+const SPC_STORM_REPORTS_BASE_URL = 'https://www.spc.noaa.gov/climo/reports';
 
-export const SPC_YESTERDAY_STORM_REPORTS_URL = 'https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv';
+export const SPC_TODAY_STORM_REPORTS_URL = `${SPC_STORM_REPORTS_BASE_URL}/today_filtered.csv`;
 
-const archiveUrlForDate = (date: string): string =>
-  `https://www.spc.noaa.gov/climo/reports/${date}_rpts_filtered.csv`;
+export const SPC_YESTERDAY_STORM_REPORTS_URL = `${SPC_STORM_REPORTS_BASE_URL}/yesterday_filtered.csv`;
+
+const archiveUrlForDate = (date: string, format: 'filtered' | 'raw' = 'filtered'): string => {
+  if (!/^\d{6}$/.test(date)) {
+    throw new Error(`Invalid SPC report date: ${JSON.stringify(date)}.`);
+  }
+  return `${SPC_STORM_REPORTS_BASE_URL}/${encodeURIComponent(date)}_rpts_${format}.csv`;
+};
 
 const isValidCalendarDate = (date: Date, year: number, month: number, day: number): boolean =>
   [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
 
 /**
- * Parses archived *_rpts_raw.csv storm report text.
+ * Parses archived *_rpts_filtered.csv storm report text.
  */
 export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
+  // SPC's filtered archive uses the same three Time-prefixed sections as its
+  // rolling filtered feeds, with narrower headers than the raw archive.
+  const filteredReports = parseTodayStormReportCsv(csvText);
+  if (filteredReports.length > 0) {
+    return filteredReports;
+  }
+
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
 
@@ -31,15 +44,15 @@ export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
       continue;
     }
 
-    if (line.includes('Raw Tornado LSR')) {
+    if (line.includes('Tornado LSR')) {
       currentSection = 'tornado';
       continue;
     }
-    if (line.includes('Raw Wind/Gust LSR') || line.includes('Raw Wind LSR')) {
+    if (line.includes('Wind/Gust LSR') || line.includes('Wind LSR')) {
       currentSection = 'wind';
       continue;
     }
-    if (line.includes('Raw Hail LSR')) {
+    if (line.includes('Hail LSR')) {
       currentSection = 'hail';
       continue;
     }
@@ -72,7 +85,12 @@ export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
  * @returns Promise with array of storm reports
  */
 export async function fetchStormReports(date: string): Promise<StormReport[]> {
-  const response = await fetch(archiveUrlForDate(date));
+  let response = await fetch(archiveUrlForDate(date));
+
+  // Some older SPC archive dates have a raw CSV but no filtered counterpart.
+  if (response.status === 404) {
+    response = await fetch(archiveUrlForDate(date, 'raw'));
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
@@ -81,7 +99,7 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
   return parseArchiveStormReportCsv(await response.text());
 }
 
-/** Fetches a rolling report-day feed (today.csv / yesterday.csv). */
+/** Fetches a rolling report-day feed (today_filtered.csv / yesterday_filtered.csv). */
 const fetchRollingStormReports = async (url: string, label: string): Promise<StormReport[]> => {
   const response = await fetch(url);
 
@@ -92,12 +110,12 @@ const fetchRollingStormReports = async (url: string, label: string): Promise<Sto
   return parseTodayStormReportCsv(await response.text());
 };
 
-/** Fetches same-day SPC storm reports (today.csv). */
+/** Fetches same-day SPC storm reports (today_filtered.csv). */
 export function fetchTodayStormReports(): Promise<StormReport[]> {
   return fetchRollingStormReports(SPC_TODAY_STORM_REPORTS_URL, "today's storm reports");
 }
 
-/** Fetches the previous report day's SPC storm reports (yesterday.csv). */
+/** Fetches the previous report day's SPC storm reports (yesterday_filtered.csv). */
 export function fetchYesterdayStormReports(): Promise<StormReport[]> {
   return fetchRollingStormReports(SPC_YESTERDAY_STORM_REPORTS_URL, "yesterday's storm reports");
 }

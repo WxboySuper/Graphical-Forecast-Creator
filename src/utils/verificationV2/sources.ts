@@ -154,8 +154,8 @@ const fetchReportFeed = (reportDate: string | null, now: Date): Promise<StormRep
 /**
  * Loads SPC storm reports for a date (or today when null), or blocks.
  *
- * The current SPC report day is routed to the live today.csv feed, and the
- * previous SPC report day to the live yesterday.csv feed, matching SPC's
+ * The current SPC report day is routed to the live today_filtered.csv feed, and the
+ * previous SPC report day to the live yesterday_filtered.csv feed, matching SPC's
  * 12Z–11:59Z publication window. Any other valid date goes to the SPC archive.
  */
 export const loadReportsForDate = async (

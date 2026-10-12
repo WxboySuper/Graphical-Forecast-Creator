@@ -23,7 +23,7 @@ Map image export remains separate via the existing export-image flow and is link
 | KML | Yes | Yes | Outlook geometry for GIS tools |
 | KMZ | Yes | Yes | Compressed KML archive |
 
-KML/KMZ export is available in production. Custom product layers remain excluded from KML/KMZ transfers.
+KML/KMZ export is enabled through staging validation before production promotion. Custom product layers remain excluded from KML/KMZ transfers.
 
 ## KML/KMZ behavior
 

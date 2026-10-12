@@ -42,6 +42,13 @@ const ALL_TARGETS_ON: FeatureExposureMatrix = {
   production: true,
 };
 
+const THROUGH_STAGING_ON: FeatureExposureMatrix = {
+  local: true,
+  beta: true,
+  staging: true,
+  production: false,
+};
+
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
 
@@ -142,12 +149,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 431,
   },
   outlookLandMasking: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: true,
-      production: true,
-    },
+    exposure: { ...THROUGH_STAGING_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
     temporary: false,
@@ -208,7 +210,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 623,
   },
   kmzExport: {
-    exposure: { local: true, beta: true, staging: true, production: true },
+    exposure: { ...THROUGH_STAGING_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: false,

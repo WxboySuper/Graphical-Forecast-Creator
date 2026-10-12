@@ -1,4 +1,4 @@
-import { fetchYesterdayStormReports, parseTodayStormReportCsv } from './stormReportParser';
+import { fetchTodayStormReports, fetchYesterdayStormReports, parseTodayStormReportCsv } from './stormReportParser';
 
 describe('parseTodayStormReportCsv', () => {
   test('parses tornado, wind, and hail sections from today.csv layout', () => {
@@ -58,7 +58,7 @@ describe('fetchYesterdayStormReports', () => {
     global.fetch = originalFetch;
   });
 
-  test('fetches yesterday.csv and parses the combined report layout', async () => {
+  test('fetches yesterday_filtered.csv and parses the combined report layout', async () => {
     const csv = [
       'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
       'Time,Speed,Location,County,State,Lat,Lon,Comments',
@@ -75,10 +75,28 @@ describe('fetchYesterdayStormReports', () => {
 
     const reports = await fetchYesterdayStormReports();
 
-    expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/yesterday.csv');
+    expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/yesterday_filtered.csv');
     expect(reports).toHaveLength(2);
     expect(reports.map((report) => report.type)).toEqual(['wind', 'hail']);
     expect(reports[0]?.magnitude).toBe('65 mph');
     expect(reports[1]?.magnitude).toBe('1.75"');
+  });
+
+  test('fetches today_filtered.csv and parses filtered reports', async () => {
+    const csv = [
+      'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+      '1805,1,Ada,OK,OK,34.77,-96.67,Filtered tornado',
+    ].join('\n');
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      statusText: 'OK',
+      text: () => Promise.resolve(csv),
+    }) as unknown as typeof global.fetch;
+
+    const reports = await fetchTodayStormReports();
+
+    expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/today_filtered.csv');
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 34.77, longitude: -96.67 });
   });
 });

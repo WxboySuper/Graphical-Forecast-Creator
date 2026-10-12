@@ -118,6 +118,13 @@ describe('featureExposure registry', () => {
     }
   });
 
+  test('keeps optional land masking and KMZ export staged before production promotion', () => {
+    for (const feature of ['outlookLandMasking', 'kmzExport'] as const) {
+      expect(isFeatureExposedOnTarget(feature, 'staging')).toBe(true);
+      expect(isFeatureExposedOnTarget(feature, 'production')).toBe(false);
+    }
+  });
+
   test('keeps unreleased v1.7 workstreams disabled outside their explicitly approved targets', () => {
     const workstreamKeys = [
       'forecastWorkflowV2',
