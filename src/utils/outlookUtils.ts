@@ -79,9 +79,23 @@ type CategoricalConversion = {
 
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
   const normalizedProbability = probability.replace(/[#]/g, '%');
-  return rules.find((rule) =>
+  const mappedRisk = rules.find((rule) =>
     rule.probabilities.includes(normalizedProbability) && rule.cigs.includes(cig)
-  )?.risk ?? 'TSTM';
+  )?.risk;
+
+  if (mappedRisk) {
+    return mappedRisk;
+  }
+
+  // An unsupported CIG level must not erase an otherwise valid probability.
+  // Fall back to that probability's non-significant categorical risk.
+  if (cig !== 'CIG0') {
+    return rules.find((rule) =>
+      rule.probabilities.includes(normalizedProbability) && rule.cigs.includes('CIG0')
+    )?.risk ?? 'TSTM';
+  }
+
+  return 'TSTM';
 };
 
 type CategoricalInput = {

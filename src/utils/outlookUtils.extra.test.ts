@@ -34,6 +34,12 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '1%', cig: 'CIG0' })).toBe('TSTM');
   });
 
+  test('unsupported CIG3 combinations preserve the underlying probability risk', () => {
+    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('MRGL');
+    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('MRGL');
+  });
+
   test('windToCategorical maps probabilities properly', () => {
     expect(windToCategorical({ probability: '5%', cig: 'CIG0' })).toBe('MRGL');
     expect(windToCategorical({ probability: '5%', cig: 'CIG2' })).toBe('SLGT');
