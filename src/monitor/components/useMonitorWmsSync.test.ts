@@ -2,8 +2,13 @@ import { renderHook } from '@testing-library/react';
 import type { WmsLayerConfig } from '../wms';
 import * as monitorMapLayerUtils from './monitorMapLayerUtils';
 import type { useMonitorMapRefs } from './monitorMapRefs';
+import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
 import { useMonitorRadarWmsSync } from './useMonitorRadarWmsSync';
 import { useMonitorSatelliteWmsSync } from './useMonitorSatelliteWmsSync';
+
+jest.mock('./useMonitorMapOverlaySync', () => ({
+  useMonitorMapOverlaySync: jest.fn(),
+}));
 
 jest.mock('./monitorMapLayerUtils', () => ({
   applyWmsLayer: jest.fn(),
@@ -27,6 +32,40 @@ describe('Monitor WMS sync', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('does not re-apply WMS layers when dark mode changes', () => {
+    const refs = {
+      radarLayerRef: { current: tileLayer },
+      radarLayerKeyRef: { current: null },
+      satelliteLayerRef: { current: tileLayer },
+      satelliteLayerKeyRef: { current: null },
+    } as unknown as ReturnType<typeof useMonitorMapRefs>;
+    const args = {
+      mapView: { center: [0, 0], zoom: 4 },
+      darkMode: false,
+      radarLayer,
+      radarOpacity: 0.72,
+      satelliteLayer,
+      satelliteOpacity: 0.68,
+      serializedFeatures: [],
+      stormReports: [],
+      alertsCollection: { type: 'FeatureCollection', features: [] },
+      alertsOpacity: 1,
+      mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
+      refs,
+      onClearSelectedAlert: jest.fn(),
+    } as unknown as Parameters<typeof useMonitorMapLayerSync>[0];
+
+    const { rerender } = renderHook(
+      ({ darkMode }) => useMonitorMapLayerSync({ ...args, darkMode }),
+      { initialProps: { darkMode: false } },
+    );
+
+    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(2);
+
+    rerender({ darkMode: true });
+    expect(monitorMapLayerUtils.applyWmsLayer).toHaveBeenCalledTimes(2);
   });
 
   it('does not re-apply the satellite WMS layer on a theme toggle', () => {
