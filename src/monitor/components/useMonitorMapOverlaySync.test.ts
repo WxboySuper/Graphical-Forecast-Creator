@@ -63,13 +63,16 @@ const makeDetails = (id: string): NwsAlertDetails => ({
   detailUrl: id,
 });
 
+const ALERT_ID = 'https://api.weather.gov/alerts/abc';
+const OTHER_ID = 'https://api.weather.gov/alerts/other';
+
 const makeArgs = (overrides: Partial<Parameters<typeof useMonitorMapOverlaySync>[0]> = {}) =>
   ({
     mapView: { center: [0, 0], zoom: 4 },
     darkMode: false,
     serializedFeatures: [],
     stormReports: [],
-    alertsCollection: makeCollection('https://api.weather.gov/alerts/abc'),
+    alertsCollection: makeCollection(ALERT_ID),
     mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
     alertsOpacity: 1,
     refs: makeRefs(),
@@ -78,46 +81,38 @@ const makeArgs = (overrides: Partial<Parameters<typeof useMonitorMapOverlaySync>
     ...overrides,
   }) as Parameters<typeof useMonitorMapOverlaySync>[0];
 
+/** Renders the hook with the abc alert selected and returns dismissal tracking. */
+const setup = (selectedAlert: NwsAlertDetails | null = makeDetails(ALERT_ID)) => {
+  const onClearSelectedAlert = jest.fn();
+  const render = renderHook(
+    ({ alertsCollection }) =>
+      useMonitorMapOverlaySync(makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlert })),
+    { initialProps: { alertsCollection: makeCollection(ALERT_ID) } },
+  );
+  return { ...render, onClearSelectedAlert };
+};
+
 describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('does nothing when nothing is selected', () => {
-    const onClearSelectedAlert = jest.fn();
-    const { rerender } = renderHook(
-      ({ alertsCollection }) =>
-        useMonitorMapOverlaySync(makeArgs({ alertsCollection, onClearSelectedAlert })),
-      { initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') } },
-    );
+    const { rerender, onClearSelectedAlert } = setup(null);
 
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
+    rerender({ alertsCollection: makeCollection(OTHER_ID) });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
 
   it('retains the selection on a single collection miss (animation frame tick)', () => {
-    const onClearSelectedAlert = jest.fn();
-    const selectedAlert = makeDetails('https://api.weather.gov/alerts/abc');
+    const { rerender, onClearSelectedAlert } = setup();
 
-    const { rerender } = renderHook(
-      ({ alertsCollection }) =>
-        useMonitorMapOverlaySync(makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlert })),
-      { initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') } },
-    );
-
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
+    rerender({ alertsCollection: makeCollection(OTHER_ID) });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
 
   it('clears the selection after two consecutive misses (expired alert)', () => {
-    const onClearSelectedAlert = jest.fn();
-    const selectedAlert = makeDetails('https://api.weather.gov/alerts/abc');
+    const { rerender, onClearSelectedAlert } = setup();
 
-    const { rerender } = renderHook(
-      ({ alertsCollection }) =>
-        useMonitorMapOverlaySync(makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlert })),
-      { initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') } },
-    );
-
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
+    rerender({ alertsCollection: makeCollection(OTHER_ID) });
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
     rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/expired') });
@@ -125,18 +120,11 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   });
 
   it('resets the miss count when the alert reappears', () => {
-    const onClearSelectedAlert = jest.fn();
-    const selectedAlert = makeDetails('https://api.weather.gov/alerts/abc');
+    const { rerender, onClearSelectedAlert } = setup();
 
-    const { rerender } = renderHook(
-      ({ alertsCollection }) =>
-        useMonitorMapOverlaySync(makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlert })),
-      { initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') } },
-    );
-
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') });
-    rerender({ alertsCollection: makeCollection('https://api.weather.gov/alerts/other') });
+    rerender({ alertsCollection: makeCollection(OTHER_ID) });
+    rerender({ alertsCollection: makeCollection(ALERT_ID) });
+    rerender({ alertsCollection: makeCollection(OTHER_ID) });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
