@@ -94,23 +94,30 @@ const assertFindingLine = (line) => {
  * Drifted findings are reported (not thrown) so one bad location cannot kill
  * the whole review; the rating cap and coverage note keep it honest. */
 const partitionFindingLocations = (findings, context) => {
-  const paths = new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
+  const paths = new Set([...(context.changedFilePaths ?? []), ...(context.files?.map((file) => file.path) ?? [])]);
+  const lineMap = context.changedLineNumbers ?? {};
   const valid = [];
   const dropped = [];
   for (const finding of findings) {
     if (!paths.has(finding.path)) {
-      dropped.push({ title: finding.title, path: finding.path, reason: 'path' });
+      dropped.push({ ...finding, reason: 'path' });
       continue;
     }
-    const lines = context.changedLineNumbers?.[finding.path] ?? [];
+    const rawLines = Object.hasOwn(lineMap, finding.path) ? lineMap[finding.path] : undefined;
+    const lines = Array.isArray(rawLines) ? rawLines : [];
     if (finding.line !== null && !lines.includes(finding.line)) {
-      dropped.push({ title: finding.title, path: finding.path, reason: 'line' });
+      dropped.push({ ...finding, reason: 'line' });
       continue;
     }
     valid.push(finding);
   }
   return { valid, dropped };
 };
+
+/** True when the review has anything actionable: a locatable finding or a recorded drop. */
+export const hasActionableFindings = (badThings, droppedFindings) => (
+  badThings.length > 0 || droppedFindings.length > 0
+);
 
 const parseReviewAssessments = (assessments, openThreads) => {
   const expected = new Set(openThreads.map((thread) => thread.id));
@@ -215,7 +222,7 @@ const parseReviewPayload = (result, context) => {
   const priorFindingAssessments = parsePriorFindingAssessments(result.priorFindingAssessments, context.priorFindings ?? []);
   const reviewCommentAssessments = parseContextReviewAssessments(result, context);
   const unresolvedThreadAssessments = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
-  if (unresolvedThreadAssessments.length && badThings.length === 0 && droppedFindings.length === 0) {
+  if (unresolvedThreadAssessments.length && !hasActionableFindings(badThings, droppedFindings)) {
     throw new Error('First-look output must include concrete findings when a review thread remains open or unclear after investigation.');
   }
   const statusById = new Map(priorFindingAssessments.map((assessment) => [assessment.findingId, assessment.status]));
@@ -226,7 +233,7 @@ const parseReviewPayload = (result, context) => {
     goodThings,
     badThings,
     droppedFindings,
-    rating: capRatingForDrops(normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]), droppedFindings),
+    rating: capRatingForDrops(normalizeRating(parseRating(result.rating), [...badThings, ...unresolvedPriorFindings]), droppedFindings, badThings),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments,
     priorFindingAssessments,
@@ -240,10 +247,17 @@ const parseFindings = (result, context) => {
   return partitionFindingLocations(findings, context);
 };
 
-/** A review with omitted findings is never perfect: cap it like a P2. */
-const capRatingForDrops = (rating, droppedFindings) => (
-  droppedFindings.length ? Math.min(rating, 8) : rating
-);
+/** A review with omitted findings is never perfect: P0/P1 drops cap hard,
+ * P3-only drops cap light, anything else caps like a P2. */
+const capRatingForDrops = (rating, droppedFindings, findings = []) => {
+  if (!droppedFindings.length) return rating;
+  const isHot = (item) => item.priority === 'P0' || item.priority === 'P1';
+  if (droppedFindings.some(isHot)) return Math.min(rating, 5);
+  if (droppedFindings.every((item) => item.priority === 'P3') && findings.every((item) => item.priority === 'P3')) {
+    return Math.min(rating, 9);
+  }
+  return Math.min(rating, 8);
+};
 
 const parseRating = (rating) => {
   if (!Number.isInteger(rating)) throw invalidRating();
@@ -322,22 +336,25 @@ const renderReviewAssessment = (result) => [
 ];
 
 const renderReviewSections = (result, context) => [
-  ...renderCoverageSection(context, result),
+  ...renderCoverageSection(result, context),
   ...renderLinkedIssueSection(result, context),
   ...renderReviewThreadSection(result, context),
   ...renderPriorFindingSection(result, context),
 ];
 
-const renderCoverageSection = (context, result) => {
-  const lines = [
-    ...(context.diffTruncationReasons ?? []),
-    ...renderDroppedFindingNotes(result?.droppedFindings ?? []),
-  ];
+const renderCoverageSection = (result, context) => {
+  const truncation = Array.isArray(context.diffTruncationReasons) ? context.diffTruncationReasons : [];
+  const dropped = Array.isArray(result?.droppedFindings) ? result.droppedFindings : [];
+  const lines = [...truncation, ...renderDroppedFindingNotes(dropped)];
   return lines.length ? ['', '## Review coverage', ...lines.map((line) => `- ${line}`)] : [];
 };
 
+const escapeCoverageText = (value) => String(value ?? '')
+  .replace(/[\r\n]+/g, ' ')
+  .replace(/[\\`*_{}\x5b\x5d()<>#+.!|]/g, '\\$&');
+
 const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => (
-  `Omitted finding “${dropped.title}” (${dropped.path}): reported location was not in the PR diff.`
+  'Omitted finding "' + escapeCoverageText(dropped.title) + '" (' + escapeCoverageText(dropped.path) + '): reported location was not in the PR diff.'
 ));
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length
@@ -362,9 +379,9 @@ export const mergeOpenCodeFirstLookResults = (previous, current) => {
   const findings = uniqueBy([...current.badThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
   const droppedFindings = uniqueBy(
     [...(previous.droppedFindings ?? []), ...(current.droppedFindings ?? [])],
-    (dropped) => `${dropped.title}:${dropped.path}`,
-  );
-  const rating = capRatingForDrops(normalizeRating(current.rating, findings), droppedFindings);
+    (dropped) => [dropped.priority, dropped.title, dropped.path, dropped.line, dropped.reason].join(':'),
+  ).slice(0, MAX_BULLETS);
+  const rating = capRatingForDrops(normalizeRating(current.rating, findings), droppedFindings, findings);
   return {
     ...current,
     goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
