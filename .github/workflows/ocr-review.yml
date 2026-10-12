@@ -94,13 +94,17 @@ jobs:
         with:
           llm_url: ${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/responses' }}
           llm_auth_token: ${{ secrets.OPENCODE_API_KEY }}
+          # The Go gateway 400s every request without x-opencode-session
+          # (MissingSessionID). The run ID is stable for the conversation,
+          # since each workflow run performs exactly one review.
+          llm_extra_headers: 'x-opencode-session=ocr-${{ github.run_id }}'
           llm_model: ${{ vars.OCR_LLM_MODEL || 'muse-spark-1.3-contributor' }}
           llm_use_anthropic: 'false'
           llm_protocol: ${{ vars.OCR_LLM_PROTOCOL || 'openai-responses' }}
-          # Muse Spark speaks the OpenAI Responses API, which rejects the
-          # action's default Anthropic-style extra_body
-          # ({"thinking": {"type": "disabled"}}) with HTTP 400 on every
-          # request (run 38203212106: 5/5 failed). Send an empty object.
+          # Keep the action's Anthropic-style default extra_body off this
+          # OpenAI-Responses request. Probe runs showed the gateway accepts
+          # every body field OCR sends (tools, store, include, cache key)
+          # once the session header is present; '{}' simply stays neutral.
           llm_extra_body: '{}'
           language: English
           effort: high
