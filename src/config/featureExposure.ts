@@ -151,8 +151,6 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
     temporary: false,
-    removalCondition:
-      'Promoted as an optional drawing setting after implementation and user validation (#619).',
     serverBacked: false,
     trackingIssue: 619,
   },
@@ -214,7 +212,6 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: false,
-    removalCondition: 'Promoted after prototype validation; issue #621 is complete.',
     serverBacked: false,
     trackingIssue: 621,
   },
