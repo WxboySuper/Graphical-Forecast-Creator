@@ -232,6 +232,7 @@ jobs:
             curl -s -w "\nHTTP:%{http_code}\n" "$URL" \
               -H "Authorization: Bearer $KEY" \
               -H "Content-Type: application/json" \
+              ${SESSION_HEADER:+-H "x-opencode-session: $SESSION_HEADER"} \
               -d "$1"
             echo ""
           }
@@ -242,3 +243,6 @@ jobs:
           send "plus-prompt-cache-key" "{\"model\":\"muse-spark-1.3-contributor\",\"input\":$INPUT,\"prompt_cache_key\":\"probe123\"}"
           send "plus-tools" "{\"model\":\"muse-spark-1.3-contributor\",\"input\":$INPUT,\"tools\":$TOOLS}"
           send "plus-max-output-tokens" "{\"model\":\"muse-spark-1.3-contributor\",\"input\":$INPUT,\"max_output_tokens\":64}"
+          SESSION_HEADER="ocr-probe-${{ github.run_id }}"
+          send "session-minimal" "{\"model\":\"muse-spark-1.3-contributor\",\"input\":$INPUT}"
+          send "session-fullish" "{\"model\":\"muse-spark-1.3-contributor\",\"input\":$INPUT,\"instructions\":\"You are a code review assistant.\",\"tools\":$TOOLS,\"store\":false,\"include\":[\"reasoning.encrypted_content\"],\"prompt_cache_key\":\"probe123\",\"max_output_tokens\":64}"
