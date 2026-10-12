@@ -134,17 +134,34 @@ jobs:
             // problem logs a warning and skips, so a digest hiccup can never
             // block a review or a merge. Uses its own marker, distinct from
             // the OCR action's summary comment.
+            // PR-number/SHA wiring note (reviewers keep misreading this):
+            // pr-refs exports PR_NUMBER/HEAD_SHA via $GITHUB_ENV on
+            // dispatch/comment runs; on pull_request_target it is skipped
+            // and the payload fallbacks below cover those events.
             const MARKER = '<!-- gfc-ocr-digest -->';
             const findDigestComment = async (prNumber) => {
               // Paginated: on busy PRs the marker can sit past page one.
+              // Retried: a flaked lookup must not masquerade a stale digest.
+              const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              const listPage = async (page) => {
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  try {
+                    return await github.rest.issues.listComments({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: prNumber,
+                      per_page: 100,
+                      page,
+                    });
+                  } catch (error) {
+                    if (attempt === 2) throw error;
+                    core.warning('OCR digest comment lookup failed; retrying.');
+                    await wait(5000);
+                  }
+                }
+              };
               for (let page = 1; page <= 10; page++) {
-                const { data: existing } = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  per_page: 100,
-                  page,
-                });
+                const { data: existing } = await listPage(page);
                 const match = existing.find((item) =>
                   item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
                 );
@@ -152,7 +169,7 @@ jobs:
               }
               return null;
             };
-            const esc = (s) => String(s).replace(/[\x60_*<>\[\]]/g, function (m) { return '\\' + m; }).replace(/@/g, '@\u200b');
+            const esc = (s) => String(s).replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/[\x60_*<>\[\]]/g, function (m) { return '\\' + m; }).replace(/@/g, '@\u200b');
             try {
               const outcome = process.env.OCR_OUTCOME || 'unknown';
               const prNumber = Number(
@@ -169,11 +186,14 @@ jobs:
                 // mark the existing comment stale instead of posting anew.
                 const stale = await findDigestComment(prNumber);
                 if (stale) {
+                    const prior = String(stale.body || '').split(MARKER).slice(1).join(MARKER).trim();
                   await github.rest.issues.updateComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     comment_id: stale.id,
-                    body: `${MARKER}\n## OCR review digest — stale\n\n⚠️ Latest run did not complete (outcome=${outcome}); findings below are from an earlier revision.\n\nFull log: ${process.env.DIGEST_RUN_URL}`,
+                    body: MARKER + '\n## OCR review digest \u2014 stale\n\n'
+                     + 'Latest run did not complete; prior findings preserved below.\n\nFull log: ' + process.env.DIGEST_RUN_URL
+                     + (prior ? '\n\n<details><summary>Previous digest</summary>\n\n' + prior + '\n\n</details>' : ''),
                   });
                   core.info('OCR digest marked stale.');
                 } else {
@@ -184,7 +204,10 @@ jobs:
               const fs = require('fs');
               let result;
               try {
+                // Written by the OCR action's run step (see run logs:
+                // `ocr review ... > /tmp/ocr-result.json`); shape-checked below.
                 result = JSON.parse(fs.readFileSync('/tmp/ocr-result.json', 'utf8'));
+                core.info(`OCR digest: read result file (${result?.summary?.files_reviewed ?? '?'} files).`);
               } catch (error) {
                 core.warning(`OCR digest: unreadable result file (${error.message}); skipping.`);
                 return;
@@ -192,7 +215,7 @@ jobs:
               const summary = result.summary || {};
               const groups = Array.isArray(result.groups) ? result.groups : [];
               const comments = Array.isArray(result.comments) ? result.comments : [];
-              const files = groups.flatMap((g) => g.files || []);
+              const files = groups.flatMap((g) => Array.isArray(g.files) ? g.files : []);
               // HEAD_SHA env only exists for dispatch/comment triggers
               // (pr-refs step); on pull_request_target use the payload SHA.
               const headSha = (
@@ -263,7 +286,7 @@ jobs:
 
       - name: Enforce zero open OCR threads (merge gate)
         id: ocr-gate
-        if: always() && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
+        if: always()
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
@@ -331,7 +354,7 @@ jobs:
                   const status = error?.status ?? error?.response?.status;
                   const msg = String(error?.message || '');
                   const transient = /timeout|timed out|econn|socket hang|eai_again|502|503|504|temporarily/i.test(msg);
-                  const retryable = status === 429 || (status ?? 0) >= 500 || (status == null && transient);
+                  const retryable = status === 429 || status === 408 || (status ?? 0) >= 500 || (status == null && transient) || (status === 403 && /rate limit|secondary|abuse/i.test(msg));
                   if (!retryable || attempt === delaysMs.length) break;
                   core.warning(`OCR gate thread query attempt ${attempt + 1} failed (${error.message}); retrying.`);
                   await sleep(delaysMs[attempt]);
