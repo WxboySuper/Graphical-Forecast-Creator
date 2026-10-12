@@ -118,6 +118,119 @@ jobs:
           head_sha: ${{ steps.pr-refs.outputs.head_sha }}
           pr_number: ${{ steps.pr-refs.outputs.pr_number }}
 
+      - name: Post OCR digest summary
+        id: ocr-digest
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          OCR_OUTCOME: ${{ steps.ocr.outcome }}
+          DIGEST_PR_NUMBER: ${{ env.PR_NUMBER }}
+          DIGEST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DIGEST_HEAD_SHA: ${{ env.HEAD_SHA }}
+        with:
+          script: |
+            // Advisory-only takeaway comment. Never fails the job: any
+            // problem logs a warning and skips, so a digest hiccup can never
+            // block a review or a merge. Uses its own marker, distinct from
+            // the OCR action's summary comment.
+            const MARKER = '<!-- gfc-ocr-digest -->';
+            try {
+              const outcome = process.env.OCR_OUTCOME || 'unknown';
+              const prNumber = Number(
+                process.env.DIGEST_PR_NUMBER
+                  || context.payload.pull_request?.number
+                  || context.payload.issue?.number,
+              );
+              if (!Number.isInteger(prNumber) || prNumber < 1) {
+                core.warning('OCR digest: no PR number; skipping.');
+                return;
+              }
+              if (outcome !== 'success') {
+                core.warning(`OCR digest: review outcome was ${outcome}; skipping.`);
+                return;
+              }
+              const fs = require('fs');
+              let result;
+              try {
+                result = JSON.parse(fs.readFileSync('/tmp/ocr-result.json', 'utf8'));
+              } catch (error) {
+                core.warning(`OCR digest: unreadable result file (${error.message}); skipping.`);
+                return;
+              }
+              const summary = result.summary || {};
+              const groups = Array.isArray(result.groups) ? result.groups : [];
+              const comments = Array.isArray(result.comments) ? result.comments : [];
+              const files = groups.flatMap((g) => g.files || []);
+              const headSha = (process.env.DIGEST_HEAD_SHA || '').slice(0, 7);
+              const elapsed = summary.elapsed || '?';
+              const tokens = summary.total_tokens ?? '?';
+
+              const sevOf = (c) => String(
+                c.severity || c.priority || c.level || '',
+              ).toLowerCase();
+              const isHot = (c) => /critical|high|^p0$|^p1$|blocker/.test(sevOf(c));
+              const hot = comments.filter(isHot).length;
+
+              const excerpt = (c) => {
+                const text = String(
+                  c.message || c.title || c.body || c.text || '',
+                ).replace(/\s+/g, ' ').trim();
+                return text.length > 300 ? `${text.slice(0, 297)}...` : text;
+              };
+              const locOf = (c) => {
+                const path = c.path || c.file || c.filename || 'unknown file';
+                return c.line ? `${path}:${c.line}` : path;
+              };
+
+              const lines = [
+                `## OCR review digest — ${headSha ? `\`${headSha}\`` : 'this revision'}`,
+                '',
+                comments.length === 0
+                  ? `✅ Clean: ${summary.files_reviewed ?? files.length} file(s) reviewed, no findings.`
+                  : `⚠️ ${comments.length} finding(s)${hot ? `, ${hot} critical/high` : ''} — resolve every inline thread to merge.`,
+                '',
+                `Scope: ${files.length ? files.slice(0, 20).map((f) => `\`${f}\``).join(', ') : 'n/a'}${files.length > 20 ? ` (+${files.length - 20} more)` : ''}`,
+              ];
+              for (const c of comments.slice(0, 20)) {
+                const sev = sevOf(c) || 'n/a';
+                lines.push(`- **${sev}** ${locOf(c)} — ${excerpt(c) || '(see inline thread)'}`);
+              }
+              if (comments.length > 20) lines.push(`- …and ${comments.length - 20} more (see inline threads)`);
+              lines.push(
+                '',
+                `Cost: ${tokens} tokens in ${elapsed}. Full log: ${process.env.DIGEST_RUN_URL}`,
+              );
+
+              const body = `${MARKER}\n${lines.join('\n')}`;
+              const { data: existing } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                per_page: 100,
+              });
+              const match = existing.find((item) =>
+                item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
+              );
+              if (match) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: match.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body,
+                });
+              }
+              core.info(`OCR digest posted (${comments.length} finding(s), ${files.length} file(s)).`);
+            } catch (error) {
+              core.warning(`OCR digest skipped: ${error.message}`);
+            }
+
       - name: Enforce zero open OCR threads (merge gate)
         id: ocr-gate
         if: always()
@@ -154,28 +267,48 @@ jobs:
             }
             let cursor = null;
             let openBotThreads = 0;
-            for (;;) {
-              const data = await github.graphql(
-                `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
-                  repository(owner: $owner, name: $repo) {
-                    pullRequest(number: $number) {
-                      reviewThreads(first: 100, after: $after) {
-                        nodes {
-                          isResolved
-                          comments(first: 20) { nodes { author { login } } }
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            // GitHub's search/GraphQL tier flakes (timeouts, 502s). Retry a
+            // bounded number of times, then fail closed — never fail open.
+            const queryThreads = async (after) => {
+              const delaysMs = [5000, 15000, 30000];
+              let lastError = null;
+              for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+                try {
+                  return await github.graphql(
+                    `query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+                      repository(owner: $owner, name: $repo) {
+                        pullRequest(number: $number) {
+                          reviewThreads(first: 100, after: $after) {
+                            nodes {
+                              isResolved
+                              comments(first: 5) { nodes { author { login } } }
+                            }
+                            pageInfo { hasNextPage endCursor }
+                          }
                         }
-                        pageInfo { hasNextPage endCursor }
                       }
-                    }
-                  }
-                }`,
-                {
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  number: prNumber,
-                  after: cursor,
-                },
-              );
+                    }`,
+                    {
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      number: prNumber,
+                      after,
+                    },
+                  );
+                } catch (error) {
+                  lastError = error;
+                  if (attempt === delaysMs.length) break;
+                  core.warning(`OCR gate thread query attempt ${attempt + 1} failed (${error.message}); retrying.`);
+                  await sleep(delaysMs[attempt]);
+                }
+              }
+              core.setFailed(`OCR gate could not read review threads after ${delaysMs.length + 1} attempts (${lastError && lastError.message}); failing closed.`);
+              return null;
+            };
+            for (;;) {
+              const data = await queryThreads(cursor);
+              if (!data) return;
               const connection = data?.repository?.pullRequest?.reviewThreads;
               if (!connection) {
                 core.setFailed('OCR gate could not read review threads; failing closed.');
