@@ -120,7 +120,7 @@ jobs:
 
       - name: Post OCR digest summary
         id: ocr-digest
-        if: always()
+        if: always() && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
@@ -152,7 +152,7 @@ jobs:
               }
               return null;
             };
-            const esc = (s) => String(s).replace(/[`*_<>\[\]]/g, (m) => `\\${m}`);
+            const esc = (s) => String(s).replace(/[\x60_*<>\[\]]/g, function (m) { return '\\' + m; }).replace(/@/g, '@\u200b');
             try {
               const outcome = process.env.OCR_OUTCOME || 'unknown';
               const prNumber = Number(
@@ -206,7 +206,7 @@ jobs:
               const sevOf = (c) => String(
                 c.severity || c.priority || c.level || '',
               ).toLowerCase();
-              const isHot = (c) => /critical|high|^p0$|^p1$|blocker/.test(sevOf(c));
+              const isHot = (c) => /\bcritical\b|\bhigh\b|^p0$|^p1$|\bblocker\b/.test(sevOf(c));
               const hot = comments.filter(isHot).length;
 
               const excerpt = (c) => {
@@ -227,7 +227,7 @@ jobs:
                   ? `✅ Clean: ${summary.files_reviewed ?? files.length} file(s) reviewed, no findings.`
                   : `⚠️ ${comments.length} finding(s)${hot ? `, ${hot} critical/high` : ''} — resolve every inline thread to merge.`,
                 '',
-                `Scope: ${files.length ? files.slice(0, 20).map((f) => `\`${f}\``).join(', ') : 'n/a'}${files.length > 20 ? ` (+${files.length - 20} more)` : ''}`,
+                `Scope: ${files.length ? files.slice(0, 20).map((f) => `\`${esc(f)}\``).join(', ') : 'n/a'}${files.length > 20 ? ` (+${files.length - 20} more)` : ''}`,
               ];
               for (const c of [...comments].sort((a, b) => Number(isHot(b)) - Number(isHot(a))).slice(0, 20)) {
                 const sev = sevOf(c) || 'n/a';
@@ -236,7 +236,7 @@ jobs:
               if (comments.length > 20) lines.push(`- …and ${comments.length - 20} more (see inline threads)`);
               lines.push(
                 '',
-                `Cost: ${tokens} tokens in ${elapsed}. Full log: ${process.env.DIGEST_RUN_URL}`,
+                `Cost: ${esc(tokens)} tokens in ${esc(elapsed)}. Full log: ${process.env.DIGEST_RUN_URL}`,
               );
 
               const body = `${MARKER}\n${lines.join('\n')}`;
@@ -263,7 +263,7 @@ jobs:
 
       - name: Enforce zero open OCR threads (merge gate)
         id: ocr-gate
-        if: always()
+        if: always() && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
@@ -329,7 +329,9 @@ jobs:
                 } catch (error) {
                   lastError = error;
                   const status = error?.status ?? error?.response?.status;
-                  const retryable = status == null || status === 429 || status >= 500;
+                  const msg = String(error?.message || '');
+                  const transient = /timeout|timed out|econn|socket hang|eai_again|502|503|504|temporarily/i.test(msg);
+                  const retryable = status === 429 || (status ?? 0) >= 500 || (status == null && transient);
                   if (!retryable || attempt === delaysMs.length) break;
                   core.warning(`OCR gate thread query attempt ${attempt + 1} failed (${error.message}); retrying.`);
                   await sleep(delaysMs[attempt]);
