@@ -134,6 +134,24 @@ jobs:
             // block a review or a merge. Uses its own marker, distinct from
             // the OCR action's summary comment.
             const MARKER = '<!-- gfc-ocr-digest -->';
+            const findDigestComment = async (prNumber) => {
+              // Paginated: on busy PRs the marker can sit past page one.
+              for (let page = 1; page <= 10; page++) {
+                const { data: existing } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  per_page: 100,
+                  page,
+                });
+                const match = existing.find((item) =>
+                  item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
+                );
+                if (match || existing.length < 100) return match || null;
+              }
+              return null;
+            };
+            const esc = (s) => String(s).replace(/[`*_<>\[\]]/g, (m) => `\\${m}`);
             try {
               const outcome = process.env.OCR_OUTCOME || 'unknown';
               const prNumber = Number(
@@ -146,7 +164,20 @@ jobs:
                 return;
               }
               if (outcome !== 'success') {
-                core.warning(`OCR digest: review outcome was ${outcome}; skipping.`);
+                // Don't leave a previous run's digest masquerading as current:
+                // mark the existing comment stale instead of posting anew.
+                const stale = await findDigestComment(prNumber);
+                if (stale) {
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: stale.id,
+                    body: `${MARKER}\n## OCR review digest — stale\n\n⚠️ Latest run did not complete (outcome=${outcome}); findings below are from an earlier revision.\n\nFull log: ${process.env.DIGEST_RUN_URL}`,
+                  });
+                  core.info('OCR digest marked stale.');
+                } else {
+                  core.warning(`OCR digest: review outcome was ${outcome}; skipping.`);
+                }
                 return;
               }
               const fs = require('fs');
@@ -191,9 +222,9 @@ jobs:
                 '',
                 `Scope: ${files.length ? files.slice(0, 20).map((f) => `\`${f}\``).join(', ') : 'n/a'}${files.length > 20 ? ` (+${files.length - 20} more)` : ''}`,
               ];
-              for (const c of comments.slice(0, 20)) {
+              for (const c of [...comments].sort((a, b) => Number(isHot(b)) - Number(isHot(a))).slice(0, 20)) {
                 const sev = sevOf(c) || 'n/a';
-                lines.push(`- **${sev}** ${locOf(c)} — ${excerpt(c) || '(see inline thread)'}`);
+                lines.push(`- **${esc(sev)}** ${esc(locOf(c))} — ${esc(excerpt(c)) || '(see inline thread)'}`);
               }
               if (comments.length > 20) lines.push(`- …and ${comments.length - 20} more (see inline threads)`);
               lines.push(
@@ -202,15 +233,7 @@ jobs:
               );
 
               const body = `${MARKER}\n${lines.join('\n')}`;
-              const { data: existing } = await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNumber,
-                per_page: 100,
-              });
-              const match = existing.find((item) =>
-                item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
-              );
+              const match = await findDigestComment(prNumber);
               if (match) {
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
@@ -282,7 +305,7 @@ jobs:
                           reviewThreads(first: 100, after: $after) {
                             nodes {
                               isResolved
-                              comments(first: 5) { nodes { author { login } } }
+                              comments(first: 20) { nodes { author { login } } }
                             }
                             pageInfo { hasNextPage endCursor }
                           }
@@ -298,7 +321,9 @@ jobs:
                   );
                 } catch (error) {
                   lastError = error;
-                  if (attempt === delaysMs.length) break;
+                  const status = error?.status ?? error?.response?.status;
+                  const retryable = status == null || status === 429 || status >= 500;
+                  if (!retryable || attempt === delaysMs.length) break;
                   core.warning(`OCR gate thread query attempt ${attempt + 1} failed (${error.message}); retrying.`);
                   await sleep(delaysMs[attempt]);
                 }
@@ -306,7 +331,8 @@ jobs:
               core.setFailed(`OCR gate could not read review threads after ${delaysMs.length + 1} attempts (${lastError && lastError.message}); failing closed.`);
               return null;
             };
-            for (;;) {
+            const MAX_PAGES = 20;
+            for (let page = 0; page < MAX_PAGES; page++) {
               const data = await queryThreads(cursor);
               if (!data) return;
               const connection = data?.repository?.pullRequest?.reviewThreads;
@@ -326,6 +352,10 @@ jobs:
                 return;
               }
               cursor = connection.pageInfo.endCursor ?? null;
+              if (page === MAX_PAGES - 1) {
+                core.setFailed('OCR gate hit the thread pagination cap; failing closed.');
+                return;
+              }
             }
             if (openBotThreads > 0) {
               core.setFailed(`${openBotThreads} unresolved reviewer thread(s) remain on PR #${prNumber}. Resolve every inline comment before merging.`);
