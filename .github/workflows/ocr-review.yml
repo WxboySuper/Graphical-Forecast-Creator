@@ -1,6 +1,7 @@
-name: Review | OCR trial
+name: Review | OCR
 
-# Side-by-side trial with the existing OpenCode first-look reviewer.
+# Permanent automated reviewer alongside the OpenCode first-look reviewer
+# (which remains the rich-summary voice; OCR is the picky inline blocker).
 # Non-interference design:
 # - Own concurrency group (ocr-<pr>), so neither reviewer cancels the other.
 # - Own sticky summary marker from the OCR action, distinct from
@@ -46,13 +47,13 @@ concurrency:
           && github.event.comment.user.type != 'Bot'
           && startsWith(github.event.comment.body, '/ocr')
           && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
-        && format('gfc-ocr-trial-{0}', github.event.pull_request.number || github.event.issue.number)
-        || format('gfc-ocr-trial-noop-{0}', github.run_id)
+        && format('gfc-ocr-{0}', github.event.pull_request.number || github.event.issue.number)
+        || format('gfc-ocr-noop-{0}', github.run_id)
     }}
   cancel-in-progress: true
 
 jobs:
-  review:
+  ocr-review:
     if: |
       github.event_name == 'pull_request_target'
       || github.event_name == 'workflow_dispatch'
@@ -406,15 +407,15 @@ jobs:
             core.info('OCR gate clean: review completed with no findings and no unresolved reviewer threads.');
             }
 
-      - name: Trial summary
+      - name: Run summary
         if: always()
         run: |
           {
-            echo "OCR trial outcome=${{ steps.ocr.outcome }}.";
+            echo "OCR outcome=${{ steps.ocr.outcome }}.";
             if [ "${{ steps.ocr.outcome }}" = "success" ]; then
-              echo "OCR trial posted. Compare with the first-look comment on the same PR.";
+              echo "OCR review posted.";
             else
-              echo "OCR trial did NOT post (outcome=${{ steps.ocr.outcome }}). No comparison available for this run.";
+              echo "OCR review did NOT post (outcome=${{ steps.ocr.outcome }}).";
             fi
             echo "inline=${{ steps.ocr.outputs.comments_inline }} total=${{ steps.ocr.outputs.comments_total }} failed=${{ steps.ocr.outputs.comments_failed }} summary=${{ steps.ocr.outputs.summary_comment_url }}";
           } >> "$GITHUB_STEP_SUMMARY"
