@@ -127,6 +127,7 @@ jobs:
           DIGEST_PR_NUMBER: ${{ env.PR_NUMBER }}
           DIGEST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DIGEST_HEAD_SHA: ${{ env.HEAD_SHA }}
+          DIGEST_PAYLOAD_SHA: ${{ github.event.pull_request.head.sha }}
         with:
           script: |
             // Advisory-only takeaway comment. Never fails the job: any
@@ -192,7 +193,13 @@ jobs:
               const groups = Array.isArray(result.groups) ? result.groups : [];
               const comments = Array.isArray(result.comments) ? result.comments : [];
               const files = groups.flatMap((g) => g.files || []);
-              const headSha = (process.env.DIGEST_HEAD_SHA || '').slice(0, 7);
+              // HEAD_SHA env only exists for dispatch/comment triggers
+              // (pr-refs step); on pull_request_target use the payload SHA.
+              const headSha = (
+                process.env.DIGEST_HEAD_SHA
+                || process.env.DIGEST_PAYLOAD_SHA
+                || ''
+              ).slice(0, 7);
               const elapsed = summary.elapsed || '?';
               const tokens = summary.total_tokens ?? '?';
 
