@@ -2,8 +2,6 @@ import { useEffect } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
-import type { NwsAlertDetails } from '../nwsAlertDetails';
-import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
@@ -27,48 +25,7 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
-  onClearSelectedAlert: () => void;
-  selectedAlert?: NwsAlertDetails | null;
 }
-
-/** Checks whether the selected alert is still present in the incoming collection. */
-const isSelectedAlertInCollection = (
-  collection: NwsAlertFeatureCollection,
-  selectedAlert: NwsAlertDetails | null | undefined,
-): boolean => {
-  if (!selectedAlert) {
-    return true;
-  }
-
-  if (selectedAlert.detailUrl) {
-    return collection.features.some((feature) => {
-      if (feature.id != null && String(feature.id) === selectedAlert.detailUrl) {
-        return true;
-      }
-      const properties = (feature.properties ?? {}) as Record<string, unknown>;
-      if (
-        properties.id != null &&
-        typeof properties.id === 'string' &&
-        properties.id === selectedAlert.detailUrl
-      ) {
-        return true;
-      }
-      return resolveNwsAlertDetailUrl(properties) === selectedAlert.detailUrl;
-    });
-  }
-
-  return collection.features.some((feature) => {
-    const properties = (feature.properties ?? {}) as Record<string, unknown>;
-    return (
-      (typeof properties.event === 'string' ? properties.event : 'Weather alert') ===
-        selectedAlert.event &&
-      (typeof properties.headline === 'string' ? properties.headline : null) ===
-        selectedAlert.headline &&
-      (typeof properties.areaDesc === 'string' ? properties.areaDesc : null) ===
-        selectedAlert.areaDesc
-    );
-  });
-};
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
 export const useMonitorMapOverlaySync = ({
@@ -80,8 +37,6 @@ export const useMonitorMapOverlaySync = ({
   mesoscaleDiscussions,
   alertsOpacity,
   refs,
-  onClearSelectedAlert,
-  selectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
   useEffect(() => {
     const style = createStateOutlineStyle(darkMode);
@@ -120,15 +75,10 @@ export const useMonitorMapOverlaySync = ({
     refs.mesoscaleDiscussionLayerRef.current?.setVisible(mesoscaleDiscussions.features.length > 0);
   }, [mesoscaleDiscussions, refs.mesoscaleDiscussionLayerRef, refs.mesoscaleDiscussionSourceRef]);
 
-  useEffect(() => {
-    if (!selectedAlert) {
-      return;
-    }
-    if (isSelectedAlertInCollection(alertsCollection, selectedAlert)) {
-      return;
-    }
-    onClearSelectedAlert();
-  }, [alertsCollection, onClearSelectedAlert, selectedAlert]);
+  // The selected alert popup is intentionally never cleared here. Clearing on
+  // alertsCollection change dismissed the popup on every animation frame tick,
+  // category toggle, and refresh. The popup stays until the user dismisses it
+  // (close button or map click), the map unmounts, or a new alert is selected.
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);
