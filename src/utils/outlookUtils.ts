@@ -77,25 +77,36 @@ type CategoricalConversion = {
   rules: readonly CategoricalRule[];
 };
 
-const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
-  const normalizedProbability = probability.replace(/[#]/g, '%');
-  const mappedRisk = rules.find((rule) =>
-    rule.probabilities.includes(normalizedProbability) && rule.cigs.includes(cig)
-  )?.risk;
+const CATEGORICAL_RISK_RANK: Record<CategoricalRiskLevel, number> = {
+  TSTM: 0,
+  MRGL: 1,
+  SLGT: 2,
+  ENH: 3,
+  MDT: 4,
+  HIGH: 5,
+};
 
-  if (mappedRisk) {
+const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
+  const normalizedProbability = probability.replace(/#/g, '');
+  const probabilityRules = rules.filter((rule) => rule.probabilities.includes(normalizedProbability));
+  const findRisk = (targetCig: CIGLevel) => probabilityRules.find((rule) => rule.cigs.includes(targetCig))?.risk;
+  const mappedRisk = findRisk(cig);
+
+  if (mappedRisk !== undefined) {
     return mappedRisk;
   }
 
-  // An unsupported CIG level must not erase an otherwise valid probability.
-  // Fall back to that probability's non-significant categorical risk.
-  if (cig !== 'CIG0') {
-    return rules.find((rule) =>
-      rule.probabilities.includes(normalizedProbability) && rule.cigs.includes('CIG0')
-    )?.risk ?? 'TSTM';
-  }
+  // Use the highest defined risk for this probability so a missing CIG rule
+  // cannot lower the category relative to a more significant mapped CIG.
+  const fallbackRisk = probabilityRules.reduce<CategoricalRiskLevel | undefined>(
+    (highestRisk, rule) =>
+      highestRisk === undefined || CATEGORICAL_RISK_RANK[rule.risk] > CATEGORICAL_RISK_RANK[highestRisk]
+        ? rule.risk
+        : highestRisk,
+    undefined,
+  );
 
-  return 'TSTM';
+  return fallbackRisk ?? 'TSTM';
 };
 
 type CategoricalInput = {

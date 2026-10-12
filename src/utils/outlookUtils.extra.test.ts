@@ -9,7 +9,7 @@ import {
   getCategoricalRiskDisplayName,
   getOutlookColor,
 } from './outlookUtils';
-import type { CIGLevel } from '../types/outlooks';
+import type { CategoricalRiskLevel, CIGLevel } from '../types/outlooks';
 
 describe('outlookUtils extra', () => {
   test('getOutlookConstraints returns correct sets for days', () => {
@@ -35,9 +35,47 @@ describe('outlookUtils extra', () => {
   });
 
   test('unsupported CIG3 combinations preserve the underlying probability risk', () => {
-    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('MRGL');
-    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
-    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('MRGL');
+    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('SLGT');
+    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('ENH');
+    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('ENH');
+    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('MDT');
+  });
+
+  test('significant probability markers do not break categorical conversion', () => {
+    expect(tornadoToCategorical({ probability: '30%#', cig: 'CIG3' })).toBe('HIGH');
+    expect(tornadoToCategorical({ probability: '#15%', cig: 'CIG1' })).toBe('ENH');
+  });
+
+  test('categorical risk does not decrease as CIG significance increases', () => {
+    const riskRank: Record<CategoricalRiskLevel, number> = {
+      TSTM: 0,
+      MRGL: 1,
+      SLGT: 2,
+      ENH: 3,
+      MDT: 4,
+      HIGH: 5,
+    };
+    const conversions: Array<{
+      convert: (input: { probability: string; cig: CIGLevel }) => CategoricalRiskLevel;
+      probabilities: readonly string[];
+    }> = [
+      { convert: tornadoToCategorical, probabilities: ['2%', '5%', '10%', '15%', '30%', '45%', '60%'] },
+      { convert: windToCategorical, probabilities: ['5%', '15%', '30%', '45%', '60%', '75%', '90%'] },
+      { convert: hailToCategorical, probabilities: ['5%', '15%', '30%', '45%', '60%'] },
+      { convert: totalSevereToCategorical, probabilities: ['5%', '15%', '30%', '45%', '60%'] },
+    ];
+
+    for (const { convert, probabilities } of conversions) {
+      for (const probability of probabilities) {
+        let previousRisk = riskRank[convert({ probability, cig: 'CIG0' })];
+        for (const cig of ['CIG1', 'CIG2', 'CIG3'] as const) {
+          const risk = riskRank[convert({ probability, cig })];
+          expect(risk).toBeGreaterThanOrEqual(previousRisk);
+          previousRisk = risk;
+        }
+      }
+    }
   });
 
   test('windToCategorical maps probabilities properly', () => {
