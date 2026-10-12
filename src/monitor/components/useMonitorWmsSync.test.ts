@@ -69,9 +69,23 @@ describe('Monitor WMS sync', () => {
   });
 
   it.each([
-    ['satellite', useMonitorSatelliteWmsSync, satelliteLayer, 0.68, 'satelliteLayerRef', 'satelliteLayerKeyRef'],
-    ['radar', useMonitorRadarWmsSync, radarLayer, 0.72, 'radarLayerRef', 'radarLayerKeyRef'],
-  ] as const)('re-applies the %s WMS layer when its config changes', (_name, useSync, layer, opacity, layerRef, keyRef) => {
+    {
+      name: 'satellite',
+      useSync: useMonitorSatelliteWmsSync,
+      layer: satelliteLayer,
+      opacity: 0.68,
+      layerRef: 'satelliteLayerRef',
+      keyRef: 'satelliteLayerKeyRef',
+    },
+    {
+      name: 'radar',
+      useSync: useMonitorRadarWmsSync,
+      layer: radarLayer,
+      opacity: 0.72,
+      layerRef: 'radarLayerRef',
+      keyRef: 'radarLayerKeyRef',
+    },
+  ])('re-applies the $name WMS layer when its config changes', ({ useSync, layer, opacity, layerRef, keyRef }) => {
     const refs = {
       [layerRef]: { current: tileLayer },
       [keyRef]: { current: null },
