@@ -90,15 +90,15 @@ const assertFindingLine = (line) => {
   if (line < 1) throw new Error('First-look finding line must be a positive integer or null.');
 };
 
-/** Split findings into locatable ones and ones whose path/line drifted off the PR diff.
- * Drifted findings are reported (not thrown) so one bad location cannot kill
- * the whole review; the rating cap and coverage note keep it honest. */
 /** Union of every known changed path; tolerant of stale or partial sources. */
 export const changedPathSet = (context) => new Set([
   ...(Array.isArray(context.changedFilePaths) ? context.changedFilePaths : []),
   ...((Array.isArray(context.files) ? context.files : []).map((file) => file.path)),
 ]);
 
+/** Split findings into locatable ones and ones whose path/line drifted off the PR diff.
+ * Drifted findings are reported (not thrown) so one bad location cannot kill
+ * the whole review; the rating cap and coverage note keep it honest. */
 const partitionFindingLocations = (findings, context) => {
   const paths = changedPathSet(context);
   const lineMap = context.changedLineNumbers ?? {};
@@ -220,7 +220,7 @@ const assertJsonObject = (result) => {
   if (Array.isArray(result)) throw new Error('First-look result must be a JSON object.');
 };
 
-const parseReviewPayload = (result, context) => {
+const parseReviewPayload = (result, context = {}) => {
   const prSummary = boundedList(result.prSummary, 'prSummary', { allowEmpty: false });
   const latestChanges = boundedList(result.latestChanges, 'latestChanges');
   const goodThings = parseGoodThings(result);
@@ -246,7 +246,7 @@ const parseReviewPayload = (result, context) => {
     rating: capRatingForDrops(
       droppedFindings.length ? Math.min(suppliedRating, normalizedRating) : normalizedRating,
       droppedFindings,
-      badThings,
+      [...badThings, ...unresolvedPriorFindings],
     ),
     linkedIssueAssessment: parseLinkedIssueAssessment(result, context),
     reviewCommentAssessments,
@@ -259,6 +259,15 @@ const parseGoodThings = (result) => boundedList(result.goodThings, 'goodThings')
 const parseFindings = (result, context) => {
   const findings = boundedFindings(result.badThings);
   return partitionFindingLocations(findings, context);
+};
+
+/** Re-validate carry-forward findings: stored state is a hand-editable blob. */
+const tryParseRetainedFinding = (finding) => {
+  try {
+    return parseFinding(finding);
+  } catch {
+    return null;
+  }
 };
 
 /** Priorities that force the hard rating cap when a finding with them is omitted. */
@@ -362,7 +371,10 @@ const renderReviewSections = (result, context) => [
 const renderCoverageSection = (result, context) => {
   const truncation = Array.isArray(context.diffTruncationReasons) ? context.diffTruncationReasons : [];
   const dropped = Array.isArray(result?.droppedFindings) ? result.droppedFindings : [];
-  const lines = [...truncation, ...renderDroppedFindingNotes(dropped)];
+  const omitted = Number.isInteger(result?.droppedOmittedCount) && result.droppedOmittedCount > 0
+    ? [`...and ${result.droppedOmittedCount} more omitted finding(s) not shown.`]
+    : [];
+  const lines = [...truncation, ...renderDroppedFindingNotes(dropped), ...omitted];
   return lines.length ? ['', '## Review coverage', ...lines.map((line) => `- ${line}`)] : [];
 };
 
@@ -373,10 +385,12 @@ const escapeCoverageText = (value) => String(value ?? '')
 
 /** One coverage line per omitted finding; titles/paths are already single-line and bounded. */
 const renderDroppedFindingNotes = (droppedFindings) => droppedFindings.map((dropped) => {
-  const location = dropped.line == null
-    ? escapeCoverageText(dropped.path)
-    : `${escapeCoverageText(dropped.path)}:${dropped.line}`;
-  return `Omitted finding [${escapeCoverageText(dropped.priority)}] "${escapeCoverageText(dropped.title)}" (${location}, ${dropped.reason}-drift): reported location was not in the PR diff.`;
+  const location = Number.isInteger(dropped.line)
+    ? escapeCoverageText(dropped.path) + ':' + dropped.line
+    : escapeCoverageText(dropped.path);
+  const reason = dropped.reason === 'line' || dropped.reason === 'path' ? dropped.reason : 'unknown';
+  return 'Omitted finding [' + escapeCoverageText(dropped.priority) + '] "' + escapeCoverageText(dropped.title)
+    + '" (' + location + ', ' + reason + '-drift): reported location was not in the PR diff.';
 });
 
 const renderLinkedIssueSection = (result, context) => context.linkedIssues?.length
@@ -394,12 +408,25 @@ const renderPriorFindingSection = (result, context) => context.priorFindings?.le
   ? renderPriorFindings(result, context.priorFindings)
   : [];
 
+/** Severity order for display: critical drops must survive the display cap. */
+const severityRank = { P0: 0, P1: 1, P2: 2, P3: 3 };
+
 /** Carry prior findings forward only when the reviewer says they remain open or unclear. */
 export const mergeOpenCodeFirstLookResults = (previous, current) => {
   const priorAssessments = Array.isArray(current.priorFindingAssessments) ? current.priorFindingAssessments : [];
   const statusById = new Map(priorAssessments.map((assessment) => [assessment.findingId, assessment.status]));
   const retainedPrevious = (Array.isArray(previous.badThings) ? previous.badThings : [])
-    .filter((finding) => statusById.get(getFirstLookFindingId(finding)) !== 'resolved');
+    .filter((finding) => {
+      let id;
+      try {
+        id = getFirstLookFindingId(finding);
+      } catch {
+        return false;
+      }
+      return statusById.get(id) !== 'resolved';
+    })
+    .map(tryParseRetainedFinding)
+    .filter(Boolean);
   const currentBadThings = Array.isArray(current.badThings) ? current.badThings : [];
   const findings = uniqueBy([...currentBadThings, ...retainedPrevious], findingKey).slice(0, MAX_BULLETS);
   const priorDrops = Array.isArray(previous.droppedFindings) ? previous.droppedFindings : [];
@@ -407,16 +434,20 @@ export const mergeOpenCodeFirstLookResults = (previous, current) => {
   const allDropped = uniqueBy(
     [...priorDrops, ...currentDrops],
     (dropped) => [dropped.priority, dropped.title, dropped.path, dropped.line, dropped.reason].join(':'),
-  );
+  ).sort((a, b) => (severityRank[a.priority] ?? 4) - (severityRank[b.priority] ?? 4));
   // Cap on the full union before slicing: a critical drop past the display
   // cap must still sink the score.
-  const rating = capRatingForDrops(normalizeRating(current.rating, findings), allDropped, findings);
+  const supplied = Number.isInteger(current?.rating) ? current.rating : 10;
+  const rating = capRatingForDrops(Math.min(supplied, normalizeRating(supplied, findings)), allDropped, findings);
   const droppedFindings = allDropped.slice(0, MAX_BULLETS);
+  const prevGood = Array.isArray(previous.goodThings) ? previous.goodThings : [];
+  const currGood = Array.isArray(current.goodThings) ? current.goodThings : [];
   return {
     ...current,
-    goodThings: uniqueStrings([...previous.goodThings, ...current.goodThings]).slice(0, MAX_BULLETS),
+    goodThings: uniqueStrings([...prevGood, ...currGood]).slice(0, MAX_BULLETS),
     badThings: findings,
     droppedFindings,
+    droppedOmittedCount: Math.max(allDropped.length - droppedFindings.length, 0),
     rating,
   };
 };

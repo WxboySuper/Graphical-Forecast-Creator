@@ -157,7 +157,28 @@ test('a critical drop past the display cap still sinks the merged score', () => 
     },
   );
   assert.equal(merged.droppedFindings.length, 6);
+  assert.equal(merged.droppedOmittedCount, 1);
   assert.equal(merged.rating, 5);
+  const rendered = renderOpenCodeFirstLookComment(merged, context);
+  assert.match(rendered, /New critical/);
+  assert.match(rendered, /1 more omitted finding/);
+});
+
+test('merged scores never rise above the supplied rating', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [] },
+    { ...result, badThings: [], droppedFindings: [], rating: 2 },
+  );
+  assert.equal(merged.rating, 2);
+});
+
+test('tampered carry-forward entries are re-validated, not trusted', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [{ priority: 'P9', title: 42, path: null, line: 'x' }] },
+    { ...result, badThings: [], droppedFindings: [], rating: 10 },
+  );
+  assert.deepEqual(merged.badThings, []);
+  assert.equal(merged.rating, 10);
 });
 
 test('coverage notes show priority, line, and drift reason', () => {
