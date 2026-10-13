@@ -1,8 +1,17 @@
-import { tornadoToCategorical, isSignificantThreat, getOutlookColor, getCategoricalRiskDisplayName, getHighestCategoricalRisk } from './outlookUtils';
+import { tornadoToCategorical, windToCategorical, hailToCategorical, isSignificantThreat, getOutlookColor, getCategoricalRiskDisplayName, getHighestCategoricalRisk } from './outlookUtils';
 
 describe('outlookUtils', () => {
   test('tornadoToCategorical simple mapping', () => {
     expect(tornadoToCategorical({ probability: '2%', cig: 'CIG0' })).toBe('MRGL');
+  });
+
+  test('significant-threat marker does not break categorical conversion', () => {
+    expect(tornadoToCategorical({ probability: '5%#', cig: 'CIG0' })).toBe(
+      tornadoToCategorical({ probability: '5%', cig: 'CIG0' }),
+    );
+    expect(tornadoToCategorical({ probability: '5%#', cig: 'CIG0' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '15%#', cig: 'CIG0' })).toBe('SLGT');
+    expect(hailToCategorical({ probability: '15%#', cig: 'CIG0' })).toBe('SLGT');
   });
 
   test('isSignificantThreat detects #', () => {
