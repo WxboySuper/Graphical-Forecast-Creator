@@ -162,6 +162,20 @@ describe('processOutlooksToCategorical', () => {
     expect(result.some((feature) => feature.properties?.probability === 'ENH')).toBe(true);
   });
 
+  test('applies a stored significant flag when deriving categorical risk', () => {
+    const feature = {
+      ...makeFeature('significant-wind'),
+      properties: { outlookType: 'wind', probability: '45%', isSignificant: true },
+    };
+    const result = processDay12OutlooksToCategorical({
+      wind: new Map([['45%', [feature]]]),
+      tornado: new Map(),
+      hail: new Map(),
+    });
+
+    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
+  });
+
   test('ignores day 4-8 and missing day 3 total severe data', () => {
     const outlooks: OutlookData = {
       tornado: new Map([['30%', [makeFeature('t1')]]]),

@@ -226,10 +226,11 @@ const applyProbabilityFeaturesWithHatching = (
   probabilityFeatures: Map<string, PolygonOutlookFeature[]>,
   hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
   cigLevels: CIGLevel[],
-  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature) => void,
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
 ): void => {
   probabilityFeatures.forEach((features, probStr) => {
     features.forEach((poly) => {
+      const isSignificant = poly.properties?.isSignificant === true;
       let remainingPoly: PolygonOutlookFeature | null = poly;
       const pairCollection = createPairFeatureCollection();
 
@@ -247,7 +248,7 @@ const applyProbabilityFeaturesWithHatching = (
           setPairFeatures(pairCollection, remainingPoly, hatchRegion);
           const intersection = turf.intersect(pairCollection);
           if (intersection) {
-            onPiece(probStr, cig, intersection as PolygonOutlookFeature);
+            onPiece(probStr, cig, intersection as PolygonOutlookFeature, isSignificant);
             setPairFeatures(pairCollection, remainingPoly, intersection as PolygonOutlookFeature);
             remainingPoly = turf.difference(pairCollection) as PolygonOutlookFeature | null;
           }
@@ -260,7 +261,7 @@ const applyProbabilityFeaturesWithHatching = (
       });
 
       if (remainingPoly) {
-        onPiece(probStr, 'CIG0', remainingPoly);
+        onPiece(probStr, 'CIG0', remainingPoly, isSignificant);
       }
     });
   });
@@ -300,7 +301,7 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
       probabilityFeatures,
       hatchingRegions,
       cigLevels,
-      (probStr, cig, piece) => addPieceToRiskMap(type, probStr, cig, piece, riskPolygons),
+      (probStr, cig, piece, isSignificant) => addPieceToRiskMap(type, probStr, cig, piece, riskPolygons, isSignificant),
     );
   });
 
@@ -317,11 +318,12 @@ function addPieceToRiskMap(
   cig: CIGLevel,
   poly: PolygonOutlookFeature,
   riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
+  isSignificant: boolean,
 ) {
   let risk: CategoricalRiskLevel = 'TSTM';
-  if (type === 'tornado') risk = tornadoToCategorical({ probability: prob, cig });
-  if (type === 'wind') risk = windToCategorical({ probability: prob, cig });
-  if (type === 'hail') risk = hailToCategorical({ probability: prob, cig });
+  if (type === 'tornado') risk = tornadoToCategorical({ probability: prob, cig, isSignificant });
+  if (type === 'wind') risk = windToCategorical({ probability: prob, cig, isSignificant });
+  if (type === 'hail') risk = hailToCategorical({ probability: prob, cig, isSignificant });
 
   appendRiskPolygon(riskMap, risk, poly);
 }
