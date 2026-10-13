@@ -33,6 +33,21 @@ const makeCollection = (label: string): MonitorMesoscaleDiscussionCollection => 
 });
 
 describe('syncAlertFeatures', () => {
+  test('skips null entries and features without geometry', () => {
+    const source = new VectorSource();
+
+    expect(() =>
+      syncAlertFeatures(
+        source,
+        {
+          type: 'FeatureCollection',
+          features: [null, { geometry: null, properties: {} }],
+        } as unknown as NwsAlertFeatureCollection,
+      ),
+    ).not.toThrow();
+    expect(source.getFeatures()).toHaveLength(0);
+  });
+
   test('preserves a top-level string id into feature properties for identity', () => {
     const source = new VectorSource();
     const url = 'https://api.weather.gov/alerts/top-level';

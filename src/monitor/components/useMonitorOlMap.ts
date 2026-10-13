@@ -12,7 +12,7 @@ import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
 import { useMonitorMapBootstrap } from './useMonitorMapBootstrap';
 import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
 import { useMonitorMapRefs } from './monitorMapRefs';
-import { normalizeAlertDetailUrl } from './useMonitorMapOverlaySync';
+import { normalizeAlertDetailUrl } from '../nwsAlertDetails';
 import {
   clearMonitorAlertPopup,
   renderMonitorAlertPopup,

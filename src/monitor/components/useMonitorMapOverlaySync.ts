@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
-import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
+import { resolveNwsAlertDetailUrl, topLevelAlertUrl } from '../nwsAlertDetails';
 import type { MonitorMapView } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { createStateOutlineStyle } from './monitorMapLayerUtils';
@@ -17,7 +17,7 @@ import type { useMonitorMapRefs } from './monitorMapRefs';
 
 type MonitorMapRefs = ReturnType<typeof useMonitorMapRefs>;
 
-interface UseMonitorMapOverlaySyncArgs {
+export interface UseMonitorMapOverlaySyncArgs {
   mapView: MonitorMapView;
   darkMode: boolean;
   serializedFeatures: SerializedMonitorOutlookFeature[];
@@ -26,6 +26,7 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
+  /** Canonical detail URL ('' for URL-less selections, exempt from expiry), or null for no selection. */
   selectedAlertDetailUrl: string | null;
   onClearSelectedAlert: () => void;
 }
@@ -33,27 +34,9 @@ interface UseMonitorMapOverlaySyncArgs {
 /** Dismisses the selection after this many consecutive collections miss it. */
 const MAX_CONSECUTIVE_ALERT_MISSES = 2;
 
-/** Normalizes a candidate alert detail URL to its canonical compared form. */
-export const normalizeAlertDetailUrl = (value: unknown): string | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed === '' ? null : trimmed;
-};
-
-/** Reads a canonical http(s) URL from a top-level GeoJSON feature id. */
-const topLevelAlertUrl = (id: unknown): string | null => {
-  if (typeof id !== 'string') {
-    return null;
-  }
-  const trimmed = id.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
-};
-
 /** Checks a collection for a canonical alert url with an early exit. */
-const hasAlertId = (collection: NwsAlertFeatureCollection, detailUrl: string): boolean => {
-  const features = Array.isArray(collection.features) ? collection.features : [];
+const hasAlertDetailUrl = (collection: NwsAlertFeatureCollection, detailUrl: string): boolean => {
+  const features = Array.isArray(collection?.features) ? collection.features : [];
   return features.some((feature) => {
     if (!feature) {
       return false;
@@ -89,7 +72,7 @@ const useSelectedAlertExpiry = (
       consecutiveMissesRef.current = 0;
       return;
     }
-    if (!hasAlertId(alertsCollection, selectedAlertDetailUrl)) {
+    if (!hasAlertDetailUrl(alertsCollection, selectedAlertDetailUrl)) {
       consecutiveMissesRef.current += 1;
       if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
         consecutiveMissesRef.current = 0;

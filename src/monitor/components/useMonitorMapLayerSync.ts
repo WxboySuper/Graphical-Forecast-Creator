@@ -1,31 +1,12 @@
-import type { StormReport } from '../../types/stormReports';
-import type { NwsAlertFeatureCollection } from '../nwsAlerts';
-import type { MonitorMapView } from '../types';
-import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import type { WmsLayerConfig } from '../wms';
-import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
-import type { useMonitorMapRefs } from './monitorMapRefs';
-import { useMonitorMapOverlaySync } from './useMonitorMapOverlaySync';
+import { useMonitorMapOverlaySync, type UseMonitorMapOverlaySyncArgs } from './useMonitorMapOverlaySync';
 import { useMonitorMapWmsSync } from './useMonitorMapWmsSync';
 
-type MonitorMapRefs = ReturnType<typeof useMonitorMapRefs>;
-
-interface UseMonitorMapLayerSyncArgs {
-  mapView: MonitorMapView;
-  darkMode: boolean;
+interface UseMonitorMapLayerSyncArgs extends UseMonitorMapOverlaySyncArgs {
   radarLayer: WmsLayerConfig | null;
   radarOpacity: number;
   satelliteLayer: WmsLayerConfig | null;
   satelliteOpacity: number;
-  serializedFeatures: SerializedMonitorOutlookFeature[];
-  stormReports: StormReport[];
-  alertsCollection: NwsAlertFeatureCollection;
-  alertsOpacity: number;
-  mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
-  refs: MonitorMapRefs;
-  /** Canonical detail URL ('' for URL-less selections, exempt from expiry), or null for no selection. */
-  selectedAlertDetailUrl: string | null;
-  onClearSelectedAlert: () => void;
 }
 
 /** Coordinates WMS and vector overlay synchronization for the monitor map. */
