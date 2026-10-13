@@ -23,6 +23,7 @@ interface UseMonitorMapLayerSyncArgs {
   alertsOpacity: number;
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   refs: MonitorMapRefs;
+  /** Canonical detail URL ('' for URL-less selections, never matches), or null for no selection. */
   selectedAlertId: string | null;
   onClearSelectedAlert: () => void;
 }
