@@ -9,10 +9,11 @@ name: Review | OCR
 # - Own manual trigger (/ocr), distinct from /review-opencode.
 # - Blocking by design: the gate step fails this check whenever the review
 #   posts findings or any bot-authored inline thread is left unresolved, and
-#   the Main Ruleset additionally requires review-thread resolution. Picky
-#   by design: effort high, full-range re-review every push, maximum-strict
-#   rules in .opencodereview/rule.json. If the reviewer proves noisy rather
-#   than useful, relax the rules or drop the gate before touching the ruleset.
+#   the Main Ruleset additionally requires review-thread resolution. Focused
+#   by design: effort medium, full re-review every push, rules in
+#   .opencodereview/rule.json only file medium+ bugs in the diff (no nits,
+#   no refactor/feature suggestions, max 5 per PR). If the reviewer proves
+#   noisy rather than useful, relax the rules or drop the gate before touching the ruleset.
 #
 # Model: Muse Spark via the OpenCode Go subscription endpoint, reusing
 # OPENCODE_API_KEY (same key works for Go and Zen; Go is the flat
@@ -108,7 +109,7 @@ jobs:
           # once the session header is present; '{}' simply stays neutral.
           llm_extra_body: '{}'
           language: English
-          effort: high
+          effort: medium
           review_task_timeout: '20'
           sticky_summary: 'true'
           incremental: 'false'
