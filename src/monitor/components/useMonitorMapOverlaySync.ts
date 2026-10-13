@@ -99,6 +99,8 @@ const useSelectedAlertExpiry = (
     } else {
       consecutiveMissesRef.current = 0;
     }
+    // Intentionally omits onClearSelectedAlert: it flows through
+    // clearSelectedAlertRef so callback identity changes never recount misses.
   }, [alertsCollection, selectedAlertDetailUrl]);
 };
 
