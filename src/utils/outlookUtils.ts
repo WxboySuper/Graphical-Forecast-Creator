@@ -443,8 +443,11 @@ export type AvailableProbabilities = {
 /** Converts a plain probability string to the shared categorical input shape. */
 function categoricalInputFromProbability(probability: string): CategoricalInput {
   const normalized = normalizeCategoricalProbability(probability);
-  if (!normalized) return { probability };
-  return { probability: normalized.significant ? `${normalized.probability}#` : normalized.probability };
+  if (!normalized) return { probability, cig: 'CIG0' };
+  return {
+    probability: normalized.significant ? `${normalized.probability}#` : normalized.probability,
+    cig: 'CIG0',
+  };
 }
 
 /** Normalizes a structured input and applies its explicit significance flag. */

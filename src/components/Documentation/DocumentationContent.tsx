@@ -235,7 +235,6 @@ const ConversionTable: React.FC<{
 }> = ({ label, rows, cigs }) => (
   <div className="conversion-table-scroll" role="region" aria-label={label} tabIndex={0}>
     <table className="conversion-table">
-      <caption className="sr-only">{label}</caption>
       <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
       <tbody>{rows.map(({ probability, risks }) => (
         <tr key={probability}><th scope="row">{probability}</th>{cigs.map((cig) => <CatCell key={cig} v={risks[cig] ?? 'TSTM'} />)}</tr>
@@ -255,7 +254,7 @@ const significantFloorSummaries = {
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>
-    <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. Day 3 uses its separate Total Severe table below.</p>
+    <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. The order is TSTM, MRGL, SLGT, ENH, MDT, then HIGH. Day 3 uses its separate Total Severe table below.</p>
     <p>
       Each table shows the plain-probability result for every supported probability and CIG combination.
       If a combination has no direct mapping, the highest category from a less significant CIG applies.
