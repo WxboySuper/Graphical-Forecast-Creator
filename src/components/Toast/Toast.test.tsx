@@ -56,6 +56,17 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('does not restart the timer when internal spacing changes', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="A  B" onClose={onClose} />);
+
+    advanceTimersByTime(2500);
+    rerender(<Toast message="A B" onClose={onClose} />);
+    advanceTimersByTime(500);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('ignores type-only changes and restarts for new copy after a close callback', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" type="info" onClose={onClose} />);
@@ -118,6 +129,22 @@ describe('Toast', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     advanceTimersByTime(7500);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    [299, 29900],
+    [300, 30000],
+    [301, 30000],
+    [601, 30000],
+  ])('caps a %i-character reading window at %i ms', (characters, duration) => {
+    const onClose = jest.fn();
+    render(<Toast message={'x'.repeat(characters)} onClose={onClose} />);
+
+    advanceTimersByTime(duration - 1);
+    expect(onClose).not.toHaveBeenCalled();
+    advanceTimersByTime(1);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -212,9 +239,13 @@ describe('ToastManager', () => {
 
   test('dismisses empty notifications without arming a toast timer', () => {
     const onDismiss = jest.fn();
-    render(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={onDismiss} />);
+    const updatedOnDismiss = jest.fn();
+    const { rerender } = render(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={onDismiss} />);
 
     expect(onDismiss).toHaveBeenCalledWith('empty');
     expect(screen.queryByText('  ')).not.toBeInTheDocument();
+
+    rerender(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={updatedOnDismiss} />);
+    expect(updatedOnDismiss).not.toHaveBeenCalled();
   });
 });

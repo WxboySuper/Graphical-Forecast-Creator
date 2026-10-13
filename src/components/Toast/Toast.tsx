@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
@@ -10,6 +10,7 @@ const MAX_READING_CHARACTERS = MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER;
 const getToastDuration = (trimmedMessage: string): number => {
   if (!trimmedMessage) return 0;
 
+  // Code points approximate reading length; the minimum and maximum bound the estimate.
   // No code point uses more than two UTF-16 code units, so this detects the cap
   // without allocating an array for very long messages.
   const characterCount = trimmedMessage.length >= MAX_READING_CHARACTERS * 2
@@ -21,14 +22,15 @@ const getToastDuration = (trimmedMessage: string): number => {
   );
 };
 
+/** Calculates how much time remains before the absolute lifetime cap. */
 const getRemainingLifetime = (
-  mountedAtRef: MutableRefObject<number | null>,
+  mountedAt: number,
+  now: number,
 ): number => {
-  const now = performance.now();
-  mountedAtRef.current ??= now;
-  return Math.max(0, MAX_TOAST_LIFETIME_MS - (now - mountedAtRef.current));
+  return Math.max(0, MAX_TOAST_LIFETIME_MS - (now - mountedAt));
 };
 
+/** Closes a toast at most once, even when its timer is replaced after the cap. */
 const closeToastOnce = (
   closedRef: MutableRefObject<boolean>,
   onCloseRef: MutableRefObject<() => void>,
@@ -49,6 +51,10 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
   const normalizedMessage = message?.trim() ?? '';
+  const timingMessage = useMemo(
+    () => normalizedMessage.replace(/\s+/g, ' '),
+    [normalizedMessage],
+  );
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -56,19 +62,22 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    if (!normalizedMessage) return;
-    const remainingLifetime = getRemainingLifetime(mountedAtRef);
+    if (!timingMessage) return;
+    const now = performance.now();
+    mountedAtRef.current ??= now;
+    const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
     if (remainingLifetime > 0) closedRef.current = false;
-    const timingMessage = normalizedMessage.replace(/\s+/g, ' ');
     const readingWindow = getToastDuration(timingMessage);
     // The lifetime cap intentionally wins over a full last reading window.
     const duration = Math.min(readingWindow, remainingLifetime);
-    const timer = setTimeout(() => closeToastOnce(closedRef, onCloseRef), duration);
+    const timer = setTimeout(() => {
+      closeToastOnce(closedRef, onCloseRef);
+    }, duration);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [normalizedMessage]);
+  }, [timingMessage]);
 
   return normalizedMessage ? (
     <div className={`toast toast-${type}`}>
@@ -84,14 +93,23 @@ export interface ToastManagerProps {
 
 // Small wrapper to avoid inline arrow functions in parent JSX
 const ToastItem: React.FC<{ toast: { id: string; message: string; type?: 'info' | 'success' | 'warning' | 'error' }; onDismiss: (id: string) => void }> = ({ toast, onDismiss }) => {
-  const emptyMessage = !toast.message.trim();
+  const emptyMessage = !(toast.message?.trim() ?? '');
+  const emptyDismissedRef = useRef(false);
   const handleClose = useCallback(() => {
     onDismiss(toast.id);
   }, [onDismiss, toast.id]);
 
   useEffect(() => {
-    if (emptyMessage) onDismiss(toast.id);
+    if (!emptyMessage) {
+      emptyDismissedRef.current = false;
+      return;
+    }
+    if (emptyDismissedRef.current) return;
+    emptyDismissedRef.current = true;
+    onDismiss(toast.id);
   }, [emptyMessage, onDismiss, toast.id]);
+
+  if (emptyMessage) return null;
 
   return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 };
