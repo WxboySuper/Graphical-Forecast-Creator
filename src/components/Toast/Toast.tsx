@@ -5,6 +5,8 @@ const MIN_TOAST_DURATION_MS = 3000;
 const MAX_TOAST_LIFETIME_MS = 30000;
 const MS_PER_CHARACTER = 100;
 const MAX_READING_CHARACTERS = MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER;
+const getCurrentTime = (): number =>
+  typeof performance === 'undefined' ? Date.now() : performance.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (trimmedMessage: string): number => {
@@ -39,7 +41,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    const now = performance.now();
+    const now = getCurrentTime();
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
     const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
