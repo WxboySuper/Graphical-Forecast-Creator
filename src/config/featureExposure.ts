@@ -1,6 +1,6 @@
 import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
-export type FeatureExposureMatrix = Record<BuildTarget, boolean>;
+export type FeatureExposureMatrix = Readonly<Record<BuildTarget, boolean>>;
 
 type FeatureExposureBase = {
   exposure: FeatureExposureMatrix;
@@ -28,19 +28,31 @@ export type FeatureExposureDefinition =
   | TemporaryFeatureExposureDefinition
   | PermanentFeatureExposureDefinition;
 
-const ALL_TARGETS_OFF: FeatureExposureMatrix = {
+const ALL_TARGETS_OFF = {
   local: false,
   beta: false,
   staging: false,
   production: false,
-};
+} as const satisfies FeatureExposureMatrix;
 
-const ALL_TARGETS_ON: FeatureExposureMatrix = {
+const ALL_TARGETS_ON = {
   local: true,
   beta: true,
   staging: true,
   production: true,
-};
+} as const satisfies FeatureExposureMatrix;
+
+// Exposure snapshots, not runtime-enforced caps. Fork a per-feature matrix if a feature diverges.
+const EXPOSURE_THROUGH_STAGING = {
+  ...ALL_TARGETS_ON,
+  production: false,
+} as const satisfies FeatureExposureMatrix;
+
+const EXPOSURE_THROUGH_BETA = {
+  ...ALL_TARGETS_ON,
+  staging: false,
+  production: false,
+} as const satisfies FeatureExposureMatrix;
 
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
@@ -142,12 +154,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 431,
   },
   outlookLandMasking: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: false,
-      production: false,
-    },
+    exposure: { ...EXPOSURE_THROUGH_STAGING },
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
     temporary: true,
@@ -195,12 +202,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 433,
   },
   paintBucketTool: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: false,
-      production: false,
-    },
+    exposure: { ...EXPOSURE_THROUGH_BETA },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -210,7 +212,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 623,
   },
   kmzExport: {
-    exposure: { local: true, beta: true, staging: false, production: false },
+    exposure: { ...EXPOSURE_THROUGH_STAGING },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -219,12 +221,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 621,
   },
   populationEstimate: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: false,
-      production: false,
-    },
+    exposure: { ...EXPOSURE_THROUGH_BETA },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,

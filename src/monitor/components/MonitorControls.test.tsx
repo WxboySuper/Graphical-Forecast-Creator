@@ -43,7 +43,7 @@ const baseProps = {
   onStormReportsFilterHailChange: jest.fn(),
   onStormReportsMatchOutlookTypeChange: jest.fn(),
   alertsMeta: {
-    alertCollection: { type: 'FeatureCollection', features: [] },
+    alertCollection: { type: 'FeatureCollection' as const, features: [] },
     frameCount: 0,
     frameIndex: 0,
     loading: false,
@@ -77,6 +77,17 @@ const baseProps = {
 describe('MonitorControls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('keeps the storm report status region mounted while the layer is disabled', () => {
+    render(
+      <MonitorControls
+        {...baseProps}
+        settings={{ ...DEFAULT_MONITOR_SETTINGS, stormReportsEnabled: false }}
+      />
+    );
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   test('renders controls and dispatches user changes', () => {
