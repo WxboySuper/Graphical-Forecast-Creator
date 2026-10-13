@@ -179,12 +179,12 @@ describe('processOutlooksToCategorical', () => {
   });
 
   test.each([
-    ['a stored significant flag', '45%', true, false, 'MDT'],
-    ['a marker with stale false metadata', '45%#', false, false, 'MDT'],
-    ['a false flag without a marker', '45%', false, false, 'ENH'],
-    ['a significant CIG overlap', '15%', true, true, 'ENH'],
-  ])('maps %s to the expected category', (_label, probability, isSignificant, addCig2, expected) => {
-    const result = deriveWindCategory(String(probability), Boolean(isSignificant), Boolean(addCig2));
+    { label: 'a stored significant flag', probability: '45%', isSignificant: true, addCig2: false, expected: 'MDT' },
+    { label: 'a marker with stale false metadata', probability: '45%#', isSignificant: false, addCig2: false, expected: 'MDT' },
+    { label: 'a false flag without a marker', probability: '45%', isSignificant: false, addCig2: false, expected: 'ENH' },
+    { label: 'a significant CIG overlap', probability: '15%', isSignificant: true, addCig2: true, expected: 'ENH' },
+  ])('maps $label to the expected category', ({ probability, isSignificant, addCig2, expected }) => {
+    const result = deriveWindCategory(probability, isSignificant, addCig2);
     expect(result.some((item) => item.properties?.probability === expected)).toBe(true);
   });
 
