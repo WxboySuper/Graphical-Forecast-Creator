@@ -9,6 +9,39 @@ afterEach(() => {
 });
 
 describe('stormReportParser integration tests', () => {
+  test('rejects impossible YYMMDD archive dates before fetching', async () => {
+    const fetchMock = jest.fn();
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const { fetchStormReports } = await import('./stormReportParser');
+
+    await expect(fetchStormReports('991332')).rejects.toThrow('Invalid SPC report date');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('does not treat a report comment containing a section label as a new section', async () => {
+    jest.doMock('uuid', () => ({ v4: () => 'section-anchor-test' }));
+
+    const csv = [
+      'Raw Tornado LSR',
+      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
+      '1234,EF1,"Tree report mentions Hail LSR in comments",33.5,-97.2,Ada,Denton,TX,,',
+      '',
+      'Raw Wind/Gust LSR',
+      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
+      '1240,UNK,"Wind report mentions Tornado LSR",34.0,-96.0,Norman,Cleveland,OK,65,',
+    ].join('\n');
+
+    globalThis.fetch = jest.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(csv) })) as unknown as typeof fetch;
+    const { fetchStormReports } = await import('./stormReportParser');
+
+    const reports = await fetchStormReports('260130');
+
+    expect(reports.map(({ type }) => type)).toEqual(['tornado', 'wind']);
+    expect(reports[0]?.comments).toContain('Hail LSR');
+    expect(reports[1]?.magnitude).toBe('65 mph');
+  });
+
   test('parses tornado EF from Remarks when EF_Scale is UNK and handles quoted location', async () => {
     jest.doMock('uuid', () => ({ v4: () => 'test-uuid-1' }));
 

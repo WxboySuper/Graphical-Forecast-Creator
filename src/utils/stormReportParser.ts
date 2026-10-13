@@ -10,27 +10,48 @@ export const SPC_TODAY_STORM_REPORTS_URL = `${SPC_STORM_REPORTS_BASE_URL}/today_
 
 export const SPC_YESTERDAY_STORM_REPORTS_URL = `${SPC_STORM_REPORTS_BASE_URL}/yesterday_filtered.csv`;
 
-const archiveUrlForDate = (date: string, format: 'filtered' | 'raw' = 'filtered'): string => {
-  if (!/^\d{6}$/.test(date)) {
+/** Builds an SPC archive URL for a valid YYMMDD date and report format. */
+function archiveUrlForDate(date: string, format: 'filtered' | 'raw' = 'filtered'): string {
+  if (!isValidArchiveDate(date)) {
     throw new Error(`Invalid SPC report date: ${JSON.stringify(date)}.`);
   }
-  return `${SPC_STORM_REPORTS_BASE_URL}/${encodeURIComponent(date)}_rpts_${format}.csv`;
-};
+  return `${SPC_STORM_REPORTS_BASE_URL}/${date}_rpts_${format}.csv`;
+}
+
+/** Validates the six digit date used by SPC's YYMMDD archive filenames. */
+function isValidArchiveDate(date: string): boolean {
+  if (!/^\d{6}$/.test(date)) {
+    return false;
+  }
+  const year = 2000 + Number(date.slice(0, 2));
+  const month = Number(date.slice(2, 4)) - 1;
+  const day = Number(date.slice(4, 6));
+  return isValidCalendarDate(new Date(year, month, day), year, month, day);
+}
 
 const isValidCalendarDate = (date: Date, year: number, month: number, day: number): boolean =>
   [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
 
-/**
- * Parses archived *_rpts_filtered.csv storm report text.
- */
-export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
-  // SPC's filtered archive uses the same three Time-prefixed sections as its
-  // rolling filtered feeds, with narrower headers than the raw archive.
-  const filteredReports = parseTodayStormReportCsv(csvText);
-  if (filteredReports.length > 0) {
-    return filteredReports;
-  }
+const ARCHIVE_SECTION_HEADERS: readonly { labels: readonly string[]; type: ReportType }[] = [
+  { labels: ['Tornado LSR', 'Raw Tornado LSR'], type: 'tornado' },
+  { labels: ['Wind/Gust LSR', 'Wind LSR', 'Raw Wind/Gust LSR', 'Raw Wind LSR'], type: 'wind' },
+  { labels: ['Hail LSR', 'Raw Hail LSR'], type: 'hail' },
+];
 
+/** Finds a section marker at the beginning of a raw archive line. */
+function archiveSectionForLine(line: string): ReportType | null {
+  return ARCHIVE_SECTION_HEADERS.find(({ labels }) => labels.some((label) => line.startsWith(label)))?.type ?? null;
+}
+
+/** Returns true when the archive contains one of SPC's filtered report sections. */
+function hasFilteredArchiveHeaders(csvText: string): boolean {
+  return csvText.split('\n').some((line) =>
+    ['Time,F_Scale,', 'Time,Speed,', 'Time,Size,'].some((header) => line.trim().startsWith(header))
+  );
+}
+
+/** Parses the sectioned raw archive format, ignoring malformed rows. */
+function parseRawArchiveStormReportCsv(csvText: string): StormReport[] {
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
 
@@ -44,16 +65,9 @@ export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
       continue;
     }
 
-    if (line.includes('Tornado LSR')) {
-      currentSection = 'tornado';
-      continue;
-    }
-    if (line.includes('Wind/Gust LSR') || line.includes('Wind LSR')) {
-      currentSection = 'wind';
-      continue;
-    }
-    if (line.includes('Hail LSR')) {
-      currentSection = 'hail';
+    const section = archiveSectionForLine(line);
+    if (section) {
+      currentSection = section;
       continue;
     }
 
@@ -66,18 +80,27 @@ export const parseArchiveStormReportCsv = (csvText: string): StormReport[] => {
       continue;
     }
 
-    try {
-      const report = parseArchiveCsvRow(line, currentSection, headers);
-      if (report) {
-        reports.push(report);
-      }
-    } catch {
-      continue;
-    }
+    const report = parseArchiveCsvRowSafely(line, currentSection, headers);
+    if (report) reports.push(report);
   }
 
   return reports;
-};
+}
+
+/** Parses archived filtered or raw SPC storm report text. */
+export const parseArchiveStormReportCsv = (csvText: string): StormReport[] =>
+  hasFilteredArchiveHeaders(csvText)
+    ? parseTodayStormReportCsv(csvText)
+    : parseRawArchiveStormReportCsv(csvText);
+
+/** Parses one raw archive row without stopping the rest of the report file. */
+function parseArchiveCsvRowSafely(line: string, section: ReportType, headers: string[]): StormReport | null {
+  try {
+    return parseArchiveCsvRow(line, section, headers);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Fetches storm reports from NOAA archives for a given date
@@ -93,7 +116,9 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
   }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch storm reports: ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch storm reports for ${date} (HTTP ${response.status}): ${response.statusText || response.url || 'No response details'}`
+    );
   }
 
   return parseArchiveStormReportCsv(await response.text());
@@ -104,7 +129,9 @@ const fetchRollingStormReports = async (url: string, label: string): Promise<Sto
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${label}: ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch ${label} (HTTP ${response.status}): ${response.statusText || response.url || 'No response details'}`
+    );
   }
 
   return parseTodayStormReportCsv(await response.text());

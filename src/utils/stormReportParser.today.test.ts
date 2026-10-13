@@ -99,4 +99,15 @@ describe('fetchYesterdayStormReports', () => {
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 34.77, longitude: -96.67 });
   });
+
+  test('includes the HTTP code when a rolling feed fails without status text', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: '',
+      url: '',
+    }) as unknown as typeof global.fetch;
+
+    await expect(fetchTodayStormReports()).rejects.toThrow('HTTP 503');
+  });
 });

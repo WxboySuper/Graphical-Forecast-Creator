@@ -42,12 +42,19 @@ const ALL_TARGETS_ON: FeatureExposureMatrix = {
   production: true,
 };
 
-const THROUGH_STAGING_ON: FeatureExposureMatrix = {
+const STAGING_MAX_ON: Readonly<FeatureExposureMatrix> = Object.freeze({
   local: true,
   beta: true,
   staging: true,
   production: false,
-};
+});
+
+const BETA_MAX_ON: Readonly<FeatureExposureMatrix> = Object.freeze({
+  local: true,
+  beta: true,
+  staging: false,
+  production: false,
+});
 
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
@@ -149,10 +156,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 431,
   },
   outlookLandMasking: {
-    exposure: { ...THROUGH_STAGING_ON },
+    exposure: { ...STAGING_MAX_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
-    temporary: false,
+    temporary: true,
+    removalCondition:
+      'Remove after land masking is validated by beta testers and the stable production rollout is approved (#619).',
     serverBacked: false,
     trackingIssue: 619,
   },
@@ -195,12 +204,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 433,
   },
   paintBucketTool: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: false,
-      production: false,
-    },
+    exposure: { ...BETA_MAX_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -210,20 +214,16 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 623,
   },
   kmzExport: {
-    exposure: { ...THROUGH_STAGING_ON },
+    exposure: { ...STAGING_MAX_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
-    temporary: false,
+    temporary: true,
+    removalCondition: 'Promote after KMZ export prototype validation and consumer testing (#621).',
     serverBacked: false,
     trackingIssue: 621,
   },
   populationEstimate: {
-    exposure: {
-      local: true,
-      beta: true,
-      staging: false,
-      production: false,
-    },
+    exposure: { ...BETA_MAX_ON },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,
