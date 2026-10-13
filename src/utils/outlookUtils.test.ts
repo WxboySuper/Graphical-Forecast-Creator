@@ -6,7 +6,7 @@ describe('outlookUtils', () => {
   });
 
   test('isSignificantThreat detects #', () => {
-    expect(isSignificantThreat({ probability: '5%#' })).toBe(true);
+    expect(isSignificantThreat({ probability: '15%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '5%' })).toBe(false);
   });
 
