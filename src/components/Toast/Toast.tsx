@@ -7,7 +7,9 @@ const MS_PER_CHARACTER = 50;
 
 /** Estimates a reading window from the message length, bounded by the toast lifetime. */
 const getToastDuration = (message: string) => {
-  const readingDuration = Array.from(message).length * MS_PER_CHARACTER;
+  let characterCount = 0;
+  for (const _character of message) characterCount += 1;
+  const readingDuration = characterCount * MS_PER_CHARACTER;
   return Math.min(MAX_TOAST_LIFETIME_MS, Math.max(MIN_TOAST_DURATION_MS, readingDuration));
 };
 
@@ -30,7 +32,11 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     const now = performance.now();
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
-    const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
+    const remainingLifetime = MAX_TOAST_LIFETIME_MS - elapsed;
+    if (remainingLifetime <= 0) {
+      onCloseRef.current();
+      return;
+    }
     const duration = Math.min(getToastDuration(message), remainingLifetime);
     const timer = setTimeout(() => {
       onCloseRef.current();
