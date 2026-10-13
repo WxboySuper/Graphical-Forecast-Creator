@@ -1,5 +1,5 @@
 import { render, screen, act } from '@testing-library/react';
-import Toast, { ToastManager } from './Toast';
+import Toast, { normalizeToastType, ToastManager } from './Toast';
 
 const advanceTimersByTime = (milliseconds: number): void => {
   act(() => {
@@ -23,7 +23,11 @@ describe('Toast', () => {
     expect(screen.getByText('Test Message')).toBeInTheDocument();
   });
 
-  test('preserves message whitespace in the rendered copy', () => {
+  test('uses info for an invalid runtime toast type', () => {
+    expect(normalizeToastType('eror')).toBe('info');
+  });
+
+  test('retains source whitespace in the message text', () => {
     const message = '  - Gusts 40kt\n  - Hail possible  ';
     render(<Toast message={message} onClose={() => undefined} />);
     const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
@@ -40,7 +44,7 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  test('restarts the auto-dismiss timer when the message updates', () => {
+  test('restarts the timer when the displayed copy changes', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" onClose={onClose} />);
 
@@ -49,38 +53,17 @@ describe('Toast', () => {
     advanceTimersByTime(500);
 
     expect(onClose).not.toHaveBeenCalled();
-
     advanceTimersByTime(2500);
-
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('restarts the timer when outer whitespace changes the displayed copy', () => {
+  test('does not restart the timer for whitespace-only changes', () => {
     const onClose = jest.fn();
-    const { rerender } = render(<Toast message="Notice" onClose={onClose} />);
+    const { rerender } = render(<Toast message="A B" onClose={onClose} />);
 
     advanceTimersByTime(2500);
-    rerender(<Toast message="  Notice  " onClose={onClose} />);
+    rerender(<Toast message=" A  B " onClose={onClose} />);
     advanceTimersByTime(500);
-
-    expect(onClose).not.toHaveBeenCalled();
-
-    advanceTimersByTime(2500);
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  test('restarts the timer when internal spacing changes the displayed copy', () => {
-    const onClose = jest.fn();
-    const { rerender } = render(<Toast message="A  B" onClose={onClose} />);
-
-    advanceTimersByTime(2500);
-    rerender(<Toast message="A B" onClose={onClose} />);
-    advanceTimersByTime(500);
-
-    expect(onClose).not.toHaveBeenCalled();
-
-    advanceTimersByTime(2500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -165,6 +148,20 @@ describe('Toast', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     advanceTimersByTime(7500);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('uses the rendered words in a multiline message to estimate reading time', () => {
+    const onClose = jest.fn();
+    const message = ['- North gusts 40 kt', '- South gusts 45 kt', '- East gusts 50 kt'].join('\n');
+    render(<Toast message={message} onClose={onClose} />);
+
+    advanceTimersByTime(3000);
+    expect(onClose).not.toHaveBeenCalled();
+    advanceTimersByTime(2799);
+    expect(onClose).not.toHaveBeenCalled();
+    advanceTimersByTime(1);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -255,7 +252,7 @@ describe('ToastManager', () => {
     
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'false');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
   });
 
   test('keeps the live region mounted when the queue is empty', () => {
@@ -279,7 +276,6 @@ describe('ToastManager', () => {
   test('dismisses empty notifications without arming a toast timer', () => {
     const onDismiss = jest.fn();
     const updatedOnDismiss = jest.fn();
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { rerender } = render(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={onDismiss} />);
 
     expect(onDismiss).toHaveBeenCalledWith('empty');
@@ -291,10 +287,16 @@ describe('ToastManager', () => {
 
   test('dismisses messages made only of zero-width formatting characters', () => {
     const onDismiss = jest.fn();
-    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    render(<ToastManager toasts={[{ id: 'invisible', message: '\u200B\uFEFF' }]} onDismiss={onDismiss} />);
+    render(<ToastManager toasts={[{ id: 'case-07', message: '\u200B\uFEFF' }]} onDismiss={onDismiss} />);
 
-    expect(onDismiss).toHaveBeenCalledWith('invisible');
+    expect(onDismiss).toHaveBeenCalledWith('case-07');
     expect(screen.queryByText(/\u200B/)).not.toBeInTheDocument();
+  });
+
+  test('dismisses malformed non-string queue messages without crashing', () => {
+    const onDismiss = jest.fn();
+    render(<ToastManager toasts={[{ id: 'case-08', message: null as unknown as string }]} onDismiss={onDismiss} />);
+
+    expect(onDismiss).toHaveBeenCalledWith('case-08');
   });
 });

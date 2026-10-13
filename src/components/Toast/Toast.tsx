@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
@@ -9,9 +9,13 @@ const MAX_TOAST_TOTAL_LIFETIME_MS = MAX_TOAST_LIFETIME_MS + MIN_TOAST_DURATION_M
 const MAX_READING_CHARACTERS = Math.floor(MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER);
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
+/** Uses a safe display type when runtime data falls outside the toast API. */
+export const normalizeToastType = (type: unknown): ToastType =>
+  type === 'success' || type === 'warning' || type === 'error' ? type : 'info';
+
 /** Returns whether a toast message contains no visible text. */
-const isEmptyToastMessage = (message: string): boolean =>
-  message.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().length === 0;
+export const isEmptyToastMessage = (message: unknown): boolean =>
+  typeof message !== 'string' || message.replace(/[\u200B-\u200D\uFEFF]/gu, '').trim().length === 0;
 
 /** Uses the same clock source for the toast lifetime and timer deadlines. */
 const getCurrentTime = (): number => performance.now();
@@ -54,22 +58,22 @@ export interface ToastProps {
   onClose: () => void;
 }
 
-const TOAST_TYPES: readonly ToastType[] = ['info', 'success', 'warning', 'error'];
-
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
   const [isClosed, setIsClosed] = useState(false);
   const displayMessage = typeof message === 'string' ? message : '';
-  const safeType: ToastType = (TOAST_TYPES as readonly (ToastType | undefined)[]).includes(type)
-    ? type as ToastType
-    : 'info';
+  const emptyMessage = isEmptyToastMessage(displayMessage);
+  const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
+  const displayType = normalizeToastType(type);
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    if (isEmptyToastMessage(displayMessage)) {
+    if (emptyMessage) {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
@@ -83,7 +87,6 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     // A changed message starts a new reading window and may close once for that version.
     closedRef.current = false;
     setIsClosed(false);
-    const timingMessage = displayMessage.trim().replace(/\s+/g, ' ');
     const readingWindow = getToastDuration(timingMessage);
     const duration = Math.min(readingWindow, remainingLifetime);
     const timer = setTimeout(() => {
@@ -94,10 +97,10 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [displayMessage]);
+  }, [emptyMessage, timingMessage]);
 
-  return !isEmptyToastMessage(displayMessage) && !isClosed ? (
-    <div className={`toast toast-${safeType}`}>
+  return !emptyMessage && !isClosed ? (
+    <div className={`toast toast-${displayType}`}>
       {displayMessage}
     </div>
   ) : null;
@@ -112,6 +115,7 @@ export interface ToastManagerProps {
 function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: string) => void }): React.ReactElement | null {
   const emptyMessage = isEmptyToastMessage(toast.message);
   const emptyDismissedRef = useRef(false);
+  const handleClose = useCallback(() => onDismiss(toast.id), [onDismiss, toast.id]);
   useEffect(() => {
     if (!emptyMessage) {
       emptyDismissedRef.current = false;
@@ -119,21 +123,18 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: st
     }
     if (emptyDismissedRef.current) return;
     emptyDismissedRef.current = true;
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`Dismissed empty toast message with id ${toast.id}`);
-    }
     onDismiss(toast.id);
   }, [emptyMessage, onDismiss, toast.id]);
 
   if (emptyMessage) return null;
 
-  return <Toast message={toast.message} type={toast.type} onClose={() => onDismiss(toast.id)} />;
+  return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 }
 
 /** Keeps the polite status region mounted and renders the current toast queue. */
 export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.ReactElement {
   return (
-    <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">
+    <div className="toast-container" role="status" aria-live="polite">
       {toasts.map(toast => (
         <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
