@@ -41,13 +41,18 @@ describe('useMonitorMapLayerSync selection forwarding', () => {
     const args = makeArgs();
     renderHook(() => useMonitorMapLayerSync(args));
 
-    expect(jest.mocked(useMonitorMapOverlaySync)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        alertsCollection: emptyCollection,
-        selectedAlertDetailUrl: 'https://api.weather.gov/alerts/abc',
-        onClearSelectedAlert: args.onClearSelectedAlert,
-      }),
-    );
+    expect(jest.mocked(useMonitorMapOverlaySync)).toHaveBeenCalledWith({
+      mapView: args.mapView,
+      darkMode: args.darkMode,
+      serializedFeatures: args.serializedFeatures,
+      stormReports: args.stormReports,
+      alertsCollection: emptyCollection,
+      mesoscaleDiscussions: args.mesoscaleDiscussions,
+      alertsOpacity: args.alertsOpacity,
+      refs: args.refs,
+      selectedAlertDetailUrl: 'https://api.weather.gov/alerts/abc',
+      onClearSelectedAlert: args.onClearSelectedAlert,
+    });
   });
 
   it('forwards null selections without alteration', () => {
