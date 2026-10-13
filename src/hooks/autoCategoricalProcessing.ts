@@ -180,6 +180,7 @@ const normalizePolygonFeature = (feature: PolygonOutlookFeature): PolygonOutlook
     const cleaned = turf.cleanCoords(feature) as PolygonOutlookFeature;
     return cleaned;
   } catch (error) {
+    // Hatching topology errors must not discard prior valid geometry.
     throw new CategoricalDerivationError(
       `Outlook geometry normalization failed: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -229,7 +230,55 @@ const buildHatchingRegions = (
   return hatchingRegions;
 };
 
-/** Splits each probability polygon by hatching layers and emits categorical pieces via callback. */
+/** Intersects one probability polygon with its available hatching regions. */
+const applyHatchingToProbabilityPolygon = (
+  probStr: string,
+  poly: PolygonOutlookFeature,
+  hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
+  cigLevels: CIGLevel[],
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
+): void => {
+  const storedSignificance = poly.properties?.isSignificant;
+  const isSignificant = storedSignificance === true || storedSignificance === 1 || storedSignificance === 'true';
+  let remainingPoly: PolygonOutlookFeature | null = poly;
+  const pairCollection = createPairFeatureCollection();
+
+  for (const cig of cigLevels) {
+    if (!remainingPoly) break;
+    const hatchRegion = hatchingRegions.get(cig);
+    if (!hatchRegion) continue;
+    remainingPoly = intersectAndEmitHatchPiece(
+      probStr, cig, remainingPoly, hatchRegion, pairCollection, isSignificant, onPiece,
+    );
+  }
+
+  if (remainingPoly) onPiece(probStr, 'CIG0', remainingPoly, isSignificant);
+};
+
+function intersectAndEmitHatchPiece(
+  probStr: string,
+  cig: CIGLevel,
+  remainingPoly: PolygonOutlookFeature,
+  hatchRegion: PolygonOutlookFeature,
+  pairCollection: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>,
+  isSignificant: boolean,
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
+): PolygonOutlookFeature | null {
+  try {
+    setPairFeatures(pairCollection, remainingPoly, hatchRegion);
+    const intersection = turf.intersect(pairCollection) as PolygonOutlookFeature | null;
+    if (!intersection) return remainingPoly;
+    onPiece(probStr, cig, intersection, isSignificant);
+    setPairFeatures(pairCollection, remainingPoly, intersection);
+    return turf.difference(pairCollection) as PolygonOutlookFeature | null;
+  } catch (error) {
+    throw new CategoricalDerivationError(
+      `Hatching intersection failed for ${probStr}/${cig}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
+/** Splits probability polygons by hatching layers and emits categorical pieces. */
 const applyProbabilityFeaturesWithHatching = (
   probabilityFeatures: Map<string, PolygonOutlookFeature[]>,
   hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
@@ -237,42 +286,7 @@ const applyProbabilityFeaturesWithHatching = (
   onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
 ): void => {
   probabilityFeatures.forEach((features, probStr) => {
-    features.forEach((poly) => {
-      const storedSignificance = poly.properties?.isSignificant;
-      const isSignificant = storedSignificance === true || storedSignificance === 1 || storedSignificance === 'true';
-      let remainingPoly: PolygonOutlookFeature | null = poly;
-      const pairCollection = createPairFeatureCollection();
-
-      cigLevels.forEach((cig) => {
-        if (!remainingPoly) {
-          return;
-        }
-
-        const hatchRegion = hatchingRegions.get(cig);
-        if (!hatchRegion) {
-          return;
-        }
-
-        try {
-          setPairFeatures(pairCollection, remainingPoly, hatchRegion);
-          const intersection = turf.intersect(pairCollection);
-          if (intersection) {
-            onPiece(probStr, cig, intersection as PolygonOutlookFeature, isSignificant);
-            setPairFeatures(pairCollection, remainingPoly, intersection as PolygonOutlookFeature);
-            remainingPoly = turf.difference(pairCollection) as PolygonOutlookFeature | null;
-          }
-        } catch (error) {
-          // Hatching topology errors must not discard prior valid geometry.
-          throw new CategoricalDerivationError(
-            `Hatching intersection failed for ${probStr}/${cig}: ${error instanceof Error ? error.message : String(error)}`
-          );
-        }
-      });
-
-      if (remainingPoly) {
-        onPiece(probStr, 'CIG0', remainingPoly, isSignificant);
-      }
-    });
+    features.forEach((poly) => applyHatchingToProbabilityPolygon(probStr, poly, hatchingRegions, cigLevels, onPiece));
   });
 };
 

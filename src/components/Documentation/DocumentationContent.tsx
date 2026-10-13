@@ -243,15 +243,13 @@ const ConversionTableBody = React.memo(function ConversionTableBody({ rows }: { 
   ))}</tbody>;
 });
 
-/** Renders a horizontally scrollable, screen-reader labeled conversion matrix. */
-const ConversionTable: React.FC<{
-  label: string;
-  rows: readonly CategoricalConversionRow[];
-  cigs: readonly CIGLevel[];
-}> = ({ label, rows, cigs }) => {
+/** Tracks whether a conversion table needs a keyboard-accessible scroll region. */
+function useHorizontalOverflow(
+  rows: readonly CategoricalConversionRow[],
+  cigs: readonly CIGLevel[],
+): [React.RefObject<HTMLDivElement | null>, boolean] {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = React.useState(false);
-
   React.useLayoutEffect(() => {
     const container = scrollRef.current;
     if (!container) return undefined;
@@ -271,7 +269,16 @@ const ConversionTable: React.FC<{
       window.removeEventListener('resize', updateOverflow);
     };
   }, [cigs, rows]);
+  return [scrollRef, overflows];
+}
 
+/** Renders a horizontally scrollable, screen-reader labeled conversion matrix. */
+const ConversionTable: React.FC<{
+  label: string;
+  rows: readonly CategoricalConversionRow[];
+  cigs: readonly CIGLevel[];
+}> = ({ label, rows, cigs }) => {
+  const [scrollRef, overflows] = useHorizontalOverflow(rows, cigs);
   return (
     <div
       ref={scrollRef}

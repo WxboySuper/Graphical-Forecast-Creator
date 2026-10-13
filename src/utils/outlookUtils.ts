@@ -431,6 +431,20 @@ export const significantCategoricalFloors = {
   totalSevere: {},
 } satisfies SignificantFloorByHazard;
 
+function hasSupportedSignificantProbability(probability: unknown): boolean {
+  const normalized = normalizeCategoricalProbability(probability);
+  return normalized?.significant === true && ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
+}
+
+function isSignificantForOutlook(input: { probability: unknown; outlookType?: unknown }): boolean {
+  const normalized = normalizeCategoricalProbability(input.probability);
+  if (!normalized?.significant) return false;
+  if (input.outlookType === undefined) return ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
+  if (typeof input.outlookType !== 'string') return false;
+  const outlookType = input.outlookType.trim().toLowerCase();
+  return SIGNIFICANT_PROBABILITY_DOMAINS_BY_NORMALIZED_TYPE[outlookType]?.has(normalized.probability) === true;
+}
+
 /**
  * Determines whether an outlook input wrapper contains a valid significant marker.
  * @param input Outlook input object. Missing or non-object values return false.
@@ -439,17 +453,9 @@ export const significantCategoricalFloors = {
 export function isSignificantThreat(
   input: string | { probability: unknown; outlookType?: unknown } | null | undefined,
 ): boolean {
-  if (typeof input === 'string') {
-    const normalized = normalizeCategoricalProbability(input);
-    return normalized?.significant === true && ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
-  }
+  if (typeof input === 'string') return hasSupportedSignificantProbability(input);
   if (!input || typeof input !== 'object') return false;
-  const normalized = normalizeCategoricalProbability(input.probability);
-  if (!normalized?.significant) return false;
-  if (input.outlookType === undefined) return ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
-  if (typeof input.outlookType !== 'string') return false;
-  const outlookType = input.outlookType.trim().toLowerCase();
-  return SIGNIFICANT_PROBABILITY_DOMAINS_BY_NORMALIZED_TYPE[outlookType]?.has(normalized.probability) === true;
+  return isSignificantForOutlook(input);
 }
 
 /** A supported hazard probability, including significant-marker variants. */
@@ -495,10 +501,11 @@ function toCategoricalInput<P extends string>(input: CategoricalOutlookValue<P>)
 
 /** Rejects untrusted non-object values before reading structured input fields. */
 function isDetailedCategoricalInput(input: unknown): input is DetailedCategoricalInput {
-  if (input === null || typeof input !== 'object' || Array.isArray(input)) return false;
+  if (input === null || typeof input !== 'object') return false;
+  if (Array.isArray(input)) return false;
   const prototype = Object.getPrototypeOf(input);
-  return (prototype === Object.prototype || prototype === null)
-    && Object.prototype.hasOwnProperty.call(input, 'probability');
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  return Object.prototype.hasOwnProperty.call(input, 'probability');
 }
 
 /** Keeps a significant probability marker even when stored flag data is stale. */
