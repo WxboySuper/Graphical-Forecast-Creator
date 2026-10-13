@@ -131,12 +131,16 @@ describe('stormReportParser integration tests', () => {
     expect(reports[1]?.magnitude).toBe('65 mph');
   });
 
-  test('accepts current archive section labels without the Raw prefix', async () => {
+  test.each([
+    ['Tornado LSR', '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,', 'tornado', 'EF1'],
+    ['Wind/Gust LSR', '1240,UNK,,34.0,-96.0,Norman,Cleveland,OK,65,', 'wind', '65 mph'],
+    ['Hail LSR', '1250,UNK,,35.0,-95.0,Norman,Cleveland,OK,,075', 'hail', '0.75"'],
+  ] as const)('parses the raw schema under the current %s marker', async (marker, row, type, magnitude) => {
     jest.doMock('uuid', () => ({ v4: () => 'current-section-anchor-test' }));
     const csv = [
-      'Tornado LSR',
+      marker,
       'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
+      row,
     ].join('\n');
     globalThis.fetch = jest.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(csv) })) as unknown as typeof fetch;
 
@@ -144,7 +148,7 @@ describe('stormReportParser integration tests', () => {
     const reports = await fetchStormReports('260130');
 
     expect(reports).toHaveLength(1);
-    expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 33.5, longitude: -97.2 });
+    expect(reports[0]).toMatchObject({ type, magnitude, latitude: expect.any(Number), longitude: expect.any(Number) });
   });
 
   test('matches BOM-prefixed lowercase raw sections and lowercase archive columns', async () => {

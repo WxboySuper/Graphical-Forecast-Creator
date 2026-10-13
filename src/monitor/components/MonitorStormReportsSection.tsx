@@ -77,11 +77,9 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
         />
         Match selected outlook type
       </label>
-      {(stormReportsMeta.loading || statusLine) && (
-        <div className="monitor-controls__meta" role="status">
-          {stormReportsMeta.loading ? 'Loading reports from the current SPC report day…' : statusLine}
-        </div>
-      )}
+      <div className="monitor-controls__meta" role="status">
+        {stormReportsMeta.loading ? 'Loading reports from the current SPC report day…' : statusLine}
+      </div>
       {stormReportsMeta.error && !stormReportsMeta.loading && (
         <div className="monitor-controls__meta monitor-controls__meta--error" role="alert">
           <span aria-hidden="true">⚠ </span>

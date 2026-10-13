@@ -79,6 +79,17 @@ describe('MonitorControls', () => {
     jest.clearAllMocks();
   });
 
+  test('keeps the storm report status region mounted while the layer is disabled', () => {
+    render(
+      <MonitorControls
+        {...baseProps}
+        settings={{ ...DEFAULT_MONITOR_SETTINGS, stormReportsEnabled: false }}
+      />
+    );
+
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
   test('renders controls and dispatches user changes', () => {
     const { rerender } = render(<MonitorControls {...baseProps} />);
 
