@@ -37,7 +37,18 @@ describe('outlookUtils extra', () => {
   test('falls back to the CIG0 category when a probability has no explicit CIG rule', () => {
     expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('MRGL');
     expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
+    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG2' })).toBe('ENH');
     expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('MRGL');
+    expect(windToCategorical({ probability: '15%', cig: 'CIG3' })).toBe('SLGT');
+    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('ENH');
+    expect(totalSevereToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('SLGT');
+  });
+
+  test('invalid probability and CIG inputs fail safely to TSTM', () => {
+    expect(tornadoToCategorical({ probability: null as unknown as string })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: undefined as unknown as string })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '' })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG4' as CIGLevel })).toBe('TSTM');
   });
 
   test('windToCategorical maps probabilities properly', () => {

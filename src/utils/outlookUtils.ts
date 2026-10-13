@@ -72,16 +72,37 @@ type CategoricalRule = {
 };
 
 type CategoricalConversion = {
-  probability: string;
-  cig: CIGLevel;
+  probability: unknown;
+  cig: unknown;
   rules: readonly CategoricalRule[];
 };
 
+const BASELINE_CIG: CIGLevel = 'CIG0';
+const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
+
+/** Checks persisted CIG values before categorical conversion. */
+function isCigLevel(cig: unknown): cig is CIGLevel {
+  return typeof cig === 'string' && CIG_LEVELS.includes(cig as CIGLevel);
+}
+
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
+  if (typeof probability !== 'string' || probability.length === 0 || !isCigLevel(cig)) {
+    return 'TSTM';
+  }
+
   const normalizedProbability = probability.replace(/[#]/g, '%');
-  const matchingProbabilityRules = rules.filter((rule) => rule.probabilities.includes(normalizedProbability));
-  const exactCigRisk = matchingProbabilityRules.find((rule) => rule.cigs.includes(cig))?.risk;
-  const baselineCigRisk = matchingProbabilityRules.find((rule) => rule.cigs.includes('CIG0'))?.risk;
+  let exactCigRisk: CategoricalRiskLevel | undefined;
+  let baselineCigRisk: CategoricalRiskLevel | undefined;
+
+  for (const rule of rules) {
+    if (!rule.probabilities.includes(normalizedProbability)) continue;
+    if (exactCigRisk === undefined && rule.cigs.includes(cig)) exactCigRisk = rule.risk;
+    if (baselineCigRisk === undefined && rule.cigs.includes(BASELINE_CIG)) baselineCigRisk = rule.risk;
+    if (exactCigRisk !== undefined && baselineCigRisk !== undefined) break;
+  }
+
+  // CIG0 is the unhatched baseline. The requested behavior uses that mapped
+  // category when a valid CIG has no rule, rather than dropping it as TSTM.
   return exactCigRisk ?? baselineCigRisk ?? 'TSTM';
 };
 
