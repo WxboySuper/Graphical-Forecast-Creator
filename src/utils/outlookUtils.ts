@@ -431,11 +431,13 @@ export const significantCategoricalFloors = {
   totalSevere: {},
 } satisfies SignificantFloorByHazard;
 
+/** Checks a marked probability without a hazard-specific domain. */
 function hasSupportedSignificantProbability(probability: unknown): boolean {
   const normalized = normalizeCategoricalProbability(probability);
   return normalized?.significant === true && ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
 }
 
+/** Checks a marked probability against its optional hazard domain. */
 function isSignificantForOutlook(input: { probability: unknown; outlookType?: unknown }): boolean {
   const normalized = normalizeCategoricalProbability(input.probability);
   if (!normalized?.significant) return false;

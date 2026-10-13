@@ -230,14 +230,28 @@ const buildHatchingRegions = (
   return hatchingRegions;
 };
 
+type ProbabilityHatchingContext = {
+  probStr: string;
+  poly: PolygonOutlookFeature;
+  hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>;
+  cigLevels: CIGLevel[];
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void;
+};
+
+type HatchIntersectionContext = {
+  probStr: string;
+  cig: CIGLevel;
+  remainingPoly: PolygonOutlookFeature;
+  hatchRegion: PolygonOutlookFeature;
+  pairCollection: ReturnType<typeof createPairFeatureCollection>;
+  isSignificant: boolean;
+  onPiece: ProbabilityHatchingContext['onPiece'];
+};
+
 /** Intersects one probability polygon with its available hatching regions. */
-const applyHatchingToProbabilityPolygon = (
-  probStr: string,
-  poly: PolygonOutlookFeature,
-  hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
-  cigLevels: CIGLevel[],
-  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
-): void => {
+const applyHatchingToProbabilityPolygon = ({
+  probStr, poly, hatchingRegions, cigLevels, onPiece,
+}: ProbabilityHatchingContext): void => {
   const storedSignificance = poly.properties?.isSignificant;
   const isSignificant = storedSignificance === true || storedSignificance === 1 || storedSignificance === 'true';
   let remainingPoly: PolygonOutlookFeature | null = poly;
@@ -247,23 +261,18 @@ const applyHatchingToProbabilityPolygon = (
     if (!remainingPoly) break;
     const hatchRegion = hatchingRegions.get(cig);
     if (!hatchRegion) continue;
-    remainingPoly = intersectAndEmitHatchPiece(
+    remainingPoly = intersectAndEmitHatchPiece({
       probStr, cig, remainingPoly, hatchRegion, pairCollection, isSignificant, onPiece,
-    );
+    });
   }
 
   if (remainingPoly) onPiece(probStr, 'CIG0', remainingPoly, isSignificant);
 };
 
-function intersectAndEmitHatchPiece(
-  probStr: string,
-  cig: CIGLevel,
-  remainingPoly: PolygonOutlookFeature,
-  hatchRegion: PolygonOutlookFeature,
-  pairCollection: GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>,
-  isSignificant: boolean,
-  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
-): PolygonOutlookFeature | null {
+/** Emits one hatch intersection and returns the polygon area not yet assigned. */
+function intersectAndEmitHatchPiece({
+  probStr, cig, remainingPoly, hatchRegion, pairCollection, isSignificant, onPiece,
+}: HatchIntersectionContext): PolygonOutlookFeature | null {
   try {
     setPairFeatures(pairCollection, remainingPoly, hatchRegion);
     const intersection = turf.intersect(pairCollection) as PolygonOutlookFeature | null;
@@ -286,7 +295,7 @@ const applyProbabilityFeaturesWithHatching = (
   onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
 ): void => {
   probabilityFeatures.forEach((features, probStr) => {
-    features.forEach((poly) => applyHatchingToProbabilityPolygon(probStr, poly, hatchingRegions, cigLevels, onPiece));
+    features.forEach((poly) => applyHatchingToProbabilityPolygon({ probStr, poly, hatchingRegions, cigLevels, onPiece }));
   });
 };
 

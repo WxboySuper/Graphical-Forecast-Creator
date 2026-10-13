@@ -254,7 +254,7 @@ function useHorizontalOverflow(
     const container = scrollRef.current;
     if (!container) return undefined;
 
-    /** Sets keyboard focus only when the table needs horizontal scrolling. */
+    /** Measures table width and updates the scroll-region state. */
     const updateOverflow = () => {
       const nextValue = container.scrollWidth > container.clientWidth + 1;
       setOverflows((currentValue) => currentValue === nextValue ? currentValue : nextValue);
