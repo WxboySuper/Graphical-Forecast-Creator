@@ -9,11 +9,16 @@ name: Review | OCR
 # - Own manual trigger (/ocr), distinct from /review-opencode.
 # - Blocking by design: the gate step fails this check whenever the review
 #   posts findings or any bot-authored inline thread is left unresolved, and
-#   the Main Ruleset additionally requires review-thread resolution. Focused
-#   by design: effort medium, full re-review every push, rules in
-#   .opencodereview/rule.json only file medium+ bugs in the diff (no nits,
-#   no refactor/feature suggestions, max 5 per PR). If the reviewer proves
-#   noisy rather than useful, relax the rules or drop the gate before touching the ruleset.
+#   the Main Ruleset additionally requires review-thread resolution. Balanced
+#   by design: effort high, full re-review every push, rules in
+#   .opencodereview/rule.json file real in-diff bugs (low severity allowed,
+#   marked low, not suppressed; max 10 per PR) but ban feature/refactor
+#   suggestions, untouched-code expansion, and hypotheticals. Everything
+#   stays inline (lows included); only style routes to the digest summary.
+#   The gate fails only on medium+ or docs findings and their threads —
+#   low-only runs stay green. If the
+#   reviewer proves noisy rather than useful, relax the rules or drop the
+#   gate before touching the ruleset.
 #
 # Model: Muse Spark via the OpenCode Go subscription endpoint, reusing
 # OPENCODE_API_KEY (same key works for Go and Zen; Go is the flat
@@ -111,6 +116,13 @@ jobs:
           language: English
           effort: medium
           review_task_timeout: '20'
+          # Cost control on a subscription: medium reasoning depth. Bump to
+          # high if reviews go quiet or shallow; drop to low only if medium
+          # proves consistently chatty enough.
+          # Placement: everything stays inline (lows included, easier to see
+          # what needs eyes). Only style routes to the digest summary.
+          # Documentation stays inline: docs findings matter here.
+          route_categories: 'style'
           sticky_summary: 'true'
           incremental: 'false'
           resolve_outdated: 'false'
@@ -292,25 +304,50 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
-          OCR_COMMENTS_TOTAL: ${{ steps.ocr.outputs.comments_total }}
           GATE_PR_NUMBER: ${{ env.PR_NUMBER }}
         with:
           script: |
-            // Fail-closed merge gate: the review must complete, post zero
-            // findings, and leave zero unresolved bot-authored review threads.
-            // Anything else fails this check. Note the Main Ruleset already
-            // requires review-thread resolution, so unresolved inline threads
-            // block merge even without this job in required_status_checks.
+            // Fail-closed merge gate with severity awareness. The review must
+            // complete. Blocking: any medium+ finding (unknown severity counts
+            // as blocking, fail-closed) or any documentation-category finding,
+            // plus any unresolved bot-authored thread NOT attributable to a
+            // low-only finding. Low-severity non-docs findings stay inline for
+            // visibility but never fail this check on their own.
             const outcome = process.env.OCR_OUTCOME || 'unknown';
             if (outcome !== 'success') {
               core.setFailed(`OCR review did not complete (outcome=${outcome}). Fix the reviewer before merging.`);
               return;
             }
-            const posted = Number(process.env.OCR_COMMENTS_TOTAL || '0');
-            if (Number.isInteger(posted) && posted > 0) {
-              core.setFailed(`OCR posted ${posted} finding(s) this run. Address or resolve every inline thread, then push again.`);
+            const fs = require('fs');
+            let result;
+            try {
+              result = JSON.parse(fs.readFileSync('/tmp/ocr-result.json', 'utf8'));
+            } catch (error) {
+              core.setFailed(`OCR gate could not read result file (${error.message}); failing closed.`);
               return;
             }
+            const comments = Array.isArray(result.comments) ? result.comments : [];
+            const sevOf = (c) => String(
+              c.severity || c.priority || c.level || '',
+            ).toLowerCase();
+            const catOf = (c) => String(c.category || '').toLowerCase();
+            const isBlocking = (c) => {
+              const sev = sevOf(c);
+              if (catOf(c) === 'documentation') return true;
+              if (!sev) return true; // unknown severity: fail closed
+              return /\bcritical\b|\bhigh\b|\bmedium\b|^p0$|^p1$|^p2$|\bblocker\b/.test(sev);
+            };
+            const locOf = (c) => {
+              const path = c.path || c.file || c.filename || '';
+              return c.line ? `${path}:${c.line}` : path;
+            };
+            const blocking = comments.filter(isBlocking);
+            const lowLocs = new Set(comments.filter((c) => !isBlocking(c)).map(locOf));
+            if (blocking.length > 0) {
+              core.setFailed(`OCR posted ${blocking.length} blocking finding(s) (medium+ or docs) this run. Address or resolve every inline thread, then push again.`);
+              return;
+            }
+            core.info(`OCR gate: ${comments.length} low finding(s), none blocking; checking threads.`);
             const prNumber = Number(
               process.env.GATE_PR_NUMBER
                 || context.payload.pull_request?.number
@@ -337,6 +374,8 @@ jobs:
                           reviewThreads(first: 100, after: $after) {
                             nodes {
                               isResolved
+                              path
+                              line
                               comments(first: 20) { nodes { author { login } } }
                             }
                             pageInfo { hasNextPage endCursor }
@@ -382,6 +421,9 @@ jobs:
               for (const thread of connection.nodes ?? []) {
                 const authors = (thread.comments?.nodes ?? []).map((c) => c?.author?.login);
                 if (!thread.isResolved && authors.includes('github-actions[bot]')) {
+                  // Threads on a low-only finding's location never block.
+                  const loc = thread.line ? `${thread.path}:${thread.line}` : (thread.path || '');
+                  if (loc && lowLocs.has(loc)) continue;
                   openBotThreads += 1;
                 }
               }
@@ -402,10 +444,10 @@ jobs:
               continue;
             }
             if (openBotThreads > 0) {
-              core.setFailed(`${openBotThreads} unresolved reviewer thread(s) remain on PR #${prNumber}. Resolve every inline comment before merging.`);
+              core.setFailed(`${openBotThreads} unresolved blocking reviewer thread(s) remain on PR #${prNumber}. Resolve every medium+ or docs inline comment before merging.`);
               return;
             }
-            core.info('OCR gate clean: review completed with no findings and no unresolved reviewer threads.');
+            core.info('OCR gate clean: review completed with no blocking findings and no unresolved blocking threads.');
             }
 
       - name: Run summary
