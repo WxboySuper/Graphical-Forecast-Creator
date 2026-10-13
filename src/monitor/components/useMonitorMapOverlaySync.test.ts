@@ -69,7 +69,7 @@ const makeArgs = (overrides: Partial<Parameters<typeof useMonitorMapOverlaySync>
     mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
     alertsOpacity: 1,
     refs: makeRefs(),
-    selectedAlertId: null,
+    selectedAlertDetailUrl: null,
     onClearSelectedAlert: jest.fn(),
     ...overrides,
   }) as Parameters<typeof useMonitorMapOverlaySync>[0];
@@ -80,18 +80,18 @@ const setup = (initialAlertId: string | null = ALERT_ID) => {
   const render = renderHook(
     ({
       alertsCollection,
-      selectedAlertId,
+      selectedAlertDetailUrl,
     }: {
       alertsCollection: NwsAlertFeatureCollection;
-      selectedAlertId: string | null;
+      selectedAlertDetailUrl: string | null;
     }) =>
       useMonitorMapOverlaySync(
-        makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlertId }),
+        makeArgs({ alertsCollection, onClearSelectedAlert, selectedAlertDetailUrl }),
       ),
     {
       initialProps: {
         alertsCollection: standardCollection(),
-        selectedAlertId: initialAlertId,
+        selectedAlertDetailUrl: initialAlertId,
       },
     },
   );
@@ -105,7 +105,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('does nothing when nothing is selected', () => {
     const { rerender, onClearSelectedAlert } = setup(null);
 
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: null });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: null });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
@@ -113,7 +113,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('retains the selection on a single collection miss (animation frame tick)', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: ALERT_ID });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
@@ -121,12 +121,12 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('clears the selection after two consecutive misses (expired alert)', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: ALERT_ID });
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
     rerender({
       alertsCollection: makeCollection(makeFeature(alertProperties({ '@id': EXPIRED_ID }), EXPIRED_ID)),
-      selectedAlertId: ALERT_ID,
+      selectedAlertDetailUrl: ALERT_ID,
     });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
@@ -134,9 +134,9 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('resets the miss count when the alert reappears', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: ALERT_ID });
-    rerender({ alertsCollection: standardCollection(), selectedAlertId: ALERT_ID });
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: ALERT_ID });
+    rerender({ alertsCollection: standardCollection(), selectedAlertDetailUrl: ALERT_ID });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: ALERT_ID });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
@@ -145,21 +145,21 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup(ALERT_ID);
 
     // New selection absent from the incoming collection: first counted miss.
-    rerender({ alertsCollection: otherCollection(), selectedAlertId: EXPIRED_ID });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: EXPIRED_ID });
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
     // Second consecutive miss clears.
-    rerender({ alertsCollection: standardCollection(), selectedAlertId: EXPIRED_ID });
+    rerender({ alertsCollection: standardCollection(), selectedAlertDetailUrl: EXPIRED_ID });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 
   it('tolerates a single empty collection and clears after two (transient empty)', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
-    rerender({ alertsCollection: makeCollection(), selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: makeCollection(), selectedAlertDetailUrl: ALERT_ID });
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
-    rerender({ alertsCollection: makeCollection(), selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: makeCollection(), selectedAlertDetailUrl: ALERT_ID });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 
@@ -167,8 +167,8 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
     const opaque = makeCollection(makeFeature(alertProperties({ '@id': ALERT_ID }), 'opaque-local-id'));
-    rerender({ alertsCollection: opaque, selectedAlertId: ALERT_ID });
-    rerender({ alertsCollection: opaque, selectedAlertId: ALERT_ID });
+    rerender({ alertsCollection: opaque, selectedAlertDetailUrl: ALERT_ID });
+    rerender({ alertsCollection: opaque, selectedAlertDetailUrl: ALERT_ID });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
@@ -178,13 +178,13 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
 
     rerender({
       alertsCollection: makeCollection(makeFeature(alertProperties({ uri: ALERT_ID }))),
-      selectedAlertId: ALERT_ID,
+      selectedAlertDetailUrl: ALERT_ID,
     });
     rerender({
       alertsCollection: makeCollection(
         makeFeature(alertProperties({ '@id': `  ${ALERT_ID}  ` })),
       ),
-      selectedAlertId: ALERT_ID,
+      selectedAlertDetailUrl: ALERT_ID,
     });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
@@ -195,8 +195,8 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup(topOnlyUrl);
 
     const topOnly = makeCollection(makeFeature(alertProperties({}), topOnlyUrl));
-    rerender({ alertsCollection: topOnly, selectedAlertId: topOnlyUrl });
-    rerender({ alertsCollection: topOnly, selectedAlertId: topOnlyUrl });
+    rerender({ alertsCollection: topOnly, selectedAlertDetailUrl: topOnlyUrl });
+    rerender({ alertsCollection: topOnly, selectedAlertDetailUrl: topOnlyUrl });
 
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
@@ -205,7 +205,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup('local-123');
 
     // Mount already counts the first miss; one more consecutive miss clears.
-    rerender({ alertsCollection: makeCollection(makeFeature(alertProperties({}), 'local-123')), selectedAlertId: 'local-123' });
+    rerender({ alertsCollection: makeCollection(makeFeature(alertProperties({}), 'local-123')), selectedAlertDetailUrl: 'local-123' });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 });

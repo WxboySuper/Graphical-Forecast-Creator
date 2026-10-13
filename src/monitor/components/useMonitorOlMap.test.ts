@@ -97,7 +97,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
 
     // Mount with no selection clears the empty popup container once.
     expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(1);
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBeNull();
+    expect(lastLayerSyncArgs()?.selectedAlertDetailUrl).toBeNull();
 
     const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
     act(() => {
@@ -109,7 +109,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
       selectedDetails,
       expect.any(Function),
     );
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBe(selectedDetails.detailUrl);
+    expect(lastLayerSyncArgs()?.selectedAlertDetailUrl).toBe(selectedDetails.detailUrl);
   });
 
   it('forwards an empty id for selections without a canonical detail URL', () => {
@@ -122,13 +122,13 @@ describe('useMonitorOlMap selected alert wiring', () => {
       onSelectAlert({ ...selectedDetails, detailUrl: null });
     });
 
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('');
+    expect(lastLayerSyncArgs()?.selectedAlertDetailUrl).toBe('');
 
     act(() => {
       onSelectAlert({ ...selectedDetails, detailUrl: '  https://api.weather.gov/alerts/abc  ' });
     });
 
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('https://api.weather.gov/alerts/abc');
+    expect(lastLayerSyncArgs()?.selectedAlertDetailUrl).toBe('https://api.weather.gov/alerts/abc');
   });
 
   it('keeps the same selection object across collection changes for dismissal tracking', () => {
@@ -149,7 +149,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
 
     const forwarded = lastLayerSyncArgs();
     expect(forwarded?.alertsCollection).toBe(second);
-    expect(forwarded?.selectedAlertId).toBe(selectedDetails.detailUrl);
+    expect(forwarded?.selectedAlertDetailUrl).toBe(selectedDetails.detailUrl);
     expect(typeof forwarded?.onClearSelectedAlert).toBe('function');
   });
 
@@ -168,6 +168,6 @@ describe('useMonitorOlMap selected alert wiring', () => {
       onSelectAlert(null);
     });
     expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(2);
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBeNull();
+    expect(lastLayerSyncArgs()?.selectedAlertDetailUrl).toBeNull();
   });
 });

@@ -26,7 +26,7 @@ interface UseMonitorMapOverlaySyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   alertsOpacity: number;
   refs: MonitorMapRefs;
-  selectedAlertId: string | null;
+  selectedAlertDetailUrl: string | null;
   onClearSelectedAlert: () => void;
 }
 
@@ -43,7 +43,7 @@ const topLevelAlertUrl = (id: unknown): string | null => {
 };
 
 /** Checks a collection for a canonical alert url with an early exit. */
-const hasAlertId = (collection: NwsAlertFeatureCollection, id: string): boolean => {
+const hasAlertId = (collection: NwsAlertFeatureCollection, detailUrl: string): boolean => {
   const features = Array.isArray(collection.features) ? collection.features : [];
   return features.some((feature) => {
     if (!feature) {
@@ -51,18 +51,18 @@ const hasAlertId = (collection: NwsAlertFeatureCollection, id: string): boolean 
     }
     const properties: Record<string, unknown> = feature.properties ?? {};
     const url = resolveNwsAlertDetailUrl(properties) ?? topLevelAlertUrl(feature.id);
-    return url === id;
+    return url === detailUrl;
   });
 };
 
-/** Drops the selection after consecutive collections miss its alert id. */
+/** Drops the selection after consecutive collections miss its alert url. */
 const useSelectedAlertExpiry = (
   alertsCollection: NwsAlertFeatureCollection,
-  selectedAlertId: string | null,
+  selectedAlertDetailUrl: string | null,
   onClearSelectedAlert: () => void,
 ) => {
   const consecutiveMissesRef = useRef(0);
-  const prevAlertIdRef = useRef<string | null>(null);
+  const prevAlertDetailUrlRef = useRef<string | null>(null);
   const clearSelectedAlertRef = useRef(onClearSelectedAlert);
 
   useEffect(() => {
@@ -70,26 +70,26 @@ const useSelectedAlertExpiry = (
   });
 
   useEffect(() => {
-    if (selectedAlertId === null) {
+    if (selectedAlertDetailUrl === null) {
       consecutiveMissesRef.current = 0;
-      prevAlertIdRef.current = null;
+      prevAlertDetailUrlRef.current = null;
       return;
     }
-    if (selectedAlertId !== prevAlertIdRef.current) {
-      prevAlertIdRef.current = selectedAlertId;
+    if (selectedAlertDetailUrl !== prevAlertDetailUrlRef.current) {
+      prevAlertDetailUrlRef.current = selectedAlertDetailUrl;
       consecutiveMissesRef.current = 0;
     }
-    if (!hasAlertId(alertsCollection, selectedAlertId)) {
+    if (!hasAlertId(alertsCollection, selectedAlertDetailUrl)) {
       consecutiveMissesRef.current += 1;
       if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
         consecutiveMissesRef.current = 0;
-        prevAlertIdRef.current = null;
+        prevAlertDetailUrlRef.current = null;
         clearSelectedAlertRef.current();
       }
     } else {
       consecutiveMissesRef.current = 0;
     }
-  }, [alertsCollection, selectedAlertId]);
+  }, [alertsCollection, selectedAlertDetailUrl]);
 };
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
@@ -102,7 +102,7 @@ export const useMonitorMapOverlaySync = ({
   mesoscaleDiscussions,
   alertsOpacity,
   refs,
-  selectedAlertId,
+  selectedAlertDetailUrl,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
   useEffect(() => {
@@ -149,7 +149,7 @@ export const useMonitorMapOverlaySync = ({
   // transient empty response without the alert does not yank the popup
   // (issue #1595), while a genuinely expired or cancelled alert is still
   // dismissed.
-  useSelectedAlertExpiry(alertsCollection, selectedAlertId, onClearSelectedAlert);
+  useSelectedAlertExpiry(alertsCollection, selectedAlertDetailUrl, onClearSelectedAlert);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);

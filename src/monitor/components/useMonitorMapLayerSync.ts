@@ -24,7 +24,7 @@ interface UseMonitorMapLayerSyncArgs {
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   refs: MonitorMapRefs;
   /** Canonical detail URL ('' for URL-less selections, never matches), or null for no selection. */
-  selectedAlertId: string | null;
+  selectedAlertDetailUrl: string | null;
   onClearSelectedAlert: () => void;
 }
 
@@ -37,5 +37,16 @@ export const useMonitorMapLayerSync = (args: UseMonitorMapLayerSyncArgs) => {
     satelliteOpacity: args.satelliteOpacity,
     refs: args.refs,
   });
-  useMonitorMapOverlaySync(args);
+  useMonitorMapOverlaySync({
+    mapView: args.mapView,
+    darkMode: args.darkMode,
+    serializedFeatures: args.serializedFeatures,
+    stormReports: args.stormReports,
+    alertsCollection: args.alertsCollection,
+    mesoscaleDiscussions: args.mesoscaleDiscussions,
+    alertsOpacity: args.alertsOpacity,
+    refs: args.refs,
+    selectedAlertDetailUrl: args.selectedAlertDetailUrl,
+    onClearSelectedAlert: args.onClearSelectedAlert,
+  });
 };

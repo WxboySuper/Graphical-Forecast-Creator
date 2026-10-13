@@ -46,7 +46,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
 
   // Canonical detail URL, '' sentinel for URL-less selections (never matches),
   // null for no selection.
-  const selectedAlertId: string | null = selectedAlert
+  const selectedAlertDetailUrl: string | null = selectedAlert
     ? (selectedAlert.detailUrl?.trim() || '')
     : null;
 
@@ -88,7 +88,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     alertsOpacity: args.alertsOpacity,
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     refs,
-    selectedAlertId,
+    selectedAlertDetailUrl,
     onClearSelectedAlert: clearSelectedAlert,
   });
 

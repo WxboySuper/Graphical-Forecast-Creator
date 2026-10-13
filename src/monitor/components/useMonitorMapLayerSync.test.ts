@@ -27,7 +27,7 @@ const makeArgs = () =>
     alertsOpacity: 1,
     mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
     refs: {},
-    selectedAlertId: 'https://api.weather.gov/alerts/abc',
+    selectedAlertDetailUrl: 'https://api.weather.gov/alerts/abc',
     onClearSelectedAlert: jest.fn(),
   }) as unknown as Parameters<typeof useMonitorMapLayerSync>[0];
 
@@ -44,18 +44,18 @@ describe('useMonitorMapLayerSync selection forwarding', () => {
     expect(jest.mocked(useMonitorMapOverlaySync)).toHaveBeenCalledWith(
       expect.objectContaining({
         alertsCollection: emptyCollection,
-        selectedAlertId: 'https://api.weather.gov/alerts/abc',
+        selectedAlertDetailUrl: 'https://api.weather.gov/alerts/abc',
         onClearSelectedAlert: args.onClearSelectedAlert,
       }),
     );
   });
 
   it('forwards null selections without alteration', () => {
-    const args = { ...makeArgs(), selectedAlertId: null };
+    const args = { ...makeArgs(), selectedAlertDetailUrl: null };
     renderHook(() => useMonitorMapLayerSync(args));
 
     expect(jest.mocked(useMonitorMapOverlaySync)).toHaveBeenCalledWith(
-      expect.objectContaining({ selectedAlertId: null }),
+      expect.objectContaining({ selectedAlertDetailUrl: null }),
     );
   });
 });
