@@ -31,8 +31,8 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '15%', cig: 'CIG2' })).toBe('MDT');
     expect(tornadoToCategorical({ probability: '30%', cig: 'CIG2' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '60%', cig: 'CIG1' })).toBe('HIGH');
-    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('MRGL');
-    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
+    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('SLGT');
+    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '1%', cig: 'CIG0' })).toBe('TSTM');
   });
 
@@ -50,8 +50,8 @@ describe('outlookUtils extra', () => {
     expect(windToCategorical({ probability: '15%', cig: 'CIG2' })).toBe('ENH');
     expect(windToCategorical({ probability: '45%', cig: 'CIG2' })).toBe('MDT');
     expect(windToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('HIGH');
-    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('MRGL');
-    expect(windToCategorical({ probability: '15%', cig: 'CIG3' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '15%', cig: 'CIG3' })).toBe('ENH');
   });
 
   test('hailToCategorical maps probabilities properly', () => {
@@ -59,7 +59,7 @@ describe('outlookUtils extra', () => {
     expect(hailToCategorical({ probability: '15%', cig: 'CIG0' })).toBe('SLGT');
     expect(hailToCategorical({ probability: '60%', cig: 'CIG0' })).toBe('ENH');
     expect(hailToCategorical({ probability: '45%', cig: 'CIG2' })).toBe('MDT');
-    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('ENH');
+    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('MDT');
   });
 
   test('totalSevereToCategorical maps probabilities for day3', () => {
@@ -76,7 +76,7 @@ describe('outlookUtils extra', () => {
         expect(totalSevereToCategorical({ probability, cig })).toBe(risks[index]);
       }
     }
-    expect(totalSevereToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('SLGT');
+    expect(totalSevereToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('ENH');
   });
 
   test('isSignificantThreat detects # marker', () => {

@@ -78,12 +78,12 @@ type CategoricalConversion = {
 };
 type CategoricalRuleSearch = {
   probability: string;
-  cig: CIGLevel;
+  targetCigRank: number;
   rules: readonly CategoricalRule[];
 };
 
-const BASELINE_CIG: CIGLevel = 'CIG0';
 const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
+const CIG_RANK: Record<CIGLevel, number> = { CIG0: 0, CIG1: 1, CIG2: 2, CIG3: 3 };
 
 /** Checks persisted CIG values before categorical conversion. */
 function isCigLevel(cig: unknown): cig is CIGLevel {
@@ -95,13 +95,29 @@ function isCategoricalProbability(probability: unknown): probability is string {
   return typeof probability === 'string' && probability.length > 0;
 }
 
-/** Returns the mapped risk for one probability and CIG pair. */
-function findCategoricalRisk({ probability, cig, rules }: CategoricalRuleSearch): CategoricalRiskLevel | undefined {
+/** Returns the highest mapped CIG rank no greater than the requested rank. */
+function highestApplicableCigRank(cigs: readonly CIGLevel[], targetCigRank: number): number {
+  let highestRank = -1;
+  for (const cig of cigs) {
+    const rank = CIG_RANK[cig];
+    if (rank <= targetCigRank && rank > highestRank) highestRank = rank;
+  }
+  return highestRank;
+}
+
+/** Finds the risk mapped at the requested CIG or the nearest lower CIG. */
+function findCategoricalRisk({ probability, targetCigRank, rules }: CategoricalRuleSearch): CategoricalRiskLevel | undefined {
+  let highestRank = -1;
+  let risk: CategoricalRiskLevel | undefined;
   for (const rule of rules) {
     if (!rule.probabilities.includes(probability)) continue;
-    if (rule.cigs.includes(cig)) return rule.risk;
+    const ruleRank = highestApplicableCigRank(rule.cigs, targetCigRank);
+    if (ruleRank > highestRank) {
+      highestRank = ruleRank;
+      risk = rule.risk;
+    }
   }
-  return undefined;
+  return risk;
 }
 
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
@@ -109,10 +125,8 @@ const categorizeProbability = ({ probability, cig, rules }: CategoricalConversio
   if (!isCigLevel(cig)) return 'TSTM';
 
   const normalizedProbability = probability.replace(/[#]/g, '%');
-  // CIG0 is the unhatched baseline. The requested behavior uses that mapped
-  // category when a valid CIG has no rule, rather than dropping it as TSTM.
-  return findCategoricalRisk({ probability: normalizedProbability, cig, rules })
-    ?? findCategoricalRisk({ probability: normalizedProbability, cig: BASELINE_CIG, rules })
+  // Higher CIG regions must keep at least the risk from a lower mapped region.
+  return findCategoricalRisk({ probability: normalizedProbability, targetCigRank: CIG_RANK[cig], rules })
     ?? 'TSTM';
 };
 
