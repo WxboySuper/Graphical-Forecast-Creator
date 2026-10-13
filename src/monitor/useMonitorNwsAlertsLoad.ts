@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { appendAlertSnapshotFrame, fetchActiveNwsAlerts, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
@@ -8,6 +8,7 @@ interface UseMonitorNwsAlertsLoadOptions {
   enabled: boolean;
   refreshToken: number;
   addToast: AddToastFn;
+  hasRetainedFrames: MutableRefObject<boolean>;
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFrameIndex: Dispatch<SetStateAction<number>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
@@ -20,6 +21,7 @@ export const useMonitorNwsAlertsLoad = ({
   enabled,
   refreshToken,
   addToast,
+  hasRetainedFrames,
   setRawFrames,
   setFrameIndex,
   setLoading,
@@ -56,8 +58,14 @@ export const useMonitorNwsAlertsLoad = ({
           return undefined;
         }
 
-        setError('Official alerts are unavailable right now.');
-        addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+        // Keep prior frames visible, but tell users clearly when those alerts may be outdated.
+        if (hasRetainedFrames.current) {
+          setError('NWS alert refresh failed. Showing the last successful alerts, which may be outdated.');
+          addToast('NWS alert refresh failed. Existing alerts remain visible and may be outdated.', 'warning');
+        } else {
+          setError('Official alerts are unavailable right now.');
+          addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+        }
         return undefined;
       })
       .finally(() => {
@@ -69,5 +77,5 @@ export const useMonitorNwsAlertsLoad = ({
     return () => {
       active = false;
     };
-  }, [addToast, enabled, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
+  }, [addToast, enabled, hasRetainedFrames, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
 };

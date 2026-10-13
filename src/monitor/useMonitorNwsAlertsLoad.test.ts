@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import * as nwsAlerts from './nwsAlerts';
 import type { NwsAlertFeatureCollection } from './nwsAlerts';
 import { useMonitorNwsAlertsLoad } from './useMonitorNwsAlertsLoad';
@@ -19,6 +19,7 @@ describe('useMonitorNwsAlertsLoad', () => {
     };
     const setters = {
       addToast: jest.fn(),
+      hasRetainedFrames: { current: true } as MutableRefObject<boolean>,
       setRawFrames: jest.fn(setRawFrames),
       setFrameIndex: jest.fn(),
       setLoading: jest.fn(),
@@ -35,7 +36,12 @@ describe('useMonitorNwsAlertsLoad', () => {
 
     expect(currentFrames).toBe(existingFrames);
     expect(setters.setRawFrames).not.toHaveBeenCalled();
-    expect(setters.setError).toHaveBeenCalledWith('Official alerts are unavailable right now.');
-    expect(setters.addToast).toHaveBeenCalledWith('NWS watch/warning polygons could not be loaded.', 'warning');
+    expect(setters.setError).toHaveBeenCalledWith(
+      'NWS alert refresh failed. Showing the last successful alerts, which may be outdated.',
+    );
+    expect(setters.addToast).toHaveBeenCalledWith(
+      'NWS alert refresh failed. Existing alerts remain visible and may be outdated.',
+      'warning',
+    );
   });
 });
