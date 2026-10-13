@@ -41,6 +41,22 @@ const makeFeature = (id: string): Feature<Polygon> => ({
   properties: {}
 });
 
+/** Derives a wind category for stored markers, significance flags, and CIG overlap cases. */
+const deriveWindCategory = (probability: string, isSignificant: boolean, addCig2: boolean) => {
+  const feature = {
+    ...makeFeature('wind-probability'),
+    properties: { outlookType: 'wind', probability, isSignificant },
+  };
+  const wind = new Map<string, Feature<Polygon>[]>([[probability, [feature]]]);
+  if (addCig2) wind.set('CIG2', [makeFeature('wind-hatch')]);
+
+  return processDay12OutlooksToCategorical({
+    wind,
+    tornado: new Map(),
+    hail: new Map(),
+  } as unknown as OutlookData);
+};
+
 const makeProbabilisticFeature = (id: string, offset: number): Feature<Polygon> => ({
   type: 'Feature',
   id,
@@ -162,62 +178,14 @@ describe('processOutlooksToCategorical', () => {
     expect(result.some((feature) => feature.properties?.probability === 'ENH')).toBe(true);
   });
 
-  test('applies a stored significant flag when deriving categorical risk', () => {
-    const feature = {
-      ...makeFeature('significant-wind'),
-      properties: { outlookType: 'wind', probability: '45%', isSignificant: true },
-    };
-    const result = processDay12OutlooksToCategorical({
-      wind: new Map([['45%', [feature]]]),
-      tornado: new Map(),
-      hail: new Map(),
-    });
-
-    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
-  });
-
-  test('keeps probability markers when stale feature metadata says non-significant', () => {
-    const feature = {
-      ...makeFeature('marked-wind'),
-      properties: { outlookType: 'wind', probability: '45%#', isSignificant: false },
-    };
-    const result = processDay12OutlooksToCategorical({
-      wind: new Map([['45%#', [feature]]]),
-      tornado: new Map(),
-      hail: new Map(),
-    });
-
-    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
-  });
-
-  test('does not apply a significant floor to an unmarked feature flagged false', () => {
-    const feature = {
-      ...makeFeature('plain-wind'),
-      properties: { outlookType: 'wind', probability: '45%', isSignificant: false },
-    };
-    const result = processDay12OutlooksToCategorical({
-      wind: new Map([['45%', [feature]]]),
-      tornado: new Map(),
-      hail: new Map(),
-    });
-
-    expect(result.some((item) => item.properties?.probability === 'ENH')).toBe(true);
-    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(false);
-  });
-
-  test('applies significant floors to intersected hatching pieces', () => {
-    const probability = {
-      ...makeFeature('significant-wind'),
-      properties: { outlookType: 'wind', probability: '15%', isSignificant: true },
-    };
-    const hatch = makeFeature('wind-hatch');
-    const result = processDay12OutlooksToCategorical({
-      wind: new Map([['15%', [probability]], ['CIG2', [hatch]]]),
-      tornado: new Map(),
-      hail: new Map(),
-    });
-
-    expect(result.some((item) => ['ENH', 'MDT', 'HIGH'].includes(String(item.properties?.probability)))).toBe(true);
+  test.each([
+    ['a stored significant flag', '45%', true, false, 'MDT'],
+    ['a marker with stale false metadata', '45%#', false, false, 'MDT'],
+    ['a false flag without a marker', '45%', false, false, 'ENH'],
+    ['a significant CIG overlap', '15%', true, true, 'ENH'],
+  ])('maps %s to the expected category', (_label, probability, isSignificant, addCig2, expected) => {
+    const result = deriveWindCategory(String(probability), Boolean(isSignificant), Boolean(addCig2));
+    expect(result.some((item) => item.properties?.probability === expected)).toBe(true);
   });
 
   test('ignores day 4-8 and missing day 3 total severe data', () => {

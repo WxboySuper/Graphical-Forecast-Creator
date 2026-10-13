@@ -256,6 +256,7 @@ const ConversionTable: React.FC<{
     const container = scrollRef.current;
     if (!container) return undefined;
 
+    /** Sets keyboard focus only when the table needs horizontal scrolling. */
     const updateOverflow = () => setOverflows(container.scrollWidth > container.clientWidth + 1);
     updateOverflow();
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateOverflow);

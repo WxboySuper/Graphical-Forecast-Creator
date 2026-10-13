@@ -97,6 +97,7 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '#15%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1 5%' })).toBe('TSTM');
+    expect(windToCategorical({ probability: '2%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '15%', cig: null as unknown as CIGLevel })).toBe('TSTM');
