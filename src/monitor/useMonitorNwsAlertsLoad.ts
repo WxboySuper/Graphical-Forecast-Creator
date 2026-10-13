@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { appendAlertSnapshotFrame, fetchActiveNwsAlerts, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
@@ -8,7 +8,7 @@ interface UseMonitorNwsAlertsLoadOptions {
   enabled: boolean;
   refreshToken: number;
   addToast: AddToastFn;
-  hasRetainedFrames: MutableRefObject<boolean>;
+  hasExistingFrames: RefObject<boolean>;
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFrameIndex: Dispatch<SetStateAction<number>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
@@ -21,7 +21,7 @@ export const useMonitorNwsAlertsLoad = ({
   enabled,
   refreshToken,
   addToast,
-  hasRetainedFrames,
+  hasExistingFrames,
   setRawFrames,
   setFrameIndex,
   setLoading,
@@ -38,6 +38,8 @@ export const useMonitorNwsAlertsLoad = ({
     }
 
     let active = true;
+    // This stable ref is sampled once for this request; changing its value does not restart the load.
+    const hadExistingFramesAtStart = hasExistingFrames.current;
     setLoading(true);
     setError(null);
 
@@ -58,10 +60,11 @@ export const useMonitorNwsAlertsLoad = ({
           return undefined;
         }
 
-        // Keep prior frames visible, but tell users clearly when those alerts may be outdated.
-        if (hasRetainedFrames.current) {
-          setError('NWS alert refresh failed. Showing the last successful alerts, which may be outdated.');
-          addToast('NWS alert refresh failed. Existing alerts remain visible and may be outdated.', 'warning');
+        // Keep prior frames; current filters still determine which alerts appear.
+        if (hadExistingFramesAtStart) {
+          const message = 'NWS alert refresh failed. Previous alert data is retained, may be outdated, and still follows current filters.';
+          setError(message);
+          addToast(message, 'warning');
         } else {
           setError('Official alerts are unavailable right now.');
           addToast('NWS watch/warning polygons could not be loaded.', 'warning');
@@ -77,5 +80,5 @@ export const useMonitorNwsAlertsLoad = ({
     return () => {
       active = false;
     };
-  }, [addToast, enabled, hasRetainedFrames, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
+  }, [addToast, enabled, hasExistingFrames, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
 };
