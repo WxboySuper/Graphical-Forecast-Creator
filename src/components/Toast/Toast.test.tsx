@@ -109,6 +109,21 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('starts a new reading window when the message changes after a close callback', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="First" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+    rerender(<Toast message="Updated" onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
   test('gives longer messages more time to be read', () => {
     const onClose = jest.fn();
     render(<Toast message={'Notice '.repeat(15)} onClose={onClose} />);
@@ -123,6 +138,33 @@ describe('Toast', () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('does not count surrounding whitespace toward the reading window', () => {
+    const onClose = jest.fn();
+    render(<Toast message={` ${'x'.repeat(59)} `} onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('hides empty or malformed messages and closes them immediately', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="   " onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(0);
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<Toast message={null as unknown as string} onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(0);
+    });
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   test('clears timeout on unmount', () => {

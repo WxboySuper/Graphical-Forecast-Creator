@@ -4,12 +4,19 @@ import './Toast.css';
 const MIN_TOAST_DURATION_MS = 3000;
 const MAX_TOAST_LIFETIME_MS = 30000;
 const MS_PER_CHARACTER = 50;
+const MAX_READING_CHARACTERS = MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER;
 
 /** Estimates a reading window from the message length, bounded by the toast lifetime. */
-const getToastDuration = (message: string) => {
-  const characterCount = Array.from(message).length;
-  const readingDuration = characterCount * MS_PER_CHARACTER;
-  return Math.min(MAX_TOAST_LIFETIME_MS, Math.max(MIN_TOAST_DURATION_MS, readingDuration));
+const getToastDuration = (message: string): number => {
+  const trimmedMessage = message.trim();
+  if (!trimmedMessage) return 0;
+
+  // No code point can use more than two UTF-16 code units, so this threshold
+  // safely detects the cap without allocating an array for very long messages.
+  const characterCount = trimmedMessage.length >= MAX_READING_CHARACTERS * 2
+    ? MAX_READING_CHARACTERS
+    : Array.from(trimmedMessage).length;
+  return Math.max(MIN_TOAST_DURATION_MS, characterCount * MS_PER_CHARACTER);
 };
 
 export interface ToastProps {
@@ -22,6 +29,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
+  const normalizedMessage = typeof message === 'string' ? message.trim() : '';
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -33,7 +41,8 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
     const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
-    const duration = Math.min(getToastDuration(message), remainingLifetime);
+    if (remainingLifetime > 0) closedRef.current = false;
+    const duration = Math.min(getToastDuration(normalizedMessage), remainingLifetime);
     const timer = setTimeout(() => {
       if (closedRef.current) return;
       closedRef.current = true;
@@ -43,11 +52,11 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [message]);
+  }, [message, normalizedMessage]);
 
-  return (
+  return normalizedMessage ? (
     <div className={`toast toast-${type}`}>{message}</div>
-  );
+  ) : null;
 };
 
 export interface ToastManagerProps {
