@@ -45,8 +45,10 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   }, [refs.overlayRef]);
 
   // Canonical detail URL, '' sentinel for URL-less selections (never matches),
-  // null for no selection. detailUrl is already trimmed by the NWS parser.
-  const selectedAlertId: string | null = selectedAlert ? (selectedAlert.detailUrl ?? '') : null;
+  // null for no selection.
+  const selectedAlertId: string | null = selectedAlert
+    ? (selectedAlert.detailUrl?.trim() || '')
+    : null;
 
   useMonitorMapBootstrap({
     mapView: args.mapView,

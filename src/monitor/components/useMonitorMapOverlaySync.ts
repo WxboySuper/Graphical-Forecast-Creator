@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
@@ -33,11 +33,7 @@ interface UseMonitorMapOverlaySyncArgs {
 /** Dismisses the selection after this many consecutive collections miss it. */
 const MAX_CONSECUTIVE_ALERT_MISSES = 2;
 
-const EMPTY_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
-
-// TODO: share a canonical alert-id helper with alertSnapshotTokens in
-// ../nwsAlerts.ts if the NWS id format ever changes.
-/** Reads a canonical https URL from a top-level GeoJSON feature id. */
+/** Reads a canonical http(s) URL from a top-level GeoJSON feature id. */
 const topLevelAlertUrl = (id: unknown): string | null => {
   if (typeof id !== 'string') {
     return null;
@@ -46,30 +42,32 @@ const topLevelAlertUrl = (id: unknown): string | null => {
   return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 };
 
-/** Collects the canonical alert urls in a collection for presence checks. */
-const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => {
-  const ids = new Set<string>();
+/** Checks a collection for a canonical alert url with an early exit. */
+const hasAlertId = (collection: NwsAlertFeatureCollection, id: string): boolean => {
   const features = Array.isArray(collection.features) ? collection.features : [];
-  features.forEach((feature) => {
+  return features.some((feature) => {
+    if (!feature) {
+      return false;
+    }
     const properties: Record<string, unknown> = feature.properties ?? {};
     const url = resolveNwsAlertDetailUrl(properties) ?? topLevelAlertUrl(feature.id);
-    if (url !== null) {
-      ids.add(url);
-    }
+    return url === id;
   });
-  return ids;
 };
 
 /** Drops the selection after consecutive collections miss its alert id. */
 const useSelectedAlertExpiry = (
-  alertIds: ReadonlySet<string>,
+  alertsCollection: NwsAlertFeatureCollection,
   selectedAlertId: string | null,
   onClearSelectedAlert: () => void,
 ) => {
   const consecutiveMissesRef = useRef(0);
   const prevAlertIdRef = useRef<string | null>(null);
   const clearSelectedAlertRef = useRef(onClearSelectedAlert);
-  clearSelectedAlertRef.current = onClearSelectedAlert;
+
+  useEffect(() => {
+    clearSelectedAlertRef.current = onClearSelectedAlert;
+  });
 
   useEffect(() => {
     if (selectedAlertId === null) {
@@ -81,16 +79,17 @@ const useSelectedAlertExpiry = (
       prevAlertIdRef.current = selectedAlertId;
       consecutiveMissesRef.current = 0;
     }
-    if (!alertIds.has(selectedAlertId)) {
+    if (!hasAlertId(alertsCollection, selectedAlertId)) {
       consecutiveMissesRef.current += 1;
       if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
         consecutiveMissesRef.current = 0;
+        prevAlertIdRef.current = null;
         clearSelectedAlertRef.current();
       }
     } else {
       consecutiveMissesRef.current = 0;
     }
-  }, [alertIds, selectedAlertId]);
+  }, [alertsCollection, selectedAlertId]);
 };
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
@@ -106,12 +105,6 @@ export const useMonitorMapOverlaySync = ({
   selectedAlertId,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
-  const hasTrackedSelection = selectedAlertId !== null && selectedAlertId !== '';
-  const alertIds = useMemo(
-    // Only selection presence matters here, not its value.
-    () => (hasTrackedSelection ? buildAlertIdSet(alertsCollection) : EMPTY_ID_SET),
-    [alertsCollection, hasTrackedSelection],
-  );
   useEffect(() => {
     const style = createStateOutlineStyle(darkMode);
     refs.stateOutlineSourceRef.current.getFeatures().forEach((feature) => feature.setStyle(style));
@@ -156,7 +149,7 @@ export const useMonitorMapOverlaySync = ({
   // transient empty response without the alert does not yank the popup
   // (issue #1595), while a genuinely expired or cancelled alert is still
   // dismissed.
-  useSelectedAlertExpiry(alertIds, selectedAlertId, onClearSelectedAlert);
+  useSelectedAlertExpiry(alertsCollection, selectedAlertId, onClearSelectedAlert);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);

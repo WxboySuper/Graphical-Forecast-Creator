@@ -128,8 +128,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
       onSelectAlert({ ...selectedDetails, detailUrl: '  https://api.weather.gov/alerts/abc  ' });
     });
 
-    // The id crosses verbatim; trimming is owned by the NWS parser.
-    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('  https://api.weather.gov/alerts/abc  ');
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('https://api.weather.gov/alerts/abc');
   });
 
   it('keeps the same selection object across collection changes for dismissal tracking', () => {
