@@ -41,8 +41,8 @@ const alertProperties = (extra: Record<string, unknown> = {}) => ({
 });
 
 const makeFeature = (
-  topId: string | undefined,
   properties: Record<string, unknown>,
+  topId?: string,
 ): AlertFeature =>
   ({
     type: 'Feature',
@@ -57,7 +57,7 @@ const makeCollection = (...features: AlertFeature[]): NwsAlertFeatureCollection 
 });
 
 const standardCollection = () =>
-  makeCollection(makeFeature(ALERT_ID, alertProperties({ '@id': ALERT_ID })));
+  makeCollection(makeFeature(alertProperties({ '@id': ALERT_ID }), ALERT_ID));
 
 const makeArgs = (overrides: Partial<Parameters<typeof useMonitorMapOverlaySync>[0]> = {}) =>
   ({
@@ -99,7 +99,7 @@ const setup = (initialAlertId: string | null = ALERT_ID) => {
 };
 
 const otherCollection = () =>
-  makeCollection(makeFeature(OTHER_ID, alertProperties({ '@id': OTHER_ID })));
+  makeCollection(makeFeature(alertProperties({ '@id': OTHER_ID }), OTHER_ID));
 
 describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('does nothing when nothing is selected', () => {
@@ -125,7 +125,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
     rerender({
-      alertsCollection: makeCollection(makeFeature(EXPIRED_ID, alertProperties({ '@id': EXPIRED_ID }))),
+      alertsCollection: makeCollection(makeFeature(alertProperties({ '@id': EXPIRED_ID }), EXPIRED_ID)),
       selectedAlertId: ALERT_ID,
     });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('matches the alert through properties @id with an opaque top-level id', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
-    const opaque = makeCollection(makeFeature('opaque-local-id', alertProperties({ '@id': ALERT_ID })));
+    const opaque = makeCollection(makeFeature(alertProperties({ '@id': ALERT_ID }), 'opaque-local-id'));
     rerender({ alertsCollection: opaque, selectedAlertId: ALERT_ID });
     rerender({ alertsCollection: opaque, selectedAlertId: ALERT_ID });
 
@@ -177,12 +177,12 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup();
 
     rerender({
-      alertsCollection: makeCollection(makeFeature(undefined, alertProperties({ uri: ALERT_ID }))),
+      alertsCollection: makeCollection(makeFeature(alertProperties({ uri: ALERT_ID }))),
       selectedAlertId: ALERT_ID,
     });
     rerender({
       alertsCollection: makeCollection(
-        makeFeature(undefined, alertProperties({ '@id': `  ${ALERT_ID}  ` })),
+        makeFeature(alertProperties({ '@id': `  ${ALERT_ID}  ` })),
       ),
       selectedAlertId: ALERT_ID,
     });
@@ -194,7 +194,7 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     const { rerender, onClearSelectedAlert } = setup('local-123');
 
     // Mount already counts the first miss; one more consecutive miss clears.
-    rerender({ alertsCollection: makeCollection(makeFeature('local-123', alertProperties({}))), selectedAlertId: 'local-123' });
+    rerender({ alertsCollection: makeCollection(makeFeature(alertProperties({}), 'local-123')), selectedAlertId: 'local-123' });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 });

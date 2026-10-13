@@ -57,7 +57,7 @@ const useSelectedAlertExpiry = (
   onClearSelectedAlert: () => void,
 ) => {
   const consecutiveMissesRef = useRef(0);
-  const prevAlertIdRef = useRef<string | null | undefined>(undefined);
+  const prevAlertIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (selectedAlertId === null) {
