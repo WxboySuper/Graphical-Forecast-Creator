@@ -29,6 +29,7 @@ to each.
 - **@turf/turf** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@types/geojson** ^7946.0.16 (root (pnpm)) — MIT — allowed
 - **@types/jest** ^30.0.0 (root (pnpm)) — MIT — allowed
+- **@types/leaflet** ^1.9.22 (root (pnpm)) — MIT — allowed
 - **@types/node** ^26.6.1 (root (pnpm)) — MIT — allowed
 - **@types/react** 19.3.0 (root (pnpm)) — MIT — allowed
 - **@types/react-dom** 19.3.0 (root (pnpm)) — MIT — allowed

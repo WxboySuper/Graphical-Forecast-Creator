@@ -143,6 +143,7 @@ export const useAutoSave = (
   const saveGenerationRef = useRef(0);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // skipcq: JS-0045 -- React useEffect callbacks may return a cleanup function.
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
