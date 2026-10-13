@@ -6,6 +6,7 @@ import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
 import { buildStormReportStyle } from '../stormReportMapStyle';
 import { toOlStyle } from '../../components/Map/openLayersMapStyles';
 import { MONITOR_OUTLOOK_TRANSPARENCY_SCALE } from './monitorMapLayerUtils';
@@ -71,7 +72,7 @@ export const syncAlertFeatures = (
   const format = new GeoJSON();
 
   alertsCollection.features.forEach((feature) => {
-    if (!feature.geometry) {
+    if (!feature || !feature.geometry) {
       return;
     }
 
@@ -83,10 +84,15 @@ export const syncAlertFeatures = (
     olFeatures.forEach((olFeature) => {
       if ('setProperties' in olFeature && typeof olFeature.setProperties === 'function') {
         olFeature.setProperties({
-          // Preserve a top-level string id so alert identity resolves the
-          // same URL here as in expiry matching (issue #1595).
-          ...(typeof feature.id === 'string' ? { id: feature.id } : {}),
           ...(feature.properties ?? {}),
+          // Only fall back to the top-level id when properties carry no URL
+          // identity, so click-time resolveNwsAlertDetailUrl sees the same
+          // URL as expiry matching (issue #1595). String-only: expiry only
+          // matches http(s) URLs, numeric GeoJSON ids are intentionally ignored.
+          ...(!resolveNwsAlertDetailUrl(feature.properties ?? {}) &&
+          typeof feature.id === 'string'
+            ? { id: feature.id }
+            : {}),
           event: feature.properties?.event ?? 'Alert',
           nwsAlert: true,
         });
