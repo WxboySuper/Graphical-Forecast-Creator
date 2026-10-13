@@ -100,7 +100,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [displayMessage, displayType, emptyMessage, timingMessage]);
+  }, [emptyMessage, timingMessage]);
 
   return !emptyMessage && !isClosed ? (
     <div className={`toast toast-${displayType}`}>
