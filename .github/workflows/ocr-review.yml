@@ -13,7 +13,9 @@ name: Review | OCR
 #   by design: effort high, full re-review every push, rules in
 #   .opencodereview/rule.json file real in-diff bugs (low severity allowed,
 #   marked low, not suppressed; max 10 per PR) but ban feature/refactor
-#   suggestions, untouched-code expansion, and hypotheticals. If the
+#   suggestions, untouched-code expansion, and hypotheticals. Lows route to
+#   the digest summary (route_severity_below) and never block; only medium+
+#   inline findings and unresolved threads fail the gate. If the
 #   reviewer proves noisy rather than useful, relax the rules or drop the
 #   gate before touching the ruleset.
 #
@@ -113,6 +115,11 @@ jobs:
           language: English
           effort: high
           review_task_timeout: '20'
+          # Lows stay visible but non-blocking: routed to the digest summary
+          # (fail-open, never dropped) instead of inline threads. Medium+
+          # stay inline and block via the gate below (which counts inline
+          # comments, not routed ones).
+          route_severity_below: 'low'
           sticky_summary: 'true'
           incremental: 'false'
           resolve_outdated: 'false'
@@ -294,13 +301,15 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
-          OCR_COMMENTS_TOTAL: ${{ steps.ocr.outputs.comments_total }}
+          OCR_COMMENTS_TOTAL: ${{ steps.ocr.outputs.comments_inline }}
           GATE_PR_NUMBER: ${{ env.PR_NUMBER }}
         with:
           script: |
             // Fail-closed merge gate: the review must complete, post zero
-            // findings, and leave zero unresolved bot-authored review threads.
-            // Anything else fails this check. Note the Main Ruleset already
+            // medium+ inline findings, and leave zero unresolved bot-authored
+            // review threads. Low-severity findings are routed to the digest
+            // summary (route_severity_below) and never block. Anything else
+            // fails this check. Note the Main Ruleset already
             // requires review-thread resolution, so unresolved inline threads
             // block merge even without this job in required_status_checks.
             const outcome = process.env.OCR_OUTCOME || 'unknown';
