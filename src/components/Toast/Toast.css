@@ -5,23 +5,10 @@
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
   gap: 8px;
   pointer-events: none;
-  width: 420px;
-}
-
-/* On phones and compact landscapes, keep toasts above the forecast toolbar
-   safe area so they never obscure the editor's primary controls. */
-@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
-  .toast-container {
-    right: 12px;
-    left: 12px;
-    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-    align-items: center;
-    width: auto;
-  }
-
+  --toast-max-width: 420px;
+  max-width: var(--toast-max-width);
 }
 
 .toast {
@@ -34,16 +21,27 @@
   animation: slideIn 0.3s ease forwards;
   pointer-events: all;
   box-sizing: border-box;
-  width: fit-content;
   min-width: 200px;
-  max-width: 420px;
-  overflow-wrap: anywhere;
+  max-width: var(--toast-max-width);
+  overflow-wrap: break-word;
+  word-break: normal;
   text-align: center;
 }
 
+/* On phones and compact landscapes, keep toasts above the forecast toolbar
+   safe area so they never obscure the editor's primary controls. */
 @media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .toast-container {
+    right: 12px;
+    left: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    align-items: center;
+    width: auto;
+    max-width: none;
+  }
+
   .toast {
-    min-width: min(200px, 100%);
+    min-width: min(200px, calc(100% - 24px));
     max-width: 100%;
   }
 }

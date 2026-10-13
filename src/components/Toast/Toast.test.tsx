@@ -169,6 +169,17 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('does not count collapsed blank lines as additional reading time', () => {
+    const onClose = jest.fn();
+    render(<Toast message={`x${'\n\n'.repeat(40)}x`} onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('hides empty or malformed messages and closes them immediately', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="   " onClose={onClose} />);
@@ -182,6 +193,32 @@ describe('Toast', () => {
     act(() => {
       jest.advanceTimersByTime(0);
     });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('starts a fresh lifetime when a reused toast gets new copy after empty state', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="First notice" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(29000);
+    });
+    rerender(<Toast message="" onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(0);
+    });
+    expect(onClose).toHaveBeenCalledTimes(2);
+    onClose.mockClear();
+    rerender(<Toast message="New notice" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2999);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
