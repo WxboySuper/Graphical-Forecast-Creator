@@ -114,10 +114,11 @@ jobs:
           # once the session header is present; '{}' simply stays neutral.
           llm_extra_body: '{}'
           language: English
-          effort: low
+          effort: medium
           review_task_timeout: '20'
-          # Cost control on a subscription: lowest reasoning depth. Bump to
-          # medium if reviews go quiet or shallow.
+          # Cost control on a subscription: medium reasoning depth. Bump to
+          # high if reviews go quiet or shallow; drop to low only if medium
+          # proves consistently chatty enough.
           # Placement: everything stays inline (lows included, easier to see
           # what needs eyes). Only style routes to the digest summary.
           # Documentation stays inline: docs findings matter here.
