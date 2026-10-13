@@ -105,22 +105,6 @@ describe('kmzExport', () => {
     expect(tornadoOnly.find((feature) => feature.probabilityKey === 'CIG2')?.fillColor).toBe('#000000');
   });
 
-  test('collects significance by outlook probability domain', () => {
-    const forecast = buildForecast();
-    const dayOne = forecast.days[1];
-    if (!dayOne) throw new Error('Day 1 fixture is missing');
-    dayOne.data.wind = new Map([['90%#', [square()]]]) as never;
-    dayOne.data.hail = new Map([['90%#', [square()]]]) as never;
-
-    const features = collectKmzExportFeatures({
-      forecastCycle: forecast,
-      options: { scope: 'current-day', day: 1 },
-    });
-
-    expect(features.find((feature) => feature.outlookType === 'wind' && feature.probabilityKey === '90%#')?.isSignificant).toBe(true);
-    expect(features.find((feature) => feature.outlookType === 'hail' && feature.probabilityKey === '90%#')?.isSignificant).toBe(false);
-  });
-
   test('buildStructuredKmlDocument emits placemarks with ExtendedData', () => {
     const forecast = buildForecast();
     const kml = buildStructuredKmlDocument({

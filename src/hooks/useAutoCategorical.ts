@@ -56,8 +56,7 @@ export const signatureFromOutlookMap = (
     .map((feature) => {
       const sourceType = String(feature.properties?.outlookType || '');
       const probability = String(feature.properties?.probability || '');
-      const significance = String(feature.properties?.isSignificant ?? '');
-      return `${sourceType}:${probability}:${significance}:${getGeometryId(feature.geometry)}`;
+      return `${sourceType}:${probability}:${getGeometryId(feature.geometry)}`;
     })
     .sort()
     .join('|');

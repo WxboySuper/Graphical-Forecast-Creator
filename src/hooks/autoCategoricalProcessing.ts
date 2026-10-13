@@ -18,14 +18,6 @@ export function processOutlooksToCategorical(outlooks: OutlookData, day: number 
 
 type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
-const DAY12_CATEGORICAL_CONVERTERS = {
-  tornado: tornadoToCategorical,
-  wind: windToCategorical,
-  hail: hailToCategorical,
-} as const;
-type Day12OutlookType = keyof typeof DAY12_CATEGORICAL_CONVERTERS;
-const DAY12_OUTLOOK_TYPES = Object.keys(DAY12_CATEGORICAL_CONVERTERS) as Day12OutlookType[];
-
 /** Builds a reusable two-feature collection shell for Turf v7 boolean ops. */
 const createPairFeatureCollection = (): FeatureCollection<Polygon | MultiPolygon> => ({
   type: 'FeatureCollection',
@@ -180,7 +172,6 @@ const normalizePolygonFeature = (feature: PolygonOutlookFeature): PolygonOutlook
     const cleaned = turf.cleanCoords(feature) as PolygonOutlookFeature;
     return cleaned;
   } catch (error) {
-    // Hatching topology errors must not discard prior valid geometry.
     throw new CategoricalDerivationError(
       `Outlook geometry normalization failed: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -230,72 +221,48 @@ const buildHatchingRegions = (
   return hatchingRegions;
 };
 
-type ProbabilityHatchingContext = {
-  probStr: string;
-  poly: PolygonOutlookFeature;
-  hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>;
-  cigLevels: CIGLevel[];
-  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void;
-};
-
-type HatchIntersectionContext = {
-  probStr: string;
-  cig: CIGLevel;
-  remainingPoly: PolygonOutlookFeature;
-  hatchRegion: PolygonOutlookFeature;
-  pairCollection: ReturnType<typeof createPairFeatureCollection>;
-  isSignificant: boolean;
-  onPiece: ProbabilityHatchingContext['onPiece'];
-};
-
-/** Intersects one probability polygon with its available hatching regions. */
-const applyHatchingToProbabilityPolygon = ({
-  probStr, poly, hatchingRegions, cigLevels, onPiece,
-}: ProbabilityHatchingContext): void => {
-  const storedSignificance = poly.properties?.isSignificant;
-  const isSignificant = storedSignificance === true || storedSignificance === 1 || storedSignificance === 'true';
-  let remainingPoly: PolygonOutlookFeature | null = poly;
-  const pairCollection = createPairFeatureCollection();
-
-  for (const cig of cigLevels) {
-    if (!remainingPoly) break;
-    const hatchRegion = hatchingRegions.get(cig);
-    if (!hatchRegion) continue;
-    remainingPoly = intersectAndEmitHatchPiece({
-      probStr, cig, remainingPoly, hatchRegion, pairCollection, isSignificant, onPiece,
-    });
-  }
-
-  if (remainingPoly) onPiece(probStr, 'CIG0', remainingPoly, isSignificant);
-};
-
-/** Emits one hatch intersection and returns the polygon area not yet assigned. */
-function intersectAndEmitHatchPiece({
-  probStr, cig, remainingPoly, hatchRegion, pairCollection, isSignificant, onPiece,
-}: HatchIntersectionContext): PolygonOutlookFeature | null {
-  try {
-    setPairFeatures(pairCollection, remainingPoly, hatchRegion);
-    const intersection = turf.intersect(pairCollection) as PolygonOutlookFeature | null;
-    if (!intersection) return remainingPoly;
-    onPiece(probStr, cig, intersection, isSignificant);
-    setPairFeatures(pairCollection, remainingPoly, intersection);
-    return turf.difference(pairCollection) as PolygonOutlookFeature | null;
-  } catch (error) {
-    throw new CategoricalDerivationError(
-      `Hatching intersection failed for ${probStr}/${cig}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
-/** Splits probability polygons by hatching layers and emits categorical pieces. */
+/** Splits each probability polygon by hatching layers and emits categorical pieces via callback. */
 const applyProbabilityFeaturesWithHatching = (
   probabilityFeatures: Map<string, PolygonOutlookFeature[]>,
   hatchingRegions: Map<CIGLevel, PolygonOutlookFeature>,
   cigLevels: CIGLevel[],
-  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature, isSignificant: boolean) => void,
+  onPiece: (probStr: string, cig: CIGLevel, piece: PolygonOutlookFeature) => void,
 ): void => {
   probabilityFeatures.forEach((features, probStr) => {
-    features.forEach((poly) => applyHatchingToProbabilityPolygon({ probStr, poly, hatchingRegions, cigLevels, onPiece }));
+    features.forEach((poly) => {
+      let remainingPoly: PolygonOutlookFeature | null = poly;
+      const pairCollection = createPairFeatureCollection();
+
+      cigLevels.forEach((cig) => {
+        if (!remainingPoly) {
+          return;
+        }
+
+        const hatchRegion = hatchingRegions.get(cig);
+        if (!hatchRegion) {
+          return;
+        }
+
+        try {
+          setPairFeatures(pairCollection, remainingPoly, hatchRegion);
+          const intersection = turf.intersect(pairCollection);
+          if (intersection) {
+            onPiece(probStr, cig, intersection as PolygonOutlookFeature);
+            setPairFeatures(pairCollection, remainingPoly, intersection as PolygonOutlookFeature);
+            remainingPoly = turf.difference(pairCollection) as PolygonOutlookFeature | null;
+          }
+        } catch (error) {
+          // Hatching topology errors must not discard prior valid geometry.
+          throw new CategoricalDerivationError(
+            `Hatching intersection failed for ${probStr}/${cig}: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      });
+
+      if (remainingPoly) {
+        onPiece(probStr, 'CIG0', remainingPoly);
+      }
+    });
   });
 };
 
@@ -317,9 +284,10 @@ const appendRiskPolygon = (
 // Helper to convert Day 1/2 probability features to categorical pieces
 export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
   const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
+  const types = ['tornado', 'wind', 'hail'] as const;
   const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
 
-  DAY12_OUTLOOK_TYPES.forEach((type) => {
+  types.forEach((type) => {
     const probMap = coerceOutlookProbabilityMap(outlooks[type]);
     if (!probMap || probMap.size === 0) {
       return;
@@ -332,7 +300,7 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
       probabilityFeatures,
       hatchingRegions,
       cigLevels,
-      (probStr, cig, piece, isSignificant) => addPieceToRiskMap(type, probStr, cig, piece, riskPolygons, isSignificant),
+      (probStr, cig, piece) => addPieceToRiskMap(type, probStr, cig, piece, riskPolygons),
     );
   });
 
@@ -342,20 +310,19 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
 /**
  * Maps one intersected probabilistic polygon piece into its categorical risk
  * bucket and appends it unless it resolves to TSTM.
- * @param isSignificant Stored source flag; probability marker handling remains in the outlook converter.
  */
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail',
-  probStr: string,
+  prob: string,
   cig: CIGLevel,
   poly: PolygonOutlookFeature,
   riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
-  isSignificant: boolean,
 ) {
-  const converter = Object.prototype.hasOwnProperty.call(DAY12_CATEGORICAL_CONVERTERS, type)
-    ? DAY12_CATEGORICAL_CONVERTERS[type]
-    : undefined;
-  const risk = converter ? converter({ probability: probStr, cig, isSignificant }) : 'TSTM';
+  let risk: CategoricalRiskLevel = 'TSTM';
+  if (type === 'tornado') risk = tornadoToCategorical({ probability: prob, cig });
+  if (type === 'wind') risk = windToCategorical({ probability: prob, cig });
+  if (type === 'hail') risk = hailToCategorical({ probability: prob, cig });
+
   appendRiskPolygon(riskMap, risk, poly);
 }
 
@@ -367,7 +334,7 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
     return [];
   }
 
-  const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
+  const cigLevels: CIGLevel[] = ['CIG2', 'CIG1'];
   const { probabilityFeatures, hatchingFeatures } = partitionProbabilityMap(probMap);
   const hatchingRegions = buildHatchingRegions(hatchingFeatures, cigLevels);
 
@@ -375,8 +342,8 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
     probabilityFeatures,
     hatchingRegions,
     cigLevels,
-    (probStr, cig, piece, isSignificant) => {
-      appendRiskPolygon(riskPolygons, totalSevereToCategorical({ probability: probStr, cig, isSignificant }), piece);
+    (probStr, cig, piece) => {
+      appendRiskPolygon(riskPolygons, totalSevereToCategorical({ probability: probStr, cig }), piece);
     },
   );
 

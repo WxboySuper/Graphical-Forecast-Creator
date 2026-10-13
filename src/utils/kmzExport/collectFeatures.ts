@@ -54,7 +54,7 @@ const collectProbabilityFeatures = (
   configuredOpacity: number | undefined,
 ): KmzExportFeature[] => {
   const isCig = isCigKey(probabilityKey);
-  const isSignificant = isSignificantThreat({ probability: probabilityKey, outlookType })
+  const isSignificant = isSignificantThreat({ probability: probabilityKey })
     || dayFeatures.some((feature) => feature.properties?.isSignificant === true);
   const fillOpacity = typeof configuredOpacity === 'number'
     ? Math.min(1, Math.max(0, configuredOpacity))
