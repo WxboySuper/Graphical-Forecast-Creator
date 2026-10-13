@@ -25,6 +25,8 @@
   overflow-wrap: anywhere;
   text-align: center;
   white-space: pre-wrap;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 /* On phones and compact landscapes, keep toasts above the forecast toolbar
@@ -35,7 +37,8 @@
     left: 12px;
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     align-items: center;
-    max-width: none;
+    max-width: 420px;
+    margin-inline: auto;
   }
 
   .toast {

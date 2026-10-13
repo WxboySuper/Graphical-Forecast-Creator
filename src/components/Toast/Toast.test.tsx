@@ -21,6 +21,14 @@ describe('Toast', () => {
     expect(screen.getByText('Test Message')).toBeInTheDocument();
   });
 
+  test('preserves message whitespace in the rendered copy', () => {
+    const message = '  - Gusts 40kt\n  - Hail possible  ';
+    render(<Toast message={message} onClose={() => undefined} />);
+    const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
+
+    expect(toast.textContent).toBe(message);
+  });
+
   test('calls onClose after 3 seconds', () => {
     const onClose = jest.fn();
     render(<Toast message="Auto Close" onClose={onClose} />);
@@ -119,6 +127,7 @@ describe('Toast', () => {
     rerender(<Toast message="Updated after cap" onClose={onClose} />);
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Updated after cap')).not.toBeInTheDocument();
   });
 
   test('gives longer messages more time to be read', () => {
