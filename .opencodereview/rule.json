@@ -2,32 +2,32 @@
   "rules": [
     {
       "path": "src/**/*.ts",
-      "rule": "GFC frontend review. Only file real bugs introduced or directly worsened by the diff: crashes, wrong data shown to users, broken forecast/monitor/verify behavior, auth/premium-gate bypasses, and security issues. Severity must be medium or higher; do NOT file nits, style, naming, memoization, dead code, or refactor suggestions. Do NOT propose new features, abstractions, or follow-up work. Do NOT expand scope to untouched code or hypothetical edge cases without evidence in this diff. Max 5 findings per PR; if there are more, file only the most severe. Each finding needs file, line, evidence in the diff, and concrete user impact.",
+      "rule": "GFC frontend review. File real bugs introduced or directly worsened by the diff: crashes, wrong data shown to users, broken forecast/monitor/verify behavior, auth/premium-gate bypasses, security issues, plus React 19 correctness (stale closures, wrong hook deps, setState during render), Redux/Immer misuse, OpenLayers mistakes (projection, layer leaks, unremoved listeners), and null/undefined derefs on weather data with evidence in the diff. Mark minor or uncertain items low rather than suppressing them. Do NOT propose new features, abstractions, refactors, or follow-up work. Do NOT expand to untouched code or hypothetical edge cases without evidence in this diff. Max 10 findings per PR, most severe first. Each finding needs file, line, evidence in the diff, and concrete user impact.",
       "merge_system_rule": true
     },
     {
       "path": "src/**/*.tsx",
-      "rule": "GFC component review. Only file real bugs in the diff that break rendering, input, or user understanding of the forecast: crashes, inaccessible critical actions with no workaround, broken controls, wrong copy that causes user error. Severity medium or higher only; no polish nits, no memoization/render micro-opts, no style taste, no new-feature ideas. Do not expand to untouched components. Max 5 findings per PR.",
+      "rule": "GFC component review. File real bugs in the diff that break rendering, input, or user understanding: crashes, broken controls, inaccessible critical actions with no workaround, wrong copy that causes user error, controlled/uncontrolled input mistakes, responsive breakage on realistic screens. Mark polish-level items low rather than suppressing them. No style taste, no memoization/render micro-opts unless they cause visible breakage, no new-feature ideas. Do not expand to untouched components. Max 10 findings per PR.",
       "merge_system_rule": true
     },
     {
       "path": "server/**/*.js",
-      "rule": "GFC backend review. Only file real bugs in touched routes: missing auth checks, injection, secret/PII leaks, unvalidated client payloads that cause crashes or bad writes, broken Stripe webhook verification. Severity medium or higher only; no style or maintainability nits, no refactor proposals, no speculative hardening. Each finding needs file, line, evidence, and user impact.",
+      "rule": "GFC backend review. File real bugs in touched routes: missing auth checks, injection, secret/PII leaks, unvalidated client payloads that cause crashes or bad writes, broken Stripe webhook verification, error paths that leak internals or silently fail user-visible operations. Mark minor items low rather than suppressing them. No style nits, no refactor proposals, no speculative hardening without evidence. Treat auth, injection, or secret-handling gaps as critical. Each finding needs file, line, evidence, and user impact.",
       "merge_system_rule": true
     },
     {
       "path": "scripts/**/*.mjs",
-      "rule": "GFC automation review. Only file bugs that break the script on realistic inputs: shell injection via PR titles/branch names, wrong gh api usage that fails, missing pagination that drops data, secrets leaking into logs. No style nits, no set -euo pipefail preaching unless its absence caused a real failure here. No feature suggestions.",
+      "rule": "GFC automation review. File bugs that break the script on realistic inputs: shell injection via PR titles/branch names, wrong gh api usage that fails, missing pagination that drops data, stale-SHA races, secrets leaking into logs. Mark minor robustness items low rather than suppressing them. No style preaching, no feature suggestions.",
       "merge_system_rule": true
     },
     {
       "path": ".github/workflows/**",
-      "rule": "GFC workflow review. Only file real safety bugs: execution of untrusted PR code via pull_request_target checkout, unpinned third-party actions on non-immutable refs, permissions wider than the job needs, secrets from anywhere but secrets context or echoed to logs. No hygiene nits, no concurrency-group taste unless it actually breaks or cancels the parallel reviewer. Critical only for genuine execution/privilege-escalation risks.",
+      "rule": "GFC workflow review. File real safety and correctness bugs: execution of untrusted PR code via pull_request_target checkout, unpinned third-party actions on non-immutable refs, permissions wider than the job needs, secrets from anywhere but secrets context or echoed to logs, concurrency groups that cancel the parallel reviewer, missing timeouts on network-dependent jobs. Mark hygiene items low rather than suppressing them. Critical only for genuine execution/privilege-escalation risks.",
       "merge_system_rule": true
     },
     {
       "path": "**/*.md",
-      "rule": "Docs review. Only flag docs the diff makes factually wrong (stale instructions, wrong commands, broken links in touched docs). No prose taste, no rewrite suggestions.",
+      "rule": "Docs review. Flag docs the diff leaves factually wrong (stale instructions, wrong commands, broken links, confusing wording in touched docs). No prose taste, no rewrite suggestions.",
       "merge_system_rule": true
     }
   ]
