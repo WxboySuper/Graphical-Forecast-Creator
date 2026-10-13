@@ -47,19 +47,29 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('does not restart the timer for a type-only update', () => {
+  test('ignores type-only changes and restarts for new copy after a close callback', () => {
     const onClose = jest.fn();
-    const { rerender } = render(<Toast message="Notice" type="info" onClose={onClose} />);
+    const { rerender } = render(<Toast message="Original" type="info" onClose={onClose} />);
 
     act(() => {
       jest.advanceTimersByTime(2500);
     });
-    rerender(<Toast message="Notice" type="success" onClose={onClose} />);
+    rerender(<Toast message="Original" type="success" onClose={onClose} />);
     act(() => {
       jest.advanceTimersByTime(500);
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    rerender(<Toast message="Updated" type="success" onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(2999);
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   test('uses the latest onClose callback without restarting the timer', () => {
@@ -109,21 +119,6 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('starts a new reading window when the message changes after a close callback', () => {
-    const onClose = jest.fn();
-    const { rerender } = render(<Toast message="First" onClose={onClose} />);
-
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
-    rerender(<Toast message="Updated" onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
-
-    expect(onClose).toHaveBeenCalledTimes(2);
-  });
-
   test('gives longer messages more time to be read', () => {
     const onClose = jest.fn();
     render(<Toast message={'Notice '.repeat(15)} onClose={onClose} />);
@@ -134,7 +129,7 @@ describe('Toast', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     act(() => {
-      jest.advanceTimersByTime(2250);
+      jest.advanceTimersByTime(7500);
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -146,6 +141,14 @@ describe('Toast', () => {
 
     act(() => {
       jest.advanceTimersByTime(3000);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(2899);
+    });
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(1);
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -160,7 +163,7 @@ describe('Toast', () => {
     });
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    rerender(<Toast message={null as unknown as string} onClose={onClose} />);
+    rerender(<Toast message={null} onClose={onClose} />);
     act(() => {
       jest.advanceTimersByTime(0);
     });

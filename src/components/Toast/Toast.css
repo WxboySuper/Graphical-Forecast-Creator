@@ -18,6 +18,7 @@
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     align-items: center;
   }
+
 }
 
 .toast {
@@ -30,13 +31,19 @@
   animation: slideIn 0.3s ease forwards;
   pointer-events: all;
   box-sizing: border-box;
-  min-width: min(200px, 100%);
-  max-width: min(420px, calc(100vw - 48px));
-  max-height: min(40vh, 240px);
-  overflow-x: hidden;
+  min-width: min(200px, calc(100% - 24px));
+  max-width: min(420px, 100%);
+  max-height: min(40dvh, 240px);
   overflow-y: auto;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
   text-align: center;
+}
+
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .toast {
+    max-height: min(30dvh, 160px);
+  }
 }
 
 .toast-info {
