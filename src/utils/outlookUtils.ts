@@ -355,6 +355,7 @@ type AvailableProbabilities = {
   hail?: CategoricalOutlookValue<HailProbability>;
 };
 
+/** Converts plain or structured outlook values to the shared categorical input shape. */
 function toCategoricalInput(input: string | DetailedCategoricalInput): CategoricalInput {
   if (typeof input === 'string') return { probability: input };
   return {

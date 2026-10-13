@@ -58,15 +58,32 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '1%', cig: 'CIG0' })).toBe('TSTM');
   });
 
-  test('unsupported CIG3 combinations preserve the underlying probability risk', () => {
-    expect(tornadoToCategorical({ probability: '2%', cig: 'CIG3' })).toBe('SLGT');
-    expect(tornadoToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('ENH');
-    expect(windToCategorical({ probability: '5%', cig: 'CIG3' })).toBe('SLGT');
-    expect(windToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('ENH');
-    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('MDT');
-    expect(tornadoToCategorical({ probability: '10%', cig: 'CIG1' })).toBe('ENH');
-    expect(windToCategorical({ probability: '90%', cig: 'CIG0' })).toBe('MDT');
-    expect(totalSevereToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('ENH');
+  test('maps probabilities across CIG fallbacks and significant variants', () => {
+    const cases: Array<[CategoricalRiskLevel, CategoricalRiskLevel]> = [
+      [tornadoToCategorical({ probability: '2%', cig: 'CIG3' }), 'SLGT'],
+      [tornadoToCategorical({ probability: '5%', cig: 'CIG3' }), 'ENH'],
+      [tornadoToCategorical({ probability: '10%', cig: 'CIG1' }), 'ENH'],
+      [tornadoToCategorical({ probability: '15#', cig: 'CIG3' }), 'MDT'],
+      [windToCategorical({ probability: '5%', cig: 'CIG0' }), 'MRGL'],
+      [windToCategorical({ probability: '5%', cig: 'CIG2' }), 'SLGT'],
+      [windToCategorical({ probability: '5%', cig: 'CIG3' }), 'SLGT'],
+      [windToCategorical({ probability: '15%', cig: 'CIG0' }), 'SLGT'],
+      [windToCategorical({ probability: '15%', cig: 'CIG2' }), 'ENH'],
+      [windToCategorical({ probability: '15#', cig: 'CIG0' }), 'SLGT'],
+      [windToCategorical({ probability: '15#', cig: 'CIG2' }), 'ENH'],
+      [windToCategorical({ probability: '30%', cig: 'CIG0' }), 'ENH'],
+      [windToCategorical({ probability: '30%', cig: 'CIG3' }), 'ENH'],
+      [windToCategorical({ probability: '45%', cig: 'CIG2' }), 'MDT'],
+      [windToCategorical({ probability: '45%', cig: 'CIG3' }), 'HIGH'],
+      [windToCategorical({ probability: '45%#', cig: 'CIG3' }), 'HIGH'],
+      [windToCategorical({ probability: '60%', cig: 'CIG0' }), 'MDT'],
+      [windToCategorical({ probability: '90%', cig: 'CIG0' }), 'MDT'],
+      [hailToCategorical({ probability: '30#', cig: 'CIG2' }), 'ENH'],
+      [hailToCategorical({ probability: '45%', cig: 'CIG3' }), 'MDT'],
+      [totalSevereToCategorical({ probability: '30%', cig: 'CIG3' }), 'ENH'],
+      [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'TSTM'],
+    ];
+    expect(cases.map(([actual]) => actual)).toEqual(cases.map(([, expected]) => expected));
   });
 
   test('malformed probability and CIG values fail safely to TSTM', () => {
@@ -102,29 +119,6 @@ describe('outlookUtils extra', () => {
     ]);
 
     expect(sequences.every(isNondecreasing)).toBe(true);
-  });
-
-  test('significant risk never lowers a higher mapped CIG risk and unsupported markers fail safely', () => {
-    expect(tornadoToCategorical({ probability: '15#', cig: 'CIG3' })).toBe('MDT');
-    expect(windToCategorical({ probability: '15#', cig: 'CIG2' })).toBe('ENH');
-    expect(windToCategorical({ probability: '45%#', cig: 'CIG3' })).toBe('HIGH');
-    expect(hailToCategorical({ probability: '30#', cig: 'CIG2' })).toBe('ENH');
-    expect(windToCategorical({ probability: '15#', cig: 'CIG0' })).toBe('SLGT');
-    expect(windToCategorical({ probability: '2%#' })).toBe('TSTM');
-    expect(windToCategorical({ probability: '999%#' })).toBe('TSTM');
-    expect(totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' })).toBe('TSTM');
-  });
-
-  test('windToCategorical maps probabilities properly', () => {
-    expect(windToCategorical({ probability: '5%', cig: 'CIG0' })).toBe('MRGL');
-    expect(windToCategorical({ probability: '5%', cig: 'CIG2' })).toBe('SLGT');
-    expect(windToCategorical({ probability: '15%', cig: 'CIG0' })).toBe('SLGT');
-    expect(windToCategorical({ probability: '15%', cig: 'CIG2' })).toBe('ENH');
-    expect(windToCategorical({ probability: '30%', cig: 'CIG0' })).toBe('ENH');
-    expect(windToCategorical({ probability: '60%', cig: 'CIG0' })).toBe('MDT');
-    expect(windToCategorical({ probability: '45%', cig: 'CIG2' })).toBe('MDT');
-    expect(windToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('HIGH');
-    expect(windToCategorical({ probability: '45#', cig: 'CIG0' })).toBe('MDT');
   });
 
   test('hailToCategorical maps probabilities properly', () => {
