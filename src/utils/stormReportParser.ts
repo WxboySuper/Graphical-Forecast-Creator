@@ -17,6 +17,10 @@ type ArchiveCsvContext = { csvText: string };
 type ArchiveRowContext = { line: string; section: ReportType; headers: string[] };
 type RollingFeedRequest = { url: string; label: string };
 
+function isValidCalendarDate({ date, year, month, day }: CalendarDateParts): boolean {
+  return [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
+}
+
 /** Builds an SPC archive URL for a valid YYMMDD date and report format. */
 function archiveUrlForDate({ date, format = 'filtered' }: ArchiveUrlOptions): string {
   if (!isValidArchiveDate(date)) {
@@ -34,10 +38,6 @@ function isValidArchiveDate(date: string): boolean {
   const month = Number(date.slice(2, 4)) - 1;
   const day = Number(date.slice(4, 6));
   return isValidCalendarDate({ date: new Date(year, month, day), year, month, day });
-}
-
-function isValidCalendarDate({ date, year, month, day }: CalendarDateParts): boolean {
-  return [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
 }
 
 const ARCHIVE_SECTION_HEADERS: readonly { labels: readonly string[]; type: ReportType }[] = [
