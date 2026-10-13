@@ -36,6 +36,16 @@ describe('parseTodayStormReportCsv', () => {
     expect(reports[2]?.magnitude).toBe('1.75"');
   });
 
+  test('recognizes quoted, spaced, and case-varied filtered section headers', () => {
+    const csv = [
+      '\uFEFF  "TIME" , "F_Scale" , Location, County, State, Lat, Lon, Comments',
+      '1805,1,Ada,OK,OK,34.77,-96.67,Normalized header',
+    ].join('\n');
+    expect(parseTodayStormReportCsv(csv)).toMatchObject([
+      { type: 'tornado', magnitude: 'EF1', latitude: 34.77, longitude: -96.67 },
+    ]);
+  });
+
   test('treats unknown Time-prefixed lines as section boundaries', () => {
     const csv = [
       'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
@@ -110,5 +120,23 @@ describe('fetchYesterdayStormReports', () => {
     }) as unknown as typeof global.fetch;
 
     await expect(fetchTodayStormReports()).rejects.toThrow('HTTP 503');
+  });
+
+  test('rejects an HTML maintenance body instead of reporting zero storms', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('<html>Maintenance</html>'),
+    }) as unknown as typeof global.fetch;
+    await expect(fetchTodayStormReports()).rejects.toThrow('invalid');
+  });
+
+  test('wraps a rejected response body read with connection guidance', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: () => Promise.reject(new TypeError('stream failed')),
+    }) as unknown as typeof global.fetch;
+    await expect(fetchTodayStormReports()).rejects.toThrow('Check the connection and try again');
   });
 });

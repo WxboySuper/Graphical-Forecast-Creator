@@ -9,8 +9,12 @@ const createReportBuckets = (): TodayReportsByType => ({
   hail: [],
 });
 
+const normalizeHeader = (line: string): string =>
+  line.replace(/^\uFEFF/, '').replace(/"/g, '').split(',').map((value) => value.trim().toLowerCase()).join(',');
+
 const getTodaySectionType = (line: string): ReportType | undefined => {
-  return TODAY_SECTION_HEADERS.find(({ header }) => line.startsWith(header))?.type;
+  const normalizedLine = normalizeHeader(line);
+  return TODAY_SECTION_HEADERS.find(({ header }) => normalizedLine.startsWith(normalizeHeader(header)))?.type;
 };
 
 const flattenReports = (reportsByType: TodayReportsByType): StormReport[] => [
@@ -27,7 +31,7 @@ export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
 
   for (const line of lines) {
     const sectionType = getTodaySectionType(line);
-    if (line.startsWith('Time,')) {
+    if (normalizeHeader(line).startsWith('time,')) {
       // Preserve the former parser's boundary behavior for unknown sections.
       activeType = sectionType;
       continue;

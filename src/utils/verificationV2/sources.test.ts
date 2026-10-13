@@ -57,6 +57,11 @@ describe('source loaders', () => {
       text: () => Promise.resolve(body),
     }) as unknown as typeof global.fetch;
   };
+  const emptyFilteredFeed = [
+    'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+    'Time,Speed,Location,County,State,Lat,Lon,Comments',
+    'Time,Size,Location,County,State,Lat,Lon,Comments',
+  ].join('\n');
 
   afterEach(() => {
     global.fetch = originalFetch;
@@ -81,7 +86,7 @@ describe('source loaders', () => {
     });
 
     test('routes null to today\'s SPC reports feed', async () => {
-      mockFetch('');
+      mockFetch(emptyFilteredFeed);
       const reports = await loadReportsForDate(null);
       expect(reports).toEqual([]);
       expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/today_filtered.csv');
@@ -131,7 +136,7 @@ describe('source loaders', () => {
     test.each(reportFeedCases)(
       'routes a date matching $label to the matching SPC reports feed',
       async ({ date, now, url }) => {
-        mockFetch('');
+        mockFetch(emptyFilteredFeed);
         const reports = await loadReportsForDate(date, now);
         expect(reports).toEqual([]);
         expect(global.fetch).toHaveBeenCalledWith(url);
@@ -152,7 +157,7 @@ describe('source loaders', () => {
       );
     });
 
-    test('falls back to the raw archive only when SPC has no filtered archive for a date', async () => {
+    test('falls back to the raw archive when the filtered archive is unavailable', async () => {
       global.fetch = jest.fn()
         .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
         .mockResolvedValueOnce({
