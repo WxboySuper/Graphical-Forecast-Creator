@@ -32,25 +32,16 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     const now = performance.now();
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
-    const remainingLifetime = MAX_TOAST_LIFETIME_MS - elapsed;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (remainingLifetime <= 0) {
-      if (!closedRef.current) {
-        closedRef.current = true;
-        onCloseRef.current();
-      }
-    } else {
-      const duration = Math.min(getToastDuration(message), remainingLifetime);
-      timer = setTimeout(() => {
-        if (!closedRef.current) {
-          closedRef.current = true;
-          onCloseRef.current();
-        }
-      }, duration);
-    }
+    const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
+    const duration = Math.min(getToastDuration(message), remainingLifetime);
+    const timer = setTimeout(() => {
+      if (closedRef.current) return;
+      closedRef.current = true;
+      onCloseRef.current();
+    }, duration);
 
     return () => {
-      if (timer !== undefined) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [message]);
 
