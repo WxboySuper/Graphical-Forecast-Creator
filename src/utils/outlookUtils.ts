@@ -76,7 +76,7 @@ type NormalizedCategoricalProbability = {
   significant: boolean;
 };
 
-type DetailedCategoricalInput<P extends string = string> = {
+export type DetailedCategoricalInput<P extends string = string> = {
   probability: P | SignificantProbability<P>;
   cig?: CIGLevel;
   isSignificant?: boolean;
@@ -197,9 +197,12 @@ function higherCategoricalRisk(
   accumulated: CategoricalRiskLevel | undefined,
   candidate: CategoricalRiskLevel,
 ): CategoricalRiskLevel {
-  if (accumulated === undefined || CATEGORICAL_RISK_RANK[candidate] > CATEGORICAL_RISK_RANK[accumulated]) {
-    return candidate;
-  }
+  const candidateRank = CATEGORICAL_RISK_RANK[candidate];
+  if (candidateRank === undefined) return accumulated ?? DEFAULT_CATEGORICAL_RISK;
+  if (accumulated === undefined) return candidate;
+
+  const accumulatedRank = CATEGORICAL_RISK_RANK[accumulated];
+  if (accumulatedRank === undefined || candidateRank > accumulatedRank) return candidate;
   return accumulated;
 }
 
@@ -241,6 +244,7 @@ function findCategoricalRisk(
   const fallbackRisk = findCigFallbackRisk(normalized.probability, targetCigRank, rules) ?? DEFAULT_CATEGORICAL_RISK;
   // Significant markers without a separate product mapping (such as Day 3
   // total severe) retain the corresponding plain-probability CIG category.
+  // When both apply, the significant category acts as a floor over CIG risk.
   return significantRisk === undefined ? fallbackRisk : higherCategoricalRisk(significantRisk, fallbackRisk);
 }
 
@@ -295,8 +299,8 @@ const WIND_RULES: readonly CategoricalRule[] = [
   { probabilities: ['60%', '75%', '90%'], cigs: CIG_23, risk: 'HIGH' },
 ];
 
-/** Shared immutable conversion guidance for hail and Day 3 total severe. */
-const HAIL_TOTAL_SEVERE_BASE_RULES: readonly CategoricalRule[] = [
+/** The current guide shares these CIG1-CIG2 rows; keep product-specific CIG0 values below. */
+const SHARED_HAIL_AND_TOTAL_SEVERE_CIG_RULES: readonly CategoricalRule[] = [
   { probabilities: ['5%'], cigs: CIG_01, risk: 'MRGL' },
   { probabilities: ['5%'], cigs: ['CIG2'], risk: 'SLGT' },
   { probabilities: ['15%'], cigs: CIG_01, risk: 'SLGT' },
@@ -308,13 +312,13 @@ const HAIL_TOTAL_SEVERE_BASE_RULES: readonly CategoricalRule[] = [
 ];
 
 const HAIL_RULES: readonly CategoricalRule[] = [
-  ...HAIL_TOTAL_SEVERE_BASE_RULES,
+  ...SHARED_HAIL_AND_TOTAL_SEVERE_CIG_RULES,
   { probabilities: ['30%'], cigs: ['CIG0'], risk: 'ENH' },
   { probabilities: ['60%'], cigs: ['CIG0'], risk: 'MDT' },
 ];
 
 const TOTAL_SEVERE_RULES: readonly CategoricalRule[] = [
-  ...HAIL_TOTAL_SEVERE_BASE_RULES,
+  ...SHARED_HAIL_AND_TOTAL_SEVERE_CIG_RULES,
   { probabilities: ['30%'], cigs: ['CIG0'], risk: 'ENH' },
   { probabilities: ['60%'], cigs: ['CIG0'], risk: 'MDT' },
 ];
