@@ -15,7 +15,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
-- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ exports in production, and expose optional land trimming for outlooks.
+- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
