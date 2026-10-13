@@ -26,7 +26,7 @@ describe('Toast', () => {
     render(<Toast message={message} onClose={() => undefined} />);
     const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
 
-    expect(toast.textContent).toBe(message);
+    expect(toast.textContent).toBe(message.trim());
   });
 
   test('calls onClose after 3 seconds', () => {
@@ -180,16 +180,16 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('hides empty or malformed messages without scheduling a timer', () => {
+  test('closes empty or malformed messages without scheduling a timer', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="   " onClose={onClose} />);
 
     advanceTimersByTime(0);
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     rerender(<Toast message={null} onClose={onClose} />);
     advanceTimersByTime(0);
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   test('keeps the lifetime cap when a reused toast gets new copy after empty state', () => {

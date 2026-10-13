@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
-import { ToastManager } from '../Toast/Toast';
+import { ToastManager, type ToastData, type ToastType } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
 import PrivacyPolicyModal from '../PrivacyPolicy/PrivacyPolicyModal';
 import { AlertBanner } from '../AlertBanner';
@@ -17,13 +17,9 @@ import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
 
-export interface ToastItem {
-  id: string;
-  message: string;
-  type?: 'info' | 'success' | 'warning' | 'error';
-}
+export type ToastItem = ToastData;
 
-export type AddToastFn = (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+export type AddToastFn = (message: string, type?: ToastType) => void;
 
 interface AppLayoutContextValue {
   addToast: AddToastFn;
