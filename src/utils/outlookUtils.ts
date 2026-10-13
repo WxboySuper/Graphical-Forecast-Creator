@@ -352,11 +352,7 @@ export function isSignificantThreat({ probability }: { probability: unknown }): 
   return normalizeCategoricalProbability(probability)?.significant === true;
 }
 
-/**
- * Get the highest categorical risk level from multiple probabilistic outlooks
- * @param probabilities Available tornado, wind, and hail probabilities
- * @returns The highest mapped risk. Plain strings use CIG0, marked strings carry significant state, and object flags override a marker.
- */
+/** A supported hazard probability, including significant-marker variants. */
 export type CategoricalOutlookValue<P extends string> = P | SignificantProbability<P> | DetailedCategoricalInput<P>;
 
 export type AvailableProbabilities = {
@@ -390,6 +386,11 @@ function resolveSignificantFlag(flag: unknown, marked: boolean): boolean {
   return marked;
 }
 
+/**
+ * Returns the highest mapped risk across the available tornado, wind, and hail outlooks.
+ * Plain strings use CIG0, marked strings carry significant state, and object flags override a marker.
+ * @param probabilities Available outlook probabilities, or null for missing weather data.
+ */
 export function getHighestCategoricalRisk(
   probabilities: AvailableProbabilities | null = {},
 ): CategoricalRiskLevel {
