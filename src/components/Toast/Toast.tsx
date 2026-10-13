@@ -8,7 +8,9 @@ const MS_PER_CHARACTER = 50;
 /** Estimates a reading window from the message length, bounded by the toast lifetime. */
 const getToastDuration = (message: string) => {
   let characterCount = 0;
-  for (const _character of message) characterCount += 1;
+  for (const character of message) {
+    characterCount += character.length === 2 ? 1 : character.length;
+  }
   const readingDuration = characterCount * MS_PER_CHARACTER;
   return Math.min(MAX_TOAST_LIFETIME_MS, Math.max(MIN_TOAST_DURATION_MS, readingDuration));
 };
