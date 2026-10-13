@@ -139,6 +139,16 @@
   color: var(--text-secondary, #6b7280);
 }
 
+.conversion-table__caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0 !important;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .conversion-table th,
 .conversion-table td {
   padding: 5px 8px;
@@ -161,10 +171,22 @@
   text-align: left;
   text-transform: none;
   letter-spacing: normal;
+  font-size: 0.83rem;
+}
+
+.conversion-table th:first-child,
+.conversion-table th[scope="row"] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.conversion-table thead th:first-child {
+  z-index: 2;
 }
 
 /* Categorical risk level color coding — faded outlook colors */
-.conversion-table .cat-tstm { background-color: var(--bg-secondary, #f9fafb); }
+.conversion-table .cat-tstm { background-color: transparent; }
 .conversion-table .cat-mrgl { background-color: rgba(125, 197, 128, 0.35); }
 .conversion-table .cat-slgt { background-color: rgba(243, 246, 125, 0.55); color: #4a4a00; }
 .conversion-table .cat-enh  { background-color: rgba(229, 194, 127, 0.45); }
@@ -237,6 +259,10 @@
   .conversion-table th,
   .conversion-table td {
     padding: 4px 5px;
+  }
+
+  .conversion-table th[scope="row"] {
+    font-size: 0.75rem;
   }
 }
 

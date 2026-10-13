@@ -421,13 +421,15 @@ export const categoricalConversionTables = {
   totalSevere: createConversionTable(Object.keys(colorMappings.totalSevere), CIG_LEVELS, totalSevereToCategorical),
 };
 
+type SignificantFloorByHazard = Readonly<Record<'tornado' | 'wind' | 'hail' | 'totalSevere', Readonly<Record<string, CategoricalRiskLevel>>>>;
+
 /** Significant-risk floors shown in the conversion guide; Day 3 has no separate floor. */
 export const significantCategoricalFloors = {
   tornado: TORNADO_SIGNIFICANT_RISKS,
   wind: WIND_SIGNIFICANT_RISKS,
   hail: HAIL_SIGNIFICANT_RISKS,
   totalSevere: {},
-} satisfies Record<string, Readonly<Record<string, CategoricalRiskLevel>>>;
+} satisfies SignificantFloorByHazard;
 
 /**
  * Determines whether an outlook input wrapper contains a valid significant marker.
@@ -435,8 +437,12 @@ export const significantCategoricalFloors = {
  * @returns True only for a valid probability with a significant suffix.
  */
 export function isSignificantThreat(
-  input: { probability: unknown; outlookType?: unknown } | null | undefined,
+  input: string | { probability: unknown; outlookType?: unknown } | null | undefined,
 ): boolean {
+  if (typeof input === 'string') {
+    const normalized = normalizeCategoricalProbability(input);
+    return normalized?.significant === true && ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
+  }
   if (!input || typeof input !== 'object') return false;
   const normalized = normalizeCategoricalProbability(input.probability);
   if (!normalized?.significant) return false;
@@ -469,7 +475,9 @@ function categoricalInputFromProbability(probability: string): CategoricalInput 
 /** Normalizes a structured input and applies its explicit significance flag. */
 function toDetailedCategoricalInput(input: DetailedCategoricalInput): CategoricalInput {
   const normalized = normalizeCategoricalProbability(input.probability);
-  if (!normalized) return { probability: input.probability, cig: input.cig };
+  if (!normalized) {
+    return { probability: typeof input.probability === 'string' ? input.probability : '', cig: input.cig };
+  }
 
   const significant = resolveSignificantFlag(input.isSignificant, normalized.significant);
   return {
@@ -487,7 +495,10 @@ function toCategoricalInput<P extends string>(input: CategoricalOutlookValue<P>)
 
 /** Rejects untrusted non-object values before reading structured input fields. */
 function isDetailedCategoricalInput(input: unknown): input is DetailedCategoricalInput {
-  return input !== null && typeof input === 'object' && 'probability' in input;
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return false;
+  const prototype = Object.getPrototypeOf(input);
+  return (prototype === Object.prototype || prototype === null)
+    && Object.prototype.hasOwnProperty.call(input, 'probability');
 }
 
 /** Keeps a significant probability marker even when stored flag data is stale. */

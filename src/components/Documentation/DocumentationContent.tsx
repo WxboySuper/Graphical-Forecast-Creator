@@ -9,19 +9,19 @@ import {
 } from '../../utils/outlookUtils';
 import type { CIGLevel, CategoricalRiskLevel } from '../../types/outlooks';
 
-// Helper: table cell with faded categorical color
-const CatCell: React.FC<{ v: CategoricalRiskLevel }> = ({ v }) => {
-  const classes: Readonly<Record<CategoricalRiskLevel, string>> = {
-    TSTM: 'cat-tstm',
-    MRGL: 'cat-mrgl',
-    SLGT: 'cat-slgt',
-    ENH: 'cat-enh',
-    MDT: 'cat-mdt',
-    HIGH: 'cat-high',
-  };
-  const cls = classes[v];
-  return <td className={cls}>{v}</td>;
+const CATEGORICAL_CELL_CLASSES: Readonly<Record<CategoricalRiskLevel, string>> = {
+  TSTM: 'cat-tstm',
+  MRGL: 'cat-mrgl',
+  SLGT: 'cat-slgt',
+  ENH: 'cat-enh',
+  MDT: 'cat-mdt',
+  HIGH: 'cat-high',
 };
+
+/** Renders a category cell using the map palette treatment. */
+const CatCell = React.memo(function CatCell({ v }: { v: CategoricalRiskLevel }) {
+  return <td className={CATEGORICAL_CELL_CLASSES[v]}>{v}</td>;
+});
 
 interface ColorExampleItem {
   label: string;
@@ -232,16 +232,16 @@ export const OutlooksSection: React.FC = () => (
 );
 
 /** Renders labeled columns for a conversion table. */
-const ConversionTableHeader: React.FC<{ cigs: readonly CIGLevel[] }> = ({ cigs }) => (
-  <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
-);
+const ConversionTableHeader = React.memo(function ConversionTableHeader({ cigs }: { cigs: readonly CIGLevel[] }) {
+  return <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>;
+});
 
 /** Renders each probability and its hazard-specific CIG results. */
-const ConversionTableBody: React.FC<{ rows: readonly CategoricalConversionRow[] }> = ({ rows }) => (
-  <tbody>{rows.map(({ probability, cells }) => (
+const ConversionTableBody = React.memo(function ConversionTableBody({ rows }: { rows: readonly CategoricalConversionRow[] }) {
+  return <tbody>{rows.map(({ probability, cells }) => (
     <tr key={probability}><th scope="row">{probability}</th>{cells.map(({ cig, risk }) => <CatCell key={cig} v={risk} />)}</tr>
-  ))}</tbody>
-);
+  ))}</tbody>;
+});
 
 /** Renders a horizontally scrollable, screen-reader labeled conversion matrix. */
 const ConversionTable: React.FC<{
@@ -252,12 +252,15 @@ const ConversionTable: React.FC<{
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [overflows, setOverflows] = React.useState(false);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const container = scrollRef.current;
     if (!container) return undefined;
 
     /** Sets keyboard focus only when the table needs horizontal scrolling. */
-    const updateOverflow = () => setOverflows(container.scrollWidth > container.clientWidth + 1);
+    const updateOverflow = () => {
+      const nextValue = container.scrollWidth > container.clientWidth + 1;
+      setOverflows((currentValue) => currentValue === nextValue ? currentValue : nextValue);
+    };
     updateOverflow();
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateOverflow);
     observer?.observe(container);
@@ -267,12 +270,18 @@ const ConversionTable: React.FC<{
       observer?.disconnect();
       window.removeEventListener('resize', updateOverflow);
     };
-  }, [cigs.length, rows.length]);
+  }, [cigs, rows]);
 
   return (
-    <div ref={scrollRef} className="conversion-table-scroll" role="region" aria-label={label} tabIndex={overflows ? 0 : undefined}>
+    <div
+      ref={scrollRef}
+      className="conversion-table-scroll"
+      role={overflows ? 'region' : undefined}
+      aria-label={overflows ? `${label} scroll area` : undefined}
+      tabIndex={overflows ? 0 : undefined}
+    >
       <table className="conversion-table">
-        <caption>{label}</caption>
+        <caption className="conversion-table__caption">{label}</caption>
         <ConversionTableHeader cigs={cigs} />
         <ConversionTableBody rows={rows} />
       </table>
@@ -283,7 +292,13 @@ const ConversionTable: React.FC<{
 /** Sorts and formats hazard floors for the documentation guide. */
 const formatSignificantFloors = (floors: Readonly<Record<string, CategoricalRiskLevel>>): string =>
   Object.entries(floors)
-    .sort(([left], [right]) => Number.parseFloat(left) - Number.parseFloat(right))
+    .sort(([left], [right]) => {
+      const leftValue = Number.parseFloat(left);
+      const rightValue = Number.parseFloat(right);
+      return Number.isNaN(leftValue) || Number.isNaN(rightValue)
+        ? left.localeCompare(right)
+        : leftValue - rightValue;
+    })
     .map(([probability, risk]) => `${probability}# → ${risk}`)
     .join(', ');
 
@@ -323,7 +338,7 @@ export const CategoricalSection: React.FC = () => (
     <h3>Probabilistic → Categorical Conversion</h3>
     <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. From lowest to highest, the order is TSTM, MRGL, SLGT, ENH, MDT, then HIGH. Day 3 uses its separate Total Severe table below.</p>
     <p>
-      Each table shows the non-significant probability result, without a trailing #, for each supported probability and CIG combination.
+      Each table shows the non-significant probability result, without a trailing #, for every displayed probability and CIG combination.
       If there is no direct mapping, the highest category from a lower-numbered CIG applies.
       CIG0 is the no-hatching baseline. Repeated values mean a higher CIG does not raise the category.
     </p>
@@ -334,8 +349,8 @@ export const CategoricalSection: React.FC = () => (
         <ConversionTable {...table} label={label} />
       </div>
     ))}
-    <h4>Significant risk floors</h4>
-    <p>A trailing # marks a significant probability. A listed floor sets its minimum category, and the final category is the higher of that floor and the probability/CIG result. Other valid # probabilities still show hatching without changing the category.</p>
+    <h4>Significant Risk Floors</h4>
+    <p>A trailing # identifies a significant probability. Where SPC guidance lists a floor, it sets the minimum category; the final category is the higher of that floor and the probability/CIG result. Other valid # probabilities keep their existing CIG hatching and do not raise the category.</p>
     <ul>
       <li><strong>Tornado:</strong> {significantFloorSummaries.tornado}</li>
       <li><strong>Wind:</strong> {significantFloorSummaries.wind}</li>

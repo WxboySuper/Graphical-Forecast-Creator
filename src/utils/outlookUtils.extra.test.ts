@@ -154,6 +154,8 @@ describe('outlookUtils extra', () => {
   });
 
   test('isSignificantThreat detects # marker', () => {
+    expect(isSignificantThreat('15%#')).toBe(true);
+    expect(isSignificantThreat('999%#')).toBe(false);
     expect(isSignificantThreat({ probability: '15#' })).toBe(true);
     expect(isSignificantThreat({ probability: '15%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '15%' })).toBe(false);
@@ -184,6 +186,9 @@ describe('outlookUtils extra', () => {
     expect(hailToCategorical(null as unknown as { probability: string })).toBe('TSTM');
     expect(totalSevereToCategorical(undefined as unknown as { probability: string })).toBe('TSTM');
     expect(tornadoToCategorical({ malformed: true } as unknown as { probability: string })).toBe('TSTM');
+    expect(tornadoToCategorical([] as unknown as { probability: string })).toBe('TSTM');
+    expect(tornadoToCategorical(Object.create({ probability: '15%' }) as { probability: string })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: 15 } as unknown as { probability: string })).toBe('TSTM');
   });
 
   test('direct converters preserve explicit significant flags', () => {

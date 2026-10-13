@@ -23,6 +23,8 @@ const DAY12_CATEGORICAL_CONVERTERS = {
   wind: windToCategorical,
   hail: hailToCategorical,
 } as const;
+type Day12OutlookType = keyof typeof DAY12_CATEGORICAL_CONVERTERS;
+const DAY12_OUTLOOK_TYPES = Object.keys(DAY12_CATEGORICAL_CONVERTERS) as Day12OutlookType[];
 
 /** Builds a reusable two-feature collection shell for Turf v7 boolean ops. */
 const createPairFeatureCollection = (): FeatureCollection<Polygon | MultiPolygon> => ({
@@ -236,7 +238,8 @@ const applyProbabilityFeaturesWithHatching = (
 ): void => {
   probabilityFeatures.forEach((features, probStr) => {
     features.forEach((poly) => {
-      const isSignificant = poly.properties?.isSignificant === true;
+      const storedSignificance = poly.properties?.isSignificant;
+      const isSignificant = storedSignificance === true || storedSignificance === 1 || storedSignificance === 'true';
       let remainingPoly: PolygonOutlookFeature | null = poly;
       const pairCollection = createPairFeatureCollection();
 
@@ -291,10 +294,9 @@ const appendRiskPolygon = (
 // Helper to convert Day 1/2 probability features to categorical pieces
 export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSON.Feature[] {
   const riskPolygons = new Map<CategoricalRiskLevel, PolygonOutlookFeature[]>();
-  const types = ['tornado', 'wind', 'hail'] as const;
   const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
 
-  types.forEach((type) => {
+  DAY12_OUTLOOK_TYPES.forEach((type) => {
     const probMap = coerceOutlookProbabilityMap(outlooks[type]);
     if (!probMap || probMap.size === 0) {
       return;
@@ -317,17 +319,20 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
 /**
  * Maps one intersected probabilistic polygon piece into its categorical risk
  * bucket and appends it unless it resolves to TSTM.
- * @param isSignificant Stored source significance. A trailing # remains authoritative if the flag is stale.
+ * @param isSignificant Stored source flag; probability marker handling remains in the outlook converter.
  */
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail',
-  prob: string,
+  probStr: string,
   cig: CIGLevel,
   poly: PolygonOutlookFeature,
   riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
   isSignificant: boolean,
 ) {
-  const risk = DAY12_CATEGORICAL_CONVERTERS[type]({ probability: prob, cig, isSignificant });
+  const converter = Object.prototype.hasOwnProperty.call(DAY12_CATEGORICAL_CONVERTERS, type)
+    ? DAY12_CATEGORICAL_CONVERTERS[type]
+    : undefined;
+  const risk = converter ? converter({ probability: probStr, cig, isSignificant }) : 'TSTM';
   appendRiskPolygon(riskMap, risk, poly);
 }
 
@@ -339,7 +344,7 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
     return [];
   }
 
-  const cigLevels: CIGLevel[] = ['CIG2', 'CIG1'];
+  const cigLevels: CIGLevel[] = ['CIG3', 'CIG2', 'CIG1'];
   const { probabilityFeatures, hatchingFeatures } = partitionProbabilityMap(probMap);
   const hatchingRegions = buildHatchingRegions(hatchingFeatures, cigLevels);
 
@@ -347,8 +352,8 @@ export function processDay3OutlooksToCategorical(outlooks: OutlookData): GeoJSON
     probabilityFeatures,
     hatchingRegions,
     cigLevels,
-    (probStr, cig, piece) => {
-      appendRiskPolygon(riskPolygons, totalSevereToCategorical({ probability: probStr, cig }), piece);
+    (probStr, cig, piece, isSignificant) => {
+      appendRiskPolygon(riskPolygons, totalSevereToCategorical({ probability: probStr, cig, isSignificant }), piece);
     },
   );
 

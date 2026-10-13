@@ -83,10 +83,14 @@ test('signature tokens are stable for reordering and change for replacement geom
   const ordered = new Map([['30%', [first]], ['45%', [second]]]);
   const reordered = new Map([['45%', [second]], ['30%', [first]]]);
   const replacement = { ...first, geometry: { ...first.geometry, coordinates: [[[9, 9], [10, 9], [10, 10], [9, 9]]] } };
+  const significanceChanged = { ...first, properties: { ...first.properties, isSignificant: true } };
 
   expect(signatureFromOutlookMap('tornado', ordered)).toBe(signatureFromOutlookMap('tornado', reordered));
   expect(signatureFromOutlookMap('tornado', ordered)).not.toBe(
     signatureFromOutlookMap('tornado', new Map([['30%', [replacement]], ['45%', [second]]] ))
+  );
+  expect(signatureFromOutlookMap('tornado', new Map([['30%', [first]]]))).not.toBe(
+    signatureFromOutlookMap('tornado', new Map([['30%', [significanceChanged]]]))
   );
 });
 
@@ -336,6 +340,16 @@ describe('processOutlooksToCategorical', () => {
     const marginal = result.find((feature) => feature.properties?.probability === 'MRGL');
     const slight = result.find((feature) => feature.properties?.probability === 'SLGT');
     expect(turf.booleanContains(marginal as Feature<Polygon>, slight as Feature<Polygon>)).toBe(true);
+  });
+
+  test('maps imported Day 3 CIG3 hatching through the CIG2 cap', () => {
+    const result = processDay3OutlooksToCategorical({
+      totalSevere: new Map([
+        ['30%', [makeSquare('day3-probability', 0)]],
+        ['CIG3', [makeSquare('day3-legacy-cighatch', 0)]],
+      ]),
+    } as unknown as OutlookData);
+    expect(result.some((feature) => feature.properties?.probability === 'MDT')).toBe(true);
   });
 
   // Since we use turf intersection, robust testing requires valid geometries and turf mocking or integration.
