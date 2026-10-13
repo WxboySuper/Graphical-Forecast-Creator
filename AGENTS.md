@@ -51,6 +51,10 @@ GFC is open source. All the code is in the open. This is a decision by the owner
 
 The rules regarding maintaining the project change all the time. If something seems off ask. Otherwise nowadays adding rules is outdated, it's important to keep building under the principles defined above. Always test your solutions, this isn't always static tests, but creating workflows and using tools to actually test the product (ex. browsers, computer use, playwright, etc.).
 
+### Keep issue-driven PRs focused
+
+For a PR tied to one GitHub issue, make only the changes needed to fix that issue and add focused regression coverage. Treat adjacent features, UI improvements, broad refactors, and general hardening as separate work. Do not add them to the PR. Create or use a separate GitHub issue for each valid follow-up, and link it from the review response. Include an adjacent change only when the target fix cannot be correct without it.
+
 ## Project Locations
 - `.github/` - Github Resources
 - `docs/` - Documentation
