@@ -190,6 +190,21 @@ describe('processOutlooksToCategorical', () => {
     expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
   });
 
+  test('does not apply a significant floor to an unmarked feature flagged false', () => {
+    const feature = {
+      ...makeFeature('plain-wind'),
+      properties: { outlookType: 'wind', probability: '45%', isSignificant: false },
+    };
+    const result = processDay12OutlooksToCategorical({
+      wind: new Map([['45%', [feature]]]),
+      tornado: new Map(),
+      hail: new Map(),
+    });
+
+    expect(result.some((item) => item.properties?.probability === 'ENH')).toBe(true);
+    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(false);
+  });
+
   test('applies significant floors to intersected hatching pieces', () => {
     const probability = {
       ...makeFeature('significant-wind'),

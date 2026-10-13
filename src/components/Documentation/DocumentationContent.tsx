@@ -334,7 +334,7 @@ export const CategoricalSection: React.FC = () => (
       </div>
     ))}
     <h4>Significant risk floors</h4>
-    <p>A trailing # marks a significant probability. A listed floor sets its minimum category, and the final category is the higher of that floor and the probability/CIG result. Other valid # probabilities retain hatching without changing the category.</p>
+    <p>A trailing # marks a significant probability. A listed floor sets its minimum category, and the final category is the higher of that floor and the probability/CIG result. Other valid # probabilities still show hatching without changing the category.</p>
     <ul>
       <li><strong>Tornado:</strong> {significantFloorSummaries.tornado}</li>
       <li><strong>Wind:</strong> {significantFloorSummaries.wind}</li>

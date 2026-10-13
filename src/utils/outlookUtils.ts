@@ -4,7 +4,8 @@ import {
   CIGLevel,
   TornadoProbability,
   WindProbability,
-  HailProbability
+  HailProbability,
+  TotalSevereProbability
 } from '../types/outlooks';
 export { getOutlookConstraints } from './outlookConstraints';
 
@@ -92,7 +93,7 @@ type CategoricalConversionOptions = {
   maxCigRank?: number;
 };
 
-/** Runtime boundary for persisted values; public callers use the narrower CategoricalInput type below. */
+/** Runtime boundary for persisted probability values received from storage and import paths. */
 type CategoricalConversion = CategoricalConversionOptions & {
   probability: unknown;
   cig: unknown;
@@ -452,6 +453,7 @@ export type AvailableProbabilities = {
   tornado?: CategoricalOutlookValue<TornadoProbability>;
   wind?: CategoricalOutlookValue<WindProbability>;
   hail?: CategoricalOutlookValue<HailProbability>;
+  totalSevere?: CategoricalOutlookValue<TotalSevereProbability>;
 };
 
 /** Converts a plain probability string to the shared categorical input shape. */
@@ -494,18 +496,19 @@ function resolveSignificantFlag(flag: unknown, marked: boolean): boolean {
 }
 
 /**
- * Returns the highest mapped risk across the available tornado, wind, and hail outlooks.
+ * Returns the highest mapped risk across the supplied hazard outlooks.
  * Plain strings use CIG0, marked strings carry significant state, and object flags override a marker.
  * @param probabilities Available outlook probabilities, or null for missing weather data.
  */
 export function getHighestCategoricalRisk(
   probabilities: AvailableProbabilities | null = {},
 ): CategoricalRiskLevel {
-  const { tornado: tornadoProb, wind: windProb, hail: hailProb } = probabilities ?? {};
+  const { tornado: tornadoProb, wind: windProb, hail: hailProb, totalSevere: totalSevereProb } = probabilities ?? {};
   const candidates: CategoricalRiskLevel[] = [];
   if (tornadoProb) candidates.push(tornadoToCategorical(toCategoricalInput(tornadoProb)));
   if (windProb) candidates.push(windToCategorical(toCategoricalInput(windProb)));
   if (hailProb) candidates.push(hailToCategorical(toCategoricalInput(hailProb)));
+  if (totalSevereProb) candidates.push(totalSevereToCategorical(toCategoricalInput(totalSevereProb)));
 
   return candidates.reduce((best, current) => higherCategoricalRisk(best, current), DEFAULT_CATEGORICAL_RISK);
 }

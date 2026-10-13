@@ -209,6 +209,7 @@ describe('outlookUtils extra', () => {
     expect(best).toBe('HIGH');
     const none = getHighestCategoricalRisk();
     expect(none).toBe('TSTM');
+    expect(getHighestCategoricalRisk({ totalSevere: '30%' })).toBe('ENH');
     expect(getHighestCategoricalRisk({
       wind: { probability: '45%', cig: 'CIG3', isSignificant: true },
     })).toBe('HIGH');
