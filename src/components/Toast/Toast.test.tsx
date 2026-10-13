@@ -1,6 +1,12 @@
 import { render, screen, act } from '@testing-library/react';
 import Toast, { ToastManager } from './Toast';
 
+const advanceTimersByTime = (milliseconds: number): void => {
+  act(() => {
+    jest.advanceTimersByTime(milliseconds);
+  });
+};
+
 describe('Toast', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -19,9 +25,7 @@ describe('Toast', () => {
     const onClose = jest.fn();
     render(<Toast message="Auto Close" onClose={onClose} />);
     
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
 
     expect(onClose).toHaveBeenCalled();
   });
@@ -30,19 +34,13 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
     rerender(<Toast message="Updated" onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
+    advanceTimersByTime(500);
 
     expect(onClose).not.toHaveBeenCalled();
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -51,13 +49,9 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Notice" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
     rerender(<Toast message="  Notice  " onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
+    advanceTimersByTime(500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -66,23 +60,15 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" type="info" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
     rerender(<Toast message="Original" type="success" onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
+    advanceTimersByTime(500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
     rerender(<Toast message="Updated" type="success" onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(2999);
-    });
+    advanceTimersByTime(2999);
     expect(onClose).toHaveBeenCalledTimes(1);
-    act(() => {
-      jest.advanceTimersByTime(1);
-    });
+    advanceTimersByTime(1);
 
     expect(onClose).toHaveBeenCalledTimes(2);
   });
@@ -92,13 +78,9 @@ describe('Toast', () => {
     const updatedOnClose = jest.fn();
     const { rerender } = render(<Toast message="Notice" onClose={originalOnClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
     rerender(<Toast message="Notice" onClose={updatedOnClose} />);
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
+    advanceTimersByTime(500);
 
     expect(originalOnClose).not.toHaveBeenCalled();
     expect(updatedOnClose).toHaveBeenCalledTimes(1);
@@ -109,15 +91,11 @@ describe('Toast', () => {
     const { rerender } = render(<Toast message="Update 0" onClose={onClose} />);
 
     for (let elapsed = 2500; elapsed < 30000; elapsed += 2500) {
-      act(() => {
-        jest.advanceTimersByTime(2500);
-      });
+      advanceTimersByTime(2500);
       rerender(<Toast message={`Update ${elapsed}`} onClose={onClose} />);
     }
 
-    act(() => {
-      jest.advanceTimersByTime(2500);
-    });
+    advanceTimersByTime(2500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -126,9 +104,7 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="First" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(30000);
-    });
+    advanceTimersByTime(30000);
     rerender(<Toast message="Updated after cap" onClose={onClose} />);
 
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -138,14 +114,10 @@ describe('Toast', () => {
     const onClose = jest.fn();
     render(<Toast message={'Notice '.repeat(15)} onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
     expect(onClose).not.toHaveBeenCalled();
 
-    act(() => {
-      jest.advanceTimersByTime(7500);
-    });
+    advanceTimersByTime(7500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -154,17 +126,11 @@ describe('Toast', () => {
     const onClose = jest.fn();
     render(<Toast message={` ${'x'.repeat(59)} `} onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
     expect(onClose).not.toHaveBeenCalled();
-    act(() => {
-      jest.advanceTimersByTime(2899);
-    });
+    advanceTimersByTime(2899);
     expect(onClose).not.toHaveBeenCalled();
-    act(() => {
-      jest.advanceTimersByTime(1);
-    });
+    advanceTimersByTime(1);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -173,51 +139,37 @@ describe('Toast', () => {
     const onClose = jest.fn();
     render(<Toast message={`x${'\n\n'.repeat(40)}x`} onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('hides empty or malformed messages and closes them immediately', () => {
+  test('hides empty or malformed messages without scheduling a timer', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="   " onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(0);
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    advanceTimersByTime(0);
+    expect(onClose).not.toHaveBeenCalled();
 
     rerender(<Toast message={null} onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(0);
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    advanceTimersByTime(0);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  test('starts a fresh lifetime when a reused toast gets new copy after empty state', () => {
+  test('keeps the lifetime cap when a reused toast gets new copy after empty state', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="First notice" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(29000);
-    });
-    rerender(<Toast message="" onClose={onClose} />);
-    act(() => {
-      jest.advanceTimersByTime(0);
-    });
-    expect(onClose).toHaveBeenCalledTimes(2);
+    advanceTimersByTime(29000);
     onClose.mockClear();
+    rerender(<Toast message="" onClose={onClose} />);
+    advanceTimersByTime(0);
+    expect(onClose).not.toHaveBeenCalled();
     rerender(<Toast message="New notice" onClose={onClose} />);
 
-    act(() => {
-      jest.advanceTimersByTime(2999);
-    });
+    advanceTimersByTime(999);
     expect(onClose).not.toHaveBeenCalled();
-    act(() => {
-      jest.advanceTimersByTime(1);
-    });
+    advanceTimersByTime(1);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -227,9 +179,7 @@ describe('Toast', () => {
     const { unmount } = render(<Toast message="Unmount" onClose={onClose} />);
     unmount();
     
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
 
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -254,11 +204,17 @@ describe('ToastManager', () => {
     const toasts = [{ id: '123', message: 'Dismissable' }];
     render(<ToastManager toasts={toasts} onDismiss={onDismiss} />);
     
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
+    advanceTimersByTime(3000);
 
     expect(onDismiss).toHaveBeenCalledWith('123');
     jest.useRealTimers();
+  });
+
+  test('dismisses empty notifications without arming a toast timer', () => {
+    const onDismiss = jest.fn();
+    render(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={onDismiss} />);
+
+    expect(onDismiss).toHaveBeenCalledWith('empty');
+    expect(screen.queryByText('  ')).not.toBeInTheDocument();
   });
 });

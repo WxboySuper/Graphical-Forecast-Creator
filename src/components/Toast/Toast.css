@@ -22,10 +22,10 @@
   pointer-events: all;
   box-sizing: border-box;
   min-width: 200px;
-  max-width: var(--toast-max-width);
-  overflow-wrap: break-word;
-  word-break: normal;
+  max-width: var(--toast-max-width, 420px);
+  overflow-wrap: anywhere;
   text-align: center;
+  white-space: pre-line;
 }
 
 /* On phones and compact landscapes, keep toasts above the forecast toolbar
@@ -36,12 +36,12 @@
     left: 12px;
     bottom: calc(88px + env(safe-area-inset-bottom, 0px));
     align-items: center;
-    width: auto;
+    --toast-max-width: none;
     max-width: none;
   }
 
   .toast {
-    min-width: min(200px, calc(100% - 24px));
+    min-width: 0;
     max-width: 100%;
   }
 }
