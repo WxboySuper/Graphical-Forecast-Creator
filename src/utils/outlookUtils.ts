@@ -94,6 +94,13 @@ type CategoricalConversion = {
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
   maxCigRank?: number;
 };
+type CategoricalRiskLookup = {
+  normalized: NormalizedCategoricalProbability;
+  cig: unknown;
+  rules: readonly CategoricalRule[];
+  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
+  maxCigRank?: number;
+};
 
 const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
   TSTM: 0,
@@ -234,13 +241,7 @@ function findCigFallbackRisk(
 }
 
 /** Treats a documented significant risk as a floor over the eligible CIG mapping. */
-function findCategoricalRisk(
-  normalized: NormalizedCategoricalProbability,
-  cig: unknown,
-  rules: readonly CategoricalRule[],
-  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
-  maxCigRank?: number,
-): CategoricalRiskLevel {
+function findCategoricalRisk({ normalized, cig, rules, significantRisks, maxCigRank }: CategoricalRiskLookup): CategoricalRiskLevel {
   if (!rules.some((rule) => rule.probabilities.includes(normalized.probability))) {
     return DEFAULT_CATEGORICAL_RISK;
   }
@@ -269,7 +270,7 @@ function categorizeProbability({ probability, cig, rules, significantRisks, maxC
   if (normalizedProbability === undefined) {
     return DEFAULT_CATEGORICAL_RISK;
   }
-  return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks, maxCigRank);
+  return findCategoricalRisk({ normalized: normalizedProbability, cig, rules, significantRisks, maxCigRank });
 }
 
 export type CategoricalInput = DetailedCategoricalInput<string>;

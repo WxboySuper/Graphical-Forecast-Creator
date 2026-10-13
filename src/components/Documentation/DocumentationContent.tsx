@@ -228,6 +228,18 @@ export const OutlooksSection: React.FC = () => (
   </div>
 );
 
+/** Renders labeled columns for a conversion table. */
+const ConversionTableHeader: React.FC<{ cigs: readonly CIGLevel[] }> = ({ cigs }) => (
+  <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
+);
+
+/** Renders each probability and its hazard-specific CIG results. */
+const ConversionTableBody: React.FC<{ rows: readonly CategoricalConversionRow[] }> = ({ rows }) => (
+  <tbody>{rows.map(({ probability, cells }) => (
+    <tr key={probability}><th scope="row">{probability}</th>{cells.map(({ cig, risk }) => <CatCell key={cig} v={risk} />)}</tr>
+  ))}</tbody>
+);
+
 /** Renders a horizontally scrollable, screen-reader labeled conversion matrix. */
 const ConversionTable: React.FC<{
   label: string;
@@ -236,10 +248,8 @@ const ConversionTable: React.FC<{
 }> = ({ label, rows, cigs }) => (
   <div className="conversion-table-scroll" role="region" aria-label={label} tabIndex={0}>
     <table className="conversion-table">
-      <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
-      <tbody>{rows.map(({ probability, cells }) => (
-        <tr key={probability}><th scope="row">{probability}</th>{cells.map(({ cig, risk }) => <CatCell key={cig} v={risk} />)}</tr>
-      ))}</tbody>
+      <ConversionTableHeader cigs={cigs} />
+      <ConversionTableBody rows={rows} />
     </table>
   </div>
 );
