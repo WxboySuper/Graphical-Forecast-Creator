@@ -14,6 +14,8 @@ import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
 import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
 
+export type { ToastData, ToastType } from '../Toast/Toast';
+
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
 

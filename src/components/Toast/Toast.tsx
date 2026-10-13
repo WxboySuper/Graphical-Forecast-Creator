@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
@@ -10,19 +10,13 @@ export type ToastType = 'info' | 'success' | 'warning' | 'error';
 /** Returns whether a toast message contains no visible text. */
 const isEmptyToastMessage = (message: string | null | undefined): boolean => (message?.trim().length ?? 0) === 0;
 
-/** Uses a monotonic browser clock when available, with a portable fallback. */
-const getCurrentTime = (): number =>
-  typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+/** Uses the same clock source for the toast lifetime and timer deadlines. */
+const getCurrentTime = (): number => Date.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (timingMessage: string): number => {
-  // Code points approximate reading length; the minimum and maximum bound the estimate.
-  // Stop at the cap so even very long messages need only a bounded scan.
-  let characterCount = 0;
-  for (const _ of timingMessage) {
-    characterCount += 1;
-    if (characterCount >= MAX_READING_CHARACTERS) break;
-  }
+  // Length is capped before multiplication so very long messages cannot exceed the lifetime.
+  const characterCount = Math.min(MAX_READING_CHARACTERS, timingMessage.length);
   return Math.min(
     MAX_TOAST_LIFETIME_MS,
     Math.max(MIN_TOAST_DURATION_MS, characterCount * MS_PER_CHARACTER),
@@ -39,8 +33,8 @@ const getRemainingLifetime = (
 
 /** Closes once for the active reading window, even if its timer is replaced. */
 const closeToastOnce = (
-  closedRef: RefObject<boolean>,
-  onCloseRef: RefObject<() => void>,
+  closedRef: { current: boolean },
+  onCloseRef: { current: () => void },
   markClosed: () => void,
 ): void => {
   if (closedRef.current) return;
@@ -66,10 +60,8 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
   const [isClosed, setIsClosed] = useState(false);
-  const { displayMessage, timingMessage } = useMemo(() => {
-    const displayMessage = message?.trim() ?? '';
-    return { displayMessage, timingMessage: displayMessage.replace(/\s+/g, ' ') };
-  }, [message]);
+  const displayMessage = message?.trim() ?? '';
+  const timingMessage = displayMessage.replace(/\s+/g, ' ');
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -84,10 +76,6 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     const now = getCurrentTime();
     mountedAtRef.current ??= now;
     const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
-    if (remainingLifetime <= 0) {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-      return;
-    }
     if (remainingLifetime < MIN_TOAST_DURATION_MS) {
       // Do not flash new copy when too little time remains for its minimum reading window.
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
@@ -107,12 +95,9 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [timingMessage]);
+  }, [displayMessage, timingMessage]);
 
-  const hasVisibleWindow = mountedAtRef.current === null ||
-    getRemainingLifetime(mountedAtRef.current, getCurrentTime()) >= MIN_TOAST_DURATION_MS;
-
-  return displayMessage.length > 0 && !isClosed && hasVisibleWindow ? (
+  return displayMessage.length > 0 && !isClosed ? (
     <div className={`toast toast-${type}`}>
       {displayMessage}
     </div>
@@ -124,14 +109,9 @@ export interface ToastManagerProps {
   onDismiss: (id: string) => void;
 }
 
-// Small wrapper to avoid inline arrow functions in parent JSX
-const ToastEntry = memo(function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: string) => void }) {
+function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: string) => void }): React.ReactElement | null {
   const emptyMessage = isEmptyToastMessage(toast.message);
   const emptyDismissedRef = useRef(false);
-  const handleClose = useCallback(() => {
-    onDismiss(toast.id);
-  }, [onDismiss, toast.id]);
-
   useEffect(() => {
     if (!emptyMessage) {
       emptyDismissedRef.current = false;
@@ -144,19 +124,17 @@ const ToastEntry = memo(function ToastEntry({ toast, onDismiss }: { toast: Toast
 
   if (emptyMessage) return null;
 
-  return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
-});
+  return <Toast message={toast.message} type={toast.type} onClose={() => onDismiss(toast.id)} />;
+}
 
-export const ToastManager = memo(function ToastManager({ toasts, onDismiss }: ToastManagerProps) {
-  if (toasts.length === 0) return null;
-
+export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.ReactElement {
   return (
-    <div className="toast-container" role="status" aria-label="Notifications" aria-live="polite" aria-atomic="false" tabIndex={0}>
+    <div className="toast-container" role="status" aria-live="polite" aria-atomic="true">
       {toasts.map(toast => (
         <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
     </div>
   );
-});
+}
 
 export default Toast;

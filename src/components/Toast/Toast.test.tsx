@@ -64,13 +64,17 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('does not restart the timer when internal spacing changes', () => {
+  test('restarts the timer when internal spacing changes the displayed copy', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="A  B" onClose={onClose} />);
 
     advanceTimersByTime(2500);
     rerender(<Toast message="A B" onClose={onClose} />);
     advanceTimersByTime(500);
+
+    expect(onClose).not.toHaveBeenCalled();
+
+    advanceTimersByTime(2500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -245,14 +249,13 @@ describe('ToastManager', () => {
     
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'false');
-    expect(screen.getByRole('status')).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
   });
 
-  test('does not render an empty live region', () => {
+  test('keeps the live region mounted when the queue is empty', () => {
     render(<ToastManager toasts={[]} onDismiss={() => undefined} />);
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
   test('calls onDismiss when toast closes', () => {

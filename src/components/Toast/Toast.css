@@ -9,9 +9,6 @@
   gap: 8px;
   pointer-events: none;
   max-width: var(--toast-max-width);
-  max-height: 40vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .toast {
@@ -25,7 +22,7 @@
   pointer-events: all;
   box-sizing: border-box;
   min-width: 200px;
-  max-width: var(--toast-max-width);
+  max-width: var(--toast-max-width, 420px);
   overflow-wrap: break-word;
   text-align: left;
   white-space: pre-wrap;
@@ -43,8 +40,9 @@
 
   .toast {
     min-width: 0;
-    width: 100%;
+    width: auto;
     max-width: 100%;
+    align-self: center;
   }
 }
 
