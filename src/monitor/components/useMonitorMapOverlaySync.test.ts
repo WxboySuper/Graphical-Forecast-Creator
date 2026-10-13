@@ -141,15 +141,19 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
 
-  it('counts the new selection in the same render where it changes', () => {
+  it('skips counting on the render where the selection changes', () => {
     const { rerender, onClearSelectedAlert } = setup(ALERT_ID);
 
-    // New selection absent from the incoming collection: first counted miss.
+    // New selection absent from the incoming collection: not counted yet.
     rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: EXPIRED_ID });
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
 
-    // Second consecutive miss clears.
+    // First counted miss.
     rerender({ alertsCollection: standardCollection(), selectedAlertDetailUrl: EXPIRED_ID });
+    expect(onClearSelectedAlert).not.toHaveBeenCalled();
+
+    // Second consecutive miss clears.
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: EXPIRED_ID });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 
@@ -161,6 +165,16 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
 
     rerender({ alertsCollection: makeCollection(), selectedAlertDetailUrl: ALERT_ID });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains selections without a stable identity until manual dismissal', () => {
+    const { rerender, onClearSelectedAlert } = setup('');
+
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: '' });
+    rerender({ alertsCollection: makeCollection(), selectedAlertDetailUrl: '' });
+    rerender({ alertsCollection: otherCollection(), selectedAlertDetailUrl: '' });
+
+    expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
 
   it('matches the alert through properties @id with an opaque top-level id', () => {
@@ -204,8 +218,13 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
   it('ignores a non-URL top-level id with no canonical property url', () => {
     const { rerender, onClearSelectedAlert } = setup('local-123');
 
-    // Mount already counts the first miss; one more consecutive miss clears.
-    rerender({ alertsCollection: makeCollection(makeFeature(alertProperties({}), 'local-123')), selectedAlertDetailUrl: 'local-123' });
+    // Mount skips counting; two further consecutive misses clear.
+    const localOnly = () =>
+      makeCollection(makeFeature(alertProperties({}), 'local-123'));
+    rerender({ alertsCollection: localOnly(), selectedAlertDetailUrl: 'local-123' });
+    expect(onClearSelectedAlert).not.toHaveBeenCalled();
+
+    rerender({ alertsCollection: localOnly(), selectedAlertDetailUrl: 'local-123' });
     expect(onClearSelectedAlert).toHaveBeenCalledTimes(1);
   });
 });

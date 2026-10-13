@@ -83,6 +83,9 @@ export const syncAlertFeatures = (
     olFeatures.forEach((olFeature) => {
       if ('setProperties' in olFeature && typeof olFeature.setProperties === 'function') {
         olFeature.setProperties({
+          // Preserve a top-level string id so alert identity resolves the
+          // same URL here as in expiry matching (issue #1595).
+          ...(typeof feature.id === 'string' ? { id: feature.id } : {}),
           ...(feature.properties ?? {}),
           event: feature.properties?.event ?? 'Alert',
           nwsAlert: true,

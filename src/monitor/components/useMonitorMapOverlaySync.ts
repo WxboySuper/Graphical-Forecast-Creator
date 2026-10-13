@@ -33,6 +33,15 @@ interface UseMonitorMapOverlaySyncArgs {
 /** Dismisses the selection after this many consecutive collections miss it. */
 const MAX_CONSECUTIVE_ALERT_MISSES = 2;
 
+/** Normalizes a candidate alert detail URL to its canonical compared form. */
+export const normalizeAlertDetailUrl = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
 /** Reads a canonical http(s) URL from a top-level GeoJSON feature id. */
 const topLevelAlertUrl = (id: unknown): string | null => {
   if (typeof id !== 'string') {
@@ -67,17 +76,18 @@ const useSelectedAlertExpiry = (
 
   useEffect(() => {
     clearSelectedAlertRef.current = onClearSelectedAlert;
-  });
+  }, [onClearSelectedAlert]);
 
   useEffect(() => {
-    if (selectedAlertDetailUrl === null) {
+    if (selectedAlertDetailUrl === null || selectedAlertDetailUrl === '') {
       consecutiveMissesRef.current = 0;
-      prevAlertDetailUrlRef.current = null;
+      prevAlertDetailUrlRef.current = selectedAlertDetailUrl;
       return;
     }
     if (selectedAlertDetailUrl !== prevAlertDetailUrlRef.current) {
       prevAlertDetailUrlRef.current = selectedAlertDetailUrl;
       consecutiveMissesRef.current = 0;
+      return;
     }
     if (!hasAlertId(alertsCollection, selectedAlertDetailUrl)) {
       consecutiveMissesRef.current += 1;
@@ -144,11 +154,12 @@ export const useMonitorMapOverlaySync = ({
 
   // Dismissal paths (popup close button, map click, unmount, new selection) live
   // in useMonitorOlMap/useMonitorMapBootstrap; here the selection is dropped
-  // only after consecutive collections miss the selected alert id. A single
-  // miss is tolerated so one animation frame, category toggle, refresh, or
-  // transient empty response without the alert does not yank the popup
-  // (issue #1595), while a genuinely expired or cancelled alert is still
-  // dismissed.
+  // only after consecutive collections miss the selected alert url. A single
+  // miss is tolerated so one animation frame, category toggle, or refresh
+  // without the alert does not yank the popup (issue #1595), while a
+  // genuinely expired or cancelled alert is still dismissed. Selections
+  // without a stable identity ('') are exempt from expiry and dismiss
+  // manually, since no collection can confirm or refute them.
   useSelectedAlertExpiry(alertsCollection, selectedAlertDetailUrl, onClearSelectedAlert);
 
   useEffect(() => {

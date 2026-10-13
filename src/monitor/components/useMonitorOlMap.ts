@@ -12,6 +12,7 @@ import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
 import { useMonitorMapBootstrap } from './useMonitorMapBootstrap';
 import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
 import { useMonitorMapRefs } from './monitorMapRefs';
+import { normalizeAlertDetailUrl } from './useMonitorMapOverlaySync';
 import {
   clearMonitorAlertPopup,
   renderMonitorAlertPopup,
@@ -44,10 +45,10 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     setSelectedAlert(null);
   }, [refs.overlayRef]);
 
-  // Canonical detail URL, '' sentinel for URL-less selections (never matches),
-  // null for no selection.
+  // Canonical detail URL, '' sentinel for URL-less selections (exempt from
+  // expiry, dismissed manually), null for no selection.
   const selectedAlertDetailUrl: string | null = selectedAlert
-    ? (selectedAlert.detailUrl?.trim() || '')
+    ? (normalizeAlertDetailUrl(selectedAlert.detailUrl) ?? '')
     : null;
 
   useMonitorMapBootstrap({
