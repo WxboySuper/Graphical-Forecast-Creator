@@ -97,14 +97,14 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '30' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1 5%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
-    expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('HIGH');
+    expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: null as unknown as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: '' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'cig1' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'CIG1 ' as CIGLevel })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '15%', cig: ' CIG1' as CIGLevel })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '015%', cig: 'CIG0' })).toBe('TSTM');
-    expect(windToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('ENH');
+    expect(windToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
   });
 
   test('categorical risk remains monotonic across CIG and probability', () => {
@@ -159,6 +159,7 @@ describe('outlookUtils extra', () => {
     expect(isSignificantThreat({ probability: '75%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '75%#', outlookType: 'tornado' })).toBe(false);
     expect(isSignificantThreat({ probability: '90%#', outlookType: 'wind' })).toBe(true);
+    expect(isSignificantThreat({ probability: '90%#', outlookType: ' Wind ' })).toBe(true);
     expect(isSignificantThreat({ probability: '90%#', outlookType: 'hail' })).toBe(false);
     expect(isSignificantThreat({ probability: '15%#', outlookType: 'categorical' })).toBe(false);
     expect(isSignificantThreat({ probability: '999%#' })).toBe(false);
@@ -182,6 +183,7 @@ describe('outlookUtils extra', () => {
     expect(windToCategorical({ probability: '45%#', isSignificant: false })).toBe('ENH');
     expect(tornadoToCategorical({ probability: 15 as unknown as string })).toBe('TSTM');
     expect(tornadoToCategorical(15 as unknown as { probability: string })).toBe('TSTM');
+    expect(windToCategorical({ probability: '45%', cig: 'BAD' as unknown as 'CIG0', isSignificant: true })).toBe('TSTM');
   });
 
   test('getHighestCategoricalRisk returns the worst of available', () => {

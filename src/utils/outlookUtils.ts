@@ -92,6 +92,7 @@ type CategoricalConversion = {
   cig: unknown;
   rules: readonly CategoricalRule[];
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
+  maxCigRank?: number;
 };
 
 const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
@@ -112,6 +113,12 @@ const CATEGORICAL_PROBABILITIES: ReadonlySet<string> = new Set([
   ...Object.keys(colorMappings.hail),
   ...Object.keys(colorMappings.totalSevere),
 ]);
+const SIGNIFICANT_PROBABILITY_DOMAINS: Readonly<Record<string, ReadonlySet<string>>> = {
+  tornado: new Set(Object.keys(colorMappings.tornado)),
+  wind: new Set(Object.keys(colorMappings.wind)),
+  hail: new Set(Object.keys(colorMappings.hail)),
+  totalSevere: new Set(Object.keys(colorMappings.totalSevere)),
+};
 
 /** Shared wind and hail significant thresholds from the product outlook guidance. */
 const WIND_HAIL_SIGNIFICANT_RISKS: Readonly<Record<string, CategoricalRiskLevel>> = {
@@ -232,6 +239,7 @@ function findCategoricalRisk(
   cig: unknown,
   rules: readonly CategoricalRule[],
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
+  maxCigRank?: number,
 ): CategoricalRiskLevel {
   if (!rules.some((rule) => rule.probabilities.includes(normalized.probability))) {
     return DEFAULT_CATEGORICAL_RISK;
@@ -239,9 +247,9 @@ function findCategoricalRisk(
   const significantRisk = getSignificantCategoricalRisk(normalized, significantRisks);
   const targetCigRank = getTargetCigRank(cig);
   if (targetCigRank === undefined) {
-    return significantRisk ?? DEFAULT_CATEGORICAL_RISK;
+    return DEFAULT_CATEGORICAL_RISK;
   }
-  if ((rules === HAIL_RULES || rules === TOTAL_SEVERE_RULES) && targetCigRank > CIG_RANK.CIG2) {
+  if (maxCigRank !== undefined && targetCigRank > maxCigRank) {
     return significantRisk ?? DEFAULT_CATEGORICAL_RISK;
   }
 
@@ -256,12 +264,12 @@ function findCategoricalRisk(
 }
 
 /** Converts a probability/CIG pair to a categorical risk, defaulting invalid input to TSTM. */
-function categorizeProbability({ probability, cig, rules, significantRisks }: CategoricalConversion): CategoricalRiskLevel {
+function categorizeProbability({ probability, cig, rules, significantRisks, maxCigRank }: CategoricalConversion): CategoricalRiskLevel {
   const normalizedProbability = normalizeCategoricalProbability(probability);
   if (normalizedProbability === undefined) {
     return DEFAULT_CATEGORICAL_RISK;
   }
-  return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks);
+  return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks, maxCigRank);
 }
 
 export type CategoricalInput = DetailedCategoricalInput<string>;
@@ -347,12 +355,12 @@ export function windToCategorical(input: CategoricalInput): CategoricalRiskLevel
 
 /** Convert hail probability to categorical risk level. */
 export function hailToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  return categorizeInput(input, HAIL_RULES, HAIL_SIGNIFICANT_RISKS);
+  return categorizeInput(input, HAIL_RULES, HAIL_SIGNIFICANT_RISKS, CIG_RANK.CIG2);
 }
 
 /** Convert Day 3 total severe with the combined-risk table; no separate significant-risk floor applies. */
 export function totalSevereToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  return categorizeInput(input, TOTAL_SEVERE_RULES);
+  return categorizeInput(input, TOTAL_SEVERE_RULES, undefined, CIG_RANK.CIG2);
 }
 
 /** Applies one hazard rule table to a normalized public converter input. */
@@ -360,29 +368,44 @@ function categorizeInput(
   input: CategoricalInput,
   rules: readonly CategoricalRule[],
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
+  maxCigRank?: number,
 ): CategoricalRiskLevel {
   const { probability, cig = 'CIG0' } = toCategoricalInput(input);
-  return categorizeProbability({ probability, cig, rules, significantRisks });
+  return categorizeProbability({ probability, cig, rules, significantRisks, maxCigRank });
+}
+
+export type CategoricalConversionRow = {
+  probability: string;
+  risks: Readonly<Partial<Record<CIGLevel, CategoricalRiskLevel>>>;
+};
+
+export type CategoricalConversionTable = {
+  cigs: readonly CIGLevel[];
+  rows: readonly CategoricalConversionRow[];
+};
+
+/** Builds a labeled conversion matrix from the same mapping used by forecasts. */
+function createConversionTable(
+  probabilities: readonly string[],
+  cigs: readonly CIGLevel[],
+  convert: (input: CategoricalInput) => CategoricalRiskLevel,
+): CategoricalConversionTable {
+  return {
+    cigs,
+    rows: probabilities.map((probability) => ({
+      probability,
+      risks: Object.fromEntries(cigs.map((cig) => [cig, convert({ probability, cig })])) as Partial<Record<CIGLevel, CategoricalRiskLevel>>,
+    })),
+  };
 }
 
 /** Reference matrices generated from the same conversion functions used by forecasts. */
 export const categoricalConversionTables = {
-  tornado: createConversionRows(Object.keys(colorMappings.tornado), CIG_LEVELS, tornadoToCategorical),
-  wind: createConversionRows(Object.keys(colorMappings.wind), CIG_LEVELS, windToCategorical),
-  hail: createConversionRows(Object.keys(colorMappings.hail), CIG_LEVELS.slice(0, 3), hailToCategorical),
-  totalSevere: createConversionRows(Object.keys(colorMappings.totalSevere), CIG_LEVELS.slice(0, 3), totalSevereToCategorical),
+  tornado: createConversionTable(Object.keys(colorMappings.tornado), CIG_LEVELS, tornadoToCategorical),
+  wind: createConversionTable(Object.keys(colorMappings.wind), CIG_LEVELS, windToCategorical),
+  hail: createConversionTable(Object.keys(colorMappings.hail), CIG_LEVELS.slice(0, 3), hailToCategorical),
+  totalSevere: createConversionTable(Object.keys(colorMappings.totalSevere), CIG_LEVELS.slice(0, 3), totalSevereToCategorical),
 };
-
-function createConversionRows(
-  probabilities: readonly string[],
-  cigs: readonly CIGLevel[],
-  convert: (input: CategoricalInput) => CategoricalRiskLevel,
-): Array<{ probability: string; risks: CategoricalRiskLevel[] }> {
-  return probabilities.map((probability) => ({
-    probability,
-    risks: cigs.map((cig) => convert({ probability, cig })),
-  }));
-}
 
 /** Significant-risk floors shown in the conversion guide; Day 3 has no separate floor. */
 export const significantCategoricalFloors = {
@@ -404,14 +427,8 @@ export function isSignificantThreat(
   const normalized = normalizeCategoricalProbability(input.probability);
   if (!normalized?.significant) return false;
   if (input.outlookType === undefined) return true;
-
-  const probabilityDomains: Readonly<Record<string, readonly string[]>> = {
-    tornado: Object.keys(colorMappings.tornado),
-    wind: Object.keys(colorMappings.wind),
-    hail: Object.keys(colorMappings.hail),
-    totalSevere: Object.keys(colorMappings.totalSevere),
-  };
-  return probabilityDomains[input.outlookType]?.includes(normalized.probability) === true;
+  const outlookType = input.outlookType.trim().toLowerCase();
+  return SIGNIFICANT_PROBABILITY_DOMAINS[outlookType]?.has(normalized.probability) === true;
 }
 
 /** A supported hazard probability, including significant-marker variants. */

@@ -107,6 +107,17 @@
 }
 
 /* ── Conversion table ─────────────────────────────────── */
+.conversion-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.conversion-table-scroll:focus-visible {
+  outline: 2px solid var(--focus-ring-color, #3b82f6);
+  outline-offset: 2px;
+}
+
 .conversion-table {
   width: 100%;
   border-collapse: collapse;

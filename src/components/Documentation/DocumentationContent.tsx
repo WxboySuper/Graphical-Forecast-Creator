@@ -1,9 +1,15 @@
 // skipcq: JS-W1028
 import React from 'react';
-import { categoricalConversionTables, colorMappings, significantCategoricalFloors } from '../../utils/outlookUtils';
+import {
+  categoricalConversionTables,
+  colorMappings,
+  significantCategoricalFloors,
+  type CategoricalConversionRow,
+} from '../../utils/outlookUtils';
+import type { CIGLevel, CategoricalRiskLevel } from '../../types/outlooks';
 
 // Helper: table cell with faded categorical color
-const CatCell: React.FC<{ v: string }> = ({ v }) => {
+const CatCell: React.FC<{ v: CategoricalRiskLevel }> = ({ v }) => {
   const cls =
     v === 'MRGL' ? 'cat-mrgl' :
     v === 'SLGT' ? 'cat-slgt' :
@@ -221,50 +227,58 @@ export const OutlooksSection: React.FC = () => (
   </div>
 );
 
+/** Renders a horizontally scrollable, screen-reader labeled conversion matrix. */
 const ConversionTable: React.FC<{
   label: string;
-  rows: Array<{ probability: string; risks: string[] }>;
-  cigs: string[];
+  rows: readonly CategoricalConversionRow[];
+  cigs: readonly CIGLevel[];
 }> = ({ label, rows, cigs }) => (
-  <table className="conversion-table" aria-label={label}>
-    <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
-    <tbody>{rows.map(({ probability, risks }) => (
-      <tr key={probability}><th scope="row">{probability}</th>{risks.map((risk, index) => <CatCell key={cigs[index]} v={risk} />)}</tr>
-    ))}</tbody>
-  </table>
+  <div className="conversion-table-scroll" role="region" aria-label={label} tabIndex={0}>
+    <table className="conversion-table">
+      <caption className="sr-only">{label}</caption>
+      <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
+      <tbody>{rows.map(({ probability, risks }) => (
+        <tr key={probability}><th scope="row">{probability}</th>{cigs.map((cig) => <CatCell key={cig} v={risks[cig] ?? 'TSTM'} />)}</tr>
+      ))}</tbody>
+    </table>
+  </div>
 );
 
-const significantFloorSummary = (floors: Readonly<Record<string, string>>) =>
-  Object.entries(floors).map(([probability, risk]) => `${probability}# → ${risk}`).join(', ');
+/** Formats hazard-specific significant floors once for the static documentation view. */
+const significantFloorSummaries = {
+  tornado: Object.entries(significantCategoricalFloors.tornado).map(([p, r]) => `${p}# → ${r}`).join(', '),
+  wind: Object.entries(significantCategoricalFloors.wind).map(([p, r]) => `${p}# → ${r}`).join(', '),
+  hail: Object.entries(significantCategoricalFloors.hail).map(([p, r]) => `${p}# → ${r}`).join(', '),
+};
 
 /** Conversion tab content generated from the same functions used by forecasts. */
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>
-    <p>The highest result from any Day 1–2 outlook (Tornado, Wind, or Hail) wins for an area.</p>
+    <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. Day 3 uses its separate Total Severe table below.</p>
     <p>
-      Tables show every supported probability/CIG combination. Where no direct rule exists, the highest
-      category mapped at a less significant CIG applies. CIG0 is the lowest level. Equal values mean the
-      category has reached its cap or is inherited by this rule.
+      Each table shows the plain-probability result for every supported probability and CIG combination.
+      If a combination has no direct mapping, the highest category from a less significant CIG applies.
+      CIG0 is the no-hatching baseline. Repeated values mean a higher CIG does not raise that category.
     </p>
     <h4>Tornado Conversion</h4>
-    <ConversionTable label="Tornado conversion" rows={categoricalConversionTables.tornado} cigs={['CIG0', 'CIG1', 'CIG2', 'CIG3']} />
+    <ConversionTable label="Tornado category by probability and CIG" {...categoricalConversionTables.tornado} />
     <h4>Wind Conversion</h4>
-    <ConversionTable label="Wind conversion" rows={categoricalConversionTables.wind} cigs={['CIG0', 'CIG1', 'CIG2', 'CIG3']} />
+    <ConversionTable label="Wind category by probability and CIG" {...categoricalConversionTables.wind} />
     <h4>Hail Conversion</h4>
-    <p>Hail supports CIG0–CIG2. CIG3 hatching is not available for this outlook.</p>
-    <ConversionTable label="Hail conversion" rows={categoricalConversionTables.hail} cigs={['CIG0', 'CIG1', 'CIG2']} />
+    <p>Hail supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline, and CIG3 is unavailable.</p>
+    <ConversionTable label="Hail category by probability and CIG" {...categoricalConversionTables.hail} />
     <p><em>Hail does not produce a HIGH categorical outcome in any combination.</em></p>
     <h4>Day 3 Total Severe Conversion</h4>
-    <p>Day 3 uses one combined probability, supports CIG0–CIG2, and has no separate significant-risk floor.</p>
-    <ConversionTable label="Day 3 total severe conversion" rows={categoricalConversionTables.totalSevere} cigs={['CIG0', 'CIG1', 'CIG2']} />
+    <p>Day 3 uses one combined probability, supports CIG1 and CIG2 hatching, and has no separate significant-risk floor. CIG0 is the no-hatching baseline.</p>
+    <ConversionTable label="Day 3 total severe category by probability and CIG" {...categoricalConversionTables.totalSevere} />
     <p><em>Day 3 categorical does not reach HIGH. Maximum output is MDT.</em></p>
-    <h4>Significant-risk floors</h4>
-    <p>A # marker adds the listed hazard-specific floor; the final result is the higher of that floor and the probability/CIG conversion. Markers without a listed floor retain hatching without changing the category.</p>
+    <h4>Significant-Risk Floors</h4>
+    <p>A trailing # marks a significant probability and adds its listed hazard-specific minimum category. The final category is the higher of that floor and the probability/CIG result. Other valid # probabilities retain hatching without changing the category.</p>
     <ul>
-      <li><strong>Tornado:</strong> {significantFloorSummary(significantCategoricalFloors.tornado)}</li>
-      <li><strong>Wind:</strong> {significantFloorSummary(significantCategoricalFloors.wind)}</li>
-      <li><strong>Hail:</strong> {significantFloorSummary(significantCategoricalFloors.hail)}</li>
+      <li><strong>Tornado:</strong> {significantFloorSummaries.tornado}</li>
+      <li><strong>Wind:</strong> {significantFloorSummaries.wind}</li>
+      <li><strong>Hail:</strong> {significantFloorSummaries.hail}</li>
       <li><strong>Day 3 total severe:</strong> no separate floor</li>
     </ul>
   </div>
