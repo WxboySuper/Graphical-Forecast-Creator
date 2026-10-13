@@ -11,6 +11,20 @@ import {
 } from './outlookUtils';
 import type { CategoricalRiskLevel, CIGLevel } from '../types/outlooks';
 
+const RISK_RANK: Record<CategoricalRiskLevel, number> = {
+  TSTM: 0,
+  MRGL: 1,
+  SLGT: 2,
+  ENH: 3,
+  MDT: 4,
+  HIGH: 5,
+};
+const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
+
+function isNondecreasing(values: readonly number[]): boolean {
+  return values.every((value, index) => index === 0 || value >= values[index - 1]);
+}
+
 describe('outlookUtils extra', () => {
   test('getOutlookConstraints returns correct sets for days', () => {
     const d1 = getOutlookConstraints(1);
@@ -39,6 +53,8 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '30#', cig: 'CIG3' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '30%#', cig: 'CIG3' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: ' 15% ', cig: 'CIG1' })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '015%', cig: 'CIG0' })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: '15#', cig: 'CIG3' })).toBe('MDT');
     expect(tornadoToCategorical({ probability: '1%', cig: 'CIG0' })).toBe('TSTM');
   });
 
@@ -62,19 +78,10 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '15%', cig: '' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'cig1' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'CIG1 ' as CIGLevel })).toBe('TSTM');
-    expect(windToCategorical({ probability: '5#' })).toBe('TSTM');
-    expect(totalSevereToCategorical({ probability: '30%#' })).toBe('TSTM');
+    expect(windToCategorical({ probability: '15#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
   });
 
   test('categorical risk remains monotonic across CIG and probability', () => {
-    const riskRank: Record<CategoricalRiskLevel, number> = {
-      TSTM: 0,
-      MRGL: 1,
-      SLGT: 2,
-      ENH: 3,
-      MDT: 4,
-      HIGH: 5,
-    };
     const conversions: Array<{
       convert: (input: { probability: string; cig: CIGLevel }) => CategoricalRiskLevel;
       probabilities: readonly string[];
@@ -85,24 +92,21 @@ describe('outlookUtils extra', () => {
       { convert: totalSevereToCategorical, probabilities: ['5%', '15%', '30%', '45%', '60%'] },
     ];
 
-    for (const { convert, probabilities } of conversions) {
-      for (const probability of probabilities) {
-        let previousRisk = riskRank[convert({ probability, cig: 'CIG0' })];
-        for (const cig of ['CIG1', 'CIG2', 'CIG3'] as const) {
-          const risk = riskRank[convert({ probability, cig })];
-          expect(risk).toBeGreaterThanOrEqual(previousRisk);
-          previousRisk = risk;
-        }
-      }
-      for (const cig of ['CIG0', 'CIG1', 'CIG2', 'CIG3'] as const) {
-        let previousProbabilityRisk = 0;
-        for (const probability of probabilities) {
-          const risk = riskRank[convert({ probability, cig })];
-          expect(risk).toBeGreaterThanOrEqual(previousProbabilityRisk);
-          previousProbabilityRisk = risk;
-        }
-      }
-    }
+    const sequences = conversions.flatMap(({ convert, probabilities }) => [
+      ...probabilities.map((probability) => CIG_LEVELS.map((cig) => RISK_RANK[convert({ probability, cig })])),
+      ...CIG_LEVELS.map((cig) => probabilities.map((probability) => RISK_RANK[convert({ probability, cig })])),
+    ]);
+
+    expect(sequences.every(isNondecreasing)).toBe(true);
+  });
+
+  test('documented significant categories override CIG categories and unsupported markers keep the plain risk', () => {
+    expect(tornadoToCategorical({ probability: '15#', cig: 'CIG3' })).toBe('MDT');
+    expect(windToCategorical({ probability: '15#', cig: 'CIG2' })).toBe('SLGT');
+    expect(windToCategorical({ probability: '45%#', cig: 'CIG3' })).toBe('MDT');
+    expect(hailToCategorical({ probability: '30#', cig: 'CIG2' })).toBe('ENH');
+    expect(windToCategorical({ probability: '5#', cig: 'CIG0' })).toBe('MRGL');
+    expect(totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' })).toBe('SLGT');
   });
 
   test('windToCategorical maps probabilities properly', () => {
