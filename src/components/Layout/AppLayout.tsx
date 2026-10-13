@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
-import { ToastManager, type ToastData, type ToastType } from '../Toast/Toast';
+import { ToastManager, type ToastData } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
 import PrivacyPolicyModal from '../PrivacyPolicy/PrivacyPolicyModal';
 import { AlertBanner } from '../AlertBanner';
@@ -14,15 +14,17 @@ import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
 import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
 
-export type { ToastData, ToastType } from '../Toast/Toast';
-
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
 
 /** @deprecated Import ToastData from the Toast component instead. */
-export type ToastItem = ToastData;
+export interface ToastItem extends ToastData {
+  id: ToastData['id'];
+  message: ToastData['message'];
+  type?: ToastData['type'];
+}
 
-export type AddToastFn = (message: string, type?: ToastType) => void;
+export type AddToastFn = (message: ToastData['message'], type?: ToastData['type']) => void;
 
 interface AppLayoutContextValue {
   addToast: AddToastFn;
@@ -51,6 +53,7 @@ export const AppLayout: React.FC = () => {
 
   // Toast management
   const addToast = useCallback<AddToastFn>((message, type = 'info') => {
+    if (typeof message !== 'string' || !message.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()) return;
     const id = uuidv4();
     setToasts(prev => [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type }]);
   }, []);

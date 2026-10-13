@@ -10,9 +10,11 @@ const advanceTimersByTime = (milliseconds: number): void => {
 describe('Toast', () => {
   beforeEach(() => {
     jest.useFakeTimers();
+    jest.spyOn(performance, 'now').mockImplementation(() => Date.now());
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
@@ -26,7 +28,7 @@ describe('Toast', () => {
     render(<Toast message={message} onClose={() => undefined} />);
     const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
 
-    expect(toast.textContent).toBe(message.trim());
+    expect(toast.textContent).toBe(message);
   });
 
   test('calls onClose after 3 seconds', () => {
@@ -53,13 +55,17 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('does not restart the timer for whitespace-only message changes', () => {
+  test('restarts the timer when outer whitespace changes the displayed copy', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Notice" onClose={onClose} />);
 
     advanceTimersByTime(2500);
     rerender(<Toast message="  Notice  " onClose={onClose} />);
     advanceTimersByTime(500);
+
+    expect(onClose).not.toHaveBeenCalled();
+
+    advanceTimersByTime(2500);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -114,7 +120,7 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Update 0" onClose={onClose} />);
 
-    for (let elapsed = 2500; elapsed < 30000; elapsed += 2500) {
+    for (let elapsed = 2500; elapsed < 33000; elapsed += 2500) {
       advanceTimersByTime(2500);
       rerender(<Toast message={`Update ${elapsed}`} onClose={onClose} />);
     }
@@ -128,22 +134,26 @@ describe('Toast', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="First" onClose={onClose} />);
 
-    advanceTimersByTime(30000);
+    advanceTimersByTime(33000);
     rerender(<Toast message="Updated after cap" onClose={onClose} />);
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Updated after cap')).not.toBeInTheDocument();
   });
 
-  test('does not flash a new message when less than the minimum reading window remains', () => {
+  test('shows a late message update for its minimum reading window within the bounded lifetime', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="First notice" onClose={onClose} />);
 
     advanceTimersByTime(3000);
     advanceTimersByTime(26000);
+    onClose.mockClear();
     rerender(<Toast message="Last second notice" onClose={onClose} />);
 
-    expect(screen.queryByText('Last second notice')).not.toBeInTheDocument();
+    expect(screen.getByText('Last second notice')).toBeInTheDocument();
+    advanceTimersByTime(2999);
+    expect(onClose).not.toHaveBeenCalled();
+    advanceTimersByTime(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
@@ -197,19 +207,15 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('closes empty or malformed messages without scheduling a timer', () => {
+  test('closes empty messages without scheduling a timer', () => {
     const onClose = jest.fn();
-    const { rerender } = render(<Toast message="   " onClose={onClose} />);
+    render(<Toast message="   " onClose={onClose} />);
 
-    advanceTimersByTime(0);
-    expect(onClose).toHaveBeenCalledTimes(1);
-
-    rerender(<Toast message={null} onClose={onClose} />);
     advanceTimersByTime(0);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  test('keeps the lifetime cap when a reused toast gets new copy after empty state', () => {
+  test('keeps empty messages from resetting the bounded lifetime', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="First notice" onClose={onClose} />);
 
@@ -219,13 +225,13 @@ describe('Toast', () => {
     advanceTimersByTime(0);
     expect(onClose).not.toHaveBeenCalled();
     rerender(<Toast message="New notice" onClose={onClose} />);
-    expect(screen.queryByText('New notice')).not.toBeInTheDocument();
+    expect(screen.getByText('New notice')).toBeInTheDocument();
 
-    advanceTimersByTime(999);
+    advanceTimersByTime(2999);
     expect(onClose).not.toHaveBeenCalled();
     advanceTimersByTime(1);
 
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   test('clears timeout on unmount', () => {
@@ -249,7 +255,7 @@ describe('ToastManager', () => {
     
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'false');
   });
 
   test('keeps the live region mounted when the queue is empty', () => {
@@ -273,6 +279,7 @@ describe('ToastManager', () => {
   test('dismisses empty notifications without arming a toast timer', () => {
     const onDismiss = jest.fn();
     const updatedOnDismiss = jest.fn();
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { rerender } = render(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={onDismiss} />);
 
     expect(onDismiss).toHaveBeenCalledWith('empty');
@@ -280,5 +287,14 @@ describe('ToastManager', () => {
 
     rerender(<ToastManager toasts={[{ id: 'empty', message: '  ' }]} onDismiss={updatedOnDismiss} />);
     expect(updatedOnDismiss).not.toHaveBeenCalled();
+  });
+
+  test('dismisses messages made only of zero-width formatting characters', () => {
+    const onDismiss = jest.fn();
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    render(<ToastManager toasts={[{ id: 'invisible', message: '\u200B\uFEFF' }]} onDismiss={onDismiss} />);
+
+    expect(onDismiss).toHaveBeenCalledWith('invisible');
+    expect(screen.queryByText(/\u200B/)).not.toBeInTheDocument();
   });
 });

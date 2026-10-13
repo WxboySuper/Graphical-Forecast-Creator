@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
-const MAX_TOAST_LIFETIME_MS = 30000;
 const MS_PER_CHARACTER = 100;
+const MAX_TOAST_LIFETIME_MS = 30000;
+// A final update at the 30-second cap still gets the minimum reading window.
+const MAX_TOAST_TOTAL_LIFETIME_MS = MAX_TOAST_LIFETIME_MS + MIN_TOAST_DURATION_MS;
 const MAX_READING_CHARACTERS = Math.floor(MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER);
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
 /** Returns whether a toast message contains no visible text. */
-const isEmptyToastMessage = (message: string | null | undefined): boolean => (message?.trim().length ?? 0) === 0;
+const isEmptyToastMessage = (message: string): boolean =>
+  message.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().length === 0;
 
 /** Uses the same clock source for the toast lifetime and timer deadlines. */
-const getCurrentTime = (): number => Date.now();
+const getCurrentTime = (): number => performance.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (timingMessage: string): number => {
@@ -23,13 +26,9 @@ const getToastDuration = (timingMessage: string): number => {
   );
 };
 
-/** Calculates how much time remains before the absolute lifetime cap. */
-const getRemainingLifetime = (
-  mountedAt: number,
-  now: number,
-): number => {
-  return Math.max(0, MAX_TOAST_LIFETIME_MS - (now - mountedAt));
-};
+/** Calculates how much time remains before the hard total lifetime cap. */
+const getRemainingLifetime = (mountedAt: number, now: number): number =>
+  Math.max(0, MAX_TOAST_TOTAL_LIFETIME_MS - (now - mountedAt));
 
 /** Closes once for the active reading window, even if its timer is replaced. */
 const closeToastOnce = (
@@ -50,42 +49,42 @@ export interface ToastData {
 }
 
 export interface ToastProps {
-  message: string | null | undefined;
+  message: string;
   type?: ToastType;
   onClose: () => void;
 }
 
+const TOAST_TYPES: readonly ToastType[] = ['info', 'success', 'warning', 'error'];
+
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
   const [isClosed, setIsClosed] = useState(false);
-  const displayMessage = message?.trim() ?? '';
-  const timingMessage = displayMessage.replace(/\s+/g, ' ');
-
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  const displayMessage = typeof message === 'string' ? message : '';
+  const safeType: ToastType = (TOAST_TYPES as readonly (ToastType | undefined)[]).includes(type)
+    ? type as ToastType
+    : 'info';
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    if (isEmptyToastMessage(timingMessage)) {
+    if (isEmptyToastMessage(displayMessage)) {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
     const now = getCurrentTime();
     mountedAtRef.current ??= now;
     const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
-    if (remainingLifetime < MIN_TOAST_DURATION_MS) {
-      // Do not flash new copy when too little time remains for its minimum reading window.
+    if (remainingLifetime === 0) {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
     // A changed message starts a new reading window and may close once for that version.
     closedRef.current = false;
     setIsClosed(false);
+    const timingMessage = displayMessage.trim().replace(/\s+/g, ' ');
     const readingWindow = getToastDuration(timingMessage);
-    // The lifetime cap intentionally wins over a full last reading window.
     const duration = Math.min(readingWindow, remainingLifetime);
     const timer = setTimeout(() => {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
@@ -95,10 +94,10 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [displayMessage, timingMessage]);
+  }, [displayMessage]);
 
-  return displayMessage.length > 0 && !isClosed ? (
-    <div className={`toast toast-${type}`}>
+  return !isEmptyToastMessage(displayMessage) && !isClosed ? (
+    <div className={`toast toast-${safeType}`}>
       {displayMessage}
     </div>
   ) : null;
@@ -109,6 +108,7 @@ export interface ToastManagerProps {
   onDismiss: (id: string) => void;
 }
 
+/** Filters and renders one queued toast, dismissing invalid empty copy. */
 function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: string) => void }): React.ReactElement | null {
   const emptyMessage = isEmptyToastMessage(toast.message);
   const emptyDismissedRef = useRef(false);
@@ -119,6 +119,9 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: st
     }
     if (emptyDismissedRef.current) return;
     emptyDismissedRef.current = true;
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`Dismissed empty toast message with id ${toast.id}`);
+    }
     onDismiss(toast.id);
   }, [emptyMessage, onDismiss, toast.id]);
 
@@ -127,9 +130,10 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: st
   return <Toast message={toast.message} type={toast.type} onClose={() => onDismiss(toast.id)} />;
 }
 
+/** Keeps the polite status region mounted and renders the current toast queue. */
 export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.ReactElement {
   return (
-    <div className="toast-container" role="status" aria-live="polite" aria-atomic="true">
+    <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">
       {toasts.map(toast => (
         <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
