@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
-import { normalizeToastType, ToastManager, type ToastData } from '../Toast/Toast';
+import { isEmptyToastMessage, normalizeToastType, ToastManager, type ToastData } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
 import PrivacyPolicyModal from '../PrivacyPolicy/PrivacyPolicyModal';
 import { AlertBanner } from '../AlertBanner';
@@ -49,6 +49,7 @@ export const AppLayout: React.FC = () => {
 
   // Toast management
   const addToast = useCallback<AddToastFn>((message, type = 'info') => {
+    if (isEmptyToastMessage(message)) return;
     const id = uuidv4();
     setToasts(prev => [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type: normalizeToastType(type) }]);
   }, []);

@@ -18,7 +18,10 @@ export const isEmptyToastMessage = (message: unknown): boolean =>
   typeof message !== 'string' || message.replace(/[\u200B-\u200D\uFEFF]/gu, '').trim().length === 0;
 
 /** Uses the same clock source for the toast lifetime and timer deadlines. */
-const getCurrentTime = (): number => performance.now();
+const getCurrentTime = (): number =>
+  typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (timingMessage: string): number => {
@@ -97,7 +100,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [emptyMessage, timingMessage]);
+  }, [displayMessage, displayType, emptyMessage, timingMessage]);
 
   return !emptyMessage && !isClosed ? (
     <div className={`toast toast-${displayType}`}>
