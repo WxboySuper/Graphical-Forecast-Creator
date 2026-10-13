@@ -17,6 +17,7 @@ type ArchiveCsvContext = { csvText: string };
 type ArchiveRowContext = { line: string; section: ReportType; headers: string[] };
 type RollingFeedRequest = { url: string; label: string };
 
+/** Confirms a constructed date kept the requested calendar year, month, and day. */
 function isValidCalendarDate({ date, year, month, day }: CalendarDateParts): boolean {
   return [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
 }
