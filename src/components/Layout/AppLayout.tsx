@@ -17,6 +17,7 @@ import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
 
+/** @deprecated Import ToastData from the Toast component instead. */
 export type ToastItem = ToastData;
 
 export type AddToastFn = (message: string, type?: ToastType) => void;
@@ -42,7 +43,7 @@ export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
   const [showTermsViewer, setShowTermsViewer] = useState(false);
   const [showPrivacyViewer, setShowPrivacyViewer] = useState(false);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
 

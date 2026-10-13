@@ -1,20 +1,25 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
 const MAX_TOAST_LIFETIME_MS = 30000;
 const MS_PER_CHARACTER = 100;
-const MAX_READING_CHARACTERS = MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER;
+const MAX_READING_CHARACTERS = Math.floor(MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER);
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
-const isEmptyToastMessage = (message: string | null | undefined): boolean => !(message?.trim() ?? '');
+/** Returns whether a toast message contains no visible text. */
+const isEmptyToastMessage = (message: string | null | undefined): boolean => (message?.trim().length ?? 0) === 0;
+
+/** Uses a monotonic browser clock when available, with a portable fallback. */
+const getCurrentTime = (): number =>
+  typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (timingMessage: string): number => {
   // Code points approximate reading length; the minimum and maximum bound the estimate.
   // Stop at the cap so even very long messages need only a bounded scan.
   let characterCount = 0;
-  for (const _character of timingMessage) {
+  for (const _ of timingMessage) {
     characterCount += 1;
     if (characterCount >= MAX_READING_CHARACTERS) break;
   }
@@ -34,8 +39,8 @@ const getRemainingLifetime = (
 
 /** Closes once for the active reading window, even if its timer is replaced. */
 const closeToastOnce = (
-  closedRef: MutableRefObject<boolean>,
-  onCloseRef: MutableRefObject<() => void>,
+  closedRef: RefObject<boolean>,
+  onCloseRef: RefObject<() => void>,
   markClosed: () => void,
 ): void => {
   if (closedRef.current) return;
@@ -46,7 +51,7 @@ const closeToastOnce = (
 
 export interface ToastData {
   id: string;
-  message: string | null | undefined;
+  message: string;
   type?: ToastType;
 }
 
@@ -76,10 +81,15 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
-    const now = performance.now();
+    const now = getCurrentTime();
     mountedAtRef.current ??= now;
     const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
     if (remainingLifetime <= 0) {
+      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+      return;
+    }
+    if (remainingLifetime < MIN_TOAST_DURATION_MS) {
+      // Do not flash new copy when too little time remains for its minimum reading window.
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
@@ -99,7 +109,10 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     };
   }, [timingMessage]);
 
-  return displayMessage.length > 0 && !isClosed ? (
+  const hasVisibleWindow = mountedAtRef.current === null ||
+    getRemainingLifetime(mountedAtRef.current, getCurrentTime()) >= MIN_TOAST_DURATION_MS;
+
+  return displayMessage.length > 0 && !isClosed && hasVisibleWindow ? (
     <div className={`toast toast-${type}`}>
       {displayMessage}
     </div>
@@ -134,14 +147,16 @@ const ToastEntry = memo(function ToastEntry({ toast, onDismiss }: { toast: Toast
   return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 });
 
-export const ToastManager: React.FC<ToastManagerProps> = ({ toasts, onDismiss }) => {
+export const ToastManager = memo(function ToastManager({ toasts, onDismiss }: ToastManagerProps) {
+  if (toasts.length === 0) return null;
+
   return (
-    <div className="toast-container" role="status" aria-live="polite" aria-atomic="false">
+    <div className="toast-container" role="status" aria-label="Notifications" aria-live="polite" aria-atomic="false" tabIndex={0}>
       {toasts.map(toast => (
         <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}
     </div>
   );
-};
+});
 
 export default Toast;

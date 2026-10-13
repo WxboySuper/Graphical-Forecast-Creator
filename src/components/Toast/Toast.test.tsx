@@ -85,6 +85,7 @@ describe('Toast', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     rerender(<Toast message="Updated" type="success" onClose={onClose} />);
+    expect(screen.getByText('Updated')).toBeInTheDocument();
     advanceTimersByTime(2999);
     expect(onClose).toHaveBeenCalledTimes(1);
     advanceTimersByTime(1);
@@ -128,6 +129,18 @@ describe('Toast', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Updated after cap')).not.toBeInTheDocument();
+  });
+
+  test('does not flash a new message when less than the minimum reading window remains', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="First notice" onClose={onClose} />);
+
+    advanceTimersByTime(3000);
+    advanceTimersByTime(26000);
+    rerender(<Toast message="Last second notice" onClose={onClose} />);
+
+    expect(screen.queryByText('Last second notice')).not.toBeInTheDocument();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   test('gives longer messages more time to be read', () => {
@@ -202,12 +215,13 @@ describe('Toast', () => {
     advanceTimersByTime(0);
     expect(onClose).not.toHaveBeenCalled();
     rerender(<Toast message="New notice" onClose={onClose} />);
+    expect(screen.queryByText('New notice')).not.toBeInTheDocument();
 
     advanceTimersByTime(999);
     expect(onClose).not.toHaveBeenCalled();
     advanceTimersByTime(1);
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   test('clears timeout on unmount', () => {
@@ -232,6 +246,13 @@ describe('ToastManager', () => {
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'false');
+    expect(screen.getByRole('status')).toHaveAttribute('tabindex', '0');
+  });
+
+  test('does not render an empty live region', () => {
+    render(<ToastManager toasts={[]} onDismiss={() => undefined} />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('calls onDismiss when toast closes', () => {

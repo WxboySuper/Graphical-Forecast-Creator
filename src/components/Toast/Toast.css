@@ -1,4 +1,5 @@
 .toast-container {
+  --toast-max-width: 420px;
   position: fixed;
   bottom: 20px;
   right: 20px;
@@ -7,6 +8,10 @@
   flex-direction: column;
   gap: 8px;
   pointer-events: none;
+  max-width: var(--toast-max-width);
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .toast {
@@ -20,10 +25,27 @@
   pointer-events: all;
   box-sizing: border-box;
   min-width: 200px;
-  max-width: 420px;
+  max-width: var(--toast-max-width);
   overflow-wrap: break-word;
-  text-align: center;
+  text-align: left;
   white-space: pre-wrap;
+}
+
+/* Keep notices above the forecast toolbar on phones and compact landscapes. */
+@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+  .toast-container {
+    right: 12px;
+    left: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    align-items: center;
+    margin-inline: auto;
+  }
+
+  .toast {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .toast-info {
