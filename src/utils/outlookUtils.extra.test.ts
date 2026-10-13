@@ -9,7 +9,7 @@ import {
   getCategoricalRiskDisplayName,
   getOutlookColor,
 } from './outlookUtils';
-import type { CategoricalRiskLevel, CIGLevel } from '../types/outlooks';
+import type { CategoricalRiskLevel, CIGLevel, WindProbability } from '../types/outlooks';
 
 const RISK_RANK: Record<CategoricalRiskLevel, number> = {
   TSTM: 0,
@@ -52,7 +52,7 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '15#', cig: 'CIG0' })).toBe('MDT');
     expect(tornadoToCategorical({ probability: '30#', cig: 'CIG3' })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '30%#', cig: 'CIG3' })).toBe('HIGH');
-    expect(tornadoToCategorical({ probability: ' 15% ', cig: 'CIG1' })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: ' 15% ', cig: 'CIG1' })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '015%', cig: 'CIG0' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15#', cig: 'CIG3' })).toBe('MDT');
     expect(tornadoToCategorical({ probability: '1%', cig: 'CIG0' })).toBe('TSTM');
@@ -78,12 +78,13 @@ describe('outlookUtils extra', () => {
       [windToCategorical({ probability: '45%#', cig: 'CIG3' }), 'HIGH'],
       [windToCategorical({ probability: '60%', cig: 'CIG0' }), 'MDT'],
       [windToCategorical({ probability: '90%', cig: 'CIG0' }), 'MDT'],
-      [windToCategorical({ probability: '75%#', cig: 'CIG0' }), 'TSTM'],
-      [windToCategorical({ probability: '90%#', cig: 'CIG0' }), 'TSTM'],
+      [windToCategorical({ probability: '75%#', cig: 'CIG0' }), 'MDT'],
+      [windToCategorical({ probability: '90%#', cig: 'CIG0' }), 'MDT'],
+      [windToCategorical({ probability: '5%#', cig: 'CIG0' }), 'MRGL'],
       [hailToCategorical({ probability: '30#', cig: 'CIG2' }), 'ENH'],
       [hailToCategorical({ probability: '45%', cig: 'CIG3' }), 'MDT'],
       [totalSevereToCategorical({ probability: '30%', cig: 'CIG3' }), 'ENH'],
-      [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'SLGT'],
+      [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'ENH'],
     ];
     expect(cases.map(([actual]) => actual)).toEqual(cases.map(([, expected]) => expected));
   });
@@ -96,12 +97,13 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '30' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1 5%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '15%', cig: null as unknown as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: '' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'cig1' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'CIG1 ' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: ' CIG1' as CIGLevel })).toBe('TSTM');
-    expect(windToCategorical({ probability: '15#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
+    expect(windToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('ENH');
   });
 
   test('categorical risk remains monotonic across CIG and probability', () => {
@@ -136,9 +138,9 @@ describe('outlookUtils extra', () => {
     const expected: Record<string, [string, string, string]> = {
       '5%': ['MRGL', 'MRGL', 'SLGT'],
       '15%': ['SLGT', 'SLGT', 'ENH'],
-      '30%': ['SLGT', 'ENH', 'ENH'],
+      '30%': ['ENH', 'ENH', 'ENH'],
       '45%': ['ENH', 'ENH', 'MDT'],
-      '60%': ['ENH', 'MDT', 'MDT'],
+      '60%': ['MDT', 'MDT', 'MDT'],
     };
 
     for (const [probability, risks] of Object.entries(expected)) {
@@ -152,7 +154,8 @@ describe('outlookUtils extra', () => {
     expect(isSignificantThreat({ probability: '15#' })).toBe(true);
     expect(isSignificantThreat({ probability: '15%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '15%' })).toBe(false);
-    expect(isSignificantThreat({ probability: '5%#' })).toBe(false);
+    expect(isSignificantThreat({ probability: '5%#' })).toBe(true);
+    expect(isSignificantThreat({ probability: '75%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '999%#' })).toBe(false);
     expect(isSignificantThreat({ probability: '1#5%' })).toBe(false);
     expect(isSignificantThreat({ probability: '#' })).toBe(false);
@@ -172,14 +175,18 @@ describe('outlookUtils extra', () => {
       wind: { probability: '45%#', cig: 'CIG3', isSignificant: true },
     })).toBe('HIGH');
     expect(getHighestCategoricalRisk({
-      wind: { probability: '45%#', cig: 'CIG3', isSignificant: false },
-    })).toBe('TSTM');
+      wind: { probability: '75%', cig: 'CIG0', isSignificant: true },
+    })).toBe('MDT');
     expect(getHighestCategoricalRisk({
-      wind: { probability: 45 as unknown as string, cig: 'CIG3', isSignificant: true },
+      wind: { probability: '45%#', cig: 'CIG3', isSignificant: false },
+    })).toBe('HIGH');
+    expect(getHighestCategoricalRisk({
+      wind: { probability: 45 as unknown as WindProbability, cig: 'CIG3', isSignificant: true },
     })).toBe('TSTM');
     expect(getHighestCategoricalRisk({
       wind: { probability: '45%', cig: 'CIG3', isSignificant: 1 as unknown as boolean },
-    })).toBe('TSTM');
+    })).toBe('HIGH');
+    expect(getHighestCategoricalRisk(null)).toBe('TSTM');
   });
 
   test('getCategoricalRiskDisplayName and getOutlookColor', () => {

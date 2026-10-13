@@ -229,6 +229,7 @@ export const CategoricalSection: React.FC = () => (
       The categorical risk is computed from each probability + CIG level combination. The highest result
       from any outlook (Tornado, Wind, or Hail) wins for a given area.
     </p>
+    <p>When a probability has no direct match at a CIG level, the highest mapped risk from a lower CIG level applies.</p>
 
     <h4>Tornado Conversion</h4>
     <table className="conversion-table">
@@ -236,13 +237,13 @@ export const CategoricalSection: React.FC = () => (
         <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th><th>CIG3</th></tr>
       </thead>
       <tbody>
-        <tr><td>2%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><td>—</td></tr>
-        <tr><td>5%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><td>—</td></tr>
-        <tr><td>10%</td><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
+        <tr><td>2%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><CatCell v="SLGT"/></tr>
+        <tr><td>5%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
+        <tr><td>10%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
         <tr><td>15%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
-        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>45%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>60%</td><CatCell v="ENH"/><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>30%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>45%</td><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>60%</td><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
       </tbody>
     </table>
 
@@ -252,13 +253,13 @@ export const CategoricalSection: React.FC = () => (
         <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th><th>CIG3</th></tr>
       </thead>
       <tbody>
-        <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><td>—</td></tr>
-        <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><td>—</td></tr>
-        <tr><td>30%</td><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/><td>—</td></tr>
+        <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><CatCell v="SLGT"/></tr>
+        <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
+        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
         <tr><td>45%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/></tr>
-        <tr><td>60%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>75%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>90%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>60%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>75%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
+        <tr><td>90%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
       </tbody>
     </table>
 
@@ -270,9 +271,9 @@ export const CategoricalSection: React.FC = () => (
       <tbody>
         <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/></tr>
         <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/></tr>
-        <tr><td>30%</td><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
+        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
         <tr><td>45%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/></tr>
-        <tr><td>60%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
+        <tr><td>60%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
       </tbody>
     </table>
     <p><em>Hail does not produce a HIGH categorical outcome in any combination.</em></p>
