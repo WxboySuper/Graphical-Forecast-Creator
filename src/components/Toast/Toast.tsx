@@ -33,16 +33,19 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
     const remainingLifetime = MAX_TOAST_LIFETIME_MS - elapsed;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (remainingLifetime <= 0) {
       onCloseRef.current();
-      return;
+    } else {
+      const duration = Math.min(getToastDuration(message), remainingLifetime);
+      timer = setTimeout(() => {
+        onCloseRef.current();
+      }, duration);
     }
-    const duration = Math.min(getToastDuration(message), remainingLifetime);
-    const timer = setTimeout(() => {
-      onCloseRef.current();
-    }, duration);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
   }, [message]);
 
   return (
