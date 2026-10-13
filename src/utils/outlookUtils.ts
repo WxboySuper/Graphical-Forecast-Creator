@@ -86,20 +86,20 @@ export type SignificantProbability<P extends string> = P extends `${infer Value}
   ? `${Value}#` | `${P}#`
   : `${P}#`;
 
-/** Runtime boundary for persisted values; public callers use the narrower CategoricalInput type below. */
-type CategoricalConversion = {
-  probability: unknown;
-  cig: unknown;
+type CategoricalConversionOptions = {
   rules: readonly CategoricalRule[];
   significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
   maxCigRank?: number;
 };
-type CategoricalRiskLookup = {
+
+/** Runtime boundary for persisted values; public callers use the narrower CategoricalInput type below. */
+type CategoricalConversion = CategoricalConversionOptions & {
+  probability: unknown;
+  cig: unknown;
+};
+type CategoricalRiskLookup = CategoricalConversionOptions & {
   normalized: NormalizedCategoricalProbability;
   cig: unknown;
-  rules: readonly CategoricalRule[];
-  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>;
-  maxCigRank?: number;
 };
 
 const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
