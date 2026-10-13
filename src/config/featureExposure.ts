@@ -1,6 +1,6 @@
 import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
-export type FeatureExposureMatrix = Record<BuildTarget, boolean>;
+export type FeatureExposureMatrix = Readonly<Record<BuildTarget, boolean>>;
 
 type FeatureExposureBase = {
   exposure: FeatureExposureMatrix;

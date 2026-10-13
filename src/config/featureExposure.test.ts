@@ -120,6 +120,8 @@ describe('featureExposure registry', () => {
 
   test('keeps optional land masking and KMZ export staged before production promotion', () => {
     for (const [feature, trackingIssue] of [['outlookLandMasking', 619], ['kmzExport', 621]] as const) {
+      expect(isFeatureExposedOnTarget(feature, 'local')).toBe(true);
+      expect(isFeatureExposedOnTarget(feature, 'beta')).toBe(true);
       expect(isFeatureExposedOnTarget(feature, 'staging')).toBe(true);
       expect(isFeatureExposedOnTarget(feature, 'production')).toBe(false);
       expect(getFeatureExposure(feature)).toMatchObject({
