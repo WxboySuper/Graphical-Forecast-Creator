@@ -56,7 +56,6 @@ export const useMonitorNwsAlertsLoad = ({
           return undefined;
         }
 
-        setRawFrames([]);
         setError('Official alerts are unavailable right now.');
         addToast('NWS watch/warning polygons could not be loaded.', 'warning');
         return undefined;
