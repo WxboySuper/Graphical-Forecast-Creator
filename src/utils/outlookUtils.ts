@@ -94,6 +94,8 @@ const CATEGORICAL_RISK_RANK: Readonly<Record<CategoricalRiskLevel, number>> = {
 };
 const DEFAULT_CATEGORICAL_RISK: CategoricalRiskLevel = 'TSTM';
 const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
+// Union of documented significant categories: tornado 10–60%, wind/hail 15–60%.
+// Wind 75% and 90% have no significant counterpart in the product guidance.
 const SIGNIFICANT_PROBABILITIES: ReadonlySet<string> = new Set(['10%', '15%', '30%', '45%', '60%']);
 
 /** Shared wind and hail significant thresholds from the product outlook guidance. */
@@ -154,7 +156,7 @@ function normalizeCategoricalProbability(probability: unknown): NormalizedCatego
 function ruleAppliesAtOrBelowCig(ruleCigs: readonly CIGLevel[], targetCigRank: number): boolean {
   for (const ruleCig of ruleCigs) {
     const ruleCigRank = CIG_LEVELS.indexOf(ruleCig);
-    if (ruleCigRank <= targetCigRank) {
+    if (ruleCigRank >= 0 && ruleCigRank <= targetCigRank) {
       return true;
     }
   }
@@ -207,7 +209,7 @@ function findCigFallbackRisk(
   return fallbackRisk;
 }
 
-/** Uses a documented significant risk when present, otherwise the highest eligible CIG mapping. */
+/** Treats a documented significant risk as a floor over the eligible CIG mapping. */
 function findCategoricalRisk(
   normalized: NormalizedCategoricalProbability,
   cig: unknown,
@@ -220,14 +222,12 @@ function findCategoricalRisk(
     return DEFAULT_CATEGORICAL_RISK;
   }
 
-  if (normalized.significant && significantRisk === undefined) {
-    return DEFAULT_CATEGORICAL_RISK;
-  }
-
   // Use a defined lower-significance CIG rule when this probability has no
   // exact mapping. This preserves monotonic risk without promoting low CIGs
   // from a rule that applies only to a more significant hatch.
   const fallbackRisk = findCigFallbackRisk(normalized.probability, targetCigRank, rules) ?? DEFAULT_CATEGORICAL_RISK;
+  // Significant markers without a separate product mapping (such as Day 3
+  // total severe) retain the corresponding plain-probability CIG category.
   return significantRisk === undefined ? fallbackRisk : higherCategoricalRisk(significantRisk, fallbackRisk);
 }
 
@@ -240,7 +240,7 @@ function categorizeProbability({ probability, cig, rules, significantRisks }: Ca
   return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks);
 }
 
-type CategoricalInput = {
+export type CategoricalInput = {
   probability: string;
   cig?: CIGLevel;
 };
@@ -346,10 +346,14 @@ export function isSignificantThreat({ probability }: { probability: unknown }): 
  * @param probabilities Available tornado, wind, and hail probabilities
  * @returns The highest mapped risk. String values use CIG0; object values may include CIG and significant state.
  */
-type DetailedCategoricalInput = { probability: string; cig?: CIGLevel; isSignificant?: boolean };
-type CategoricalOutlookValue<P extends string> = P | DetailedCategoricalInput;
+export type DetailedCategoricalInput<P extends string = string> = {
+  probability: P;
+  cig?: CIGLevel;
+  isSignificant?: boolean;
+};
+export type CategoricalOutlookValue<P extends string> = P | DetailedCategoricalInput<P>;
 
-type AvailableProbabilities = {
+export type AvailableProbabilities = {
   tornado?: CategoricalOutlookValue<TornadoProbability>;
   wind?: CategoricalOutlookValue<WindProbability>;
   hail?: CategoricalOutlookValue<HailProbability>;
@@ -358,8 +362,19 @@ type AvailableProbabilities = {
 /** Converts plain or structured outlook values to the shared categorical input shape. */
 function toCategoricalInput(input: string | DetailedCategoricalInput): CategoricalInput {
   if (typeof input === 'string') return { probability: input };
+  if (
+    typeof input.probability !== 'string' ||
+    (input.isSignificant !== undefined && typeof input.isSignificant !== 'boolean')
+  ) {
+    return { probability: '', cig: input.cig };
+  }
+  const normalized = normalizeCategoricalProbability(input.probability);
+  if (!normalized || (input.isSignificant === false && normalized.significant)) {
+    return { probability: '', cig: input.cig };
+  }
+  const isSignificant = input.isSignificant ?? normalized.significant;
   return {
-    probability: input.isSignificant ? `${input.probability}#` : input.probability,
+    probability: isSignificant ? `${normalized.probability}#` : normalized.probability,
     cig: input.cig,
   };
 }

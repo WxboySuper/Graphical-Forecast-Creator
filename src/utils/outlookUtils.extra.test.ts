@@ -78,10 +78,12 @@ describe('outlookUtils extra', () => {
       [windToCategorical({ probability: '45%#', cig: 'CIG3' }), 'HIGH'],
       [windToCategorical({ probability: '60%', cig: 'CIG0' }), 'MDT'],
       [windToCategorical({ probability: '90%', cig: 'CIG0' }), 'MDT'],
+      [windToCategorical({ probability: '75%#', cig: 'CIG0' }), 'TSTM'],
+      [windToCategorical({ probability: '90%#', cig: 'CIG0' }), 'TSTM'],
       [hailToCategorical({ probability: '30#', cig: 'CIG2' }), 'ENH'],
       [hailToCategorical({ probability: '45%', cig: 'CIG3' }), 'MDT'],
       [totalSevereToCategorical({ probability: '30%', cig: 'CIG3' }), 'ENH'],
-      [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'TSTM'],
+      [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'SLGT'],
     ];
     expect(cases.map(([actual]) => actual)).toEqual(cases.map(([, expected]) => expected));
   });
@@ -166,6 +168,18 @@ describe('outlookUtils extra', () => {
     expect(getHighestCategoricalRisk({
       wind: { probability: '45%', cig: 'CIG3', isSignificant: true },
     })).toBe('HIGH');
+    expect(getHighestCategoricalRisk({
+      wind: { probability: '45%#', cig: 'CIG3', isSignificant: true },
+    })).toBe('HIGH');
+    expect(getHighestCategoricalRisk({
+      wind: { probability: '45%#', cig: 'CIG3', isSignificant: false },
+    })).toBe('TSTM');
+    expect(getHighestCategoricalRisk({
+      wind: { probability: 45 as unknown as string, cig: 'CIG3', isSignificant: true },
+    })).toBe('TSTM');
+    expect(getHighestCategoricalRisk({
+      wind: { probability: '45%', cig: 'CIG3', isSignificant: 1 as unknown as boolean },
+    })).toBe('TSTM');
   });
 
   test('getCategoricalRiskDisplayName and getOutlookColor', () => {
