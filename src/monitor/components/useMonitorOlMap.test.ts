@@ -97,7 +97,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
 
     // Mount with no selection clears the empty popup container once.
     expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(1);
-    expect(lastLayerSyncArgs()?.selectedAlert).toBeNull();
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBeNull();
 
     const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
     act(() => {
@@ -109,7 +109,20 @@ describe('useMonitorOlMap selected alert wiring', () => {
       selectedDetails,
       expect.any(Function),
     );
-    expect(lastLayerSyncArgs()?.selectedAlert).toBe(selectedDetails);
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBe(selectedDetails.detailUrl);
+  });
+
+  it('forwards an empty id for selections without a canonical detail URL', () => {
+    renderHook(({ alertsCollection }) => useMonitorOlMap(makeArgs(alertsCollection)), {
+      initialProps: { alertsCollection: makeCollection('https://api.weather.gov/alerts/abc') },
+    });
+
+    const onSelectAlert = jest.mocked(useMonitorMapBootstrap).mock.calls[0][0].onSelectAlert;
+    act(() => {
+      onSelectAlert({ ...selectedDetails, detailUrl: null });
+    });
+
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('');
   });
 
   it('keeps the same selection object across collection changes for dismissal tracking', () => {
@@ -130,7 +143,7 @@ describe('useMonitorOlMap selected alert wiring', () => {
 
     const forwarded = lastLayerSyncArgs();
     expect(forwarded?.alertsCollection).toBe(second);
-    expect(forwarded?.selectedAlert).toBe(selectedDetails);
+    expect(forwarded?.selectedAlertId).toBe(selectedDetails.detailUrl);
     expect(typeof forwarded?.onClearSelectedAlert).toBe('function');
   });
 
@@ -149,6 +162,6 @@ describe('useMonitorOlMap selected alert wiring', () => {
       onSelectAlert(null);
     });
     expect(clearMonitorAlertPopup).toHaveBeenCalledTimes(2);
-    expect(lastLayerSyncArgs()?.selectedAlert).toBeNull();
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBeNull();
   });
 });

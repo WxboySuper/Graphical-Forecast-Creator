@@ -44,6 +44,12 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     setSelectedAlert(null);
   }, [refs.overlayRef]);
 
+  // Only the canonical detail URL crosses into layer sync for expiry
+  // dismissal. Alerts without one use an empty id that never matches, so the
+  // popup survives the grace window and is then dismissed instead of
+  // lingering indefinitely (issue #1595).
+  const selectedAlertId = selectedAlert ? (selectedAlert.detailUrl ?? '') : null;
+
   useMonitorMapBootstrap({
     mapView: args.mapView,
     darkMode,
@@ -82,7 +88,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     alertsOpacity: args.alertsOpacity,
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     refs,
-    selectedAlert,
+    selectedAlertId,
     onClearSelectedAlert: clearSelectedAlert,
   });
 
