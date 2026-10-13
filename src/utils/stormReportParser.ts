@@ -22,14 +22,14 @@ function isValidCalendarDate({ date, year, month, day }: CalendarDateParts): boo
 
 /** Builds an SPC archive URL for a valid YYMMDD date and report format. */
 function archiveUrlForDate({ date, format = 'filtered' }: ArchiveUrlOptions): string {
-  if (!isValidArchiveDate(date)) {
+  if (!isValidArchiveDate({ date })) {
     throw new Error(`Invalid SPC report date: ${date}. Expected YYMMDD.`);
   }
   return `${SPC_STORM_REPORTS_BASE_URL}/${date}_rpts_${format}.csv`;
 }
 
 /** Validates the six digit date used by SPC's YYMMDD archive filenames. */
-function isValidArchiveDate(date: string): boolean {
+function isValidArchiveDate({ date }: { date: string }): boolean {
   if (!/^\d{6}$/.test(date)) {
     return false;
   }
@@ -54,22 +54,23 @@ const ARCHIVE_SECTION_HEADERS: readonly { labels: readonly string[]; type: Repor
 ];
 
 /** Finds a section marker at the beginning of a raw archive line. */
-function archiveSectionForLine(line: string): ReportType | null {
+function archiveSectionForLine({ line }: { line: string }): ReportType | null {
   return ARCHIVE_SECTION_HEADERS.find(({ labels }) => labels.some((label) => line.startsWith(label)))?.type ?? null;
 }
 
 /** Returns true when the archive contains one of SPC's filtered report sections. */
-function hasFilteredArchiveHeaders(csvText: string): boolean {
+function hasFilteredArchiveHeaders({ csvText }: { csvText: string }): boolean {
   const sectionHeaders = TODAY_SECTION_HEADERS.map(({ header }) => `${header},`);
   return csvText.split('\n', 50).some((line) => sectionHeaders.some((header) => line.trim().startsWith(header)));
 }
 
-function hasRawArchiveHeaders(csvText: string): boolean {
-  return csvText.split('\n', 50).some((line) => archiveSectionForLine(line.trim()) !== null);
+/** Detects raw section markers within the archive preamble. */
+function hasRawArchiveHeaders({ csvText }: { csvText: string }): boolean {
+  return csvText.split('\n', 50).some((line) => archiveSectionForLine({ line: line.trim() }) !== null);
 }
 
 /** Parses the sectioned raw archive format, ignoring malformed rows. */
-function parseRawArchiveStormReportCsv(csvText: string): StormReport[] {
+function parseRawArchiveStormReportCsv({ csvText }: { csvText: string }): StormReport[] {
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
 
@@ -83,7 +84,7 @@ function parseRawArchiveStormReportCsv(csvText: string): StormReport[] {
       continue;
     }
 
-    const section = archiveSectionForLine(line);
+    const section = archiveSectionForLine({ line });
     if (section) {
       currentSection = section;
       continue;
@@ -105,11 +106,20 @@ function parseRawArchiveStormReportCsv(csvText: string): StormReport[] {
   return reports;
 }
 
+/** Rejects empty, HTML, and unrecognized archive responses before parsing. */
+function isRecognizedArchiveResponse({ csvText }: { csvText: string }): boolean {
+  const trimmedText = csvText.trimStart();
+  if (!trimmedText) return false;
+  if (/^<\s*html\b/i.test(trimmedText)) return false;
+  if (hasFilteredArchiveHeaders({ csvText })) return true;
+  return hasRawArchiveHeaders({ csvText });
+}
+
 /** Parses archived filtered or raw SPC storm report text. */
 export const parseArchiveStormReportCsv = (csvText: string): StormReport[] =>
-  hasFilteredArchiveHeaders(csvText)
+  hasFilteredArchiveHeaders({ csvText })
     ? parseTodayStormReportCsv(csvText)
-    : parseRawArchiveStormReportCsv(csvText);
+    : parseRawArchiveStormReportCsv({ csvText });
 
 /** Parses one raw archive row without stopping the rest of the report file. */
 function parseArchiveCsvRowSafely({ line, section, headers }: ArchiveRowContext): StormReport | null {
@@ -148,12 +158,7 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
   }
 
   const csvText = await response.text();
-  const trimmedText = csvText.trimStart();
-  if (
-    !trimmedText ||
-    /^<\s*html\b/i.test(trimmedText) ||
-    (!hasFilteredArchiveHeaders(csvText) && !hasRawArchiveHeaders(csvText))
-  ) {
+  if (!isRecognizedArchiveResponse({ csvText })) {
     throw new Error(`SPC returned an invalid report archive for ${date}.`);
   }
   return parseArchiveStormReportCsv(csvText);
