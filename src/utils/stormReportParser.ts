@@ -214,7 +214,6 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
     return requireArchiveReports(filtered, date);
   }
   if (filtered.reports !== undefined) return filtered.reports;
-  rememberRawArchive(date);
 
   const raw = await loadParsedArchive(archiveUrlForDate({ date, format: 'raw' }), date);
   if (!raw.response.ok) {
@@ -225,6 +224,7 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
       cause: new AggregateError([filtered.parseError, filtered.bodyError, raw.parseError, raw.bodyError].filter((error) => error !== undefined)),
     });
   }
+  rememberRawArchive(date);
   return raw.reports;
 }
 

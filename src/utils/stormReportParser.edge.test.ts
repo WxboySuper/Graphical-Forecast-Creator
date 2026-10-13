@@ -68,6 +68,27 @@ describe('stormReportParser integration tests', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(3, `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`);
   });
 
+  test('does not cache a raw archive after the raw fallback fails', async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: () => Promise.resolve([
+          'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+          '1234,1,Ada,Denton,TX,33.5,-97.2,Filtered archive',
+        ].join('\n')),
+      });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchStormReports } = await import('./stormReportParser');
+
+    await expect(fetchStormReports('260130')).rejects.toThrow('SPC report archives failed');
+    await expect(fetchStormReports('260130')).resolves.toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_filtered.csv');
+  });
+
   test('retries the filtered archive after the raw-only cache expires', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-01-30T12:00:00Z'));
