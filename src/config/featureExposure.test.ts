@@ -130,6 +130,14 @@ describe('featureExposure registry', () => {
     }
   });
 
+  test('keeps paint bucket and population estimate capped at beta', () => {
+    for (const feature of ['paintBucketTool', 'populationEstimate'] as const) {
+      expect(isFeatureExposedOnTarget(feature, 'beta')).toBe(true);
+      expect(isFeatureExposedOnTarget(feature, 'staging')).toBe(false);
+      expect(isFeatureExposedOnTarget(feature, 'production')).toBe(false);
+    }
+  });
+
   test('keeps unreleased v1.7 workstreams disabled outside their explicitly approved targets', () => {
     const workstreamKeys = [
       'forecastWorkflowV2',

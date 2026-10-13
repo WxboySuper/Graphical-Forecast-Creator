@@ -42,6 +42,34 @@ describe('stormReportParser integration tests', () => {
     expect(reports[1]?.magnitude).toBe('65 mph');
   });
 
+  test('accepts current archive section labels without the Raw prefix', async () => {
+    jest.doMock('uuid', () => ({ v4: () => 'current-section-anchor-test' }));
+    const csv = [
+      'Tornado LSR',
+      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
+      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
+    ].join('\n');
+    globalThis.fetch = jest.fn(() => Promise.resolve({ ok: true, text: () => Promise.resolve(csv) })) as unknown as typeof fetch;
+
+    const { fetchStormReports } = await import('./stormReportParser');
+    const reports = await fetchStormReports('260130');
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 33.5, longitude: -97.2 });
+  });
+
+  test.each(['', '<html><body>maintenance</body></html>'])(
+    'rejects empty or HTML archive bodies instead of reporting zero storms', async (body) => {
+      globalThis.fetch = jest.fn(() => Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve(body),
+      })) as unknown as typeof fetch;
+
+      const { fetchStormReports } = await import('./stormReportParser');
+      await expect(fetchStormReports('260130')).rejects.toThrow('invalid report archive');
+    }
+  );
+
   test('parses tornado EF from Remarks when EF_Scale is UNK and handles quoted location', async () => {
     jest.doMock('uuid', () => ({ v4: () => 'test-uuid-1' }));
 

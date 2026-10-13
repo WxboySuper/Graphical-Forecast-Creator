@@ -1,5 +1,5 @@
 import { StormReport, ReportType } from '../types/stormReports';
-import { parseArchiveCsvRow } from './stormReportRows';
+import { parseArchiveCsvRow, TODAY_SECTION_HEADERS } from './stormReportRows';
 import { parseTodayStormReportCsv } from './stormReportTodayCsv';
 
 export { parseTodayStormReportCsv } from './stormReportTodayCsv';
@@ -12,20 +12,18 @@ export const SPC_YESTERDAY_STORM_REPORTS_URL = `${SPC_STORM_REPORTS_BASE_URL}/ye
 
 type ArchiveUrlOptions = { date: string; format?: 'filtered' | 'raw' };
 type CalendarDateParts = { date: Date; year: number; month: number; day: number };
-type ArchiveLineContext = { line: string };
-type ArchiveCsvContext = { csvText: string };
 type ArchiveRowContext = { line: string; section: ReportType; headers: string[] };
 type RollingFeedRequest = { url: string; label: string };
 
 /** Confirms a constructed date kept the requested calendar year, month, and day. */
 function isValidCalendarDate({ date, year, month, day }: CalendarDateParts): boolean {
-  return [date.getFullYear() === year, date.getMonth() === month, date.getDate() === day].every(Boolean);
+  return date.getFullYear() === year && date.getMonth() === month && date.getDate() === day;
 }
 
 /** Builds an SPC archive URL for a valid YYMMDD date and report format. */
 function archiveUrlForDate({ date, format = 'filtered' }: ArchiveUrlOptions): string {
   if (!isValidArchiveDate(date)) {
-    throw new Error(`Invalid SPC report date: ${JSON.stringify(date)}.`);
+    throw new Error(`Invalid SPC report date: ${date}. Expected YYMMDD.`);
   }
   return `${SPC_STORM_REPORTS_BASE_URL}/${date}_rpts_${format}.csv`;
 }
@@ -35,10 +33,18 @@ function isValidArchiveDate(date: string): boolean {
   if (!/^\d{6}$/.test(date)) {
     return false;
   }
-  const year = 2000 + Number(date.slice(0, 2));
+  const year = resolveArchiveYear(Number(date.slice(0, 2)), new Date().getFullYear());
   const month = Number(date.slice(2, 4)) - 1;
   const day = Number(date.slice(4, 6));
   return isValidCalendarDate({ date: new Date(year, month, day), year, month, day });
+}
+
+/** Applies the rolling-century rule used for SPC YYMMDD archive dates. */
+function resolveArchiveYear(shortYear: number, referenceYear: number): number {
+  const currentCentury = Math.floor(referenceYear / 100) * 100;
+  let year = currentCentury + shortYear;
+  if (year > referenceYear + 1) year -= 100;
+  return year;
 }
 
 const ARCHIVE_SECTION_HEADERS: readonly { labels: readonly string[]; type: ReportType }[] = [
@@ -48,19 +54,22 @@ const ARCHIVE_SECTION_HEADERS: readonly { labels: readonly string[]; type: Repor
 ];
 
 /** Finds a section marker at the beginning of a raw archive line. */
-function archiveSectionForLine({ line }: ArchiveLineContext): ReportType | null {
+function archiveSectionForLine(line: string): ReportType | null {
   return ARCHIVE_SECTION_HEADERS.find(({ labels }) => labels.some((label) => line.startsWith(label)))?.type ?? null;
 }
 
 /** Returns true when the archive contains one of SPC's filtered report sections. */
-function hasFilteredArchiveHeaders({ csvText }: ArchiveCsvContext): boolean {
-  return csvText.split('\n').some((line) =>
-    ['Time,F_Scale,', 'Time,Speed,', 'Time,Size,'].some((header) => line.trim().startsWith(header))
-  );
+function hasFilteredArchiveHeaders(csvText: string): boolean {
+  const sectionHeaders = TODAY_SECTION_HEADERS.map(({ header }) => `${header},`);
+  return csvText.split('\n', 50).some((line) => sectionHeaders.some((header) => line.trim().startsWith(header)));
+}
+
+function hasRawArchiveHeaders(csvText: string): boolean {
+  return csvText.split('\n', 50).some((line) => archiveSectionForLine(line.trim()) !== null);
 }
 
 /** Parses the sectioned raw archive format, ignoring malformed rows. */
-function parseRawArchiveStormReportCsv({ csvText }: ArchiveCsvContext): StormReport[] {
+function parseRawArchiveStormReportCsv(csvText: string): StormReport[] {
   const reports: StormReport[] = [];
   const lines = csvText.split('\n');
 
@@ -74,7 +83,7 @@ function parseRawArchiveStormReportCsv({ csvText }: ArchiveCsvContext): StormRep
       continue;
     }
 
-    const section = archiveSectionForLine({ line });
+    const section = archiveSectionForLine(line);
     if (section) {
       currentSection = section;
       continue;
@@ -98,9 +107,9 @@ function parseRawArchiveStormReportCsv({ csvText }: ArchiveCsvContext): StormRep
 
 /** Parses archived filtered or raw SPC storm report text. */
 export const parseArchiveStormReportCsv = (csvText: string): StormReport[] =>
-  hasFilteredArchiveHeaders({ csvText })
+  hasFilteredArchiveHeaders(csvText)
     ? parseTodayStormReportCsv(csvText)
-    : parseRawArchiveStormReportCsv({ csvText });
+    : parseRawArchiveStormReportCsv(csvText);
 
 /** Parses one raw archive row without stopping the rest of the report file. */
 function parseArchiveCsvRowSafely({ line, section, headers }: ArchiveRowContext): StormReport | null {
@@ -117,30 +126,50 @@ function parseArchiveCsvRowSafely({ line, section, headers }: ArchiveRowContext)
  * @returns Promise with array of storm reports
  */
 export async function fetchStormReports(date: string): Promise<StormReport[]> {
-  let response = await fetch(archiveUrlForDate({ date }));
+  const filteredArchiveUrl = archiveUrlForDate({ date });
+  let response: Response;
+  try {
+    response = await fetch(filteredArchiveUrl);
+  } catch {
+    throw new Error(`Could not load SPC storm reports for ${date}. Check the connection and try again.`);
+  }
 
   // Some older SPC archive dates have a raw CSV but no filtered counterpart.
   if (response.status === 404) {
-    response = await fetch(archiveUrlForDate({ date, format: 'raw' }));
+    try {
+      response = await fetch(archiveUrlForDate({ date, format: 'raw' }));
+    } catch {
+      throw new Error(`Could not load SPC storm reports for ${date}. Check the connection and try again.`);
+    }
   }
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch storm reports for ${date} (HTTP ${response.status}): ${response.statusText || response.url || 'No response details'}`
-    );
+    throw new Error(`SPC storm reports for ${date} are unavailable (HTTP ${response.status}).`);
   }
 
-  return parseArchiveStormReportCsv(await response.text());
+  const csvText = await response.text();
+  const trimmedText = csvText.trimStart();
+  if (
+    !trimmedText ||
+    /^<\s*html\b/i.test(trimmedText) ||
+    (!hasFilteredArchiveHeaders(csvText) && !hasRawArchiveHeaders(csvText))
+  ) {
+    throw new Error(`SPC returned an invalid report archive for ${date}.`);
+  }
+  return parseArchiveStormReportCsv(csvText);
 }
 
 /** Fetches a rolling report-day feed (today_filtered.csv / yesterday_filtered.csv). */
 const fetchRollingStormReports = async ({ url, label }: RollingFeedRequest): Promise<StormReport[]> => {
-  const response = await fetch(url);
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch {
+    throw new Error(`Could not load ${label}. Check the connection and try again.`);
+  }
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch ${label} (HTTP ${response.status}): ${response.statusText || response.url || 'No response details'}`
-    );
+    throw new Error(`Failed to fetch ${label} (HTTP ${response.status}).`);
   }
 
   return parseTodayStormReportCsv(await response.text());
@@ -175,10 +204,7 @@ export function parseReportDate(dateStr: string, referenceDate = new Date()): Da
   }
 
   const shortYear = parseInt(dateStr.slice(0, 2), 10);
-  const currentYear = referenceDate.getFullYear();
-  const currentCentury = Math.floor(currentYear / 100) * 100;
-  let year = currentCentury + shortYear;
-  if (year > currentYear + 1) year -= 100;
+  const year = resolveArchiveYear(shortYear, referenceDate.getFullYear());
   const month = parseInt(dateStr.slice(2, 4), 10) - 1;
   const day = parseInt(dateStr.slice(4, 6), 10);
   const parsedDate = new Date(year, month, day);

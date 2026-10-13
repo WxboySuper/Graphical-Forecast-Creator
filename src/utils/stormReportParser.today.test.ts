@@ -1,6 +1,22 @@
-import { fetchTodayStormReports, fetchYesterdayStormReports, parseTodayStormReportCsv } from './stormReportParser';
+import {
+  fetchTodayStormReports,
+  fetchYesterdayStormReports,
+  parseArchiveStormReportCsv,
+  parseTodayStormReportCsv,
+} from './stormReportParser';
 
 describe('parseTodayStormReportCsv', () => {
+  test('parses filtered archive sections using the shared report headers', () => {
+    const csv = [
+      'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+      '1805,1,Ada,OK,OK,34.77,-96.67,Filtered archive tornado',
+    ].join('\n');
+
+    expect(parseArchiveStormReportCsv(csv)).toMatchObject([
+      { type: 'tornado', magnitude: 'EF1', latitude: 34.77, longitude: -96.67 },
+    ]);
+  });
+
   test('parses report values and preserves type order when feed sections are out of order', () => {
     const csv = [
       'Time,Size,Location,County,State,Lat,Lon,Comments',
