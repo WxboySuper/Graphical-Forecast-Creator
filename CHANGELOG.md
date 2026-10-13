@@ -23,7 +23,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
-- **CIG risk conversion:** Preserve the highest mapped risk for valid probabilities when a requested CIG combination has no explicit rule.
+- **CIG risk conversion:** Use a probability's CIG0 category when a valid CIG combination has no explicit rule.
 - **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
 - **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
