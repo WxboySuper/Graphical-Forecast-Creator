@@ -1,5 +1,18 @@
 type FetchMock = jest.Mock<Promise<{ ok: boolean; text: () => Promise<string> }>, []>;
 
+/** Representative raw tornado archive body shared by archive fallback tests. */
+const rawTornadoArchiveCsv = (): string => [
+  'Raw Tornado LSR',
+  'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
+  '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
+].join('\n');
+
+const filteredFailureResponses: Array<[string, { ok: boolean; status: number; text?: () => Promise<string> }]> = [
+  ['an HTML error page', { ok: true, status: 200, text: () => Promise.resolve('<html>Unavailable</html>') }],
+  ['a server error', { ok: false, status: 503 }],
+  ['a rejected body read', { ok: true, status: 200, text: () => Promise.reject(new TypeError('stream failed')) }],
+];
+
 jest.setTimeout(10000);
 
 afterEach(() => {
@@ -22,72 +35,33 @@ describe('stormReportParser integration tests', () => {
   test('rejects future archive dates before fetching', async () => {
     const fetchMock = jest.fn();
     globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const { fetchStormReports } = await import('./stormReportParser');
-    await expect(fetchStormReports('270101')).rejects.toThrow('Invalid SPC report date');
+    const { fetchStormReports, formatReportDate } = await import('./stormReportParser');
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 2);
+    await expect(fetchStormReports(formatReportDate(futureDate))).rejects.toThrow('Invalid SPC report date');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('retries the raw archive when a filtered response is an HTML error page', async () => {
-    jest.doMock('uuid', () => ({ v4: () => 'raw-fallback-test' }));
-    const rawCsv = [
-      'Raw Tornado LSR',
-      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
-    ].join('\n');
+  test.each(filteredFailureResponses)('retries the raw archive after %s', async (_description, filteredResponse) => {
     const fetchMock = jest.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve('<html>Unavailable</html>') })
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(rawCsv) });
+      .mockResolvedValueOnce(filteredResponse)
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { fetchStormReports } = await import('./stormReportParser');
-    const reports = await fetchStormReports('260130');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(reports).toHaveLength(1);
-  });
-
-  test('retries the raw archive when the filtered endpoint returns a server error', async () => {
-    const rawCsv = [
-      'Raw Tornado LSR',
-      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
-    ].join('\n');
-    globalThis.fetch = jest.fn()
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(rawCsv) }) as unknown as typeof fetch;
-    const { fetchStormReports } = await import('./stormReportParser');
     await expect(fetchStormReports('260130')).resolves.toHaveLength(1);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test('remembers dates that only have a raw archive for this page session', async () => {
-    const rawCsv = [
-      'Raw Tornado LSR',
-      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
-    ].join('\n');
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({ ok: false, status: 404 })
-      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawCsv) });
+      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { fetchStormReports } = await import('./stormReportParser');
     await fetchStormReports('260130');
     await fetchStormReports('260130');
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_raw.csv');
-  });
-
-  test('retries the raw archive when reading the filtered response body fails', async () => {
-    const rawCsv = [
-      'Raw Tornado LSR',
-      'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
-    ].join('\n');
-    const fetchMock = jest.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.reject(new TypeError('stream failed')) })
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(rawCsv) });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const { fetchStormReports } = await import('./stormReportParser');
-    await expect(fetchStormReports('260130')).resolves.toHaveLength(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   test('does not treat a report comment containing a section label as a new section', async () => {

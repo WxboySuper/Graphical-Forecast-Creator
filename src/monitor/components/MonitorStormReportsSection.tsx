@@ -82,7 +82,7 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
       </div>
       {stormReportsMeta.error && (
         <div className="monitor-controls__meta monitor-controls__meta--error" role="alert">
-          SPC storm reports unavailable: {stormReportsMeta.error}
+          SPC storm reports are unavailable. Check your connection and try again.
         </div>
       )}
     </MonitorControlsSection>
