@@ -1,4 +1,5 @@
 import type { ForecastState } from './forecastSlice';
+import { DEFAULT_FORECAST_WORKSPACE } from '../config/forecastWorkspaces';
 import {
   createEmptyOutlook,
   INITIAL_CYCLE_DATE,
@@ -7,6 +8,8 @@ import {
 
 /** Builds the deterministic state used before the first forecast action. */
 export const createInitialForecastState = (): ForecastState => ({
+  cycleGeneration: 1,
+  workspaceId: DEFAULT_FORECAST_WORKSPACE,
   forecastCycle: {
     days: {
       1: createEmptyOutlook(1, INITIAL_TIMESTAMP),
