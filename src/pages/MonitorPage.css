@@ -66,8 +66,13 @@
 }
 
 .monitor-controls__meta--error {
+  min-width: 0;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
   color: rgb(185, 28, 28);
   font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .dark-mode .monitor-controls__header p,
@@ -76,7 +81,7 @@
   color: rgb(203, 213, 225);
 }
 
-.dark-mode .monitor-controls__meta--error {
+.dark-mode .monitor-controls__meta.monitor-controls__meta--error {
   color: rgb(252, 165, 165);
 }
 

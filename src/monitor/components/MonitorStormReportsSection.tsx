@@ -43,8 +43,8 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
     stormReportsFilterHail: onStormReportsFilterHailChange,
   };
 
-  const statusLine = !stormReportsMeta.error && settings.stormReportsEnabled
-    ? formatStormReportsStatusLine(stormReportsMeta.reports.length, stormReportsMeta.totalCount)
+  const statusLine = !stormReportsMeta.loading && !stormReportsMeta.error && settings.stormReportsEnabled
+    ? formatStormReportsStatusLine(stormReportsMeta.reports.length, stormReportsMeta.totalCount, 'SPC report day')
     : null;
 
   return (
@@ -55,7 +55,7 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
           checked={settings.stormReportsEnabled}
           onChange={(event) => onStormReportsEnabledChange(event.target.checked)}
         />
-        Show reports from the current SPC report day
+        Show filtered reports from the current SPC report day (12Z–11:59Z)
       </label>
       {STORM_REPORT_FILTERS.map(({ label, settingKey }) => (
         <label key={settingKey} className="monitor-controls__checkbox">
@@ -77,12 +77,15 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
         />
         Match selected outlook type
       </label>
-      <div className="monitor-controls__meta" role="status">
-        {stormReportsMeta.loading ? 'Loading reports from the current SPC report day…' : statusLine}
-      </div>
-      {stormReportsMeta.error && (
+      {(stormReportsMeta.loading || statusLine) && (
+        <div className="monitor-controls__meta" role="status">
+          {stormReportsMeta.loading ? 'Loading reports from the current SPC report day…' : statusLine}
+        </div>
+      )}
+      {stormReportsMeta.error && !stormReportsMeta.loading && (
         <div className="monitor-controls__meta monitor-controls__meta--error" role="alert">
-          SPC storm reports are unavailable. Check your connection and try again.
+          <span aria-hidden="true">⚠ </span>
+          <span title={stormReportsMeta.error}>SPC storm reports are unavailable. Check your connection and try again.</span>
         </div>
       )}
     </MonitorControlsSection>

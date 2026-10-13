@@ -52,10 +52,11 @@ export const formatAlertsStatusLine = (
 export const formatStormReportsStatusLine = (
   shownCount: number,
   totalCount: number,
+  dayLabel = 'today',
 ): string => {
   if (totalCount === shownCount) {
-    return `${shownCount} shown today`;
+    return `${shownCount} shown for ${dayLabel}`;
   }
 
-  return `${shownCount} shown (${totalCount} total today)`;
+  return `${shownCount} shown (${totalCount} total for ${dayLabel})`;
 };

@@ -19,6 +19,7 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis as typeof globalThis & { fetch?: unknown }, 'fetch');
   jest.resetModules();
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 describe('stormReportParser integration tests', () => {
@@ -38,7 +39,7 @@ describe('stormReportParser integration tests', () => {
     const { fetchStormReports, formatReportDate } = await import('./stormReportParser');
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 2);
-    await expect(fetchStormReports(formatReportDate(futureDate))).rejects.toThrow('Invalid SPC report date');
+    await expect(fetchStormReports(formatReportDate(futureDate))).rejects.toThrow('SPC report date is in the future');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -52,7 +53,7 @@ describe('stormReportParser integration tests', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  test('remembers dates that only have a raw archive for this page session', async () => {
+  test('reuses raw-only archive probes during the cache window', async () => {
     const fetchMock = jest.fn()
       .mockResolvedValueOnce({ ok: false, status: 404 })
       .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
@@ -62,6 +63,37 @@ describe('stormReportParser integration tests', () => {
     await fetchStormReports('260130');
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_raw.csv');
+  });
+
+  test('retries the filtered archive after the raw-only cache expires', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-01-30T12:00:00Z'));
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve([
+        'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+        '1234,1,Ada,Denton,TX,33.5,-97.2,Filtered archive',
+      ].join('\n')) });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchStormReports } = await import('./stormReportParser');
+    await fetchStormReports('260130');
+    jest.advanceTimersByTime(6 * 60 * 60 * 1000 + 1);
+    await fetchStormReports('260130');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_filtered.csv');
+  });
+
+  test('reuses a raw archive after a filtered 200 response contains invalid content', async () => {
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve('<html>not published</html>') })
+      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchStormReports } = await import('./stormReportParser');
+    await fetchStormReports('260131');
+    await fetchStormReports('260131');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260131_rpts_raw.csv');
   });
 
   test('does not treat a report comment containing a section label as a new section', async () => {
@@ -101,6 +133,19 @@ describe('stormReportParser integration tests', () => {
 
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 33.5, longitude: -97.2 });
+  });
+
+  test('matches BOM-prefixed lowercase raw sections and lowercase archive columns', async () => {
+    const csv = [
+      '\uFEFF"raw tornado lsr"',
+      'time,ef_scale,remarks,lat,lon,location,county,state,speed(mph),size(1/100in.)',
+      '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
+    ].join('\n');
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(csv) }) as unknown as typeof fetch;
+    const { fetchStormReports } = await import('./stormReportParser');
+    await expect(fetchStormReports('260129')).resolves.toMatchObject([
+      { type: 'tornado', magnitude: 'EF1', latitude: 33.5, longitude: -97.2 },
+    ]);
   });
 
   test('handles filtered headers with long preambles, quotes, casing, and whitespace', async () => {

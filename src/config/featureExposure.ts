@@ -49,8 +49,9 @@ const EXPOSURE_THROUGH_STAGING = {
 } as const satisfies FeatureExposureMatrix;
 
 const EXPOSURE_THROUGH_BETA = {
-  ...EXPOSURE_THROUGH_STAGING,
+  ...ALL_TARGETS_ON,
   staging: false,
+  production: false,
 } as const satisfies FeatureExposureMatrix;
 
 const CORE_PRODUCT_OWNER = 'WxboySuper';

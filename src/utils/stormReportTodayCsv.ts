@@ -1,5 +1,6 @@
 import type { StormReport, ReportType } from '../types/stormReports';
 import { parseTodayCsvRow, TODAY_SECTION_HEADERS } from './stormReportRows';
+import { isStormReportCsvHeaderLine, normalizeStormReportCsvHeader } from './stormReportCsv';
 
 type TodayReportsByType = Record<ReportType, StormReport[]>;
 
@@ -9,13 +10,16 @@ const createReportBuckets = (): TodayReportsByType => ({
   hail: [],
 });
 
-/** Normalizes an SPC CSV header before matching its section schema. */
-const normalizeHeader = ({ line }: { line: string }): string =>
-  line.replace(/^\uFEFF/u, '').replace(/"/gu, '').split(',').map((value) => value.trim().toLowerCase()).join(',');
+const NORMALIZED_TODAY_HEADERS = TODAY_SECTION_HEADERS.map(({ header, type }) => ({
+  prefix: normalizeStormReportCsvHeader(header),
+  type,
+}));
 
+/** Finds a known filtered-feed section header without normalizing every row. */
 const getTodaySectionType = ({ line }: { line: string }): ReportType | undefined => {
-  const normalizedLine = normalizeHeader({ line });
-  return TODAY_SECTION_HEADERS.find(({ header }) => normalizedLine.startsWith(normalizeHeader({ line: header })))?.type;
+  if (!isStormReportCsvHeaderLine(line)) return undefined;
+  const normalizedHeader = normalizeStormReportCsvHeader(line);
+  return NORMALIZED_TODAY_HEADERS.find(({ prefix }) => normalizedHeader.startsWith(prefix))?.type;
 };
 
 const flattenReports = (reportsByType: TodayReportsByType): StormReport[] => [
@@ -32,7 +36,7 @@ export const parseTodayStormReportCsv = (csvText: string): StormReport[] => {
 
   for (const line of lines) {
     const sectionType = getTodaySectionType({ line });
-    if (normalizeHeader({ line }).startsWith('time,')) {
+    if (isStormReportCsvHeaderLine(line)) {
       // Preserve the former parser's boundary behavior for unknown sections.
       activeType = sectionType;
       continue;
