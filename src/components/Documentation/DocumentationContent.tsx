@@ -4,6 +4,7 @@ import {
   categoricalConversionTables,
   colorMappings,
   significantCategoricalFloors,
+  type CategoricalConversionTable,
   type CategoricalConversionRow,
 } from '../../utils/outlookUtils';
 import type { CIGLevel, CategoricalRiskLevel } from '../../types/outlooks';
@@ -236,8 +237,8 @@ const ConversionTable: React.FC<{
   <div className="conversion-table-scroll" role="region" aria-label={label} tabIndex={0}>
     <table className="conversion-table">
       <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
-      <tbody>{rows.map(({ probability, risks }) => (
-        <tr key={probability}><th scope="row">{probability}</th>{cigs.map((cig) => <CatCell key={cig} v={risks[cig] ?? 'TSTM'} />)}</tr>
+      <tbody>{rows.map(({ probability, cells }) => (
+        <tr key={probability}><th scope="row">{probability}</th>{cells.map(({ cig, risk }) => <CatCell key={cig} v={risk} />)}</tr>
       ))}</tbody>
     </table>
   </div>
@@ -250,6 +251,28 @@ const significantFloorSummaries = {
   hail: Object.entries(significantCategoricalFloors.hail).map(([p, r]) => `${p}# → ${r}`).join(', '),
 };
 
+const conversionGuides: readonly {
+  title: string;
+  label: string;
+  table: CategoricalConversionTable;
+  note?: string;
+}[] = [
+  { title: 'Tornado Conversion', label: 'Tornado category by probability and CIG', table: categoricalConversionTables.tornado },
+  { title: 'Wind Conversion', label: 'Wind category by probability and CIG', table: categoricalConversionTables.wind },
+  {
+    title: 'Hail Conversion',
+    label: 'Hail category by probability and CIG',
+    table: categoricalConversionTables.hail,
+    note: 'Hail supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline, and CIG3 is unavailable. Hail does not produce a HIGH category.',
+  },
+  {
+    title: 'Day 3 Total Severe Conversion',
+    label: 'Day 3 total severe category by probability and CIG',
+    table: categoricalConversionTables.totalSevere,
+    note: 'Day 3 uses one combined probability, supports CIG1 and CIG2 hatching, and has no separate significant-risk floor. CIG0 is the no-hatching baseline. Its maximum category is MDT.',
+  },
+];
+
 /** Conversion tab content generated from the same functions used by forecasts. */
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
@@ -260,18 +283,13 @@ export const CategoricalSection: React.FC = () => (
       If a combination has no direct mapping, the highest category from a less significant CIG applies.
       CIG0 is the no-hatching baseline. Repeated values mean a higher CIG does not raise that category.
     </p>
-    <h4>Tornado Conversion</h4>
-    <ConversionTable label="Tornado category by probability and CIG" {...categoricalConversionTables.tornado} />
-    <h4>Wind Conversion</h4>
-    <ConversionTable label="Wind category by probability and CIG" {...categoricalConversionTables.wind} />
-    <h4>Hail Conversion</h4>
-    <p>Hail supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline, and CIG3 is unavailable.</p>
-    <ConversionTable label="Hail category by probability and CIG" {...categoricalConversionTables.hail} />
-    <p><em>Hail does not produce a HIGH categorical outcome in any combination.</em></p>
-    <h4>Day 3 Total Severe Conversion</h4>
-    <p>Day 3 uses one combined probability, supports CIG1 and CIG2 hatching, and has no separate significant-risk floor. CIG0 is the no-hatching baseline.</p>
-    <ConversionTable label="Day 3 total severe category by probability and CIG" {...categoricalConversionTables.totalSevere} />
-    <p><em>Day 3 categorical does not reach HIGH. Maximum output is MDT.</em></p>
+    {conversionGuides.map(({ title, label, table, note }) => (
+      <section key={title}>
+        <h4>{title}</h4>
+        {note ? <p>{note}</p> : null}
+        <ConversionTable label={label} {...table} />
+      </section>
+    ))}
     <h4>Significant-Risk Floors</h4>
     <p>A trailing # marks a significant probability and adds its listed hazard-specific minimum category. The final category is the higher of that floor and the probability/CIG result. Other valid # probabilities retain hatching without changing the category.</p>
     <ul>

@@ -376,7 +376,7 @@ function categorizeInput(
 
 export type CategoricalConversionRow = {
   probability: string;
-  risks: Readonly<Partial<Record<CIGLevel, CategoricalRiskLevel>>>;
+  cells: readonly { cig: CIGLevel; risk: CategoricalRiskLevel }[];
 };
 
 export type CategoricalConversionTable = {
@@ -394,7 +394,7 @@ function createConversionTable(
     cigs,
     rows: probabilities.map((probability) => ({
       probability,
-      risks: Object.fromEntries(cigs.map((cig) => [cig, convert({ probability, cig })])) as Partial<Record<CIGLevel, CategoricalRiskLevel>>,
+      cells: cigs.map((cig) => ({ cig, risk: convert({ probability, cig }) })),
     })),
   };
 }
