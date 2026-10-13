@@ -119,13 +119,25 @@ const CATEGORICAL_PROBABILITIES: ReadonlySet<string> = new Set([
   ...Object.keys(colorMappings.wind),
   ...Object.keys(colorMappings.hail),
   ...Object.keys(colorMappings.totalSevere),
+  ...Object.keys(colorMappings['day4-8']),
 ]);
 const SIGNIFICANT_PROBABILITY_DOMAINS: Readonly<Record<string, ReadonlySet<string>>> = {
   tornado: new Set(Object.keys(colorMappings.tornado)),
   wind: new Set(Object.keys(colorMappings.wind)),
   hail: new Set(Object.keys(colorMappings.hail)),
   totalSevere: new Set(Object.keys(colorMappings.totalSevere)),
+  'day4-8': new Set(Object.keys(colorMappings['day4-8'])),
 };
+const SIGNIFICANT_PROBABILITY_DOMAINS_BY_NORMALIZED_TYPE: Readonly<Record<string, ReadonlySet<string>>> = {
+  tornado: SIGNIFICANT_PROBABILITY_DOMAINS.tornado,
+  wind: SIGNIFICANT_PROBABILITY_DOMAINS.wind,
+  hail: SIGNIFICANT_PROBABILITY_DOMAINS.hail,
+  totalsevere: SIGNIFICANT_PROBABILITY_DOMAINS.totalSevere,
+  'day4-8': SIGNIFICANT_PROBABILITY_DOMAINS['day4-8'],
+};
+const ALL_SIGNIFICANT_PROBABILITIES: ReadonlySet<string> = new Set(
+  Object.values(SIGNIFICANT_PROBABILITY_DOMAINS).flatMap((domain) => [...domain]),
+);
 
 /** Shared wind and hail significant thresholds from the product outlook guidance. */
 const WIND_HAIL_SIGNIFICANT_RISKS: Readonly<Record<string, CategoricalRiskLevel>> = {
@@ -248,16 +260,16 @@ function findCategoricalRisk({ normalized, cig, rules, significantRisks, maxCigR
   const significantRisk = getSignificantCategoricalRisk(normalized, significantRisks);
   const targetCigRank = getTargetCigRank(cig);
   if (targetCigRank === undefined) {
-    return DEFAULT_CATEGORICAL_RISK;
-  }
-  if (maxCigRank !== undefined && targetCigRank > maxCigRank) {
     return significantRisk ?? DEFAULT_CATEGORICAL_RISK;
   }
+  const applicableCigRank = maxCigRank === undefined
+    ? targetCigRank
+    : Math.min(targetCigRank, maxCigRank);
 
   // Use a defined lower-significance CIG rule when this probability has no
   // exact mapping. This preserves monotonic risk without promoting low CIGs
   // from a rule that applies only to a more significant hatch.
-  const fallbackRisk = findCigFallbackRisk(normalized.probability, targetCigRank, rules) ?? DEFAULT_CATEGORICAL_RISK;
+  const fallbackRisk = findCigFallbackRisk(normalized.probability, applicableCigRank, rules) ?? DEFAULT_CATEGORICAL_RISK;
   // Significant markers without a separate product mapping (such as Day 3
   // total severe) retain the corresponding plain-probability CIG category.
   // When both apply, the significant category acts as a floor over CIG risk.
@@ -404,8 +416,8 @@ function createConversionTable(
 export const categoricalConversionTables = {
   tornado: createConversionTable(Object.keys(colorMappings.tornado), CIG_LEVELS, tornadoToCategorical),
   wind: createConversionTable(Object.keys(colorMappings.wind), CIG_LEVELS, windToCategorical),
-  hail: createConversionTable(Object.keys(colorMappings.hail), CIG_LEVELS.slice(0, 3), hailToCategorical),
-  totalSevere: createConversionTable(Object.keys(colorMappings.totalSevere), CIG_LEVELS.slice(0, 3), totalSevereToCategorical),
+  hail: createConversionTable(Object.keys(colorMappings.hail), CIG_LEVELS, hailToCategorical),
+  totalSevere: createConversionTable(Object.keys(colorMappings.totalSevere), CIG_LEVELS, totalSevereToCategorical),
 };
 
 /** Significant-risk floors shown in the conversion guide; Day 3 has no separate floor. */
@@ -422,14 +434,15 @@ export const significantCategoricalFloors = {
  * @returns True only for a valid probability with a significant suffix.
  */
 export function isSignificantThreat(
-  input: { probability: unknown; outlookType?: string } | null | undefined,
+  input: { probability: unknown; outlookType?: unknown } | null | undefined,
 ): boolean {
   if (!input || typeof input !== 'object') return false;
   const normalized = normalizeCategoricalProbability(input.probability);
   if (!normalized?.significant) return false;
-  if (input.outlookType === undefined) return true;
+  if (input.outlookType === undefined) return ALL_SIGNIFICANT_PROBABILITIES.has(normalized.probability);
+  if (typeof input.outlookType !== 'string') return false;
   const outlookType = input.outlookType.trim().toLowerCase();
-  return SIGNIFICANT_PROBABILITY_DOMAINS[outlookType]?.has(normalized.probability) === true;
+  return SIGNIFICANT_PROBABILITY_DOMAINS_BY_NORMALIZED_TYPE[outlookType]?.has(normalized.probability) === true;
 }
 
 /** A supported hazard probability, including significant-marker variants. */
@@ -472,14 +485,12 @@ function toCategoricalInput<P extends string>(input: CategoricalOutlookValue<P>)
 
 /** Rejects untrusted non-object values before reading structured input fields. */
 function isDetailedCategoricalInput(input: unknown): input is DetailedCategoricalInput {
-  return input !== null && typeof input === 'object';
+  return input !== null && typeof input === 'object' && 'probability' in input;
 }
 
-/** Uses an explicit boolean when valid and otherwise trusts the marker. */
+/** Keeps a significant probability marker even when stored flag data is stale. */
 function resolveSignificantFlag(flag: unknown, marked: boolean): boolean {
-  if (flag === true) return true;
-  if (flag === false) return false;
-  return marked;
+  return flag === true || flag === 1 || flag === 'true' || marked;
 }
 
 /**

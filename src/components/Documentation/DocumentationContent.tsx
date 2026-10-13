@@ -11,12 +11,15 @@ import type { CIGLevel, CategoricalRiskLevel } from '../../types/outlooks';
 
 // Helper: table cell with faded categorical color
 const CatCell: React.FC<{ v: CategoricalRiskLevel }> = ({ v }) => {
-  const cls =
-    v === 'MRGL' ? 'cat-mrgl' :
-    v === 'SLGT' ? 'cat-slgt' :
-    v === 'ENH'  ? 'cat-enh'  :
-    v === 'MDT'  ? 'cat-mdt'  :
-    v === 'HIGH' ? 'cat-high' : '';
+  const classes: Readonly<Record<CategoricalRiskLevel, string>> = {
+    TSTM: 'cat-tstm',
+    MRGL: 'cat-mrgl',
+    SLGT: 'cat-slgt',
+    ENH: 'cat-enh',
+    MDT: 'cat-mdt',
+    HIGH: 'cat-high',
+  };
+  const cls = classes[v];
   return <td className={cls}>{v}</td>;
 };
 
@@ -245,20 +248,50 @@ const ConversionTable: React.FC<{
   label: string;
   rows: readonly CategoricalConversionRow[];
   cigs: readonly CIGLevel[];
-}> = ({ label, rows, cigs }) => (
-  <div className="conversion-table-scroll" role="region" aria-label={label} tabIndex={0}>
-    <table className="conversion-table">
-      <ConversionTableHeader cigs={cigs} />
-      <ConversionTableBody rows={rows} />
-    </table>
-  </div>
-);
+}> = ({ label, rows, cigs }) => {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = React.useState(false);
 
-/** Formats hazard-specific significant floors once for the static documentation view. */
+  React.useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return undefined;
+
+    const updateOverflow = () => setOverflows(container.scrollWidth > container.clientWidth + 1);
+    updateOverflow();
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(updateOverflow);
+    observer?.observe(container);
+    if (container.firstElementChild) observer?.observe(container.firstElementChild);
+    window.addEventListener('resize', updateOverflow);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', updateOverflow);
+    };
+  }, [cigs.length, rows.length]);
+
+  return (
+    <div ref={scrollRef} className="conversion-table-scroll" role="region" aria-label={label} tabIndex={overflows ? 0 : undefined}>
+      <table className="conversion-table">
+        <caption>{label}</caption>
+        <ConversionTableHeader cigs={cigs} />
+        <ConversionTableBody rows={rows} />
+      </table>
+    </div>
+  );
+};
+
+/** Sorts and formats hazard floors for the documentation guide. */
+const formatSignificantFloors = (floors: Readonly<Record<string, CategoricalRiskLevel>>): string =>
+  Object.entries(floors)
+    .sort(([left], [right]) => Number.parseFloat(left) - Number.parseFloat(right))
+    .map(([probability, risk]) => `${probability}# → ${risk}`)
+    .join(', ');
+
+/** Formats significant floors once for the static documentation view. */
 const significantFloorSummaries = {
-  tornado: Object.entries(significantCategoricalFloors.tornado).map(([p, r]) => `${p}# → ${r}`).join(', '),
-  wind: Object.entries(significantCategoricalFloors.wind).map(([p, r]) => `${p}# → ${r}`).join(', '),
-  hail: Object.entries(significantCategoricalFloors.hail).map(([p, r]) => `${p}# → ${r}`).join(', '),
+  tornado: formatSignificantFloors(significantCategoricalFloors.tornado),
+  wind: formatSignificantFloors(significantCategoricalFloors.wind),
+  hail: formatSignificantFloors(significantCategoricalFloors.hail),
+  totalSevere: formatSignificantFloors(significantCategoricalFloors.totalSevere),
 };
 
 const conversionGuides: readonly {
@@ -267,19 +300,19 @@ const conversionGuides: readonly {
   table: CategoricalConversionTable;
   note?: string;
 }[] = [
-  { title: 'Tornado Conversion', label: 'Tornado category by probability and CIG', table: categoricalConversionTables.tornado },
-  { title: 'Wind Conversion', label: 'Wind category by probability and CIG', table: categoricalConversionTables.wind },
+  { title: 'Tornado Conversion', label: 'Tornado category by probability and CIG', table: categoricalConversionTables.tornado, note: 'Tornado supports CIG0, the no-hatching baseline, through CIG3.' },
+  { title: 'Wind Conversion', label: 'Wind category by probability and CIG', table: categoricalConversionTables.wind, note: 'Wind supports CIG0, the no-hatching baseline, through CIG3.' },
   {
     title: 'Hail Conversion',
     label: 'Hail category by probability and CIG',
     table: categoricalConversionTables.hail,
-    note: 'Hail supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline, and CIG3 is unavailable. Hail does not produce a HIGH category.',
+    note: 'Hail supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline. CIG3 is not a drawable hail hatch, but imported or legacy CIG3 data uses the CIG2 mapping. Hail does not produce a HIGH category.',
   },
   {
     title: 'Day 3 Total Severe Conversion',
     label: 'Day 3 total severe category by probability and CIG',
     table: categoricalConversionTables.totalSevere,
-    note: 'Day 3 uses one combined probability, supports CIG1 and CIG2 hatching, and has no separate significant-risk floor. CIG0 is the no-hatching baseline. Its maximum category is MDT.',
+    note: 'Day 3 uses one combined probability and supports CIG1 and CIG2 hatching. CIG0 is the no-hatching baseline. CIG3 is not drawable, and imported or legacy CIG3 data uses the CIG2 mapping. Its maximum category is MDT.',
   },
 ];
 
@@ -287,26 +320,26 @@ const conversionGuides: readonly {
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>
-    <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. The order is TSTM, MRGL, SLGT, ENH, MDT, then HIGH. Day 3 uses its separate Total Severe table below.</p>
+    <p>For Days 1–2, the highest categorical level among Tornado, Wind, and Hail wins where their areas overlap. From lowest to highest, the order is TSTM, MRGL, SLGT, ENH, MDT, then HIGH. Day 3 uses its separate Total Severe table below.</p>
     <p>
-      Each table shows the plain-probability result for every supported probability and CIG combination.
-      If a combination has no direct mapping, the highest category from a less significant CIG applies.
-      CIG0 is the no-hatching baseline. Repeated values mean a higher CIG does not raise that category.
+      Each table shows the non-significant probability result, without a trailing #, for each supported probability and CIG combination.
+      If there is no direct mapping, the highest category from a lower-numbered CIG applies.
+      CIG0 is the no-hatching baseline. Repeated values mean a higher CIG does not raise the category.
     </p>
     {conversionGuides.map(({ title, label, table, note }) => (
-      <section key={title}>
+      <div key={title}>
         <h4>{title}</h4>
         {note ? <p>{note}</p> : null}
-        <ConversionTable label={label} {...table} />
-      </section>
+        <ConversionTable {...table} label={label} />
+      </div>
     ))}
-    <h4>Significant-Risk Floors</h4>
-    <p>A trailing # marks a significant probability and adds its listed hazard-specific minimum category. The final category is the higher of that floor and the probability/CIG result. Other valid # probabilities retain hatching without changing the category.</p>
+    <h4>Significant risk floors</h4>
+    <p>A trailing # marks a significant probability. A listed floor sets its minimum category, and the final category is the higher of that floor and the probability/CIG result. Other valid # probabilities retain hatching without changing the category.</p>
     <ul>
       <li><strong>Tornado:</strong> {significantFloorSummaries.tornado}</li>
       <li><strong>Wind:</strong> {significantFloorSummaries.wind}</li>
       <li><strong>Hail:</strong> {significantFloorSummaries.hail}</li>
-      <li><strong>Day 3 total severe:</strong> no separate floor</li>
+      <li><strong>Day 3 Total Severe:</strong> {significantFloorSummaries.totalSevere || 'no separate floor'}</li>
     </ul>
   </div>
 );

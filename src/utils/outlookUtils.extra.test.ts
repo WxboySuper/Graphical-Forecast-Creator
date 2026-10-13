@@ -8,6 +8,7 @@ import {
   getHighestCategoricalRisk,
   getCategoricalRiskDisplayName,
   getOutlookColor,
+  categoricalConversionTables,
 } from './outlookUtils';
 import type { CategoricalRiskLevel, CIGLevel, WindProbability } from '../types/outlooks';
 
@@ -82,14 +83,14 @@ describe('outlookUtils extra', () => {
       [windToCategorical({ probability: '90%#', cig: 'CIG0' }), 'MDT'],
       [windToCategorical({ probability: '5%#', cig: 'CIG0' }), 'MRGL'],
       [hailToCategorical({ probability: '30#', cig: 'CIG2' }), 'ENH'],
-      [hailToCategorical({ probability: '45%', cig: 'CIG3' }), 'TSTM'],
-      [totalSevereToCategorical({ probability: '30%', cig: 'CIG3' }), 'TSTM'],
+      [hailToCategorical({ probability: '45%', cig: 'CIG3' }), 'MDT'],
+      [totalSevereToCategorical({ probability: '30%', cig: 'CIG3' }), 'MDT'],
       [totalSevereToCategorical({ probability: '30%#', cig: 'CIG0' }), 'ENH'],
     ];
     expect(cases.map(([actual]) => actual)).toEqual(cases.map(([, expected]) => expected));
   });
 
-  test('malformed probability and CIG values fail safely to TSTM', () => {
+  test('malformed probabilities fail safely while significant floors survive an invalid CIG', () => {
     expect(tornadoToCategorical({ probability: undefined as unknown as string })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1#5%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '#' })).toBe('TSTM');
@@ -97,14 +98,14 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: '30' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '1 5%' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '30%', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
-    expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
+    expect(tornadoToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('HIGH');
     expect(tornadoToCategorical({ probability: '15%', cig: null as unknown as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: '' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'cig1' as CIGLevel })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '15%', cig: 'CIG1 ' as CIGLevel })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '15%', cig: ' CIG1' as CIGLevel })).toBe('ENH');
     expect(tornadoToCategorical({ probability: '015%', cig: 'CIG0' })).toBe('TSTM');
-    expect(windToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('TSTM');
+    expect(windToCategorical({ probability: '30#', cig: 'INVALID' as CIGLevel })).toBe('ENH');
   });
 
   test('categorical risk remains monotonic across CIG and probability', () => {
@@ -161,6 +162,11 @@ describe('outlookUtils extra', () => {
     expect(isSignificantThreat({ probability: '90%#', outlookType: 'wind' })).toBe(true);
     expect(isSignificantThreat({ probability: '90%#', outlookType: ' Wind ' })).toBe(true);
     expect(isSignificantThreat({ probability: '90%#', outlookType: 'hail' })).toBe(false);
+    expect(isSignificantThreat({ probability: '30%#', outlookType: 'totalSevere' })).toBe(true);
+    expect(isSignificantThreat({ probability: '30%#', outlookType: 'TOTALSEVERE' })).toBe(true);
+    expect(isSignificantThreat({ probability: '30%#', outlookType: 'day4-8' })).toBe(true);
+    expect(isSignificantThreat({ probability: '15%#', outlookType: 123 })).toBe(false);
+    expect(isSignificantThreat({ probability: '15%#', outlookType: {} })).toBe(false);
     expect(isSignificantThreat({ probability: '15%#', outlookType: 'categorical' })).toBe(false);
     expect(isSignificantThreat({ probability: '999%#' })).toBe(false);
     expect(isSignificantThreat({ probability: '1#5%' })).toBe(false);
@@ -176,14 +182,26 @@ describe('outlookUtils extra', () => {
     expect(windToCategorical(undefined as unknown as { probability: string })).toBe('TSTM');
     expect(hailToCategorical(null as unknown as { probability: string })).toBe('TSTM');
     expect(totalSevereToCategorical(undefined as unknown as { probability: string })).toBe('TSTM');
+    expect(tornadoToCategorical({ malformed: true } as unknown as { probability: string })).toBe('TSTM');
   });
 
   test('direct converters preserve explicit significant flags', () => {
     expect(windToCategorical({ probability: '45%', isSignificant: true })).toBe('MDT');
-    expect(windToCategorical({ probability: '45%#', isSignificant: false })).toBe('ENH');
+    expect(windToCategorical({ probability: '45%#', isSignificant: false })).toBe('MDT');
+    expect(hailToCategorical({ probability: '45%', cig: 'CIG3' })).toBe('MDT');
+    expect(totalSevereToCategorical({ probability: '30%', cig: 'CIG3' })).toBe('MDT');
+    expect(windToCategorical({ probability: '45%', isSignificant: 1 as unknown as boolean })).toBe('MDT');
+    expect(windToCategorical({ probability: '45%', isSignificant: 'true' as unknown as boolean })).toBe('MDT');
     expect(tornadoToCategorical({ probability: 15 as unknown as string })).toBe('TSTM');
     expect(tornadoToCategorical(15 as unknown as { probability: string })).toBe('TSTM');
-    expect(windToCategorical({ probability: '45%', cig: 'BAD' as unknown as 'CIG0', isSignificant: true })).toBe('TSTM');
+    expect(windToCategorical({ probability: '45%', cig: 'BAD' as unknown as 'CIG0', isSignificant: true })).toBe('MDT');
+  });
+
+  test('documents the capped CIG3 mapping for hail and Day 3', () => {
+    expect(categoricalConversionTables.hail.cigs).toContain('CIG3');
+    expect(categoricalConversionTables.totalSevere.cigs).toContain('CIG3');
+    expect(categoricalConversionTables.hail.rows.find((row) => row.probability === '45%')?.cells.find((cell) => cell.cig === 'CIG3')?.risk).toBe('MDT');
+    expect(categoricalConversionTables.totalSevere.rows.find((row) => row.probability === '30%')?.cells.find((cell) => cell.cig === 'CIG3')?.risk).toBe('MDT');
   });
 
   test('getHighestCategoricalRisk returns the worst of available', () => {

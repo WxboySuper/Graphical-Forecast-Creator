@@ -176,6 +176,35 @@ describe('processOutlooksToCategorical', () => {
     expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
   });
 
+  test('keeps probability markers when stale feature metadata says non-significant', () => {
+    const feature = {
+      ...makeFeature('marked-wind'),
+      properties: { outlookType: 'wind', probability: '45%#', isSignificant: false },
+    };
+    const result = processDay12OutlooksToCategorical({
+      wind: new Map([['45%#', [feature]]]),
+      tornado: new Map(),
+      hail: new Map(),
+    });
+
+    expect(result.some((item) => item.properties?.probability === 'MDT')).toBe(true);
+  });
+
+  test('applies significant floors to intersected hatching pieces', () => {
+    const probability = {
+      ...makeFeature('significant-wind'),
+      properties: { outlookType: 'wind', probability: '15%', isSignificant: true },
+    };
+    const hatch = makeFeature('wind-hatch');
+    const result = processDay12OutlooksToCategorical({
+      wind: new Map([['15%', [probability]], ['CIG2', [hatch]]]),
+      tornado: new Map(),
+      hail: new Map(),
+    });
+
+    expect(result.some((item) => ['ENH', 'MDT', 'HIGH'].includes(String(item.properties?.probability)))).toBe(true);
+  });
+
   test('ignores day 4-8 and missing day 3 total severe data', () => {
     const outlooks: OutlookData = {
       tornado: new Map([['30%', [makeFeature('t1')]]]),

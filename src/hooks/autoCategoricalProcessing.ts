@@ -18,6 +18,12 @@ export function processOutlooksToCategorical(outlooks: OutlookData, day: number 
 
 type PolygonOutlookFeature = Feature<Polygon | MultiPolygon>;
 
+const DAY12_CATEGORICAL_CONVERTERS = {
+  tornado: tornadoToCategorical,
+  wind: windToCategorical,
+  hail: hailToCategorical,
+} as const;
+
 /** Builds a reusable two-feature collection shell for Turf v7 boolean ops. */
 const createPairFeatureCollection = (): FeatureCollection<Polygon | MultiPolygon> => ({
   type: 'FeatureCollection',
@@ -311,6 +317,7 @@ export function processDay12OutlooksToCategorical(outlooks: OutlookData): GeoJSO
 /**
  * Maps one intersected probabilistic polygon piece into its categorical risk
  * bucket and appends it unless it resolves to TSTM.
+ * @param isSignificant Stored source significance. A trailing # remains authoritative if the flag is stale.
  */
 function addPieceToRiskMap(
   type: 'tornado' | 'wind' | 'hail',
@@ -320,11 +327,7 @@ function addPieceToRiskMap(
   riskMap: Map<CategoricalRiskLevel, PolygonOutlookFeature[]>,
   isSignificant: boolean,
 ) {
-  let risk: CategoricalRiskLevel = 'TSTM';
-  if (type === 'tornado') risk = tornadoToCategorical({ probability: prob, cig, isSignificant });
-  if (type === 'wind') risk = windToCategorical({ probability: prob, cig, isSignificant });
-  if (type === 'hail') risk = hailToCategorical({ probability: prob, cig, isSignificant });
-
+  const risk = DAY12_CATEGORICAL_CONVERTERS[type]({ probability: prob, cig, isSignificant });
   appendRiskPolygon(riskMap, risk, poly);
 }
 
