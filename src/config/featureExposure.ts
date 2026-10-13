@@ -42,19 +42,19 @@ const ALL_TARGETS_ON: FeatureExposureMatrix = {
   production: true,
 };
 
-const STAGING_MAX_ON: Readonly<FeatureExposureMatrix> = Object.freeze({
+const STAGING_MAX_ON: Readonly<FeatureExposureMatrix> = {
   local: true,
   beta: true,
   staging: true,
   production: false,
-});
+};
 
-const BETA_MAX_ON: Readonly<FeatureExposureMatrix> = Object.freeze({
+const BETA_MAX_ON: Readonly<FeatureExposureMatrix> = {
   local: true,
   beta: true,
   staging: false,
   production: false,
-});
+};
 
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
