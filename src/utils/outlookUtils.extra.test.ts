@@ -11,6 +11,34 @@ import {
 } from './outlookUtils';
 import type { CIGLevel } from '../types/outlooks';
 
+type CategoricalConverter = (input: { probability: string; cig: CIGLevel }) => string;
+const CIG3_RISK_CASES: Array<{ hazard: string; probability: string; convert: CategoricalConverter; expected: string }> = [
+  { hazard: 'tornado', probability: '2%', convert: tornadoToCategorical, expected: 'SLGT' },
+  { hazard: 'tornado', probability: '5%', convert: tornadoToCategorical, expected: 'ENH' },
+  { hazard: 'tornado', probability: '10%', convert: tornadoToCategorical, expected: 'ENH' },
+  { hazard: 'tornado', probability: '15%', convert: tornadoToCategorical, expected: 'MDT' },
+  { hazard: 'tornado', probability: '30%', convert: tornadoToCategorical, expected: 'HIGH' },
+  { hazard: 'tornado', probability: '45%', convert: tornadoToCategorical, expected: 'HIGH' },
+  { hazard: 'tornado', probability: '60%', convert: tornadoToCategorical, expected: 'HIGH' },
+  { hazard: 'wind', probability: '5%', convert: windToCategorical, expected: 'SLGT' },
+  { hazard: 'wind', probability: '15%', convert: windToCategorical, expected: 'ENH' },
+  { hazard: 'wind', probability: '30%', convert: windToCategorical, expected: 'ENH' },
+  { hazard: 'wind', probability: '45%', convert: windToCategorical, expected: 'HIGH' },
+  { hazard: 'wind', probability: '60%', convert: windToCategorical, expected: 'HIGH' },
+  { hazard: 'wind', probability: '75%', convert: windToCategorical, expected: 'HIGH' },
+  { hazard: 'wind', probability: '90%', convert: windToCategorical, expected: 'HIGH' },
+  { hazard: 'hail', probability: '5%', convert: hailToCategorical, expected: 'SLGT' },
+  { hazard: 'hail', probability: '15%', convert: hailToCategorical, expected: 'ENH' },
+  { hazard: 'hail', probability: '30%', convert: hailToCategorical, expected: 'ENH' },
+  { hazard: 'hail', probability: '45%', convert: hailToCategorical, expected: 'MDT' },
+  { hazard: 'hail', probability: '60%', convert: hailToCategorical, expected: 'MDT' },
+  { hazard: 'Day 3 total severe', probability: '5%', convert: totalSevereToCategorical, expected: 'SLGT' },
+  { hazard: 'Day 3 total severe', probability: '15%', convert: totalSevereToCategorical, expected: 'ENH' },
+  { hazard: 'Day 3 total severe', probability: '30%', convert: totalSevereToCategorical, expected: 'ENH' },
+  { hazard: 'Day 3 total severe', probability: '45%', convert: totalSevereToCategorical, expected: 'MDT' },
+  { hazard: 'Day 3 total severe', probability: '60%', convert: totalSevereToCategorical, expected: 'MDT' },
+];
+
 describe('outlookUtils extra', () => {
   test('getOutlookConstraints returns correct sets for days', () => {
     const d1 = getOutlookConstraints(1);
@@ -41,6 +69,10 @@ describe('outlookUtils extra', () => {
     expect(tornadoToCategorical({ probability: undefined as unknown as string })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '' })).toBe('TSTM');
     expect(tornadoToCategorical({ probability: '5%', cig: 'CIG4' as CIGLevel })).toBe('TSTM');
+  });
+
+  test.each(CIG3_RISK_CASES)('$hazard $probability preserves its highest mapped risk at CIG3', ({ convert, probability, expected }) => {
+    expect(convert({ probability, cig: 'CIG3' })).toBe(expected);
   });
 
   test('windToCategorical maps probabilities properly', () => {
