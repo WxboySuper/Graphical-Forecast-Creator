@@ -47,6 +47,21 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('does not restart the timer for whitespace-only message changes', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="Notice" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(2500);
+    });
+    rerender(<Toast message="  Notice  " onClose={onClose} />);
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('ignores type-only changes and restarts for new copy after a close callback', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" type="info" onClose={onClose} />);
@@ -167,7 +182,7 @@ describe('Toast', () => {
     act(() => {
       jest.advanceTimersByTime(0);
     });
-    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   test('clears timeout on unmount', () => {

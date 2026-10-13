@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
 const MAX_TOAST_LIFETIME_MS = 30000;
 const MS_PER_CHARACTER = 100;
 const MAX_READING_CHARACTERS = MAX_TOAST_LIFETIME_MS / MS_PER_CHARACTER;
-const getCurrentTime = (): number =>
-  typeof performance === 'undefined' ? Date.now() : performance.now();
 
 /** Estimates a reading window from trimmed copy, bounded by the toast lifetime. */
 const getToastDuration = (trimmedMessage: string): number => {
@@ -33,7 +31,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
   const mountedAtRef = useRef<number | null>(null);
   const closedRef = useRef(false);
-  const normalizedMessage = message?.trim() ?? '';
+  const normalizedMessage = useMemo(() => message?.trim() ?? '', [message]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -41,12 +39,12 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    const now = getCurrentTime();
+    const now = Date.now();
     if (mountedAtRef.current === null) mountedAtRef.current = now;
     const elapsed = now - mountedAtRef.current;
     const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
     if (remainingLifetime > 0) closedRef.current = false;
-    const readingWindow = message == null ? 0 : getToastDuration(normalizedMessage);
+    const readingWindow = getToastDuration(normalizedMessage);
     // The lifetime cap intentionally wins over a full last reading window.
     const duration = Math.min(readingWindow, remainingLifetime);
     const timer = setTimeout(() => {
@@ -58,14 +56,11 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [message, normalizedMessage]);
+  }, [normalizedMessage]);
 
   return normalizedMessage ? (
-    <div
-      className={`toast toast-${type}`}
-      tabIndex={normalizedMessage.length > MAX_READING_CHARACTERS ? 0 : undefined}
-    >
-      {message}
+    <div className={`toast toast-${type}`}>
+      {normalizedMessage}
     </div>
   ) : null;
 };
