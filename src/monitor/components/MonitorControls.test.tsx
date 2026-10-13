@@ -43,7 +43,7 @@ const baseProps = {
   onStormReportsFilterHailChange: jest.fn(),
   onStormReportsMatchOutlookTypeChange: jest.fn(),
   alertsMeta: {
-    alertCollection: { type: 'FeatureCollection', features: [] },
+    alertCollection: { type: 'FeatureCollection' as const, features: [] },
     frameCount: 0,
     frameIndex: 0,
     loading: false,
