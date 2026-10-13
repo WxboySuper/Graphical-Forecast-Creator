@@ -37,6 +37,15 @@ const EMPTY_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
 
 // TODO: share a canonical alert-id helper with alertSnapshotTokens in
 // ../nwsAlerts.ts if the NWS id format ever changes.
+/** Reads a canonical https URL from a top-level GeoJSON feature id. */
+const topLevelAlertUrl = (id: unknown): string | null => {
+  if (typeof id !== 'string') {
+    return null;
+  }
+  const trimmed = id.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+};
+
 /** Collects the canonical alert urls in a collection for presence checks. */
 const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => {
   const ids = new Set<string>();
@@ -49,15 +58,6 @@ const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => 
     }
   });
   return ids;
-};
-
-/** Reads a canonical https URL from a top-level GeoJSON feature id. */
-const topLevelAlertUrl = (id: unknown): string | null => {
-  if (typeof id !== 'string') {
-    return null;
-  }
-  const trimmed = id.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 };
 
 /** Drops the selection after consecutive collections miss its alert id. */
