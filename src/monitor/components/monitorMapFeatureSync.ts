@@ -1,7 +1,6 @@
 import GeoJSON from 'ol/format/GeoJSON';
-import Feature from 'ol/Feature';
+import Feature, { type FeatureLike } from 'ol/Feature';
 import Point from 'ol/geom/Point';
-import type { FeatureLike } from 'ol/Feature';
 import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
@@ -41,7 +40,7 @@ export const syncOutlookFeatures = (
       featureProjection: 'EPSG:3857',
     });
 
-    // Applies monitor outlook styling before adding a feature to the source.
+    /** Applies the computed monitor style to a feature. */
     const applyStyle = (item: FeatureLike) => {
       if ('setStyle' in item && typeof item.setStyle === 'function') {
         item.setStyle(toOlStyle(
