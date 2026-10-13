@@ -33,21 +33,31 @@ interface UseMonitorMapOverlaySyncArgs {
 /** Dismisses the selection after this many consecutive collections miss it. */
 const MAX_CONSECUTIVE_ALERT_MISSES = 2;
 
-const EMPTY_ID_SET: ReadonlySet<string> = new Set();
+const EMPTY_ID_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
 
 // TODO: share a canonical alert-id helper with alertSnapshotTokens in
 // ../nwsAlerts.ts if the NWS id format ever changes.
 /** Collects the canonical alert urls in a collection for presence checks. */
 const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => {
   const ids = new Set<string>();
-  collection.features.forEach((feature) => {
+  const features = Array.isArray(collection.features) ? collection.features : [];
+  features.forEach((feature) => {
     const properties: Record<string, unknown> = feature.properties ?? {};
-    const url = resolveNwsAlertDetailUrl(properties);
+    const url = resolveNwsAlertDetailUrl(properties) ?? topLevelAlertUrl(feature.id);
     if (url !== null) {
       ids.add(url);
     }
   });
   return ids;
+};
+
+/** Reads a canonical https URL from a top-level GeoJSON feature id. */
+const topLevelAlertUrl = (id: unknown): string | null => {
+  if (typeof id !== 'string') {
+    return null;
+  }
+  const trimmed = id.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
 };
 
 /** Drops the selection after consecutive collections miss its alert id. */
@@ -58,6 +68,8 @@ const useSelectedAlertExpiry = (
 ) => {
   const consecutiveMissesRef = useRef(0);
   const prevAlertIdRef = useRef<string | null>(null);
+  const clearSelectedAlertRef = useRef(onClearSelectedAlert);
+  clearSelectedAlertRef.current = onClearSelectedAlert;
 
   useEffect(() => {
     if (selectedAlertId === null) {
@@ -73,12 +85,12 @@ const useSelectedAlertExpiry = (
       consecutiveMissesRef.current += 1;
       if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
         consecutiveMissesRef.current = 0;
-        onClearSelectedAlert();
+        clearSelectedAlertRef.current();
       }
     } else {
       consecutiveMissesRef.current = 0;
     }
-  }, [alertIds, selectedAlertId, onClearSelectedAlert]);
+  }, [alertIds, selectedAlertId]);
 };
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
@@ -94,9 +106,11 @@ export const useMonitorMapOverlaySync = ({
   selectedAlertId,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
+  const hasTrackedSelection = selectedAlertId !== null && selectedAlertId !== '';
   const alertIds = useMemo(
-    () => (selectedAlertId === null ? EMPTY_ID_SET : buildAlertIdSet(alertsCollection)),
-    [alertsCollection, selectedAlertId],
+    // Only selection presence matters here, not its value.
+    () => (hasTrackedSelection ? buildAlertIdSet(alertsCollection) : EMPTY_ID_SET),
+    [alertsCollection, hasTrackedSelection],
   );
   useEffect(() => {
     const style = createStateOutlineStyle(darkMode);

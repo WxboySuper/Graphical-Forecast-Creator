@@ -44,11 +44,9 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     setSelectedAlert(null);
   }, [refs.overlayRef]);
 
-  // Only the canonical detail URL crosses into layer sync for expiry
-  // dismissal. Alerts without one use an empty id that never matches, so the
-  // popup survives the grace window and is then dismissed instead of
-  // lingering indefinitely (issue #1595).
-  const selectedAlertId = selectedAlert ? (selectedAlert.detailUrl?.trim() || '') : null;
+  // Canonical detail URL, '' sentinel for URL-less selections (never matches),
+  // null for no selection. detailUrl is already trimmed by the NWS parser.
+  const selectedAlertId: string | null = selectedAlert ? (selectedAlert.detailUrl ?? '') : null;
 
   useMonitorMapBootstrap({
     mapView: args.mapView,

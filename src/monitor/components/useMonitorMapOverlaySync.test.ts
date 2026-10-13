@@ -190,6 +190,17 @@ describe('useMonitorMapOverlaySync selected alert dismissal', () => {
     expect(onClearSelectedAlert).not.toHaveBeenCalled();
   });
 
+  it('matches a canonical top-level id url with no property url', () => {
+    const topOnlyUrl = 'https://api.weather.gov/alerts/top-level';
+    const { rerender, onClearSelectedAlert } = setup(topOnlyUrl);
+
+    const topOnly = makeCollection(makeFeature(alertProperties({}), topOnlyUrl));
+    rerender({ alertsCollection: topOnly, selectedAlertId: topOnlyUrl });
+    rerender({ alertsCollection: topOnly, selectedAlertId: topOnlyUrl });
+
+    expect(onClearSelectedAlert).not.toHaveBeenCalled();
+  });
+
   it('ignores a non-URL top-level id with no canonical property url', () => {
     const { rerender, onClearSelectedAlert } = setup('local-123');
 
