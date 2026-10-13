@@ -97,6 +97,18 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('does not dismiss the same toast more than once after its lifetime', () => {
+    const onClose = jest.fn();
+    const { rerender } = render(<Toast message="First" onClose={onClose} />);
+
+    act(() => {
+      jest.advanceTimersByTime(30000);
+    });
+    rerender(<Toast message="Updated after cap" onClose={onClose} />);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('gives longer messages more time to be read', () => {
     const onClose = jest.fn();
     render(<Toast message={'Notice '.repeat(15)} onClose={onClose} />);
