@@ -29,6 +29,17 @@
       "path": "**/*.md",
       "rule": "Docs review. Flag docs the diff leaves factually wrong (stale instructions, wrong commands, broken links, confusing wording in touched docs). No prose taste, no rewrite suggestions.",
       "merge_system_rule": true
+    },
+    {
+      "path": "**/*.test.{ts,tsx}",
+      "rule": "GFC test-value review. These tests were admitted to review explicitly, so judge whether each test earns its lines: flag tests with no meaningful assertion (only mocks, snapshots of nothing, tautologies), tests that cannot fail, tests duplicating coverage already present in the diff, and excessive mock scaffolding that tests the mocks instead of the code. File as low unless a hollow test gives false confidence on a critical path (forecast correctness, auth, premium gates, payments), which is medium or higher. Do not demand tests for trivial code and do not propose new test files or frameworks.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "**/CHANGELOG.md",
+      "rule": "GFC changelog review. This file was admitted to review explicitly. Every entry the diff adds or changes must describe a real user-visible change with enough specifics to understand it; flag filler entries (vague one-liners like 'fixed bugs' or 'updated stuff'), entries that describe no discernible change, and entries that contradict the code diff. Do not rewrite prose for taste.",
+      "merge_system_rule": true
     }
-  ]
+  ],
+  "include": ["**/*.test.ts", "**/*.test.tsx", "**/CHANGELOG.md"]
 }
