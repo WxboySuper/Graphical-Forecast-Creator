@@ -36,16 +36,5 @@ export const useMonitorMapLayerSync = (args: UseMonitorMapLayerSyncArgs) => {
     satelliteOpacity: args.satelliteOpacity,
     refs: args.refs,
   });
-  useMonitorMapOverlaySync({
-    mapView: args.mapView,
-    darkMode: args.darkMode,
-    serializedFeatures: args.serializedFeatures,
-    stormReports: args.stormReports,
-    alertsCollection: args.alertsCollection,
-    mesoscaleDiscussions: args.mesoscaleDiscussions,
-    alertsOpacity: args.alertsOpacity,
-    refs: args.refs,
-    selectedAlertId: args.selectedAlertId,
-    onClearSelectedAlert: args.onClearSelectedAlert,
-  });
+  useMonitorMapOverlaySync(args);
 };

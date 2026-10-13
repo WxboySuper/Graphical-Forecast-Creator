@@ -33,16 +33,14 @@ interface UseMonitorMapOverlaySyncArgs {
 /** Dismisses the selection after this many consecutive collections miss it. */
 const MAX_CONSECUTIVE_ALERT_MISSES = 2;
 
-/** Collects the canonical alert ids in a collection for presence checks. */
+const EMPTY_ID_SET: ReadonlySet<string> = new Set();
+
+// TODO: share a canonical alert-id helper with alertSnapshotTokens in
+// ../nwsAlerts.ts if the NWS id format ever changes.
+/** Collects the canonical alert urls in a collection for presence checks. */
 const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => {
   const ids = new Set<string>();
   collection.features.forEach((feature) => {
-    if (typeof feature.id === 'string') {
-      const trimmed = feature.id.trim();
-      if (trimmed !== '') {
-        ids.add(trimmed);
-      }
-    }
     const properties: Record<string, unknown> = feature.properties ?? {};
     const url = resolveNwsAlertDetailUrl(properties);
     if (url !== null) {
@@ -50,6 +48,37 @@ const buildAlertIdSet = (collection: NwsAlertFeatureCollection): Set<string> => 
     }
   });
   return ids;
+};
+
+/** Drops the selection after consecutive collections miss its alert id. */
+const useSelectedAlertExpiry = (
+  alertIds: ReadonlySet<string>,
+  selectedAlertId: string | null,
+  onClearSelectedAlert: () => void,
+) => {
+  const consecutiveMissesRef = useRef(0);
+  const prevAlertIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (selectedAlertId === null) {
+      consecutiveMissesRef.current = 0;
+      prevAlertIdRef.current = null;
+      return;
+    }
+    if (selectedAlertId !== prevAlertIdRef.current) {
+      prevAlertIdRef.current = selectedAlertId;
+      consecutiveMissesRef.current = 0;
+    }
+    if (!alertIds.has(selectedAlertId)) {
+      consecutiveMissesRef.current += 1;
+      if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
+        consecutiveMissesRef.current = 0;
+        onClearSelectedAlert();
+      }
+    } else {
+      consecutiveMissesRef.current = 0;
+    }
+  }, [alertIds, selectedAlertId, onClearSelectedAlert]);
 };
 
 /** Synchronizes non-WMS monitor map overlays and external map view state. */
@@ -65,9 +94,10 @@ export const useMonitorMapOverlaySync = ({
   selectedAlertId,
   onClearSelectedAlert,
 }: UseMonitorMapOverlaySyncArgs) => {
-  const alertIds = useMemo(() => buildAlertIdSet(alertsCollection), [alertsCollection]);
-  const consecutiveMissesRef = useRef(0);
-  const prevAlertIdRef = useRef<string | null | undefined>(undefined);
+  const alertIds = useMemo(
+    () => (selectedAlertId === null ? EMPTY_ID_SET : buildAlertIdSet(alertsCollection)),
+    [alertsCollection, selectedAlertId],
+  );
   useEffect(() => {
     const style = createStateOutlineStyle(darkMode);
     refs.stateOutlineSourceRef.current.getFeatures().forEach((feature) => feature.setStyle(style));
@@ -108,35 +138,11 @@ export const useMonitorMapOverlaySync = ({
   // Dismissal paths (popup close button, map click, unmount, new selection) live
   // in useMonitorOlMap/useMonitorMapBootstrap; here the selection is dropped
   // only after consecutive collections miss the selected alert id. A single
-  // miss is tolerated so one animation frame, category toggle, or refresh
-  // without the alert does not yank the popup (issue #1595), while a
-  // genuinely expired or cancelled alert is still dismissed. An empty
-  // collection (alerts disabled or none active) dismisses immediately since
-  // no further change will follow it.
-  useEffect(() => {
-    if (selectedAlertId !== prevAlertIdRef.current) {
-      prevAlertIdRef.current = selectedAlertId;
-      consecutiveMissesRef.current = 0;
-      return;
-    }
-    if (selectedAlertId === null) {
-      return;
-    }
-    if (alertIds.size === 0) {
-      consecutiveMissesRef.current = 0;
-      onClearSelectedAlert();
-      return;
-    }
-    if (alertIds.has(selectedAlertId)) {
-      consecutiveMissesRef.current = 0;
-      return;
-    }
-    consecutiveMissesRef.current += 1;
-    if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
-      consecutiveMissesRef.current = 0;
-      onClearSelectedAlert();
-    }
-  }, [alertIds, selectedAlertId, onClearSelectedAlert]);
+  // miss is tolerated so one animation frame, category toggle, refresh, or
+  // transient empty response without the alert does not yank the popup
+  // (issue #1595), while a genuinely expired or cancelled alert is still
+  // dismissed.
+  useSelectedAlertExpiry(alertIds, selectedAlertId, onClearSelectedAlert);
 
   useEffect(() => {
     syncStormReportFeatures(refs.stormReportsSourceRef.current, stormReports);

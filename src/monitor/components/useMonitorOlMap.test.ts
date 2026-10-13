@@ -123,6 +123,12 @@ describe('useMonitorOlMap selected alert wiring', () => {
     });
 
     expect(lastLayerSyncArgs()?.selectedAlertId).toBe('');
+
+    act(() => {
+      onSelectAlert({ ...selectedDetails, detailUrl: '  https://api.weather.gov/alerts/abc  ' });
+    });
+
+    expect(lastLayerSyncArgs()?.selectedAlertId).toBe('https://api.weather.gov/alerts/abc');
   });
 
   it('keeps the same selection object across collection changes for dismissal tracking', () => {

@@ -48,7 +48,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
   // dismissal. Alerts without one use an empty id that never matches, so the
   // popup survives the grace window and is then dismissed instead of
   // lingering indefinitely (issue #1595).
-  const selectedAlertId = selectedAlert ? (selectedAlert.detailUrl ?? '') : null;
+  const selectedAlertId = selectedAlert ? (selectedAlert.detailUrl?.trim() || '') : null;
 
   useMonitorMapBootstrap({
     mapView: args.mapView,
