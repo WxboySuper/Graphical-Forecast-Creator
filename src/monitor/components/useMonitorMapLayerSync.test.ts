@@ -63,4 +63,13 @@ describe('useMonitorMapLayerSync selection forwarding', () => {
       expect.objectContaining({ selectedAlertDetailUrl: null }),
     );
   });
+
+  it('forwards URL-less selections for manual dismissal', () => {
+    const args = { ...makeArgs(), selectedAlertDetailUrl: '' };
+    renderHook(() => useMonitorMapLayerSync(args));
+
+    expect(jest.mocked(useMonitorMapOverlaySync)).toHaveBeenCalledWith(
+      expect.objectContaining({ selectedAlertDetailUrl: '' }),
+    );
+  });
 });

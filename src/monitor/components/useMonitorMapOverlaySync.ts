@@ -76,7 +76,6 @@ const useSelectedAlertExpiry = (
       consecutiveMissesRef.current += 1;
       if (consecutiveMissesRef.current >= MAX_CONSECUTIVE_ALERT_MISSES) {
         consecutiveMissesRef.current = 0;
-        prevAlertDetailUrlRef.current = null;
         clearSelectedAlertRef.current();
       }
     } else {
