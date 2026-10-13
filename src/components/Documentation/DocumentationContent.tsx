@@ -1,6 +1,6 @@
 // skipcq: JS-W1028
 import React from 'react';
-import { colorMappings } from '../../utils/outlookUtils';
+import { categoricalConversionTables, colorMappings, significantCategoricalFloors } from '../../utils/outlookUtils';
 
 // Helper: table cell with faded categorical color
 const CatCell: React.FC<{ v: string }> = ({ v }) => {
@@ -221,78 +221,52 @@ export const OutlooksSection: React.FC = () => (
   </div>
 );
 
-/** Conversion tab content documenting probabilistic-to-categorical mappings. */
+const ConversionTable: React.FC<{
+  label: string;
+  rows: Array<{ probability: string; risks: string[] }>;
+  cigs: string[];
+}> = ({ label, rows, cigs }) => (
+  <table className="conversion-table" aria-label={label}>
+    <thead><tr><th scope="col">Probability</th>{cigs.map((cig) => <th scope="col" key={cig}>{cig}</th>)}</tr></thead>
+    <tbody>{rows.map(({ probability, risks }) => (
+      <tr key={probability}><th scope="row">{probability}</th>{risks.map((risk, index) => <CatCell key={cigs[index]} v={risk} />)}</tr>
+    ))}</tbody>
+  </table>
+);
+
+const significantFloorSummary = (floors: Readonly<Record<string, string>>) =>
+  Object.entries(floors).map(([probability, risk]) => `${probability}# → ${risk}`).join(', ');
+
+/** Conversion tab content generated from the same functions used by forecasts. */
 export const CategoricalSection: React.FC = () => (
   <div className="doc-section">
     <h3>Probabilistic → Categorical Conversion</h3>
+    <p>The highest result from any Day 1–2 outlook (Tornado, Wind, or Hail) wins for an area.</p>
     <p>
-      The categorical risk is computed from each probability + CIG level combination. The highest result
-      from any outlook (Tornado, Wind, or Hail) wins for a given area.
+      Tables show every supported probability/CIG combination. Where no direct rule exists, the highest
+      category mapped at a less significant CIG applies. CIG0 is the lowest level. Equal values mean the
+      category has reached its cap or is inherited by this rule.
     </p>
-    <p>When a probability has no direct match at a CIG level, the highest mapped risk from a lower CIG level applies.</p>
-
     <h4>Tornado Conversion</h4>
-    <table className="conversion-table">
-      <thead>
-        <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th><th>CIG3</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>2%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><CatCell v="SLGT"/></tr>
-        <tr><td>5%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
-        <tr><td>10%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
-        <tr><td>15%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
-        <tr><td>30%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>45%</td><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>60%</td><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-      </tbody>
-    </table>
-
+    <ConversionTable label="Tornado conversion" rows={categoricalConversionTables.tornado} cigs={['CIG0', 'CIG1', 'CIG2', 'CIG3']} />
     <h4>Wind Conversion</h4>
-    <table className="conversion-table">
-      <thead>
-        <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th><th>CIG3</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/><CatCell v="SLGT"/></tr>
-        <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
-        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
-        <tr><td>45%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="HIGH"/></tr>
-        <tr><td>60%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>75%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-        <tr><td>90%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="HIGH"/><CatCell v="HIGH"/></tr>
-      </tbody>
-    </table>
-
+    <ConversionTable label="Wind conversion" rows={categoricalConversionTables.wind} cigs={['CIG0', 'CIG1', 'CIG2', 'CIG3']} />
     <h4>Hail Conversion</h4>
-    <table className="conversion-table">
-      <thead>
-        <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/></tr>
-        <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/></tr>
-        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="ENH"/></tr>
-        <tr><td>45%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/></tr>
-        <tr><td>60%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
-      </tbody>
-    </table>
+    <p>Hail supports CIG0–CIG2. CIG3 hatching is not available for this outlook.</p>
+    <ConversionTable label="Hail conversion" rows={categoricalConversionTables.hail} cigs={['CIG0', 'CIG1', 'CIG2']} />
     <p><em>Hail does not produce a HIGH categorical outcome in any combination.</em></p>
-
     <h4>Day 3 Total Severe Conversion</h4>
-    <p>Day 3 uses a single combined probability rather than three separate hazards.</p>
-    <table className="conversion-table">
-      <thead>
-        <tr><th>Probability</th><th>CIG0</th><th>CIG1</th><th>CIG2</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>5%</td><CatCell v="MRGL"/><CatCell v="MRGL"/><CatCell v="SLGT"/></tr>
-        <tr><td>15%</td><CatCell v="SLGT"/><CatCell v="SLGT"/><CatCell v="ENH"/></tr>
-        <tr><td>30%</td><CatCell v="ENH"/><CatCell v="ENH"/><CatCell v="MDT"/></tr>
-        <tr><td>45%</td><CatCell v="ENH"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
-        <tr><td>60%</td><CatCell v="MDT"/><CatCell v="MDT"/><CatCell v="MDT"/></tr>
-      </tbody>
-    </table>
+    <p>Day 3 uses one combined probability, supports CIG0–CIG2, and has no separate significant-risk floor.</p>
+    <ConversionTable label="Day 3 total severe conversion" rows={categoricalConversionTables.totalSevere} cigs={['CIG0', 'CIG1', 'CIG2']} />
     <p><em>Day 3 categorical does not reach HIGH. Maximum output is MDT.</em></p>
+    <h4>Significant-risk floors</h4>
+    <p>A # marker adds the listed hazard-specific floor; the final result is the higher of that floor and the probability/CIG conversion. Markers without a listed floor retain hatching without changing the category.</p>
+    <ul>
+      <li><strong>Tornado:</strong> {significantFloorSummary(significantCategoricalFloors.tornado)}</li>
+      <li><strong>Wind:</strong> {significantFloorSummary(significantCategoricalFloors.wind)}</li>
+      <li><strong>Hail:</strong> {significantFloorSummary(significantCategoricalFloors.hail)}</li>
+      <li><strong>Day 3 total severe:</strong> no separate floor</li>
+    </ul>
   </div>
 );
 
