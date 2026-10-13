@@ -76,6 +76,11 @@ type CategoricalConversion = {
   cig: unknown;
   rules: readonly CategoricalRule[];
 };
+type CategoricalRuleSearch = {
+  probability: string;
+  cig: CIGLevel;
+  rules: readonly CategoricalRule[];
+};
 
 const BASELINE_CIG: CIGLevel = 'CIG0';
 const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
@@ -85,25 +90,30 @@ function isCigLevel(cig: unknown): cig is CIGLevel {
   return typeof cig === 'string' && CIG_LEVELS.includes(cig as CIGLevel);
 }
 
-const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
-  if (typeof probability !== 'string' || probability.length === 0 || !isCigLevel(cig)) {
-    return 'TSTM';
+/** Checks that persisted probability values can be converted. */
+function isCategoricalProbability(probability: unknown): probability is string {
+  return typeof probability === 'string' && probability.length > 0;
+}
+
+/** Returns the mapped risk for one probability and CIG pair. */
+function findCategoricalRisk({ probability, cig, rules }: CategoricalRuleSearch): CategoricalRiskLevel | undefined {
+  for (const rule of rules) {
+    if (!rule.probabilities.includes(probability)) continue;
+    if (rule.cigs.includes(cig)) return rule.risk;
   }
+  return undefined;
+}
+
+const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
+  if (!isCategoricalProbability(probability)) return 'TSTM';
+  if (!isCigLevel(cig)) return 'TSTM';
 
   const normalizedProbability = probability.replace(/[#]/g, '%');
-  let exactCigRisk: CategoricalRiskLevel | undefined;
-  let baselineCigRisk: CategoricalRiskLevel | undefined;
-
-  for (const rule of rules) {
-    if (!rule.probabilities.includes(normalizedProbability)) continue;
-    if (exactCigRisk === undefined && rule.cigs.includes(cig)) exactCigRisk = rule.risk;
-    if (baselineCigRisk === undefined && rule.cigs.includes(BASELINE_CIG)) baselineCigRisk = rule.risk;
-    if (exactCigRisk !== undefined && baselineCigRisk !== undefined) break;
-  }
-
   // CIG0 is the unhatched baseline. The requested behavior uses that mapped
   // category when a valid CIG has no rule, rather than dropping it as TSTM.
-  return exactCigRisk ?? baselineCigRisk ?? 'TSTM';
+  return findCategoricalRisk({ probability: normalizedProbability, cig, rules })
+    ?? findCategoricalRisk({ probability: normalizedProbability, cig: BASELINE_CIG, rules })
+    ?? 'TSTM';
 };
 
 type CategoricalInput = {
