@@ -239,16 +239,22 @@ function shouldUseRawArchive(date: string): boolean {
   return true;
 }
 
-/** Caches a raw-only archive briefly so a later filtered archive is retried. */
-function rememberRawArchive(date: string): void {
-  const now = Date.now();
+function removeExpiredRawArchiveDates(now: number): void {
   for (const [cachedDate, expiresAt] of RAW_ONLY_ARCHIVE_DATES) {
     if (expiresAt <= now) RAW_ONLY_ARCHIVE_DATES.delete(cachedDate);
   }
-  if (RAW_ONLY_ARCHIVE_DATES.size >= RAW_ONLY_CACHE_LIMIT) {
-    const oldestDate = RAW_ONLY_ARCHIVE_DATES.keys().next().value;
-    if (oldestDate !== undefined) RAW_ONLY_ARCHIVE_DATES.delete(oldestDate);
-  }
+}
+
+function removeOldestRawArchiveDate(): void {
+  const oldestDate = RAW_ONLY_ARCHIVE_DATES.keys().next().value;
+  if (oldestDate !== undefined) RAW_ONLY_ARCHIVE_DATES.delete(oldestDate);
+}
+
+/** Caches a raw-only archive briefly so a later filtered archive is retried. */
+function rememberRawArchive(date: string): void {
+  const now = Date.now();
+  removeExpiredRawArchiveDates(now);
+  if (RAW_ONLY_ARCHIVE_DATES.size >= RAW_ONLY_CACHE_LIMIT) removeOldestRawArchiveDate();
   RAW_ONLY_ARCHIVE_DATES.set(date, now + RAW_ONLY_CACHE_TTL_MS);
 }
 
@@ -262,10 +268,14 @@ const fetchRollingStormReports = async ({ url, label }: RollingFeedRequest): Pro
 function parseRollingStormReports({ response, text, label }: Pick<RollingFeedRequest, 'label'> & { response: Response; text?: string }): StormReport[] {
   if (!response.ok) throw httpError({ context: label, status: response.status });
   if (!text) throw connectionError({ context: `Could not read ${label}.` });
+  validateRollingFeedContent(text, label);
+  return parseTodayStormReportCsv(text);
+}
+
+function validateRollingFeedContent(text: string, label: string): void {
   if (!text.trim()) throw new Error(`SPC returned invalid ${label}.`);
   if (/^\s*<\s*html\b/iu.test(text)) throw new Error(`SPC returned invalid ${label}.`);
   if (!hasFilteredArchiveHeaders({ csvText: text })) throw new Error(`SPC returned invalid ${label}.`);
-  return parseTodayStormReportCsv(text);
 }
 
 /** Fetches same-day SPC storm reports (today_filtered.csv). */

@@ -53,16 +53,19 @@ describe('stormReportParser integration tests', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  test('reuses raw-only archive probes during the cache window', async () => {
+  test.each([
+    ['a missing filtered archive', '260130', { ok: false, status: 404 }],
+    ['an invalid filtered response', '260131', { ok: true, status: 200, text: () => Promise.resolve('<html>not published</html>') }],
+  ])('reuses raw archive probes after %s within the cache window', async (_reason, date, filteredResponse) => {
     const fetchMock = jest.fn()
-      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce(filteredResponse)
       .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     const { fetchStormReports } = await import('./stormReportParser');
-    await fetchStormReports('260130');
-    await fetchStormReports('260130');
+    await fetchStormReports(date);
+    await fetchStormReports(date);
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_raw.csv');
+    expect(fetchMock).toHaveBeenNthCalledWith(3, `https://www.spc.noaa.gov/climo/reports/${date}_rpts_raw.csv`);
   });
 
   test('retries the filtered archive after the raw-only cache expires', async () => {
@@ -82,18 +85,6 @@ describe('stormReportParser integration tests', () => {
     await fetchStormReports('260130');
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260130_rpts_filtered.csv');
-  });
-
-  test('reuses a raw archive after a filtered 200 response contains invalid content', async () => {
-    const fetchMock = jest.fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve('<html>not published</html>') })
-      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(rawTornadoArchiveCsv()) });
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const { fetchStormReports } = await import('./stormReportParser');
-    await fetchStormReports('260131');
-    await fetchStormReports('260131');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock).toHaveBeenNthCalledWith(3, 'https://www.spc.noaa.gov/climo/reports/260131_rpts_raw.csv');
   });
 
   test('does not treat a report comment containing a section label as a new section', async () => {
