@@ -264,10 +264,7 @@ function categorizeProbability({ probability, cig, rules, significantRisks }: Ca
   return findCategoricalRisk(normalizedProbability, cig, rules, significantRisks);
 }
 
-export type CategoricalInput = {
-  probability: string;
-  cig?: CIGLevel;
-};
+export type CategoricalInput = DetailedCategoricalInput<string>;
 
 const CIG_01 = ['CIG0', 'CIG1'] as const;
 const CIG_12 = ['CIG1', 'CIG2'] as const;
@@ -340,26 +337,32 @@ const TOTAL_SEVERE_RULES: readonly CategoricalRule[] = [
 
 /** Convert tornado probability to categorical risk level. */
 export function tornadoToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  const { probability, cig = 'CIG0' } = input ?? {} as CategoricalInput;
-  return categorizeProbability({ probability, cig, rules: TORNADO_RULES, significantRisks: TORNADO_SIGNIFICANT_RISKS });
+  return categorizeInput(input, TORNADO_RULES, TORNADO_SIGNIFICANT_RISKS);
 }
 
 /** Convert wind probability to categorical risk level. */
 export function windToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  const { probability, cig = 'CIG0' } = input ?? {} as CategoricalInput;
-  return categorizeProbability({ probability, cig, rules: WIND_RULES, significantRisks: WIND_SIGNIFICANT_RISKS });
+  return categorizeInput(input, WIND_RULES, WIND_SIGNIFICANT_RISKS);
 }
 
 /** Convert hail probability to categorical risk level. */
 export function hailToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  const { probability, cig = 'CIG0' } = input ?? {} as CategoricalInput;
-  return categorizeProbability({ probability, cig, rules: HAIL_RULES, significantRisks: HAIL_SIGNIFICANT_RISKS });
+  return categorizeInput(input, HAIL_RULES, HAIL_SIGNIFICANT_RISKS);
 }
 
 /** Convert Day 3 total severe with the combined-risk table; no separate significant-risk floor applies. */
 export function totalSevereToCategorical(input: CategoricalInput): CategoricalRiskLevel {
-  const { probability, cig = 'CIG0' } = input ?? {} as CategoricalInput;
-  return categorizeProbability({ probability, cig, rules: TOTAL_SEVERE_RULES });
+  return categorizeInput(input, TOTAL_SEVERE_RULES);
+}
+
+/** Applies one hazard rule table to a normalized public converter input. */
+function categorizeInput(
+  input: CategoricalInput,
+  rules: readonly CategoricalRule[],
+  significantRisks?: Readonly<Record<string, CategoricalRiskLevel>>,
+): CategoricalRiskLevel {
+  const { probability, cig = 'CIG0' } = toCategoricalInput(input);
+  return categorizeProbability({ probability, cig, rules, significantRisks });
 }
 
 /** Reference matrices generated from the same conversion functions used by forecasts. */
@@ -420,25 +423,35 @@ export type AvailableProbabilities = {
   hail?: CategoricalOutlookValue<HailProbability>;
 };
 
-/** Converts plain values without a wrapper into the shared categorical shape. */
-function toCategoricalInput<P extends string>(input: CategoricalOutlookValue<P>): CategoricalInput {
-  if (typeof input === 'string') {
-    const normalized = normalizeCategoricalProbability(input);
-    return { probability: normalized ? normalized.probability + (normalized.significant ? '#' : '') : '' };
-  }
-  return toDetailedCategoricalInput(input);
+/** Converts a plain probability string to the shared categorical input shape. */
+function categoricalInputFromProbability(probability: string): CategoricalInput {
+  const normalized = normalizeCategoricalProbability(probability);
+  if (!normalized) return { probability };
+  return { probability: normalized.significant ? `${normalized.probability}#` : normalized.probability };
 }
 
-/** Normalizes structured values and lets an explicit boolean override a marker. */
+/** Normalizes a structured input and applies its explicit significance flag. */
 function toDetailedCategoricalInput(input: DetailedCategoricalInput): CategoricalInput {
   const normalized = normalizeCategoricalProbability(input.probability);
-  if (!normalized) return { probability: '', cig: input.cig };
+  if (!normalized) return { probability: input.probability, cig: input.cig };
 
   const significant = resolveSignificantFlag(input.isSignificant, normalized.significant);
   return {
     probability: significant ? `${normalized.probability}#` : normalized.probability,
     cig: input.cig,
   };
+}
+
+/** Converts supported caller forms and fails safely on malformed runtime values. */
+function toCategoricalInput<P extends string>(input: CategoricalOutlookValue<P>): CategoricalInput {
+  if (typeof input === 'string') return categoricalInputFromProbability(input);
+  if (isDetailedCategoricalInput(input)) return toDetailedCategoricalInput(input);
+  return { probability: '' };
+}
+
+/** Rejects untrusted non-object values before reading structured input fields. */
+function isDetailedCategoricalInput(input: unknown): input is DetailedCategoricalInput {
+  return input !== null && typeof input === 'object';
 }
 
 /** Uses an explicit boolean when valid and otherwise trusts the marker. */

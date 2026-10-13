@@ -177,6 +177,13 @@ describe('outlookUtils extra', () => {
     expect(totalSevereToCategorical(undefined as unknown as { probability: string })).toBe('TSTM');
   });
 
+  test('direct converters preserve explicit significant flags', () => {
+    expect(windToCategorical({ probability: '45%', isSignificant: true })).toBe('MDT');
+    expect(windToCategorical({ probability: '45%#', isSignificant: false })).toBe('ENH');
+    expect(tornadoToCategorical({ probability: 15 as unknown as string })).toBe('TSTM');
+    expect(tornadoToCategorical(15 as unknown as { probability: string })).toBe('TSTM');
+  });
+
   test('getHighestCategoricalRisk returns the worst of available', () => {
     const best = getHighestCategoricalRisk({ tornado: '60%', wind: '5%' });
     expect(best).toBe('HIGH');
