@@ -3,9 +3,13 @@ import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
 const MAX_TOAST_LIFETIME_MS = 30000;
+const MS_PER_CHARACTER = 50;
 
-const getToastDuration = (message: string) =>
-  Math.min(MAX_TOAST_LIFETIME_MS, Math.max(MIN_TOAST_DURATION_MS, message.length * 50));
+/** Estimates a reading window from the message length, bounded by the toast lifetime. */
+const getToastDuration = (message: string) => {
+  const readingDuration = Array.from(message).length * MS_PER_CHARACTER;
+  return Math.min(MAX_TOAST_LIFETIME_MS, Math.max(MIN_TOAST_DURATION_MS, readingDuration));
+};
 
 export interface ToastProps {
   message: string;
@@ -15,15 +19,17 @@ export interface ToastProps {
 
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
-  const mountedAtRef = useRef(performance.now());
+  const mountedAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     onCloseRef.current = onClose;
-  });
+  }, [onClose]);
 
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
-    const elapsed = performance.now() - mountedAtRef.current;
+    const now = performance.now();
+    if (mountedAtRef.current === null) mountedAtRef.current = now;
+    const elapsed = now - mountedAtRef.current;
     const remainingLifetime = Math.max(0, MAX_TOAST_LIFETIME_MS - elapsed);
     const duration = Math.min(getToastDuration(message), remainingLifetime);
     const timer = setTimeout(() => {
