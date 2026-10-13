@@ -2,33 +2,44 @@
   "rules": [
     {
       "path": "src/**/*.ts",
-      "rule": "GFC frontend review. Be maximally strict and picky: file every substantiated issue, including nits, and mark low-severity items low rather than suppressing them. Check: React 19 correctness (stale closures, wrong hook deps, setState during render), Redux Toolkit and Immer misuse, non-serializable state, OpenLayers correctness (projection mistakes, layer leaks, unremoved listeners), any forecast/monitor/verify regression risk, any possible null or undefined deref on weather data, any premium-gated path reachable by free users, every user-visible error-handling gap (silent failure, swallowed error, raw stack trace to users), plus maintainability nits (dead code, duplicated logic, confusing names, changed behavior without test coverage). Every finding needs file, line, evidence, and user impact. Scope findings to the diff and code it directly affects; do not invent problems in untouched code.",
+      "rule": "GFC frontend review. File real bugs introduced or directly worsened by the diff: crashes, wrong data shown to users, broken forecast/monitor/verify behavior, auth/premium-gate bypasses, security issues, plus React 19 correctness (stale closures, wrong hook deps, setState during render), Redux/Immer misuse, OpenLayers mistakes (projection, layer leaks, unremoved listeners), and null/undefined derefs on weather data with evidence in the diff. Mark minor-impact items low rather than suppressing them, but require the same evidence (file, line, diff evidence, concrete user impact) at every severity; do not file claims you cannot evidence. Do NOT propose new features, abstractions, refactors, or follow-up work. Do NOT expand to untouched code or hypothetical edge cases without evidence in this diff. Max 10 findings per PR, most severe first. Each finding needs file, line, evidence in the diff, and concrete user impact.",
       "merge_system_rule": true
     },
     {
       "path": "src/**/*.tsx",
-      "rule": "GFC component review. Be maximally strict and picky: file every substantiated issue, including polish nits, as low severity or higher. Check: accessibility (labels, keyboard access, focus management), controlled versus uncontrolled inputs, wasteful renders and missing memoization, responsive breakage, and any copy that could confuse meteorologists or students. Scope findings to the diff and code it directly affects; do not invent problems in untouched code.",
+      "rule": "GFC component review. File real bugs in the diff that break rendering, input, or user understanding: crashes, broken controls, inaccessible critical actions with no workaround, wrong copy that causes user error, controlled/uncontrolled input mistakes, responsive breakage on realistic screens. Mark polish-level items low rather than suppressing them. No style taste, no memoization/render micro-opts unless they cause visible breakage, no new-feature ideas. Do not expand to untouched components. Max 10 findings per PR.",
       "merge_system_rule": true
     },
     {
       "path": "server/**/*.js",
-      "rule": "GFC backend review. Be maximally strict. Check: auth and authorization on every new or touched route, Firestore rule alignment (server must not trust client writes the rules deny), Stripe webhook verification, secret handling (no logging of keys, tokens, or PII), input validation on all client-supplied payloads, error paths that leak internals, plus reliability and maintainability nits. Treat any auth, injection, or secret-handling gap as critical. Every finding needs file, line, evidence, and user impact.",
+      "rule": "GFC backend review. File real bugs in touched routes: missing auth checks, injection, secret/PII leaks, unvalidated client payloads that cause crashes or bad writes, broken Stripe webhook verification, error paths that leak internals or silently fail user-visible operations. Mark minor items low rather than suppressing them. No style nits, no refactor proposals, no speculative hardening without evidence. Treat auth, injection, or secret-handling gaps as critical. Each finding needs file, line, evidence, and user impact.",
       "merge_system_rule": true
     },
     {
       "path": "scripts/**/*.mjs",
-      "rule": "GFC automation review. Be maximally strict: flag every deviation, however small. These scripts run in CI with GitHub tokens. Check: shell injection via interpolated PR titles or branch names, correct gh api usage (gh api takes ONE endpoint arg, method via --method flag), pagination completeness, stale-SHA races, secrets leaking into logs, plus robustness nits (quoting, set -euo pipefail discipline, clear error messages).",
+      "rule": "GFC automation review. File bugs that break the script on realistic inputs: shell injection via PR titles/branch names, wrong gh api usage that fails, missing pagination that drops data, stale-SHA races, secrets leaking into logs. Mark minor robustness items low rather than suppressing them. No style preaching, no feature suggestions.",
       "merge_system_rule": true
     },
     {
       "path": ".github/workflows/**",
-      "rule": "GFC workflow review. Be maximally strict. Check: pull_request_target safety (never checkout untrusted PR head, only base plus fetched diff), minimal permissions per job, pinned action SHAs, timeouts, concurrency groups that do not cancel unrelated reviewers (this repo runs OpenCode first-look and OCR side by side), secrets only from secrets context, no echo of tokens, plus hygiene nits. Flag any permission widening or execution of PR code as critical.",
+      "rule": "GFC workflow review. File real safety and correctness bugs: execution of untrusted PR code via pull_request_target checkout, unpinned third-party actions on non-immutable refs, permissions wider than the job needs, secrets from anywhere but secrets context or echoed to logs, concurrency groups that cancel the parallel reviewer, missing timeouts on network-dependent jobs. Mark hygiene items low rather than suppressing them. Critical only for genuine execution/privilege-escalation risks.",
       "merge_system_rule": true
     },
     {
       "path": "**/*.md",
-      "rule": "Docs review. Flag any user doc or CHANGELOG.md that the code diff leaves stale, plus confusing wording, broken links, or stale examples in touched docs. Do not rewrite prose for taste, but do flag anything a user could misread.",
+      "rule": "Docs review. Flag docs the diff leaves factually wrong (stale instructions, wrong commands, broken links, confusing wording in touched docs). No prose taste, no rewrite suggestions.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "**/*.test.{ts,tsx}",
+      "rule": "GFC test-value review. These tests were admitted to review explicitly, so judge whether each test earns its lines: flag tests with no meaningful assertion (only mocks, snapshots of nothing, tautologies), tests that cannot fail, tests duplicating coverage already present in the diff, and excessive mock scaffolding that tests the mocks instead of the code. File as low unless a hollow test gives false confidence on a critical path (forecast correctness, auth, premium gates, payments), which is medium or higher. Do not demand tests for trivial code and do not propose new test files or frameworks.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "**/CHANGELOG.md",
+      "rule": "GFC changelog review. This file was admitted to review explicitly. Every entry the diff adds or changes must describe a real user-visible change with enough specifics to understand it; flag filler entries (vague one-liners like 'fixed bugs' or 'updated stuff'), entries that describe no discernible change, and entries that contradict the code diff. Do not rewrite prose for taste.",
       "merge_system_rule": true
     }
-  ]
+  ],
+  "include": ["**/*.test.ts", "**/*.test.tsx", "**/CHANGELOG.md"]
 }

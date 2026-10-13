@@ -54,6 +54,7 @@ describe('Monitor WMS sync', () => {
       alertsOpacity: 1,
       mesoscaleDiscussions: { type: 'FeatureCollection', features: [] },
       refs,
+      selectedAlertDetailUrl: null,
       onClearSelectedAlert: jest.fn(),
     } as unknown as Parameters<typeof useMonitorMapLayerSync>[0];
 

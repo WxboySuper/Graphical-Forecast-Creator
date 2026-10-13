@@ -15,6 +15,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
@@ -24,6 +25,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **CIG risk conversion:** Use a probability's CIG0 category when a valid CIG combination has no explicit rule.
+- **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
 - **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
 - **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.

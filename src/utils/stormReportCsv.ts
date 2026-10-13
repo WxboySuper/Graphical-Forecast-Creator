@@ -18,6 +18,14 @@ export const splitCsvLine = (line: string): string[] => {
   );
 };
 
+/** Normalizes CSV header text for case-insensitive schema matching. */
+export const normalizeStormReportCsvHeader = (line: string): string =>
+  line.replace(/^\uFEFF/u, '').replace(/"/gu, '').split(',').map((value) => value.trim().toLowerCase()).join(',');
+
+/** Identifies a Time column header without splitting ordinary report rows. */
+export const isStormReportCsvHeaderLine = (line: string): boolean =>
+  /^"?time"?\s*,/iu.test(line.replace(/^\uFEFF/u, '').trimStart());
+
 export const buildCsvRow = (headers: string[], values: string[]): Record<string, string> => {
   const row: Record<string, string> = {};
   for (const [index, header] of headers.entries()) {

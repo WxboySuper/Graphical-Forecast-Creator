@@ -36,6 +36,19 @@ export const TODAY_SECTION_HEADERS: ReadonlyArray<TodaySectionHeader> = (
   type,
 }));
 
+const ARCHIVE_HEADER_ALIASES: Readonly<Record<string, string>> = {
+  time: 'Time',
+  ef_scale: 'EF_Scale',
+  'speed(mph)': 'Speed(MPH)',
+  'size(1/100in.)': 'Size(1/100in.)',
+  location: 'Location',
+  county: 'County',
+  state: 'State',
+  lat: 'LAT',
+  lon: 'LON',
+  remarks: 'Remarks',
+};
+
 const parseStormReportRow = (
   line: string,
   type: ReportType,
@@ -81,8 +94,9 @@ export const parseArchiveCsvRow = (
   line: string,
   type: ReportType,
   headers: string[],
-): StormReport | null =>
-  parseStormReportRow(line, type, headers, {
+): StormReport | null => {
+  const normalizedHeaders = headers.map((header) => ARCHIVE_HEADER_ALIASES[header.trim().toLowerCase()] ?? header.trim());
+  return parseStormReportRow(line, type, normalizedHeaders, {
     scaleField: 'EF_Scale',
     speedField: 'Speed(MPH)',
     sizeField: 'Size(1/100in.)',
@@ -90,3 +104,4 @@ export const parseArchiveCsvRow = (
     lonField: 'LON',
     remarksField: 'Remarks',
   });
+};
