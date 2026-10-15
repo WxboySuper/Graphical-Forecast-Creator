@@ -52,6 +52,11 @@ async function main() {
   const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'w', 0o600);
   await fs.chmod(path.join(output, 'full-snapshot.jsonl'), 0o600);
   let fullSnapshotCount = 0;
+  let snapshotWriteQueue = Promise.resolve();
+  const writeSnapshotLine = (record) => {
+    snapshotWriteQueue = snapshotWriteQueue.then(() => fullSnapshotFile.write(`${JSON.stringify(record)}\n`));
+    return snapshotWriteQueue;
+  };
   const exportCollection = async (collectionRef) => {
     let cursor = null;
     while (true) {
@@ -59,11 +64,13 @@ async function main() {
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const collectionSnapshot = await pageQuery.get();
       for (const document of collectionSnapshot.docs) {
-        await fullSnapshotFile.write(`${JSON.stringify({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })}\n`);
+        await writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) });
         fullSnapshotCount += 1;
         const childCollections = await document.ref.listCollections();
         for (let offset = 0; offset < childCollections.length; offset += 10) {
-          await Promise.all(childCollections.slice(offset, offset + 10).map(exportCollection));
+          const results = await Promise.allSettled(childCollections.slice(offset, offset + 10).map(exportCollection));
+          const failed = results.find((result) => result.status === 'rejected');
+          if (failed) throw failed.reason;
         }
       }
       if (collectionSnapshot.docs.length < 500) break;

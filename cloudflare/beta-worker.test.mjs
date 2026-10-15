@@ -213,6 +213,7 @@ class D1Mock {
       if ([...this.customProducts.values()].some((row) => row.user_id === user_id && row.product_id === product_id)) {
         throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.product_id');
       }
+      if ([...this.customProducts.values()].filter((row) => row.user_id === user_id).length >= params.at(-1)) return { meta: { changes: 0 } };
       const slotId = Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`)
         .find((candidate) => !this.customProducts.has(`${user_id}:${candidate}`));
       if (!slotId) return { meta: { changes: 0 } };
@@ -308,6 +309,10 @@ test('the Worker serves health and public billing configuration without a user s
   const config = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/config'), createEnv());
   assert.equal(config.status, 200);
   assert.equal((await config.json()).checkoutEnabled, false);
+  const unavailable = createEnv({ prepare: () => ({ first: async () => { throw new Error('no migrated schema'); } }) });
+  const unhealthy = await worker.fetch(new Request('https://beta.gfcweather.com/api/health'), unavailable);
+  assert.equal(unhealthy.status, 503);
+  assert.equal((await unhealthy.json()).database, false);
 });
 
 test('authentication rejects signed sessions when no authorized party is configured', async () => {
@@ -408,7 +413,7 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
   });
 });
 
-test('snapshot migration respects D1 cycle and custom-product limits', async () => {
+test('snapshot migration preserves cycles and products beyond new-account quotas', async () => {
   const db = new D1Mock();
   const env = createEnv(db, {
     cloudCycles: Array.from({ length: 105 }, (_, index) => ({ id: `cycle-${index}`, payloadJson: '{}', metadata: {} })),
@@ -417,11 +422,15 @@ test('snapshot migration respects D1 cycle and custom-product limits', async () 
   await withClerkFetch(async () => {
     const response = await call('/api/me/bootstrap', env);
     assert.equal(response.status, 200);
-    assert.equal(db.cloudCycles.size, 100);
-    assert.equal(db.customProducts.size, 16);
+    assert.equal(db.cloudCycles.size, 105);
+    assert.equal(db.customProducts.size, 20);
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
-    assert.equal(db.customProducts.has('user_beta_test:legacy-0'), false);
+    assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
+    const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
+      product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
+    } });
+    assert.equal(overQuota.status, 409);
   });
 });
 
@@ -474,6 +483,11 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
   const sqlite = new DatabaseSync(':memory:');
   try {
     sqlite.exec(await readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'));
+    assert.doesNotThrow(() => sqlite.prepare(`SELECT (SELECT 1 FROM users LIMIT 1) AS users,
+      (SELECT 1 FROM user_settings LIMIT 1) AS settings, (SELECT 1 FROM user_entitlements LIMIT 1) AS entitlements,
+      (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
+      (SELECT 1 FROM workflow_awareness LIMIT 1) AS awareness, (SELECT 1 FROM custom_products LIMIT 1) AS products,
+      (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).get());
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run('user_sqlite', 'sqlite@example.com', '2026-10-15', '2026-10-15');
 
@@ -506,10 +520,11 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
       SELECT ?, slots.slot_id, ?, ? FROM slots
       WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
+        AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ?) < ?
       ORDER BY slots.slot_id LIMIT 1`);
-    insertSlot.run('user_sqlite', 'one', '{}', 'user_sqlite');
-    insertSlot.run('user_sqlite', 'two', '{}', 'user_sqlite');
-    assert.equal(insertSlot.run('user_sqlite', 'three', '{}', 'user_sqlite').changes, 0);
+    insertSlot.run('user_sqlite', 'one', '{}', 'user_sqlite', 'user_sqlite', 2);
+    insertSlot.run('user_sqlite', 'two', '{}', 'user_sqlite', 'user_sqlite', 2);
+    assert.equal(insertSlot.run('user_sqlite', 'three', '{}', 'user_sqlite', 'user_sqlite', 2).changes, 0);
 
     const insertMetric = sqlite.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)');
     insertMetric.run('evt-1', '2026-10-15', 'install-1', 'cloud_cycle_saved', 'user_sqlite');
@@ -666,6 +681,21 @@ test('Stripe webhook verifies any valid v1 signature and ignores duplicate event
   const duplicate = await send();
   assert.equal(duplicate.status, 200);
   assert.deepEqual(await duplicate.json(), { received: true, duplicate: true });
+});
+
+test('Stripe subscription events remain retryable until the Clerk user exists', async () => {
+  const db = new D1Mock();
+  const env = { ...createEnv(db), STRIPE_WEBHOOK_SECRET: 'whsec_beta_test' };
+  const raw = JSON.stringify({ id: 'evt_unprovisioned', type: 'customer.subscription.updated', data: { object: {
+    id: 'sub_unprovisioned', status: 'active', metadata: { clerkId: 'not-created-yet' },
+  } } });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${raw}`).digest('hex');
+  const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+    method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+  }), env);
+  assert.equal(response.status, 503);
+  assert.equal(db.stripeEvents.has('evt_unprovisioned'), false);
 });
 
 test('Stripe webhook rejects malformed JSON even when its signature is valid', async () => {

@@ -147,12 +147,12 @@ async function ensureUser(user, env) {
       if (metrics) statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
-      for (const cycle of (snapshot.cloudCycles || []).slice(0, MAX_CLOUD_CYCLES)) {
-        if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) continue;
+      for (const cycle of snapshot.cloudCycles || []) {
+        if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
         const payloadJson = typeof cycle.payloadJson === 'string' && cycle.payloadJson ? cycle.payloadJson : '{}';
         const payloadBytes = new TextEncoder().encode(payloadJson).length;
-        if (payloadBytes > MAX_CYCLE_BYTES) continue;
-        try { JSON.parse(payloadJson); } catch { continue; }
+        if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
+        try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
         statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
           (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -161,17 +161,18 @@ async function ensureUser(user, env) {
             cycle.createdAt || now, cycle.updatedAt || now));
       }
       for (const record of snapshot.workflowAwareness || []) {
-        if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) continue;
+        if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)')
           .bind(user.clerkId, record.id, JSON.stringify(record.data)));
       }
-      for (const [index, product] of (snapshot.customProducts || []).slice(0, MAX_CUSTOM_PRODUCTS).entries()) {
+      for (const [index, product] of (snapshot.customProducts || []).entries()) {
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
-        if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) continue;
+        if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
         migratedProduct.id = productId;
+        const slotId = index < MAX_CUSTOM_PRODUCTS ? `product-${String(index + 1).padStart(2, '0')}` : `legacy-${index + 1}`;
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
-          .bind(user.clerkId, `product-${String(index + 1).padStart(2, '0')}`, productId, JSON.stringify(migratedProduct)));
+          .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('complete', now, now, user.clerkId));
@@ -237,7 +238,17 @@ async function handleApi(request, env) {
   const path = url.pathname;
   if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
   if (path === '/api/health' && request.method === 'GET') {
-    return json({ status: 'ok', service: 'gfc-beta-worker', database: Boolean(env.DB) });
+    if (!env.DB) return json({ status: 'ok', service: 'gfc-beta-worker', database: false }, 503);
+    try {
+      await env.DB.prepare(`SELECT (SELECT 1 FROM users LIMIT 1) AS users,
+        (SELECT 1 FROM user_settings LIMIT 1) AS settings, (SELECT 1 FROM user_entitlements LIMIT 1) AS entitlements,
+        (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
+        (SELECT 1 FROM workflow_awareness LIMIT 1) AS awareness, (SELECT 1 FROM custom_products LIMIT 1) AS products,
+        (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).first();
+      return json({ status: 'ok', service: 'gfc-beta-worker', database: true });
+    } catch {
+      return json({ status: 'ok', service: 'gfc-beta-worker', database: false }, 503);
+    }
   }
   if (path === '/api/billing/config' && request.method === 'GET') {
     const checkoutEnabled = Boolean(env.STRIPE_SECRET_KEY && (env.STRIPE_PRICE_MONTHLY || env.STRIPE_PRICE_ANNUAL_STANDARD));
@@ -319,6 +330,9 @@ async function handleApi(request, env) {
           await env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
             .bind(event.id, eventDate, event.id, 'cancellations', owner.clerk_id).run();
         }
+      } else {
+        await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+        return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
       }
     }
     return json({ received: true });
@@ -461,7 +475,7 @@ async function handleApi(request, env) {
 
   if (path === '/api/cloud-cycles' && request.method === 'GET') {
     const result = await env.DB.prepare(`SELECT id, user_id AS userId, label, cycle_date AS cycleDate, metadata_json, created_at AS createdAt, updated_at AS updatedAt
-      FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?`).bind(user.clerk_id, MAX_CLOUD_CYCLES).all();
+      FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC`).bind(user.clerk_id).all();
     return json({ cycles: (result.results || []).map((row) => {
       const stored = parseJson(row.metadata_json) || {};
       const metadata = { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
@@ -578,8 +592,9 @@ async function handleApi(request, env) {
         INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
         SELECT ?, slots.slot_id, ?, ? FROM slots
         WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
+          AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ?) < ?
         ORDER BY slots.slot_id LIMIT 1`)
-        .bind(user.clerk_id, product.id, dataJson, user.clerk_id).run();
+        .bind(user.clerk_id, product.id, dataJson, user.clerk_id, user.clerk_id, MAX_CUSTOM_PRODUCTS).run();
       if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
     } catch (error) {
       if (String(error?.message || '').includes('UNIQUE constraint failed')) return json({ error: 'Custom product already exists.' }, 409);
@@ -767,6 +782,9 @@ export default {
     try { return await handleApi(request, env); }
     catch (error) {
       console.error('[beta-worker] request failed', error);
+      if (typeof error?.message === 'string' && error.message.startsWith('SNAPSHOT_')) {
+        return json({ error: 'Legacy data migration could not complete. The Firestore snapshot is retained for recovery.', code: 'SNAPSHOT_MIGRATION_FAILED' }, 422);
+      }
       return json({ error: 'The beta API request failed.' }, 500);
     }
   },
