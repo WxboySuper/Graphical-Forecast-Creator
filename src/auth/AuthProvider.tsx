@@ -1580,7 +1580,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!clerkUser) return null;
     const facade = {
       uid: clerkUser.id,
-      email: clerkUser.primaryEmailAddress?.emailAddress ?? '',
+      email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
       displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
       photoURL: clerkUser.imageUrl,
       providerData: clerkUser.externalAccounts.map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : account.provider })),
@@ -1591,7 +1591,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
     if (!currentUser) throw new Error('Sign in before changing account settings.');
-    const requestId = betaAccessRequestIdRef.current;
+    const requestId = ++betaAccessRequestIdRef.current;
     const userId = currentUser.uid;
     const baseline = lastSyncedSettingsRef.current ?? buildHostedAccountFallbackSettings(
       darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,

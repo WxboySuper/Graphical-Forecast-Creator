@@ -61,8 +61,8 @@ async function authenticate(request, env) {
     const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
     const identity = { clerkId: data.sub, email, displayName };
     const now = Date.now();
-    for (const [userId, profile] of authProfileCache) {
-      if (profile.expiresAt <= now) authProfileCache.delete(userId);
+    for (const [userId, entry] of authProfileCache) {
+      if (entry.expiresAt <= now) authProfileCache.delete(userId);
     }
     if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
       const oldestKey = authProfileCache.keys().next().value;
@@ -122,9 +122,9 @@ async function ensureUser(user, env) {
       existing = racedUser;
     }
   } else {
-    await env.DB.prepare(`UPDATE users SET migration_status = ?,
+    await env.DB.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
       beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
-      .bind(migrationStatus, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
+      .bind(migrationStatus, snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
   }
 
   if (snapshot) {
@@ -269,11 +269,14 @@ async function handleApi(request, env) {
     let event;
     try { event = JSON.parse(raw); } catch { return json({ error: 'Invalid webhook payload.' }, 400); }
     if (typeof event?.id !== 'string' || !event.id || typeof event.type !== 'string') return json({ error: 'Invalid webhook payload.' }, 400);
+    const object = event.data?.object || {};
+    if (event.type === 'checkout.session.completed' && object.subscription && !env.STRIPE_SECRET_KEY) {
+      return json({ error: 'Billing is not configured.' }, 503);
+    }
     const claim = await env.DB.prepare('INSERT OR IGNORE INTO stripe_events (event_id, processed_at) VALUES (?, ?)')
       .bind(event.id, new Date().toISOString()).run();
     if (claim.meta.changes === 0) return json({ received: true, duplicate: true });
     try {
-    const object = event.data?.object || {};
     let subscription = object;
     if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${object.subscription}`, null, 'GET');
     if (event.type.startsWith('customer.subscription.') || event.type === 'checkout.session.completed') {
@@ -496,7 +499,8 @@ async function handleApi(request, env) {
     if (request.method === 'GET') {
       const row = await env.DB.prepare('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
       if (!row) return json({ error: 'Cloud cycle not found.' }, 404);
-      return json({ cycle: { ...row, metadata: parseJson(row.metadata_json), payload: parseJson(row.payload_json) } });
+      return json({ cycle: { id: row.id, userId: row.user_id, label: row.label, cycleDate: row.cycle_date,
+        createdAt: row.created_at, updatedAt: row.updated_at, metadata: parseJson(row.metadata_json), payload: parseJson(row.payload_json) } });
     }
     if (request.method === 'PATCH') {
       const body = await readBody(request);
@@ -580,6 +584,7 @@ async function handleApi(request, env) {
       .bind(user.clerk_id, productId).first();
     if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
     const current = parseJson(currentRow.data_json) || {};
+    if (request.method !== 'PATCH' && request.method !== 'DELETE') return json({ error: 'Method not allowed.' }, 405);
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (request.method === 'PATCH') {
@@ -736,6 +741,7 @@ export default {
         return json({ error: 'Invalid Clerk webhook signature.' }, 400);
       }
       if (event.type === 'user.deleted' && typeof event.data?.id === 'string') {
+        if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
         try {
           await deleteBetaUserData(event.data.id, env);
           await flushStripeCleanupQueue(env);

@@ -505,7 +505,7 @@ export const loadCloudCycle = async (
     if (isBetaClerkD1Mode()) {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
       const body = await response.json().catch(() => ({}));
-      if (!response.ok || !body.cycle) return { success: false, error: body.error || 'Cloud cycle not found' };
+      if (!response.ok || !body?.cycle) return { success: false, error: body?.error || 'Cloud cycle not found' };
       const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
       const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
       return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
@@ -540,6 +540,7 @@ export const deleteCloudCycle = async (
     if (isBetaClerkD1Mode()) {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
       if (response.ok) return { success: true };
+      if (response.status === 404) return { success: true };
       const body = await response.json().catch(() => ({}));
       return { success: false, error: body?.error || 'Unable to delete cloud cycle.' };
     }
@@ -615,8 +616,10 @@ export async function listCloudCycles(
       const body = await response.json().catch(() => ({}));
       if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
       const cycles = (Array.isArray(body.cycles) ? body.cycles : [])
-        .map((raw: unknown) => normalizeCloudCycleMetadataRecord({ cycleId: isPlainObject(raw) && typeof raw.id === 'string' ? raw.id : '', rawRecord: raw, fallbackUserId: userId }))
-        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle));
+        .map((raw: unknown) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
+          ? normalizeCloudCycleMetadataRecord({ cycleId: raw.id, rawRecord: raw, fallbackUserId: userId })
+          : null)
+        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id));
       return { success: true, data: sortCloudCycleMetadata(cycles) };
     }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
@@ -656,8 +659,12 @@ export const subscribeToCloudCycles = (
       try {
         const result = await listCloudCycles({ userId });
         if (active && result.success && result.data) onUpdate(result.data);
-        else if (active && !result.success) onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
-      } catch (error) { if (active) onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.')); }
+        else if (active && !result.success && result.error !== 'The beta session is still initializing') onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
+      } catch (error) {
+        if (active && !(error instanceof Error && error.message === 'The beta session is still initializing')) {
+          onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.'));
+        }
+      }
     };
     refresh().catch(() => undefined);
     const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);

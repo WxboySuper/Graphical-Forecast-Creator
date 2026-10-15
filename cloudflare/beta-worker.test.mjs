@@ -49,6 +49,10 @@ class D1Mock {
   }
   async first(sql, params) {
     if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return this.users.get(params[0]) || null;
+    if (sql.startsWith('SELECT beta_access FROM users WHERE clerk_id')) {
+      const user = this.users.get(params[0]);
+      return user ? { beta_access: user.beta_access } : null;
+    }
     if (sql.startsWith('SELECT clerk_id FROM users WHERE email')) {
       const user = [...this.users.values()].find((entry) => entry.email.toLowerCase() === String(params[0]).toLowerCase());
       return user ? { clerk_id: user.clerk_id } : null;
@@ -131,15 +135,18 @@ class D1Mock {
       const clerk_id = params.at(-1);
       const updated_at = params.at(-2);
       const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { migration_status, updated_at, ...(params.length === 4 && params[1] === 1 ? { beta_access: 1 } : {}) });
+      if (user) Object.assign(user, {
+        migration_status, updated_at,
+        ...(sql.includes('legacy_uid = COALESCE') ? { legacy_uid: user.legacy_uid || params[1], ...(params[2] === 1 ? { beta_access: 1 } : {}) } : {}),
+      });
     } else if (sql.startsWith('UPDATE users SET email')) {
       const [email, updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
       if (user) Object.assign(user, { email, updated_at, email_verified: 1 });
     } else if (sql.startsWith('UPDATE users SET beta_access')) {
-      const [beta_access, updated_at, clerk_id] = params;
+      const [updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { beta_access, updated_at });
+      if (user) Object.assign(user, { beta_access: 1, updated_at });
     } else if (sql.startsWith('INSERT OR IGNORE INTO user_settings') || sql.startsWith('INSERT INTO user_settings')) {
       if (sql.includes('ON CONFLICT')) {
         const existing = JSON.parse(this.settings.get(params[0]) || '{}');
@@ -311,6 +318,21 @@ test('authentication rejects signed sessions when no authorized party is configu
     headers: { Authorization: `Bearer ${createToken()}` },
   }), env);
   assert.equal(identity, null);
+});
+
+test('beta invite claim updates the authenticated user with the D1 bind order', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db);
+  env.BETA_INVITE_TOKEN = 'invite-token';
+  env.BETA_INVITE_PATH = 'private-beta';
+  await withClerkFetch(async () => {
+    const response = await call('/api/beta/claim', env, {
+      method: 'POST', body: { token: 'invite-token', invitePath: 'private-beta' },
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).betaAccess, true);
+    assert.equal(db.users.get('user_beta_test')?.beta_access, 1);
+  });
 });
 
 test('Firebase beta mode proxies API requests to the configured VPS origin', async () => {

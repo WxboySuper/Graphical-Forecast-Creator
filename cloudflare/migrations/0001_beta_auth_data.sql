@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS users_legacy_uid_idx ON users(legacy_uid);
 
 -- Worker account deletion removes dependent rows explicitly. D1 connection
 -- PRAGMA settings are not persisted, so these declarations are not the cleanup guarantee.

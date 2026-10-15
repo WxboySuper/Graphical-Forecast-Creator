@@ -169,8 +169,13 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const isBusy = submitting || status === 'loading';
-  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : `${window.location.origin}${window.location.pathname}`;
-  const clerkSignUpUrl = `${clerkRedirectUrl}?clerkSignUp=1`;
+  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  const clerkSignUpUrl = (() => {
+    if (typeof window === 'undefined') return '/beta?clerkSignUp=1';
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('clerkSignUp', '1');
+    return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
+  })();
 
   useEffect(() => {
     if (!allowSignUp) {
@@ -185,10 +190,21 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   }, [allowSignUp, mode]);
 
   useEffect(() => {
-    if (authProvider === 'clerk' && typeof window !== 'undefined') {
-      setMode(new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
-    }
+    if (authProvider !== 'clerk' || typeof window === 'undefined') return;
+    const syncMode = () => setMode(new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
+    syncMode();
+    window.addEventListener('popstate', syncMode);
+    return () => window.removeEventListener('popstate', syncMode);
   }, [authProvider]);
+
+  const setClerkMode = (nextMode: AuthMode) => {
+    setMode(nextMode);
+    if (typeof window === 'undefined') return;
+    const nextUrl = new URL(window.location.href);
+    if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
+    else nextUrl.searchParams.delete('clerkSignUp');
+    window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+  };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -244,13 +260,13 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
       {authProvider === 'clerk' ? (
         <div className="beta-auth-content">
-          <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} />
+          {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => { setMode('sign_in'); window.history.replaceState(null, '', clerkRedirectUrl); }}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => { setMode('sign_up'); window.history.replaceState(null, '', clerkSignUpUrl); }}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
                 Create account
               </Button>
             </div>
@@ -258,7 +274,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />
           ) : (
-            <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl} />
+            <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl}
+              appearance={allowSignUp ? undefined : { elements: { footerAction: { display: 'none' } } }} />
           )}
           {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
         </div>

@@ -346,7 +346,10 @@ const resolveEntitlementEffect = (
         const { currentPeriodEnd: _remoteEnd, ...rawValues } = raw ?? {};
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
         if (typeof rawEnd === 'string') {
-          normalized.currentPeriodEnd = { toDate: () => new Date(rawEnd) } as unknown as Timestamp;
+          const parsedEnd = new Date(rawEnd);
+          if (!Number.isNaN(parsedEnd.getTime())) {
+            normalized.currentPeriodEnd = { toDate: () => parsedEnd } as unknown as Timestamp;
+          }
         }
         const state = createEntitlementListenerState(normalized);
         handlers.setEntitlement(state.entitlement);

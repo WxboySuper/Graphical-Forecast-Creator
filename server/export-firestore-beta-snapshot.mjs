@@ -118,7 +118,7 @@ async function main() {
         cycleDate: metadata.cycleDate,
         metadata,
         payloadJson: typeof payloadJson === 'string' ? payloadJson : '{}',
-        payloadBytes: Number(metadata.payloadBytes) || Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
+        payloadBytes: Number.isFinite(Number(metadata.payloadBytes)) ? Number(metadata.payloadBytes) : Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
         createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
         updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
       });
