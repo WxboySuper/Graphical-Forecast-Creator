@@ -42,22 +42,20 @@ describe('OpenLayersForecastMap additional helpers', () => {
     global.fetch = originalFetch;
   });
 
-  test('createLabelOverlaySource returns a source for known styles and null for unknown', () => {
+  test('OpenStreetMap styles use full tiles and no separate label overlay', () => {
     const s1 = createLabelOverlaySource('osm');
-    expect(s1).toBeTruthy();
-
     const s2 = createLabelOverlaySource('carto-dark');
-    expect(s2).toBeTruthy();
-
-    const s3 = createLabelOverlaySource('esri-satellite');
-    expect(s3).toBeTruthy();
-
+    expect(s1).toBeNull();
+    expect(s2).toBeNull();
+    expect(createLabelOverlaySource('esri-satellite')).toBeTruthy();
     expect(createLabelOverlaySource('nonexistent' as never)).toBeNull();
   });
 
-  test('createTileSource returns a tile source for known styles', () => {
+  test('createTileSource uses OpenStreetMap for standard and legacy CARTO styles', () => {
     const t1 = createTileSource('osm');
-    expect(t1).toBeTruthy();
+    expect(t1.getUrls()?.[0]).toContain('tile.openstreetmap.org');
+    expect(createTileSource('carto-light').getUrls()?.[0]).toContain('tile.openstreetmap.org');
+    expect(createTileSource('carto-dark').getUrls()?.[0]).toContain('tile.openstreetmap.org');
 
     const t2 = createTileSource('esri-satellite');
     expect(t2).toBeTruthy();

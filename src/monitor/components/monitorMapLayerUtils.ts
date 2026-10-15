@@ -3,7 +3,7 @@ import LayerGroup from 'ol/layer/Group';
 import TileLayer from 'ol/layer/Tile';
 import VectorSource from 'ol/source/Vector';
 import TileWMS from 'ol/source/TileWMS';
-import XYZ from 'ol/source/XYZ';
+import OSM from 'ol/source/OSM';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Fill, Stroke, Style } from 'ol/style';
 import type { WmsLayerConfig } from '../wms';
@@ -24,14 +24,7 @@ const US_STATES_GEOJSON_URL =
 let cachedUsStatesGeoJSON: object | null = null;
 
 /** Creates the monitor basemap tile source for the active theme. */
-export const createBaseSource = (darkMode: boolean) => new XYZ({
-  url: darkMode
-    ? 'https://{a-d}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png'
-    : 'https://{a-d}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png',
-  attributions: '&copy; OpenStreetMap &copy; CARTO',
-  crossOrigin: 'anonymous',
-  maxZoom: 19,
-});
+export const createBaseSource = (_darkMode: boolean) => new OSM({ crossOrigin: 'anonymous' });
 
 /** Replaces a layer group's children while preserving the target group instance. */
 export const replaceLayerGroupLayers = (target: LayerGroup, source: LayerGroup) => {
