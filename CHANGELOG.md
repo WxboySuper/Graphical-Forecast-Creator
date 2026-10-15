@@ -54,7 +54,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
-- **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, React Router 8.3.1 for navigation, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
+- **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
 - **Server:** Update hosted API dependencies to Sentry Node 11.6.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
 - **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
