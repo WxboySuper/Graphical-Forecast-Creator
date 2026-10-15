@@ -62,7 +62,9 @@ async function main() {
         await fullSnapshotFile.write(`${JSON.stringify({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })}\n`);
         fullSnapshotCount += 1;
         const childCollections = await document.ref.listCollections();
-        for (const childCollection of childCollections) await exportCollection(childCollection);
+        for (let offset = 0; offset < childCollections.length; offset += 10) {
+          await Promise.all(childCollections.slice(offset, offset + 10).map(exportCollection));
+        }
       }
       if (collectionSnapshot.docs.length < 500) break;
       cursor = collectionSnapshot.docs.at(-1);
@@ -108,20 +110,25 @@ async function main() {
     }
     const cycleQuery = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
     const migratedCycles = [];
-    for (const cycleDoc of cycleQuery.docs) {
-      const metadata = cycleDoc.data();
-      const payloadDoc = await cycleDoc.ref.collection('payload').doc('payload').get();
-      const payloadJson = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-      migratedCycles.push({
-        id: cycleDoc.id,
-        label: metadata.label,
-        cycleDate: metadata.cycleDate,
-        metadata,
-        payloadJson: typeof payloadJson === 'string' ? payloadJson : '{}',
-        payloadBytes: Number.isFinite(Number(metadata.payloadBytes)) ? Number(metadata.payloadBytes) : Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
-        createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
-        updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
-      });
+    for (let offset = 0; offset < cycleQuery.docs.length; offset += 10) {
+      const cycleDocs = cycleQuery.docs.slice(offset, offset + 10);
+      const payloadDocs = await Promise.all(cycleDocs.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
+      for (const [index, cycleDoc] of cycleDocs.entries()) {
+        const metadata = cycleDoc.data();
+        const payloadDoc = payloadDocs[index];
+        const payloadJson = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
+        const normalizedPayload = typeof payloadJson === 'string' ? payloadJson : '{}';
+        migratedCycles.push({
+          id: cycleDoc.id,
+          label: metadata.label,
+          cycleDate: metadata.cycleDate,
+          metadata,
+          payloadJson: normalizedPayload,
+          payloadBytes: Buffer.byteLength(normalizedPayload),
+          createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
+          updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
+        });
+      }
     }
     for (const cycle of migratedCycles) {
       account.cloudCycles = account.cloudCycles.filter((existingCycle) => existingCycle.id !== cycle.id);

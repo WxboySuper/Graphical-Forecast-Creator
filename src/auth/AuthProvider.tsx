@@ -1504,12 +1504,14 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [bootstrapKey, setBootstrapKey] = useState('');
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const betaAccessRequestIdRef = useRef(0);
+  const settingsRequestIdRef = useRef(0);
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
 
   useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
+  useEffect(() => { settingsRequestIdRef.current += 1; }, [clerkUser?.id, isLoaded, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
     const token = await getToken();
@@ -1591,7 +1593,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
     if (!currentUser) throw new Error('Sign in before changing account settings.');
-    const requestId = ++betaAccessRequestIdRef.current;
+    const requestId = ++settingsRequestIdRef.current;
     const userId = currentUser.uid;
     const baseline = lastSyncedSettingsRef.current ?? buildHostedAccountFallbackSettings(
       darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
@@ -1603,13 +1605,13 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
-      if (requestId !== betaAccessRequestIdRef.current || currentUser.uid !== userId) return;
+      if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
       lastSyncedSettingsRef.current = next;
       setSyncedSettings(next);
       setSettingsSyncStatus('synced');
       writeStoredForecastUiVariant(next.forecastUiVariant);
     } catch (nextError) {
-      if (requestId !== betaAccessRequestIdRef.current || currentUser.uid !== userId) return;
+      if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
       setSettingsSyncStatus('error');
       setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
       throw nextError;
@@ -1623,19 +1625,19 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let active = true;
     const userId = currentUser.uid;
     const timer = window.setTimeout(() => {
-      const requestId = ++betaAccessRequestIdRef.current;
+      const requestId = ++settingsRequestIdRef.current;
       setSettingsSyncStatus('syncing');
       const syncSettings = async () => {
         try {
           const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
           const body = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
-          if (!active || requestId !== betaAccessRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
           lastSyncedSettingsRef.current = next;
           setSyncedSettings(next);
           setSettingsSyncStatus('synced');
         } catch (syncError) {
-          if (!active || requestId !== betaAccessRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
           setSettingsSyncStatus('error');
           setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.');
         }

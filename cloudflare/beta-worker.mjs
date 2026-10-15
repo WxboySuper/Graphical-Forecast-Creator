@@ -147,26 +147,37 @@ async function ensureUser(user, env) {
       if (metrics) statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
-      for (const cycle of snapshot.cloudCycles || []) {
+      for (const cycle of (snapshot.cloudCycles || []).slice(0, MAX_CLOUD_CYCLES)) {
+        if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) continue;
+        const payloadJson = typeof cycle.payloadJson === 'string' && cycle.payloadJson ? cycle.payloadJson : '{}';
+        const payloadBytes = new TextEncoder().encode(payloadJson).length;
+        if (payloadBytes > MAX_CYCLE_BYTES) continue;
+        try { JSON.parse(payloadJson); } catch { continue; }
         statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
           (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .bind(cycle.id, user.clerkId, cycle.label || '', cycle.cycleDate || '', JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId }),
-            cycle.payloadJson || '{}', cycle.payloadBytes || new TextEncoder().encode(cycle.payloadJson || '{}').length,
+            payloadJson, payloadBytes,
             cycle.createdAt || now, cycle.updatedAt || now));
       }
       for (const record of snapshot.workflowAwareness || []) {
+        if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) continue;
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)')
           .bind(user.clerkId, record.id, JSON.stringify(record.data)));
       }
-      for (const product of snapshot.customProducts || []) {
+      for (const [index, product] of (snapshot.customProducts || []).slice(0, MAX_CUSTOM_PRODUCTS).entries()) {
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
+        const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
+        if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) continue;
+        migratedProduct.id = productId;
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
-          .bind(user.clerkId, product.id, migratedProduct.id || '', JSON.stringify(migratedProduct)));
+          .bind(user.clerkId, `product-${String(index + 1).padStart(2, '0')}`, productId, JSON.stringify(migratedProduct)));
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('complete', now, now, user.clerkId));
-      await env.DB.batch(statements);
+      for (let offset = 0; offset < statements.length; offset += 50) {
+        await env.DB.batch(statements.slice(offset, offset + 50));
+      }
     } catch (error) {
       await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('failed', new Date().toISOString(), user.clerkId).run();
@@ -469,7 +480,7 @@ async function handleApi(request, env) {
     const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
     const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
     const bytes = new TextEncoder().encode(payloadJson).length;
-    if (!id || id.length > 128 || !label || label.length > 200 || !cycleDate || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
+    if (!id || id.length > 128 || id.includes('/') || !label || label.length > 200 || !cycleDate || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
     try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
@@ -483,7 +494,7 @@ async function handleApi(request, env) {
         metadata_json = json_set(excluded.metadata_json, '$.createdAt', json_extract(cloud_cycles.metadata_json, '$.createdAt')),
         payload_json = excluded.payload_json,
         payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
-      .bind(id, user.clerk_id, label, cycleDate, JSON.stringify(body.metadata), payloadJson, bytes, now, now,
+      .bind(id, user.clerk_id, label, cycleDate, JSON.stringify({ ...body.metadata, userId: user.clerk_id }), payloadJson, bytes, now, now,
         user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
     if (!saveResult.meta.changes) {
       const existing = await env.DB.prepare('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')
@@ -495,7 +506,7 @@ async function handleApi(request, env) {
   const cycleMatch = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
   if (cycleMatch) {
     const id = decodePathId(cycleMatch[1]);
-    if (!id) return json({ error: 'Invalid cloud cycle ID.' }, 400);
+    if (!id || id.includes('/')) return json({ error: 'Invalid cloud cycle ID.' }, 400);
     if (request.method === 'GET') {
       const row = await env.DB.prepare('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
       if (!row) return json({ error: 'Cloud cycle not found.' }, 404);
@@ -526,7 +537,7 @@ async function handleApi(request, env) {
   if (path === '/api/workflow-awareness' && request.method === 'PUT') {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string' || !body.record.metadata.cycleId.trim()) return json({ error: 'Invalid workflow record.' }, 400);
+    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string' || !body.record.metadata.cycleId.trim() || body.record.metadata.cycleId.includes('/')) return json({ error: 'Invalid workflow record.' }, 400);
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
     await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
@@ -541,7 +552,7 @@ async function handleApi(request, env) {
   const awarenessMatch = path.match(/^\/api\/workflow-awareness\/([^/]+)$/);
   if (awarenessMatch && request.method === 'DELETE') {
     const cycleId = decodePathId(awarenessMatch[1]);
-    if (!cycleId) return json({ error: 'Invalid cycle ID.' }, 400);
+    if (!cycleId || cycleId.includes('/')) return json({ error: 'Invalid cycle ID.' }, 400);
     await env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
       .bind(user.clerk_id, cycleId).run();
     return json({ success: true });
@@ -557,7 +568,7 @@ async function handleApi(request, env) {
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     const product = body?.product;
     const productId = typeof product?.id === 'string' ? product.id.trim() : '';
-    if (!isObject(product) || !productId || productId.length > 128 || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
+    if (!isObject(product) || !productId || productId.length > 128 || productId.includes('/') || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
     product.id = productId;
     const dataJson = JSON.stringify(product);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
@@ -579,7 +590,7 @@ async function handleApi(request, env) {
   const productMatch = path.match(/^\/api\/custom-products\/([^/]+)$/);
   if (productMatch) {
     const productId = decodePathId(productMatch[1]);
-    if (!productId) return json({ error: 'Invalid custom product ID.' }, 400);
+    if (!productId || productId.includes('/')) return json({ error: 'Invalid custom product ID.' }, 400);
     const currentRow = await env.DB.prepare('SELECT slot_id, data_json FROM custom_products WHERE user_id = ? AND product_id = ?')
       .bind(user.clerk_id, productId).first();
     if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
@@ -610,7 +621,7 @@ async function handleApi(request, env) {
   if (recordRoute) {
     const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
     const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
-    if (recordId === null) return json({ error: 'Invalid record ID.' }, 400);
+    if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
     if (request.method === 'GET' && !recordId) {
       const rows = await env.DB.prepare('SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC LIMIT 200')
         .bind(user.clerk_id, recordType).all();
@@ -620,7 +631,7 @@ async function handleApi(request, env) {
       const body = await readBody(request);
       if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
       const id = typeof body?.id === 'string' ? body.id : '';
-      if (!id || id.length > 128 || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
+      if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
       const dataJson = JSON.stringify(body.data);
       if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
       const now = new Date().toISOString();

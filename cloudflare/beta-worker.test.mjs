@@ -408,16 +408,36 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
   });
 });
 
+test('snapshot migration respects D1 cycle and custom-product limits', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db, {
+    cloudCycles: Array.from({ length: 105 }, (_, index) => ({ id: `cycle-${index}`, payloadJson: '{}', metadata: {} })),
+    customProducts: Array.from({ length: 20 }, (_, index) => ({ id: `legacy-${index}`, data: { id: `product-${index}`, version: 1 } })),
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', env);
+    assert.equal(response.status, 200);
+    assert.equal(db.cloudCycles.size, 100);
+    assert.equal(db.customProducts.size, 16);
+    assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
+    assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
+    assert.equal(db.customProducts.has('user_beta_test:legacy-0'), false);
+  });
+});
+
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
   const db = new D1Mock();
   db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
   const env = createEnv(db);
-  const cycle = { id: 'cycle-1', label: 'Morning', cycleDate: '2026-10-15', metadata: { createdAt: '2026-10-01T00:00:00.000Z' }, payloadJson: '{}' };
+  const cycle = { id: 'cycle-1', label: 'Morning', cycleDate: '2026-10-15', metadata: { createdAt: '2026-10-01T00:00:00.000Z', userId: 'spoofed-user' }, payloadJson: '{}' };
   await withClerkFetch(async () => {
     const malformed = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, payloadJson: '{' } });
     assert.equal(malformed.status, 400);
+    const slashId = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, id: 'bad/id' } });
+    assert.equal(slashId.status, 400);
     const create = await call('/api/cloud-cycles', env, { method: 'POST', body: cycle });
     assert.equal(create.status, 200, await create.clone().text());
+    assert.equal(JSON.parse(db.cloudCycles.get('user_beta_test:cycle-1').metadata_json).userId, 'user_beta_test');
     const originalCreatedAt = db.cloudCycles.get('user_beta_test:cycle-1').created_at;
     const update = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, label: 'Afternoon' } });
     assert.equal(update.status, 200);
@@ -481,7 +501,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     runCycleWrite('cycle-2', 1);
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles').get().count, 1);
 
-    const slots = Array.from({ length: 2 }, (_, index) => `('product-${index + 1}')`).join(', ');
+    const slots = Array.from({ length: 2 }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
     const insertSlot = sqlite.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
       INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
       SELECT ?, slots.slot_id, ?, ? FROM slots

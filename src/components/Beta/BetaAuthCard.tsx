@@ -169,7 +169,11 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const isBusy = submitting || status === 'loading';
-  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : (() => {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('clerkSignUp');
+    return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
+  })();
   const clerkSignUpUrl = (() => {
     if (typeof window === 'undefined') return '/beta?clerkSignUp=1';
     const nextUrl = new URL(window.location.href);

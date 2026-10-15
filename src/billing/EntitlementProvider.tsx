@@ -338,10 +338,10 @@ const resolveEntitlementEffect = (
     handlers.setEntitlementStatus('loading');
     fetchBetaApi('/api/user/entitlement')
       .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || 'Unable to load account billing status.');
+        const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
+        if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
         if (!active) return;
-        const raw = body.entitlement as (Record<string, unknown> | null);
+        const raw = body?.entitlement ?? null;
         const rawEnd = raw?.currentPeriodEnd;
         const { currentPeriodEnd: _remoteEnd, ...rawValues } = raw ?? {};
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);

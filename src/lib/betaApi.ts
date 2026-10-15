@@ -15,6 +15,10 @@ export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): 
 
 /** Sends an authenticated request to the same-origin beta Worker API. */
 export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  // Child service effects can run before the Clerk provider's parent effect registers the token source.
+  for (let attempt = 0; !tokenProvider && attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
   if (!tokenProvider) throw new Error('The beta session is still initializing.');
   const token = await tokenProvider();
   if (!token) throw new Error('A signed-in beta session is required.');
