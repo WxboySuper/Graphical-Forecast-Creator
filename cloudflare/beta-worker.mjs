@@ -100,7 +100,8 @@ async function ensureUser(user, env) {
       const statements = [];
       const settings = snapshot.userSettings;
       if (settings) {
-        const { cloudCycles: _legacyCloudCycles, ...settingsWithoutLegacyCycles } = settings;
+        const settingsWithoutLegacyCycles = { ...settings };
+        delete settingsWithoutLegacyCycles.cloudCycles;
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO user_settings (user_id, data_json) VALUES (?, ?)').bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles)));
       }
       const entitlement = snapshot.userEntitlement;

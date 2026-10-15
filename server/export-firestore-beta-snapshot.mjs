@@ -1,10 +1,8 @@
-'use strict';
-
-const { createHash } = require('node:crypto');
-const fs = require('node:fs/promises');
-const path = require('node:path');
-const { cert, getApps, initializeApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
 const required = (name) => {
   const value = process.env[name];

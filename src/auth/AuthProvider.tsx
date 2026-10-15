@@ -1636,7 +1636,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     updateSyncedSettings,
     refreshBetaAccess,
-  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, refreshBetaAccess, request, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
+  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, refreshBetaAccess, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

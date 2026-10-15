@@ -42,7 +42,7 @@ $env:FIREBASE_ADMIN_PROJECT_ID = '<beta Firebase project id>'
 $env:BETA_FIREBASE_PROJECT_ID = '<same beta Firebase project id>'
 $env:FIREBASE_ADMIN_CLIENT_EMAIL = '<beta service account email>'
 $env:FIREBASE_ADMIN_PRIVATE_KEY = '<beta service account private key>'
-node server/export-firestore-beta-snapshot.cjs --output C:\private\gfc-beta-firestore-snapshot
+ node server/export-firestore-beta-snapshot.mjs --output C:\private\gfc-beta-firestore-snapshot
 ```
 
 The output directory contains `full-snapshot.jsonl` plus hashed per-user JSON files. Upload the full snapshot to a private archival key in the R2 bucket and upload each hashed per-user file to `by-email/<sha256-of-normalized-email>.json` using Wrangler's remote R2 object upload. Confirm both document and per-user counts before enabling Clerk. Keep the R2 objects until the maintainer explicitly decides the migration source can be deleted. Securely remove local export files after upload and validation.
