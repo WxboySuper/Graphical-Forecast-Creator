@@ -26,19 +26,39 @@ describe('DIYDiscussionEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('Storm *mode*');
   });
 
-  test('inserts heading prefixes at the cursor', () => {
+  test('inserts heading prefixes at the start of the current line', () => {
     const onChange = jest.fn();
     render(<DIYDiscussionEditor content="Discussion" onChange={onChange} />);
     const textarea = screen.getByPlaceholderText(/Write your forecast discussion/i) as HTMLTextAreaElement;
 
     setSelection(textarea, 0);
     fireEvent.click(screen.getByTitle('Heading 1'));
-    expect(onChange).toHaveBeenLastCalledWith('\n# Discussion');
+    expect(onChange).toHaveBeenLastCalledWith('# Discussion');
 
     fireEvent.click(screen.getByTitle('Heading 2'));
-    expect(onChange).toHaveBeenLastCalledWith('\n## Discussion');
+    expect(onChange).toHaveBeenLastCalledWith('## Discussion');
 
     fireEvent.click(screen.getByTitle('Heading 3'));
-    expect(onChange).toHaveBeenLastCalledWith('\n### Discussion');
+    expect(onChange).toHaveBeenLastCalledWith('### Discussion');
+  });
+
+  test('heading buttons convert a mid-line cursor without splitting the line', () => {
+    const onChange = jest.fn();
+    render(<DIYDiscussionEditor content="some text" onChange={onChange} />);
+    const textarea = screen.getByPlaceholderText(/Write your forecast discussion/i) as HTMLTextAreaElement;
+
+    setSelection(textarea, 2);
+    fireEvent.click(screen.getByTitle('Heading 1'));
+    expect(onChange).toHaveBeenLastCalledWith('# some text');
+  });
+
+  test('heading buttons prefix the current line in multiline content', () => {
+    const onChange = jest.fn();
+    render(<DIYDiscussionEditor content={'line1\nline2 text'} onChange={onChange} />);
+    const textarea = screen.getByPlaceholderText(/Write your forecast discussion/i) as HTMLTextAreaElement;
+
+    setSelection(textarea, 8);
+    fireEvent.click(screen.getByTitle('Heading 2'));
+    expect(onChange).toHaveBeenLastCalledWith('line1\n## line2 text');
   });
 });
