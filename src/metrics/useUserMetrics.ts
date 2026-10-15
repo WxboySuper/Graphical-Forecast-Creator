@@ -46,7 +46,9 @@ const readMetricsCount = (value: unknown): number => (typeof value === 'number' 
 
 /** Reads an optional Firestore timestamp field into a native Date. */
 const readMetricsTimestamp = (value: Timestamp | string | null | undefined): Date | null =>
-  typeof value === 'string' ? new Date(value) : value?.toDate?.() ?? null;
+  typeof value === 'string'
+    ? Number.isNaN(new Date(value).getTime()) ? null : new Date(value)
+    : value?.toDate?.() ?? null;
 
 /** Normalizes one Firestore metrics document into the client-safe account metrics contract. */
 const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined): UserMetricsDocument => {
@@ -100,8 +102,8 @@ export const useUserMetrics = (): UseUserMetricsResult => {
     const requestId = requestIdRef.current;
     const readMetrics = isBetaClerkD1Mode()
       ? fetchBetaApi('/api/user/metrics').then(async (response) => {
-          const body = await response.json();
-          if (!response.ok) throw new Error(body.error || 'Unable to load account metrics.');
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(body?.error || 'Unable to load account metrics.');
           return body.metrics as Partial<UserMetricsDocument> | undefined;
         })
       : getDoc(doc(db!, 'userMetrics', user.uid)).then((snapshot) => snapshot.data() as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined);

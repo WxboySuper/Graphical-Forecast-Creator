@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
-import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
+import { GoogleOneTap, SignIn } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
@@ -169,6 +169,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const isBusy = submitting || status === 'loading';
+  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : window.location.href;
 
   useEffect(() => {
     if (!allowSignUp) {
@@ -236,11 +237,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
       {authProvider === 'clerk' ? (
         <div className="beta-auth-content">
-          <GoogleOneTap signInForceRedirectUrl={`${window.location.pathname}${window.location.search}`} signUpForceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
-          {allowSignUp ? <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={setMode} /> : null}
-          {mode === 'sign_up' && allowSignUp
-            ? <SignUp routing="hash" signInUrl={`${window.location.pathname}${window.location.search}`} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
-            : <SignIn routing="hash" signUpUrl={allowSignUp ? `${window.location.pathname}${window.location.search}` : undefined} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />}
+          <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} />
+          <SignIn routing="hash" signUpUrl={allowSignUp ? clerkRedirectUrl : undefined} forceRedirectUrl={clerkRedirectUrl} />
           {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
         </div>
       ) : (

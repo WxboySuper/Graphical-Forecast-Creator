@@ -29,7 +29,7 @@ const readArguments = () => {
 
 async function main() {
   const { output } = readArguments();
-  if (!output) throw new Error('Usage: node server/export-firestore-beta-snapshot.cjs --output <private-directory>');
+  if (!output) throw new Error('Usage: node server/export-firestore-beta-snapshot.mjs --output <private-directory>');
   const projectId = required('FIREBASE_ADMIN_PROJECT_ID');
   const expectedBetaProjectId = required('BETA_FIREBASE_PROJECT_ID');
   if (projectId !== expectedBetaProjectId) throw new Error('Refusing export: FIREBASE_ADMIN_PROJECT_ID does not match BETA_FIREBASE_PROJECT_ID.');
@@ -44,7 +44,8 @@ async function main() {
   const db = getFirestore(app);
   await fs.mkdir(output, { recursive: true, mode: 0o700 });
   await fs.chmod(output, 0o700);
-  const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
+  const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'w', 0o600);
+  await fs.chmod(path.join(output, 'full-snapshot.jsonl'), 0o600);
   let fullSnapshotCount = 0;
   const exportCollection = async (collectionRef) => {
     let cursor = null;
@@ -68,38 +69,13 @@ async function main() {
     await fullSnapshotFile.close();
   }
 
-  const profiles = await db.collection('userProfiles').get();
-  const accounts = new Map();
-
-  for (const profileDoc of profiles.docs) {
-    const profile = profileDoc.data();
-    const email = normalizeEmail(profile.email);
-    if (!email) continue;
-    if (accounts.has(email)) throw new Error(`Duplicate account email in beta userProfiles: ${email}`);
-    accounts.set(email, {
-      uid: profileDoc.id,
-      email,
-      userProfile: profile,
-      userSettings: null,
-      userEntitlement: null,
-      userMetrics: null,
-      cloudCycles: [],
-      workflowAwareness: [],
-      customProducts: [],
-    });
-  }
-
-  const readOwnedDoc = async (collection, key) => {
-    await Promise.all([...accounts.values()].map(async (account) => {
+  const seenEmails = new Set();
+  let count = 0;
+  const migrateAccount = async (account) => {
+    for (const [collection, key] of [['userSettings', 'userSettings'], ['userEntitlements', 'userEntitlement'], ['userMetrics', 'userMetrics']]) {
       const snapshot = await db.collection(collection).doc(account.uid).get();
       if (snapshot.exists) account[key] = snapshot.data();
-    }));
-  };
-  await readOwnedDoc('userSettings', 'userSettings');
-  await readOwnedDoc('userEntitlements', 'userEntitlement');
-  await readOwnedDoc('userMetrics', 'userMetrics');
-
-  await Promise.all([...accounts.values()].map(async (account) => {
+    }
     const legacyValue = account.userSettings?.cloudCycles;
     if (legacyValue) {
       let legacy = legacyValue;
@@ -125,11 +101,12 @@ async function main() {
       }
     }
     const cycleQuery = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
-    const migratedCycles = await Promise.all(cycleQuery.docs.map(async (cycleDoc) => {
+    const migratedCycles = [];
+    for (const cycleDoc of cycleQuery.docs) {
       const metadata = cycleDoc.data();
       const payloadDoc = await cycleDoc.ref.collection('payload').doc('payload').get();
       const payloadJson = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-      return {
+      migratedCycles.push({
         id: cycleDoc.id,
         label: metadata.label,
         cycleDate: metadata.cycleDate,
@@ -138,8 +115,8 @@ async function main() {
         payloadBytes: Number(metadata.payloadBytes) || Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
         createdAt: metadata.createdAt?.toDate?.().toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
         updatedAt: metadata.updatedAt?.toDate?.().toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
-      };
-    }));
+      });
+    }
     for (const cycle of migratedCycles) {
       account.cloudCycles = account.cloudCycles.filter((existingCycle) => existingCycle.id !== cycle.id);
       account.cloudCycles.push(cycle);
@@ -151,24 +128,52 @@ async function main() {
     ]);
     account.workflowAwareness = awareness.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
     account.customProducts = products.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-  }));
-
-  let count = 0;
-  for (const account of accounts.values()) {
     const key = `by-email/${sha256(account.email)}.json`;
     const outPath = path.join(output, key);
     await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });
     await fs.chmod(path.dirname(outPath), 0o700);
     const json = JSON.stringify(serializeFirestoreValue(account));
-    await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'w' });
+    await fs.chmod(outPath, 0o600);
     console.log(`${key} ${Buffer.byteLength(json)} bytes`);
     count += 1;
+  };
+
+  let profileCursor = null;
+  while (true) {
+    let profileQuery = db.collection('userProfiles').orderBy(FieldPath.documentId()).limit(500);
+    if (profileCursor) profileQuery = profileQuery.startAfter(profileCursor);
+    const profilePage = await profileQuery.get();
+    const pageAccounts = [];
+    for (const profileDoc of profilePage.docs) {
+      const profile = profileDoc.data();
+      const email = normalizeEmail(profile.email);
+      if (!email) continue;
+      if (seenEmails.has(email)) throw new Error(`Duplicate account email in beta userProfiles: ${email}`);
+      seenEmails.add(email);
+      pageAccounts.push({
+        uid: profileDoc.id,
+        email,
+        userProfile: profile,
+        userSettings: null,
+        userEntitlement: null,
+        userMetrics: null,
+        cloudCycles: [],
+        workflowAwareness: [],
+        customProducts: [],
+      });
+    }
+    for (let offset = 0; offset < pageAccounts.length; offset += 10) {
+      await Promise.all(pageAccounts.slice(offset, offset + 10).map(migrateAccount));
+    }
+    if (profilePage.docs.length < 500) break;
+    profileCursor = profilePage.docs.at(-1);
   }
   console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
 }
 
 main().catch((error) => {
-  console.error(error.message || error);
+  console.error(error?.stack || error);
   process.exitCode = 1;
 });

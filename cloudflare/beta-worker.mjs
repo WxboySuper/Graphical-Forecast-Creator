@@ -4,9 +4,12 @@ import { verifyWebhook } from '@clerk/backend/webhooks';
 const API_PREFIX = '/api';
 const MAX_CYCLE_BYTES = 750_000;
 const MAX_CLOUD_CYCLES = 100;
+const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
 const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
+const AUTH_PROFILE_CACHE_MAX = 1_000;
 const authProfileCache = new Map();
+const PRODUCT_METRIC_EVENT_TYPES = new Set(['account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded']);
 
 const json = (body, status = 200, headers = {}) => Response.json(body, {
   status,
@@ -27,7 +30,8 @@ async function authenticate(request, env) {
   const token = readBearer(request);
   if (!token || !env.CLERK_JWT_KEY) { console.warn('[beta-worker] missing token or JWT key', Boolean(token), Boolean(env.CLERK_JWT_KEY)); return null; }
   try {
-    const parties = (env.CLERK_AUTHORIZED_PARTIES || 'https://beta.gfcweather.com')
+    const requestOrigin = new URL(request.url).origin;
+    const parties = (env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || requestOrigin)
       .split(',').map((party) => party.trim()).filter(Boolean);
     const verified = await verifyToken(token, {
       jwtKey: env.CLERK_JWT_KEY,
@@ -55,7 +59,15 @@ async function authenticate(request, env) {
     if (!email || primary?.verification?.status !== 'verified') { console.warn('[beta-worker] Clerk primary email is not verified', Boolean(email), primary?.verification?.status); return null; }
     const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
     const identity = { clerkId: data.sub, email, displayName };
-    authProfileCache.set(data.sub, { identity, expiresAt: Date.now() + AUTH_PROFILE_CACHE_TTL_MS });
+    const now = Date.now();
+    for (const [userId, profile] of authProfileCache) {
+      if (profile.expiresAt <= now) authProfileCache.delete(userId);
+    }
+    if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
+      const oldestKey = authProfileCache.keys().next().value;
+      if (oldestKey) authProfileCache.delete(oldestKey);
+    }
+    authProfileCache.set(data.sub, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
     return identity;
   } catch (error) {
     console.warn('[beta-worker] Clerk token rejected', error instanceof Error ? error.message : 'verification failed');
@@ -121,6 +133,7 @@ async function ensureUser(user, env) {
       if (settings) {
         const settingsWithoutLegacyCycles = { ...settings };
         delete settingsWithoutLegacyCycles.cloudCycles;
+        // Snapshot values seed missing keys; current D1 values win on collisions.
         statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
           .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
@@ -174,7 +187,12 @@ async function stripeRequest(env, endpoint, params, method = 'POST') {
     ...(params ? { body: new URLSearchParams(params) } : {}),
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error?.message || 'Stripe request failed.');
+  if (!response.ok) {
+    const error = new Error(body?.error?.message || 'Stripe request failed.');
+    error.code = body?.error?.code;
+    error.stripeType = body?.error?.type;
+    throw error;
+  }
   return body;
 }
 
@@ -216,8 +234,9 @@ async function handleApi(request, env) {
   if (path === '/api/sentry-tunnel' && request.method === 'POST') {
     const declaredSize = Number(request.headers.get('Content-Length') || 0);
     if (declaredSize > MAX_SENTRY_ENVELOPE_BYTES) return json({ error: 'Sentry envelope is too large.' }, 413);
-    const envelope = new Uint8Array(await request.arrayBuffer());
-    if (!envelope.length || envelope.byteLength > MAX_SENTRY_ENVELOPE_BYTES) return json({ error: 'Invalid Sentry envelope.' }, 400);
+    const envelope = await readLimitedBody(request, MAX_SENTRY_ENVELOPE_BYTES);
+    if (!envelope) return json({ error: 'Sentry envelope is too large.' }, 413);
+    if (!envelope.length) return json({ error: 'Invalid Sentry envelope.' }, 400);
     const configured = parseSentryDsn(env.SENTRY_BROWSER_DSN || env.SENTRY_DSN);
     const incoming = parseSentryEnvelopeDsn(envelope);
     if (!configured || !incoming || configured.host !== incoming.host || configured.projectId !== incoming.projectId) return json({ error: 'Invalid Sentry envelope.' }, 400);
@@ -268,6 +287,14 @@ async function handleApi(request, env) {
         await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
           .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt).run();
+        const eventDate = entitlement.updatedAt.slice(0, 10);
+        if (!prior.premiumActive && active) {
+          await env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?)')
+            .bind(eventDate, event.id, 'upgrades', owner.clerk_id).run();
+        } else if (prior.premiumActive && !active) {
+          await env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?)')
+            .bind(eventDate, event.id, 'cancellations', owner.clerk_id).run();
+        }
       }
     }
     return json({ received: true });
@@ -308,8 +335,8 @@ async function handleApi(request, env) {
       mode: 'subscription',
       'line_items[0][price]': price,
       'line_items[0][quantity]': '1',
-      success_url: 'https://beta.gfcweather.com/account?checkout=success',
-      cancel_url: 'https://beta.gfcweather.com/pricing?checkout=cancelled',
+      success_url: `${env.PUBLIC_ORIGIN || url.origin}/account?checkout=success`,
+      cancel_url: `${env.PUBLIC_ORIGIN || url.origin}/pricing?checkout=cancelled`,
       ...(!entitlement.stripeCustomerId ? { customer_email: user.email } : {}),
       client_reference_id: user.clerk_id,
       'metadata[clerkId]': user.clerk_id,
@@ -330,7 +357,7 @@ async function handleApi(request, env) {
     if (!entitlement?.stripeCustomerId) return json({ error: 'No billing account is associated with this user.' }, 400);
     const portal = await stripeRequest(env, 'billing_portal/sessions', {
       customer: entitlement.stripeCustomerId,
-      return_url: 'https://beta.gfcweather.com/account',
+      return_url: `${env.PUBLIC_ORIGIN || url.origin}/account`,
     });
     return json({ url: portal.url });
   }
@@ -369,7 +396,7 @@ async function handleApi(request, env) {
       env.DB.prepare('SELECT COUNT(*) AS count FROM users').first(),
       env.DB.prepare("SELECT COUNT(*) AS count FROM user_entitlements WHERE json_extract(data_json, '$.billingStatus') IN ('active', 'trialing')").first(),
       env.DB.prepare('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles').first(),
-      env.DB.prepare(`SELECT event_date AS date, COUNT(DISTINCT installation_id) AS activeDevices,
+      env.DB.prepare(`SELECT event_date AS date, COUNT(DISTINCT CASE WHEN event_type NOT IN ('upgrades', 'cancellations') THEN installation_id END) AS activeDevices,
         COUNT(DISTINCT user_id) AS activeSignedInAccounts,
         SUM(CASE WHEN event_type = 'account_signup' THEN 1 ELSE 0 END) AS signups,
         SUM(CASE WHEN event_type = 'account_signin' THEN 1 ELSE 0 END) AS signIns,
@@ -394,8 +421,7 @@ async function handleApi(request, env) {
 
   if (path === '/api/metrics/event' && request.method === 'POST') {
     const body = await readBody(request);
-    const eventTypes = new Set(['account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded']);
-    if (!eventTypes.has(body?.event) || typeof body.installationId !== 'string' || body.installationId.length < 8 || body.installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
+    if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || typeof body.installationId !== 'string' || body.installationId.length < 8 || body.installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
     const eventDate = new Date().toISOString().slice(0, 10);
     await env.DB.prepare(`INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id)
       VALUES (?, ?, ?, ?)`)
@@ -424,22 +450,22 @@ async function handleApi(request, env) {
     const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
     const bytes = new TextEncoder().encode(payloadJson).length;
     if (!id || id.length > 128 || !label || label.length > 200 || !cycleDate || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
+    try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
-    const existing = await env.DB.prepare('SELECT id FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
-    if (!existing) {
-      const count = await env.DB.prepare('SELECT COUNT(*) AS count FROM cloud_cycles WHERE user_id = ?').bind(user.clerk_id).first();
-      if ((count?.count || 0) >= MAX_CLOUD_CYCLES) return json({ error: 'Cloud storage quota reached.' }, 409);
-    }
     const now = new Date().toISOString();
-    await env.DB.prepare(`INSERT INTO cloud_cycles
+    const saveResult = await env.DB.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
+        OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ?) < ?
       ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
         metadata_json = json_set(excluded.metadata_json, '$.createdAt', json_extract(cloud_cycles.metadata_json, '$.createdAt')),
         payload_json = excluded.payload_json,
         payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
-      .bind(id, user.clerk_id, label, cycleDate, JSON.stringify(body.metadata), payloadJson, bytes, now, now).run();
+      .bind(id, user.clerk_id, label, cycleDate, JSON.stringify(body.metadata), payloadJson, bytes, now, now,
+        user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
+    if (!saveResult.meta.changes) return json({ error: 'Cloud storage quota reached.' }, 409);
     return json({ success: true, data: id });
   }
   const cycleMatch = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
@@ -461,8 +487,8 @@ async function handleApi(request, env) {
       return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
     }
     if (request.method === 'DELETE') {
-      await env.DB.prepare('DELETE FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).run();
-      return json({ success: true });
+      const result = await env.DB.prepare('DELETE FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).run();
+      return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
     }
   }
 
@@ -473,7 +499,7 @@ async function handleApi(request, env) {
   }
   if (path === '/api/workflow-awareness' && request.method === 'PUT') {
     const body = await readBody(request);
-    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string') return json({ error: 'Invalid workflow record.' }, 400);
+    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string' || !body.record.metadata.cycleId.trim()) return json({ error: 'Invalid workflow record.' }, 400);
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
     await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
@@ -503,15 +529,17 @@ async function handleApi(request, env) {
     const body = await readBody(request);
     const product = body?.product;
     if (!isObject(product) || typeof product.id !== 'string' || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
-    const occupied = await env.DB.prepare('SELECT slot_id FROM custom_products WHERE user_id = ?').bind(user.clerk_id).all();
-    const used = new Set((occupied.results || []).map((row) => row.slot_id));
-    const slot = Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`).find((value) => !used.has(value));
-    if (!slot) return json({ error: 'Custom product limit reached.' }, 409);
     const dataJson = JSON.stringify(product);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
+    const slotValues = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
     try {
-      await env.DB.prepare('INSERT INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
-        .bind(user.clerk_id, slot, product.id, dataJson).run();
+      const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slotValues})
+        INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
+        SELECT ?, slots.slot_id, ?, ? FROM slots
+        WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
+        ORDER BY slots.slot_id LIMIT 1`)
+        .bind(user.clerk_id, product.id, dataJson, user.clerk_id).run();
+      if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
     } catch { return json({ error: 'Custom product already exists.' }, 409); }
     return json({ success: true, product });
   }
@@ -580,7 +608,9 @@ async function handleApi(request, env) {
   return json({ error: 'Not found.' }, 404);
 }
 
+const JSON_RECORD_TABLES = new Set(['user_settings', 'user_entitlements', 'user_metrics']);
 async function readJsonRecord(db, table, userId) {
+  if (!JSON_RECORD_TABLES.has(table)) throw new Error('Invalid user data table.');
   const row = await db.prepare(`SELECT data_json FROM ${table} WHERE user_id = ?`).bind(userId).first();
   return row ? parseJson(row.data_json) : null;
 }
@@ -593,7 +623,7 @@ async function flushStripeCleanupQueue(env) {
       await stripeRequest(env, `customers/${encodeURIComponent(row.stripe_customer_id)}`, null, 'DELETE');
       await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
     } catch (error) {
-      if (String(error?.message || '').toLowerCase().includes('no such customer')) {
+      if (error?.code === 'resource_missing') {
         await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
         continue;
       }
@@ -619,6 +649,7 @@ async function deleteBetaUserData(userId, env) {
     env.DB.prepare('DELETE FROM user_settings WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM user_entitlements WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM user_metrics WHERE user_id = ?').bind(userId),
+    env.DB.prepare('DELETE FROM product_metric_events WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE clerk_id = ?').bind(userId),
   );
   await env.DB.batch(statements);
@@ -689,9 +720,37 @@ export default {
     }
   },
   async scheduled(_controller, env) {
-    await flushStripeCleanupQueue(env);
-    await env.DB?.prepare("DELETE FROM product_metric_events WHERE event_date < date('now', '-90 days')").run();
+    try { await flushStripeCleanupQueue(env); }
+    catch (error) { console.error('[beta-worker] Stripe cleanup queue failed', error); }
+    try {
+      await env.DB?.prepare("DELETE FROM product_metric_events WHERE event_date < date('now', '-90 days')").run();
+      await env.DB?.prepare("DELETE FROM stripe_events WHERE processed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')").run();
+    } catch (error) { console.error('[beta-worker] retention cleanup failed', error); }
   },
 };
+
+async function readLimitedBody(request, limit) {
+  if (!request.body) return new Uint8Array();
+  const reader = request.body.getReader();
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
 
 export const __test = { authenticate, emailSnapshotKey, deleteBetaUserData };

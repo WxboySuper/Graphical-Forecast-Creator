@@ -25,7 +25,7 @@
   "r2_buckets": [
     { "binding": "FIRESTORE_SNAPSHOT", "bucket_name": "gfc-beta-firestore-migration-snapshot" }
   ],
-  "vars": { "BETA_AUTH_BACKEND": "clerk-d1" },
+  "vars": { "BETA_AUTH_BACKEND": "clerk-d1", "PUBLIC_ORIGIN": "https://beta.gfcweather.com" },
   "triggers": { "crons": ["0 4 * * *"] },
   "observability": {
     "enabled": true,

@@ -196,7 +196,8 @@ export const saveWorkflowAwareness = async ({
   if (!isValidWorkflowAwarenessMetadata(metadata)) throw new Error('Invalid workflow awareness metadata');
   if (isBetaClerkD1Mode()) {
     const response = await fetchBetaApi('/api/workflow-awareness', { method: 'PUT', body: JSON.stringify({ record: toRecord(metadata) }) });
-    if (!response.ok) throw new Error('Unable to save workflow awareness.');
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body?.error || 'Unable to save workflow awareness.');
     return;
   }
   await setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
@@ -215,7 +216,12 @@ export const listWorkflowAwareness = async ({
     const response = await fetchBetaApi('/api/workflow-awareness');
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || 'Unable to load workflow awareness.');
-    return (Array.isArray(body.records) ? body.records : [])
+    return (Array.isArray(body.records) ? body.records : []).map((record: unknown) => {
+      if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
+      const envelope = record as Partial<WorkflowAwarenessDocument>;
+      if (typeof envelope.metadata !== 'object' || envelope.metadata === null || Array.isArray(envelope.metadata)) return record;
+      return { ...envelope.metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
+    })
       .filter(isValidWorkflowAwarenessRecord) as WorkflowAwarenessRecord[];
   }
   const snapshot = await getDocs(query(getAwarenessCollection(userId)));

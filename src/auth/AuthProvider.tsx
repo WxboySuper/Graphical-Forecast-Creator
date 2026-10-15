@@ -1503,6 +1503,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [error, setError] = useState<string | null>(null);
   const [bootstrapKey, setBootstrapKey] = useState('');
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
+  const betaAccessRequestIdRef = useRef(0);
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
@@ -1520,6 +1521,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [getToken]);
 
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    const requestId = ++betaAccessRequestIdRef.current;
     if (!isSignedIn || !clerkUser) {
       setBetaAccess(false);
       setBetaAccessLoading(false);
@@ -1530,12 +1532,14 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await request('/api/me/bootstrap');
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
-      setBetaAccess(Boolean(body.user?.betaAccess));
-      const settings = readRemoteSettings(body.settings ?? undefined);
+      if (requestId !== betaAccessRequestIdRef.current) return;
+      setBetaAccess(Boolean(body?.user?.betaAccess));
+      const settings = readRemoteSettings(body?.settings ?? undefined);
       if (settings) {
         applySettingsToState(settings, { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef });
         setSettingsSyncStatus('synced');
       } else {
+        lastSyncedSettingsRef.current = null;
         setSyncedSettings(null);
         setSettingsSyncStatus('idle');
       }
@@ -1543,19 +1547,22 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setBootstrapKey(clerkUser.id);
       setError(null);
     } catch (nextError) {
+      if (requestId !== betaAccessRequestIdRef.current) return;
       setError(nextError instanceof Error ? nextError.message : 'Unable to load your beta account.');
       setBetaAccess(false);
     } finally {
-      setBetaAccessLoading(false);
+      if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
     }
   }, [clerkUser, dispatch, isSignedIn, request]);
 
   useEffect(() => {
     if (!isLoaded) {
+      betaAccessRequestIdRef.current += 1;
       setBetaAccessLoading(true);
       return;
     }
     if (!isSignedIn || !clerkUser) {
+      betaAccessRequestIdRef.current += 1;
       setSyncedSettings(null);
       setSettingsSyncStatus('idle');
       setBetaAccess(false);
@@ -1584,6 +1591,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
     if (!currentUser) throw new Error('Sign in before changing account settings.');
+    const requestId = betaAccessRequestIdRef.current;
+    const userId = currentUser.uid;
     const baseline = lastSyncedSettingsRef.current ?? buildHostedAccountFallbackSettings(
       darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
     );
@@ -1593,12 +1602,14 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Unable to update account settings.');
+      if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
+      if (requestId !== betaAccessRequestIdRef.current || currentUser.uid !== userId) return;
       lastSyncedSettingsRef.current = next;
       setSyncedSettings(next);
       setSettingsSyncStatus('synced');
       writeStoredForecastUiVariant(next.forecastUiVariant);
     } catch (nextError) {
+      if (requestId !== betaAccessRequestIdRef.current || currentUser.uid !== userId) return;
       setSettingsSyncStatus('error');
       setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
       throw nextError;
@@ -1609,13 +1620,24 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || !syncedSettings || bootstrapKey !== currentUser.uid) return;
     const next = createSettingsSnapshot({ darkMode, overlays, defaultForecasterName: syncedSettings.defaultForecasterName || currentUser.displayName || '', forecastUiVariant: syncedSettings.forecastUiVariant, monitorSettings: syncedSettings.monitorSettings ?? monitorSettings });
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, next)) return;
+    let active = true;
+    const userId = currentUser.uid;
     const timer = window.setTimeout(() => {
       request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) })
         .then((response) => { if (!response.ok) throw new Error('Unable to sync account settings.'); })
-        .then(() => { lastSyncedSettingsRef.current = next; setSyncedSettings(next); setSettingsSyncStatus('synced'); })
-        .catch((syncError) => { setSettingsSyncStatus('error'); setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.'); });
+        .then(() => {
+          if (!active || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          lastSyncedSettingsRef.current = next;
+          setSyncedSettings(next);
+          setSettingsSyncStatus('synced');
+        })
+        .catch((syncError) => {
+          if (!active || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          setSettingsSyncStatus('error');
+          setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.');
+        });
     }, 750);
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
 
   const value = useMemo<AuthContextValue>(() => ({

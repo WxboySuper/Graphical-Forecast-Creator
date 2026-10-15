@@ -40,7 +40,11 @@ class D1Mock {
     this.billingCleanupQueue = new Map();
   }
   prepare(sql) { return new D1Statement(this, sql); }
-  async batch(statements) { return Promise.all(statements.map((statement) => statement.run())); }
+  async batch(statements) {
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
+  }
   async first(sql, params) {
     if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return this.users.get(params[0]) || null;
     if (sql.startsWith('SELECT clerk_id FROM users WHERE email')) {
@@ -84,11 +88,13 @@ class D1Mock {
       const [, userId, type] = [null, params[0], params[1]];
       return { results: [...this.records.values()].filter((record) => record.user_id === userId && record.record_type === type) };
     }
-    if (sql.startsWith('SELECT * FROM cloud_cycles WHERE user_id = ?')) {
-      return { results: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0]) };
+    if (sql.includes('FROM cloud_cycles WHERE user_id = ?')) {
+      return { results: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0])
+        .map((row) => ({ ...row, userId: row.user_id, cycleDate: row.cycle_date, createdAt: row.created_at, updatedAt: row.updated_at })) };
     }
-    if (sql.startsWith('SELECT * FROM workflow_awareness WHERE user_id = ?')) {
-      return { results: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0]) };
+    if (sql.includes('FROM workflow_awareness WHERE user_id = ?')) {
+      return { results: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0])
+        .map((row) => ({ id: row.cycle_id, data_json: row.data_json })) };
     }
     if (sql.startsWith('SELECT * FROM custom_products WHERE user_id = ?')) {
       return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]) };
@@ -99,6 +105,7 @@ class D1Mock {
     return { results: [] };
   }
   async run(sql, params) {
+    let changes = 1;
     if (sql.startsWith('INSERT INTO users')) {
       const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
       this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
@@ -135,17 +142,31 @@ class D1Mock {
     } else if (sql.startsWith('INSERT INTO cloud_cycles') || sql.startsWith('INSERT OR IGNORE INTO cloud_cycles')) {
       const [id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at] = params;
       const key = `${user_id}:${id}`;
-      if (!sql.startsWith('INSERT OR IGNORE') || !this.cloudCycles.has(key)) {
-        this.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at });
+      const exists = this.cloudCycles.has(key);
+      const limit = sql.includes('SELECT ?') ? params.at(-1) : Number.MAX_SAFE_INTEGER;
+      const count = [...this.cloudCycles.values()].filter((row) => row.user_id === user_id).length;
+      if (sql.includes('SELECT ?') && !exists && count >= limit) return { meta: { changes: 0 } };
+      if (!sql.startsWith('INSERT OR IGNORE') || !exists) {
+        const previous = this.cloudCycles.get(key);
+        const incomingMetadata = JSON.parse(metadata_json || '{}');
+        const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
+        if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
+        this.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
+          created_at: previous?.created_at || created_at, updated_at });
       }
     } else if (sql.startsWith('UPDATE cloud_cycles SET label')) {
-      const [label, updated_at, metadata_json, id, user_id] = params;
+      const [label, updated_at, , , id, user_id] = params;
       const row = this.cloudCycles.get(`${user_id}:${id}`);
-      if (row) Object.assign(row, { label, updated_at, metadata_json });
+      if (row) {
+        const metadata = JSON.parse(row.metadata_json || '{}');
+        Object.assign(row, { label, updated_at, metadata_json: JSON.stringify({ ...metadata, label, updatedAt: updated_at }) });
+      } else changes = 0;
     } else if (sql.startsWith('DELETE FROM cloud_cycles')) {
+      const before = this.cloudCycles.size;
       if (params.length === 1) {
         for (const [key, row] of this.cloudCycles) if (row.user_id === params[0]) this.cloudCycles.delete(key);
       } else this.cloudCycles.delete(`${params[1]}:${params[0]}`);
+      changes = before - this.cloudCycles.size;
     } else if (sql.startsWith('INSERT OR IGNORE INTO stripe_events')) {
       const [eventId, processedAt] = params;
       if (this.stripeEvents.has(eventId)) return { meta: { changes: 0 } };
@@ -155,12 +176,13 @@ class D1Mock {
       this.stripeEvents.delete(params[0]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO product_metric_events')) {
       const [date, installation, type, userId] = params;
-      this.metricEvents.add(`${date}:${installation}:${type}:${userId}`);
+      const key = `${date}:${installation}:${type}:${userId}`;
+      if (!this.metricEvents.has(key)) this.metricEvents.add(key);
     } else if (sql.startsWith('INSERT OR IGNORE INTO billing_cleanup_queue')) {
       this.billingCleanupQueue.set(params[0], { customer_id: params[0], retry_after: params[1] });
     } else if (sql.startsWith('DELETE FROM billing_cleanup_queue')) {
       this.billingCleanupQueue.delete(params[0]);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO workflow_awareness')) {
+    } else if (sql.startsWith('INSERT OR IGNORE INTO workflow_awareness') || sql.startsWith('INSERT INTO workflow_awareness')) {
       const [user_id, cycle_id, data_json] = params;
       this.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json });
     } else if (sql.startsWith('INSERT OR IGNORE INTO custom_products')) {
@@ -170,24 +192,32 @@ class D1Mock {
       const [user_id, record_type, record_id, data_json, created_at, updated_at] = params;
       this.records.set(`${user_id}:${record_type}:${record_id}`, { user_id, record_type, record_id, data_json, created_at, updated_at });
     } else if (sql.startsWith('DELETE FROM user_records')) {
+      const before = this.records.size;
       const [user_id, record_type, record_id] = params;
       if (record_type === undefined) {
         for (const [key, record] of this.records) if (record.user_id === user_id) this.records.delete(key);
       } else this.records.delete(`${user_id}:${record_type}:${record_id}`);
+      changes = before - this.records.size;
     } else if (sql.startsWith('DELETE FROM user_settings')) {
+      changes = Number(this.settings.has(params[0]));
       this.settings.delete(params[0]);
     } else if (sql.startsWith('DELETE FROM user_entitlements')) {
+      changes = Number(this.entitlements.has(params[0]));
       this.entitlements.delete(params[0]);
     } else if (sql.startsWith('DELETE FROM user_metrics')) {
+      changes = Number(this.metrics.has(params[0]));
       this.metrics.delete(params[0]);
     } else if (sql.startsWith('DELETE FROM workflow_awareness')) {
       for (const [key, row] of this.workflowAwareness) if (row.user_id === params[0]) this.workflowAwareness.delete(key);
     } else if (sql.startsWith('DELETE FROM custom_products')) {
       for (const [key, row] of this.customProducts) if (row.user_id === params[0]) this.customProducts.delete(key);
+    } else if (sql.startsWith('DELETE FROM product_metric_events')) {
+      for (const key of this.metricEvents) if (key.endsWith(`:${params[0]}`)) this.metricEvents.delete(key);
     } else if (sql.startsWith('DELETE FROM users')) {
+      changes = Number(this.users.has(params[0]));
       this.users.delete(params[0]);
     }
-    return { meta: { changes: 1 } };
+    return { meta: { changes } };
   }
 }
 
@@ -277,14 +307,75 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
   await withClerkFetch(async () => {
     const initial = await call('/api/me/bootstrap', createEnv(db));
     assert.equal((await initial.json()).user.migrationStatus, 'no_match');
+    const localSettings = await call('/api/user/settings', createEnv(db), {
+      method: 'PUT', body: { settings: { darkMode: true, localOnly: 'keep this' } },
+    });
+    assert.equal(localSettings.status, 200);
     const afterUpload = await call('/api/me/bootstrap', createEnv(db, {
       uid: 'firebase_late_uid', userProfile: { email: 'test@example.com', betaAccess: true },
-      userSettings: { darkMode: false }, cloudCycles: [], workflowAwareness: [], customProducts: [],
+      userSettings: { darkMode: false, migratedField: 'from snapshot' }, cloudCycles: [], workflowAwareness: [], customProducts: [],
     }));
     const migrated = await afterUpload.json();
     assert.equal(migrated.user.migrationStatus, 'complete');
     assert.equal(migrated.user.betaAccess, true);
-    assert.equal(migrated.settings.darkMode, false);
+    assert.deepEqual(migrated.settings, { darkMode: true, localOnly: 'keep this', migratedField: 'from snapshot' });
+  });
+});
+
+test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
+  const db = new D1Mock();
+  db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
+  const env = createEnv(db);
+  const cycle = { id: 'cycle-1', label: 'Morning', cycleDate: '2026-10-15', metadata: { createdAt: '2026-10-01T00:00:00.000Z' }, payloadJson: '{}' };
+  await withClerkFetch(async () => {
+    const malformed = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, payloadJson: '{' } });
+    assert.equal(malformed.status, 400);
+    const create = await call('/api/cloud-cycles', env, { method: 'POST', body: cycle });
+    assert.equal(create.status, 200, await create.clone().text());
+    const originalCreatedAt = db.cloudCycles.get('user_beta_test:cycle-1').created_at;
+    const update = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, label: 'Afternoon' } });
+    assert.equal(update.status, 200);
+    const listed = await call('/api/cloud-cycles', env);
+    const [saved] = (await listed.json()).cycles;
+    assert.equal(saved.label, 'Afternoon');
+    assert.equal(saved.createdAt, originalCreatedAt);
+    const remove = await call('/api/cloud-cycles/cycle-1', env, { method: 'DELETE' });
+    assert.equal(remove.status, 200);
+    const missing = await call('/api/cloud-cycles/cycle-1', env, { method: 'DELETE' });
+    assert.equal(missing.status, 404);
+  });
+});
+
+test('cloud cycle quota check rejects writes at the limit', async () => {
+  const db = new D1Mock();
+  db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
+  for (let index = 0; index < 100; index += 1) {
+    const id = `existing-${index}`;
+    db.cloudCycles.set(`user_beta_test:${id}`, {
+      id, user_id: 'user_beta_test', label: id, cycle_date: '2026-10-15', metadata_json: '{}',
+      payload_json: '{}', payload_bytes: 2, created_at: '', updated_at: '',
+    });
+  }
+  await withClerkFetch(async () => {
+    const response = await call('/api/cloud-cycles', createEnv(db), { method: 'POST', body: {
+      id: 'new-cycle', label: 'New', cycleDate: '2026-10-15', metadata: {}, payloadJson: '{}',
+    } });
+    assert.equal(response.status, 409);
+  });
+});
+
+test('workflow awareness rejects empty cycle IDs and returns persisted envelopes', async () => {
+  const db = new D1Mock();
+  await withClerkFetch(async () => {
+    const invalid = await call('/api/workflow-awareness', createEnv(db), {
+      method: 'PUT', body: { record: { metadata: { cycleId: '' } } },
+    });
+    assert.equal(invalid.status, 400);
+    const record = { consentVersion: 1, schemaVersion: 1, metadata: { cycleId: 'cycle-1' } };
+    const saved = await call('/api/workflow-awareness', createEnv(db), { method: 'PUT', body: { record } });
+    assert.equal(saved.status, 200);
+    const list = await call('/api/workflow-awareness', createEnv(db));
+    assert.deepEqual((await list.json()).records, [record]);
   });
 });
 
@@ -317,11 +408,13 @@ test('Clerk deletion cleanup removes D1-owned user records idempotently', async 
   db.records.set(`${user.clerk_id}:forecast:forecast-1`, { user_id: user.clerk_id, record_type: 'forecast', record_id: 'forecast-1' });
   db.settings.set(user.clerk_id, '{}');
   db.entitlements.set(user.clerk_id, JSON.stringify({ stripeCustomerId: 'cus_beta_test' }));
+  db.metricEvents.add(`2026-10-15:installation:account_signin:${user.clerk_id}`);
   await __test.deleteBetaUserData(user.clerk_id, env);
   await __test.deleteBetaUserData(user.clerk_id, env);
   assert.equal(db.users.has(user.clerk_id), false);
   assert.equal(db.settings.has(user.clerk_id), false);
   assert.equal(db.billingCleanupQueue.has('cus_beta_test'), true);
+  assert.equal(db.metricEvents.size, 0);
   assert.equal(db.records.size, 0);
 });
 
@@ -372,5 +465,11 @@ test('the Sentry tunnel only forwards envelopes for the configured project', asy
       method: 'POST', body: '{"dsn":"https://public-key@evil.example/999"}\n{}',
     }), env);
     assert.equal(invalid.status, 400);
+    const oversized = await worker.fetch(new Request('https://beta.gfcweather.com/api/sentry-tunnel', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-sentry-envelope' },
+      body: new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(100 * 1024 + 1)); controller.close(); } }),
+      duplex: 'half',
+    }), env);
+    assert.equal(oversized.status, 413);
   } finally { globalThis.fetch = originalFetch; }
 });

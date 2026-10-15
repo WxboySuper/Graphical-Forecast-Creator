@@ -506,7 +506,8 @@ export const loadCloudCycle = async (
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body.cycle) return { success: false, error: body.error || 'Cloud cycle not found' };
-      const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: body.cycle.payload });
+      const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
+      const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
       return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
     }
     const record = await fetchCloudCycleById(params);
@@ -538,7 +539,9 @@ export const deleteCloudCycle = async (
   try {
     if (isBetaClerkD1Mode()) {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
-      return response.ok ? { success: true } : { success: false, error: 'Unable to delete cloud cycle.' };
+      if (response.ok) return { success: true };
+      const body = await response.json().catch(() => ({}));
+      return { success: false, error: body?.error || 'Unable to delete cloud cycle.' };
     }
     const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
@@ -567,7 +570,9 @@ export const renameCloudCycle = async (
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, {
         method: 'PATCH', body: JSON.stringify({ label: params.newLabel }),
       });
-      return response.ok ? { success: true } : { success: false, error: 'Cloud cycle not found' };
+      if (response.ok) return { success: true };
+      const body = await response.json().catch(() => ({}));
+      return { success: false, error: body?.error || 'Cloud cycle not found' };
     }
     const existing = await getOwnedCloudCycle(params);
     if (!existing) {

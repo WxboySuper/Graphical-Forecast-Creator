@@ -1,7 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const configPath = 'cloudflare/wrangler.beta.clerk-d1.jsonc';
-const generatedPath = 'cloudflare/wrangler.beta.clerk-d1.generated.jsonc';
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const configPath = path.join(repoRoot, 'cloudflare/wrangler.beta.clerk-d1.jsonc');
+const generatedPath = path.join(repoRoot, 'cloudflare/wrangler.beta.clerk-d1.generated.jsonc');
 const databaseId = process.env.BETA_D1_DATABASE_ID?.trim() || '';
 
 if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(databaseId)) {
