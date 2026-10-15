@@ -15,6 +15,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
@@ -23,6 +24,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
 - **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
 - **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
 - **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
@@ -53,6 +55,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Dependencies
 
 - **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, React Router 8.3.1 for navigation, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
+- **Server:** Update hosted API dependencies to Sentry Node 11.6.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
 - **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
