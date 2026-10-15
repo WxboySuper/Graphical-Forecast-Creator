@@ -30,9 +30,10 @@ async function authenticate(request, env) {
   const token = readBearer(request);
   if (!token || !env.CLERK_JWT_KEY) { console.warn('[beta-worker] missing token or JWT key', Boolean(token), Boolean(env.CLERK_JWT_KEY)); return null; }
   try {
-    const requestOrigin = new URL(request.url).origin;
-    const parties = (env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || requestOrigin)
+    const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
+    const parties = configuredParties
       .split(',').map((party) => party.trim()).filter(Boolean);
+    if (parties.length === 0) return null;
     const verified = await verifyToken(token, {
       jwtKey: env.CLERK_JWT_KEY,
       authorizedParties: parties,
@@ -176,8 +177,11 @@ async function ensureUser(user, env) {
   return await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
 }
 
+const BODY_TOO_LARGE = Symbol('body-too-large');
 const readBody = async (request) => {
-  try { return await request.json(); } catch { return null; }
+  const bytes = await readLimitedBody(request, MAX_CYCLE_BYTES);
+  if (bytes === null) return BODY_TOO_LARGE;
+  try { return JSON.parse(new TextDecoder().decode(bytes)); } catch { return null; }
 };
 
 async function stripeRequest(env, endpoint, params, method = 'POST') {
@@ -197,7 +201,11 @@ async function stripeRequest(env, endpoint, params, method = 'POST') {
 }
 
 async function verifyStripeSignature(payload, header, secret) {
-  const parts = (header || '').split(',').map((part) => part.trim().split('='));
+  const parts = (header || '').split(',').map((part) => {
+    const separator = part.indexOf('=');
+    if (separator < 0) return ['', ''];
+    return [part.slice(0, separator).trim(), part.slice(separator + 1).trim().replace(/^"|"$/g, '')];
+  });
   const timestamp = parts.find(([key]) => key === 't')?.[1];
   const signatures = parts.filter(([key, value]) => key === 'v1' && value).map(([, value]) => value);
   if (!timestamp || signatures.length === 0 || !/^\d+$/.test(timestamp)) return false;
@@ -254,7 +262,9 @@ async function handleApi(request, env) {
   if (path === '/api/billing/webhook' && request.method === 'POST') {
     if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
     if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'Billing webhook is not configured.' }, 503);
-    const raw = await request.text();
+    const rawBytes = await readLimitedBody(request, MAX_CYCLE_BYTES);
+    if (rawBytes === null) return json({ error: 'Webhook payload is too large.' }, 413);
+    const raw = new TextDecoder().decode(rawBytes);
     if (!(await verifyStripeSignature(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) return json({ error: 'Invalid Stripe signature.' }, 400);
     let event;
     try { event = JSON.parse(raw); } catch { return json({ error: 'Invalid webhook payload.' }, 400); }
@@ -289,11 +299,11 @@ async function handleApi(request, env) {
           .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt).run();
         const eventDate = entitlement.updatedAt.slice(0, 10);
         if (!prior.premiumActive && active) {
-          await env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?)')
-            .bind(eventDate, event.id, 'upgrades', owner.clerk_id).run();
+          await env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(event.id, eventDate, event.id, 'upgrades', owner.clerk_id).run();
         } else if (prior.premiumActive && !active) {
-          await env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?)')
-            .bind(eventDate, event.id, 'cancellations', owner.clerk_id).run();
+          await env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(event.id, eventDate, event.id, 'cancellations', owner.clerk_id).run();
         }
       }
     }
@@ -327,16 +337,18 @@ async function handleApi(request, env) {
   if (path === '/api/billing/checkout' && request.method === 'POST') {
     if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     const plan = body?.plan;
     const price = plan === 'monthly' ? env.STRIPE_PRICE_MONTHLY : plan === 'annual' ? env.STRIPE_PRICE_ANNUAL_STANDARD : null;
     if (!price) return json({ error: 'This billing plan is not available.' }, 400);
+    if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
     const params = {
       mode: 'subscription',
       'line_items[0][price]': price,
       'line_items[0][quantity]': '1',
-      success_url: `${env.PUBLIC_ORIGIN || url.origin}/account?checkout=success`,
-      cancel_url: `${env.PUBLIC_ORIGIN || url.origin}/pricing?checkout=cancelled`,
+      success_url: `${env.PUBLIC_ORIGIN}/account?checkout=success`,
+      cancel_url: `${env.PUBLIC_ORIGIN}/pricing?checkout=cancelled`,
       ...(!entitlement.stripeCustomerId ? { customer_email: user.email } : {}),
       client_reference_id: user.clerk_id,
       'metadata[clerkId]': user.clerk_id,
@@ -353,11 +365,12 @@ async function handleApi(request, env) {
 
   if (path === '/api/billing/portal' && request.method === 'POST') {
     if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
+    if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (!entitlement?.stripeCustomerId) return json({ error: 'No billing account is associated with this user.' }, 400);
     const portal = await stripeRequest(env, 'billing_portal/sessions', {
       customer: entitlement.stripeCustomerId,
-      return_url: `${env.PUBLIC_ORIGIN || url.origin}/account`,
+      return_url: `${env.PUBLIC_ORIGIN}/account`,
     });
     return json({ url: portal.url });
   }
@@ -365,6 +378,7 @@ async function handleApi(request, env) {
   if (path === '/api/beta/claim' && request.method === 'POST') {
     if (!user.beta_access && env.BETA_INVITE_TOKEN) {
       const body = await readBody(request);
+      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
       if (!body || body.token !== env.BETA_INVITE_TOKEN || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
       await env.DB.prepare('UPDATE users SET beta_access = 1, updated_at = ? WHERE clerk_id = ?').bind(new Date().toISOString(), user.clerk_id).run();
     }
@@ -375,6 +389,7 @@ async function handleApi(request, env) {
   if (path === '/api/user/settings' && request.method === 'GET') return json({ settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id) });
   if (path === '/api/user/settings' && request.method === 'PUT') {
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (!isObject(body?.settings)) return json({ error: 'Invalid settings.' }, 400);
     const dataJson = JSON.stringify(body.settings);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Settings are too large.' }, 413);
@@ -421,11 +436,12 @@ async function handleApi(request, env) {
 
   if (path === '/api/metrics/event' && request.method === 'POST') {
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || typeof body.installationId !== 'string' || body.installationId.length < 8 || body.installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
     const eventDate = new Date().toISOString().slice(0, 10);
-    await env.DB.prepare(`INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id)
-      VALUES (?, ?, ?, ?)`)
-      .bind(eventDate, body.installationId, body.event, user.clerk_id).run();
+    await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
+      VALUES (?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), eventDate, body.installationId, body.event, user.clerk_id).run();
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -444,6 +460,7 @@ async function handleApi(request, env) {
   }
   if (path === '/api/cloud-cycles' && request.method === 'POST') {
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     const id = typeof body?.id === 'string' ? body.id : '';
     const label = typeof body?.label === 'string' ? body.label.trim() : '';
     const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
@@ -465,7 +482,11 @@ async function handleApi(request, env) {
         payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
       .bind(id, user.clerk_id, label, cycleDate, JSON.stringify(body.metadata), payloadJson, bytes, now, now,
         user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
-    if (!saveResult.meta.changes) return json({ error: 'Cloud storage quota reached.' }, 409);
+    if (!saveResult.meta.changes) {
+      const existing = await env.DB.prepare('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')
+        .bind(user.clerk_id, id).first();
+      if (!existing) return json({ error: 'Cloud storage quota reached.' }, 409);
+    }
     return json({ success: true, data: id });
   }
   const cycleMatch = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
@@ -479,6 +500,7 @@ async function handleApi(request, env) {
     }
     if (request.method === 'PATCH') {
       const body = await readBody(request);
+      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
       if (typeof body?.label !== 'string' || !body.label.trim() || body.label.length > 200) return json({ error: 'Invalid label.' }, 400);
       const updatedAt = new Date().toISOString();
       const result = await env.DB.prepare(`UPDATE cloud_cycles SET label = ?, updated_at = ?,
@@ -499,6 +521,7 @@ async function handleApi(request, env) {
   }
   if (path === '/api/workflow-awareness' && request.method === 'PUT') {
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string' || !body.record.metadata.cycleId.trim()) return json({ error: 'Invalid workflow record.' }, 400);
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
@@ -527,8 +550,11 @@ async function handleApi(request, env) {
   }
   if (path === '/api/custom-products' && request.method === 'POST') {
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     const product = body?.product;
-    if (!isObject(product) || typeof product.id !== 'string' || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
+    const productId = typeof product?.id === 'string' ? product.id.trim() : '';
+    if (!isObject(product) || !productId || productId.length > 128 || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
+    product.id = productId;
     const dataJson = JSON.stringify(product);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
     const slotValues = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
@@ -540,7 +566,10 @@ async function handleApi(request, env) {
         ORDER BY slots.slot_id LIMIT 1`)
         .bind(user.clerk_id, product.id, dataJson, user.clerk_id).run();
       if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
-    } catch { return json({ error: 'Custom product already exists.' }, 409); }
+    } catch (error) {
+      if (String(error?.message || '').includes('UNIQUE constraint failed')) return json({ error: 'Custom product already exists.' }, 409);
+      throw error;
+    }
     return json({ success: true, product });
   }
   const productMatch = path.match(/^\/api\/custom-products\/([^/]+)$/);
@@ -552,6 +581,7 @@ async function handleApi(request, env) {
     if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
     const current = parseJson(currentRow.data_json) || {};
     const body = await readBody(request);
+    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (request.method === 'PATCH') {
       const product = body?.product;
       if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) {
@@ -583,6 +613,7 @@ async function handleApi(request, env) {
     }
     if (request.method === 'PUT' && !recordId) {
       const body = await readBody(request);
+      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
       const id = typeof body?.id === 'string' ? body.id : '';
       if (!id || id.length > 128 || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
       const dataJson = JSON.stringify(body.data);
@@ -617,7 +648,8 @@ async function readJsonRecord(db, table, userId) {
 
 async function flushStripeCleanupQueue(env) {
   if (!env.DB || !env.STRIPE_SECRET_KEY) return;
-  const rows = await env.DB.prepare('SELECT stripe_customer_id FROM billing_cleanup_queue ORDER BY created_at LIMIT 50').all();
+  const rows = await env.DB.prepare(`SELECT stripe_customer_id, attempts FROM billing_cleanup_queue
+    WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50`).bind(new Date().toISOString()).all();
   for (const row of rows.results || []) {
     try {
       await stripeRequest(env, `customers/${encodeURIComponent(row.stripe_customer_id)}`, null, 'DELETE');
@@ -628,8 +660,10 @@ async function flushStripeCleanupQueue(env) {
         continue;
       }
       console.error('[beta-worker] Stripe deletion will retry', row.stripe_customer_id);
-      await env.DB.prepare('UPDATE billing_cleanup_queue SET attempts = attempts + 1, last_error = ? WHERE stripe_customer_id = ?')
-        .bind('Stripe customer deletion failed.', row.stripe_customer_id).run();
+      const retryDelayHours = Math.min(24, 2 ** Math.min(Number(row.attempts) || 0, 5));
+      const nextAttemptAt = new Date(Date.now() + retryDelayHours * 60 * 60 * 1000).toISOString();
+      await env.DB.prepare('UPDATE billing_cleanup_queue SET attempts = attempts + 1, last_error = ?, next_attempt_at = ? WHERE stripe_customer_id = ?')
+        .bind('Stripe customer deletion failed.', nextAttemptAt, row.stripe_customer_id).run();
     }
   }
 }

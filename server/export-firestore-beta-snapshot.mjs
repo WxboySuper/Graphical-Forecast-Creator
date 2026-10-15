@@ -14,6 +14,11 @@ const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLow
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const serializeFirestoreValue = (value) => {
   if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (value && typeof value.latitude === 'number' && typeof value.longitude === 'number') {
+    return { __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude };
+  }
+  if (value && typeof value.path === 'string' && value.parent) return { __type: 'documentReference', path: value.path };
+  if (value && typeof value.toBase64 === 'function') return { __type: 'bytes', base64: value.toBase64() };
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, serializeFirestoreValue(child)]));
@@ -57,7 +62,7 @@ async function main() {
         await fullSnapshotFile.write(`${JSON.stringify({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })}\n`);
         fullSnapshotCount += 1;
         const childCollections = await document.ref.listCollections();
-        await Promise.all(childCollections.map(exportCollection));
+        for (const childCollection of childCollections) await exportCollection(childCollection);
       }
       if (collectionSnapshot.docs.length < 500) break;
       cursor = collectionSnapshot.docs.at(-1);
@@ -71,6 +76,7 @@ async function main() {
 
   const seenEmails = new Set();
   let count = 0;
+  let skippedNoEmail = 0;
   const migrateAccount = async (account) => {
     for (const [collection, key] of [['userSettings', 'userSettings'], ['userEntitlements', 'userEntitlement'], ['userMetrics', 'userMetrics']]) {
       const snapshot = await db.collection(collection).doc(account.uid).get();
@@ -113,8 +119,8 @@ async function main() {
         metadata,
         payloadJson: typeof payloadJson === 'string' ? payloadJson : '{}',
         payloadBytes: Number(metadata.payloadBytes) || Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
-        createdAt: metadata.createdAt?.toDate?.().toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
-        updatedAt: metadata.updatedAt?.toDate?.().toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
+        createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
+        updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
       });
     }
     for (const cycle of migratedCycles) {
@@ -148,8 +154,12 @@ async function main() {
     for (const profileDoc of profilePage.docs) {
       const profile = profileDoc.data();
       const email = normalizeEmail(profile.email);
-      if (!email) continue;
-      if (seenEmails.has(email)) throw new Error(`Duplicate account email in beta userProfiles: ${email}`);
+      if (!email) {
+        skippedNoEmail += 1;
+        console.warn(`Skipping beta user profile without an email (uid hash ${sha256(profileDoc.id)}).`);
+        continue;
+      }
+      if (seenEmails.has(email)) throw new Error(`Duplicate account email hash in beta userProfiles: ${sha256(email)}`);
       seenEmails.add(email);
       pageAccounts.push({
         uid: profileDoc.id,
@@ -169,7 +179,7 @@ async function main() {
     if (profilePage.docs.length < 500) break;
     profileCursor = profilePage.docs.at(-1);
   }
-  console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}.`);
+  console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}; skipped ${skippedNoEmail} profiles without email.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
 }
 

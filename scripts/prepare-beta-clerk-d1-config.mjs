@@ -13,5 +13,7 @@ if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data
 
 const template = await readFile(configPath, 'utf8');
 if (!template.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 config template is missing its database id marker.');
-await writeFile(generatedPath, template.replace('SET_AFTER_CREATING_BETA_D1', databaseId), 'utf8');
+const generated = template.replaceAll('SET_AFTER_CREATING_BETA_D1', databaseId);
+if (generated.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 config still contains an unresolved database id marker.');
+await writeFile(generatedPath, generated, 'utf8');
 console.log(`Prepared ${generatedPath} using the configured beta D1 database id.`);

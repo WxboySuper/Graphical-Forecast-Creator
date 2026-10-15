@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
-import { GoogleOneTap, SignIn } from '@clerk/react';
+import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
@@ -169,7 +169,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const isBusy = submitting || status === 'loading';
-  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : window.location.href;
+  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : `${window.location.origin}${window.location.pathname}`;
+  const clerkSignUpUrl = `${clerkRedirectUrl}?clerkSignUp=1`;
 
   useEffect(() => {
     if (!allowSignUp) {
@@ -182,6 +183,12 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
       setConfirmPassword('');
     }
   }, [allowSignUp, mode]);
+
+  useEffect(() => {
+    if (authProvider === 'clerk' && typeof window !== 'undefined') {
+      setMode(new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
+    }
+  }, [authProvider]);
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -238,7 +245,21 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
       {authProvider === 'clerk' ? (
         <div className="beta-auth-content">
           <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} />
-          <SignIn routing="hash" signUpUrl={allowSignUp ? clerkRedirectUrl : undefined} forceRedirectUrl={clerkRedirectUrl} />
+          {allowSignUp ? (
+            <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => { setMode('sign_in'); window.history.replaceState(null, '', clerkRedirectUrl); }}>
+                Sign in
+              </Button>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => { setMode('sign_up'); window.history.replaceState(null, '', clerkSignUpUrl); }}>
+                Create account
+              </Button>
+            </div>
+          ) : null}
+          {mode === 'sign_up' && allowSignUp ? (
+            <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />
+          ) : (
+            <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl} />
+          )}
           {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
         </div>
       ) : (

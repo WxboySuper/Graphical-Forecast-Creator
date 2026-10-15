@@ -23,6 +23,7 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { useAuth } from "../auth/AuthProvider";
+import BetaAuthCard from "../components/Beta/BetaAuthCard";
 import { useEntitlement } from "../billing/EntitlementProvider";
 import { PRICING_COPY } from "../billing/pricingCopy";
 import { useUserMetrics } from "../metrics/useUserMetrics";
@@ -1423,7 +1424,7 @@ const DisabledStateView: React.FC = () => (
 
 /** Production-facing account page for hosted sign-in, synced defaults, and local-only fallback. */
 const AccountPage: React.FC = () => {
-  const { hostedAuthEnabled, status } = useAuth();
+  const { authProvider, hostedAuthEnabled, status } = useAuth();
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -1432,7 +1433,10 @@ const AccountPage: React.FC = () => {
         {hostedAuthEnabled && status === "signed_in" ? (
           <SignedInAccountView />
         ) : null}
-        {hostedAuthEnabled && status !== "signed_in" ? (
+        {hostedAuthEnabled && status !== "signed_in" && authProvider === 'clerk' ? (
+          <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
+        ) : null}
+        {hostedAuthEnabled && status !== "signed_in" && authProvider !== 'clerk' ? (
           <SignedOutAccountView />
         ) : null}
       </div>

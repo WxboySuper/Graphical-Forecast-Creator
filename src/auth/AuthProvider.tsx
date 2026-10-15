@@ -1280,7 +1280,7 @@ const useHostedAuthState = (): AuthContextValue => {
     }
 
     betaAccessRequestIdRef.current += 1;
-    const requestId = betaAccessRequestIdRef.current;
+    const requestId = ++betaAccessRequestIdRef.current;
     setBetaAccessLoading(true);
 
     try {
@@ -1623,19 +1623,24 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let active = true;
     const userId = currentUser.uid;
     const timer = window.setTimeout(() => {
-      request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) })
-        .then((response) => { if (!response.ok) throw new Error('Unable to sync account settings.'); })
-        .then(() => {
-          if (!active || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+      const requestId = ++betaAccessRequestIdRef.current;
+      setSettingsSyncStatus('syncing');
+      const syncSettings = async () => {
+        try {
+          const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
+          const body = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
+          if (!active || requestId !== betaAccessRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
           lastSyncedSettingsRef.current = next;
           setSyncedSettings(next);
           setSettingsSyncStatus('synced');
-        })
-        .catch((syncError) => {
-          if (!active || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+        } catch (syncError) {
+          if (!active || requestId !== betaAccessRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
           setSettingsSyncStatus('error');
           setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.');
-        });
+        }
+      };
+      syncSettings();
     }, 750);
     return () => { active = false; window.clearTimeout(timer); };
   }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);

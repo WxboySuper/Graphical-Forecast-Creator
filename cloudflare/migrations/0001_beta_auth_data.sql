@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS users_legacy_uid_idx ON users(legacy_uid);
 
+-- Worker account deletion removes dependent rows explicitly. D1 connection
+-- PRAGMA settings are not persisted, so these declarations are not the cleanup guarantee.
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
   data_json TEXT NOT NULL CHECK (json_valid(data_json)),
@@ -70,15 +72,16 @@ CREATE TABLE IF NOT EXISTS billing_cleanup_queue (
   stripe_customer_id TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
   attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   last_error TEXT
 );
 
 CREATE TABLE IF NOT EXISTS product_metric_events (
+  event_id TEXT PRIMARY KEY,
   event_date TEXT NOT NULL,
   installation_id TEXT NOT NULL,
   event_type TEXT NOT NULL CHECK (event_type IN ('account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded', 'upgrades', 'cancellations')),
-  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
-  PRIMARY KEY (event_date, installation_id, event_type, user_id)
+  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric_events(event_date, user_id);
 
