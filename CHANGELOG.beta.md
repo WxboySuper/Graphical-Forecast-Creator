@@ -4,6 +4,12 @@ Development entries for pull requests targeting `beta`. These notes are consolid
 
 ## Unreleased
 
+### PR #1618
+
+#### Changed
+
+- Replace CARTO basemaps with OpenStreetMap tiles and remove the retired Light and Dark map choices.
+
 ### PR #878
 
 #### Changed
