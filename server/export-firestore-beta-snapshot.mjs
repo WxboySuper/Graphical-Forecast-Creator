@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { FieldPath, getFirestore } from 'firebase-admin/firestore';
+import { Bytes, DocumentReference, FieldPath, GeoPoint, getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 const required = (name) => {
   const value = process.env[name];
@@ -13,12 +13,12 @@ const required = (name) => {
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const serializeFirestoreValue = (value) => {
-  if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
-  if (value && typeof value.latitude === 'number' && typeof value.longitude === 'number') {
+  if (value instanceof Timestamp) return value.toDate().toISOString();
+  if (value instanceof GeoPoint) {
     return { __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude };
   }
-  if (value && typeof value.path === 'string' && value.parent) return { __type: 'documentReference', path: value.path };
-  if (value && typeof value.toBase64 === 'function') return { __type: 'bytes', base64: value.toBase64() };
+  if (value instanceof DocumentReference) return { __type: 'documentReference', path: value.path };
+  if (value instanceof Bytes) return { __type: 'bytes', base64: value.toBase64() };
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, serializeFirestoreValue(child)]));
@@ -47,10 +47,8 @@ async function main() {
     }),
   });
   const db = getFirestore(app);
-  await fs.mkdir(output, { recursive: true, mode: 0o700 });
-  await fs.chmod(output, 0o700);
-  const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'w', 0o600);
-  await fs.chmod(path.join(output, 'full-snapshot.jsonl'), 0o600);
+  await fs.mkdir(output, { mode: 0o700 });
+  const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
   let fullSnapshotCount = 0;
   let snapshotWriteQueue = Promise.resolve();
   const writeSnapshotLine = (record) => {
@@ -77,6 +75,19 @@ async function main() {
       cursor = collectionSnapshot.docs.at(-1);
     }
   };
+  const readAllDocuments = async (query) => {
+    const documents = [];
+    let cursor = null;
+    while (true) {
+      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
+      if (cursor) pageQuery = pageQuery.startAfter(cursor);
+      const page = await pageQuery.get();
+      documents.push(...page.docs);
+      if (page.docs.length < 500) break;
+      cursor = page.docs.at(-1);
+    }
+    return documents;
+  };
   try {
     for (const collection of await db.listCollections()) await exportCollection(collection);
   } finally {
@@ -95,11 +106,16 @@ async function main() {
     if (legacyValue) {
       let legacy = legacyValue;
       if (typeof legacyValue === 'string') {
-        try { legacy = JSON.parse(legacyValue); } catch { legacy = null; }
+        try { legacy = JSON.parse(legacyValue); } catch {
+          throw new Error(`Unparseable legacy cloudCycles for account hash ${sha256(account.uid)}.`);
+        }
       }
       if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
         for (const [id, raw] of Object.entries(legacy)) {
-          if (!raw || typeof raw !== 'object') continue;
+          if (!raw || typeof raw !== 'object') {
+            console.warn(`Skipping malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
+            continue;
+          }
           const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : raw;
           const payload = raw.payloadJson || raw.payload || '{}';
           account.cloudCycles.push({
@@ -115,16 +131,20 @@ async function main() {
         }
       }
     }
-    const cycleQuery = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
+    const cycleDocs = await readAllDocuments(db.collection('cloudCycles').where('userId', '==', account.uid));
     const migratedCycles = [];
-    for (let offset = 0; offset < cycleQuery.docs.length; offset += 10) {
-      const cycleDocs = cycleQuery.docs.slice(offset, offset + 10);
-      const payloadDocs = await Promise.all(cycleDocs.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
-      for (const [index, cycleDoc] of cycleDocs.entries()) {
+    for (let offset = 0; offset < cycleDocs.length; offset += 10) {
+      const cycleBatch = cycleDocs.slice(offset, offset + 10);
+      const payloadDocs = await Promise.all(cycleBatch.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
+      for (const [index, cycleDoc] of cycleBatch.entries()) {
         const metadata = cycleDoc.data();
         const payloadDoc = payloadDocs[index];
-        const payloadJson = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-        const normalizedPayload = typeof payloadJson === 'string' ? payloadJson : '{}';
+        const payloadValue = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
+        const payloadJson = typeof payloadValue === 'string' ? payloadValue : payloadValue == null ? null : JSON.stringify(payloadValue);
+        if (typeof payloadJson !== 'string') {
+          throw new Error(`Missing cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`);
+        }
+        const normalizedPayload = payloadJson;
         migratedCycles.push({
           id: cycleDoc.id,
           label: metadata.label,
@@ -143,18 +163,16 @@ async function main() {
     }
 
     const [awareness, products] = await Promise.all([
-      db.collection('users').doc(account.uid).collection('workflowAwareness').get(),
-      db.collection('users').doc(account.uid).collection('customProducts').get(),
+      readAllDocuments(db.collection('users').doc(account.uid).collection('workflowAwareness')),
+      readAllDocuments(db.collection('users').doc(account.uid).collection('customProducts')),
     ]);
-    account.workflowAwareness = awareness.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-    account.customProducts = products.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+    account.workflowAwareness = awareness.map((doc) => ({ id: doc.id, data: doc.data() }));
+    account.customProducts = products.map((doc) => ({ id: doc.id, data: doc.data() }));
     const key = `by-email/${sha256(account.email)}.json`;
     const outPath = path.join(output, key);
     await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });
-    await fs.chmod(path.dirname(outPath), 0o700);
     const json = JSON.stringify(serializeFirestoreValue(account));
-    await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'w' });
-    await fs.chmod(outPath, 0o600);
+    await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
     console.log(`${key} ${Buffer.byteLength(json)} bytes`);
     count += 1;
   };

@@ -254,6 +254,16 @@ jobs:
       - name: Apply target beta version for build validation
         run: npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
 
+      - name: Require Clerk publishable key for Clerk+D1
+        if: inputs.auth_backend == 'clerk-d1'
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.BETA_CLERK_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+            echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
+            exit 1
+          fi
+
       - name: Build beta frontend (validation only)
         run: pnpm run build
         env:

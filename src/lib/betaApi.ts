@@ -12,11 +12,10 @@ export const isBetaClerkD1Mode = (): boolean => Boolean(
 /** Registers the active Clerk session token source for non-component data services. */
 export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): void => {
   tokenProvider = provider;
-  if (provider) {
-    const waiters = tokenProviderWaiters;
-    tokenProviderWaiters = [];
-    waiters.forEach((resolve) => resolve(provider));
-  }
+  const waiters = tokenProviderWaiters;
+  tokenProviderWaiters = [];
+  const resolvedProvider = provider ?? (async () => null);
+  waiters.forEach((resolve) => resolve(resolvedProvider));
 };
 
 const waitForTokenProvider = (): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {

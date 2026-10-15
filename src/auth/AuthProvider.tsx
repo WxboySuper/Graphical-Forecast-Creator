@@ -1660,7 +1660,15 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     signInWithGoogle: disabledAuthAction,
     signInWithEmail: disabledAuthAction,
     signUpWithEmail: disabledAuthAction,
-    signOutUser: async () => { setError(null); await clerk.signOut(); },
+    signOutUser: async () => {
+      setError(null);
+      try {
+        await clerk.signOut();
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : 'Unable to sign out right now.');
+        throw nextError;
+      }
+    },
     deleteAccount: async () => {
       await deleteClerkUser();
       setSyncedSettings(null);

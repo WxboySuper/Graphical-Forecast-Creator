@@ -201,6 +201,7 @@ async function stripeRequest(env, endpoint, params, method = 'POST') {
     method,
     headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
     ...(params ? { body: new URLSearchParams(params) } : {}),
+    signal: AbortSignal.timeout(8_000),
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -300,7 +301,7 @@ async function handleApi(request, env) {
     if (claim.meta.changes === 0) return json({ received: true, duplicate: true });
     try {
     let subscription = object;
-    if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${object.subscription}`, null, 'GET');
+    if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET');
     if (event.type.startsWith('customer.subscription.') || event.type === 'checkout.session.completed') {
       const metadata = subscription.metadata || object.metadata || {};
       const clerkId = metadata.clerkId || object.client_reference_id || '';
@@ -615,7 +616,7 @@ async function handleApi(request, env) {
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (request.method === 'PATCH') {
       const product = body?.product;
-      if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) {
+      if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || product.builtIn === true || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) {
         return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
       }
       const dataJson = JSON.stringify(product);
@@ -782,6 +783,9 @@ export default {
     try { return await handleApi(request, env); }
     catch (error) {
       console.error('[beta-worker] request failed', error);
+      if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
+        return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
+      }
       if (typeof error?.message === 'string' && error.message.startsWith('SNAPSHOT_')) {
         return json({ error: 'Legacy data migration could not complete. The Firestore snapshot is retained for recovery.', code: 'SNAPSHOT_MIGRATION_FAILED' }, 422);
       }
