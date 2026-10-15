@@ -180,6 +180,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     nextUrl.searchParams.set('clerkSignUp', '1');
     return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
   })();
+  const clerkVerificationInProgress = typeof window !== 'undefined' && /verify|email-code|phone-code|factor/i.test(window.location.hash);
 
   useEffect(() => {
     if (!allowSignUp) {
@@ -202,6 +203,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   }, [authProvider]);
 
   const setClerkMode = (nextMode: AuthMode) => {
+    if (clerkVerificationInProgress) return;
     setMode(nextMode);
     if (typeof window === 'undefined') return;
     const nextUrl = new URL(window.location.href);
@@ -267,10 +269,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
+              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
+              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
                 Create account
               </Button>
             </div>

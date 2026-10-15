@@ -1511,7 +1511,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
-  useEffect(() => { settingsRequestIdRef.current += 1; }, [clerkUser?.id, isLoaded, isSignedIn]);
+  useEffect(() => { settingsRequestIdRef.current += 1; }, [clerkUser?.id, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
     const token = await getToken();
@@ -1585,7 +1585,10 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
       displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
       photoURL: clerkUser.imageUrl,
-      providerData: clerkUser.externalAccounts.map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com` })),
+      providerData: [
+        ...(clerkUser.externalAccounts ?? []).map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com` })),
+        ...(clerkUser.passwordEnabled ? [{ providerId: 'password' }] : []),
+      ],
       getIdToken: async () => {
         const token = await getToken();
         if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');

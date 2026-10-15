@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS custom_products (
 
 CREATE TABLE IF NOT EXISTS stripe_events (
   event_id TEXT PRIMARY KEY,
-  processed_at TEXT NOT NULL
+  processed_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'processing' CHECK (status IN ('processing', 'completed'))
 );
 CREATE INDEX IF NOT EXISTS stripe_events_processed_idx ON stripe_events(processed_at);
 

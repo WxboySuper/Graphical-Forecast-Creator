@@ -47,7 +47,7 @@ async function main() {
     }),
   });
   const db = getFirestore(app);
-  await fs.mkdir(output, { mode: 0o700 });
+  await fs.mkdir(output, { recursive: true, mode: 0o700 });
   const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
   let fullSnapshotCount = 0;
   let snapshotWriteQueue = Promise.resolve();
@@ -79,7 +79,7 @@ async function main() {
     const documents = [];
     let cursor = null;
     while (true) {
-      let pageQuery = query.limit(500);
+      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
       documents.push(...page.docs);
@@ -91,7 +91,8 @@ async function main() {
   try {
     for (const collection of await db.listCollections()) await exportCollection(collection);
   } finally {
-    await fullSnapshotFile.close();
+    try { await snapshotWriteQueue; }
+    finally { await fullSnapshotFile.close(); }
   }
 
   const seenEmails = new Set();

@@ -37,7 +37,7 @@ class D1Mock {
     this.cloudCycles = new Map();
     this.workflowAwareness = new Map();
     this.customProducts = new Map();
-    this.stripeEvents = new Set();
+    this.stripeEvents = new Map();
     this.metricEvents = new Set();
     this.billingCleanupQueue = new Map();
   }
@@ -94,7 +94,10 @@ class D1Mock {
     if (sql.startsWith('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles')) {
       return { bytes: [...this.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
     }
-    if (sql.startsWith('SELECT event_id FROM stripe_events')) return this.stripeEvents.has(params[0]) ? { event_id: params[0] } : null;
+    if (sql.startsWith('SELECT status FROM stripe_events')) {
+      const status = this.stripeEvents.get(params[0]);
+      return status ? { status } : null;
+    }
     return null;
   }
   async all(sql, params) {
@@ -188,10 +191,13 @@ class D1Mock {
       } else this.cloudCycles.delete(`${params[1]}:${params[0]}`);
       changes = before - this.cloudCycles.size;
     } else if (sql.startsWith('INSERT OR IGNORE INTO stripe_events')) {
-      const [eventId, processedAt] = params;
+      const [eventId, processedAt, status] = params;
       if (this.stripeEvents.has(eventId)) return { meta: { changes: 0 } };
-      this.stripeEvents.add(eventId);
+      this.stripeEvents.set(eventId, status);
       return { meta: { changes: 1 }, processed_at: processedAt };
+    } else if (sql.startsWith('UPDATE stripe_events SET status')) {
+      const [status, , eventId] = params;
+      if (this.stripeEvents.has(eventId)) this.stripeEvents.set(eventId, status);
     } else if (sql.startsWith('DELETE FROM stripe_events')) {
       this.stripeEvents.delete(params[0]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO product_metric_events') || sql.startsWith('INSERT INTO product_metric_events')) {
@@ -505,7 +511,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
         OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ?) < ?
       ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
-        metadata_json = json_set(excluded.metadata_json, '$.createdAt', json_extract(cloud_cycles.metadata_json, '$.createdAt')),
+        metadata_json = json_set(excluded.metadata_json, '$.createdAt', COALESCE(json_extract(cloud_cycles.metadata_json, '$.createdAt'), json_extract(excluded.metadata_json, '$.createdAt'))),
         payload_json = excluded.payload_json, payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`);
     const runCycleWrite = (id, limit) => cycleWrite.run(id, 'user_sqlite', id, '2026-10-15', '{}', '{}', 2, 'created', 'updated', 'user_sqlite', id, 'user_sqlite', limit);
     runCycleWrite('cycle-1', 1);
@@ -527,9 +533,30 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     assert.equal(insertSlot.run('user_sqlite', 'three', '{}', 'user_sqlite', 'user_sqlite', 2).changes, 0);
 
     const insertMetric = sqlite.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)');
-    insertMetric.run('evt-1', '2026-10-15', 'install-1', 'cloud_cycle_saved', 'user_sqlite');
-    insertMetric.run('evt-2', '2026-10-15', 'install-1', 'cloud_cycle_saved', 'user_sqlite');
+    const today = new Date().toISOString().slice(0, 10);
+    insertMetric.run('evt-1', today, 'install-1', 'cloud_cycle_saved', 'user_sqlite');
+    insertMetric.run('evt-2', today, 'install-1', 'cloud_cycle_saved', 'user_sqlite');
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM product_metric_events').get().count, 2);
+    const reportRows = sqlite.prepare(`SELECT event_date AS date, COUNT(DISTINCT CASE WHEN event_type NOT IN ('upgrades', 'cancellations') THEN installation_id END) AS activeDevices,
+      COUNT(DISTINCT user_id) AS activeSignedInAccounts,
+      SUM(CASE WHEN event_type = 'account_signup' THEN 1 ELSE 0 END) AS signups,
+      SUM(CASE WHEN event_type = 'account_signin' THEN 1 ELSE 0 END) AS signIns,
+      SUM(CASE WHEN event_type = 'upgrades' THEN 1 ELSE 0 END) AS upgrades,
+      SUM(CASE WHEN event_type = 'cancellations' THEN 1 ELSE 0 END) AS cancellations,
+      SUM(CASE WHEN event_type IN ('cloud_cycle_saved', 'cycle_saved') THEN 1 ELSE 0 END) AS cloudSaves,
+      SUM(CASE WHEN event_type = 'cloud_cycle_loaded' THEN 1 ELSE 0 END) AS cloudLoads
+      FROM product_metric_events WHERE event_date >= date('now', ?) GROUP BY event_date ORDER BY event_date ASC`).all('-30 days');
+    assert.equal(reportRows.at(-1).activeDevices, 1);
+    assert.equal(reportRows.at(-1).activeSignedInAccounts, 1);
+    assert.equal(reportRows.at(-1).cloudSaves, 2);
+
+    sqlite.prepare('INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)')
+      .run('user_sqlite', JSON.stringify({ billingStatus: 'active' }), today);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM user_entitlements WHERE json_extract(data_json, '$.billingStatus') IN ('active', 'trialing')").get().count, 1);
+
+    sqlite.prepare('INSERT INTO stripe_events (event_id, processed_at, status) VALUES (?, ?, ?)').run('evt-pending', today, 'processing');
+    sqlite.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?').run('completed', today, 'evt-pending');
+    assert.equal(sqlite.prepare('SELECT status FROM stripe_events WHERE event_id = ?').get('evt-pending').status, 'completed');
   } finally {
     sqlite.close();
   }
