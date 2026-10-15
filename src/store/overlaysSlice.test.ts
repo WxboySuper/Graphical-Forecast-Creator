@@ -7,9 +7,10 @@ describe('overlaysSlice', () => {
     expect(Object.values(state.ghostOutlooks)).toEqual([false, false, false, false, false, false]);
   });
 
-  test('redirects the retired dark basemap to light', () => {
-    expect(normalizeBaseMapStyle('carto-dark')).toBe('carto-light');
-    expect(reducer(undefined, setBaseMapStyle('carto-dark')).baseMapStyle).toBe('carto-light');
-    expect(reducer(undefined, applyOverlaySettings({ baseMapStyle: 'carto-dark' })).baseMapStyle).toBe('carto-light');
+  test('redirects retired Carto basemaps to OpenStreetMap', () => {
+    expect(normalizeBaseMapStyle('carto-light')).toBe('osm');
+    expect(normalizeBaseMapStyle('carto-dark')).toBe('osm');
+    expect(reducer(undefined, setBaseMapStyle('carto-dark')).baseMapStyle).toBe('osm');
+    expect(reducer(undefined, applyOverlaySettings({ baseMapStyle: 'carto-light' })).baseMapStyle).toBe('osm');
   });
 });

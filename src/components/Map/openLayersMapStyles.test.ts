@@ -107,7 +107,7 @@ describe('openLayersMapStyles', () => {
   });
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
-    expect(createLabelOverlaySource('osm')).toBeNull();
+    expect(createLabelOverlaySource('osm')?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
     expect(createTileSource('osm')).toBeTruthy();
     expect(createTileSource('osm').getUrls()?.[0]).toContain('tile.openstreetmap.org');
     expect(createTileSource('esri-satellite')).toBeTruthy();

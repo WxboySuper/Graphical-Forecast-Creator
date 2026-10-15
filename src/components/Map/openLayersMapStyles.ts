@@ -453,9 +453,6 @@ export const createLabelOverlaySource = (
 ): XYZ | null => {
   switch (style) {
     case "osm":
-      return null;
-    case "carto-light":
-      return null;
     case "esri-satellite":
       return new XYZ({
         url: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
@@ -474,8 +471,6 @@ export const createTileSource = (
 ): OSM | XYZ => {
   switch (style) {
     case "osm":
-      return new OSM({ crossOrigin: "anonymous" });
-    case "carto-light":
       return new OSM({ crossOrigin: "anonymous" });
     case "esri-satellite":
       return new XYZ({

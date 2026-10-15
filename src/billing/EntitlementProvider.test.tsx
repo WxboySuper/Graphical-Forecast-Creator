@@ -146,7 +146,7 @@ describe('EntitlementProvider', () => {
     expect(result.current.premiumActive).toBe(false);
     expect(result.current.error).toBeNull();
     expect(warnSpy).toHaveBeenCalledWith(
-      'No entitlement record was found for this signed-in account; using the free tier.'
+      expect.stringContaining('[entitlements] missing document path=')
     );
     warnSpy.mockRestore();
   });
