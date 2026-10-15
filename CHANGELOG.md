@@ -11,10 +11,6 @@ Work toward the next major release continues in the beta channel while the final
 
 <!-- v1.7.0 release lane: keep all v1.7 work here until stable promotion converts this lane into ## v1.7.0. -->
 
-#### Changed
-
-- Remove CARTO basemap tiles and retire the Light map option in favor of OpenStreetMap.
-
 #### Dependencies
 
 <!-- dependabot-automation -->
@@ -116,7 +112,7 @@ Work toward the next major release continues in the beta channel while the final
 #### Fixed
 
 - **Beta premium entitlements:** Treat beta overrides as premium access in the client and surface missing entitlement records instead of silently showing a free plan.
-- **Basemap availability:** Remove the broken Carto dark basemap from forecast, verification, and monitor maps, and redirect saved dark-map settings to the supported light basemap.
+- **Basemap availability:** Remove CARTO tile requests from forecast, verification, and monitor maps, retire the Light option, and use OpenStreetMap for saved legacy styles.
 - **Custom product handoff:** Handle unavailable sessionStorage safely and avoid consuming a handoff when its removal fails.
 - **Map reliability:** Reject malformed or empty forecast geometry before OpenLayers Snap indexes it, preserving the last valid rendered feature.
 - **Auto-categorical worker recovery:** Reset failed or timed-out workers, preserve the last good categorical geometry, and allow later edits to derive again instead of repeating the same Redux error.
