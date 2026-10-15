@@ -107,8 +107,9 @@ describe('openLayersMapStyles', () => {
   });
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
-    expect(createLabelOverlaySource('osm')).toBeTruthy();
+    expect(createLabelOverlaySource('osm')).toBeNull();
     expect(createTileSource('osm')).toBeTruthy();
+    expect(createTileSource('osm').getUrls()?.[0]).toContain('tile.openstreetmap.org');
     expect(createTileSource('esri-satellite')).toBeTruthy();
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM
   });

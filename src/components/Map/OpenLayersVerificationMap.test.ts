@@ -143,6 +143,7 @@ describe('OpenLayersVerificationMap helpers', () => {
   test('createVerifTileSource returns a source for known styles', () => {
     const tileSource = createVerifTileSource('osm');
     expect(tileSource).toBeTruthy();
+    expect(tileSource.getUrls()?.[0]).toContain('tile.openstreetmap.org');
   });
 });
 

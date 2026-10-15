@@ -6,10 +6,15 @@ import {
   STATE_OUTLINE_LAYER_Z_INDEX,
   STORM_REPORTS_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+  createBaseSource,
   createMesoscaleDiscussionStyle,
 } from './monitorMapLayerUtils';
 
 describe('monitor reference layer order', () => {
+  test('uses OpenStreetMap tiles for the monitor basemap', () => {
+    expect(createBaseSource().getUrls()?.[0]).toContain('tile.openstreetmap.org');
+  });
+
   test('keeps official references below alerts and user overlays', () => {
     expect(MONITOR_LAYER_Z_ORDER).toEqual({
       spcMesoscaleDiscussion: SPC_REFERENCE_LAYER_Z_INDEX,
