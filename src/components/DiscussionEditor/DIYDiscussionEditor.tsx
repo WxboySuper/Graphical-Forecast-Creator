@@ -42,7 +42,7 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const lineStart = content.lastIndexOf('\n', start - 1) + 1;
+    const lineStart = start === 0 ? 0 : content.lastIndexOf('\n', start - 1) + 1;
     const newText =
       content.substring(0, lineStart) +
       prefix +

@@ -61,4 +61,14 @@ describe('DIYDiscussionEditor', () => {
     fireEvent.click(screen.getByTitle('Heading 2'));
     expect(onChange).toHaveBeenLastCalledWith('line1\n## line2 text');
   });
+
+  test('heading at position 0 prefixes the first line even when content starts with a newline', () => {
+    const onChange = jest.fn();
+    render(<DIYDiscussionEditor content={'\nDiscussion'} onChange={onChange} />);
+    const textarea = screen.getByPlaceholderText(/Write your forecast discussion/i) as HTMLTextAreaElement;
+
+    setSelection(textarea, 0);
+    fireEvent.click(screen.getByTitle('Heading 1'));
+    expect(onChange).toHaveBeenLastCalledWith('# \nDiscussion');
+  });
 });
