@@ -11,6 +11,10 @@ Work toward the next major release continues in the beta channel while the final
 
 <!-- v1.7.0 release lane: keep all v1.7 work here until stable promotion converts this lane into ## v1.7.0. -->
 
+#### Changed
+
+- Remove CARTO basemap tiles and retire the Light map option in favor of OpenStreetMap.
+
 #### Dependencies
 
 <!-- dependabot-automation -->
