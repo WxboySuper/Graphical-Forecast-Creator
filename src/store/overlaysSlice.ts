@@ -3,6 +3,10 @@ import type { OutlookType } from '../types/outlooks';
 
 export type BaseMapStyle = 'osm' | 'carto-light' | 'carto-dark' | 'esri-satellite' | 'blank';
 
+/** Redirects retired CARTO map values to the supported OpenStreetMap style. */
+export const normalizeBaseMapStyle = (style: BaseMapStyle): BaseMapStyle =>
+  style === 'carto-light' || style === 'carto-dark' ? 'osm' : style;
+
 export interface OverlaysState {
   stateBorders: boolean;
   counties: boolean;
@@ -45,7 +49,7 @@ const overlaysSlice = createSlice({
       state[action.payload.layer] = action.payload.visible;
     },
     setBaseMapStyle: (state, action: PayloadAction<BaseMapStyle>) => {
-      state.baseMapStyle = action.payload;
+      state.baseMapStyle = normalizeBaseMapStyle(action.payload);
     },
     toggleGhostOutlook: (state, action: PayloadAction<OutlookType>) => {
       const outlookType = action.payload;
@@ -67,7 +71,7 @@ const overlaysSlice = createSlice({
       }
 
       if (baseMapStyle) {
-        state.baseMapStyle = baseMapStyle;
+        state.baseMapStyle = normalizeBaseMapStyle(baseMapStyle);
       }
 
       if (ghostOutlooks && !areGhostOutlooksEqual(state.ghostOutlooks, {

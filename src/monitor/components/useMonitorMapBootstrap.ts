@@ -184,6 +184,11 @@ export const useMonitorMapBootstrap = ({
     refs.alertsLayerRef.current = alertsLayer;
     refs.vectorReferenceGroupRef.current = vectorReferenceGroup;
 
+    const syncReferenceLabels = () => {
+      vectorReferenceGroup.setVisible(satelliteLayerInstance.getVisible());
+    };
+    satelliteLayerInstance.on('change:visible', syncReferenceLabels);
+
     loadUsStateOutlines(refs.stateOutlineSourceRef.current, darkMode).catch(() => undefined);
 
     const requestId = refs.vectorStyleRequestRef.current + 1;
@@ -200,7 +205,7 @@ export const useMonitorMapBootstrap = ({
 
         replaceLayerGroupLayers(refs.vectorReferenceGroupRef.current, nextReferenceGroup);
         refs.vectorReferenceGroupRef.current.setZIndex(TOP_VECTOR_REFERENCE_LAYER_Z_INDEX);
-        refs.vectorReferenceGroupRef.current.setVisible(true);
+        syncReferenceLabels();
         return undefined;
       })
       .catch(() => undefined);
@@ -209,6 +214,7 @@ export const useMonitorMapBootstrap = ({
       map.un('moveend', handleMoveEnd);
       map.un('click', handleMapClick);
       map.un('pointermove', handlePointerMove);
+      satelliteLayerInstance.un('change:visible', syncReferenceLabels);
       const target = map.getTargetElement();
       if (target instanceof HTMLElement) {
         target.style.cursor = '';

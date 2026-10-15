@@ -40,8 +40,7 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 - Copy cycle JSON to clipboard for sharing
 
 ### Map & UI
-- Multiple base map styles: Standard (OSM), Light (CartoDB), Dark (CartoDB), Satellite (Esri), **Blank (Weather)** (classic weather-style flat map — cream US, gray neighbors, blue ocean)
-- Map auto-switches to dark tile set when dark mode is enabled
+- Multiple base map styles: Standard (OpenStreetMap), Satellite (Esri), **Blank (Weather)** (classic weather-style flat map — cream US, gray neighbors, blue ocean)
 - Overlay toggles: state borders, county/CWA boundaries
 - Full light/dark theme with persistent preference
 - Toast notifications for all major actions
