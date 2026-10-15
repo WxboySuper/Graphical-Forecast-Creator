@@ -1,5 +1,3 @@
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS users (
   clerk_id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -12,27 +10,28 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS users_legacy_uid_idx ON users(legacy_uid);
 
 CREATE TABLE IF NOT EXISTS user_settings (
   user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
   data_json TEXT NOT NULL CHECK (json_valid(data_json)),
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS user_entitlements (
   user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
   data_json TEXT NOT NULL CHECK (json_valid(data_json)),
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS user_metrics (
   user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
   data_json TEXT NOT NULL CHECK (json_valid(data_json)),
-  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS cloud_cycles (
-  id TEXT PRIMARY KEY,
+  id TEXT NOT NULL,
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
   label TEXT NOT NULL,
   cycle_date TEXT NOT NULL,
@@ -40,7 +39,8 @@ CREATE TABLE IF NOT EXISTS cloud_cycles (
   payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
   payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0),
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS cloud_cycles_user_updated_idx ON cloud_cycles(user_id, updated_at DESC);
 
@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   processed_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS billing_cleanup_queue (
+  stripe_customer_id TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT
+);
+
+CREATE TABLE IF NOT EXISTS product_metric_events (
+  event_date TEXT NOT NULL,
+  installation_id TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded')),
+  user_id TEXT,
+  PRIMARY KEY (event_date, installation_id, event_type)
+);
+CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric_events(event_date, user_id);
+
 -- Forecast drafts, discussions and verification sessions are currently local
 -- browser workflow state. This table supports future opt-in server persistence
 -- without pretending those records were part of the Firestore snapshot.
@@ -77,3 +93,4 @@ CREATE TABLE IF NOT EXISTS user_records (
   updated_at TEXT NOT NULL,
   PRIMARY KEY (user_id, record_type, record_id)
 );
+CREATE INDEX IF NOT EXISTS user_records_user_type_updated_idx ON user_records(user_id, record_type, updated_at DESC);

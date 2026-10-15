@@ -263,9 +263,10 @@ const normalizeCloudCycleRecord = ({
 
   // Keep the Firestore contract strict on the client too: invalid nested
   // metadata is ignored rather than trusted as workflow state.
-  const workflowMetadata = isValidWorkflowMetadata(rawRecord.workflowMetadata) &&
-    rawRecord.workflowMetadata.cycleDate === metadata.cycleDate
-    ? rawRecord.workflowMetadata
+  const rawWorkflowMetadata = rawRecord.workflowMetadata ?? metadataSource.workflowMetadata;
+  const workflowMetadata = isValidWorkflowMetadata(rawWorkflowMetadata) &&
+    rawWorkflowMetadata.cycleDate === metadata.cycleDate
+    ? rawWorkflowMetadata
     : undefined;
 
   return {
@@ -445,9 +446,16 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   const cycleId = params.existingId || createCloudCycleId(params.userId, params.cycleDate);
   if (isBetaClerkD1Mode()) {
     const now = new Date().toISOString();
+    let existingMetadata: Record<string, unknown> | null = null;
+    if (params.existingId) {
+      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
+      existingMetadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
+    }
     const metadata: CloudCycleMetadata = {
       id: cycleId, userId: params.userId, label: params.label, cycleDate: params.cycleDate,
-      createdAt: now, updatedAt: now, forecastDays: params.stats.forecastDays,
+      createdAt: readTimestampString(existingMetadata?.createdAt, now), updatedAt: now, forecastDays: params.stats.forecastDays,
       totalOutlooks: params.stats.totalOutlooks, totalFeatures: params.stats.totalFeatures,
       isReadOnly: params.isReadOnly ?? false, payloadHash: computePayloadHash(params.payload),
       workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,

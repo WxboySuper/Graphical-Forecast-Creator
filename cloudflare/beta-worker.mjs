@@ -5,6 +5,8 @@ const API_PREFIX = '/api';
 const MAX_CYCLE_BYTES = 750_000;
 const MAX_CLOUD_CYCLES = 100;
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
+const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
+const authProfileCache = new Map();
 
 const json = (body, status = 200, headers = {}) => Response.json(body, {
   status,
@@ -13,6 +15,9 @@ const json = (body, status = 200, headers = {}) => Response.json(body, {
 
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const decodePathId = (value) => {
+  try { return decodeURIComponent(value); } catch { return null; }
+};
 const readBearer = (request) => {
   const value = request.headers.get('Authorization') || '';
   return value.startsWith('Bearer ') ? value.slice(7) : '';
@@ -22,9 +27,11 @@ async function authenticate(request, env) {
   const token = readBearer(request);
   if (!token || !env.CLERK_JWT_KEY) { console.warn('[beta-worker] missing token or JWT key', Boolean(token), Boolean(env.CLERK_JWT_KEY)); return null; }
   try {
+    const parties = (env.CLERK_AUTHORIZED_PARTIES || 'https://beta.gfcweather.com')
+      .split(',').map((party) => party.trim()).filter(Boolean);
     const verified = await verifyToken(token, {
       jwtKey: env.CLERK_JWT_KEY,
-      authorizedParties: ['https://beta.gfcweather.com'],
+      authorizedParties: parties,
     });
     const data = verified?.data || verified;
     const errors = verified?.errors;
@@ -32,9 +39,12 @@ async function authenticate(request, env) {
       if (errors?.length) console.warn('[beta-worker] Clerk token rejected', errors.map((error) => error.message).join('; '));
       return null;
     }
+    const cached = authProfileCache.get(data.sub);
+    if (cached && cached.expiresAt > Date.now()) return cached.identity;
     if (!env.CLERK_SECRET_KEY) return null;
     const profileResponse = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(data.sub)}`, {
       headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+      signal: AbortSignal.timeout(3_000),
     });
     if (!profileResponse.ok) { console.warn('[beta-worker] Clerk profile response rejected', profileResponse.status); return null; }
     const profile = await profileResponse.json();
@@ -44,7 +54,9 @@ async function authenticate(request, env) {
     const email = normalizeEmail(primary?.email_address);
     if (!email || primary?.verification?.status !== 'verified') { console.warn('[beta-worker] Clerk primary email is not verified', Boolean(email), primary?.verification?.status); return null; }
     const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
-    return { clerkId: data.sub, email, displayName };
+    const identity = { clerkId: data.sub, email, displayName };
+    authProfileCache.set(data.sub, { identity, expiresAt: Date.now() + AUTH_PROFILE_CACHE_TTL_MS });
+    return identity;
   } catch (error) {
     console.warn('[beta-worker] Clerk token rejected', error instanceof Error ? error.message : 'verification failed');
     return null;
@@ -58,7 +70,9 @@ const emailSnapshotKey = async (email) => {
 };
 
 async function ensureUser(user, env) {
-  const existing = await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
+  let existing = await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
+  const emailOwner = await env.DB.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
+  if (emailOwner && emailOwner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
   if (existing) {
     if (normalizeEmail(existing.email) !== user.email) {
       await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, updated_at = ? WHERE clerk_id = ?')
@@ -67,11 +81,6 @@ async function ensureUser(user, env) {
     if (existing.migration_status === 'complete') {
       return await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
     }
-  }
-
-  const emailOwner = await env.DB.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
-  if (emailOwner && emailOwner.clerk_id !== user.clerkId) {
-    throw new Error('EMAIL_ALREADY_LINKED');
   }
 
   let snapshot = null;
@@ -85,10 +94,20 @@ async function ensureUser(user, env) {
   const now = new Date().toISOString();
   const migrationStatus = snapshot ? 'migrating' : 'no_match';
   if (!existing) {
-    await env.DB.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
-      migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
-      .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
-        migrationStatus, now, now).run();
+    try {
+      await env.DB.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
+        migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
+        .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
+          migrationStatus, now, now).run();
+    } catch (error) {
+      const racedUser = await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
+      if (!racedUser) {
+        const racedEmail = await env.DB.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
+        if (racedEmail && racedEmail.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
+        throw error;
+      }
+      existing = racedUser;
+    }
   } else {
     await env.DB.prepare(`UPDATE users SET migration_status = ?,
       beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
@@ -102,12 +121,18 @@ async function ensureUser(user, env) {
       if (settings) {
         const settingsWithoutLegacyCycles = { ...settings };
         delete settingsWithoutLegacyCycles.cloudCycles;
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO user_settings (user_id, data_json) VALUES (?, ?)').bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles)));
+        statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
+          .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
       }
       const entitlement = snapshot.userEntitlement;
-      if (entitlement) statements.push(env.DB.prepare('INSERT OR IGNORE INTO user_entitlements (user_id, data_json) VALUES (?, ?)').bind(user.clerkId, JSON.stringify({ ...entitlement, uid: user.clerkId })));
+      if (entitlement) statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
+        .bind(user.clerkId, JSON.stringify({ ...entitlement, uid: user.clerkId }), now));
       const metrics = snapshot.userMetrics;
-      if (metrics) statements.push(env.DB.prepare('INSERT OR IGNORE INTO user_metrics (user_id, data_json) VALUES (?, ?)').bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId })));
+      if (metrics) statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
+        .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
       for (const cycle of snapshot.cloudCycles || []) {
         statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
           (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
@@ -125,9 +150,9 @@ async function ensureUser(user, env) {
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
           .bind(user.clerkId, product.id, migratedProduct.id || '', JSON.stringify(migratedProduct)));
       }
-      if (statements.length) await env.DB.batch(statements);
-      await env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
-        .bind('complete', now, now, user.clerkId).run();
+      statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
+        .bind('complete', now, now, user.clerkId));
+      await env.DB.batch(statements);
     } catch (error) {
       await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('failed', new Date().toISOString(), user.clerkId).run();
@@ -154,15 +179,20 @@ async function stripeRequest(env, endpoint, params, method = 'POST') {
 }
 
 async function verifyStripeSignature(payload, header, secret) {
-  const values = Object.fromEntries((header || '').split(',').map((part) => part.split('=')));
-  if (!values.t || !values.v1) return false;
+  const parts = (header || '').split(',').map((part) => part.trim().split('='));
+  const timestamp = parts.find(([key]) => key === 't')?.[1];
+  const signatures = parts.filter(([key, value]) => key === 'v1' && value).map(([, value]) => value);
+  if (!timestamp || signatures.length === 0 || !/^\d+$/.test(timestamp)) return false;
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${values.t}.${payload}`));
+  const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`));
   const expected = Array.from(new Uint8Array(signed), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  if (expected.length !== values.v1.length) return false;
-  let difference = 0;
-  for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ values.v1.charCodeAt(index);
-  return difference === 0 && Math.abs(Date.now() / 1000 - Number(values.t)) <= 300;
+  const valid = signatures.some((signature) => {
+    if (expected.length !== signature.length) return false;
+    let difference = 0;
+    for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
+    return difference === 0;
+  });
+  return valid && Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300;
 }
 
 async function handleApi(request, env) {
@@ -207,8 +237,13 @@ async function handleApi(request, env) {
     if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'Billing webhook is not configured.' }, 503);
     const raw = await request.text();
     if (!(await verifyStripeSignature(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) return json({ error: 'Invalid Stripe signature.' }, 400);
-    const event = JSON.parse(raw);
-    if (await env.DB.prepare('SELECT event_id FROM stripe_events WHERE event_id = ?').bind(event.id).first()) return json({ received: true, duplicate: true });
+    let event;
+    try { event = JSON.parse(raw); } catch { return json({ error: 'Invalid webhook payload.' }, 400); }
+    if (typeof event?.id !== 'string' || !event.id || typeof event.type !== 'string') return json({ error: 'Invalid webhook payload.' }, 400);
+    const claim = await env.DB.prepare('INSERT OR IGNORE INTO stripe_events (event_id, processed_at) VALUES (?, ?)')
+      .bind(event.id, new Date().toISOString()).run();
+    if (claim.meta.changes === 0) return json({ received: true, duplicate: true });
+    try {
     const object = event.data?.object || {};
     let subscription = object;
     if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${object.subscription}`, null, 'GET');
@@ -230,13 +265,16 @@ async function handleApi(request, env) {
           effectiveSource: prior.betaOverrideActive === true ? 'beta_override' : active ? 'stripe' : 'none',
           cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
           planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly', updatedAt: new Date().toISOString() };
-        await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json) VALUES (?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = CURRENT_TIMESTAMP`)
-          .bind(owner.clerk_id, JSON.stringify(entitlement)).run();
+        await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+          .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt).run();
       }
     }
-    await env.DB.prepare('INSERT INTO stripe_events (event_id, processed_at) VALUES (?, ?)').bind(event.id, new Date().toISOString()).run();
     return json({ received: true });
+    } catch (error) {
+      await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+      throw error;
+    }
   }
   if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
 
@@ -311,9 +349,11 @@ async function handleApi(request, env) {
   if (path === '/api/user/settings' && request.method === 'PUT') {
     const body = await readBody(request);
     if (!isObject(body?.settings)) return json({ error: 'Invalid settings.' }, 400);
-    await env.DB.prepare(`INSERT INTO user_settings (user_id, data_json) VALUES (?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = CURRENT_TIMESTAMP`)
-      .bind(user.clerk_id, JSON.stringify(body.settings)).run();
+    const dataJson = JSON.stringify(body.settings);
+    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Settings are too large.' }, 413);
+    await env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+      .bind(user.clerk_id, dataJson, new Date().toISOString()).run();
     return json({ success: true });
   }
 
@@ -324,21 +364,57 @@ async function handleApi(request, env) {
     if (!allowed.includes(user.clerk_id) && !(user.legacy_uid && allowed.includes(user.legacy_uid))) return json({ error: 'Admin access denied.' }, 403);
     const days = url.searchParams.get('window') === '30' ? 30 : url.searchParams.get('window') === '7' ? 7 : null;
     if (!days) return json({ error: 'Invalid metrics window.' }, 400);
-    const accounts = await env.DB.prepare('SELECT COUNT(*) AS count FROM users').first();
-    const premium = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_entitlements WHERE json_extract(data_json, '$.billingStatus') IN ('active', 'trialing')").first();
-    const metricRows = await env.DB.prepare('SELECT data_json FROM user_metrics').all();
-    const summary = { totalAccounts: Number(accounts?.count || 0), activeDevices: 0, activeSignedInAccounts: 0, premiumSubscriptions: Number(premium?.count || 0), storageBytes: 0, signups: 0, signIns: 0, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0 };
-    for (const row of metricRows.results || []) {
-      const metrics = parseJson(row.data_json) || {};
-      for (const [target, field] of [['cloudSaves', 'cloudCyclesSaved'], ['signIns', 'signIns'], ['signups', 'signups'], ['upgrades', 'upgrades'], ['cancellations', 'cancellations'], ['cloudLoads', 'cloudLoads']]) summary[target] += Number(metrics[field] || 0);
-    }
-    return json({ metricsEnabled: true, window: days, summary, dailyMetrics: [] });
+    const windowStart = `-${days - 1} days`;
+    const [accounts, premium, storage, rows] = await Promise.all([
+      env.DB.prepare('SELECT COUNT(*) AS count FROM users').first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM user_entitlements WHERE json_extract(data_json, '$.billingStatus') IN ('active', 'trialing')").first(),
+      env.DB.prepare('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles').first(),
+      env.DB.prepare(`SELECT event_date AS date, COUNT(DISTINCT installation_id) AS activeDevices,
+        COUNT(DISTINCT user_id) AS activeSignedInAccounts,
+        SUM(CASE WHEN event_type = 'account_signup' THEN 1 ELSE 0 END) AS signups,
+        SUM(CASE WHEN event_type = 'account_signin' THEN 1 ELSE 0 END) AS signIns,
+        SUM(CASE WHEN event_type = 'upgrades' THEN 1 ELSE 0 END) AS upgrades,
+        SUM(CASE WHEN event_type = 'cancellations' THEN 1 ELSE 0 END) AS cancellations,
+        SUM(CASE WHEN event_type IN ('cloud_cycle_saved', 'cycle_saved') THEN 1 ELSE 0 END) AS cloudSaves,
+        SUM(CASE WHEN event_type = 'cloud_cycle_loaded' THEN 1 ELSE 0 END) AS cloudLoads
+        FROM product_metric_events WHERE event_date >= date('now', ?) GROUP BY event_date ORDER BY event_date ASC`)
+        .bind(windowStart).all(),
+    ]);
+    const dailyMetrics = rows.results || [];
+    const totals = dailyMetrics.reduce((result, row) => {
+      for (const key of ['signups', 'signIns', 'upgrades', 'cancellations', 'cloudSaves', 'cloudLoads']) result[key] += Number(row[key] || 0);
+      return result;
+    }, { signups: 0, signIns: 0, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0 });
+    const latest = dailyMetrics.at(-1) || {};
+    const summary = { totalAccounts: Number(accounts?.count || 0), activeDevices: Number(latest.activeDevices || 0),
+      activeSignedInAccounts: Number(latest.activeSignedInAccounts || 0), premiumSubscriptions: Number(premium?.count || 0),
+      storageBytes: Number(storage?.bytes || 0), ...totals };
+    return json({ metricsEnabled: true, window: days, summary, dailyMetrics });
+  }
+
+  if (path === '/api/metrics/event' && request.method === 'POST') {
+    const body = await readBody(request);
+    const eventTypes = new Set(['account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded']);
+    if (!eventTypes.has(body?.event) || typeof body.installationId !== 'string' || body.installationId.length < 8 || body.installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
+    const eventDate = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare(`INSERT OR IGNORE INTO product_metric_events (event_date, installation_id, event_type, user_id)
+      VALUES (?, ?, ?, ?)`)
+      .bind(eventDate, body.installationId, body.event, user.clerk_id).run();
+    return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   }
 
   if (path === '/api/cloud-cycles' && request.method === 'GET') {
     const result = await env.DB.prepare(`SELECT id, user_id AS userId, label, cycle_date AS cycleDate, metadata_json, created_at AS createdAt, updated_at AS updatedAt
       FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC LIMIT ?`).bind(user.clerk_id, MAX_CLOUD_CYCLES).all();
-    return json({ cycles: (result.results || []).map((row) => ({ ...row, ...parseJson(row.metadata_json), metadata: parseJson(row.metadata_json) })) });
+    return json({ cycles: (result.results || []).map((row) => {
+      const stored = parseJson(row.metadata_json) || {};
+      const metadata = { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
+        createdAt: row.createdAt, updatedAt: row.updatedAt, forecastDays: stored.forecastDays,
+        totalOutlooks: stored.totalOutlooks, totalFeatures: stored.totalFeatures, isReadOnly: stored.isReadOnly,
+        payloadHash: stored.payloadHash, workspaceId: stored.workspaceId, workflowMetadata: stored.workflowMetadata };
+      return { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
+        createdAt: row.createdAt, updatedAt: row.updatedAt, workflowMetadata: stored.workflowMetadata, metadata };
+    }) });
   }
   if (path === '/api/cloud-cycles' && request.method === 'POST') {
     const body = await readBody(request);
@@ -350,8 +426,7 @@ async function handleApi(request, env) {
     if (!id || id.length > 128 || !label || label.length > 200 || !cycleDate || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
-    const existing = await env.DB.prepare('SELECT user_id FROM cloud_cycles WHERE id = ?').bind(id).first();
-    if (existing && existing.user_id !== user.clerk_id) return json({ error: 'Cloud cycle belongs to another account.' }, 409);
+    const existing = await env.DB.prepare('SELECT id FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
     if (!existing) {
       const count = await env.DB.prepare('SELECT COUNT(*) AS count FROM cloud_cycles WHERE user_id = ?').bind(user.clerk_id).first();
       if ((count?.count || 0) >= MAX_CLOUD_CYCLES) return json({ error: 'Cloud storage quota reached.' }, 409);
@@ -360,15 +435,17 @@ async function handleApi(request, env) {
     await env.DB.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
-        metadata_json = excluded.metadata_json, payload_json = excluded.payload_json,
+      ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
+        metadata_json = json_set(excluded.metadata_json, '$.createdAt', json_extract(cloud_cycles.metadata_json, '$.createdAt')),
+        payload_json = excluded.payload_json,
         payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
       .bind(id, user.clerk_id, label, cycleDate, JSON.stringify(body.metadata), payloadJson, bytes, now, now).run();
     return json({ success: true, data: id });
   }
   const cycleMatch = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
   if (cycleMatch) {
-    const id = decodeURIComponent(cycleMatch[1]);
+    const id = decodePathId(cycleMatch[1]);
+    if (!id) return json({ error: 'Invalid cloud cycle ID.' }, 400);
     if (request.method === 'GET') {
       const row = await env.DB.prepare('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
       if (!row) return json({ error: 'Cloud cycle not found.' }, 404);
@@ -377,8 +454,10 @@ async function handleApi(request, env) {
     if (request.method === 'PATCH') {
       const body = await readBody(request);
       if (typeof body?.label !== 'string' || !body.label.trim() || body.label.length > 200) return json({ error: 'Invalid label.' }, 400);
-      const result = await env.DB.prepare('UPDATE cloud_cycles SET label = ?, updated_at = ? WHERE id = ? AND user_id = ?')
-        .bind(body.label.trim(), new Date().toISOString(), id, user.clerk_id).run();
+      const updatedAt = new Date().toISOString();
+      const result = await env.DB.prepare(`UPDATE cloud_cycles SET label = ?, updated_at = ?,
+        metadata_json = json_set(metadata_json, '$.label', ?, '$.updatedAt', ?) WHERE id = ? AND user_id = ?`)
+        .bind(body.label.trim(), updatedAt, body.label.trim(), updatedAt, id, user.clerk_id).run();
       return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
     }
     if (request.method === 'DELETE') {
@@ -390,17 +469,16 @@ async function handleApi(request, env) {
   if (path === '/api/workflow-awareness' && request.method === 'GET') {
     const result = await env.DB.prepare('SELECT cycle_id AS id, data_json FROM workflow_awareness WHERE user_id = ?')
       .bind(user.clerk_id).all();
-    return json({ records: (result.results || []).map((row) => {
-      const stored = parseJson(row.data_json) || {};
-      return { ...(stored.metadata || {}), consentVersion: stored.consentVersion, schemaVersion: stored.schemaVersion };
-    }) });
+    return json({ records: (result.results || []).map((row) => parseJson(row.data_json)).filter(Boolean) });
   }
   if (path === '/api/workflow-awareness' && request.method === 'PUT') {
     const body = await readBody(request);
     if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string') return json({ error: 'Invalid workflow record.' }, 400);
+    const dataJson = JSON.stringify(body.record);
+    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
     await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
       ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
-      .bind(user.clerk_id, body.record.metadata.cycleId, JSON.stringify(body.record)).run();
+      .bind(user.clerk_id, body.record.metadata.cycleId, dataJson).run();
     return json({ success: true });
   }
   if (path === '/api/workflow-awareness' && request.method === 'DELETE') {
@@ -409,8 +487,10 @@ async function handleApi(request, env) {
   }
   const awarenessMatch = path.match(/^\/api\/workflow-awareness\/([^/]+)$/);
   if (awarenessMatch && request.method === 'DELETE') {
+    const cycleId = decodePathId(awarenessMatch[1]);
+    if (!cycleId) return json({ error: 'Invalid cycle ID.' }, 400);
     await env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
-      .bind(user.clerk_id, decodeURIComponent(awarenessMatch[1])).run();
+      .bind(user.clerk_id, cycleId).run();
     return json({ success: true });
   }
 
@@ -437,7 +517,8 @@ async function handleApi(request, env) {
   }
   const productMatch = path.match(/^\/api\/custom-products\/([^/]+)$/);
   if (productMatch) {
-    const productId = decodeURIComponent(productMatch[1]);
+    const productId = decodePathId(productMatch[1]);
+    if (!productId) return json({ error: 'Invalid custom product ID.' }, 400);
     const currentRow = await env.DB.prepare('SELECT slot_id, data_json FROM custom_products WHERE user_id = ? AND product_id = ?')
       .bind(user.clerk_id, productId).first();
     if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
@@ -465,7 +546,8 @@ async function handleApi(request, env) {
   const recordRoute = path.match(/^\/api\/(forecasts|discussions|verifications)(?:\/([^/]+))?$/);
   if (recordRoute) {
     const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
-    const recordId = recordRoute[2] ? decodeURIComponent(recordRoute[2]) : '';
+    const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
+    if (recordId === null) return json({ error: 'Invalid record ID.' }, 400);
     if (request.method === 'GET' && !recordId) {
       const rows = await env.DB.prepare('SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC LIMIT 200')
         .bind(user.clerk_id, recordType).all();
@@ -503,16 +585,33 @@ async function readJsonRecord(db, table, userId) {
   return row ? parseJson(row.data_json) : null;
 }
 
-async function deleteBetaUserData(userId, env) {
-  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', userId);
-  if (entitlement?.stripeCustomerId) {
-    if (!env.STRIPE_SECRET_KEY) throw new Error('Stripe cleanup is not configured.');
-    try { await stripeRequest(env, `customers/${encodeURIComponent(entitlement.stripeCustomerId)}`, null, 'DELETE'); }
-    catch (error) {
-      if (!String(error?.message || '').toLowerCase().includes('no such customer')) throw error;
+async function flushStripeCleanupQueue(env) {
+  if (!env.DB || !env.STRIPE_SECRET_KEY) return;
+  const rows = await env.DB.prepare('SELECT stripe_customer_id FROM billing_cleanup_queue ORDER BY created_at LIMIT 50').all();
+  for (const row of rows.results || []) {
+    try {
+      await stripeRequest(env, `customers/${encodeURIComponent(row.stripe_customer_id)}`, null, 'DELETE');
+      await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
+    } catch (error) {
+      if (String(error?.message || '').toLowerCase().includes('no such customer')) {
+        await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
+        continue;
+      }
+      console.error('[beta-worker] Stripe deletion will retry', row.stripe_customer_id);
+      await env.DB.prepare('UPDATE billing_cleanup_queue SET attempts = attempts + 1, last_error = ? WHERE stripe_customer_id = ?')
+        .bind('Stripe customer deletion failed.', row.stripe_customer_id).run();
     }
   }
-  await env.DB.batch([
+}
+
+async function deleteBetaUserData(userId, env) {
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', userId);
+  const statements = [];
+  if (typeof entitlement?.stripeCustomerId === 'string' && entitlement.stripeCustomerId) {
+    statements.push(env.DB.prepare('INSERT OR IGNORE INTO billing_cleanup_queue (stripe_customer_id, created_at) VALUES (?, ?)')
+      .bind(entitlement.stripeCustomerId, new Date().toISOString()));
+  }
+  statements.push(
     env.DB.prepare('DELETE FROM cloud_cycles WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM custom_products WHERE user_id = ?').bind(userId),
@@ -521,7 +620,8 @@ async function deleteBetaUserData(userId, env) {
     env.DB.prepare('DELETE FROM user_entitlements WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM user_metrics WHERE user_id = ?').bind(userId),
     env.DB.prepare('DELETE FROM users WHERE clerk_id = ?').bind(userId),
-  ]);
+  );
+  await env.DB.batch(statements);
 }
 
 const parseJson = (value) => {
@@ -571,7 +671,10 @@ export default {
         return json({ error: 'Invalid Clerk webhook signature.' }, 400);
       }
       if (event.type === 'user.deleted' && typeof event.data?.id === 'string') {
-        try { await deleteBetaUserData(event.data.id, env); }
+        try {
+          await deleteBetaUserData(event.data.id, env);
+          await flushStripeCleanupQueue(env);
+        }
         catch (error) {
           console.error('[beta-worker] Clerk deletion cleanup failed', error instanceof Error ? error.message : 'cleanup failed');
           return json({ error: 'Clerk account cleanup failed.' }, 500);
@@ -584,6 +687,10 @@ export default {
       console.error('[beta-worker] request failed', error);
       return json({ error: 'The beta API request failed.' }, 500);
     }
+  },
+  async scheduled(_controller, env) {
+    await flushStripeCleanupQueue(env);
+    await env.DB?.prepare("DELETE FROM product_metric_events WHERE event_date < date('now', '-90 days')").run();
   },
 };
 

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { FieldPath, getFirestore } from 'firebase-admin/firestore';
 
 const required = (name) => {
   const value = process.env[name];
@@ -43,15 +43,23 @@ async function main() {
   });
   const db = getFirestore(app);
   await fs.mkdir(output, { recursive: true, mode: 0o700 });
+  await fs.chmod(output, 0o700);
   const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
   let fullSnapshotCount = 0;
   const exportCollection = async (collectionRef) => {
-    const collectionSnapshot = await collectionRef.get();
-    for (const document of collectionSnapshot.docs) {
-      await fullSnapshotFile.write(`${JSON.stringify({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })}\n`);
-      fullSnapshotCount += 1;
-      const childCollections = await document.ref.listCollections();
-      for (const childCollection of childCollections) await exportCollection(childCollection);
+    let cursor = null;
+    while (true) {
+      let pageQuery = collectionRef.orderBy(FieldPath.documentId()).limit(500);
+      if (cursor) pageQuery = pageQuery.startAfter(cursor);
+      const collectionSnapshot = await pageQuery.get();
+      for (const document of collectionSnapshot.docs) {
+        await fullSnapshotFile.write(`${JSON.stringify({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })}\n`);
+        fullSnapshotCount += 1;
+        const childCollections = await document.ref.listCollections();
+        await Promise.all(childCollections.map(exportCollection));
+      }
+      if (collectionSnapshot.docs.length < 500) break;
+      cursor = collectionSnapshot.docs.at(-1);
     }
   };
   try {
@@ -82,17 +90,16 @@ async function main() {
   }
 
   const readOwnedDoc = async (collection, key) => {
-    const snapshot = await db.collection(collection).get();
-    for (const doc of snapshot.docs) {
-      const account = accounts.get(normalizeEmail((await db.collection('userProfiles').doc(doc.id).get()).data()?.email));
-      if (account) account[key] = doc.data();
-    }
+    await Promise.all([...accounts.values()].map(async (account) => {
+      const snapshot = await db.collection(collection).doc(account.uid).get();
+      if (snapshot.exists) account[key] = snapshot.data();
+    }));
   };
   await readOwnedDoc('userSettings', 'userSettings');
   await readOwnedDoc('userEntitlements', 'userEntitlement');
   await readOwnedDoc('userMetrics', 'userMetrics');
 
-  for (const account of accounts.values()) {
+  await Promise.all([...accounts.values()].map(async (account) => {
     const legacyValue = account.userSettings?.cloudCycles;
     if (legacyValue) {
       let legacy = legacyValue;
@@ -118,12 +125,11 @@ async function main() {
       }
     }
     const cycleQuery = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
-    for (const cycleDoc of cycleQuery.docs) {
-      account.cloudCycles = account.cloudCycles.filter((cycle) => cycle.id !== cycleDoc.id);
+    const migratedCycles = await Promise.all(cycleQuery.docs.map(async (cycleDoc) => {
       const metadata = cycleDoc.data();
       const payloadDoc = await cycleDoc.ref.collection('payload').doc('payload').get();
       const payloadJson = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-      account.cloudCycles.push({
+      return {
         id: cycleDoc.id,
         label: metadata.label,
         cycleDate: metadata.cycleDate,
@@ -132,19 +138,27 @@ async function main() {
         payloadBytes: Number(metadata.payloadBytes) || Buffer.byteLength(typeof payloadJson === 'string' ? payloadJson : '{}'),
         createdAt: metadata.createdAt?.toDate?.().toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
         updatedAt: metadata.updatedAt?.toDate?.().toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
-      });
+      };
+    }));
+    for (const cycle of migratedCycles) {
+      account.cloudCycles = account.cloudCycles.filter((existingCycle) => existingCycle.id !== cycle.id);
+      account.cloudCycles.push(cycle);
     }
 
-    const awareness = await db.collection('users').doc(account.uid).collection('workflowAwareness').get();
+    const [awareness, products] = await Promise.all([
+      db.collection('users').doc(account.uid).collection('workflowAwareness').get(),
+      db.collection('users').doc(account.uid).collection('customProducts').get(),
+    ]);
     account.workflowAwareness = awareness.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-    const products = await db.collection('users').doc(account.uid).collection('customProducts').get();
     account.customProducts = products.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
-  }
+  }));
 
   let count = 0;
   for (const account of accounts.values()) {
     const key = `by-email/${sha256(account.email)}.json`;
-    const outPath = path.join(output, `${sha256(account.email)}.json`);
+    const outPath = path.join(output, key);
+    await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });
+    await fs.chmod(path.dirname(outPath), 0o700);
     const json = JSON.stringify(serializeFirestoreValue(account));
     await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
     console.log(`${key} ${Buffer.byteLength(json)} bytes`);

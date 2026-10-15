@@ -26,6 +26,7 @@
     { "binding": "FIRESTORE_SNAPSHOT", "bucket_name": "gfc-beta-firestore-migration-snapshot" }
   ],
   "vars": { "BETA_AUTH_BACKEND": "clerk-d1" },
+  "triggers": { "crons": ["0 4 * * *"] },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,

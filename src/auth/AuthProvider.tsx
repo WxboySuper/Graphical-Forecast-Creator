@@ -1499,7 +1499,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
-  const [betaAccessLoading, setBetaAccessLoading] = useState(Boolean(isSignedIn));
+  const [betaAccessLoading, setBetaAccessLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapKey, setBootstrapKey] = useState('');
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
@@ -1528,7 +1528,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setBetaAccessLoading(true);
     try {
       const response = await request('/api/me/bootstrap');
-      const body = await response.json();
+      const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
       setBetaAccess(Boolean(body.user?.betaAccess));
       const settings = readRemoteSettings(body.settings ?? undefined);
@@ -1551,7 +1551,10 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [clerkUser, dispatch, isSignedIn, request]);
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded) {
+      setBetaAccessLoading(true);
+      return;
+    }
     if (!isSignedIn || !clerkUser) {
       setSyncedSettings(null);
       setSettingsSyncStatus('idle');

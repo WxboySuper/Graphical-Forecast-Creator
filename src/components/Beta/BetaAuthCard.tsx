@@ -239,8 +239,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           <GoogleOneTap signInForceRedirectUrl={`${window.location.pathname}${window.location.search}`} signUpForceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
           {allowSignUp ? <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={setMode} /> : null}
           {mode === 'sign_up' && allowSignUp
-            ? <SignUp routing="hash" signInUrl="/beta" forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
-            : <SignIn routing="hash" signUpUrl={allowSignUp ? '/beta-access' : undefined} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />}
+            ? <SignUp routing="hash" signInUrl={`${window.location.pathname}${window.location.search}`} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
+            : <SignIn routing="hash" signUpUrl={allowSignUp ? `${window.location.pathname}${window.location.search}` : undefined} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />}
           {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
         </div>
       ) : (
