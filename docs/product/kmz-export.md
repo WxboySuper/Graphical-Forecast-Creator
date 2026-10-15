@@ -2,7 +2,7 @@
 
 Issue: [#621](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/621)
 
-GFC uses a single **Import / Export** dialog for transferring forecast data between GFC and external tools. JSON, workflow ZIP packages, and (on local/beta) KML/KMZ are supported through one API and UI.
+GFC uses a single **Import / Export** dialog for transferring forecast data between GFC and external tools. JSON, workflow ZIP packages, KML, and KMZ are supported through one API and UI.
 
 ## UI entry points
 
@@ -20,10 +20,10 @@ Map image export remains separate via the existing export-image flow and is link
 | --- | --- | --- | --- |
 | JSON | Yes | Yes | Native GFC forecast file |
 | Package (ZIP) | Yes | Yes | Forecast JSON plus discussions; workflow-scoped export when a workflow is active |
-| KML | Yes (local/beta) | Yes (local/beta) | Outlook geometry for GIS tools |
-| KMZ | Yes (local/beta) | Yes (local/beta) | Compressed KML archive |
+| KML | Yes | Yes | Outlook geometry for GIS tools |
+| KMZ | Yes | Yes | Compressed KML archive |
 
-KML/KMZ are gated behind the `kmzExport` feature flag during prototype validation.
+KML/KMZ export is enabled through staging validation before production promotion. Custom product layers remain excluded from KML/KMZ transfers.
 
 ## KML/KMZ behavior
 
