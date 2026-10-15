@@ -18,16 +18,8 @@ export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): 
   waiters.forEach((resolve) => resolve(provider));
 };
 
-const waitForTokenProvider = (): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
-  const waiter = (provider: BetaApiTokenProvider) => {
-    clearTimeout(timeout);
-    resolve(provider);
-  };
-  const timeout = setTimeout(() => {
-    tokenProviderWaiters = tokenProviderWaiters.filter((pending) => pending !== waiter);
-    reject(new Error('The beta session is still initializing.'));
-  }, 5_000);
-  tokenProviderWaiters.push(waiter);
+const waitForTokenProvider = (): Promise<BetaApiTokenProvider> => new Promise((resolve) => {
+  tokenProviderWaiters.push(resolve);
 });
 
 /** Sends an authenticated request to the same-origin beta Worker API. */

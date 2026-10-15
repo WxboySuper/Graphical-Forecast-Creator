@@ -98,8 +98,10 @@ async function main() {
   const seenEmails = new Set();
   let count = 0;
   let skippedNoEmail = 0;
+  const userSnapshotEmailHashes = [];
   const missingEmailHashes = [];
   const accountFailures = [];
+  const malformedLegacyCycles = [];
   const migrateAccount = async (account) => {
     const [settingsDoc, entitlementDoc, metricsDoc] = await Promise.all([
       db.collection('userSettings').doc(account.uid).get(),
@@ -120,8 +122,8 @@ async function main() {
       if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
         for (const [id, raw] of Object.entries(legacy)) {
           if (!raw || typeof raw !== 'object') {
-            console.warn(`Skipping malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
-            continue;
+            malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
+            throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
           }
           const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : raw;
           const payload = raw.payloadJson || raw.payload || '{}';
@@ -181,6 +183,7 @@ async function main() {
     const json = JSON.stringify(serializeFirestoreValue(account));
     await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
     console.log(`${key} ${Buffer.byteLength(json)} bytes`);
+    userSnapshotEmailHashes.push(sha256(account.email));
     count += 1;
   };
 
@@ -230,10 +233,13 @@ async function main() {
     projectId,
     fullSnapshotCount,
     userSnapshotCount: count,
+    userSnapshotEmailHashes,
     skippedNoEmailCount: skippedNoEmail,
     missingEmailUidHashes: missingEmailHashes,
     accountFailures,
-    complete: accountFailures.length === 0,
+    malformedLegacyCycleCount: malformedLegacyCycles.length,
+    malformedLegacyCycleHashes: malformedLegacyCycles,
+    complete: accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0,
   }, null, 2), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}; skipped ${skippedNoEmail} profiles without email.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');

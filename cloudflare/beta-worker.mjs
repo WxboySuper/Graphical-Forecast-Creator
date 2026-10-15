@@ -46,10 +46,28 @@ async function authenticate(request, env) {
     }
     const cached = authProfileCache.get(data.sub);
     if (cached && cached.expiresAt > Date.now()) return cached.identity;
-    const profileResponse = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(data.sub)}`, {
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-      signal: AbortSignal.timeout(3_000),
-    });
+    if (cached) authProfileCache.delete(data.sub);
+    if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
+      const oldestKey = authProfileCache.keys().next().value;
+      if (oldestKey) authProfileCache.delete(oldestKey);
+    }
+    let profileResponse;
+    try {
+      profileResponse = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(data.sub)}`, {
+        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
+        signal: AbortSignal.timeout(3_000),
+      });
+    } catch (error) {
+      const unavailable = new Error('Clerk profile service is temporarily unavailable.');
+      unavailable.code = 'CLERK_PROFILE_UNAVAILABLE';
+      unavailable.cause = error;
+      throw unavailable;
+    }
+    if (profileResponse.status === 429 || profileResponse.status >= 500) {
+      const unavailable = new Error('Clerk profile service is temporarily unavailable.');
+      unavailable.code = 'CLERK_PROFILE_UNAVAILABLE';
+      throw unavailable;
+    }
     if (!profileResponse.ok) { console.warn('[beta-worker] Clerk profile response rejected', profileResponse.status); return null; }
     const profile = await profileResponse.json();
     const primary = Array.isArray(profile.email_addresses)
@@ -60,16 +78,10 @@ async function authenticate(request, env) {
     const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
     const identity = { clerkId: data.sub, email, displayName };
     const now = Date.now();
-    for (const [userId, entry] of authProfileCache) {
-      if (entry.expiresAt <= now) authProfileCache.delete(userId);
-    }
-    if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
-      const oldestKey = authProfileCache.keys().next().value;
-      if (oldestKey) authProfileCache.delete(oldestKey);
-    }
     authProfileCache.set(data.sub, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
     return identity;
   } catch (error) {
+    if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') throw error;
     console.warn('[beta-worker] Clerk token rejected', error instanceof Error ? error.message : 'verification failed');
     return null;
   }
@@ -309,7 +321,7 @@ async function handleApi(request, env) {
     try {
     let subscription = object;
     if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET');
-    if (event.type.startsWith('customer.subscription.') || event.type === 'checkout.session.completed') {
+    if (event.type.startsWith('customer.subscription.') || (event.type === 'checkout.session.completed' && object.subscription)) {
       const metadata = subscription.metadata || object.metadata || {};
       const clerkId = metadata.clerkId || object.client_reference_id || '';
       const legacyUid = metadata.legacyUid || '';
@@ -642,7 +654,11 @@ async function handleApi(request, env) {
       return result.meta.changes ? json({ success: true, product }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
     }
     if (request.method === 'DELETE') {
-      const expectedVersion = Number(request.headers.get('If-Match') || body?.expectedVersion);
+      const ifMatch = request.headers.get('If-Match')?.trim();
+      const headerVersions = [...(ifMatch || '').matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
+      const expectedVersion = headerVersions.length
+        ? headerVersions.includes(current.version) ? current.version : NaN
+        : body?.expectedVersion;
       if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
       const result = await env.DB.prepare(`DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?
         AND json_extract(data_json, '$.version') = ?`).bind(user.clerk_id, currentRow.slot_id, productId, expectedVersion).run();
@@ -699,14 +715,14 @@ async function flushStripeCleanupQueue(env) {
   if (!env.DB || !env.STRIPE_SECRET_KEY) return;
   const rows = await env.DB.prepare(`SELECT stripe_customer_id, attempts FROM billing_cleanup_queue
     WHERE next_attempt_at <= ? ORDER BY created_at LIMIT 50`).bind(new Date().toISOString()).all();
-  for (const row of rows.results || []) {
+  const cleanCustomer = async (row) => {
     try {
       await stripeRequest(env, `customers/${encodeURIComponent(row.stripe_customer_id)}`, null, 'DELETE');
       await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
     } catch (error) {
       if (error?.code === 'resource_missing') {
         await env.DB.prepare('DELETE FROM billing_cleanup_queue WHERE stripe_customer_id = ?').bind(row.stripe_customer_id).run();
-        continue;
+        return;
       }
       console.error('[beta-worker] Stripe deletion will retry', row.stripe_customer_id);
       const retryDelayHours = Math.min(24, 2 ** Math.min(Number(row.attempts) || 0, 5));
@@ -714,6 +730,10 @@ async function flushStripeCleanupQueue(env) {
       await env.DB.prepare('UPDATE billing_cleanup_queue SET attempts = attempts + 1, last_error = ?, next_attempt_at = ? WHERE stripe_customer_id = ?')
         .bind('Stripe customer deletion failed.', nextAttemptAt, row.stripe_customer_id).run();
     }
+  };
+  const pending = rows.results || [];
+  for (let offset = 0; offset < pending.length; offset += 5) {
+    await Promise.allSettled(pending.slice(offset, offset + 5).map(cleanCustomer));
   }
 }
 
@@ -787,6 +807,7 @@ export default {
       if (event.type === 'user.deleted' && typeof event.data?.id === 'string') {
         if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
         try {
+          authProfileCache.delete(event.data.id);
           await deleteBetaUserData(event.data.id, env);
           await flushStripeCleanupQueue(env);
         }
@@ -800,6 +821,7 @@ export default {
     try { return await handleApi(request, env); }
     catch (error) {
       console.error('[beta-worker] request failed', error);
+      if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
       if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
         return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
       }

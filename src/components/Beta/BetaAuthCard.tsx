@@ -168,6 +168,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [clerkVerificationInProgress, setClerkVerificationInProgress] = useState(false);
   const isBusy = submitting || status === 'loading';
   const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : (() => {
     const nextUrl = new URL(window.location.href);
@@ -180,7 +181,17 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     nextUrl.searchParams.set('clerkSignUp', '1');
     return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
   })();
-  const clerkVerificationInProgress = typeof window !== 'undefined' && /verify|email-code|phone-code|factor/i.test(window.location.hash);
+  useEffect(() => {
+    if (authProvider !== 'clerk' || typeof window === 'undefined') return;
+    const syncVerificationState = () => {
+      const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+      const verificationSegments = new Set(['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback']);
+      setClerkVerificationInProgress(segments.some((segment) => verificationSegments.has(segment.toLowerCase())));
+    };
+    syncVerificationState();
+    window.addEventListener('hashchange', syncVerificationState);
+    return () => window.removeEventListener('hashchange', syncVerificationState);
+  }, [authProvider]);
 
   useEffect(() => {
     if (!allowSignUp) {

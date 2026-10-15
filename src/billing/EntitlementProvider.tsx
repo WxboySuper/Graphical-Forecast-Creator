@@ -335,9 +335,12 @@ const resolveEntitlementEffect = (
 
   if (isBetaClerkD1Mode()) {
     let active = true;
+    let attempts = 0;
+    let retryTimer: number | undefined;
     handlers.setEntitlementStatus('loading');
-    fetchBetaApi('/api/user/entitlement')
-      .then(async (response) => {
+    const loadEntitlement = async (): Promise<void> => {
+      try {
+        const response = await fetchBetaApi('/api/user/entitlement');
         const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
         if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
         if (!active) return;
@@ -355,15 +358,21 @@ const resolveEntitlementEffect = (
         handlers.setEntitlement(state.entitlement);
         handlers.setEntitlementStatus(state.status);
         handlers.setError(null);
-      })
-      .catch((nextError: Error) => {
+      } catch (nextError) {
         if (!active) return;
-        if (nextError.message.includes('The beta session is still initializing')) return;
+        const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
+        if (message.includes('The beta session is still initializing') && attempts < 20) {
+          attempts += 1;
+          retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
+          return;
+        }
         handlers.setEntitlement(DEFAULT_ENTITLEMENT);
         handlers.setEntitlementStatus('error');
-        handlers.setError(nextError.message);
-      });
-    return () => { active = false; };
+        handlers.setError(message);
+      }
+    };
+    void loadEntitlement();
+    return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
   }
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };

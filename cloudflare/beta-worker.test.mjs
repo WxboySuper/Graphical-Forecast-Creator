@@ -143,9 +143,9 @@ class D1Mock {
         ...(sql.includes('legacy_uid = COALESCE') ? { legacy_uid: user.legacy_uid || params[1], ...(params[2] === 1 ? { beta_access: 1 } : {}) } : {}),
       });
     } else if (sql.startsWith('UPDATE users SET email')) {
-      const [email, updated_at, clerk_id] = params;
+      const [email, display_name, updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { email, updated_at, email_verified: 1 });
+      if (user) Object.assign(user, { email, display_name, updated_at, email_verified: 1 });
     } else if (sql.startsWith('UPDATE users SET beta_access')) {
       const [updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
@@ -396,6 +396,21 @@ test('email ownership conflicts return 409 without changing the existing account
     assert.equal(response.status, 409);
     assert.deepEqual(db.users.get('other_clerk_user'), { clerk_id: 'other_clerk_user', email: 'test@example.com', legacy_uid: 'legacy_owner' });
     assert.equal(db.users.has('user_beta_test'), false);
+  });
+});
+
+test('existing Clerk accounts refresh their email and display name safely', async () => {
+  const db = new D1Mock();
+  db.users.set('user_beta_test', {
+    clerk_id: 'user_beta_test', email: 'test@example.com', display_name: 'Old Name', migration_status: 'complete',
+    beta_access: 1, email_verified: 1,
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', createEnv(db));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).user, {
+      id: 'user_beta_test', email: 'test@example.com', displayName: 'Beta Tester', betaAccess: true, migrationStatus: 'complete',
+    });
   });
 });
 

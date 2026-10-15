@@ -1487,15 +1487,19 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const monitorSettings = useSelector((state: RootState) => state.monitor);
   const { isLoaded, isSignedIn, getToken } = useClerkAuth();
   const clerk = useClerk();
-  const { user: clerkUser } = useUser();
+  const { user: clerkUser, isLoaded: isUserLoaded } = useUser();
   const deleteClerkUser = useReverification(async () => {
     if (!clerkUser) throw new Error('Sign in before deleting your account.');
     await clerkUser.delete();
   });
   useEffect(() => {
+    if (!isLoaded) {
+      setBetaApiTokenProvider(null);
+      return () => setBetaApiTokenProvider(null);
+    }
     setBetaApiTokenProvider(async () => (await getToken()) ?? null);
     return () => setBetaApiTokenProvider(null);
-  }, [getToken]);
+  }, [getToken, isLoaded]);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
@@ -1511,7 +1515,10 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
-  useEffect(() => { settingsRequestIdRef.current += 1; }, [clerkUser?.id, isSignedIn]);
+  useEffect(() => {
+    settingsRequestIdRef.current += 1;
+    setSettingsSyncStatus('idle');
+  }, [clerkUser?.id, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
     const token = await getToken();
@@ -1558,7 +1565,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [clerkUser, dispatch, isSignedIn, request]);
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || !isUserLoaded) {
       betaAccessRequestIdRef.current += 1;
       setBetaAccessLoading(true);
       return;
@@ -1576,7 +1583,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     refreshBetaAccess().catch(() => undefined);
-  }, [clerkUser, isLoaded, isSignedIn, refreshBetaAccess]);
+  }, [clerkUser, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess]);
 
   const currentUser = useMemo(() => {
     if (!clerkUser) return null;
@@ -1626,8 +1633,11 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [currentUser, darkMode, monitorSettings, overlays, request]);
 
   useEffect(() => {
-    if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || !syncedSettings || bootstrapKey !== currentUser.uid) return;
-    const next = createSettingsSnapshot({ darkMode, overlays, defaultForecasterName: syncedSettings.defaultForecasterName || currentUser.displayName || '', forecastUiVariant: syncedSettings.forecastUiVariant, monitorSettings: syncedSettings.monitorSettings ?? monitorSettings });
+    if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || bootstrapKey !== currentUser.uid) return;
+    const baseline = syncedSettings ?? buildHostedAccountFallbackSettings(
+      darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
+    );
+    const next = createSettingsSnapshot({ darkMode, overlays, defaultForecasterName: baseline.defaultForecasterName || currentUser.displayName || '', forecastUiVariant: baseline.forecastUiVariant, monitorSettings: baseline.monitorSettings ?? monitorSettings });
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, next)) return;
     let active = true;
     const userId = currentUser.uid;
@@ -1655,7 +1665,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
 
   const value = useMemo<AuthContextValue>(() => ({
-    status: !isLoaded ? 'loading' : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
+    status: !isLoaded || !isUserLoaded ? 'loading' : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
     settingsSyncStatus,
     user: currentUser,
     authProvider: 'clerk',
@@ -1683,7 +1693,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     updateSyncedSettings,
     refreshBetaAccess,
-  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, refreshBetaAccess, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
+  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

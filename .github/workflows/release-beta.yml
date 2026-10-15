@@ -258,7 +258,7 @@ jobs:
       - name: Require Clerk publishable key for Clerk+D1
         if: inputs.auth_backend == 'clerk-d1'
         env:
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.BETA_CLERK_PUBLISHABLE_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
         run: |
           if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
             echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
@@ -457,9 +457,36 @@ jobs:
             pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql --remote
             test -s beta-d1-backup-verified.sql
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --remote
-            node --input-type=module -e "import fs from 'node:fs'; const manifest = JSON.parse(fs.readFileSync('beta-firestore-manifest.json', 'utf8')); if (manifest.complete !== true || !Number.isInteger(manifest.fullSnapshotCount) || !Number.isInteger(manifest.userSnapshotCount)) throw new Error('Firestore snapshot manifest is incomplete or invalid.');"
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --remote
-            test -f beta-firestore-full-snapshot.jsonl
+            test -s beta-firestore-full-snapshot.jsonl
+            node --input-type=module - <<'NODE'
+            import fs from 'node:fs';
+            import readline from 'node:readline';
+            import { createReadStream } from 'node:fs';
+            const manifest = JSON.parse(fs.readFileSync('beta-firestore-manifest.json', 'utf8'));
+            if (manifest.complete !== true || manifest.skippedNoEmailCount !== 0 || manifest.malformedLegacyCycleCount !== 0
+              || !Array.isArray(manifest.accountFailures) || manifest.accountFailures.length !== 0
+              || !Number.isInteger(manifest.fullSnapshotCount) || manifest.fullSnapshotCount < 1
+              || !Number.isInteger(manifest.userSnapshotCount) || manifest.userSnapshotCount < 1
+              || !Array.isArray(manifest.userSnapshotEmailHashes)
+              || manifest.userSnapshotEmailHashes.length !== manifest.userSnapshotCount
+              || manifest.userSnapshotEmailHashes.some((hash) => !/^[a-f0-9]{64}$/.test(hash))
+              || new Set(manifest.userSnapshotEmailHashes).size !== manifest.userSnapshotEmailHashes.length) {
+              throw new Error('Firestore snapshot manifest is incomplete or has skipped users/data.');
+            }
+            fs.writeFileSync('beta-firestore-email-hashes.txt', `${manifest.userSnapshotEmailHashes.join('\n')}\n`, { mode: 0o600 });
+            let lines = 0;
+            for await (const line of readline.createInterface({ input: createReadStream('beta-firestore-full-snapshot.jsonl'), crlfDelay: Infinity })) {
+              if (line.trim()) { JSON.parse(line); lines += 1; }
+            }
+            if (lines !== manifest.fullSnapshotCount) throw new Error(`Full snapshot has ${lines} records; manifest expects ${manifest.fullSnapshotCount}.`);
+            NODE
+            SNAPSHOT_VERIFY_DIR=$(mktemp -d)
+            trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
+            while IFS= read -r EMAIL_HASH; do
+              pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --remote
+              test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
+            done < beta-firestore-email-hashes.txt
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 deploy --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
