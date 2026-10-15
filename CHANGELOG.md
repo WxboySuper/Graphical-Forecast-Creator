@@ -55,6 +55,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
 - **Stripe server SDK:** Update the server Stripe library from 22.6.2 to 23.0.0 to keep premium checkout, customer portal, and subscription webhooks on a supported release with no change to billing behavior.
 - **Server:** Update hosted API dependencies to Sentry Node 11.6.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
 - **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
