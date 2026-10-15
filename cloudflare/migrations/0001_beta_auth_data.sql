@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS billing_cleanup_queue (
   next_attempt_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   last_error TEXT
 );
+CREATE INDEX IF NOT EXISTS billing_cleanup_queue_next_attempt_idx ON billing_cleanup_queue(next_attempt_at);
 
 CREATE TABLE IF NOT EXISTS product_metric_events (
   event_id TEXT PRIMARY KEY,
@@ -83,6 +84,7 @@ CREATE TABLE IF NOT EXISTS product_metric_events (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric_events(event_date, user_id);
+CREATE INDEX IF NOT EXISTS product_metric_events_reporting_idx ON product_metric_events(event_date, event_type, installation_id);
 
 -- Forecast drafts, discussions and verification sessions are currently local
 -- browser workflow state. This table supports future opt-in server persistence

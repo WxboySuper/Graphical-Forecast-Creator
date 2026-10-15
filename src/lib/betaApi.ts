@@ -26,7 +26,7 @@ const waitForTokenProvider = (): Promise<BetaApiTokenProvider> => new Promise((r
   const timeout = setTimeout(() => {
     tokenProviderWaiters = tokenProviderWaiters.filter((pending) => pending !== waiter);
     reject(new Error('The beta session is still initializing.'));
-  }, 30_000);
+  }, 5_000);
   tokenProviderWaiters.push(waiter);
 });
 

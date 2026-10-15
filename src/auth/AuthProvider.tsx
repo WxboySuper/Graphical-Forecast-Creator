@@ -1585,8 +1585,12 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
       displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
       photoURL: clerkUser.imageUrl,
-      providerData: clerkUser.externalAccounts.map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : account.provider })),
-      getIdToken: async () => (await getToken()) ?? '',
+      providerData: clerkUser.externalAccounts.map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com` })),
+      getIdToken: async () => {
+        const token = await getToken();
+        if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
+        return token;
+      },
     };
     return facade as unknown as User;
   }, [clerkUser, getToken]);

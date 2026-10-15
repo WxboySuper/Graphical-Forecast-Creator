@@ -79,7 +79,7 @@ async function main() {
     const documents = [];
     let cursor = null;
     while (true) {
-      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
+      let pageQuery = query.limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
       documents.push(...page.docs);
@@ -97,11 +97,17 @@ async function main() {
   const seenEmails = new Set();
   let count = 0;
   let skippedNoEmail = 0;
+  const missingEmailHashes = [];
+  const accountFailures = [];
   const migrateAccount = async (account) => {
-    for (const [collection, key] of [['userSettings', 'userSettings'], ['userEntitlements', 'userEntitlement'], ['userMetrics', 'userMetrics']]) {
-      const snapshot = await db.collection(collection).doc(account.uid).get();
-      if (snapshot.exists) account[key] = snapshot.data();
-    }
+    const [settingsDoc, entitlementDoc, metricsDoc] = await Promise.all([
+      db.collection('userSettings').doc(account.uid).get(),
+      db.collection('userEntitlements').doc(account.uid).get(),
+      db.collection('userMetrics').doc(account.uid).get(),
+    ]);
+    if (settingsDoc.exists) account.userSettings = settingsDoc.data();
+    if (entitlementDoc.exists) account.userEntitlement = entitlementDoc.data();
+    if (metricsDoc.exists) account.userMetrics = metricsDoc.data();
     const legacyValue = account.userSettings?.cloudCycles;
     if (legacyValue) {
       let legacy = legacyValue;
@@ -188,6 +194,7 @@ async function main() {
       const email = normalizeEmail(profile.email);
       if (!email) {
         skippedNoEmail += 1;
+        missingEmailHashes.push(sha256(profileDoc.id));
         console.warn(`Skipping beta user profile without an email (uid hash ${sha256(profileDoc.id)}).`);
         continue;
       }
@@ -206,13 +213,30 @@ async function main() {
       });
     }
     for (let offset = 0; offset < pageAccounts.length; offset += 10) {
-      await Promise.all(pageAccounts.slice(offset, offset + 10).map(migrateAccount));
+      const results = await Promise.allSettled(pageAccounts.slice(offset, offset + 10).map(migrateAccount));
+      for (const [index, result] of results.entries()) {
+        if (result.status === 'rejected') {
+          const failedAccount = pageAccounts[offset + index];
+          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email) });
+          console.error(`Failed beta snapshot for account hash ${sha256(failedAccount.uid)}: ${result.reason?.message || 'unknown error'}`);
+        }
+      }
     }
     if (profilePage.docs.length < 500) break;
     profileCursor = profilePage.docs.at(-1);
   }
+  await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({
+    projectId,
+    fullSnapshotCount,
+    userSnapshotCount: count,
+    skippedNoEmailCount: skippedNoEmail,
+    missingEmailUidHashes: missingEmailHashes,
+    accountFailures,
+    complete: accountFailures.length === 0,
+  }, null, 2), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}; skipped ${skippedNoEmail} profiles without email.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
+  if (accountFailures.length) throw new Error(`Snapshot export incomplete: ${accountFailures.length} user records failed; review manifest.json and rerun to a new output directory.`);
 }
 
 main().catch((error) => {

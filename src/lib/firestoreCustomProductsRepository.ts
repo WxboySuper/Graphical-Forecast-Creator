@@ -92,9 +92,9 @@ export const findOpenProductSlot = (occupiedSlotIds: Iterable<string>): string =
 
 const readBetaProducts = async (userId: string): Promise<HostedCustomProduct[]> => {
   const response = await fetchBetaApi('/api/custom-products');
-  const body = await response.json().catch(() => ({}));
+  const body = (await response.json().catch(() => ({}))) ?? {};
   if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
-  return sortProducts((Array.isArray(body.products) ? body.products : [])
+  return sortProducts((Array.isArray(body?.products) ? body.products : [])
     .filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
 };
 
@@ -104,10 +104,11 @@ const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, 
   if (!current || current.version !== expected.version) throw new Error('This product changed in another session. Refresh and try again.');
   const response = await fetchBetaApi(`/api/custom-products/${encodeURIComponent(expected.id)}`, {
     method: next ? 'PATCH' : 'DELETE',
-    body: JSON.stringify(next ? { product: next, expectedVersion: expected.version } : { expectedVersion: expected.version }),
+    headers: { 'If-Match': String(expected.version) },
+    body: next ? JSON.stringify({ product: next, expectedVersion: expected.version }) : undefined,
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Unable to save custom product.');
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body?.error || 'Unable to save custom product.');
   return next;
 };
 
@@ -124,7 +125,10 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
   subscribe(userId, onUpdate, onError) {
     if (isBetaClerkD1Mode()) {
       let active = true;
-      const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => { if (active) onError?.(error instanceof Error ? error : new Error('Unable to load custom products.')); });
+      const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
+        if (!active || (error instanceof Error && error.message.includes('The beta session is still initializing'))) return;
+        onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
+      });
       refresh().catch(() => undefined);
       const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);
       return () => { active = false; window.clearInterval(timer); };
@@ -138,8 +142,8 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
     if (isBetaClerkD1Mode()) {
       const product = createHostedProduct({ id: uuidv4(), userId, draft });
       const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || 'Unable to create custom product.');
+      const body = (await response.json().catch(() => ({}))) ?? {};
+      if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
       return product;
     }
     const slot = findOpenProductSlot(await readOccupiedSlots(userId));

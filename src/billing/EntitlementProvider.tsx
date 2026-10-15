@@ -358,6 +358,7 @@ const resolveEntitlementEffect = (
       })
       .catch((nextError: Error) => {
         if (!active) return;
+        if (nextError.message.includes('The beta session is still initializing')) return;
         handlers.setEntitlement(DEFAULT_ENTITLEMENT);
         handlers.setEntitlementStatus('error');
         handlers.setError(nextError.message);

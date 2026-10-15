@@ -39,6 +39,11 @@ on:
         options:
           - firebase
           - clerk-d1
+      confirm_d1_backup:
+        description: 'Confirm a verified D1 backup and uploaded Firestore snapshot exist before Clerk+D1 deployment'
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: beta-release
@@ -59,6 +64,16 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+
+      - name: Require migration backup confirmation
+        if: inputs.auth_backend == 'clerk-d1' && !inputs.dry_run
+        env:
+          CONFIRM_D1_BACKUP: ${{ inputs.confirm_d1_backup }}
+        run: |
+          if [ "$CONFIRM_D1_BACKUP" != "true" ]; then
+            echo "::error::Before Clerk+D1 deployment, create and verify a D1 backup and upload the full Firestore snapshot to the beta R2 bucket." >&2
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -442,8 +457,13 @@ jobs:
           BETA_D1_DATABASE_ID: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_D1_DATABASE_ID || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.BETA_CLERK_PUBLISHABLE_KEY }}
         run: |
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
+            if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+              echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
+              exit 1
+            fi
             node scripts/prepare-beta-clerk-d1-config.mjs
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
@@ -636,7 +656,13 @@ jobs:
               let body = {};
               try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 500) }; }
               if (response.ok && body.service === 'gfc-beta-worker' && body.database === true) {
-                healthy = true;
+                const authProbe = await fetch(`${process.env.BETA_ORIGIN || 'https://beta.gfcweather.com'}/api/me/bootstrap`, {
+                  headers: { 'Cache-Control': 'no-cache' }, signal: controller.signal,
+                });
+                if (authProbe.status === 401) healthy = true;
+                else lastFailure = `Health succeeded but unauthenticated bootstrap returned HTTP ${authProbe.status}.`;
+              }
+              if (healthy) {
                 break;
               }
               lastFailure = `HTTP ${response.status}: ${JSON.stringify(body)}`;

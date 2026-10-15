@@ -88,8 +88,13 @@ async function ensureUser(user, env) {
   if (emailOwner && emailOwner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
   if (existing) {
     if (normalizeEmail(existing.email) !== user.email) {
-      await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, updated_at = ? WHERE clerk_id = ?')
-        .bind(user.email, new Date().toISOString(), user.clerkId).run();
+      try {
+        await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, updated_at = ? WHERE clerk_id = ?')
+          .bind(user.email, new Date().toISOString(), user.clerkId).run();
+      } catch (error) {
+        if (String(error?.message || '').includes('UNIQUE constraint failed: users.email')) throw new Error('EMAIL_ALREADY_LINKED');
+        throw error;
+      }
     }
     if (existing.migration_status === 'complete') {
       return await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
@@ -320,17 +325,18 @@ async function handleApi(request, env) {
           effectiveSource: prior.betaOverrideActive === true ? 'beta_override' : active ? 'stripe' : 'none',
           cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
           planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly', updatedAt: new Date().toISOString() };
-        await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+        const billingStatements = [env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-          .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt).run();
+          .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt)];
         const eventDate = entitlement.updatedAt.slice(0, 10);
         if (!prior.premiumActive && active) {
-          await env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(event.id, eventDate, event.id, 'upgrades', owner.clerk_id).run();
+          billingStatements.push(env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(event.id, eventDate, event.id, 'upgrades', owner.clerk_id));
         } else if (prior.premiumActive && !active) {
-          await env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(event.id, eventDate, event.id, 'cancellations', owner.clerk_id).run();
+          billingStatements.push(env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(event.id, eventDate, event.id, 'cancellations', owner.clerk_id));
         }
+        await env.DB.batch(billingStatements);
       } else {
         await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
         return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
@@ -598,7 +604,13 @@ async function handleApi(request, env) {
         .bind(user.clerk_id, product.id, dataJson, user.clerk_id, user.clerk_id, MAX_CUSTOM_PRODUCTS).run();
       if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
     } catch (error) {
-      if (String(error?.message || '').includes('UNIQUE constraint failed')) return json({ error: 'Custom product already exists.' }, 409);
+      if (String(error?.message || '').includes('UNIQUE constraint failed')) {
+        const duplicate = await env.DB.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?')
+          .bind(user.clerk_id, product.id).first();
+        return duplicate
+          ? json({ error: 'Custom product already exists.' }, 409)
+          : json({ error: 'Custom product limit reached. Refresh and try again.' }, 409);
+      }
       throw error;
     }
     return json({ success: true, product });
@@ -626,10 +638,11 @@ async function handleApi(request, env) {
       return result.meta.changes ? json({ success: true, product }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
     }
     if (request.method === 'DELETE') {
-      if (!Number.isInteger(body?.expectedVersion) || body.expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
-      await env.DB.prepare('DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?')
-        .bind(user.clerk_id, currentRow.slot_id, productId).run();
-      return json({ success: true });
+      const expectedVersion = Number(request.headers.get('If-Match') || body?.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+      const result = await env.DB.prepare(`DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?
+        AND json_extract(data_json, '$.version') = ?`).bind(user.clerk_id, currentRow.slot_id, productId, expectedVersion).run();
+      return result.meta.changes ? json({ success: true }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
     }
   }
 

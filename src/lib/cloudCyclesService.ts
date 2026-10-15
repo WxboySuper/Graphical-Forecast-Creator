@@ -449,7 +449,7 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
     let existingMetadata: Record<string, unknown> | null = null;
     if (params.existingId) {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
-      const body = await response.json().catch(() => ({}));
+      const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok || !isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
       existingMetadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
     }
@@ -613,9 +613,9 @@ export async function listCloudCycles(
   try {
     if (isBetaClerkD1Mode()) {
       const response = await fetchBetaApi('/api/cloud-cycles');
-      const body = await response.json().catch(() => ({}));
+      const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
-      const cycles = (Array.isArray(body.cycles) ? body.cycles : [])
+      const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
         .map((raw: unknown) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
           ? normalizeCloudCycleMetadataRecord({ cycleId: raw.id, rawRecord: raw, fallbackUserId: userId })
           : null)
