@@ -32,6 +32,7 @@
 
 npm-debug.log*
 firestore-debug.log
+cloudflare/wrangler.beta.clerk-d1.generated.jsonc
 yarn-debug.log*
 yarn-error.log*
 

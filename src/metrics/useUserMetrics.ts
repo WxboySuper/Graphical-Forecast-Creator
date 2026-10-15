@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { doc, getDoc, type Timestamp } from 'firebase/firestore';
 import { db, isHostedAuthEnabled } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
+import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
 
 export interface UserMetricsDocument {
   uid: string;
@@ -44,8 +45,8 @@ const readMetricsDateString = (value: unknown): string | null =>
 const readMetricsCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
 
 /** Reads an optional Firestore timestamp field into a native Date. */
-const readMetricsTimestamp = (value: Timestamp | null | undefined): Date | null =>
-  value?.toDate?.() ?? null;
+const readMetricsTimestamp = (value: Timestamp | string | null | undefined): Date | null =>
+  typeof value === 'string' ? new Date(value) : value?.toDate?.() ?? null;
 
 /** Normalizes one Firestore metrics document into the client-safe account metrics contract. */
 const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined): UserMetricsDocument => {
@@ -70,12 +71,12 @@ const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedA
 export const useUserMetrics = (): UseUserMetricsResult => {
   const { user, status } = useAuth();
   const [metrics, setMetrics] = useState<UserMetricsDocument>(DEFAULT_USER_METRICS);
-  const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled));
+  const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled || isBetaClerkD1Mode()));
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (!isHostedAuthEnabled || !db) {
+    if ((!isHostedAuthEnabled || !db) && !isBetaClerkD1Mode()) {
       setMetrics(DEFAULT_USER_METRICS);
       setLoading(false);
       setError(null);
@@ -97,17 +98,21 @@ export const useUserMetrics = (): UseUserMetricsResult => {
     setLoading(true);
     requestIdRef.current += 1;
     const requestId = requestIdRef.current;
-    const metricsRef = doc(db, 'userMetrics', user.uid);
-    getDoc(metricsRef)
-      .then((snapshot) => {
+    const readMetrics = isBetaClerkD1Mode()
+      ? fetchBetaApi('/api/user/metrics').then(async (response) => {
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.error || 'Unable to load account metrics.');
+          return body.metrics as Partial<UserMetricsDocument> | undefined;
+        })
+      : getDoc(doc(db!, 'userMetrics', user.uid)).then((snapshot) => snapshot.data() as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined);
+    readMetrics
+      .then((value) => {
         if (requestId !== requestIdRef.current) {
           return;
         }
 
         setMetrics(
-          readUserMetricsDocument(
-            snapshot.data() as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined
-          )
+          readUserMetricsDocument(value as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined)
         );
         setLoading(false);
         setError(null);

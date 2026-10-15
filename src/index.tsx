@@ -10,6 +10,8 @@ import './darkMode.css';
 import App from './App';
 import { store } from './store';
 import { initializeStorePersistence } from './store/persistence';
+import { ClerkProvider } from '@clerk/react';
+import { betaClerkPublishableKey, isBetaClerkD1Mode } from './lib/betaApi';
 
 // Browser-only hydration and persistence are explicit application bootstrap,
 // not import-time behavior of the Redux store modules.
@@ -28,8 +30,8 @@ const root = ReactDOM.createRoot(
       }
     : undefined
 );
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+const application = isBetaClerkD1Mode()
+  ? <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>
+  : <App />;
+
+root.render(<React.StrictMode>{application}</React.StrictMode>);

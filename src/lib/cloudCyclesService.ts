@@ -8,6 +8,7 @@ import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 import { DEFAULT_FORECAST_WORKSPACE, resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { fetchBetaApi, isBetaClerkD1Mode } from './betaApi';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -84,7 +85,11 @@ interface SaveCloudCycleParams {
 }
 
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
-  const response = await fetch('/api/cloud-cycles', {
+  const response = isBetaClerkD1Mode() ? await fetchBetaApi('/api/cloud-cycles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }) : await fetch('/api/cloud-cycles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -103,6 +108,7 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
 });
 
 const getCloudSaveToken = async (): Promise<string | null> => {
+  if (isBetaClerkD1Mode()) return 'clerk-session';
   const currentUser = auth?.currentUser;
   return currentUser ? currentUser.getIdToken() : null;
 };
@@ -437,6 +443,17 @@ const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): P
  */
 const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   const cycleId = params.existingId || createCloudCycleId(params.userId, params.cycleDate);
+  if (isBetaClerkD1Mode()) {
+    const now = new Date().toISOString();
+    const metadata: CloudCycleMetadata = {
+      id: cycleId, userId: params.userId, label: params.label, cycleDate: params.cycleDate,
+      createdAt: now, updatedAt: now, forecastDays: params.stats.forecastDays,
+      totalOutlooks: params.stats.totalOutlooks, totalFeatures: params.stats.totalFeatures,
+      isReadOnly: params.isReadOnly ?? false, payloadHash: computePayloadHash(params.payload),
+      workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
+    };
+    return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
+  }
   const existingCycle = params.existingId ? await getOwnedCloudCycle({ userId: params.userId, cycleId: params.existingId }) : null;
   if (params.existingId && !existingCycle) return { error: 'Cloud cycle not found' as const };
   const now = new Date().toISOString();
@@ -477,6 +494,13 @@ export const loadCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
   try {
+    if (isBetaClerkD1Mode()) {
+      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.cycle) return { success: false, error: body.error || 'Cloud cycle not found' };
+      const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: body.cycle.payload });
+      return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
+    }
     const record = await fetchCloudCycleById(params);
 
     if (!record) {
@@ -504,6 +528,10 @@ export const deleteCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
   try {
+    if (isBetaClerkD1Mode()) {
+      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
+      return response.ok ? { success: true } : { success: false, error: 'Unable to delete cloud cycle.' };
+    }
     const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
       return { success: true };
@@ -527,6 +555,12 @@ export const renameCloudCycle = async (
   params: RenameCloudCycleParams
 ): Promise<CloudOperationResult> => {
   try {
+    if (isBetaClerkD1Mode()) {
+      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, {
+        method: 'PATCH', body: JSON.stringify({ label: params.newLabel }),
+      });
+      return response.ok ? { success: true } : { success: false, error: 'Cloud cycle not found' };
+    }
     const existing = await getOwnedCloudCycle(params);
     if (!existing) {
       return {
@@ -563,6 +597,15 @@ export async function listCloudCycles(
   { userId }: ListCloudCyclesParams
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> {
   try {
+    if (isBetaClerkD1Mode()) {
+      const response = await fetchBetaApi('/api/cloud-cycles');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
+      const cycles = (Array.isArray(body.cycles) ? body.cycles : [])
+        .map((raw: unknown) => normalizeCloudCycleMetadataRecord({ cycleId: isPlainObject(raw) && typeof raw.id === 'string' ? raw.id : '', rawRecord: raw, fallbackUserId: userId }))
+        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle));
+      return { success: true, data: sortCloudCycleMetadata(cycles) };
+    }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
     const legacyCycles = await readLegacyCloudCycles(userId);
@@ -594,6 +637,19 @@ export async function listCloudCycles(
 export const subscribeToCloudCycles = (
   { userId, onUpdate, onError }: CloudCycleSubscriptionParams
 ): (() => void) => {
+  if (isBetaClerkD1Mode()) {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const result = await listCloudCycles({ userId });
+        if (active && result.success && result.data) onUpdate(result.data);
+        else if (active && !result.success) onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
+      } catch (error) { if (active) onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.')); }
+    };
+    refresh().catch(() => undefined);
+    const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }
   let active = true;
   try {
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));

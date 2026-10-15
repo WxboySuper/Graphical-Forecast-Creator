@@ -28,7 +28,12 @@ const firebaseClientConfig: FirebaseClientConfig = {
 };
 
 /** True when the hosted auth configuration required for Firebase sign-in is present. */
-export const isHostedAuthEnabled = Object.values(firebaseClientConfig).every(Boolean);
+const clerkD1Build = typeof __GFC_BETA_CLERK_D1__ !== 'undefined'
+  && __GFC_BETA_CLERK_D1__
+  && typeof __GFC_CLERK_PUBLISHABLE_KEY__ !== 'undefined'
+  && Boolean(__GFC_CLERK_PUBLISHABLE_KEY__);
+export const isHostedAuthEnabled = !clerkD1Build
+  && Object.values(firebaseClientConfig).every(Boolean);
 
 let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;

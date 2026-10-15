@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
+import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
@@ -160,7 +161,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   allowSignUp = false,
   googleLabel = 'Continue with Google',
 }) => {
-  const { error, signInWithEmail, signInWithGoogle, signUpWithEmail, status } = useAuth();
+  const { authProvider, error, signInWithEmail, signInWithGoogle, signUpWithEmail, status } = useAuth();
   const [mode, setMode] = useState<AuthMode>('sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -233,6 +234,16 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
 
   return (
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
+      {authProvider === 'clerk' ? (
+        <div className="beta-auth-content">
+          <GoogleOneTap signInForceRedirectUrl={`${window.location.pathname}${window.location.search}`} signUpForceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
+          {allowSignUp ? <BetaAuthModeToggle isBusy={isBusy} mode={mode} onSelectMode={setMode} /> : null}
+          {mode === 'sign_up' && allowSignUp
+            ? <SignUp routing="hash" signInUrl="/beta" forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />
+            : <SignIn routing="hash" signUpUrl={allowSignUp ? '/beta-access' : undefined} forceRedirectUrl={`${window.location.pathname}${window.location.search}`} />}
+          {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
+        </div>
+      ) : (
       <BetaAuthCardBody
         allowSignUp={allowSignUp}
         confirmPassword={confirmPassword}
@@ -250,6 +261,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
         onSelectMode={setMode}
         onSubmit={handleEmailSubmit}
       />
+      )}
     </BetaInfoCard>
   );
 };

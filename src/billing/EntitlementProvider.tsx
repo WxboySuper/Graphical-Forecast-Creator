@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';
+import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
 import { useAuth } from '../auth/AuthProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 
@@ -246,7 +247,7 @@ const subscribeToEntitlements = (
 };
 
 /** True when the provider should operate in hosted mode for the current render. */
-const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && db);
+const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && (db || isBetaClerkD1Mode()));
 
 /** Applies the loading state used while auth is still resolving. */
 const applyLoadingEntitlementState = (
@@ -332,6 +333,34 @@ const resolveEntitlementEffect = (
     return null;
   }
 
+  if (isBetaClerkD1Mode()) {
+    let active = true;
+    handlers.setEntitlementStatus('loading');
+    fetchBetaApi('/api/user/entitlement')
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.error || 'Unable to load account billing status.');
+        if (!active) return;
+        const raw = body.entitlement as (Record<string, unknown> | null);
+        const rawEnd = raw?.currentPeriodEnd;
+        const { currentPeriodEnd: _remoteEnd, ...rawValues } = raw ?? {};
+        const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
+        if (typeof rawEnd === 'string') {
+          normalized.currentPeriodEnd = { toDate: () => new Date(rawEnd) } as unknown as Timestamp;
+        }
+        const state = createEntitlementListenerState(normalized);
+        handlers.setEntitlement(state.entitlement);
+        handlers.setEntitlementStatus(state.status);
+        handlers.setError(null);
+      })
+      .catch((nextError: Error) => {
+        if (!active) return;
+        handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+        handlers.setEntitlementStatus('error');
+        handlers.setError(nextError.message);
+      });
+    return () => { active = false; };
+  }
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 

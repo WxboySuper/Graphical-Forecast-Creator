@@ -1,0 +1,79 @@
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS users (
+  clerk_id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  legacy_uid TEXT,
+  email_verified INTEGER NOT NULL CHECK (email_verified IN (0, 1)),
+  display_name TEXT NOT NULL DEFAULT '',
+  beta_access INTEGER NOT NULL DEFAULT 0 CHECK (beta_access IN (0, 1)),
+  migration_status TEXT NOT NULL DEFAULT 'pending' CHECK (migration_status IN ('pending', 'migrating', 'complete', 'no_match', 'failed')),
+  migrated_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_entitlements (
+  user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_metrics (
+  user_id TEXT PRIMARY KEY REFERENCES users(clerk_id) ON DELETE CASCADE,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cloud_cycles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  cycle_date TEXT NOT NULL,
+  metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json)),
+  payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
+  payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cloud_cycles_user_updated_idx ON cloud_cycles(user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS workflow_awareness (
+  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
+  cycle_id TEXT NOT NULL,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  PRIMARY KEY (user_id, cycle_id)
+);
+
+CREATE TABLE IF NOT EXISTS custom_products (
+  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
+  slot_id TEXT NOT NULL,
+  product_id TEXT NOT NULL,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  PRIMARY KEY (user_id, slot_id),
+  UNIQUE (user_id, product_id)
+);
+
+CREATE TABLE IF NOT EXISTS stripe_events (
+  event_id TEXT PRIMARY KEY,
+  processed_at TEXT NOT NULL
+);
+
+-- Forecast drafts, discussions and verification sessions are currently local
+-- browser workflow state. This table supports future opt-in server persistence
+-- without pretending those records were part of the Firestore snapshot.
+CREATE TABLE IF NOT EXISTS user_records (
+  user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
+  record_type TEXT NOT NULL CHECK (record_type IN ('forecast', 'discussion', 'verification')),
+  record_id TEXT NOT NULL,
+  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, record_type, record_id)
+);

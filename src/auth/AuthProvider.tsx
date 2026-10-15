@@ -12,6 +12,7 @@ import {
   signOut,
   type User,
 } from 'firebase/auth';
+import { useAuth as useClerkAuth, useClerk, useReverification, useUser } from '@clerk/react';
 import {
   doc,
   getDoc,
@@ -26,6 +27,7 @@ import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
+import { isBetaClerkD1Mode, setBetaApiTokenProvider } from '../lib/betaApi';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
@@ -91,6 +93,7 @@ interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
   user: User | null;
+  authProvider: 'firebase' | 'clerk' | 'local';
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
   hostedAuthEnabled: boolean;
@@ -799,6 +802,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
   settingsSyncStatus: 'disabled',
   user: null,
+  authProvider: 'local',
   syncedSettings: null,
   error: null,
   hostedAuthEnabled: false,
@@ -1084,6 +1088,7 @@ const useLocalAuthState = (): AuthContextValue => {
     status,
     settingsSyncStatus,
     user,
+    authProvider: 'local',
     syncedSettings,
     error,
     hostedAuthEnabled: true,
@@ -1409,6 +1414,7 @@ const useHostedAuthState = (): AuthContextValue => {
       status,
       settingsSyncStatus,
       user,
+      authProvider: 'firebase',
       syncedSettings,
       error,
       hostedAuthEnabled: true,
@@ -1473,11 +1479,175 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+/** Provides Clerk sessions and the beta Worker profile/settings API for the Clerk+D1 beta build. */
+const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const dispatch = useDispatch();
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+  const overlays = useSelector((state: RootState) => state.overlays);
+  const monitorSettings = useSelector((state: RootState) => state.monitor);
+  const { isLoaded, isSignedIn, getToken } = useClerkAuth();
+  const clerk = useClerk();
+  const { user: clerkUser } = useUser();
+  const deleteClerkUser = useReverification(async () => {
+    if (!clerkUser) throw new Error('Sign in before deleting your account.');
+    await clerkUser.delete();
+  });
+  useEffect(() => {
+    setBetaApiTokenProvider(async () => (await getToken()) ?? null);
+    return () => setBetaApiTokenProvider(null);
+  }, [getToken]);
+  const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
+  const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
+  const [betaAccess, setBetaAccess] = useState(false);
+  const [betaAccessLoading, setBetaAccessLoading] = useState(Boolean(isSignedIn));
+  const [error, setError] = useState<string | null>(null);
+  const [bootstrapKey, setBootstrapKey] = useState('');
+  const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
+  const currentDarkModeRef = useRef(darkMode);
+  const currentOverlaysRef = useRef(overlays);
+  const hasInitializedSettingsRef = useRef(false);
+
+  useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
+  useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
+
+  const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
+    const token = await getToken();
+    if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    return fetch(path, { ...init, headers });
+  }, [getToken]);
+
+  const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    if (!isSignedIn || !clerkUser) {
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      return;
+    }
+    setBetaAccessLoading(true);
+    try {
+      const response = await request('/api/me/bootstrap');
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
+      setBetaAccess(Boolean(body.user?.betaAccess));
+      const settings = readRemoteSettings(body.settings ?? undefined);
+      if (settings) {
+        applySettingsToState(settings, { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef });
+        setSettingsSyncStatus('synced');
+      } else {
+        setSyncedSettings(null);
+        setSettingsSyncStatus('idle');
+      }
+      hasInitializedSettingsRef.current = true;
+      setBootstrapKey(clerkUser.id);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : 'Unable to load your beta account.');
+      setBetaAccess(false);
+    } finally {
+      setBetaAccessLoading(false);
+    }
+  }, [clerkUser, dispatch, isSignedIn, request]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!isSignedIn || !clerkUser) {
+      setSyncedSettings(null);
+      setSettingsSyncStatus('idle');
+      setBetaAccess(false);
+      setBetaAccessLoading(false);
+      setBootstrapKey('');
+      setError(null);
+      lastSyncedSettingsRef.current = null;
+      hasInitializedSettingsRef.current = false;
+      return;
+    }
+    refreshBetaAccess().catch(() => undefined);
+  }, [clerkUser, isLoaded, isSignedIn, refreshBetaAccess]);
+
+  const currentUser = useMemo(() => {
+    if (!clerkUser) return null;
+    const facade = {
+      uid: clerkUser.id,
+      email: clerkUser.primaryEmailAddress?.emailAddress ?? '',
+      displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
+      photoURL: clerkUser.imageUrl,
+      providerData: clerkUser.externalAccounts.map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : account.provider })),
+      getIdToken: async () => (await getToken()) ?? '',
+    };
+    return facade as unknown as User;
+  }, [clerkUser, getToken]);
+
+  const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
+    if (!currentUser) throw new Error('Sign in before changing account settings.');
+    const baseline = lastSyncedSettingsRef.current ?? buildHostedAccountFallbackSettings(
+      darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
+    );
+    const next = mergeUserSettingsDocument(baseline, patch);
+    setSettingsSyncStatus('syncing');
+    setError(null);
+    try {
+      const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Unable to update account settings.');
+      lastSyncedSettingsRef.current = next;
+      setSyncedSettings(next);
+      setSettingsSyncStatus('synced');
+      writeStoredForecastUiVariant(next.forecastUiVariant);
+    } catch (nextError) {
+      setSettingsSyncStatus('error');
+      setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
+      throw nextError;
+    }
+  }, [currentUser, darkMode, monitorSettings, overlays, request]);
+
+  useEffect(() => {
+    if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || !syncedSettings || bootstrapKey !== currentUser.uid) return;
+    const next = createSettingsSnapshot({ darkMode, overlays, defaultForecasterName: syncedSettings.defaultForecasterName || currentUser.displayName || '', forecastUiVariant: syncedSettings.forecastUiVariant, monitorSettings: syncedSettings.monitorSettings ?? monitorSettings });
+    if (areUserSettingsEqual(lastSyncedSettingsRef.current, next)) return;
+    const timer = window.setTimeout(() => {
+      request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) })
+        .then((response) => { if (!response.ok) throw new Error('Unable to sync account settings.'); })
+        .then(() => { lastSyncedSettingsRef.current = next; setSyncedSettings(next); setSettingsSyncStatus('synced'); })
+        .catch((syncError) => { setSettingsSyncStatus('error'); setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.'); });
+    }, 750);
+    return () => window.clearTimeout(timer);
+  }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
+
+  const value = useMemo<AuthContextValue>(() => ({
+    status: !isLoaded ? 'loading' : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
+    settingsSyncStatus,
+    user: currentUser,
+    authProvider: 'clerk',
+    syncedSettings,
+    error,
+    hostedAuthEnabled: typeof __GFC_CLERK_PUBLISHABLE_KEY__ !== 'undefined' && Boolean(__GFC_CLERK_PUBLISHABLE_KEY__),
+    betaAccess,
+    betaAccessLoading,
+    signInWithGoogle: disabledAuthAction,
+    signInWithEmail: disabledAuthAction,
+    signUpWithEmail: disabledAuthAction,
+    signOutUser: async () => { setError(null); await clerk.signOut(); },
+    deleteAccount: async () => {
+      await deleteClerkUser();
+      setSyncedSettings(null);
+      setBetaAccess(false);
+    },
+    updateSyncedSettings,
+    refreshBetaAccess,
+  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, refreshBetaAccess, request, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   readLocalTestAccount()
     ? <LocalAuthContextProvider>{children}</LocalAuthContextProvider>
-    : <HostedAuthContextProvider>{children}</HostedAuthContextProvider>
+    : isBetaClerkD1Mode()
+      ? <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>
+      : <HostedAuthContextProvider>{children}</HostedAuthContextProvider>
 );
 
 /** Reads the current hosted-auth state and actions for the app. */

@@ -1,71 +1,62 @@
-# Beta authentication migration: Firebase to Clerk
+# Beta Clerk and D1 migration
 
-**Status:** Investigation complete. No provider or rollout change is approved by this document.
+**Status:** Implementation is prepared behind an explicit beta release input. The default beta release remains Firebase + the VPS API.
 
-**Merge hold:** Do not merge this PR before November 1, 2026. Any implementation or beta rollout needs a separate go/no-go review after that date.
+**Merge and rollout hold:** Keep this pull request in draft and do not merge before November 1, 2026 or before v1.8 has released. Do not select `clerk-d1` for a beta release until the setup and go-live checklist below is complete. Production remains on Firebase + the VPS.
 
-## Recommendation
+## What changed
 
-Treat this as an identity-provider change for the beta deployment, not a Firebase removal. Keep Firestore and its current document model during the first rollout. Preserve each existing Firebase UID as GFC's canonical account ID so profile, settings, entitlement, metrics, workflow, custom-product, cloud-cycle, and Stripe records continue to point at the same account.
+- Added a beta-only Clerk provider. `VITE_BETA_AUTH_BACKEND=clerk-d1` enables Clerk's React components, Google One Tap, email/password sign-in, and the Worker API session token. Other build targets continue using Firebase.
+- Added a Cloudflare Worker API path backed by D1. The existing Worker proxy remains the default Firebase beta path until a release explicitly selects `clerk-d1`.
+- Added D1 tables for Clerk users, settings, entitlements, metrics, cloud cycles, workflow awareness, custom products, Stripe event idempotency, and user forecast/discussion/verification records.
+- Added the beta Firestore snapshot exporter. It requires the configured Firebase project to exactly match `BETA_FIREBASE_PROJECT_ID`, normalizes and hashes email addresses, and writes per-user JSON files with private file permissions. The files are intended for the beta R2 snapshot bucket; no user snapshot is committed to this repository.
+- Added first-request migration. The Worker accepts only a Clerk session with a verified primary email, fetches that email from Clerk's Backend API, matches it to the snapshot, and moves owned records into D1 under the Clerk user ID. D1's `users` row records the legacy Firebase UID for continuity with migrated billing metadata; there is no identity mapping table. Migration writes are idempotent, failed attempts can retry, and the R2 snapshot has no automatic expiry.
+- Added beta release selection for Firebase or Clerk+D1. The VPS API deploy job only runs for Firebase releases. The Clerk+D1 path applies D1 migrations and deploys the Worker using a generated config containing the database ID.
 
-For the first beta cut, evaluate Clerk as the sign-in and session provider with a server-controlled Firebase custom-token bridge. The server would verify the Clerk session, resolve the Clerk account to its existing Firebase UID, and mint a Firebase custom token for that UID. The browser would exchange that token for a Firebase session to keep using the existing Firestore SDK and security rules. Server routes must derive the canonical UID from verified credentials, never from a request body or client metadata.
+## Firestore inventory and record scope
 
-Keep this bridge as a migration boundary. Moving Firestore access behind the API is a separate, larger project. Clerk's published Firebase integration guide describes a similar token exchange, but the guide is marked deprecated, so GFC should not depend on that managed integration without confirming its support status with Clerk.
+Current persistent user records are `userProfiles`, `userSettings`, `userEntitlements`, `userMetrics`, `cloudCycles` and each cycle's `payload/payload`, `users/{uid}/workflowAwareness`, and `users/{uid}/customProducts`. The exporter matches the profile email to the signed-in Clerk email, then includes those account-owned documents. It also converts legacy `userSettings.cloudCycles` records and avoids duplicate cycle IDs when a current `cloudCycles` document exists.
 
-## Current coupling
+The existing application does not have Firestore collections or VPS CRUD endpoints for forecasts, discussions, or verification sessions. Those workflows persist in browser/local application state. The migration adds authenticated D1 CRUD routes for those record types, but there are no existing Firestore records of those types to import. Moving the current local browser data into account-synced D1 records would be a separate product change and is not silently included here.
 
-- `src/auth/AuthProvider.tsx` uses Firebase Auth for Google and email/password sign-in, account reauthentication and deletion, and listens for Firebase auth state changes.
-- `src/auth/AuthProvider.tsx` and `src/lib/cloudCyclesService.ts` access Firestore from the browser. `firestore.rules` authorizes these requests with `request.auth.uid` and uses that UID for ownership and entitlement checks.
-- `server/firebase-auth.js` verifies Firebase ID tokens. Beta invite claims, cloud-cycle API routes, billing routes, and account deletion use the verified Firebase UID.
-- Server billing and Stripe webhook state store Firebase UIDs in entitlement documents and Stripe metadata. Account deletion removes the Firebase identity and cleans up associated records.
-- The beta release workflow builds the frontend with `VITE_FIREBASE_*` and deploys the API with `FIREBASE_ADMIN_*`. Beta is a release channel on `main`, so the migration must use beta-specific Clerk and Firebase configuration and must not change production defaults.
+System-wide Firestore collections such as `adminDailyMetrics`, `adminMetricDedupes`, and Firebase deletion/webhook internals are not user-owned migration data. D1 admin summaries are recalculated from migrated user data; historical daily aggregate rows are not carried over.
 
-These dependencies mean that swapping the sign-in widget or changing only the frontend SDK would leave authorization inconsistent and could orphan paid or user-owned data.
+## Required Clerk and Cloudflare setup
 
-## Options considered
+The external accounts are not provisioned by repository code. Before choosing Clerk+D1 for a release:
 
-| Option | Assessment |
-| --- | --- |
-| Clerk with the documented Firebase integration | Smallest client change and preserves Firestore access. Clerk currently marks its integration guide deprecated. Do not select it without a support commitment or a replacement path. |
-| Clerk sessions with a GFC-managed Firebase custom-token bridge | Best candidate for a beta trial. Preserves existing Firebase UIDs, Firestore rules, and data paths while moving interactive sign-in to Clerk. Adds a security-sensitive token-exchange endpoint and keeps Firebase Auth as an authorization bridge. |
-| Clerk sessions with all Firestore access moved behind the GFC API | Cleaner long-term provider boundary. Requires replacing direct client reads/writes, authorization checks, and realtime subscriptions. This is too broad for the initial beta migration. |
+1. Create a Clerk application with separate development and production instances. Configure Google with custom credentials and enable Google One Tap. Enable email/password for the beta instance. Add `beta.gfcweather.com` to the beta Clerk instance; record `gfcweather.com` only for future production work. Do not put production credentials in this beta deployment.
+2. Configure the beta Clerk instance's authorized party for `https://beta.gfcweather.com`. In Cloudflare Worker secrets, set `CLERK_SECRET_KEY` and the PEM public key as `CLERK_JWT_KEY`. Add the Clerk development publishable key as the GitHub Actions secret `BETA_CLERK_PUBLISHABLE_KEY`.
+3. Create the beta-only D1 database named `gfc-beta` and the R2 bucket `gfc-beta-firestore-migration-snapshot`. Set the D1 UUID as GitHub Actions secret `BETA_D1_DATABASE_ID`.
+4. Set Cloudflare Worker secrets `BETA_INVITE_TOKEN`, `CLERK_SECRET_KEY`, `CLERK_JWT_KEY`, `CLERK_WEBHOOK_SIGNING_SECRET`, `STRIPE_SECRET_KEY`, and `STRIPE_WEBHOOK_SECRET` as applicable. Set beta-only Stripe price IDs, `ADMIN_CLERK_ID_ALLOWLIST` or the legacy UID allowlist, the invite path, and `SENTRY_BROWSER_DSN` in Worker vars/secrets. Configure a Clerk webhook subscribed to `user.deleted` at `https://beta.gfcweather.com/api/webhooks/clerk`; its signed event removes the user's D1 records and Stripe customer after the Clerk client completes its built-in re-verification protected account deletion. Point only the beta Stripe webhook at `/api/billing/webhook`.
+5. Ensure the Clerk dashboard email/password flow requires a verified primary email. The Worker checks the Clerk Backend API's primary address verification state on authenticated requests.
 
-## Identity and account migration
+Firebase password hashes are not imported into Clerk by this implementation. Users who choose email/password will set a Clerk password during sign-up/reset; Google sign-in continues through Clerk's Google connection. Existing user-owned data is linked by verified email on first Clerk API request.
 
-1. Confirm that beta's Firebase project and account export are separate from production. Record the project IDs and deployment secret names without copying secret values into the repository.
-2. Inventory beta accounts and sign-in methods. Include Firebase UIDs, verified email addresses, provider IDs, account state, and linked Stripe customer/subscription identifiers. Do not export password hashes into a tracked file.
-3. Test Clerk's documented Firebase password-hash import with a small set of beta-only accounts. Clerk supports Firebase scrypt imports when the Firebase hash parameters are supplied. Keep those parameters in a restricted migration environment.
-4. Preserve the old Firebase UID as a server-managed external identity mapping. Do not trust a user-editable Clerk metadata field to choose the Firebase UID.
-5. Test Google account linking with verified email addresses. Imported OAuth users may need to sign in with Google and link their existing account; email equality alone must not silently merge identities.
-6. Keep a tested rollback path that restores Firebase sign-in for beta without changing Firestore documents, Stripe metadata, or production configuration.
+## Snapshot export and upload
 
-Clerk documents importing Firebase users, including Firebase scrypt password digests and prior IDs as external IDs. The import guide does not resolve GFC's Google account-linking policy or its Stripe and Firestore identity mapping; those remain GFC decisions.
+Install the `server` package dependencies, then export using a beta-only Firebase Admin service account:
 
-## Work required before an implementation PR
+```powershell
+$env:FIREBASE_ADMIN_PROJECT_ID = '<beta Firebase project id>'
+$env:BETA_FIREBASE_PROJECT_ID = '<same beta Firebase project id>'
+$env:FIREBASE_ADMIN_CLIENT_EMAIL = '<beta service account email>'
+$env:FIREBASE_ADMIN_PRIVATE_KEY = '<beta service account private key>'
+node server/export-firestore-beta-snapshot.cjs --output C:\private\gfc-beta-firestore-snapshot
+```
 
-- Verify beta and production use separate Firebase projects, Clerk instances, API credentials, domains, and deployment secrets.
-- Decide whether the beta migration is invite-only, uses user-triggered account linking, or requires a maintenance window. Do not silently merge accounts by email.
-- Define the Clerk-to-canonical-UID mapping store, its write permissions, uniqueness constraint, recovery process, and audit trail.
-- Specify the custom-token exchange, token lifetimes, rate limits, CSRF/origin checks, session revocation behavior, and failure handling.
-- Update server verification so Clerk-only endpoints and Firebase-backed Firestore access have explicit credential boundaries.
-- Adapt account deletion and recent-auth checks. Verify deletion still handles Stripe cleanup, Firestore-owned records, Firebase bridge identity, and the Clerk identity without leaving a re-creatable mapping.
-- Confirm Clerk plan limits, beta domain setup, email delivery, privacy disclosures, and processor terms before importing real beta users.
-- Add migration and rollback runbooks. Exercise both against a beta-only staging dataset before any production-facing change.
+The output directory contains `full-snapshot.jsonl` plus hashed per-user JSON files. Upload the full snapshot to a private archival key in the R2 bucket and upload each hashed per-user file to `by-email/<sha256-of-normalized-email>.json` using Wrangler's remote R2 object upload. Confirm both document and per-user counts before enabling Clerk. Keep the R2 objects until the maintainer explicitly decides the migration source can be deleted. Securely remove local export files after upload and validation.
 
-## Go/no-go checks for November review
+## Beta deployment
 
-- [ ] The beta Firebase project is confirmed separate from production.
-- [ ] Every migrated test account resolves to exactly one existing canonical UID.
-- [ ] Password sign-in and Google sign-in/linking work for representative beta accounts.
-- [ ] Firestore owner rules still prevent cross-account reads and writes.
-- [ ] Beta claims, settings sync, cloud cycles, entitlement reads, billing, and account deletion pass end-to-end checks.
-- [ ] Rollback restores Firebase sign-in and access to the same records.
-- [ ] No change reaches production configuration or deployment secrets.
-- [ ] Maintainer approves the rollout window after November 1, 2026.
+The beta release workflow still defaults to `auth_backend=firebase`. After v1.8, the migration PR is merged, all required Cloudflare/Clerk secrets exist, and the snapshot is uploaded, select `auth_backend=clerk-d1` when dispatching the beta release workflow. That path applies `cloudflare/migrations` to the beta D1 database and deploys the Clerk+D1 Worker configuration. It skips the beta VPS API deployment. Production release and deploy workflows are not changed.
 
-## References
+The workflow smoke check verifies `/api/health` reports `gfc-beta-worker` with D1 available. After deployment, verify representative sign-in, invite claim, settings, entitlement, cloud-cycle create/list/load/rename/delete, workflow awareness, custom products, billing, and account deletion in beta. Verify forecast, discussion, and verification remain functional in their existing local persistence flows; the new D1 records API can be exercised independently but is not their current storage path.
 
-- [Clerk: Migrate from Firebase](https://clerk.com/docs/guides/development/migrating/firebase)
-- [Clerk: Integrate Firebase with Clerk (deprecated)](https://clerk.com/docs/guides/development/integrations/databases/firebase)
-- [Clerk: JWT templates](https://clerk.com/docs/guides/sessions/jwt-templates)
-- [Clerk: Migration strategies](https://clerk.com/docs/guides/development/migrating/overview)
+## Operational notes and limits
+
+- This repository does not include real Clerk credentials, D1 IDs, R2 contents, or Firebase exports. Those must be provisioned in the beta accounts after v1.8.
+- `cloudflare/wrangler.beta.clerk-d1.jsonc` is a template. The release workflow generates a temporary config from `BETA_D1_DATABASE_ID`; the database and R2 bucket must already exist.
+- Beta D1 currently disables Auto-TSTM and returns an unavailable response for `/api/tstm/latest`; its server implementation launches a Python/GRIB workflow and is not part of the user-data/auth migration. Do not select Clerk+D1 if beta requires Auto-TSTM until that workload has a Worker-compatible service design.
+- D1 admin summaries contain current totals only; the prior Firestore daily admin history is not migrated.
+- Keep the Clerk+D1 release choice off until the v1.8 and November hold clears. Switching the workflow input back to Firebase after D1 users have written new data does not copy those new writes back to Firestore.
