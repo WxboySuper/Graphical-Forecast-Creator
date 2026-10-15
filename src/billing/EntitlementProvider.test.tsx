@@ -119,8 +119,8 @@ describe('EntitlementProvider', () => {
   });
 
   test('keeps a user without an entitlement document on the free tier', async () => {
-    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
-      onNext({ exists: () => false });
+    (onSnapshot as jest.Mock).mockImplementationOnce((_reference, onNext) => {
+      onNext({ exists: () => false, metadata: { fromCache: false, hasPendingWrites: false } });
       return jest.fn();
     });
     (useAuth as jest.Mock).mockReturnValue({
