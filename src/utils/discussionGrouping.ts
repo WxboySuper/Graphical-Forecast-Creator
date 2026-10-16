@@ -18,10 +18,14 @@ const isDayType = (value: unknown): value is DayType =>
 /** Returns true when a discussion has user-authored content. */
 export const hasDiscussionContent = (discussion: DiscussionData | undefined): boolean => {
   if (!discussion) return false;
-  if (discussion.mode === 'diy') return Boolean(discussion.diyContent?.trim());
+  if (discussion.mode === 'diy') {
+    return typeof discussion.diyContent === 'string' && discussion.diyContent.trim().length > 0;
+  }
   return Boolean(
     discussion.guidedContent
-      && Object.values(discussion.guidedContent).some((value) => value.trim().length > 0),
+      && Object.values(discussion.guidedContent).some(
+        (value) => typeof value === 'string' && value.trim().length > 0,
+      ),
   );
 };
 
