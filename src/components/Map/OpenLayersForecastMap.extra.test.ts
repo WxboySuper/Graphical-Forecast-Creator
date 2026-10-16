@@ -47,9 +47,9 @@ describe('OpenLayersForecastMap additional helpers', () => {
     global.fetch = originalFetch;
   });
 
-  test('createLabelOverlaySource returns a source for known styles and null for unknown', () => {
+  test('OpenStreetMap fallback keeps place labels above forecast fills', () => {
     const s1 = createLabelOverlaySource('osm');
-    expect(s1).toBeTruthy();
+    expect(s1?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
 
     const s3 = createLabelOverlaySource('esri-satellite');
     expect(s3).toBeTruthy();

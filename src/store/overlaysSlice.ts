@@ -1,12 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { OutlookType } from '../types/outlooks';
 
-export type BaseMapStyle = 'osm' | 'carto-light' | 'esri-satellite' | 'blank';
-export type LegacyBaseMapStyle = 'carto-dark';
+export type BaseMapStyle = 'osm' | 'esri-satellite' | 'blank';
+export type LegacyBaseMapStyle = 'carto-light' | 'carto-dark';
 
-/** Redirects the retired Carto dark basemap to the supported light style. */
+/** Redirects saved Carto basemaps to the supported OpenStreetMap style. */
 export const normalizeBaseMapStyle = (style: BaseMapStyle | LegacyBaseMapStyle): BaseMapStyle =>
-  style === 'carto-dark' ? 'carto-light' : style;
+  style === 'carto-dark' || style === 'carto-light' ? 'osm' : style;
 
 export interface OverlaysState {
   stateBorders: boolean;

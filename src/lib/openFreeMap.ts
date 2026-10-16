@@ -23,7 +23,6 @@ interface OpenFreeMapStyleSet {
 
 const OPEN_FREE_MAP_STYLE_URLS: Partial<Record<BaseMapStyle, string>> = {
   osm: 'https://tiles.openfreemap.org/styles/liberty',
-  'carto-light': 'https://tiles.openfreemap.org/styles/positron',
 };
 
 const OVERLAY_LINE_PREFIXES = [
