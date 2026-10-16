@@ -1523,21 +1523,20 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
   useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
   useEffect(() => {
+    if (!(isSignedIn && clerkUser?.id && bootstrapKey !== '' && bootstrapKey !== clerkUser.id)) return;
     settingsRequestIdRef.current += 1;
     setSettingsSyncStatus('idle');
-    if (isSignedIn && clerkUser?.id && bootstrapKey !== '' && bootstrapKey !== clerkUser.id) {
-      lastSyncedSettingsRef.current = null;
-      hasInitializedSettingsRef.current = false;
-      setSyncedSettings(null);
-      setBootstrapKey('');
-      setBetaAccess(false);
-      setBetaAccessLoading(true);
-      setError(null);
-      dispatch(setDarkMode(false));
-      dispatch(applyOverlaySettings(defaultOverlaySettings));
-      dispatch(applyMonitorSettings(DEFAULT_MONITOR_SETTINGS));
-      writeStoredForecastUiVariant(DEFAULT_FORECAST_UI_VARIANT);
-    }
+    lastSyncedSettingsRef.current = null;
+    hasInitializedSettingsRef.current = false;
+    setSyncedSettings(null);
+    setBootstrapKey('');
+    setBetaAccess(false);
+    setBetaAccessLoading(true);
+    setError(null);
+    dispatch(setDarkMode(false));
+    dispatch(applyOverlaySettings(defaultOverlaySettings));
+    dispatch(applyMonitorSettings(DEFAULT_MONITOR_SETTINGS));
+    writeStoredForecastUiVariant(DEFAULT_FORECAST_UI_VARIANT);
   }, [bootstrapKey, clerkUser?.id, dispatch, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {

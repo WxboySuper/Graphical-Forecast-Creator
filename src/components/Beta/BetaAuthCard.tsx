@@ -170,13 +170,13 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [formError, setFormError] = useState<string | null>(null);
   const [clerkVerificationInProgress, setClerkVerificationInProgress] = useState(false);
   const isBusy = submitting || status === 'loading';
-  const clerkRedirectUrl = typeof window === 'undefined' ? '/beta' : (() => {
+  const clerkRedirectUrl = typeof window === 'undefined' ? undefined : (() => {
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.delete('clerkSignUp');
     return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
   })();
   const clerkSignUpUrl = (() => {
-    if (typeof window === 'undefined') return '/beta?clerkSignUp=1';
+    if (typeof window === 'undefined') return undefined;
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set('clerkSignUp', '1');
     return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
@@ -220,11 +220,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const setClerkMode = (nextMode: AuthMode) => {
     if (nextMode === mode) return;
     if (typeof window === 'undefined') return;
-    if (window.location.hash && !window.confirm('Switching account actions restarts sign-in. Any verification code you entered will need to be entered again. Continue?')) return;
+    if (clerkVerificationInProgress) return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
-    nextUrl.hash = '';
     window.history.pushState(null, '', nextUrl.href);
     setMode(nextMode);
   };
@@ -286,16 +285,16 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy} aria-pressed={mode === 'sign_in'}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy || clerkVerificationInProgress} aria-pressed={mode === 'sign_in'}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy} aria-pressed={mode === 'sign_up'}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy || clerkVerificationInProgress} aria-pressed={mode === 'sign_up'}>
                 Create account
               </Button>
             </div>
           ) : null}
           {allowSignUp && clerkVerificationInProgress ? (
-            <p role="status" className="text-sm text-muted-foreground">Switching account actions restarts sign-in, so you will need to enter any verification code again.</p>
+            <p role="status" className="text-sm text-muted-foreground">Finish verification before switching account actions.</p>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />

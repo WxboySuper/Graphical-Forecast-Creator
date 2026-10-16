@@ -1,6 +1,5 @@
 import type { User } from 'firebase/auth';
 import { isHostedAuthEnabled } from '../lib/firebase';
-import { isBetaClerkD1Mode } from '../lib/betaApi';
 
 export type ProductMetricEvent =
   | 'account_signup'
@@ -20,7 +19,7 @@ const INSTALLATION_ID_STORAGE_KEY = 'gfcInstallationId';
 
 /** Returns the browser-scoped anonymous installation id used for daily active-device dedupe. */
 const getInstallationId = (): string | null => {
-  if ((!isHostedAuthEnabled && !isBetaClerkD1Mode()) || typeof window === 'undefined') {
+  if (!isHostedAuthEnabled || typeof window === 'undefined') {
     return null;
   }
 
