@@ -685,11 +685,22 @@ const fetchBetaCloudCyclePage = async (userId: string, page: number): Promise<Be
   return { success: true, data: { cycles, nextPage: readNextCyclePage(body?.nextPage) } };
 };
 
+const hasBetaCloudCycleId = (record: Record<string, unknown>): boolean => {
+  if (typeof record.id !== 'string') return false;
+  return Boolean(record.id);
+};
+
+const betaCloudCycleOwnerId = (record: Record<string, unknown>): unknown => {
+  if (record.userId !== null && record.userId !== undefined) return record.userId;
+  if (!isPlainObject(record.metadata)) return undefined;
+  return record.metadata.userId;
+};
+
 const normalizeBetaCloudCycle = (raw: unknown, userId: string): CloudCycleMetadata | null => {
-  if (!isPlainObject(raw) || typeof raw.id !== 'string' || !raw.id) return null;
-  const metadataUserId = isPlainObject(raw.metadata) ? raw.metadata.userId : undefined;
-  if ((raw.userId ?? metadataUserId) !== userId) return null;
+  if (!isPlainObject(raw)) return null;
   const record = raw as Record<string, unknown>;
+  if (!hasBetaCloudCycleId(record)) return null;
+  if (betaCloudCycleOwnerId(record) !== userId) return null;
   return normalizeCloudCycleMetadataRecord({ cycleId: record.id as string, rawRecord: record, fallbackUserId: userId });
 };
 

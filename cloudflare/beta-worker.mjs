@@ -138,19 +138,38 @@ async function bootstrapAccount(env, user) {
   });
 }
 
-async function startBillingCheckout(request, env, user) {
+function getStripeUnavailableError(env) {
   if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
+  return null;
+}
+
+function getCheckoutPrice(plan, env) {
+  if (plan === 'monthly') return env.STRIPE_PRICE_MONTHLY || null;
+  if (plan === 'annual') return env.STRIPE_PRICE_ANNUAL_STANDARD || null;
+  return null;
+}
+
+async function createCheckoutSession(env, params) {
+  try {
+    return await stripeRequest(env, 'checkout/sessions', params);
+  } catch {
+    return null;
+  }
+}
+
+async function startBillingCheckout(request, env, user) {
+  const stripeUnavailable = getStripeUnavailableError(env);
+  if (stripeUnavailable) return stripeUnavailable;
   const body = await readBody(request);
   if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
   const plan = body?.plan;
-  const price = ({ monthly: env.STRIPE_PRICE_MONTHLY, annual: env.STRIPE_PRICE_ANNUAL_STANDARD })[plan] || null;
+  const price = getCheckoutPrice(plan, env);
   if (!price) return json({ error: 'This billing plan is not available.' }, 400);
   if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
   const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
   const params = buildCheckoutParams({ env, user, plan, price, entitlement });
-  let session;
-  try { session = await stripeRequest(env, 'checkout/sessions', params); }
-  catch { return json({ error: 'Unable to start checkout with Stripe.' }, 502); }
+  const session = await createCheckoutSession(env, params);
+  if (!session) return json({ error: 'Unable to start checkout with Stripe.' }, 502);
   if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
   return json({ url: session.url });
 }
@@ -180,11 +199,24 @@ async function openBillingPortal(env, user) {
   return json({ url: portal.url });
 }
 
+function shouldClaimBetaAccess(user, env) {
+  if (user.beta_access) return false;
+  if (!env.BETA_INVITE_TOKEN) return false;
+  return true;
+}
+
+async function isValidBetaInvite(body, env) {
+  if (!body) return false;
+  if (!(await timingSafeStringEqual(body.token, env.BETA_INVITE_TOKEN))) return false;
+  if (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH) return false;
+  return true;
+}
+
 async function claimBetaAccess(request, env, user) {
-  if (!user.beta_access && env.BETA_INVITE_TOKEN) {
+  if (shouldClaimBetaAccess(user, env)) {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!body || !(await timingSafeStringEqual(body.token, env.BETA_INVITE_TOKEN)) || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
+    if (!(await isValidBetaInvite(body, env))) return json({ error: 'Invalid invite.' }, 403);
     await env.DB.prepare('UPDATE users SET beta_access = 1, updated_at = ? WHERE clerk_id = ?').bind(new Date().toISOString(), user.clerk_id).run();
   }
   const updated = await env.DB.prepare('SELECT beta_access FROM users WHERE clerk_id = ?').bind(user.clerk_id).first();
