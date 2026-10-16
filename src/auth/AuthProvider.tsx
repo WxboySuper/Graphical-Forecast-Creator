@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createUserWithEmailAndPassword,
@@ -13,7 +13,6 @@ import {
   type IdTokenResult,
   type User,
 } from 'firebase/auth';
-import { useAuth as useClerkAuth, useClerk, useReverification, useUser } from '@clerk/react';
 import {
   doc,
   getDoc,
@@ -28,7 +27,7 @@ import { applyOverlaySettings, initialState as defaultOverlaySettings } from '..
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
-import { getBetaApiToken, isBetaClerkD1Mode, setBetaApiTokenProvider } from '../lib/betaApi';
+import { isBetaClerkD1Mode } from '../lib/betaApi';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
@@ -72,10 +71,10 @@ export const extractLocalUserFromData = (data: unknown) => {
   };
 };
 
-type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
-type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
+export type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
+export type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
-interface UserSettingsDocument {
+export interface UserSettingsDocument {
   darkMode: boolean;
   baseMapStyle: OverlaysState['baseMapStyle'];
   stateBorders: boolean;
@@ -90,7 +89,7 @@ interface UserProfileDocument {
   betaAccess?: boolean;
 }
 
-interface AuthContextValue {
+export interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
   user: User | null;
@@ -109,7 +108,7 @@ interface AuthContextValue {
   refreshBetaAccess: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 const INITIAL_PROFILE_SYNC_STATUS: SettingsSyncStatus = isHostedAuthEnabled ? 'idle' : 'disabled';
 
 /** Rejects hosted-auth actions when the current deployment intentionally runs in local-only mode. */
@@ -354,7 +353,7 @@ const writeHostedSettingsDocument = async (
 };
 
 /** Builds a full settings snapshot from local UI state when hosted sync has no baseline yet. */
-const buildHostedAccountFallbackSettings = (
+export const buildHostedAccountFallbackSettings = (
   darkMode: boolean,
   overlays: OverlaysState,
   displayName: string,
@@ -1479,419 +1478,7 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-const shouldResetForClerkAccountChange = (isSignedIn: boolean, userId: string | undefined, bootstrapKey: string): boolean => {
-  if (!isSignedIn) return false;
-  if (!userId) return false;
-  if (!bootstrapKey) return false;
-  return bootstrapKey !== userId;
-};
-
-const isClerkSettingsSyncReady = (
-  isSignedIn: boolean,
-  user: User | null,
-  initialized: boolean,
-  bootstrapKey: string,
-): user is User => {
-  if (!isSignedIn) return false;
-  if (!user) return false;
-  if (!initialized) return false;
-  return bootstrapKey === user.uid;
-};
-
-const isCurrentClerkSettingsSync = ({
-  active, requestId, latestRequestId, isSignedIn, userId, currentUserId, bootstrapKey,
-}: {
-  active: boolean;
-  requestId: number;
-  latestRequestId: number;
-  isSignedIn: boolean;
-  userId: string;
-  currentUserId: string;
-  bootstrapKey: string;
-}): boolean => {
-  if (!active) return false;
-  if (requestId !== latestRequestId) return false;
-  if (!isSignedIn) return false;
-  if (currentUserId !== userId) return false;
-  return bootstrapKey === userId;
-};
-
-/** Provides Clerk sessions and the beta Worker profile/settings API for the Clerk+D1 beta build. */
-const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const dispatch = useDispatch();
-  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
-  const overlays = useSelector((state: RootState) => state.overlays);
-  const monitorSettings = useSelector((state: RootState) => state.monitor);
-  const { isLoaded, isSignedIn, getToken } = useClerkAuth();
-  const clerk = useClerk();
-  const { user: clerkUser, isLoaded: isUserLoaded } = useUser();
-  const clerkUserRef = useRef(clerkUser);
-  const clerkIdentityRef = useRef({ isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id });
-  useEffect(() => {
-    clerkIdentityRef.current = { isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id };
-  }, [clerkUser?.id, isSignedIn]);
-  useEffect(() => { clerkUserRef.current = clerkUser; }, [clerkUser]);
-  const deleteClerkUser = useReverification(async () => {
-    const currentUser = clerkUserRef.current;
-    if (!currentUser) throw new Error('Sign in before deleting your account.');
-    await currentUser.delete();
-  });
-  const getTokenRef = useRef(getToken);
-  useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
-  const betaTokenProviderRef = useRef(async () => (await getTokenRef.current()) ?? null);
-  useEffect(() => {
-    if (!isLoaded) return;
-    setBetaApiTokenProvider(isSignedIn ? betaTokenProviderRef.current : null);
-  }, [clerkUser?.id, isLoaded, isSignedIn]);
-  const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
-  const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
-  const [betaAccess, setBetaAccess] = useState(false);
-  const [betaAccessLoading, setBetaAccessLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [bootstrapKey, setBootstrapKey] = useState('');
-  const bootstrapKeyRef = useRef(bootstrapKey);
-  const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
-  const betaAccessRequestIdRef = useRef(0);
-  const settingsRequestIdRef = useRef(0);
-  const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const currentDarkModeRef = useRef(darkMode);
-  const currentOverlaysRef = useRef(overlays);
-  const hasInitializedSettingsRef = useRef(false);
-  const betaAccessAbortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
-  useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
-  useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
-  useEffect(() => {
-    if (!shouldResetForClerkAccountChange(Boolean(isSignedIn), clerkUser?.id, bootstrapKey)) return;
-    betaAccessRequestIdRef.current += 1;
-    betaAccessAbortRef.current?.abort();
-    settingsRequestIdRef.current += 1;
-    settingsWriteQueueRef.current = Promise.resolve();
-    setSettingsSyncStatus('idle');
-    lastSyncedSettingsRef.current = null;
-    hasInitializedSettingsRef.current = false;
-    setSyncedSettings(null);
-    setBootstrapKey('');
-    setBetaAccess(false);
-    setBetaAccessLoading(true);
-    setError(null);
-    dispatch(setDarkMode(false));
-    dispatch(applyOverlaySettings(defaultOverlaySettings));
-    dispatch(applyMonitorSettings(DEFAULT_MONITOR_SETTINGS));
-    writeStoredForecastUiVariant(DEFAULT_FORECAST_UI_VARIANT);
-  }, [bootstrapKey, clerkUser?.id, dispatch, isSignedIn]);
-
-  const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
-    const requestUserId = clerkUser?.id;
-    if (!isSignedIn || !requestUserId) throw new Error('The beta session is signed out.');
-    const token = await getBetaApiToken(async () => (await getToken()) ?? null, init.signal ?? undefined);
-    if (init.signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
-    if (!clerkIdentityRef.current.isSignedIn || clerkIdentityRef.current.userId !== requestUserId) {
-      throw new Error('The beta session is signed out.');
-    }
-    const headers = new Headers(init.headers);
-    headers.set('Authorization', `Bearer ${token}`);
-    if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-    return fetch(path, { ...init, headers });
-  }, [clerkUser?.id, getToken, isSignedIn]);
-  const putSettings = useCallback(async (settings: UserSettingsDocument, userId: string, signal?: AbortSignal): Promise<Response> => {
-    const previous = settingsWriteQueueRef.current;
-    let release!: () => void;
-    settingsWriteQueueRef.current = new Promise<void>((resolve) => { release = resolve; });
-    await previous.catch(() => undefined);
-    try {
-      if (clerkUser?.id !== userId) throw new Error('The beta session is still initializing. Try changing settings again in a moment.');
-      return await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings }), signal });
-    } finally {
-      release();
-    }
-  }, [clerkUser?.id, request]);
-
-  const clerkUserId = clerkUser?.id;
-  const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    betaAccessAbortRef.current?.abort();
-    const abortController = new AbortController();
-    betaAccessAbortRef.current = abortController;
-    const requestId = ++betaAccessRequestIdRef.current;
-    if (!isSignedIn || !clerkUserId) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
-      return;
-    }
-    setBetaAccessLoading(true);
-    try {
-      const response = await request('/api/me/bootstrap', { signal: abortController.signal });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
-      if (requestId !== betaAccessRequestIdRef.current) return;
-      setBetaAccess(Boolean(body?.user?.betaAccess));
-      const settings = readRemoteSettings(body?.settings ?? undefined);
-      if (settings) {
-        applySettingsToState(settings, { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef });
-        setSettingsSyncStatus('synced');
-      } else {
-        const displayName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ');
-        const fallbackSettings = buildHostedAccountFallbackSettings(
-          currentDarkModeRef.current,
-          currentOverlaysRef.current,
-          displayName,
-          readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
-          monitorSettings,
-        );
-        lastSyncedSettingsRef.current = null;
-        setSyncedSettings(fallbackSettings);
-        setSettingsSyncStatus('idle');
-      }
-      hasInitializedSettingsRef.current = true;
-      setBootstrapKey(clerkUserId);
-      setError(null);
-    } catch (nextError) {
-      if (requestId !== betaAccessRequestIdRef.current) return;
-      if (bootstrapKeyRef.current !== clerkUserId) {
-        lastSyncedSettingsRef.current = null;
-        hasInitializedSettingsRef.current = false;
-        setSyncedSettings(null);
-        setBootstrapKey('');
-      }
-      setError(nextError instanceof Error ? nextError.message : 'Unable to load your beta account.');
-      setBetaAccess(false);
-    } finally {
-      if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
-      if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
-    }
-  }, [clerkUserId, clerkUser?.firstName, clerkUser?.lastName, dispatch, isSignedIn, monitorSettings, request]);
-
-  useEffect(() => {
-    if (!isLoaded || !isUserLoaded) {
-      betaAccessRequestIdRef.current += 1;
-      setBetaAccessLoading(true);
-      return;
-    }
-    if (!isSignedIn || !clerkUserId) {
-      betaAccessRequestIdRef.current += 1;
-      betaAccessAbortRef.current?.abort();
-      betaAccessAbortRef.current = null;
-      setSyncedSettings(null);
-      setSettingsSyncStatus('idle');
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      setBootstrapKey('');
-      setError(null);
-      lastSyncedSettingsRef.current = null;
-      hasInitializedSettingsRef.current = false;
-      return;
-    }
-    refreshBetaAccess().catch(() => undefined);
-  }, [clerkUserId, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess]);
-
-  const currentUser = useMemo(() => {
-    if (!clerkUser) return null;
-    const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
-    const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
-    const photoURL = clerkUser.imageUrl || null;
-    const tokenForClerkSession = async (forceRefresh?: boolean) => {
-      const token = await getToken({ skipCache: Boolean(forceRefresh) });
-      if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
-      return token;
-    };
-    const decodeTokenClaims = (token: string): IdTokenResult['claims'] => {
-      try {
-        let encoded = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
-        if (!encoded) return {};
-        encoded += '='.repeat((4 - (encoded.length % 4)) % 4);
-        const json = decodeURIComponent(Array.from(globalThis.atob(encoded), (character) =>
-          `%${character.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''));
-        return JSON.parse(json) as IdTokenResult['claims'];
-      } catch {
-        return {};
-      }
-    };
-    const facade = {
-      uid: clerkUser.id,
-      email,
-      displayName,
-      photoURL,
-      emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
-      isAnonymous: false,
-      metadata: {
-        creationTime: clerkUser.createdAt?.toISOString() ?? null,
-        lastSignInTime: clerkUser.lastSignInAt?.toISOString() ?? null,
-      },
-      phoneNumber: clerkUser.primaryPhoneNumber?.phoneNumber ?? null,
-      refreshToken: '',
-      tenantId: null,
-      providerData: [
-        ...(clerkUser.passwordEnabled ? [{
-          uid: clerkUser.id,
-          displayName,
-          email,
-          phoneNumber: null,
-          photoURL,
-          providerId: 'password',
-        }] : []),
-        ...(clerkUser.externalAccounts ?? []).map((account) => ({
-          uid: account.id,
-          displayName: account.username ?? displayName,
-          email: account.emailAddress ?? email,
-          phoneNumber: null,
-          photoURL: account.imageUrl ?? photoURL,
-          providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com`,
-        })),
-      ],
-      getIdToken: tokenForClerkSession,
-      getIdTokenResult: async () => {
-        const token = await tokenForClerkSession();
-        const claims = decodeTokenClaims(token);
-        const time = (value: unknown) => typeof value === 'number' ? new Date(value * 1000).toUTCString() : '';
-        return {
-          claims,
-          token,
-          authTime: time(claims.auth_time),
-          issuedAtTime: time(claims.iat),
-          expirationTime: time(claims.exp),
-          signInProvider: typeof claims.firebase?.sign_in_provider === 'string' ? claims.firebase.sign_in_provider : null,
-        };
-      },
-      reload: async () => { await clerkUser.reload(); },
-      delete: async () => { await deleteClerkUser(); },
-      toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
-    };
-    return facade as unknown as User;
-  }, [clerkUser, deleteClerkUser, getToken]);
-
-  const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
-    if (!currentUser) throw new Error('Sign in before changing account settings.');
-    if (bootstrapKey !== currentUser.uid || !hasInitializedSettingsRef.current) {
-      throw new Error('The beta session is still initializing. Try changing settings again in a moment.');
-    }
-    const requestId = ++settingsRequestIdRef.current;
-    const userId = currentUser.uid;
-    const baseline = (bootstrapKey === currentUser.uid ? lastSyncedSettingsRef.current : null) ?? buildHostedAccountFallbackSettings(
-      darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
-    );
-    const next = mergeUserSettingsDocument(baseline, patch);
-    setSettingsSyncStatus('syncing');
-    setError(null);
-    try {
-      const response = await putSettings(next, userId);
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
-      if (requestId !== settingsRequestIdRef.current || clerkIdentityRef.current.userId !== userId) return;
-      lastSyncedSettingsRef.current = next;
-      setSyncedSettings(next);
-      setSettingsSyncStatus('synced');
-      writeStoredForecastUiVariant(next.forecastUiVariant);
-    } catch (nextError) {
-      if (requestId !== settingsRequestIdRef.current || clerkIdentityRef.current.userId !== userId) return;
-      setSettingsSyncStatus('error');
-      setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
-      throw nextError;
-    }
-  }, [bootstrapKey, currentUser, darkMode, monitorSettings, overlays, putSettings]);
-
-  useEffect(() => {
-    if (!isClerkSettingsSyncReady(Boolean(isSignedIn), currentUser, hasInitializedSettingsRef.current, bootstrapKey)) return;
-    const baseline = syncedSettings ?? buildHostedAccountFallbackSettings(
-      darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
-    );
-    const next = createSettingsSnapshot({ darkMode, overlays, defaultForecasterName: baseline.defaultForecasterName || currentUser.displayName || '', forecastUiVariant: baseline.forecastUiVariant, monitorSettings: baseline.monitorSettings ?? monitorSettings });
-    if (areUserSettingsEqual(lastSyncedSettingsRef.current, next)) return;
-    let active = true;
-    const userId = currentUser.uid;
-    const abortController = new AbortController();
-    const timer = window.setTimeout(() => {
-      const requestId = ++settingsRequestIdRef.current;
-      setSettingsSyncStatus('syncing');
-      const syncSettings = async () => {
-        try {
-          const response = await putSettings(next, userId, abortController.signal);
-          const body = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
-          if (!isCurrentClerkSettingsSync({ active, requestId, latestRequestId: settingsRequestIdRef.current, isSignedIn: Boolean(isSignedIn), userId, currentUserId: currentUser.uid, bootstrapKey })) return;
-          lastSyncedSettingsRef.current = next;
-          setSyncedSettings(next);
-          setSettingsSyncStatus('synced');
-        } catch (syncError) {
-          if (!isCurrentClerkSettingsSync({ active, requestId, latestRequestId: settingsRequestIdRef.current, isSignedIn: Boolean(isSignedIn), userId, currentUserId: currentUser.uid, bootstrapKey })) return;
-          setSettingsSyncStatus('error');
-          setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.');
-        }
-      };
-      syncSettings();
-    }, 750);
-    return () => { active = false; abortController.abort(); window.clearTimeout(timer); };
-  }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, putSettings, syncedSettings]);
-
-  const resetClerkAccountState = useCallback(() => {
-    setBetaApiTokenProvider(null);
-    betaAccessRequestIdRef.current += 1;
-    settingsRequestIdRef.current += 1;
-    settingsWriteQueueRef.current = Promise.resolve();
-    setBetaAccess(false);
-    setBetaAccessLoading(false);
-    setBootstrapKey('');
-    setSyncedSettings(null);
-    setSettingsSyncStatus('idle');
-    lastSyncedSettingsRef.current = null;
-    hasInitializedSettingsRef.current = false;
-  }, []);
-
-  const hasInitializedSettings = Boolean(currentUser && bootstrapKey === currentUser.uid && hasInitializedSettingsRef.current);
-  let authStatus: AuthStatus = 'signed_out';
-  if (!isLoaded || !isUserLoaded) authStatus = 'loading';
-  else if (error && isSignedIn && !hasInitializedSettings) authStatus = 'error';
-  else if (isSignedIn && currentUser) authStatus = 'signed_in';
-
-  const value = useMemo<AuthContextValue>(() => ({
-    status: authStatus,
-    settingsSyncStatus,
-    user: currentUser,
-    authProvider: 'clerk',
-    syncedSettings: bootstrapKey === currentUser?.uid ? syncedSettings : null,
-    error,
-    hostedAuthEnabled: typeof __GFC_CLERK_PUBLISHABLE_KEY__ !== 'undefined' && Boolean(__GFC_CLERK_PUBLISHABLE_KEY__),
-    betaAccess,
-    betaAccessLoading,
-    signInWithGoogle: disabledAuthAction,
-    signInWithEmail: disabledAuthAction,
-    signUpWithEmail: disabledAuthAction,
-    signOutUser: async () => {
-      setError(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(true);
-      try {
-        await clerk.signOut();
-        resetClerkAccountState();
-      } catch (nextError) {
-        const message = nextError instanceof Error ? nextError.message : 'Unable to sign out right now.';
-        await refreshBetaAccess().catch(() => undefined);
-        setError(message);
-        throw nextError;
-      }
-    },
-    deleteAccount: async (_password?: string) => {
-      setError(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(true);
-      try {
-        await deleteClerkUser();
-        resetClerkAccountState();
-      } catch (nextError) {
-        const message = nextError instanceof Error ? nextError.message : 'Unable to delete your account right now.';
-        await refreshBetaAccess().catch(() => undefined);
-        setError(message);
-        throw nextError;
-      }
-    },
-    updateSyncedSettings,
-    refreshBetaAccess,
-  }), [authStatus, betaAccess, betaAccessLoading, bootstrapKey, clerk, currentUser, deleteClerkUser, error, refreshBetaAccess, resetClerkAccountState, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
+import { ClerkAuthContextProvider } from './ClerkAuthContextProvider';
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (readLocalTestAccount()) return <LocalAuthContextProvider>{children}</LocalAuthContextProvider>;

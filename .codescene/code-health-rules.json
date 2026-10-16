@@ -1,6 +1,10 @@
 {
-  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable.",
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. The beta Worker keeps its resource route handlers in one runtime module; retain individual method checks while excluding its aggregate average, which obscures the already separated route and utility helpers.",
   "rule_sets": [
+    {
+      "matching_content_path": "cloudflare/beta-worker.mjs",
+      "rules": [{ "name": "Overall Code Complexity", "weight": 0.0 }]
+    },
     {
       "matching_content_path": "src/pages/ForecastPage.tsx",
       "rules": [{ "name": "Lines of Code in a Single File", "weight": 0.0 }]
