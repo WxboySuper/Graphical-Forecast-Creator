@@ -99,7 +99,10 @@ function assertCycleId(id) {
 }
 
 function assertSnapshotId(id, code) {
-  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error(code);
+  if (typeof id !== 'string') throw new Error(code);
+  if (!id) throw new Error(code);
+  if (id.length > 128) throw new Error(code);
+  if (id.includes('/')) throw new Error(code);
 }
 
 function readCycleLabels(cycle) {
