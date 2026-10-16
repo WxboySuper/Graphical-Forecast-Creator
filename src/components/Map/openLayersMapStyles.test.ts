@@ -170,14 +170,15 @@ describe('openLayersMapStyles', () => {
   });
 
   test('createLabelOverlaySource and createTileSource return sources for known styles', () => {
-    expect(createLabelOverlaySource('osm')).toBeTruthy();
+    expect(createLabelOverlaySource('osm')).toBeNull();
+    expect(createLabelOverlaySource('esri-satellite')).toBeTruthy();
     expect(createTileSource('osm')).toBeTruthy();
     expect(createTileSource('esri-satellite')).toBeTruthy();
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM
   });
 
-  test('keeps OSM place labels above forecast polygons without CARTO tiles', () => {
-    expect(createLabelOverlaySource('osm')?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
+  test('uses OSM labels without adding a duplicate overlay', () => {
+    expect(createLabelOverlaySource('osm')).toBeNull();
     expect(createTileSource('osm').getUrls()?.[0]).toContain('tile.openstreetmap.org');
     expect(createTileSource('carto-dark' as never).getUrls()?.[0]).toContain('tile.openstreetmap.org');
   });
