@@ -377,14 +377,14 @@ function saveCloudCycle(db, sql, params) {
   const [id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at] = params;
   const key = `${user_id}:${id}`;
   const previous = db.cloudCycles.get(key);
-  if (cloudCycleQuotaExceeded(db, sql, user_id, previous, params)) return result(0);
+  if (cloudCycleQuotaExceeded({ db, sql, userId: user_id, previous, params })) return result(0);
   if (!shouldWriteCloudCycle(sql, previous)) return result();
   const row = buildMockCloudCycle({ sql, id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at, previous });
   db.cloudCycles.set(key, row);
   return result();
 }
 
-function cloudCycleQuotaExceeded(db, sql, userId, previous, params) {
+function cloudCycleQuotaExceeded({ db, sql, userId, previous, params }) {
   if (!sql.includes('SELECT ?') || previous) return false;
   const count = [...db.cloudCycles.values()].filter((row) => row.user_id === userId && row.migration_import !== 1).length;
   return count >= params.at(-1);
