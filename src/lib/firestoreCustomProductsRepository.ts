@@ -193,16 +193,25 @@ const readOccupiedSlots = async (userId: string): Promise<Set<string>> => {
   return new Set(snapshot.docs.map((item) => item.id));
 };
 
-const createBetaProduct = async (userId: string, draft: CustomProductDraft): Promise<HostedCustomProduct> => {
-  const products = await readBetaProducts(userId);
+const assertBetaProductCapacity = (products: HostedCustomProduct[]) => {
   if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
     throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
   }
-  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+};
+
+const postBetaProduct = async (product: HostedCustomProduct) => {
   const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
   const body = (await response.json().catch(() => ({}))) ?? {};
   if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
-  return body?.product && ownedProduct(body.product, userId) ? body.product : product;
+  return body?.product;
+};
+
+const createBetaProduct = async ({ userId, draft }: { userId: string; draft: CustomProductDraft }): Promise<HostedCustomProduct> => {
+  const products = await readBetaProducts(userId);
+  assertBetaProductCapacity(products);
+  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+  const created = await postBetaProduct(product);
+  return ownedProduct(created, userId) ? created : product;
 };
 
 const createFirestoreProduct = async (userId: string, draft: CustomProductDraft): Promise<HostedCustomProduct> => {
@@ -231,7 +240,7 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
     }, (error) => onError?.(error));
   },
   create(userId, draft) {
-    if (isBetaClerkD1Mode()) return createBetaProduct(userId, draft);
+    if (isBetaClerkD1Mode()) return createBetaProduct({ userId, draft });
     return createFirestoreProduct(userId, draft);
   },
   update(userId, product, draft) {
