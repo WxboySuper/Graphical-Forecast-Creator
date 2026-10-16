@@ -54,4 +54,26 @@ describe('PopulationEstimateBeta', () => {
     expect(screen.getByText('Day 1 Tornado polygons, merged before the request.')).toBeInTheDocument();
     expect(screen.queryByText('Day 1 Wind polygons, merged before the request.')).not.toBeInTheDocument();
   });
+
+  test('allows dismissing the dialog while loading and aborts the request', async () => {
+    const user = userEvent.setup();
+    const store = createStore();
+    store.dispatch(addFeature({ feature: tornadoFeature }));
+    let capturedSignal: AbortSignal | undefined;
+    estimatePopulationMock.mockImplementation((_geometry, options) => {
+      capturedSignal = options?.signal;
+      return new Promise(() => undefined);
+    });
+
+    renderEstimate(store);
+    await user.click(screen.getByRole('button', { name: /Estimate affected population/i }));
+    expect(await screen.findByText('WorldPop is calculating the population inside your outlook...')).toBeInTheDocument();
+
+    const cancelButton = await screen.findByRole('button', { name: /Cancel request/i });
+    await user.click(cancelButton);
+
+    expect(screen.queryByText('WorldPop is calculating the population inside your outlook...')).not.toBeInTheDocument();
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(screen.getByRole('button', { name: /Estimate affected population/i })).toBeEnabled();
+  });
 });
