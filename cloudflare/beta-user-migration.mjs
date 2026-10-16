@@ -98,11 +98,14 @@ function assertCycleId(id) {
   assertSnapshotId(id, 'SNAPSHOT_CYCLE_ID_INVALID');
 }
 
+const SNAPSHOT_ID_VALIDATORS = [
+  (id) => typeof id === 'string',
+  (id) => id.length > 0 && id.length <= 128,
+  (id) => !id.includes('/'),
+];
+
 function assertSnapshotId(id, code) {
-  if (typeof id !== 'string') throw new Error(code);
-  if (!id) throw new Error(code);
-  if (id.length > 128) throw new Error(code);
-  if (id.includes('/')) throw new Error(code);
+  if (!SNAPSHOT_ID_VALIDATORS.every((validate) => validate(id))) throw new Error(code);
 }
 
 function readCycleLabels(cycle) {

@@ -316,6 +316,17 @@ test('snapshot migration rejects cycle fields that fail the API schema', async (
     assert.equal(response.status, 409);
     assert.match((await response.json()).error, /could not be migrated automatically/);
   });
+
+  const invalidIdEnv = createEnv(new D1Mock(), {
+    userProfile: { email: 'test@example.com' }, userSettings: {},
+    cloudCycles: [{ id: 'invalid/cycle', label: 'Morning', cycleDate: '2026-10-15', payloadJson: '{}', metadata: {} }],
+    workflowAwareness: [], customProducts: [],
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', invalidIdEnv);
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /could not be migrated automatically/);
+  });
 });
 
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {

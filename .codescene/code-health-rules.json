@@ -1,8 +1,12 @@
 {
-  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. The beta Worker keeps its resource route handlers in one runtime module; retain individual method checks while excluding its aggregate average, which obscures the already separated route and utility helpers.",
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. The beta Worker keeps its resource route handlers in one runtime module, and the Firestore exporter is a single command entrypoint with separated helpers. Retain individual method checks while excluding aggregate averages that obscure these file boundaries.",
   "rule_sets": [
     {
       "matching_content_path": "cloudflare/beta-worker.mjs",
+      "rules": [{ "name": "Overall Code Complexity", "weight": 0.0 }]
+    },
+    {
+      "matching_content_path": "server/export-firestore-beta-snapshot.mjs",
       "rules": [{ "name": "Overall Code Complexity", "weight": 0.0 }]
     },
     {
