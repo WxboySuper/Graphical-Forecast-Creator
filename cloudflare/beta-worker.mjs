@@ -505,7 +505,7 @@ async function reserveCustomProductSlot(env, userId, product, dataJson) {
     try {
       return await insertCustomProductSlot(env, userId, product.id, dataJson);
     } catch (error) {
-      const failure = await classifyCustomProductSlotFailure(env.DB, error, userId, product.id, attempt);
+      const failure = await classifyCustomProductSlotFailure({ db: env.DB, error, userId, productId: product.id, attempt });
       if (failure) return failure;
     }
   }
@@ -529,7 +529,7 @@ function customProductSlotValues() {
     ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`)].join(', ');
 }
 
-async function classifyCustomProductSlotFailure(db, error, userId, productId, attempt) {
+async function classifyCustomProductSlotFailure({ db, error, userId, productId, attempt }) {
   const message = String(error?.message || '');
   if (message.includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
   if (!message.includes('UNIQUE constraint failed')) throw error;

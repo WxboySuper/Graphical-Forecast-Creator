@@ -30,11 +30,13 @@ function getAdminAccessError(env, user) {
 function createAdminMetricsSummary({ accounts, premium, storage, dailyMetrics }) {
   const latest = dailyMetrics.at(-1) || {};
   return {
-    totalAccounts: Number(accounts?.count || 0), activeDevices: Number(latest.activeDevices || 0),
-    activeSignedInAccounts: Number(latest.activeSignedInAccounts || 0), premiumSubscriptions: Number(premium?.count || 0),
-    storageBytes: Number(storage?.bytes || 0), ...sumAdminMetrics(dailyMetrics),
+    totalAccounts: toCount(accounts?.count), activeDevices: toCount(latest.activeDevices),
+    activeSignedInAccounts: toCount(latest.activeSignedInAccounts), premiumSubscriptions: toCount(premium?.count),
+    storageBytes: toCount(storage?.bytes), ...sumAdminMetrics(dailyMetrics),
   };
 }
+
+function toCount(value) { return Number(value ?? 0); }
 
 async function loadAdminMetricRows(db, days) {
   const windowStart = `-${days - 1} days`;

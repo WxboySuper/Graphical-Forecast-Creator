@@ -664,12 +664,20 @@ const fetchBetaCloudCyclePage = async (userId: string, page: number): Promise<Be
   const response = await fetchBetaApi(`/api/cloud-cycles?page=${page}`);
   const body = (await response.json().catch(() => ({}))) ?? {};
   if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
-  const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
-    .filter((raw: unknown) => isPlainObject(raw) && (raw.userId ?? (isPlainObject(raw.metadata) ? raw.metadata.userId : undefined)) === userId && typeof raw.id === 'string' && raw.id)
-    .map((raw: Record<string, unknown>) => normalizeCloudCycleMetadataRecord({ cycleId: raw.id as string, rawRecord: raw, fallbackUserId: userId }))
-    .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId));
-  return { success: true, data: { cycles, nextPage: Number.isSafeInteger(body?.nextPage) ? body.nextPage : null } };
+  const cycles = Array.isArray(body?.cycles) ? body.cycles.map((raw: unknown) => normalizeBetaCloudCycle(raw, userId)).filter(isOwnedCycle(userId)) : [];
+  return { success: true, data: { cycles, nextPage: readNextCyclePage(body?.nextPage) } };
 };
+
+const normalizeBetaCloudCycle = (raw: unknown, userId: string): CloudCycleMetadata | null => {
+  if (!isPlainObject(raw) || typeof raw.id !== 'string' || !raw.id) return null;
+  const metadataUserId = isPlainObject(raw.metadata) ? raw.metadata.userId : undefined;
+  if ((raw.userId ?? metadataUserId) !== userId) return null;
+  const record = raw as Record<string, unknown>;
+  return normalizeCloudCycleMetadataRecord({ cycleId: record.id as string, rawRecord: record, fallbackUserId: userId });
+};
+
+const isOwnedCycle = (userId: string) => (cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId);
+const readNextCyclePage = (nextPage: unknown): number | null => Number.isSafeInteger(nextPage) ? nextPage as number : null;
 
 /**
  * Subscribes to cloud cycles list for real-time updates
