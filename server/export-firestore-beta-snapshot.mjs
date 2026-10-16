@@ -12,6 +12,9 @@ const required = (name) => {
 
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+const MAX_SNAPSHOT_CYCLES = 300;
+const MAX_SNAPSHOT_WORKFLOW_RECORDS = 200;
+const MAX_SNAPSHOT_CUSTOM_PRODUCTS = 48;
 const serializeFirestoreValue = (value) => {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   if (value instanceof GeoPoint) {
@@ -136,6 +139,9 @@ function normalizeFirestoreTimestamp(value) {
 }
 
 async function readCloudCyclePage(account, cycleDocs, malformedLegacyCycles) {
+  if (account.cloudCycles.length + cycleDocs.length > MAX_SNAPSHOT_CYCLES) {
+    throw new Error(`Snapshot cycle limit exceeded for account hash ${sha256(account.uid)}.`);
+  }
   const migratedCycles = [];
   for (let offset = 0; offset < cycleDocs.length; offset += 10) {
     const cycleBatch = cycleDocs.slice(offset, offset + 10);
@@ -280,9 +286,15 @@ async function main() {
 
     await Promise.all([
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('workflowAwareness'), (page) => {
+        if (account.workflowAwareness.length + page.length > MAX_SNAPSHOT_WORKFLOW_RECORDS) {
+          throw new Error(`Snapshot workflow record limit exceeded for account hash ${sha256(account.uid)}.`);
+        }
         account.workflowAwareness.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('customProducts'), (page) => {
+        if (account.customProducts.length + page.length > MAX_SNAPSHOT_CUSTOM_PRODUCTS) {
+          throw new Error(`Snapshot custom product limit exceeded for account hash ${sha256(account.uid)}.`);
+        }
         account.customProducts.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
     ]);
@@ -334,7 +346,8 @@ async function main() {
       for (const [index, result] of results.entries()) {
         if (result.status === 'rejected') {
           const failedAccount = pageAccounts[offset + index];
-          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email), reason: result.reason instanceof Error ? result.reason.name : 'unknown-error' });
+          const reason = result.reason instanceof Error ? result.reason.message : String(result.reason || 'unknown error');
+          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email), reason: reason.slice(0, 500) });
           console.error(`Failed beta snapshot for account hash ${sha256(failedAccount.uid)}: ${result.reason?.message || 'unknown error'}`);
         }
       }

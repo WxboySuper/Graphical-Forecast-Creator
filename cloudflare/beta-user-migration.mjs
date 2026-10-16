@@ -95,8 +95,11 @@ function assertCycleObject(cycle) {
 }
 
 function assertCycleId(id) {
-  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
-  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+  assertSnapshotId(id, 'SNAPSHOT_CYCLE_ID_INVALID');
+}
+
+function assertSnapshotId(id, code) {
+  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error(code);
 }
 
 function readCycleLabels(cycle) {
@@ -161,8 +164,7 @@ function assertWorkflowRecordData(data) {
 }
 
 function assertWorkflowRecordId(id) {
-  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
-  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+  assertSnapshotId(id, 'SNAPSHOT_WORKFLOW_ID_INVALID');
 }
 
 function serializeWorkflowData(data) {
@@ -193,8 +195,7 @@ function assertProductObject(product) {
 }
 
 function assertProductId(id) {
-  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
-  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+  assertSnapshotId(id, 'SNAPSHOT_PRODUCT_ID_INVALID');
 }
 
 function assertNotBuiltIn(product) {
@@ -390,7 +391,7 @@ async function insertMigratingUser(db, user, snapshot, now) {
   return db.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
     migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
     ON CONFLICT DO NOTHING`)
-    .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
+    .bind(user.clerkId, normalizeEmail(user.email), snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
       snapshot ? 'migrating' : 'no_match', now, now).run();
 }
 
@@ -420,14 +421,22 @@ async function prepareClerkUser(env, user) {
 
 function needsClerkProfileUpdate(existing, user) {
   if (!existing) return false;
-  const emailChanged = normalizeEmail(existing.email) !== user.email;
+  const emailChanged = normalizeEmail(existing.email) !== normalizeEmail(user.email);
   const displayNameChanged = (existing.display_name || '') !== (user.displayName || '');
   return emailChanged || displayNameChanged;
 }
 
 async function finishCompletedUser(env, user, refreshMigratedStripeEntitlement) {
-  await refreshMigratedStripeEntitlement(env, user.clerkId);
+  await refreshStripeEntitlementBestEffort(env, user.clerkId, refreshMigratedStripeEntitlement);
   return findClerkUser(env.DB, user.clerkId);
+}
+
+async function refreshStripeEntitlementBestEffort(env, userId, refreshMigratedStripeEntitlement) {
+  try {
+    await refreshMigratedStripeEntitlement(env, userId);
+  } catch (error) {
+    console.error('[beta-worker] migrated Stripe entitlement refresh failed', error instanceof Error ? error.message : 'refresh failed');
+  }
 }
 
 function canSkipSnapshotMigration(existing, snapshot) {
@@ -450,7 +459,7 @@ export const createUserEnsurer = (refreshMigratedStripeEntitlement) => async (us
   const snapshot = await readUserSnapshot(env, user.email);
   if (canSkipSnapshotMigration(existing, snapshot)) return findClerkUser(env.DB, user.clerkId);
   await migrateClerkUserSnapshot(env, user, existing, snapshot);
-  await refreshMigratedStripeEntitlement(env, user.clerkId);
+  await refreshStripeEntitlementBestEffort(env, user.clerkId, refreshMigratedStripeEntitlement);
   return findClerkUser(env.DB, user.clerkId);
 }
 
