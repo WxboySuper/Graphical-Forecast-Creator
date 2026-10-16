@@ -80,6 +80,53 @@ const decodeClerkTokenClaims = (token: string): IdTokenResult['claims'] => {
   }
 };
 
+const getClerkSessionToken = async (getToken: ClerkGetToken, forceRefresh = false): Promise<string> => {
+  const token = await getToken({ skipCache: forceRefresh });
+  if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
+  return token;
+};
+
+const getClerkTokenTime = (value: unknown): string => typeof value === 'number' ? new Date(value * 1000).toUTCString() : '';
+
+const createClerkTokenResult = async (getToken: ClerkGetToken): Promise<IdTokenResult> => {
+  const token = await getClerkSessionToken(getToken);
+  const claims = decodeClerkTokenClaims(token);
+  return {
+    claims, token, authTime: getClerkTokenTime(claims.auth_time),
+    issuedAtTime: getClerkTokenTime(claims.iat), expirationTime: getClerkTokenTime(claims.exp),
+    signInProvider: typeof claims.firebase?.sign_in_provider === 'string' ? claims.firebase.sign_in_provider : null,
+    signInSecondFactor: null,
+  };
+};
+
+const createClerkExternalProviderData = (
+  account: NonNullable<ClerkUserResource['externalAccounts']>[number],
+  displayName: string | null,
+  email: string | null,
+  photoURL: string | null,
+): User['providerData'][number] => ({
+  uid: account.id,
+  displayName: account.username ?? displayName,
+  email: account.emailAddress ?? email,
+  phoneNumber: null,
+  photoURL: account.imageUrl ?? photoURL,
+  providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com`,
+});
+
+const createClerkProviderData = (
+  clerkUser: ClerkUserResource,
+  displayName: string | null,
+  email: string | null,
+  photoURL: string | null,
+): User['providerData'] => {
+  const passwordProvider = clerkUser.passwordEnabled ? [{
+    uid: clerkUser.id, displayName, email, phoneNumber: null, photoURL, providerId: 'password',
+  } as User['providerData'][number]] : [];
+  const externalProviders = (clerkUser.externalAccounts ?? []).map((account) =>
+    createClerkExternalProviderData(account, displayName, email, photoURL));
+  return [...passwordProvider, ...externalProviders];
+};
+
 const createClerkUserFacade = (
   clerkUser: ClerkUserResource | null | undefined,
   getToken: ClerkGetToken,
@@ -89,12 +136,6 @@ const createClerkUserFacade = (
   const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
   const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
   const photoURL = clerkUser.imageUrl || null;
-  const tokenForClerkSession = async (forceRefresh?: boolean) => {
-    const token = await getToken({ skipCache: Boolean(forceRefresh) });
-    if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
-    return token;
-  };
-  const time = (value: unknown) => typeof value === 'number' ? new Date(value * 1000).toUTCString() : '';
   return {
     uid: clerkUser.id,
     email,
@@ -109,28 +150,9 @@ const createClerkUserFacade = (
     phoneNumber: clerkUser.primaryPhoneNumber?.phoneNumber ?? null,
     refreshToken: '',
     tenantId: null,
-    providerData: [
-      ...(clerkUser.passwordEnabled ? [{
-        uid: clerkUser.id, displayName, email, phoneNumber: null, photoURL, providerId: 'password',
-      }] : []),
-      ...(clerkUser.externalAccounts ?? []).map((account) => ({
-        uid: account.id,
-        displayName: account.username ?? displayName,
-        email: account.emailAddress ?? email,
-        phoneNumber: null,
-        photoURL: account.imageUrl ?? photoURL,
-        providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com`,
-      })),
-    ],
-    getIdToken: tokenForClerkSession,
-    getIdTokenResult: async () => {
-      const token = await tokenForClerkSession();
-      const claims = decodeClerkTokenClaims(token);
-      return {
-        claims, token, authTime: time(claims.auth_time), issuedAtTime: time(claims.iat), expirationTime: time(claims.exp),
-        signInProvider: typeof claims.firebase?.sign_in_provider === 'string' ? claims.firebase.sign_in_provider : null,
-      };
-    },
+    providerData: createClerkProviderData(clerkUser, displayName, email, photoURL),
+    getIdToken: (forceRefresh?: boolean) => getClerkSessionToken(getToken, Boolean(forceRefresh)),
+    getIdTokenResult: () => createClerkTokenResult(getToken),
     reload: async () => { await clerkUser.reload(); },
     delete: async () => { await deleteClerkUser(); },
     toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
@@ -162,14 +184,17 @@ const requestClerkBetaApi = async (
   return fetch(path, { ...init, headers });
 };
 
-const putClerkSettings = async (
-  queueRef: React.MutableRefObject<Promise<void>>,
-  currentUserId: string | undefined,
-  request: (path: string, init?: RequestInit) => Promise<Response>,
-  settings: UserSettingsDocument,
-  userId: string,
-  signal?: AbortSignal,
-): Promise<Response> => {
+type ClerkSettingsWriteContext = {
+  queueRef: React.MutableRefObject<Promise<void>>;
+  currentUserId: string | undefined;
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  settings: UserSettingsDocument;
+  userId: string;
+  signal?: AbortSignal;
+};
+
+const putClerkSettings = async (context: ClerkSettingsWriteContext): Promise<Response> => {
+  const { queueRef, currentUserId, request, settings, userId, signal } = context;
   const previous = queueRef.current;
   let release!: () => void;
   queueRef.current = new Promise<void>((resolve) => { release = resolve; });
@@ -204,7 +229,15 @@ type ClerkBootstrapContext = {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
-const applyClerkBootstrapSettings = (body: Record<string, any>, context: ClerkBootstrapContext): void => {
+const clerkResponseError = (body: Record<string, unknown>, fallback: string): string =>
+  typeof body.error === 'string' && body.error ? body.error : fallback;
+
+const readClerkBetaAccess = (body: Record<string, unknown>): boolean => {
+  const user = body.user;
+  return typeof user === 'object' && user !== null && 'betaAccess' in user ? Boolean(user.betaAccess) : false;
+};
+
+const applyClerkBootstrapSettings = (body: Record<string, unknown>, context: ClerkBootstrapContext): void => {
   const settings = readRemoteSettings(body?.settings ?? undefined);
   if (settings) {
     applySettingsToState(settings, context);
@@ -224,9 +257,9 @@ const applyClerkBootstrapSettings = (body: Record<string, any>, context: ClerkBo
   context.setSettingsSyncStatus('idle');
 };
 
-const applyClerkBootstrapResponse = (body: Record<string, any>, requestId: number, context: ClerkBootstrapContext): void => {
+const applyClerkBootstrapResponse = (body: Record<string, unknown>, requestId: number, context: ClerkBootstrapContext): void => {
   if (requestId !== context.betaAccessRequestIdRef.current) return;
-  context.setBetaAccess(Boolean(body?.user?.betaAccess));
+  context.setBetaAccess(readClerkBetaAccess(body));
   applyClerkBootstrapSettings(body, context);
   context.hasInitializedSettingsRef.current = true;
   context.setBootstrapKey(context.clerkUserId!);
@@ -248,7 +281,9 @@ const applyClerkBootstrapFailure = (error: unknown, requestId: number, context: 
   context.setBetaAccess(false);
 };
 
-const refreshClerkBetaAccess = async (context: ClerkBootstrapContext): Promise<void> => {
+type ClerkBootstrapRequest = { abortController: AbortController; requestId: number };
+
+const beginClerkBootstrapRequest = (context: ClerkBootstrapContext): ClerkBootstrapRequest | null => {
   context.betaAccessAbortRef.current?.abort();
   const abortController = new AbortController();
   context.betaAccessAbortRef.current = abortController;
@@ -257,13 +292,21 @@ const refreshClerkBetaAccess = async (context: ClerkBootstrapContext): Promise<v
     context.setBetaAccess(false);
     context.setBetaAccessLoading(false);
     if (context.betaAccessAbortRef.current === abortController) context.betaAccessAbortRef.current = null;
-    return;
+    return null;
   }
   context.setBetaAccessLoading(true);
+  return { abortController, requestId };
+};
+
+const loadClerkBetaAccess = async (
+  context: ClerkBootstrapContext,
+  bootstrap: ClerkBootstrapRequest,
+): Promise<void> => {
+  const { abortController, requestId } = bootstrap;
   try {
     const response = await context.request('/api/me/bootstrap', { signal: abortController.signal });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
+    const body = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok) throw new Error(clerkResponseError(body, 'Unable to load your beta account.'));
     applyClerkBootstrapResponse(body, requestId, context);
   } catch (error) {
     applyClerkBootstrapFailure(error, requestId, context);
@@ -271,6 +314,11 @@ const refreshClerkBetaAccess = async (context: ClerkBootstrapContext): Promise<v
     if (requestId === context.betaAccessRequestIdRef.current) context.setBetaAccessLoading(false);
     if (context.betaAccessAbortRef.current === abortController) context.betaAccessAbortRef.current = null;
   }
+};
+
+const refreshClerkBetaAccess = async (context: ClerkBootstrapContext): Promise<void> => {
+  const bootstrap = beginClerkBootstrapRequest(context);
+  if (bootstrap) await loadClerkBetaAccess(context, bootstrap);
 };
 
 type ClerkSettingsUpdateContext = {
@@ -397,30 +445,50 @@ const createClerkSettingsSyncSnapshot = (context: ClerkSettingsSyncContext): Use
   return areUserSettingsEqual(context.lastSyncedSettingsRef.current, next) ? null : next;
 };
 
+type ClerkSettingsSyncRequest = { active: boolean; requestId: number; userId: string; next: UserSettingsDocument; signal: AbortSignal };
+
+const isActiveClerkSettingsSync = (context: ClerkSettingsSyncContext, request: ClerkSettingsSyncRequest): boolean =>
+  isCurrentClerkSettingsSync({
+    active: request.active,
+    requestId: request.requestId,
+    latestRequestId: context.settingsRequestIdRef.current,
+    isSignedIn: Boolean(context.isSignedIn),
+    userId: request.userId,
+    currentUserId: context.currentUser?.uid ?? '',
+    bootstrapKey: context.bootstrapKey,
+  });
+
+const applyClerkSettingsSyncSuccess = (
+  context: ClerkSettingsSyncContext,
+  request: ClerkSettingsSyncRequest,
+): void => {
+  if (!isActiveClerkSettingsSync(context, request)) return;
+  context.lastSyncedSettingsRef.current = request.next;
+  context.setSyncedSettings(request.next);
+  context.setSettingsSyncStatus('synced');
+};
+
+const applyClerkSettingsSyncFailure = (
+  context: ClerkSettingsSyncContext,
+  request: ClerkSettingsSyncRequest,
+  error: unknown,
+): void => {
+  if (!isActiveClerkSettingsSync(context, request)) return;
+  context.setSettingsSyncStatus('error');
+  context.setError(error instanceof Error ? error.message : 'Unable to sync account settings.');
+};
+
 const persistClerkSettingsSync = async (
   context: ClerkSettingsSyncContext,
-  args: { active: boolean; requestId: number; userId: string; next: UserSettingsDocument; signal: AbortSignal },
+  request: ClerkSettingsSyncRequest,
 ): Promise<void> => {
   try {
-    const response = await context.putSettings(args.next, args.userId, args.signal);
+    const response = await context.putSettings(request.next, request.userId, request.signal);
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
-    if (!isCurrentClerkSettingsSync({
-      active: args.active, requestId: args.requestId, latestRequestId: context.settingsRequestIdRef.current,
-      isSignedIn: Boolean(context.isSignedIn), userId: args.userId,
-      currentUserId: context.currentUser?.uid ?? '', bootstrapKey: context.bootstrapKey,
-    })) return;
-    context.lastSyncedSettingsRef.current = args.next;
-    context.setSyncedSettings(args.next);
-    context.setSettingsSyncStatus('synced');
+    applyClerkSettingsSyncSuccess(context, request);
   } catch (error) {
-    if (!isCurrentClerkSettingsSync({
-      active: args.active, requestId: args.requestId, latestRequestId: context.settingsRequestIdRef.current,
-      isSignedIn: Boolean(context.isSignedIn), userId: args.userId,
-      currentUserId: context.currentUser?.uid ?? '', bootstrapKey: context.bootstrapKey,
-    })) return;
-    context.setSettingsSyncStatus('error');
-    context.setError(error instanceof Error ? error.message : 'Unable to sync account settings.');
+    applyClerkSettingsSyncFailure(context, request, error);
   }
 };
 
@@ -514,26 +582,25 @@ const runClerkBootstrapLifecycle = (context: ClerkBootstrapLifecycleContext): vo
   context.refreshBetaAccess().catch(() => undefined);
 };
 
-const resolveClerkAuthStatus = (
-  isLoaded: boolean,
-  isUserLoaded: boolean,
-  error: string | null,
-  isSignedIn: boolean | undefined,
-  hasInitializedSettings: boolean,
-  currentUser: User | null,
-): AuthStatus => {
-  if (!isLoaded || !isUserLoaded) return 'loading';
-  if (error && isSignedIn && !hasInitializedSettings) return 'error';
-  if (isSignedIn && currentUser) return 'signed_in';
-  return 'signed_out';
+type ClerkAuthStatusContext = {
+  isLoaded: boolean;
+  isUserLoaded: boolean;
+  error: string | null;
+  isSignedIn: boolean | undefined;
+  hasInitializedSettings: boolean;
+  currentUser: User | null;
 };
 
-/** Provides Clerk sessions and the beta Worker profile/settings API for the Clerk+D1 beta build. */
-export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const dispatch = useDispatch();
-  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
-  const overlays = useSelector((state: RootState) => state.overlays);
-  const monitorSettings = useSelector((state: RootState) => state.monitor);
+const resolveClerkAuthStatus = (context: ClerkAuthStatusContext): AuthStatus => {
+  if (!context.isLoaded) return 'loading';
+  if (!context.isUserLoaded) return 'loading';
+  const hasBootstrapError = [Boolean(context.error), Boolean(context.isSignedIn), !context.hasInitializedSettings].every(Boolean);
+  if (hasBootstrapError) return 'error';
+  if (!context.isSignedIn) return 'signed_out';
+  return context.currentUser ? 'signed_in' : 'signed_out';
+};
+
+const useClerkSession = () => {
   const { isLoaded, isSignedIn, getToken } = useClerkAuth();
   const clerk = useClerk();
   const { user: clerkUser, isLoaded: isUserLoaded } = useUser();
@@ -552,9 +619,30 @@ export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> =
   useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
   const betaTokenProviderRef = useRef(async () => (await getTokenRef.current()) ?? null);
   useEffect(() => {
-    if (!isLoaded) return;
-    setBetaApiTokenProvider(isSignedIn ? betaTokenProviderRef.current : null);
+    if (isLoaded) setBetaApiTokenProvider(isSignedIn ? betaTokenProviderRef.current : null);
   }, [clerkUser?.id, isLoaded, isSignedIn]);
+  return { isLoaded, isSignedIn, isUserLoaded, getToken, clerk, clerkUser, clerkIdentityRef, deleteClerkUser };
+};
+
+const useClerkPreferences = () => {
+  const dispatch = useDispatch();
+  const darkMode = useSelector((state: RootState) => state.theme.darkMode);
+  const overlays = useSelector((state: RootState) => state.overlays);
+  const monitorSettings = useSelector((state: RootState) => state.monitor);
+  const currentDarkModeRef = useRef(darkMode);
+  const currentOverlaysRef = useRef(overlays);
+  useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
+  useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
+  return { dispatch, darkMode, overlays, monitorSettings, currentDarkModeRef, currentOverlaysRef };
+};
+
+type ClerkProviderStateContext = {
+  isSignedIn: boolean | undefined;
+  clerkUserId: string | undefined;
+  dispatch: ReturnType<typeof useDispatch>;
+};
+
+const useClerkProviderState = (context: ClerkProviderStateContext) => {
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
@@ -566,106 +654,218 @@ export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> =
   const betaAccessRequestIdRef = useRef(0);
   const settingsRequestIdRef = useRef(0);
   const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const currentDarkModeRef = useRef(darkMode);
-  const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
   const betaAccessAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
-  useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
   useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
-  const accountSwitchContext: ClerkAccountSwitchContext = {
-    isSignedIn, clerkUserId: clerkUser?.id, bootstrapKey, dispatch,
+  const accountSwitchContext = useMemo<ClerkAccountSwitchContext>(() => ({
+    isSignedIn: context.isSignedIn, clerkUserId: context.clerkUserId, bootstrapKey,
+    dispatch: context.dispatch, betaAccessRequestIdRef, betaAccessAbortRef, settingsRequestIdRef,
+    settingsWriteQueueRef, lastSyncedSettingsRef, hasInitializedSettingsRef,
+    setSettingsSyncStatus, setSyncedSettings, setBetaAccess, setBetaAccessLoading, setBootstrapKey, setError,
+  }), [bootstrapKey, context.clerkUserId, context.dispatch, context.isSignedIn,
     betaAccessRequestIdRef, betaAccessAbortRef, settingsRequestIdRef, settingsWriteQueueRef,
     lastSyncedSettingsRef, hasInitializedSettingsRef, setSettingsSyncStatus, setSyncedSettings,
-    setBetaAccess, setBetaAccessLoading, setBootstrapKey, setError,
+    setBetaAccess, setBetaAccessLoading, setBootstrapKey, setError]);
+  useEffect(() => resetClerkStateForAccountSwitch(accountSwitchContext), [accountSwitchContext]);
+  return {
+    syncedSettings, setSyncedSettings, settingsSyncStatus, setSettingsSyncStatus,
+    betaAccess, setBetaAccess, betaAccessLoading, setBetaAccessLoading, error, setError,
+    bootstrapKey, setBootstrapKey, bootstrapKeyRef, lastSyncedSettingsRef, betaAccessRequestIdRef,
+    settingsRequestIdRef, settingsWriteQueueRef, hasInitializedSettingsRef, betaAccessAbortRef,
   };
-  useEffect(() => resetClerkStateForAccountSwitch(accountSwitchContext), [bootstrapKey, clerkUser?.id, dispatch, isSignedIn]);
+};
 
-  const clerkUserId = clerkUser?.id;
-  const requestContext = { clerkUserId, isSignedIn, getToken, identityRef: clerkIdentityRef };
+type ClerkProviderApiContext = {
+  clerkUserId: string | undefined;
+  isSignedIn: boolean | undefined;
+  getToken: ClerkGetToken;
+  identityRef: React.MutableRefObject<{ isSignedIn: boolean; userId: string | undefined }>;
+  settingsWriteQueueRef: React.MutableRefObject<Promise<void>>;
+};
+
+const useClerkProviderApi = (context: ClerkProviderApiContext) => {
+  const requestContext = useMemo<ClerkRequestContext>(() => ({
+    clerkUserId: context.clerkUserId, isSignedIn: context.isSignedIn,
+    getToken: context.getToken, identityRef: context.identityRef,
+  }), [context.clerkUserId, context.getToken, context.identityRef, context.isSignedIn]);
   const request = useCallback((path: string, init: RequestInit = {}) =>
-    requestClerkBetaApi(requestContext, path, init), [clerkUserId, getToken, isSignedIn]);
+    requestClerkBetaApi(requestContext, path, init), [requestContext]);
   const putSettings = useCallback((settings: UserSettingsDocument, userId: string, signal?: AbortSignal) =>
-    putClerkSettings(settingsWriteQueueRef, clerkUserId, request, settings, userId, signal), [clerkUserId, request]);
-  const bootstrapContext: ClerkBootstrapContext = {
-    isSignedIn, clerkUserId, clerkUser, monitorSettings, request, dispatch,
-    currentDarkModeRef, currentOverlaysRef, betaAccessRequestIdRef, betaAccessAbortRef,
-    bootstrapKeyRef, lastSyncedSettingsRef, hasInitializedSettingsRef,
-    setBetaAccess, setBetaAccessLoading, setSyncedSettings, setSettingsSyncStatus, setBootstrapKey, setError,
-  };
-  const refreshBetaAccess = useCallback(() => refreshClerkBetaAccess(bootstrapContext), [
-    clerkUserId, clerkUser?.firstName, clerkUser?.lastName, dispatch, isSignedIn, monitorSettings, request,
-  ]);
+    putClerkSettings({
+      queueRef: context.settingsWriteQueueRef, currentUserId: context.clerkUserId,
+      request, settings, userId, signal,
+    }), [context.clerkUserId, context.settingsWriteQueueRef, request]);
+  return { request, putSettings };
+};
 
-  const bootstrapLifecycleContext: ClerkBootstrapLifecycleContext = {
-    clerkUserId, betaAccessRequestIdRef, betaAccessAbortRef, lastSyncedSettingsRef, hasInitializedSettingsRef,
-    setSyncedSettings, setSettingsSyncStatus, setBetaAccess, setBetaAccessLoading, setBootstrapKey, setError,
-    isLoaded, isUserLoaded, isSignedIn, refreshBetaAccess,
-  };
-  useEffect(() => runClerkBootstrapLifecycle(bootstrapLifecycleContext), [clerkUserId, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess]);
+type ClerkProviderBootstrapContext = {
+  session: ReturnType<typeof useClerkSession>;
+  preferences: ReturnType<typeof useClerkPreferences>;
+  state: ReturnType<typeof useClerkProviderState>;
+  request: ClerkBootstrapContext['request'];
+};
 
-  const currentUser = useMemo(
-    () => createClerkUserFacade(clerkUser, getToken, deleteClerkUser),
-    [clerkUser, deleteClerkUser, getToken],
-  );
+const useClerkBetaAccess = (context: ClerkProviderBootstrapContext) => {
+  const { session, preferences, state, request } = context;
+  const bootstrapContext = useMemo<ClerkBootstrapContext>(() => ({
+    isSignedIn: session.isSignedIn, clerkUserId: session.clerkUser?.id, clerkUser: session.clerkUser,
+    monitorSettings: preferences.monitorSettings, request, dispatch: preferences.dispatch,
+    currentDarkModeRef: preferences.currentDarkModeRef, currentOverlaysRef: preferences.currentOverlaysRef,
+    betaAccessRequestIdRef: state.betaAccessRequestIdRef, betaAccessAbortRef: state.betaAccessAbortRef,
+    bootstrapKeyRef: state.bootstrapKeyRef, lastSyncedSettingsRef: state.lastSyncedSettingsRef,
+    hasInitializedSettingsRef: state.hasInitializedSettingsRef, setBetaAccess: state.setBetaAccess,
+    setBetaAccessLoading: state.setBetaAccessLoading, setSyncedSettings: state.setSyncedSettings,
+    setSettingsSyncStatus: state.setSettingsSyncStatus, setBootstrapKey: state.setBootstrapKey, setError: state.setError,
+  }), [session.isSignedIn, session.clerkUser,
+    preferences.monitorSettings, request, preferences.dispatch, preferences.currentDarkModeRef,
+    preferences.currentOverlaysRef, state.betaAccessRequestIdRef, state.betaAccessAbortRef,
+    state.bootstrapKeyRef, state.lastSyncedSettingsRef, state.hasInitializedSettingsRef,
+    state.setBetaAccess, state.setBetaAccessLoading, state.setSyncedSettings,
+    state.setSettingsSyncStatus, state.setBootstrapKey, state.setError]);
+  const refreshBetaAccess = useCallback(() => refreshClerkBetaAccess(bootstrapContext), [bootstrapContext]);
+  const lifecycleContext = useMemo<ClerkBootstrapLifecycleContext>(() => ({
+    clerkUserId: session.clerkUser?.id,
+    betaAccessRequestIdRef: state.betaAccessRequestIdRef, betaAccessAbortRef: state.betaAccessAbortRef,
+    lastSyncedSettingsRef: state.lastSyncedSettingsRef, hasInitializedSettingsRef: state.hasInitializedSettingsRef,
+    setSyncedSettings: state.setSyncedSettings, setSettingsSyncStatus: state.setSettingsSyncStatus,
+    setBetaAccess: state.setBetaAccess, setBetaAccessLoading: state.setBetaAccessLoading,
+    setBootstrapKey: state.setBootstrapKey, setError: state.setError,
+    isLoaded: session.isLoaded, isUserLoaded: session.isUserLoaded, isSignedIn: session.isSignedIn, refreshBetaAccess,
+  }), [session.clerkUser?.id, session.isLoaded, session.isSignedIn, session.isUserLoaded, refreshBetaAccess,
+    state.betaAccessRequestIdRef, state.betaAccessAbortRef, state.lastSyncedSettingsRef,
+    state.hasInitializedSettingsRef, state.setSyncedSettings, state.setSettingsSyncStatus,
+    state.setBetaAccess, state.setBetaAccessLoading, state.setBootstrapKey, state.setError]);
+  useEffect(() => runClerkBootstrapLifecycle(lifecycleContext), [lifecycleContext]);
+  return refreshBetaAccess;
+};
 
-  const settingsUpdateContext: ClerkSettingsUpdateContext = {
-    currentUser, bootstrapKey, hasInitializedSettingsRef, settingsRequestIdRef, lastSyncedSettingsRef,
-    darkMode, overlays, monitorSettings, syncedSettings, putSettings, clerkIdentityRef,
-    setSettingsSyncStatus, setError, setSyncedSettings,
-  };
+type ClerkProviderSettingsContext = {
+  session: ReturnType<typeof useClerkSession>;
+  preferences: ReturnType<typeof useClerkPreferences>;
+  state: ReturnType<typeof useClerkProviderState>;
+  currentUser: User | null;
+  putSettings: ClerkSettingsSyncContext['putSettings'];
+};
+
+const useClerkSettings = (context: ClerkProviderSettingsContext) => {
+  const { session, preferences, state, currentUser, putSettings } = context;
+  const settingsUpdateContext = useMemo<ClerkSettingsUpdateContext>(() => ({
+    currentUser, bootstrapKey: state.bootstrapKey, hasInitializedSettingsRef: state.hasInitializedSettingsRef,
+    settingsRequestIdRef: state.settingsRequestIdRef, lastSyncedSettingsRef: state.lastSyncedSettingsRef,
+    darkMode: preferences.darkMode, overlays: preferences.overlays, monitorSettings: preferences.monitorSettings,
+    syncedSettings: state.syncedSettings, putSettings, clerkIdentityRef: session.clerkIdentityRef,
+    setSettingsSyncStatus: state.setSettingsSyncStatus, setError: state.setError, setSyncedSettings: state.setSyncedSettings,
+  }), [currentUser, state.bootstrapKey, state.hasInitializedSettingsRef, state.settingsRequestIdRef,
+    state.lastSyncedSettingsRef, preferences.darkMode, preferences.overlays, preferences.monitorSettings,
+    state.syncedSettings, putSettings, session.clerkIdentityRef, state.setSettingsSyncStatus,
+    state.setError, state.setSyncedSettings]);
   const updateSyncedSettings = useCallback((patch: Partial<UserSettingsDocument>) =>
-    updateClerkSyncedSettings(settingsUpdateContext, patch), [
-    bootstrapKey, currentUser, darkMode, monitorSettings, overlays, putSettings, syncedSettings,
-  ]);
+    updateClerkSyncedSettings(settingsUpdateContext, patch), [settingsUpdateContext]);
+  const settingsSyncContext = useMemo<ClerkSettingsSyncContext>(() => ({
+    bootstrapKey: state.bootstrapKey, currentUser, hasInitializedSettingsRef: state.hasInitializedSettingsRef,
+    isSignedIn: session.isSignedIn, darkMode: preferences.darkMode, overlays: preferences.overlays,
+    monitorSettings: preferences.monitorSettings, syncedSettings: state.syncedSettings,
+    lastSyncedSettingsRef: state.lastSyncedSettingsRef, settingsRequestIdRef: state.settingsRequestIdRef,
+    putSettings, setSyncedSettings: state.setSyncedSettings, setSettingsSyncStatus: state.setSettingsSyncStatus,
+    setError: state.setError,
+  }), [state.bootstrapKey, currentUser, state.hasInitializedSettingsRef, session.isSignedIn,
+    preferences.darkMode, preferences.overlays, preferences.monitorSettings, state.syncedSettings,
+    state.lastSyncedSettingsRef, state.settingsRequestIdRef, putSettings, state.setSyncedSettings,
+    state.setSettingsSyncStatus, state.setError]);
+  useEffect(() => startClerkSettingsSync(settingsSyncContext), [settingsSyncContext]);
+  return updateSyncedSettings;
+};
 
-  const settingsSyncContext: ClerkSettingsSyncContext = {
-    bootstrapKey, currentUser, hasInitializedSettingsRef, isSignedIn, darkMode, overlays, monitorSettings, syncedSettings,
-    lastSyncedSettingsRef, settingsRequestIdRef, putSettings, setSyncedSettings, setSettingsSyncStatus, setError,
-  };
-  useEffect(() => startClerkSettingsSync(settingsSyncContext), [
-    bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, putSettings, syncedSettings,
-  ]);
+type ClerkProviderActionsContext = {
+  session: ReturnType<typeof useClerkSession>;
+  state: ReturnType<typeof useClerkProviderState>;
+  refreshBetaAccess: () => Promise<void>;
+};
 
-  const resetClerkAccountState = useCallback(() => {
-    setBetaApiTokenProvider(null);
-    betaAccessRequestIdRef.current += 1;
-    settingsRequestIdRef.current += 1;
-    settingsWriteQueueRef.current = Promise.resolve();
-    setBetaAccess(false);
-    setBetaAccessLoading(false);
-    setBootstrapKey('');
-    setSyncedSettings(null);
-    setSettingsSyncStatus('idle');
-    lastSyncedSettingsRef.current = null;
-    hasInitializedSettingsRef.current = false;
-  }, []);
+type ClerkAccountResetContext = Pick<ReturnType<typeof useClerkProviderState>,
+  'betaAccessRequestIdRef' | 'settingsRequestIdRef' | 'settingsWriteQueueRef' | 'setBetaAccess'
+  | 'setBetaAccessLoading' | 'setBootstrapKey' | 'setSyncedSettings' | 'setSettingsSyncStatus'
+  | 'lastSyncedSettingsRef' | 'hasInitializedSettingsRef'>;
 
+const resetClerkAccountState = (state: ClerkAccountResetContext): void => {
+  setBetaApiTokenProvider(null);
+  state.betaAccessRequestIdRef.current += 1;
+  state.settingsRequestIdRef.current += 1;
+  state.settingsWriteQueueRef.current = Promise.resolve();
+  state.setBetaAccess(false);
+  state.setBetaAccessLoading(false);
+  state.setBootstrapKey('');
+  state.setSyncedSettings(null);
+  state.setSettingsSyncStatus('idle');
+  state.lastSyncedSettingsRef.current = null;
+  state.hasInitializedSettingsRef.current = false;
+};
+
+const useClerkAccountActions = (context: ClerkProviderActionsContext) => {
+  const { session, state, refreshBetaAccess } = context;
+  const resetAccountState = useCallback(() => resetClerkAccountState({
+    betaAccessRequestIdRef: state.betaAccessRequestIdRef,
+    settingsRequestIdRef: state.settingsRequestIdRef,
+    settingsWriteQueueRef: state.settingsWriteQueueRef,
+    setBetaAccess: state.setBetaAccess,
+    setBetaAccessLoading: state.setBetaAccessLoading,
+    setBootstrapKey: state.setBootstrapKey,
+    setSyncedSettings: state.setSyncedSettings,
+    setSettingsSyncStatus: state.setSettingsSyncStatus,
+    lastSyncedSettingsRef: state.lastSyncedSettingsRef,
+    hasInitializedSettingsRef: state.hasInitializedSettingsRef,
+  }), [state.betaAccessRequestIdRef, state.settingsRequestIdRef, state.settingsWriteQueueRef,
+    state.setBetaAccess, state.setBetaAccessLoading, state.setBootstrapKey, state.setSyncedSettings,
+    state.setSettingsSyncStatus, state.lastSyncedSettingsRef, state.hasInitializedSettingsRef]);
   const signOutUser = useCallback(() => runClerkAccountAction({
-    action: () => clerk.signOut(), fallbackMessage: 'Unable to sign out right now.',
-    refreshBetaAccess, resetAccountState: resetClerkAccountState,
-    setBetaAccess, setBetaAccessLoading, setError,
-  }), [clerk, refreshBetaAccess, resetClerkAccountState]);
+    action: () => session.clerk.signOut(), fallbackMessage: 'Unable to sign out right now.',
+    refreshBetaAccess, resetAccountState,
+    setBetaAccess: state.setBetaAccess, setBetaAccessLoading: state.setBetaAccessLoading, setError: state.setError,
+  }), [session.clerk, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
   const deleteAccount = useCallback(() => runClerkAccountAction({
-    action: deleteClerkUser, fallbackMessage: 'Unable to delete your account right now.',
-    refreshBetaAccess, resetAccountState: resetClerkAccountState,
-    setBetaAccess, setBetaAccessLoading, setError,
-  }), [deleteClerkUser, refreshBetaAccess, resetClerkAccountState]);
+    action: session.deleteClerkUser, fallbackMessage: 'Unable to delete your account right now.',
+    refreshBetaAccess, resetAccountState,
+    setBetaAccess: state.setBetaAccess, setBetaAccessLoading: state.setBetaAccessLoading, setError: state.setError,
+  }), [session.deleteClerkUser, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
+  return { signOutUser, deleteAccount };
+};
 
-  const hasInitializedSettings = Boolean(currentUser && bootstrapKey === currentUser.uid && hasInitializedSettingsRef.current);
-  const authStatus = resolveClerkAuthStatus(isLoaded, isUserLoaded, error, isSignedIn, hasInitializedSettings, currentUser);
+/** Provides Clerk sessions and the beta Worker profile/settings API for the Clerk+D1 beta build. */
+export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const session = useClerkSession();
+  const preferences = useClerkPreferences();
+  const state = useClerkProviderState({
+    isSignedIn: session.isSignedIn, clerkUserId: session.clerkUser?.id,
+    dispatch: preferences.dispatch,
+  });
+  const { request, putSettings } = useClerkProviderApi({
+    clerkUserId: session.clerkUser?.id, isSignedIn: session.isSignedIn,
+    getToken: session.getToken, identityRef: session.clerkIdentityRef, settingsWriteQueueRef: state.settingsWriteQueueRef,
+  });
+  const refreshBetaAccess = useClerkBetaAccess({ session, preferences, state, request });
+  const currentUser = useMemo(
+    () => createClerkUserFacade(session.clerkUser, session.getToken, session.deleteClerkUser),
+    [session.clerkUser, session.deleteClerkUser, session.getToken],
+  );
+  const updateSyncedSettings = useClerkSettings({ session, preferences, state, currentUser, putSettings });
+  const { signOutUser, deleteAccount } = useClerkAccountActions({ session, state, refreshBetaAccess });
+  const hasInitializedSettings = Boolean(currentUser && state.bootstrapKey === currentUser.uid && state.hasInitializedSettingsRef.current);
+  const authStatus = resolveClerkAuthStatus({
+    isLoaded: session.isLoaded, isUserLoaded: session.isUserLoaded, error: state.error,
+    isSignedIn: session.isSignedIn, hasInitializedSettings, currentUser,
+  });
 
   const value = useMemo<AuthContextValue>(() => ({
     status: authStatus,
-    settingsSyncStatus,
+    settingsSyncStatus: state.settingsSyncStatus,
     user: currentUser,
     authProvider: 'clerk',
-    syncedSettings: bootstrapKey === currentUser?.uid ? syncedSettings : null,
-    error,
+    syncedSettings: state.bootstrapKey === currentUser?.uid ? state.syncedSettings : null,
+    error: state.error,
     hostedAuthEnabled: typeof __GFC_CLERK_PUBLISHABLE_KEY__ !== 'undefined' && Boolean(__GFC_CLERK_PUBLISHABLE_KEY__),
-    betaAccess,
-    betaAccessLoading,
+    betaAccess: state.betaAccess,
+    betaAccessLoading: state.betaAccessLoading,
     signInWithGoogle: disabledAuthAction,
     signInWithEmail: disabledAuthAction,
     signUpWithEmail: disabledAuthAction,
@@ -673,7 +873,8 @@ export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> =
     deleteAccount,
     updateSyncedSettings,
     refreshBetaAccess,
-  }), [authStatus, betaAccess, betaAccessLoading, bootstrapKey, currentUser, deleteAccount, error, refreshBetaAccess, settingsSyncStatus, signOutUser, syncedSettings, updateSyncedSettings]);
+  }), [authStatus, state.settingsSyncStatus, currentUser, state.bootstrapKey, state.syncedSettings,
+    state.error, state.betaAccess, state.betaAccessLoading, deleteAccount, refreshBetaAccess, signOutUser, updateSyncedSettings]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
