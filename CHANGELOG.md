@@ -22,6 +22,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
 
 - **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
+- **Cloud Library workspaces:** Organize saved forecasts with workspace tabs and shareable workspace links.
 
 #### Fixed
 
@@ -37,6 +38,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
 - **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
 - **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
+- **Verification summaries:** Show zero misses when no reports are available instead of reporting a 100% miss rate.
 - **Forecast file handling:** Validate copied forecast files before import and keep generated downloads available long enough for browsers to save them.
 - **Reference layers and dialogs:** Restore saved reference-layer settings and keep keyboard focus inside open dialogs.
 - **Beta account access:** Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
