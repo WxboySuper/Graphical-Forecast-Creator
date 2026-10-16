@@ -55,7 +55,7 @@ async function authenticate(request, env) {
   try {
     const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
     const parties = configuredParties
-      .split(',').map((party) => party.trim()).filter(Boolean);
+      .split(',').map((party) => party.trim().replace(/\/+$/, '')).filter(Boolean);
     if (parties.length === 0) {
       const error = new Error('Clerk authorized parties are not configured.');
       error.code = 'CLERK_CONFIG_MISSING';
@@ -586,7 +586,7 @@ async function handleApi(request, env) {
   if (path === '/api/user/entitlement' && request.method === 'GET') return json({ entitlement: await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) });
   if (path === '/api/user/metrics' && request.method === 'GET') return json({ metrics: await readJsonRecord(env.DB, 'user_metrics', user.clerk_id) });
   if (path === '/api/admin/metrics' && request.method === 'GET') {
-    const allowed = (env.ADMIN_CLERK_ID_ALLOWLIST || env.ADMIN_UID_ALLOWLIST || '').split(',').map((value) => value.trim()).filter(Boolean);
+    const allowed = `${env.ADMIN_CLERK_ID_ALLOWLIST || ''},${env.ADMIN_UID_ALLOWLIST || ''}`.split(',').map((value) => value.trim()).filter(Boolean);
     if (!allowed.includes(user.clerk_id) && !(user.legacy_uid && allowed.includes(user.legacy_uid))) return json({ error: 'Admin access denied.' }, 403);
     const requestedWindow = url.searchParams.get('window');
     let days = null;

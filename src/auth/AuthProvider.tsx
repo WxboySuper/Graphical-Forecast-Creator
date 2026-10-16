@@ -1488,6 +1488,10 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { isLoaded, isSignedIn, getToken } = useClerkAuth();
   const clerk = useClerk();
   const { user: clerkUser, isLoaded: isUserLoaded } = useUser();
+  const clerkIdentityRef = useRef({ isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id });
+  useEffect(() => {
+    clerkIdentityRef.current = { isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id };
+  }, [clerkUser?.id, isSignedIn]);
   const deleteClerkUser = useReverification(async () => {
     if (!clerkUser) throw new Error('Sign in before deleting your account.');
     await clerkUser.delete();
@@ -1505,6 +1509,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [betaAccessLoading, setBetaAccessLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapKey, setBootstrapKey] = useState('');
+  const bootstrapKeyRef = useRef(bootstrapKey);
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const betaAccessRequestIdRef = useRef(0);
   const settingsRequestIdRef = useRef(0);
@@ -1516,10 +1521,11 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
+  useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
   useEffect(() => {
     settingsRequestIdRef.current += 1;
     setSettingsSyncStatus('idle');
-    if (isSignedIn && clerkUser?.id && bootstrapKey !== clerkUser.id) {
+    if (isSignedIn && clerkUser?.id && bootstrapKey !== '' && bootstrapKey !== clerkUser.id) {
       lastSyncedSettingsRef.current = null;
       hasInitializedSettingsRef.current = false;
       setSyncedSettings(null);
@@ -1535,12 +1541,18 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [bootstrapKey, clerkUser?.id, dispatch, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
+    const requestUserId = clerkUser?.id;
+    if (!isSignedIn || !requestUserId) throw new Error('The beta session is signed out.');
     const token = await getBetaApiToken(async () => (await getToken()) ?? null, init.signal ?? undefined);
+    if (init.signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
+    if (!clerkIdentityRef.current.isSignedIn || clerkIdentityRef.current.userId !== requestUserId) {
+      throw new Error('The beta session is signed out.');
+    }
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     return fetch(path, { ...init, headers });
-  }, [getToken]);
+  }, [clerkUser?.id, getToken, isSignedIn]);
   const putSettings = useCallback(async (settings: UserSettingsDocument, userId: string, signal?: AbortSignal): Promise<Response> => {
     const previous = settingsWriteQueueRef.current;
     let release!: () => void;
@@ -1587,7 +1599,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setError(null);
     } catch (nextError) {
       if (requestId !== betaAccessRequestIdRef.current) return;
-      if (bootstrapKey !== clerkUserId) {
+      if (bootstrapKeyRef.current !== clerkUserId) {
         lastSyncedSettingsRef.current = null;
         hasInitializedSettingsRef.current = false;
         setSyncedSettings(null);
@@ -1599,7 +1611,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
       if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
     }
-  }, [bootstrapKey, clerkUserId, dispatch, isSignedIn, request]);
+  }, [clerkUserId, dispatch, isSignedIn, request]);
 
   useEffect(() => {
     if (!isLoaded || !isUserLoaded) {

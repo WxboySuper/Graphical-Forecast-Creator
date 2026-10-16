@@ -23,6 +23,19 @@ describe('beta Worker token provider lifecycle', () => {
     expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is still initializing.' }));
   });
 
+  it('discards a token that resolves after the provider is cleared', async () => {
+    let resolveToken!: (token: string) => void;
+    const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    setBetaApiTokenProvider(provider);
+    const pending = fetchBetaApi('/api/user/settings');
+    await Promise.resolve();
+    setBetaApiTokenProvider(null);
+    resolveToken('stale-clerk-token');
+    await expect(pending).rejects.toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('shares one bounded token wait and stops polling when aborted', async () => {
     jest.useFakeTimers();
     const provider = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('clerk-token');
