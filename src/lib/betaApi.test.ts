@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, it, jest } from '@jest/globals';
 import { fetchBetaApi, setBetaApiTokenProvider } from './betaApi';
 
 describe('beta Worker token provider lifecycle', () => {
