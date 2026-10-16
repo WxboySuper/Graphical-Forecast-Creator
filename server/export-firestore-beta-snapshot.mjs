@@ -115,6 +115,15 @@ async function main() {
   const accountFailures = [];
   const malformedLegacyCycles = [];
   const migrateAccount = async (account) => {
+    const validateCycleMetadata = (metadata, cycleId) => {
+      const label = typeof metadata?.label === 'string' ? metadata.label.trim() : '';
+      const cycleDate = typeof metadata?.cycleDate === 'string' ? metadata.cycleDate : '';
+      if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) {
+        malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(cycleId) });
+        throw new Error(`Invalid cycle label or date for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleId)}.`);
+      }
+      return { label, cycleDate };
+    };
     const [settingsDoc, entitlementDoc, metricsDoc] = await Promise.all([
       db.collection('userSettings').doc(account.uid).get(),
       db.collection('userEntitlements').doc(account.uid).get(),
@@ -142,14 +151,15 @@ async function main() {
             throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
           }
           const metadata = raw.metadata ?? raw;
+          const { label, cycleDate } = validateCycleMetadata(metadata, id);
           const rawPayload = raw.payloadJson ?? raw.payload;
           let payloadJson = '{}';
           if (typeof rawPayload === 'string') payloadJson = rawPayload;
           else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
           account.cloudCycles.push({
             id,
-            label: metadata.label || '',
-            cycleDate: metadata.cycleDate || '',
+            label,
+            cycleDate,
             metadata,
             payloadJson,
             payloadBytes: Buffer.byteLength(payloadJson),
@@ -169,6 +179,7 @@ async function main() {
       const payloadDocs = await Promise.all(cycleBatch.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
       for (const [index, cycleDoc] of cycleBatch.entries()) {
         const metadata = cycleDoc.data();
+        const { label, cycleDate } = validateCycleMetadata(metadata, cycleDoc.id);
         const payloadDoc = payloadDocs[index];
         const payloadValue = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
         let payloadJson = null;
@@ -180,8 +191,8 @@ async function main() {
         const normalizedPayload = payloadJson;
         migratedCycles.push({
           id: cycleDoc.id,
-          label: metadata.label || '',
-          cycleDate: metadata.cycleDate || '',
+          label,
+          cycleDate,
           metadata,
           payloadJson: normalizedPayload,
           payloadBytes: Buffer.byteLength(normalizedPayload),

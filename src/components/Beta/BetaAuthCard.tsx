@@ -232,7 +232,9 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     if (typeof window === 'undefined') return;
     const nextUrl = new URL(window.location.href);
     nextUrl.hash = '';
+    nextUrl.searchParams.delete('clerkSignUp');
     window.history.replaceState(null, '', nextUrl.href);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
     setClerkVerificationInProgress(false);
     setMode('sign_in');
   };

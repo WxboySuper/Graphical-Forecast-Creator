@@ -175,7 +175,7 @@ class D1Mock {
         this.settings.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
       } else if (!this.settings.has(params[0])) this.settings.set(params[0], params[1]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO user_entitlements') || sql.startsWith('INSERT INTO user_entitlements')) {
-      if (!this.entitlements.has(params[0])) this.entitlements.set(params[0], params[1]);
+      if (sql.includes('ON CONFLICT') || !this.entitlements.has(params[0])) this.entitlements.set(params[0], params[1]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO user_metrics') || sql.startsWith('INSERT INTO user_metrics')) {
       if (sql.includes('ON CONFLICT')) {
         const existing = JSON.parse(this.metrics.get(params[0]) || '{}');
@@ -304,7 +304,7 @@ class D1Mock {
   }
 }
 
-const withClerkFetch = async (action) => {
+const withClerkFetch = async (action, stripeFetch = null) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     if (String(input).startsWith('https://api.clerk.com/v1/users/')) {
@@ -316,6 +316,7 @@ const withClerkFetch = async (action) => {
         email_addresses: [{ id: 'email_test', email_address: 'Test@Example.com', verification: { status: 'verified' } }],
       });
     }
+    if (String(input).startsWith('https://api.stripe.com/v1/') && stripeFetch) return stripeFetch(input, init);
     return originalFetch(input, init);
   };
   try { return await action(); } finally { globalThis.fetch = originalFetch; }
@@ -436,16 +437,17 @@ test('Firebase beta mode proxies API requests to the configured VPS origin', asy
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test('first verified Clerk request migrates matching snapshot settings and ownership into D1', async () => {
+test('first verified Clerk request migrates matching snapshot data and verifies Stripe entitlement', async () => {
   const db = new D1Mock();
   const env = createEnv(db, {
     uid: 'firebase_old_uid',
     userProfile: { email: 'test@example.com', betaAccess: true },
     userSettings: { darkMode: true, cloudCycles: { old: 'legacy' } },
-    userEntitlement: { premiumActive: true, uid: 'firebase_old_uid' },
+    userEntitlement: { premiumActive: true, uid: 'firebase_old_uid', billingStatus: 'active', stripeCustomerId: 'cus_beta', stripeSubscriptionId: 'sub_beta' },
     userMetrics: { uid: 'firebase_old_uid', cyclesCreated: 4 },
     cloudCycles: [], workflowAwareness: [], customProducts: [],
   });
+  env.STRIPE_SECRET_KEY = 'sk_test_beta';
   await withClerkFetch(async () => {
     const identity = await __test.authenticate(new Request('https://beta.gfcweather.com/api/me/bootstrap', { headers: { Authorization: `Bearer ${createToken()}` } }), env);
     assert.equal(identity?.email, 'test@example.com');
@@ -457,10 +459,15 @@ test('first verified Clerk request migrates matching snapshot settings and owner
     assert.equal(body.user.migrationStatus, 'complete');
     assert.equal(body.settings.darkMode, true);
     assert.equal(body.entitlement.uid, 'user_beta_test');
-    assert.equal(body.entitlement.premiumActive, false);
-    assert.equal(body.entitlement.billingStatus, 'inactive');
+    assert.equal(body.entitlement.premiumActive, true);
+    assert.equal(body.entitlement.billingStatus, 'active');
+    assert.equal(body.entitlement.pendingStripeSync, false);
     assert.equal(body.metrics.uid, 'user_beta_test');
     assert.equal(db.users.get('user_beta_test').legacy_uid, 'firebase_old_uid');
+  }, async (input) => {
+    assert.match(String(input), /subscriptions\/sub_beta$/);
+    return Response.json({ id: 'sub_beta', customer: 'cus_beta', status: 'active', current_period_end: 1_800_000_000,
+      items: { data: [{ price: { recurring: { interval: 'month' } } }] } });
   });
 });
 

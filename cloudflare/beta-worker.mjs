@@ -140,7 +140,19 @@ function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, ac
         accountForMigrationBytes(entitlement);
         statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
-        .bind(user.clerkId, JSON.stringify({ uid: user.clerkId, premiumActive: false, billingStatus: 'inactive', effectiveSource: 'none', migratedFromSnapshot: true }), now));
+        .bind(user.clerkId, JSON.stringify({
+          uid: user.clerkId,
+          premiumActive: false,
+          billingStatus: 'pending_verification',
+          effectiveSource: 'none',
+          stripeCustomerId: typeof entitlement.stripeCustomerId === 'string' ? entitlement.stripeCustomerId : null,
+          stripeSubscriptionId: typeof entitlement.stripeSubscriptionId === 'string' ? entitlement.stripeSubscriptionId : null,
+          planInterval: entitlement.planInterval === 'annual' ? 'annual' : entitlement.planInterval === 'monthly' ? 'monthly' : null,
+          cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd === true,
+          currentPeriodEnd: typeof entitlement.currentPeriodEnd === 'string' ? entitlement.currentPeriodEnd : null,
+          pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
+          migratedFromSnapshot: true,
+        }), now));
       }
       const metrics = snapshot.userMetrics;
       if (metrics !== undefined && metrics !== null) {
@@ -327,14 +339,70 @@ async function ensureUser(user, env) {
   if (existing && (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || ''))) {
     await updateClerkProfile(env.DB, user);
   }
-  if (existing?.migration_status === 'complete') return findClerkUser(env.DB, user.clerkId);
+  if (existing?.migration_status === 'complete') {
+    await refreshMigratedStripeEntitlement(env, user.clerkId);
+    return findClerkUser(env.DB, user.clerkId);
+  }
 
   const snapshot = await readUserSnapshot(env, user.email);
+  if (existing && !snapshot && existing.migration_status === 'no_match') return existing;
   const now = new Date().toISOString();
   if (existing) await updateMigratingUser(env.DB, user, snapshot, now);
   else await insertOrUpdateMigratingUser(env.DB, user, snapshot, now);
   await applySnapshotMigration(user, env, snapshot, now);
+  await refreshMigratedStripeEntitlement(env, user.clerkId);
   return findClerkUser(env.DB, user.clerkId);
+}
+
+async function refreshMigratedStripeEntitlement(env, userId) {
+  if (!env.STRIPE_SECRET_KEY) return;
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', userId);
+  if (!entitlement?.pendingStripeSync) return;
+  const lastAttempt = Date.parse(entitlement.stripeSyncAttemptAt || '');
+  if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < 15 * 60 * 1000) return;
+
+  const attemptedAt = new Date().toISOString();
+  const attempted = { ...entitlement, stripeSyncAttemptAt: attemptedAt };
+  await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+    .bind(userId, JSON.stringify(attempted), attemptedAt).run();
+  try {
+    let subscriptions;
+    if (typeof entitlement.stripeSubscriptionId === 'string' && entitlement.stripeSubscriptionId.startsWith('sub_')) {
+      subscriptions = [await stripeRequest(env, `subscriptions/${encodeURIComponent(entitlement.stripeSubscriptionId)}`, null, 'GET')];
+    } else if (typeof entitlement.stripeCustomerId === 'string' && entitlement.stripeCustomerId.startsWith('cus_')) {
+      const result = await stripeRequest(env, `subscriptions?customer=${encodeURIComponent(entitlement.stripeCustomerId)}&status=all&limit=100`, null, 'GET');
+      subscriptions = Array.isArray(result?.data) ? result.data : [];
+    } else {
+      subscriptions = [];
+    }
+    const subscription = subscriptions.find((item) => item.customer === entitlement.stripeCustomerId
+      && (!entitlement.stripeSubscriptionId || item.id === entitlement.stripeSubscriptionId)) || null;
+    const status = subscription?.status || 'inactive';
+    const active = ['active', 'trialing'].includes(status);
+    const betaOverrideActive = entitlement.betaOverrideActive === true;
+    const updated = {
+      ...attempted,
+      uid: userId,
+      premiumActive: betaOverrideActive || active,
+      effectiveSource: betaOverrideActive ? 'beta_override' : active ? 'stripe' : 'none',
+      billingStatus: status,
+      stripeSubscriptionId: subscription?.id || entitlement.stripeSubscriptionId || null,
+      cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
+      currentPeriodEnd: Number(subscription?.current_period_end)
+        ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null,
+      planInterval: subscription?.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual'
+        : subscription ? 'monthly' : entitlement.planInterval || null,
+      pendingStripeSync: false,
+      stripeSyncAttemptAt: undefined,
+      updatedAt: attemptedAt,
+    };
+    await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+      .bind(userId, JSON.stringify(updated), attemptedAt).run();
+  } catch (error) {
+    console.warn('[beta-worker] migrated Stripe entitlement sync will retry', error instanceof Error ? error.message : 'Stripe lookup failed');
+  }
 }
 
 const BODY_TOO_LARGE = Symbol('body-too-large');
@@ -598,11 +666,12 @@ async function handleCloudCycleRoutes(request, env, url, path, user) {
     if (request.method === 'PATCH') {
       const body = await readBody(request);
       if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      if (typeof body?.label !== 'string' || !body.label.trim() || body.label.length > 200) return json({ error: 'Invalid label.' }, 400);
+      const label = typeof body?.label === 'string' ? body.label.trim() : '';
+      if (!label || label.length > 200) return json({ error: 'Invalid label.' }, 400);
       const updatedAt = new Date().toISOString();
       const result = await env.DB.prepare(`UPDATE cloud_cycles SET label = ?, updated_at = ?,
         metadata_json = json_set(metadata_json, '$.label', ?, '$.updatedAt', ?) WHERE id = ? AND user_id = ?`)
-        .bind(body.label.trim(), updatedAt, body.label.trim(), updatedAt, id, user.clerk_id).run();
+        .bind(label, updatedAt, label, updatedAt, id, user.clerk_id).run();
       return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
     }
     if (request.method === 'DELETE') {

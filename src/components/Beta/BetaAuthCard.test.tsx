@@ -119,7 +119,7 @@ describe('BetaAuthCard', () => {
   });
 
   test('lets a user restart when Clerk verification hash is stale', async () => {
-    window.history.replaceState(null, '', '/beta#/verify-email-address');
+    window.history.replaceState(null, '', '/beta?clerkSignUp=1#/verify-email-address');
     (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
     render(<BetaAuthCard title="T" description="D" allowSignUp />);
 
@@ -128,6 +128,7 @@ describe('BetaAuthCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restart sign-in' }));
 
     await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(false);
     expect(signInButton).toBeEnabled();
   });
 });

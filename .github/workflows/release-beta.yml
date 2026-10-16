@@ -488,7 +488,11 @@ jobs:
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
-            npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0
+            for attempt in 1 2 3; do
+              if npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0; then break; fi
+              if [ "$attempt" -eq 3 ]; then echo "::error::Unable to install the pinned Wrangler snapshot verifier after three attempts." >&2; exit 1; fi
+              sleep "$((attempt * 3))"
+            done
             export SNAPSHOT_VERIFY_DIR WRANGLER_BIN
             xargs -r -P 4 -I '{}' bash -euo pipefail -c '
               EMAIL_HASH="$1"
