@@ -67,6 +67,29 @@ describe('discussionGrouping', () => {
     ])).toEqual([]);
   });
 
+  test('treats non-string imported guided values as empty instead of throwing', () => {
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    };
+
+    expect(() => hasDiscussionContent(malformedGuided as never)).not.toThrow();
+    expect(hasDiscussionContent(malformedGuided as never)).toBe(false);
+    expect(hasDiscussionContent({
+      ...malformedGuided,
+      guidedContent: { ...(malformedGuided.guidedContent as object), synopsis: '  Valid  ' },
+    } as never)).toBe(true);
+  });
+
   test('merges mixed DIY and guided drafts into one DIY draft', () => {
     const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
     const guidedDraft = {
