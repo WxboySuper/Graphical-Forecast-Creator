@@ -213,10 +213,17 @@ export const listWorkflowAwareness = async ({
 }): Promise<WorkflowAwarenessRecord[]> => {
   if (!isCurrentAwarenessConsent(consent)) return [];
   if (isBetaClerkD1Mode()) {
-    const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}`);
-    const body = (await response.json().catch(() => ({}))) ?? {};
-    if (!response.ok) throw new Error(body?.error || 'Unable to load workflow awareness.');
-    return (Array.isArray(body.records) ? body.records : []).map((record: unknown) => {
+    const records: unknown[] = [];
+    let page = 0;
+    while (true) {
+      const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}&page=${page}`);
+      const body = (await response.json().catch(() => ({}))) ?? {};
+      if (!response.ok) throw new Error(body?.error || 'Unable to load workflow awareness.');
+      if (Array.isArray(body.records)) records.push(...body.records);
+      if (typeof body.nextPage !== 'number') break;
+      page = body.nextPage;
+    }
+    return records.map((record: unknown) => {
       if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
       const envelope = record as Partial<WorkflowAwarenessDocument>;
       if (typeof envelope.metadata !== 'object' || envelope.metadata === null || Array.isArray(envelope.metadata)) return record;

@@ -1,3 +1,6 @@
+import { createUserEnsurer, emailSnapshotKey } from './beta-user-migration.mjs';
+import { decodePathId, isObject, json, mapStripeInterval, normalizeEmail, parseJson, readBearer, readLimitedBody, timingSafeStringEqual, tokenCacheKey, verifyStripeSignature } from './beta-worker-utils.mjs';
+import { parseSentryDsn, parseSentryEnvelopeDsn } from './beta-sentry-utils.mjs';
 import { verifyToken } from '@clerk/backend';
 import { verifyWebhook } from '@clerk/backend/webhooks';
 
@@ -7,10 +10,7 @@ const MAX_CLOUD_CYCLES = 100;
 const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_USER_RECORDS = 200;
 const MAX_WORKFLOW_RECORDS = 200;
-const MAX_MIGRATED_CLOUD_CYCLES = 300;
-const MAX_MIGRATED_WORKFLOW_RECORDS = MAX_WORKFLOW_RECORDS;
-const MAX_MIGRATED_CUSTOM_PRODUCTS = 48;
-const MAX_MIGRATION_BYTES = 20_000_000;
+const MAX_LIST_PAGE_SIZE = 10;
 // Keep this synchronized with the per-user/day limit in 0001_beta_auth_data.sql.
 const MAX_PRODUCT_METRIC_DAILY_EVENTS = 500;
 export { MAX_PRODUCT_METRIC_DAILY_EVENTS };
@@ -22,49 +22,72 @@ const DEFAULT_ANNUAL_DISPLAY_PRICE = '$30/year';
 const authProfileCache = new Map();
 const PRODUCT_METRIC_EVENT_TYPES = new Set(['account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded']);
 
-const json = (body, status = 200, headers = {}) => Response.json(body, {
-  status,
-  headers: { 'Cache-Control': 'no-store', ...headers },
-});
-
-const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
-const normalizePlanInterval = (value) => value === 'annual' || value === 'monthly' ? value : null;
-const mapStripeInterval = (subscription) => {
-  const interval = subscription?.items?.data?.[0]?.price?.recurring?.interval;
-  if (interval === 'year') return 'annual';
-  if (interval === 'month') return 'monthly';
-  return null;
-};
-const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
-const sha256Hex = async (value) => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
-const timingSafeStringEqual = async (left, right) => {
-  if (typeof left !== 'string' || typeof right !== 'string') return false;
-  const [leftDigest, rightDigest] = await Promise.all([
-    crypto.subtle.digest('SHA-256', new TextEncoder().encode(left)),
-    crypto.subtle.digest('SHA-256', new TextEncoder().encode(right)),
-  ]);
-  const leftBytes = new Uint8Array(leftDigest);
-  const rightBytes = new Uint8Array(rightDigest);
-  let difference = 0;
-  for (let index = 0; index < leftBytes.length; index += 1) difference |= leftBytes[index] ^ rightBytes[index];
-  return difference === 0;
-};
-const tokenCacheKey = async (subject, token) => `${subject}:${await sha256Hex(token)}`;
 const clearAuthProfileCache = (clerkId) => {
   for (const key of authProfileCache.keys()) {
     if (key.startsWith(`${clerkId}:`)) authProfileCache.delete(key);
   }
 };
-const decodePathId = (value) => {
-  try { return decodeURIComponent(value); } catch { return null; }
-};
-const readBearer = (request) => {
-  const value = request.headers.get('Authorization') || '';
-  return value.startsWith('Bearer ') ? value.slice(7) : '';
-};
+function getAuthorizedParties(env) {
+  const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
+  const parties = configuredParties.split(',').map((party) => party.trim().replace(/\/+$/, '')).filter(Boolean);
+  if (parties.length) return parties;
+  const error = new Error('Clerk authorized parties are not configured.');
+  error.code = 'CLERK_CONFIG_MISSING';
+  throw error;
+}
+
+async function verifyClerkIdentity(token, env) {
+  const verified = await verifyToken(token, { jwtKey: env.CLERK_JWT_KEY, authorizedParties: getAuthorizedParties(env) });
+  const data = verified?.data || verified;
+  if (verified?.errors?.length || !data?.sub) {
+    if (verified?.errors?.length) console.warn('[beta-worker] Clerk token rejected', verified.errors.map((error) => error.message).join('; '));
+    return null;
+  }
+  return { clerkId: data.sub, cacheKey: await tokenCacheKey(data.sub, token) };
+}
+
+function readCachedIdentity(cacheKey) {
+  const cached = authProfileCache.get(cacheKey);
+  if (cached?.expiresAt > Date.now()) return cached.identity;
+  if (cached) authProfileCache.delete(cacheKey);
+  if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
+    const oldestKey = authProfileCache.keys().next().value;
+    if (oldestKey) authProfileCache.delete(oldestKey);
+  }
+  return null;
+}
+
+async function fetchClerkProfile(clerkId, env) {
+  let response;
+  try {
+    response = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkId)}`, {
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
+    });
+  } catch (cause) {
+    const error = new Error('Clerk profile service is temporarily unavailable.');
+    error.code = 'CLERK_PROFILE_UNAVAILABLE';
+    error.cause = cause;
+    throw error;
+  }
+  if ([401, 403, 429].includes(response.status) || response.status >= 500) {
+    const error = new Error('Clerk profile service is temporarily unavailable.');
+    error.code = 'CLERK_PROFILE_UNAVAILABLE';
+    throw error;
+  }
+  if (!response.ok) {
+    console.warn('[beta-worker] Clerk profile response rejected', response.status);
+    return null;
+  }
+  const profile = await response.json();
+  const emailAddresses = Array.isArray(profile.email_addresses) ? profile.email_addresses : [];
+  const primary = emailAddresses.find((entry) => entry?.id === profile.primary_email_address_id);
+  const email = normalizeEmail(primary?.email_address);
+  if (!email || primary?.verification?.status !== 'verified') {
+    console.warn('[beta-worker] Clerk primary email is not verified', Boolean(email), primary?.verification?.status);
+    return null;
+  }
+  return { clerkId, email, displayName: [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ') };
+}
 
 async function authenticate(request, env) {
   const token = readBearer(request);
@@ -75,60 +98,13 @@ async function authenticate(request, env) {
     throw error;
   }
   try {
-    const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
-    const parties = configuredParties
-      .split(',').map((party) => party.trim().replace(/\/+$/, '')).filter(Boolean);
-    if (parties.length === 0) {
-      const error = new Error('Clerk authorized parties are not configured.');
-      error.code = 'CLERK_CONFIG_MISSING';
-      throw error;
-    }
-    const verified = await verifyToken(token, {
-      jwtKey: env.CLERK_JWT_KEY,
-      authorizedParties: parties,
-    });
-    const data = verified?.data || verified;
-    const errors = verified?.errors;
-    if (errors?.length || !data?.sub) {
-      if (errors?.length) console.warn('[beta-worker] Clerk token rejected', errors.map((error) => error.message).join('; '));
-      return null;
-    }
-    const cacheKey = await tokenCacheKey(data.sub, token);
-    const cached = authProfileCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) return cached.identity;
-    if (cached) authProfileCache.delete(cacheKey);
-    if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
-      const oldestKey = authProfileCache.keys().next().value;
-      if (oldestKey) authProfileCache.delete(oldestKey);
-    }
-    let profileResponse;
-    try {
-      profileResponse = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(data.sub)}`, {
-        headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-        signal: AbortSignal.timeout(3_000),
-      });
-    } catch (error) {
-      const unavailable = new Error('Clerk profile service is temporarily unavailable.');
-      unavailable.code = 'CLERK_PROFILE_UNAVAILABLE';
-      unavailable.cause = error;
-      throw unavailable;
-    }
-    if (profileResponse.status === 429 || profileResponse.status >= 500 || profileResponse.status === 401 || profileResponse.status === 403) {
-      const unavailable = new Error('Clerk profile service is temporarily unavailable.');
-      unavailable.code = 'CLERK_PROFILE_UNAVAILABLE';
-      throw unavailable;
-    }
-    if (!profileResponse.ok) { console.warn('[beta-worker] Clerk profile response rejected', profileResponse.status); return null; }
-    const profile = await profileResponse.json();
-    const primary = Array.isArray(profile.email_addresses)
-      ? profile.email_addresses.find((entry) => entry?.id === profile.primary_email_address_id)
-      : null;
-    const email = normalizeEmail(primary?.email_address);
-    if (!email || primary?.verification?.status !== 'verified') { console.warn('[beta-worker] Clerk primary email is not verified', Boolean(email), primary?.verification?.status); return null; }
-    const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
-    const identity = { clerkId: data.sub, email, displayName };
-    const now = Date.now();
-    authProfileCache.set(cacheKey, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
+    const verified = await verifyClerkIdentity(token, env);
+    if (!verified) return null;
+    const cached = readCachedIdentity(verified.cacheKey);
+    if (cached) return cached;
+    const identity = await fetchClerkProfile(verified.clerkId, env);
+    if (!identity) return null;
+    authProfileCache.set(verified.cacheKey, { identity, expiresAt: Date.now() + AUTH_PROFILE_CACHE_TTL_MS });
     return identity;
   } catch (error) {
     if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') throw error;
@@ -137,292 +113,32 @@ async function authenticate(request, env) {
   }
 }
 
-const emailSnapshotKey = async (email) => {
-  return `by-email/${await sha256Hex(normalizeEmail(email))}.json`;
-};
-
-function appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes) {
-  const settings = snapshot.userSettings;
-  if (settings === null || settings === undefined) return;
-  if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
-  const settingsWithoutLegacyCycles = { ...settings };
-  delete settingsWithoutLegacyCycles.cloudCycles;
-  accountForMigrationBytes(settingsWithoutLegacyCycles);
-  statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
-    .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
+async function findMigratedStripeSubscription(env, entitlement) {
+  if (typeof entitlement.stripeSubscriptionId === 'string' && entitlement.stripeSubscriptionId.startsWith('sub_')) {
+    return stripeRequest(env, `subscriptions/${encodeURIComponent(entitlement.stripeSubscriptionId)}`, null, 'GET');
+  }
+  if (typeof entitlement.stripeCustomerId !== 'string' || !entitlement.stripeCustomerId.startsWith('cus_')) return null;
+  const result = await stripeRequest(env, `subscriptions?customer=${encodeURIComponent(entitlement.stripeCustomerId)}&status=all&limit=100`, null, 'GET');
+  const subscriptions = Array.isArray(result?.data) ? result.data : [];
+  return subscriptions.find((item) => !entitlement.stripeSubscriptionId || item.id === entitlement.stripeSubscriptionId) || null;
 }
 
-function appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes) {
-  const entitlement = snapshot.userEntitlement;
-  if (entitlement === null || entitlement === undefined) return;
-  if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
-  accountForMigrationBytes(entitlement);
-  statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
-        .bind(user.clerkId, JSON.stringify({
-          uid: user.clerkId,
-          premiumActive: false,
-          billingStatus: 'pending_verification',
-          effectiveSource: 'none',
-          stripeCustomerId: typeof entitlement.stripeCustomerId === 'string' ? entitlement.stripeCustomerId : null,
-          stripeSubscriptionId: typeof entitlement.stripeSubscriptionId === 'string' ? entitlement.stripeSubscriptionId : null,
-          planInterval: normalizePlanInterval(entitlement.planInterval),
-          cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd === true,
-          currentPeriodEnd: typeof entitlement.currentPeriodEnd === 'string' ? entitlement.currentPeriodEnd : null,
-          pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
-          migratedFromSnapshot: true,
-    }), now));
-}
-
-function appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes) {
-  const metrics = snapshot.userMetrics;
-  if (metrics === null || metrics === undefined) return;
-  if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
-  accountForMigrationBytes(metrics);
-  statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
-    .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
-}
-
-function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes) {
-  appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes);
-}
-
-function appendSnapshotCycles(cloudCycles, user, env, now, statements, accountForMigrationBytes) {
-      for (const cycle of cloudCycles) {
-        if (!isObject(cycle)) throw new Error('SNAPSHOT_CYCLE_INVALID');
-        if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
-        const label = typeof cycle.label === 'string' ? cycle.label.trim() : '';
-        const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
-        if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
-        if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
-        let payloadJson;
-        if (typeof cycle.payloadJson === 'string') payloadJson = cycle.payloadJson;
-        else if (cycle.payloadJson === null || cycle.payloadJson === undefined) payloadJson = '{}';
-        else payloadJson = JSON.stringify(cycle.payloadJson);
-        const payloadBytes = new TextEncoder().encode(payloadJson).length;
-        if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
-        accountForMigrationBytes(payloadJson);
-        try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
-        const metadataJson = JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId });
-        accountForMigrationBytes(metadataJson);
-        statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
-          (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, migration_import, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
-          .bind(cycle.id, user.clerkId, label, cycleDate, metadataJson,
-            payloadJson, payloadBytes,
-            cycle.createdAt || now, cycle.updatedAt || now));
-      }
-}
-
-function appendSnapshotWorkflows(workflowAwareness, user, env, statements, accountForMigrationBytes) {
-      for (const record of workflowAwareness) {
-        if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-        if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
-        if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-        const workflowJson = JSON.stringify(record.data);
-        accountForMigrationBytes(workflowJson);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json, migration_import) VALUES (?, ?, ?, 1)')
-          .bind(user.clerkId, record.id, workflowJson));
-      }
-}
-
-async function appendSnapshotProducts(customProducts, user, env, statements, accountForMigrationBytes) {
-      const existingProducts = ((await env.DB.prepare('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')
-        .bind(user.clerkId).all()).results || []);
-      const occupiedProductSlots = new Set(existingProducts.map((row) => row.slot_id));
-      const existingProductIds = new Map(existingProducts.map((row) => [row.product_id, row.migration_import === 1]));
-      for (const [index, product] of customProducts.entries()) {
-        if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
-        const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
-        const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
-        if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
-        if (existingProductIds.has(productId)) {
-          if (existingProductIds.get(productId)) continue;
-          throw new Error('SNAPSHOT_PRODUCT_ID_CONFLICT');
-        }
-        migratedProduct.id = productId;
-        if (migratedProduct.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
-        migratedProduct.version = 1;
-        const productJson = JSON.stringify(migratedProduct);
-        if (new TextEncoder().encode(productJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
-        accountForMigrationBytes(productJson);
-        let slotId = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, slotIndex) => `product-${String(slotIndex + 1).padStart(2, '0')}`)
-          .find((candidate) => !occupiedProductSlots.has(candidate));
-        if (!slotId) {
-          slotId = `legacy-${index + 1}`;
-          let suffix = 1;
-          while (occupiedProductSlots.has(slotId)) {
-            slotId = `legacy-${index + 1}-${suffix}`;
-            suffix += 1;
-          }
-        }
-        occupiedProductSlots.add(slotId);
-        existingProductIds.set(productId, true);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
-          .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
-      }
-}
-
-function readSnapshotCollections(snapshot) {
-  const read = (key) => {
-    const value = snapshot[key];
-    if (value === null || value === undefined) return [];
-    if (!Array.isArray(value)) throw new Error(`SNAPSHOT_${key.toUpperCase()}_INVALID`);
-    return value;
-  };
+function buildMigratedStripeEntitlement(entitlement, attempted, userId, subscription, attemptedAt) {
+  const status = subscription?.status || 'inactive';
+  const active = ['active', 'trialing'].includes(status);
+  const betaOverrideActive = entitlement.betaOverrideActive === true;
+  let effectiveSource = 'none';
+  if (betaOverrideActive) effectiveSource = 'beta_override';
+  else if (active) effectiveSource = 'stripe';
+  const periodEnd = Number(subscription?.current_period_end)
+    ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
   return {
-    cloudCycles: read('cloudCycles'),
-    workflowAwareness: read('workflowAwareness'),
-    customProducts: read('customProducts'),
+    ...attempted, uid: userId, premiumActive: betaOverrideActive || active, effectiveSource,
+    billingStatus: status, stripeSubscriptionId: subscription?.id || entitlement.stripeSubscriptionId || null,
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end), currentPeriodEnd: periodEnd,
+    planInterval: mapStripeInterval(subscription) || entitlement.planInterval || null,
+    pendingStripeSync: false, stripeSyncAttemptAt: undefined, updatedAt: attemptedAt,
   };
-}
-
-function assertUniqueSnapshotIds(records, readId, code) {
-  const ids = new Set();
-  for (const record of records) {
-    const id = readId(record);
-    if (typeof id !== 'string' || !id) continue;
-    if (ids.has(id)) throw new Error(code);
-    ids.add(id);
-  }
-}
-
-function validateSnapshotCollections({ cloudCycles, workflowAwareness, customProducts }) {
-  assertUniqueSnapshotIds(cloudCycles, (record) => record?.id, 'SNAPSHOT_CYCLE_DUPLICATE_ID');
-  assertUniqueSnapshotIds(workflowAwareness, (record) => record?.id, 'SNAPSHOT_WORKFLOW_DUPLICATE_ID');
-  assertUniqueSnapshotIds(customProducts, (record) => record?.data?.id || record?.id, 'SNAPSHOT_PRODUCT_DUPLICATE_ID');
-  if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
-  if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
-  if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
-}
-
-function createMigrationByteCounter() {
-  let bytes = 0;
-  return (value) => {
-    bytes += new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).length;
-    if (bytes > MAX_MIGRATION_BYTES) throw new Error('SNAPSHOT_MIGRATION_TOO_LARGE');
-  };
-}
-
-async function buildSnapshotStatements(user, env, snapshot, now, collections) {
-  const accountForMigrationBytes = createMigrationByteCounter();
-  const statements = [];
-  appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotCycles(collections.cloudCycles, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotWorkflows(collections.workflowAwareness, user, env, statements, accountForMigrationBytes);
-  await appendSnapshotProducts(collections.customProducts, user, env, statements, accountForMigrationBytes);
-  return statements;
-}
-
-async function executeSnapshotMigration(db, user, now, statements) {
-  statements.push(db.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
-    .bind('complete', now, now, user.clerkId));
-  await db.prepare("UPDATE users SET migration_status = 'migrating', updated_at = ? WHERE clerk_id = ?")
-    .bind(now, user.clerkId).run();
-  // D1 batches are atomic individually; imported-row writes use INSERT OR IGNORE / merge semantics,
-  // so a later sign-in can safely retry after a batch failure before the final status update runs.
-  for (let offset = 0; offset < statements.length; offset += 50) await db.batch(statements.slice(offset, offset + 50));
-}
-
-async function markSnapshotMigrationFailed(db, user) {
-  await db.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
-    .bind('failed', new Date().toISOString(), user.clerkId).run();
-}
-
-async function applySnapshotMigration(user, env, snapshot, now) {
-  if (!snapshot) return;
-  try {
-    const collections = readSnapshotCollections(snapshot);
-    validateSnapshotCollections(collections);
-    const statements = await buildSnapshotStatements(user, env, snapshot, now, collections);
-    await executeSnapshotMigration(env.DB, user, now, statements);
-  } catch (error) {
-    await markSnapshotMigrationFailed(env.DB, user);
-    throw error;
-  }
-}
-
-async function findClerkUser(db, clerkId) {
-  return db.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(clerkId).first();
-}
-
-async function assertEmailAvailable(db, user) {
-  const owner = await db.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
-  if (owner && owner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
-}
-
-async function updateClerkProfile(db, user) {
-  try {
-    await db.prepare('UPDATE users SET email = ?, email_verified = 1, display_name = ?, updated_at = ? WHERE clerk_id = ?')
-      .bind(user.email, user.displayName, new Date().toISOString(), user.clerkId).run();
-  } catch (error) {
-    const message = String(error?.message || '');
-    if (message.includes('UNIQUE constraint failed') && message.includes('users.email')) throw new Error('EMAIL_ALREADY_LINKED');
-    throw error;
-  }
-}
-
-async function readUserSnapshot(env, email) {
-  if (!env.FIRESTORE_SNAPSHOT) return null;
-  const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(email));
-  if (!object) return null;
-  let snapshot;
-  try { snapshot = await object.json(); } catch { throw new Error('SNAPSHOT_INVALID'); }
-  if (!isObject(snapshot)) throw new Error('SNAPSHOT_INVALID');
-  if (snapshot.userProfile !== undefined && snapshot.userProfile !== null && !isObject(snapshot.userProfile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
-  return snapshot;
-}
-
-async function insertMigratingUser(db, user, snapshot, now) {
-  await db.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
-    migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
-    .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
-      snapshot ? 'migrating' : 'no_match', now, now).run();
-}
-
-async function updateMigratingUser(db, user, snapshot, now) {
-  await db.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
-    beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
-    .bind(snapshot ? 'migrating' : 'no_match', snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
-}
-
-async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
-  try {
-    await insertMigratingUser(db, user, snapshot, now);
-  } catch (error) {
-    if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
-    const racedUser = await findClerkUser(db, user.clerkId);
-    if (!racedUser) {
-      await assertEmailAvailable(db, user);
-      throw error;
-    }
-    await updateMigratingUser(db, user, snapshot, now);
-  }
-}
-
-async function ensureUser(user, env) {
-  const existing = await findClerkUser(env.DB, user.clerkId);
-  await assertEmailAvailable(env.DB, user);
-  if (existing && (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || ''))) {
-    await updateClerkProfile(env.DB, user);
-  }
-  if (existing?.migration_status === 'complete') {
-    await refreshMigratedStripeEntitlement(env, user.clerkId);
-    return findClerkUser(env.DB, user.clerkId);
-  }
-
-  const snapshot = await readUserSnapshot(env, user.email);
-  if (existing && !snapshot && existing.migration_status === 'no_match') return findClerkUser(env.DB, user.clerkId);
-  const now = new Date().toISOString();
-  if (existing) await updateMigratingUser(env.DB, user, snapshot, now);
-  else await insertOrUpdateMigratingUser(env.DB, user, snapshot, now);
-  await applySnapshotMigration(user, env, snapshot, now);
-  await refreshMigratedStripeEntitlement(env, user.clerkId);
-  return findClerkUser(env.DB, user.clerkId);
 }
 
 async function refreshMigratedStripeEntitlement(env, userId) {
@@ -431,45 +147,14 @@ async function refreshMigratedStripeEntitlement(env, userId) {
   if (!entitlement?.pendingStripeSync) return;
   const lastAttempt = Date.parse(entitlement.stripeSyncAttemptAt || '');
   if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < 15 * 60 * 1000) return;
-
   const attemptedAt = new Date().toISOString();
   const attempted = { ...entitlement, stripeSyncAttemptAt: attemptedAt };
   await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
     .bind(userId, JSON.stringify(attempted), attemptedAt).run();
   try {
-    let subscriptions;
-    if (typeof entitlement.stripeSubscriptionId === 'string' && entitlement.stripeSubscriptionId.startsWith('sub_')) {
-      subscriptions = [await stripeRequest(env, `subscriptions/${encodeURIComponent(entitlement.stripeSubscriptionId)}`, null, 'GET')];
-    } else if (typeof entitlement.stripeCustomerId === 'string' && entitlement.stripeCustomerId.startsWith('cus_')) {
-      const result = await stripeRequest(env, `subscriptions?customer=${encodeURIComponent(entitlement.stripeCustomerId)}&status=all&limit=100`, null, 'GET');
-      subscriptions = Array.isArray(result?.data) ? result.data : [];
-    } else {
-      subscriptions = [];
-    }
-    const subscription = subscriptions.find((item) => (!entitlement.stripeCustomerId || item.customer === entitlement.stripeCustomerId)
-      && (!entitlement.stripeSubscriptionId || item.id === entitlement.stripeSubscriptionId)) || null;
-    const status = subscription?.status || 'inactive';
-    const active = ['active', 'trialing'].includes(status);
-    const betaOverrideActive = entitlement.betaOverrideActive === true;
-    let effectiveSource = 'none';
-    if (betaOverrideActive) effectiveSource = 'beta_override';
-    else if (active) effectiveSource = 'stripe';
-    const updated = {
-      ...attempted,
-      uid: userId,
-      premiumActive: betaOverrideActive || active,
-      effectiveSource,
-      billingStatus: status,
-      stripeSubscriptionId: subscription?.id || entitlement.stripeSubscriptionId || null,
-      cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
-      currentPeriodEnd: Number(subscription?.current_period_end)
-        ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null,
-      planInterval: mapStripeInterval(subscription) || entitlement.planInterval || null,
-      pendingStripeSync: false,
-      stripeSyncAttemptAt: undefined,
-      updatedAt: attemptedAt,
-    };
+    const subscription = await findMigratedStripeSubscription(env, entitlement);
+    const updated = buildMigratedStripeEntitlement(entitlement, attempted, userId, subscription, attemptedAt);
     await env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
       .bind(userId, JSON.stringify(updated), attemptedAt).run();
@@ -477,6 +162,8 @@ async function refreshMigratedStripeEntitlement(env, userId) {
     console.warn('[beta-worker] migrated Stripe entitlement sync will retry', error instanceof Error ? error.message : 'Stripe lookup failed');
   }
 }
+
+const ensureUser = createUserEnsurer(refreshMigratedStripeEntitlement);
 
 const BODY_TOO_LARGE = Symbol('body-too-large');
 const readBody = async (request) => {
@@ -502,28 +189,8 @@ async function stripeRequest(env, endpoint, params, method = 'POST') {
   return body;
 }
 
-async function verifyStripeSignature(payload, header, secret) {
-  const parts = (header || '').split(',').map((part) => {
-    const separator = part.indexOf('=');
-    if (separator < 0) return ['', ''];
-    return [part.slice(0, separator).trim(), part.slice(separator + 1).trim().replace(/^"|"$/g, '')];
-  });
-  const timestamp = parts.find(([key]) => key === 't')?.[1];
-  const signatures = parts.filter(([key, value]) => key === 'v1' && value).map(([, value]) => value);
-  if (!timestamp || signatures.length === 0 || !/^\d+$/.test(timestamp)) return false;
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`));
-  const expected = Array.from(new Uint8Array(signed), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const valid = signatures.some((signature) => {
-    if (expected.length !== signature.length) return false;
-    let difference = 0;
-    for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
-    return difference === 0;
-  });
-  return valid && Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300;
-}
-
 async function handleAuthenticatedApi(request, env, url, path, user) {
+  const context = { request, env, url, path, user };
   const handlers = [
     handleAccountBootstrapAndBilling,
     handleAccountSettingsAndMetrics,
@@ -533,12 +200,12 @@ async function handleAuthenticatedApi(request, env, url, path, user) {
     handleUserRecordRoutes,
   ];
   for (const handler of handlers) {
-    const response = await handler(request, env, url, path, user);
+    const response = await handler(context);
     if (response) return response;
   }
   return json({ error: 'Not found.' }, 404);
 }
-async function handleAccountBootstrapAndBilling(request, env, url, path, user) {
+async function handleAccountBootstrapAndBilling({ request, env, path, user }) {
   if (path === '/api/me/bootstrap' && request.method === 'GET') {
     return json({ user: { id: user.clerk_id, email: user.email, displayName: user.display_name, betaAccess: Boolean(user.beta_access), migrationStatus: user.migration_status },
       settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id),
@@ -609,7 +276,7 @@ async function handleAccountBootstrapAndBilling(request, env, url, path, user) {
   return null;
 }
 
-async function handleAccountSettingsAndMetrics(request, env, url, path, user) {
+async function handleAccountSettingsAndMetrics({ request, env, url, path, user }) {
   if (path === '/api/user/settings' && request.method === 'GET') return json({ settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id) });
   if (path === '/api/user/settings' && request.method === 'PUT') {
     const body = await readBody(request);
@@ -680,229 +347,272 @@ async function handleAccountSettingsAndMetrics(request, env, url, path, user) {
   return null;
 }
 
-async function handleCloudCycleRoutes(request, env, url, path, user) {
-  if (path === '/api/cloud-cycles' && request.method === 'GET') {
-    const result = await env.DB.prepare(`SELECT id, user_id AS userId, label, cycle_date AS cycleDate, metadata_json, created_at AS createdAt, updated_at AS updatedAt
-      FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC`).bind(user.clerk_id).all();
-    return json({ cycles: (result.results || []).map((row) => {
-      const stored = parseJson(row.metadata_json) || {};
-      const metadata = { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
-        createdAt: row.createdAt, updatedAt: row.updatedAt, forecastDays: stored.forecastDays,
-        totalOutlooks: stored.totalOutlooks, totalFeatures: stored.totalFeatures, isReadOnly: stored.isReadOnly,
-        payloadHash: stored.payloadHash, workspaceId: stored.workspaceId, workflowMetadata: stored.workflowMetadata };
-      return { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
-        createdAt: row.createdAt, updatedAt: row.updatedAt, workflowMetadata: stored.workflowMetadata, metadata };
-    }) });
-  }
-  if (path === '/api/cloud-cycles' && request.method === 'POST') {
-    const body = await readBody(request);
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    const id = typeof body?.id === 'string' ? body.id.trim() : '';
-    const label = typeof body?.label === 'string' ? body.label.trim() : '';
-    const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
-    const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
-    const bytes = new TextEncoder().encode(payloadJson).length;
-    if (!id || id.length > 128 || id.includes('/') || !label || label.length > 200 || !cycleDate || cycleDate.length > 32 || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
-    const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
-    if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
-    try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
-    const now = new Date().toISOString();
-    let saveResult;
-    try {
-      saveResult = await env.DB.prepare(`INSERT INTO cloud_cycles
+async function listCloudCycles(env, user) {
+  const result = await env.DB.prepare(`SELECT id, user_id AS userId, label, cycle_date AS cycleDate, metadata_json, created_at AS createdAt, updated_at AS updatedAt
+    FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC`).bind(user.clerk_id).all();
+  return json({ cycles: (result.results || []).map((row) => {
+    const stored = parseJson(row.metadata_json) || {};
+    const metadata = { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
+      createdAt: row.createdAt, updatedAt: row.updatedAt, forecastDays: stored.forecastDays,
+      totalOutlooks: stored.totalOutlooks, totalFeatures: stored.totalFeatures, isReadOnly: stored.isReadOnly,
+      payloadHash: stored.payloadHash, workspaceId: stored.workspaceId, workflowMetadata: stored.workflowMetadata };
+    return { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
+      createdAt: row.createdAt, updatedAt: row.updatedAt, workflowMetadata: stored.workflowMetadata, metadata };
+  }) });
+}
+
+async function writeCloudCycle(env, user, data) {
+  const now = new Date().toISOString();
+  try {
+    return await env.DB.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
         OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ? AND migration_import = 0) < ?
       ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
         metadata_json = json_set(excluded.metadata_json, '$.createdAt', COALESCE(json_extract(cloud_cycles.metadata_json, '$.createdAt'), json_extract(excluded.metadata_json, '$.createdAt'))),
-        payload_json = excluded.payload_json,
-        payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
-      .bind(id, user.clerk_id, label, cycleDate, JSON.stringify({ ...body.metadata, userId: user.clerk_id }), payloadJson, bytes, now, now,
-        user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
-    } catch (error) {
-      if (String(error?.message || '').includes('cloud_cycle_quota_reached')) return json({ error: 'Cloud storage quota reached.' }, 409);
-      if (String(error?.message || '').includes('cloud_cycle_too_large') || String(error?.message || '').includes('CHECK constraint failed')) return json({ error: 'Cloud cycle is too large.' }, 413);
-      throw error;
+        payload_json = excluded.payload_json, payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
+      .bind(data.id, user.clerk_id, data.label, data.cycleDate, JSON.stringify({ ...data.metadata, userId: user.clerk_id }),
+        data.payloadJson, data.bytes, now, now, user.clerk_id, data.id, user.clerk_id, MAX_CLOUD_CYCLES).run();
+  } catch (error) {
+    if (String(error?.message || '').includes('cloud_cycle_quota_reached')) return { response: json({ error: 'Cloud storage quota reached.' }, 409) };
+    if (String(error?.message || '').includes('cloud_cycle_too_large') || String(error?.message || '').includes('CHECK constraint failed')) {
+      return { response: json({ error: 'Cloud cycle is too large.' }, 413) };
     }
-    if (!saveResult.meta.changes) {
-      const existing = await env.DB.prepare('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')
-        .bind(user.clerk_id, id).first();
-      if (!existing) return json({ error: 'Cloud storage quota reached.' }, 409);
-    }
-    return json({ success: true, data: id });
+    throw error;
   }
-  const cycleMatch = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
-  if (cycleMatch) {
-    const id = decodePathId(cycleMatch[1]);
-    if (!id || id.includes('/')) return json({ error: 'Invalid cloud cycle ID.' }, 400);
-    if (request.method === 'GET') {
-      const row = await env.DB.prepare('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
-      if (!row) return json({ error: 'Cloud cycle not found.' }, 404);
-      return json({ cycle: { id: row.id, userId: row.user_id, label: row.label, cycleDate: row.cycle_date,
-        createdAt: row.created_at, updatedAt: row.updated_at, metadata: parseJson(row.metadata_json), payload: parseJson(row.payload_json) } });
-    }
-    if (request.method === 'PATCH') {
-      const body = await readBody(request);
-      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      const label = typeof body?.label === 'string' ? body.label.trim() : '';
-      if (!label || label.length > 200) return json({ error: 'Invalid label.' }, 400);
-      const updatedAt = new Date().toISOString();
-      const result = await env.DB.prepare(`UPDATE cloud_cycles SET label = ?, updated_at = ?,
-        metadata_json = json_set(metadata_json, '$.label', ?, '$.updatedAt', ?) WHERE id = ? AND user_id = ?`)
-        .bind(label, updatedAt, label, updatedAt, id, user.clerk_id).run();
-      return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
-    }
-    if (request.method === 'DELETE') {
-      const result = await env.DB.prepare('DELETE FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).run();
-      return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
-    }
+}
+
+async function saveCloudCycle(request, env, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const id = typeof body?.id === 'string' ? body.id.trim() : '';
+  const label = typeof body?.label === 'string' ? body.label.trim() : '';
+  const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
+  const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
+  const data = { id, label, cycleDate, payloadJson, bytes: new TextEncoder().encode(payloadJson).length, metadata: body?.metadata };
+  if (!id || id.length > 128 || id.includes('/') || !label || label.length > 200 || !cycleDate || cycleDate.length > 32 || data.bytes > MAX_CYCLE_BYTES || !isObject(data.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
+  if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
+  try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
+  const saved = await writeCloudCycle(env, user, data);
+  if (saved.response) return saved.response;
+  if (!saved.meta.changes) {
+    const existing = await env.DB.prepare('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?').bind(user.clerk_id, id).first();
+    if (!existing) return json({ error: 'Cloud storage quota reached.' }, 409);
+  }
+  return json({ success: true, data: id });
+}
+
+async function readCloudCycle(env, id, user) {
+  const row = await env.DB.prepare('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).first();
+  if (!row) return json({ error: 'Cloud cycle not found.' }, 404);
+  return json({ cycle: { id: row.id, userId: row.user_id, label: row.label, cycleDate: row.cycle_date,
+    createdAt: row.created_at, updatedAt: row.updated_at, metadata: parseJson(row.metadata_json), payload: parseJson(row.payload_json) } });
+}
+
+async function updateCloudCycleLabel(request, env, id, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const label = typeof body?.label === 'string' ? body.label.trim() : '';
+  if (!label || label.length > 200) return json({ error: 'Invalid label.' }, 400);
+  const updatedAt = new Date().toISOString();
+  const result = await env.DB.prepare(`UPDATE cloud_cycles SET label = ?, updated_at = ?,
+    metadata_json = json_set(metadata_json, '$.label', ?, '$.updatedAt', ?) WHERE id = ? AND user_id = ?`)
+    .bind(label, updatedAt, label, updatedAt, id, user.clerk_id).run();
+  return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
+}
+
+async function handleCloudCycleById({ request, env, path, user }) {
+  const match = path.match(/^\/api\/cloud-cycles\/([^/]+)$/);
+  if (!match) return null;
+  const id = decodePathId(match[1]);
+  if (!id || id.includes('/')) return json({ error: 'Invalid cloud cycle ID.' }, 400);
+  if (request.method === 'GET') return readCloudCycle(env, id, user);
+  if (request.method === 'PATCH') return updateCloudCycleLabel(request, env, id, user);
+  if (request.method === 'DELETE') {
+    const result = await env.DB.prepare('DELETE FROM cloud_cycles WHERE id = ? AND user_id = ?').bind(id, user.clerk_id).run();
+    return result.meta.changes ? json({ success: true }) : json({ error: 'Cloud cycle not found.' }, 404);
   }
   return null;
 }
 
-async function handleWorkflowAwarenessRoutes(request, env, url, path, user) {
-  if (path === '/api/workflow-awareness' && request.method === 'GET') {
-    const requestedUserId = url.searchParams.get('userId');
-    if (requestedUserId && requestedUserId !== user.clerk_id) return json({ error: 'Account does not match session.' }, 403);
-    const result = await env.DB.prepare('SELECT cycle_id AS id, data_json FROM workflow_awareness WHERE user_id = ?')
-      .bind(user.clerk_id).all();
-    return json({ records: (result.results || []).map((row) => parseJson(row.data_json)).filter(Boolean) });
+async function handleCloudCycleRoutes(context) {
+  const { request, env, path, user } = context;
+  if (path === '/api/cloud-cycles' && request.method === 'GET') return listCloudCycles(env, user);
+  if (path === '/api/cloud-cycles' && request.method === 'POST') return saveCloudCycle(request, env, user);
+  return handleCloudCycleById(context);
+}
+
+async function listWorkflowAwareness(env, url, user) {
+  const requestedUserId = url.searchParams.get('userId');
+  if (requestedUserId && requestedUserId !== user.clerk_id) return json({ error: 'Account does not match session.' }, 403);
+  const page = Number(url.searchParams.get('page') || 0);
+  if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
+  const result = await env.DB.prepare(`SELECT cycle_id AS id, data_json FROM workflow_awareness
+    WHERE user_id = ? ORDER BY cycle_id LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
+    .bind(user.clerk_id, page * MAX_LIST_PAGE_SIZE).all();
+  const rows = result.results || [];
+  return json({ records: rows.map((row) => parseJson(row.data_json)).filter(Boolean),
+    nextPage: rows.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
+}
+
+async function saveWorkflowAwareness(request, env, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string') return json({ error: 'Invalid workflow record.' }, 400);
+  const cycleId = body.record.metadata.cycleId.trim();
+  if (!cycleId || cycleId.includes('/')) return json({ error: 'Invalid workflow record.' }, 400);
+  body.record.metadata.cycleId = cycleId;
+  const dataJson = JSON.stringify(body.record);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
+  const existingCount = await env.DB.prepare('SELECT COUNT(*) AS count FROM workflow_awareness WHERE user_id = ? AND migration_import = 0').bind(user.clerk_id).first();
+  if (Number(existingCount?.count || 0) >= MAX_WORKFLOW_RECORDS) {
+    const existing = await env.DB.prepare('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
+      .bind(user.clerk_id, cycleId).first();
+    if (!existing) return json({ error: 'Workflow record quota reached.' }, 409);
   }
-  if (path === '/api/workflow-awareness' && request.method === 'PUT') {
-    const body = await readBody(request);
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string') return json({ error: 'Invalid workflow record.' }, 400);
-    const cycleId = body.record.metadata.cycleId.trim();
-    if (!cycleId || cycleId.includes('/')) return json({ error: 'Invalid workflow record.' }, 400);
-    body.record.metadata.cycleId = cycleId;
-    const dataJson = JSON.stringify(body.record);
-    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
-    const existingCount = await env.DB.prepare('SELECT COUNT(*) AS count FROM workflow_awareness WHERE user_id = ? AND migration_import = 0').bind(user.clerk_id).first();
-    if (Number(existingCount?.count || 0) >= MAX_WORKFLOW_RECORDS) {
-      const existing = await env.DB.prepare('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
-        .bind(user.clerk_id, cycleId).first();
-      if (!existing) return json({ error: 'Workflow record quota reached.' }, 409);
-    }
-    try {
-      await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
-        ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
-        .bind(user.clerk_id, cycleId, dataJson).run();
-    } catch (error) {
-      if (String(error?.message || '').includes('workflow_awareness_quota_reached')) return json({ error: 'Workflow record quota reached.' }, 409);
-      throw error;
-    }
-    return json({ success: true });
+  try {
+    await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
+      ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
+      .bind(user.clerk_id, cycleId, dataJson).run();
+  } catch (error) {
+    if (String(error?.message || '').includes('workflow_awareness_quota_reached')) return json({ error: 'Workflow record quota reached.' }, 409);
+    throw error;
   }
-  if (path === '/api/workflow-awareness' && request.method === 'DELETE') {
-    await env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ?').bind(user.clerk_id).run();
-    return json({ success: true });
-  }
+  return json({ success: true });
+}
+
+async function handleWorkflowDelete(env, path, user) {
   const awarenessMatch = path.match(/^\/api\/workflow-awareness\/([^/]+)$/);
-  if (awarenessMatch && request.method === 'DELETE') {
-    const cycleId = decodePathId(awarenessMatch[1]);
-    if (!cycleId || cycleId.includes('/')) return json({ error: 'Invalid cycle ID.' }, 400);
-    await env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
-      .bind(user.clerk_id, cycleId).run();
-    return json({ success: true });
+  const cycleId = awarenessMatch ? decodePathId(awarenessMatch[1]) : null;
+  if (awarenessMatch && (!cycleId || cycleId.includes('/'))) return json({ error: 'Invalid cycle ID.' }, 400);
+  const query = cycleId === null
+    ? env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ?').bind(user.clerk_id)
+    : env.DB.prepare('DELETE FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?').bind(user.clerk_id, cycleId);
+  await query.run();
+  return json({ success: true });
+}
+
+async function handleWorkflowAwarenessRoutes({ request, env, url, path, user }) {
+  if (path === '/api/workflow-awareness' && request.method === 'GET') return listWorkflowAwareness(env, url, user);
+  if (path === '/api/workflow-awareness' && request.method === 'PUT') return saveWorkflowAwareness(request, env, user);
+  if ((path === '/api/workflow-awareness' || /^\/api\/workflow-awareness\/[^/]+$/.test(path)) && request.method === 'DELETE') {
+    return handleWorkflowDelete(env, path, user);
   }
   return null;
 }
 
-async function handleCustomProductRoutes(request, env, url, path, user) {
-  if (path === '/api/custom-products' && request.method === 'GET') {
-    const result = await env.DB.prepare('SELECT data_json FROM custom_products WHERE user_id = ? ORDER BY slot_id')
-      .bind(user.clerk_id).all();
-    return json({ products: (result.results || []).map((row) => parseJson(row.data_json)).filter(Boolean) });
-  }
-  if (path === '/api/custom-products' && request.method === 'POST') {
-    const body = await readBody(request);
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    const product = body?.product;
-    const productId = typeof product?.id === 'string' ? product.id.trim() : '';
-    if (!isObject(product) || !productId || productId.length > 128 || productId.includes('/') || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
-    product.id = productId;
-    const dataJson = JSON.stringify(product);
-    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
-    const slotValues = [
-      ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`),
-      ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`),
-    ].join(', ');
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slotValues})
-          INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
-          SELECT ?, slots.slot_id, ?, ? FROM slots
-          WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
-            AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
-          ORDER BY slots.slot_id LIMIT 1`)
-          .bind(user.clerk_id, product.id, dataJson, user.clerk_id, user.clerk_id, MAX_CUSTOM_PRODUCTS).run();
-        if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
-        break;
-      } catch (error) {
-        if (String(error?.message || '').includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
-        if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
-        const duplicate = await env.DB.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?')
-          .bind(user.clerk_id, product.id).first();
-        if (duplicate) return json({ error: 'Custom product already exists.' }, 409);
-        if (attempt === 1) return json({ error: 'Custom product limit reached. Refresh and try again.' }, 409);
-      }
-    }
-    return json({ success: true, product });
-  }
-  const productMatch = path.match(/^\/api\/custom-products\/([^/]+)$/);
-  if (productMatch) {
-    if (request.method !== 'PATCH' && request.method !== 'DELETE') return json({ error: 'Method not allowed.' }, 405);
-    const productId = decodePathId(productMatch[1]);
-    if (!productId || productId.includes('/')) return json({ error: 'Invalid custom product ID.' }, 400);
-    const currentRow = await env.DB.prepare('SELECT slot_id, data_json FROM custom_products WHERE user_id = ? AND product_id = ?')
-      .bind(user.clerk_id, productId).first();
-    if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
-    const current = parseJson(currentRow.data_json) || {};
-    const ifMatch = request.method === 'DELETE' ? request.headers.get('If-Match')?.trim() : '';
-    const body = request.method === 'PATCH' || !ifMatch ? await readBody(request) : null;
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (request.method === 'PATCH') {
-      if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid custom product.' }, 400);
-      const product = body?.product;
-      if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || product.builtIn === true || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) {
-        return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
-      }
-      const dataJson = JSON.stringify(product);
-      if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
-      const result = await env.DB.prepare(`UPDATE custom_products SET data_json = ? WHERE user_id = ? AND slot_id = ? AND product_id = ? AND json_extract(data_json, '$.version') = ?`)
-        .bind(dataJson, user.clerk_id, currentRow.slot_id, productId, body.expectedVersion).run();
-      return result.meta.changes ? json({ success: true, product }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
-    }
-    if (request.method === 'DELETE') {
-      const headerVersions = [...(ifMatch || '').matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
-      let expectedVersion;
-      if (ifMatch === '*') {
-        expectedVersion = current.version;
-      } else if (ifMatch) {
-        expectedVersion = headerVersions.includes(current.version) ? current.version : NaN;
-      } else {
-        expectedVersion = body?.expectedVersion;
-      }
-      if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
-      const result = await env.DB.prepare(`DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?
-        AND json_extract(data_json, '$.version') = ?`).bind(user.clerk_id, currentRow.slot_id, productId, expectedVersion).run();
-      return result.meta.changes ? json({ success: true }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+async function listCustomProducts(env, url, user) {
+  const page = Number(url.searchParams.get('page') || 0);
+  if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
+  const result = await env.DB.prepare(`SELECT data_json FROM custom_products WHERE user_id = ? ORDER BY slot_id LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
+    .bind(user.clerk_id, page * MAX_LIST_PAGE_SIZE).all();
+  const rows = result.results || [];
+  return json({ products: rows.map((row) => parseJson(row.data_json)).filter(Boolean),
+    nextPage: rows.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
+}
+
+async function reserveCustomProductSlot(env, userId, product, dataJson) {
+  const slots = [...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`),
+    ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`)].join(', ');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
+        INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
+        SELECT ?, slots.slot_id, ?, ? FROM slots
+        WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
+          AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
+        ORDER BY CASE WHEN slots.slot_id LIKE 'product-%' THEN 0 ELSE 1 END, slots.slot_id LIMIT 1`)
+        .bind(userId, product.id, dataJson, userId, userId, MAX_CUSTOM_PRODUCTS).run();
+      if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
+      return null;
+    } catch (error) {
+      if (String(error?.message || '').includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
+      if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
+      const duplicate = await env.DB.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?').bind(userId, product.id).first();
+      if (duplicate) return json({ error: 'Custom product already exists.' }, 409);
+      if (attempt === 1) return json({ error: 'Custom product limit reached. Refresh and try again.' }, 409);
     }
   }
   return null;
 }
 
-async function handleUserRecordRoutes(request, env, url, path, user) {
+async function createCustomProduct(request, env, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const product = body?.product;
+  const productId = typeof product?.id === 'string' ? product.id.trim() : '';
+  if (!isObject(product) || !productId || productId.length > 128 || productId.includes('/') || product.userId !== user.clerk_id || product.version !== 1 || product.builtIn === true) return json({ error: 'Invalid custom product.' }, 400);
+  product.id = productId;
+  const dataJson = JSON.stringify(product);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
+  const failure = await reserveCustomProductSlot(env, user.clerk_id, product, dataJson);
+  return failure || json({ success: true, product });
+}
+
+async function patchCustomProduct(request, env, user, productId, currentRow, current) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid custom product.' }, 400);
+  const product = body.product;
+  if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || product.builtIn === true || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+  const dataJson = JSON.stringify(product);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
+  const result = await env.DB.prepare(`UPDATE custom_products SET data_json = ? WHERE user_id = ? AND slot_id = ? AND product_id = ? AND json_extract(data_json, '$.version') = ?`)
+    .bind(dataJson, user.clerk_id, currentRow.slot_id, productId, body.expectedVersion).run();
+  return result.meta.changes ? json({ success: true, product }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+}
+
+async function deleteCustomProduct(request, env, user, productId, currentRow, current) {
+  const ifMatch = request.headers.get('If-Match')?.trim() || '';
+  const body = ifMatch ? null : await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const headerVersions = [...ifMatch.matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
+  let expectedVersion;
+  if (ifMatch === '*') expectedVersion = current.version;
+  else if (ifMatch) expectedVersion = headerVersions.includes(current.version) ? current.version : NaN;
+  else expectedVersion = body?.expectedVersion;
+  if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+  const result = await env.DB.prepare(`DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?
+    AND json_extract(data_json, '$.version') = ?`).bind(user.clerk_id, currentRow.slot_id, productId, expectedVersion).run();
+  return result.meta.changes ? json({ success: true }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
+}
+
+async function updateCustomProduct({ request, env, path, user }) {
+  const match = path.match(/^\/api\/custom-products\/([^/]+)$/);
+  if (!match) return null;
+  if (request.method !== 'PATCH' && request.method !== 'DELETE') return json({ error: 'Method not allowed.' }, 405);
+  const productId = decodePathId(match[1]);
+  if (!productId || productId.includes('/')) return json({ error: 'Invalid custom product ID.' }, 400);
+  const currentRow = await env.DB.prepare('SELECT slot_id, data_json FROM custom_products WHERE user_id = ? AND product_id = ?').bind(user.clerk_id, productId).first();
+  if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
+  const current = parseJson(currentRow.data_json) || {};
+  if (request.method === 'PATCH') return patchCustomProduct(request, env, user, productId, currentRow, current);
+  return deleteCustomProduct(request, env, user, productId, currentRow, current);
+}
+
+async function handleCustomProductRoutes(context) {
+  const { request, env, url, path, user } = context;
+  if (path === '/api/custom-products' && request.method === 'GET') return listCustomProducts(env, url, user);
+  if (path === '/api/custom-products' && request.method === 'POST') return createCustomProduct(request, env, user);
+  return updateCustomProduct(context);
+}
+
+async function handleUserRecordRoutes({ request, env, url, path, user }) {
   const recordRoute = path.match(/^\/api\/(forecasts|discussions|verifications)(?:\/([^/]+))?$/);
   if (recordRoute) {
     const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
     const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
     if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
     if (request.method === 'GET' && !recordId) {
-      const rows = await env.DB.prepare(`SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC LIMIT ${MAX_USER_RECORDS}`)
-        .bind(user.clerk_id, recordType).all();
-      return json({ records: (rows.results || []).map((row) => ({ id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at })) });
+      const page = Number(url.searchParams.get('page') || 0);
+      if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
+      const rows = await env.DB.prepare(`SELECT record_id, data_json, created_at, updated_at FROM user_records
+        WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC, record_id DESC LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
+        .bind(user.clerk_id, recordType, page * MAX_LIST_PAGE_SIZE).all();
+      const results = rows.results || [];
+      return json({ records: results.map((row) => ({ id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at })),
+        nextPage: results.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
     }
     if (request.method === 'PUT' && !recordId) {
       const body = await readBody(request);
@@ -961,32 +671,32 @@ async function resolveStripeOwner(db, metadata, object, subscription) {
   let owner = null;
   if (clerkId) owner = await db.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first();
   if (!owner && legacyUid) owner = await db.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
-  const customerId = subscription.customer || object.customer;
+  const customerId = subscription?.customer || object?.customer;
   if (!owner && typeof customerId === 'string') {
     owner = await db.prepare(`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`).bind(customerId).first();
   }
   return { owner, clerkId, legacyUid };
 }
 
-function buildStripeEntitlement(ownerId, prior, subscription, object, eventType) {
-  const status = subscription.status || (eventType === 'checkout.session.completed' ? 'active' : 'inactive');
+function buildStripeEntitlement({ ownerId, prior, subscription, object, eventType }) {
+  const status = subscription?.status || (eventType === 'checkout.session.completed' ? 'active' : 'inactive');
   const active = ['active', 'trialing'].includes(status);
-  const periodEnd = Number(subscription.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
+  const periodEnd = Number(subscription?.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
   let effectiveSource = 'none';
   if (prior.betaOverrideActive === true) effectiveSource = 'beta_override';
   else if (active) effectiveSource = 'stripe';
   return {
-    ...prior, uid: ownerId, stripeCustomerId: subscription.customer || object.customer || prior.stripeCustomerId || null,
-    stripeSubscriptionId: subscription.id || object.subscription || null, billingStatus: status,
+    ...prior, uid: ownerId, stripeCustomerId: subscription?.customer || object?.customer || prior.stripeCustomerId || null,
+    stripeSubscriptionId: subscription?.id || object?.subscription || null, billingStatus: status,
     premiumActive: prior.betaOverrideActive === true || active, effectiveSource,
-    cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
+    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end), currentPeriodEnd: periodEnd,
     planInterval: mapStripeInterval(subscription) || prior.planInterval || null,
     updatedAt: new Date().toISOString(),
   };
 }
 
-async function writeStripeEntitlement(db, event, ownerId, prior, subscription, object) {
-  const entitlement = buildStripeEntitlement(ownerId, prior, subscription, object, event.type);
+async function writeStripeEntitlement(db, { event, ownerId, prior, subscription, object }) {
+  const entitlement = buildStripeEntitlement({ ownerId, prior, subscription, object, eventType: event.type });
   const statements = [db.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
     .bind(ownerId, JSON.stringify(entitlement), entitlement.updatedAt)];
@@ -1013,7 +723,7 @@ async function processStripeSubscriptionEvent(event, object, env) {
   const identity = await resolveStripeOwner(env.DB, subscription.metadata || object.metadata || {}, object, subscription);
   if (identity.owner) {
     const prior = await readJsonRecord(env.DB, 'user_entitlements', identity.owner.clerk_id) || {};
-    await writeStripeEntitlement(env.DB, event, identity.owner.clerk_id, prior, subscription, object);
+    await writeStripeEntitlement(env.DB, { event, ownerId: identity.owner.clerk_id, prior, subscription, object });
     return null;
   }
   if (!identity.clerkId && !identity.legacyUid) return json({ received: true, ignored: 'missing-account-metadata' });
@@ -1072,23 +782,43 @@ async function handleStripeWebhook(request, env) {
   }
 }
 
-async function handleApi(request, env) {
-  const url = new URL(request.url);
-  const path = url.pathname;
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
-  if (path === '/api/health' && request.method === 'GET') {
-    if (!env.DB) return json({ status: 'error', service: 'gfc-beta-worker', database: false }, 503);
-    try {
-      await env.DB.prepare(`SELECT (SELECT 1 FROM users LIMIT 1) AS users,
-        (SELECT 1 FROM user_settings LIMIT 1) AS settings, (SELECT 1 FROM user_entitlements LIMIT 1) AS entitlements,
-        (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
-        (SELECT 1 FROM workflow_awareness LIMIT 1) AS awareness, (SELECT 1 FROM custom_products LIMIT 1) AS products,
-        (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).first();
-      return json({ status: 'ok', service: 'gfc-beta-worker', database: true });
-    } catch {
-      return json({ status: 'error', service: 'gfc-beta-worker', database: false }, 503);
-    }
+async function handleHealthCheck(env) {
+  if (!env.DB) return json({ status: 'error', service: 'gfc-beta-worker', database: false }, 503);
+  try {
+    await env.DB.prepare(`SELECT (SELECT 1 FROM users LIMIT 1) AS users,
+      (SELECT 1 FROM user_settings LIMIT 1) AS settings, (SELECT 1 FROM user_entitlements LIMIT 1) AS entitlements,
+      (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
+      (SELECT 1 FROM workflow_awareness LIMIT 1) AS awareness, (SELECT 1 FROM custom_products LIMIT 1) AS products,
+      (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).first();
+    return json({ status: 'ok', service: 'gfc-beta-worker', database: true });
+  } catch {
+    return json({ status: 'error', service: 'gfc-beta-worker', database: false }, 503);
   }
+}
+
+async function handleSentryTunnel(request, env) {
+  const declaredSize = Number(request.headers.get('Content-Length') || 0);
+  if (declaredSize > MAX_SENTRY_ENVELOPE_BYTES) return json({ error: 'Sentry envelope is too large.' }, 413);
+  const envelope = await readLimitedBody(request, MAX_SENTRY_ENVELOPE_BYTES);
+  if (!envelope) return json({ error: 'Sentry envelope is too large.' }, 413);
+  if (!envelope.length) return json({ error: 'Invalid Sentry envelope.' }, 400);
+  const configured = parseSentryDsn(env.SENTRY_BROWSER_DSN || env.SENTRY_DSN);
+  const incoming = parseSentryEnvelopeDsn(envelope);
+  if (!configured || !incoming || configured.host !== incoming.host || configured.projectId !== incoming.projectId) return json({ error: 'Invalid Sentry envelope.' }, 400);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`https://${configured.host}/api/${configured.projectId}/envelope/`, {
+      method: 'POST', headers: { 'Content-Type': 'application/x-sentry-envelope' }, body: envelope, signal: controller.signal,
+    });
+    return new Response(null, { status: response.status, headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    return json({ error: error?.name === 'AbortError' ? 'Sentry is temporarily unavailable.' : 'Unable to forward Sentry envelope.' }, error?.name === 'AbortError' ? 504 : 502);
+  } finally { clearTimeout(timeout); }
+}
+
+async function handlePublicApi(request, env, path) {
+  if (path === '/api/health' && request.method === 'GET') return handleHealthCheck(env);
   if (path === '/api/billing/config' && request.method === 'GET') {
     const checkoutEnabled = Boolean(env.STRIPE_SECRET_KEY && (env.STRIPE_PRICE_MONTHLY || env.STRIPE_PRICE_ANNUAL_STANDARD));
     return json({ billingEnabled: Boolean(env.STRIPE_SECRET_KEY), checkoutEnabled, annualPromoActive: false,
@@ -1098,30 +828,18 @@ async function handleApi(request, env) {
   if (path === '/api/capabilities/status' && request.method === 'GET') {
     return json({ capabilities: { TSTM_GENERATION_ENABLED: { available: false, reason: 'deployment_disabled' } } });
   }
-  if (path === '/api/tstm/latest' && request.method === 'GET') {
-    return json({ error: 'This beta capability is unavailable during the D1 migration.' }, 503);
-  }
-  if (path === '/api/sentry-tunnel' && request.method === 'POST') {
-    const declaredSize = Number(request.headers.get('Content-Length') || 0);
-    if (declaredSize > MAX_SENTRY_ENVELOPE_BYTES) return json({ error: 'Sentry envelope is too large.' }, 413);
-    const envelope = await readLimitedBody(request, MAX_SENTRY_ENVELOPE_BYTES);
-    if (!envelope) return json({ error: 'Sentry envelope is too large.' }, 413);
-    if (!envelope.length) return json({ error: 'Invalid Sentry envelope.' }, 400);
-    const configured = parseSentryDsn(env.SENTRY_BROWSER_DSN || env.SENTRY_DSN);
-    const incoming = parseSentryEnvelopeDsn(envelope);
-    if (!configured || !incoming || configured.host !== incoming.host || configured.projectId !== incoming.projectId) return json({ error: 'Invalid Sentry envelope.' }, 400);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5_000);
-    try {
-      const response = await fetch(`https://${configured.host}/api/${configured.projectId}/envelope/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/x-sentry-envelope' }, body: envelope, signal: controller.signal,
-      });
-      return new Response(null, { status: response.status, headers: { 'Cache-Control': 'no-store' } });
-    } catch (error) {
-      return json({ error: error?.name === 'AbortError' ? 'Sentry is temporarily unavailable.' : 'Unable to forward Sentry envelope.' }, error?.name === 'AbortError' ? 504 : 502);
-    } finally { clearTimeout(timeout); }
-  }
+  if (path === '/api/tstm/latest' && request.method === 'GET') return json({ error: 'This beta capability is unavailable during the D1 migration.' }, 503);
+  if (path === '/api/sentry-tunnel' && request.method === 'POST') return handleSentryTunnel(request, env);
   if (path === '/api/billing/webhook' && request.method === 'POST') return handleStripeWebhook(request, env);
+  return null;
+}
+
+async function handleApi(request, env) {
+  const url = new URL(request.url);
+  const path = url.pathname;
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+  const publicResponse = await handlePublicApi(request, env, path);
+  if (publicResponse) return publicResponse;
   const identity = await authenticate(request, env);
   if (!identity) return json({ error: 'A verified Clerk session is required.' }, 401);
 
@@ -1194,22 +912,6 @@ async function deleteBetaUserData(userId, env) {
   await env.DB.batch(statements);
 }
 
-const parseJson = (value) => {
-  try { return JSON.parse(value); } catch { return null; }
-};
-
-const parseSentryDsn = (value) => {
-  if (typeof value !== 'string') return null;
-  const match = value.trim().match(/^https:\/\/(?:[^@/]+@)?(o\d+\.ingest(?:\.[a-z]{2})?\.sentry\.io)\/(\d+)\/?$/iu);
-  return match ? { host: match[1], projectId: match[2] } : null;
-};
-
-const parseSentryEnvelopeDsn = (envelope) => {
-  const firstLine = new TextDecoder().decode(envelope).split('\n').find((line) => line.trim());
-  if (!firstLine) return null;
-  try { return parseSentryDsn(JSON.parse(firstLine)?.dsn); } catch { return null; }
-};
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1277,31 +979,5 @@ export default {
     } catch (error) { console.error('[beta-worker] retention cleanup failed', error); }
   },
 };
-
-async function readLimitedBody(request, limit) {
-  const contentLength = Number(request.headers.get('Content-Length'));
-  if (Number.isFinite(contentLength) && contentLength > limit) return null;
-  if (!request.body) return new Uint8Array();
-  const reader = request.body.getReader();
-  const chunks = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > limit) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  const result = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return result;
-}
 
 export const __test = { authenticate, emailSnapshotKey, deleteBetaUserData, clearAuthCache: () => authProfileCache.clear() };

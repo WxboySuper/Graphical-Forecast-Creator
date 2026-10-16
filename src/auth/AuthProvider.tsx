@@ -1488,13 +1488,16 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { isLoaded, isSignedIn, getToken } = useClerkAuth();
   const clerk = useClerk();
   const { user: clerkUser, isLoaded: isUserLoaded } = useUser();
+  const clerkUserRef = useRef(clerkUser);
   const clerkIdentityRef = useRef({ isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id });
   useEffect(() => {
     clerkIdentityRef.current = { isSignedIn: Boolean(isSignedIn), userId: clerkUser?.id };
   }, [clerkUser?.id, isSignedIn]);
+  useEffect(() => { clerkUserRef.current = clerkUser; }, [clerkUser]);
   const deleteClerkUser = useReverification(async () => {
-    if (!clerkUser) throw new Error('Sign in before deleting your account.');
-    await clerkUser.delete();
+    const currentUser = clerkUserRef.current;
+    if (!currentUser) throw new Error('Sign in before deleting your account.');
+    await currentUser.delete();
   });
   const getTokenRef = useRef(getToken);
   useEffect(() => { getTokenRef.current = getToken; }, [getToken]);

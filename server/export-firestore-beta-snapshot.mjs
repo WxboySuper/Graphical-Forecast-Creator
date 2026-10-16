@@ -32,6 +32,39 @@ const readArguments = () => {
   return { output: outputAt >= 0 ? args[outputAt + 1] : '' };
 };
 
+async function exportChildCollections(page, exportCollection) {
+  const childLists = await Promise.all(page.map((document) => document.ref.listCollections()));
+  const children = childLists.flat();
+  for (let offset = 0; offset < children.length; offset += 10) {
+    const results = await Promise.allSettled(children.slice(offset, offset + 10).map(exportCollection));
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason;
+  }
+}
+
+async function exportSnapshotPage(page, writeSnapshotLine, exportCollection) {
+  await Promise.all(page.map((document) => writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })));
+  await exportChildCollections(page, exportCollection);
+}
+
+async function exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection) {
+  let cursor = null;
+  let exportedCount = 0;
+  while (true) {
+    let pageQuery = collectionRef.orderBy(FieldPath.documentId()).limit(500);
+    if (cursor) pageQuery = pageQuery.startAfter(cursor);
+    const collectionSnapshot = await pageQuery.get();
+    for (let offset = 0; offset < collectionSnapshot.docs.length; offset += 10) {
+      const page = collectionSnapshot.docs.slice(offset, offset + 10);
+      await exportSnapshotPage(page, writeSnapshotLine, exportCollection);
+      exportedCount += page.length;
+    }
+    if (collectionSnapshot.docs.length < 500) break;
+    cursor = collectionSnapshot.docs.at(-1);
+  }
+  return exportedCount;
+}
+
 async function main() {
   const { output } = readArguments();
   if (!output) throw new Error('Usage: node server/export-firestore-beta-snapshot.mjs --output <private-directory>');
@@ -65,34 +98,13 @@ async function main() {
     return snapshotWriteQueue;
   };
   const exportCollection = async (collectionRef) => {
-    let cursor = null;
-    while (true) {
-      let pageQuery = collectionRef.orderBy(FieldPath.documentId()).limit(500);
-      if (cursor) pageQuery = pageQuery.startAfter(cursor);
-      const collectionSnapshot = await pageQuery.get();
-      for (let offset = 0; offset < collectionSnapshot.docs.length; offset += 10) {
-        const page = collectionSnapshot.docs.slice(offset, offset + 10);
-        await Promise.all(page.map((document) => writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })));
-        fullSnapshotCount += page.length;
-        const childLists = await Promise.all(page.map((document) => document.ref.listCollections()));
-        for (const childCollections of childLists) {
-          for (let childOffset = 0; childOffset < childCollections.length; childOffset += 10) {
-            const results = await Promise.allSettled(childCollections.slice(childOffset, childOffset + 10).map(exportCollection));
-            const failed = results.find((result) => result.status === 'rejected');
-            if (failed) throw failed.reason;
-          }
-        }
-      }
-      if (collectionSnapshot.docs.length < 500) break;
-      cursor = collectionSnapshot.docs.at(-1);
-    }
+    fullSnapshotCount += await exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection);
   };
   const readAllDocuments = async (query) => {
     const documents = [];
     let cursor = null;
     while (true) {
-      // Standard Firestore adds document ID ordering by default; keeping the query unchanged avoids extra index requirements.
-      let pageQuery = query.limit(500);
+      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
       documents.push(...page.docs);

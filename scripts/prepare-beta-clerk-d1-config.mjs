@@ -11,7 +11,12 @@ if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data
   throw new Error('BETA_D1_DATABASE_ID must contain the UUID returned by wrangler d1 create.');
 }
 
-const template = await readFile(configPath, 'utf8');
+let template;
+try {
+  template = await readFile(configPath, 'utf8');
+} catch (error) {
+  throw new Error(`Beta D1 config template not found at ${configPath}: ${error.message}`);
+}
 if (!template.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 config template is missing its database id marker.');
 const generated = template.replaceAll('SET_AFTER_CREATING_BETA_D1', databaseId);
 if (generated.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 config still contains an unresolved database id marker.');

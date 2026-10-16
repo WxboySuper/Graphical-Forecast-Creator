@@ -91,10 +91,17 @@ export const findOpenProductSlot = (occupiedSlotIds: Iterable<string>): string =
 };
 
 const readBetaProducts = async (userId: string): Promise<HostedCustomProduct[]> => {
-  const response = await fetchBetaApi('/api/custom-products');
-  const body = (await response.json().catch(() => ({}))) ?? {};
-  if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
-  return sortProducts((Array.isArray(body?.products) ? body.products : [])
+  const products: unknown[] = [];
+  let page = 0;
+  while (true) {
+    const response = await fetchBetaApi(`/api/custom-products?page=${page}`);
+    const body = (await response.json().catch(() => ({}))) ?? {};
+    if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
+    if (Array.isArray(body?.products)) products.push(...body.products);
+    if (typeof body?.nextPage !== 'number') break;
+    page = body.nextPage;
+  }
+  return sortProducts(products
     .filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
 };
 

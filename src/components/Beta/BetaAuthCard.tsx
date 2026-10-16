@@ -186,7 +186,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     if (authProvider !== 'clerk' || typeof window === 'undefined') return;
     const syncVerificationState = () => {
       const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-      const routeSegments = new Set(['sign-in', 'sign-up', 'forgot-password', 'reset-password', 'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback', 'choose']);
+      const routeSegments = new Set(['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback']);
       const normalizedSegments = segments.map((segment) => segment.toLowerCase());
       setClerkRoutingInProgress(normalizedSegments.some((segment) => routeSegments.has(segment)));
       setClerkVerificationInProgress(normalizedSegments.some((segment) => ['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback'].includes(segment)));
@@ -315,10 +315,11 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
             </div>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (
-            <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />
+            <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl}
+              appearance={{ elements: { footerAction: { display: 'none' } } }} />
           ) : (
             <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl}
-              appearance={allowSignUp ? undefined : { elements: { footerAction: { display: 'none' } } }} />
+              appearance={{ elements: { footerAction: { display: 'none' } } }} />
           )}
           {error || formError ? <div className="beta-auth-error">{error ?? formError}</div> : null}
         </div>
