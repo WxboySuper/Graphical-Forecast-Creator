@@ -91,7 +91,7 @@ async function authenticate(request, env) {
       unavailable.cause = error;
       throw unavailable;
     }
-    if (profileResponse.status === 429 || profileResponse.status >= 500) {
+    if (profileResponse.status === 429 || profileResponse.status >= 500 || profileResponse.status === 401 || profileResponse.status === 403) {
       const unavailable = new Error('Clerk profile service is temporarily unavailable.');
       unavailable.code = 'CLERK_PROFILE_UNAVAILABLE';
       throw unavailable;
@@ -143,6 +143,8 @@ async function ensureUser(user, env) {
     const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(user.email));
     if (object) {
       try { snapshot = await object.json(); } catch { throw new Error('SNAPSHOT_INVALID'); }
+      if (!isObject(snapshot)) throw new Error('SNAPSHOT_INVALID');
+      if (snapshot.userProfile !== undefined && snapshot.userProfile !== null && !isObject(snapshot.userProfile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
     }
   }
 
@@ -204,7 +206,8 @@ async function ensureUser(user, env) {
       };
       const statements = [];
       const settings = snapshot.userSettings;
-      if (settings) {
+      if (settings !== undefined && settings !== null) {
+        if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
         const settingsWithoutLegacyCycles = { ...settings };
         delete settingsWithoutLegacyCycles.cloudCycles;
         accountForMigrationBytes(settingsWithoutLegacyCycles);
@@ -214,20 +217,23 @@ async function ensureUser(user, env) {
           .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
       }
       const entitlement = snapshot.userEntitlement;
-      if (entitlement) {
+      if (entitlement !== undefined && entitlement !== null) {
+        if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
         accountForMigrationBytes(entitlement);
         statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...entitlement, uid: user.clerkId }), now));
       }
       const metrics = snapshot.userMetrics;
-      if (metrics) {
+      if (metrics !== undefined && metrics !== null) {
+        if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
         accountForMigrationBytes(metrics);
         statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
       }
       for (const cycle of cloudCycles) {
+        if (!isObject(cycle)) throw new Error('SNAPSHOT_CYCLE_INVALID');
         if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
         if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
         const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson === null || cycle.payloadJson === undefined ? '{}' : JSON.stringify(cycle.payloadJson);
@@ -238,22 +244,25 @@ async function ensureUser(user, env) {
         const metadataJson = JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId });
         accountForMigrationBytes(metadataJson);
         statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
-          (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, migration_import, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
           .bind(cycle.id, user.clerkId, cycle.label || '', cycle.cycleDate || '', metadataJson,
             payloadJson, payloadBytes,
             cycle.createdAt || now, cycle.updatedAt || now));
       }
       for (const record of workflowAwareness) {
+        if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
         if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+        if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
         const workflowJson = JSON.stringify(record.data);
         accountForMigrationBytes(workflowJson);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)')
+        statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json, migration_import) VALUES (?, ?, ?, 1)')
           .bind(user.clerkId, record.id, workflowJson));
       }
       const occupiedProductSlots = new Set(((await env.DB.prepare('SELECT slot_id FROM custom_products WHERE user_id = ?')
         .bind(user.clerkId).all()).results || []).map((row) => row.slot_id));
       for (const [index, product] of customProducts.entries()) {
+        if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
@@ -274,7 +283,7 @@ async function ensureUser(user, env) {
           }
         }
         occupiedProductSlots.add(slotId);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
+        statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
           .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
@@ -456,7 +465,13 @@ async function handleApi(request, env) {
           billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
             .bind(`stripe:${event.id}:cancellation`, eventDate, event.id, 'cancellations', owner.clerk_id));
         }
-        await env.DB.batch(billingStatements);
+        await env.DB.batch(billingStatements.slice(0, 1));
+        if (billingStatements.length > 1) {
+          try { await env.DB.batch(billingStatements.slice(1)); }
+          catch (error) {
+            if (!String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
+          }
+        }
       } else {
         if (!clerkId && !legacyUid) {
           await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')

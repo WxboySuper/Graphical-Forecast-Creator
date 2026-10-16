@@ -560,6 +560,17 @@ test('snapshot migration rejects archives above automatic limits before writing 
   });
 });
 
+test('snapshot migration rejects malformed account sub-documents as a permanent migration error', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db, { uid: 'firebase_bad_uid', userProfile: { email: 'test@example.com' }, userSettings: 'malformed' });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', env);
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /could not be migrated automatically/);
+    assert.equal(db.settings.has('user_beta_test'), false);
+  });
+});
+
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
   const db = new D1Mock();
   db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
@@ -624,6 +635,16 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).get());
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run('user_sqlite', 'sqlite@example.com', '2026-10-15', '2026-10-15');
+    sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, migration_status, created_at, updated_at) VALUES (?, ?, 1, ?, ?, ?)')
+      .run('user_migrating', 'migrating@example.com', 'migrating', '2026-10-15', '2026-10-15');
+    const importCycle = sqlite.prepare(`INSERT INTO cloud_cycles
+      (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, migration_import, created_at, updated_at)
+      VALUES (?, 'user_migrating', 'cycle', '2026-10-15', '{}', '{}', 2, 1, 'created', 'updated')`);
+    for (let index = 0; index < 101; index += 1) importCycle.run(`import-${index}`);
+    const concurrentNormalWrite = sqlite.prepare(`INSERT INTO cloud_cycles
+      (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
+      VALUES ('concurrent', 'user_migrating', 'cycle', '2026-10-15', '{}', '{}', 2, 'created', 'updated')`);
+    assert.throws(() => concurrentNormalWrite.run(), /cloud_cycle_quota_reached/);
 
     const metricInsert = sqlite.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
       VALUES (?, ?, ?, ?, ?)`);
@@ -650,11 +671,11 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
         payload_json = excluded.payload_json, payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`);
     const runCycleWrite = (id, limit) => cycleWrite.run(id, 'user_sqlite', id, '2026-10-15', '{}', '{}', 2, 'created', 'updated', 'user_sqlite', id, 'user_sqlite', limit);
     runCycleWrite('cycle-1', 1);
-    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles').get().count, 1);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles WHERE user_id = ?').get('user_sqlite').count, 1);
     const noOpRetry = runCycleWrite('cycle-1', 1);
     assert.equal(noOpRetry.changes, 1);
     runCycleWrite('cycle-2', 1);
-    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles').get().count, 1);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles WHERE user_id = ?').get('user_sqlite').count, 1);
     const directCycle = sqlite.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       VALUES (?, ?, ?, ?, '{}', '{}', 2, 'created', 'updated')`);
