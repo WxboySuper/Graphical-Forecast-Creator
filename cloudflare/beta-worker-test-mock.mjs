@@ -1,3 +1,5 @@
+import { MAX_CYCLE_BYTES } from './beta-worker-utils.mjs';
+
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql.replace(/\s+/g, ' ').trim(); this.params = []; }
   bind(...params) { this.params = params; return this; }
@@ -484,7 +486,7 @@ function updateCleanupRecord(queue, params) {
 function runWorkflowMutation(db, sql, params) {
   if (!sql.includes('INTO workflow_awareness')) return UNHANDLED_QUERY;
   const [user_id, cycle_id, data_json] = params;
-  if (Buffer.byteLength(data_json) > 750_000) throw new Error('workflow_awareness_too_large');
+  if (Buffer.byteLength(data_json) > MAX_CYCLE_BYTES) throw new Error('workflow_awareness_too_large');
   db.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json, migration_import: sql.includes('migration_import') ? 1 : 0 });
   return result();
 }

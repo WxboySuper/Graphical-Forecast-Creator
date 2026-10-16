@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS custom_products (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
   slot_id TEXT NOT NULL,
   product_id TEXT NOT NULL,
+  -- Mirror MAX_CYCLE_BYTES (750000) from cloudflare/beta-worker-utils.mjs.
   data_json TEXT NOT NULL CHECK (json_valid(data_json) AND length(CAST(data_json AS BLOB)) <= 750000),
   migration_import INTEGER NOT NULL DEFAULT 0 CHECK (migration_import IN (0, 1)),
   PRIMARY KEY (user_id, slot_id),

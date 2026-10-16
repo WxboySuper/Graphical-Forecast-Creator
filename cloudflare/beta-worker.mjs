@@ -1,5 +1,5 @@
 import { createUserEnsurer, emailSnapshotKey } from './beta-user-migration.mjs';
-import { decodePathId, isObject, json, mapStripeInterval, parseJson, readLimitedBody, timingSafeStringEqual, verifyStripeSignature } from './beta-worker-utils.mjs';
+import { MAX_CYCLE_BYTES, decodePathId, isObject, json, mapStripeInterval, parseJson, readLimitedBody, timingSafeStringEqual, verifyStripeSignature } from './beta-worker-utils.mjs';
 import { proxyFirebaseApi } from './beta-worker-routing.mjs';
 import { readAdminMetrics } from './beta-admin-metrics.mjs';
 import { verifyWebhook } from '@clerk/backend/webhooks';
@@ -7,7 +7,6 @@ import { authenticate, clearAuthProfileCache } from './beta-worker-auth.mjs';
 import { handleHealthCheck, handleSentryTunnel } from './beta-worker-observability.mjs';
 
 const API_PREFIX = '/api';
-const MAX_CYCLE_BYTES = 750_000;
 const MAX_CLOUD_CYCLES = 100;
 const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_USER_RECORDS = 200;
@@ -483,7 +482,6 @@ async function reserveCustomProductSlot(env, userId, product, dataJson) {
       if (failure) return failure;
     }
   }
-  return null;
 }
 
 async function insertCustomProductSlot(env, userId, productId, dataJson) {

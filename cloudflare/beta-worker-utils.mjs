@@ -2,6 +2,9 @@ const parseJson = (value) => {
   try { return JSON.parse(value); } catch { return null; }
 };
 
+// Keep byte limits in JavaScript in one place; mirror this value in D1 CHECKs.
+const MAX_CYCLE_BYTES = 750_000;
+
 const json = (body, status = 200, headers = {}) => Response.json(body, {
   status, headers: { 'Cache-Control': 'no-store', ...headers },
 });
@@ -94,4 +97,4 @@ async function readLimitedBody(request, limit) {
   return result;
 }
 
-export { decodePathId, isObject, json, mapStripeInterval, normalizeEmail, parseJson, readBearer, readLimitedBody, sha256Hex, timingSafeStringEqual, tokenCacheKey, verifyStripeSignature };
+export { MAX_CYCLE_BYTES, decodePathId, isObject, json, mapStripeInterval, normalizeEmail, parseJson, readBearer, readLimitedBody, sha256Hex, timingSafeStringEqual, tokenCacheKey, verifyStripeSignature };

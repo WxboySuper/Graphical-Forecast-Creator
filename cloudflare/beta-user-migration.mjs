@@ -1,6 +1,5 @@
-import { isObject, normalizeEmail, sha256Hex } from './beta-worker-utils.mjs';
+import { MAX_CYCLE_BYTES, isObject, normalizeEmail, sha256Hex } from './beta-worker-utils.mjs';
 
-const MAX_CYCLE_BYTES = 750_000;
 const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_WORKFLOW_RECORDS = 200;
 const MAX_MIGRATED_CLOUD_CYCLES = 300;
@@ -345,9 +344,16 @@ async function updateClerkProfile(db, user) {
       .bind(normalizeEmail(user.email), user.displayName, new Date().toISOString(), user.clerkId).run();
   } catch (error) {
     const message = String(error?.message || '');
-    if (/UNIQUE constraint failed:\s*users\.email\b/i.test(message)) throw new Error('EMAIL_ALREADY_LINKED');
+    if (isEmailUniqueViolation(error, message)) throw new Error('EMAIL_ALREADY_LINKED');
     throw error;
   }
+}
+
+function isEmailUniqueViolation(error, message) {
+  const code = error?.code || error?.cause?.code;
+  return code === 'SQLITE_CONSTRAINT_UNIQUE'
+    || code === 'SQLITE_CONSTRAINT'
+    || /UNIQUE constraint failed:\s*users\.email\b/i.test(message);
 }
 
 async function readUserSnapshot(env, email) {
