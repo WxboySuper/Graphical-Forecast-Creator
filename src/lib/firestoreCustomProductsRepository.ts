@@ -108,6 +108,54 @@ const readBetaProducts = async (userId: string): Promise<HostedCustomProduct[]> 
   return sortProducts(products.filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
 };
 
+const scheduleBetaProductRetry = (
+  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined },
+  refresh: () => void,
+) => {
+  if (retryTimer.current !== undefined) globalThis.clearTimeout(retryTimer.current);
+  retryTimer.current = globalThis.setTimeout(() => {
+    retryTimer.current = undefined;
+    refresh();
+  }, 250);
+};
+
+const handleBetaProductSubscriptionError = (
+  error: unknown,
+  isActive: () => boolean,
+  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined },
+  refresh: () => void,
+  onError?: (error: Error) => void,
+) => {
+  if (!isActive()) return;
+  if (isBetaSessionInitializing(error)) {
+    scheduleBetaProductRetry(retryTimer, refresh);
+    return;
+  }
+  onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
+};
+
+const subscribeBetaProducts = (
+  userId: string,
+  onUpdate: (products: HostedCustomProduct[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  let active = true;
+  const retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined } = { current: undefined };
+  const refresh = () => {
+    void readBetaProducts(userId)
+      .then((products) => { if (active) onUpdate(products); })
+      .catch((error) => handleBetaProductSubscriptionError(error, () => active, retryTimer, refresh, onError));
+  };
+
+  refresh();
+  const timer = globalThis.setInterval(refresh, 15_000);
+  return () => {
+    active = false;
+    globalThis.clearInterval(timer);
+    if (retryTimer.current !== undefined) globalThis.clearTimeout(retryTimer.current);
+  };
+};
+
 const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, next: HostedCustomProduct | null): Promise<HostedCustomProduct | null> => {
   const products = await readBetaProducts(userId);
   const current = products.find((candidate) => candidate.id === expected.id);
@@ -133,22 +181,7 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
     return sortProducts((await readRecords(userId)).map(({ product }) => product));
   },
   subscribe(userId, onUpdate, onError) {
-    if (isBetaClerkD1Mode()) {
-      let active = true;
-      let retryTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
-      const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
-        if (!active) return;
-        if (isBetaSessionInitializing(error)) {
-          if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer);
-          retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
-          return;
-        }
-        onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
-      });
-      refresh().catch(() => undefined);
-      const timer = globalThis.setInterval(() => refresh().catch(() => undefined), 15_000);
-      return () => { active = false; globalThis.clearInterval(timer); if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer); };
-    }
+    if (isBetaClerkD1Mode()) return subscribeBetaProducts(userId, onUpdate, onError);
     return onSnapshot(collectionRef(userId), (snapshot) => {
       const products = snapshot.docs.map((item) => item.data()).filter((value) => ownedProduct(value, userId));
       onUpdate(sortProducts(products));
