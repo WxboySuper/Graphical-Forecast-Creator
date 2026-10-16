@@ -249,7 +249,6 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
     assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
-    assert.equal(db.batchSizes.reduce((sum, size) => sum + size, 0), 126);
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });

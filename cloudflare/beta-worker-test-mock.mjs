@@ -333,6 +333,8 @@ class D1Mock {
     } else if (sql.startsWith('DELETE FROM users')) {
       changes = Number(this.users.has(params[0]));
       this.users.delete(params[0]);
+    } else {
+      throw new Error(`Unhandled D1 mock SQL: ${sql}`);
     }
     return { meta: { changes } };
   }
