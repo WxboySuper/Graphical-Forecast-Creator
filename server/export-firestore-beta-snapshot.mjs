@@ -170,7 +170,13 @@ async function main() {
           const { label, cycleDate } = validateCycleMetadata(metadata, id);
           const rawPayload = raw.payloadJson ?? raw.payload;
           let payloadJson = '{}';
-          if (typeof rawPayload === 'string') payloadJson = rawPayload;
+          if (typeof rawPayload === 'string') {
+            payloadJson = rawPayload;
+            try { JSON.parse(payloadJson); } catch {
+              malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
+              throw new Error(`Invalid legacy cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
+            }
+          }
           else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
           account.cloudCycles.push({
             id,
@@ -219,9 +225,15 @@ async function main() {
         });
       }
     }
+    const legacyCycleIndexes = new Map(account.cloudCycles.map((cycle, index) => [cycle.id, index]));
     for (const cycle of migratedCycles) {
-      account.cloudCycles = account.cloudCycles.filter((existingCycle) => existingCycle.id !== cycle.id);
-      account.cloudCycles.push(cycle);
+      const legacyIndex = legacyCycleIndexes.get(cycle.id);
+      if (legacyIndex === undefined) {
+        legacyCycleIndexes.set(cycle.id, account.cloudCycles.length);
+        account.cloudCycles.push(cycle);
+      } else {
+        account.cloudCycles[legacyIndex] = cycle;
+      }
     }
 
     const [awareness, products] = await Promise.all([
@@ -278,7 +290,7 @@ async function main() {
       for (const [index, result] of results.entries()) {
         if (result.status === 'rejected') {
           const failedAccount = pageAccounts[offset + index];
-          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email) });
+          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email), reason: result.reason instanceof Error ? result.reason.name : 'unknown-error' });
           console.error(`Failed beta snapshot for account hash ${sha256(failedAccount.uid)}: ${result.reason?.message || 'unknown error'}`);
         }
       }

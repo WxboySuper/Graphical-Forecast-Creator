@@ -76,9 +76,19 @@ function validateSnapshotCycle(cycle) {
   assertCycleMetadata(cycle.metadata);
   const payloadJson = serializeCyclePayload(cycle.payloadJson);
   const payloadBytes = new TextEncoder().encode(payloadJson).length;
+  const now = new Date().toISOString();
   if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
   assertJsonPayload(payloadJson);
-  return { ...cycle, label, cycleDate, payloadJson, payloadBytes };
+  return {
+    ...cycle, label, cycleDate, payloadJson, payloadBytes,
+    createdAt: normalizeSnapshotTimestamp(cycle.createdAt, new Date(0).toISOString()),
+    updatedAt: normalizeSnapshotTimestamp(cycle.updatedAt, now),
+  };
+}
+
+function normalizeSnapshotTimestamp(value, fallback) {
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return fallback;
+  return value;
 }
 
 function assertCycleObject(cycle) {
@@ -192,8 +202,7 @@ function findProductSlot(index, occupied) {
 async function appendSnapshotProduct(product, index, context, state) {
   const { id, migrated, dataJson } = normalizeSnapshotProduct(product, context.user.clerkId);
   if (state.existingIds.has(id)) {
-    if (state.existingIds.get(id)) return;
-    throw new Error('SNAPSHOT_PRODUCT_ID_CONFLICT');
+    return;
   }
   context.accountForMigrationBytes(dataJson);
   const slotId = findProductSlot(index, state.occupiedSlots);
@@ -287,8 +296,12 @@ async function executeSnapshotMigration(db, user, now, statements) {
 }
 
 async function markSnapshotMigrationFailed(db, user) {
-  await db.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
-    .bind('failed', new Date().toISOString(), user.clerkId).run();
+  try {
+    await db.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
+      .bind('failed', new Date().toISOString(), user.clerkId).run();
+  } catch (error) {
+    console.error('[beta-worker] failed to record snapshot migration error', error);
+  }
 }
 
 async function applySnapshotMigration(user, env, snapshot, now) {

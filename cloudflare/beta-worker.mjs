@@ -862,14 +862,27 @@ async function ensureUserForRequest(identity, env) {
 }
 
 function migrationErrorResponse(error) {
-  if (error?.code === 'SNAPSHOT_CONFIG_MISSING') return json({ error: 'Beta snapshot storage is temporarily unavailable.' }, 503);
-  if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
-  if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
-    return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
-  }
-  if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
+  const mapped = snapshotConfigurationError(error) || linkedEmailError(error) || snapshotQuotaError(error) || snapshotDataError(error);
+  if (mapped) return mapped;
   console.error('[beta-worker] migration failed', error);
   return json({ error: 'Account data could not be migrated. Please retry later.' }, 503);
+}
+
+function snapshotConfigurationError(error) {
+  return error?.code === 'SNAPSHOT_CONFIG_MISSING' ? json({ error: 'Beta snapshot storage is temporarily unavailable.' }, 503) : null;
+}
+
+function linkedEmailError(error) {
+  return error?.message === 'EMAIL_ALREADY_LINKED' ? json({ error: 'This email is already linked to another beta account.' }, 409) : null;
+}
+
+function snapshotQuotaError(error) {
+  const quotaExceeded = /^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '');
+  return quotaExceeded ? json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409) : null;
+}
+
+function snapshotDataError(error) {
+  return /^SNAPSHOT_/.test(error?.message || '') ? json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409) : null;
 }
 
 const JSON_RECORD_TABLES = new Set(['user_settings', 'user_entitlements', 'user_metrics']);
@@ -953,12 +966,17 @@ async function handleClerkUserDeleted(userId, env) {
 
 function workerErrorResponse(error) {
   console.error('[beta-worker] request failed', error);
-  if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
-  if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
-    return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
-  }
-  if (error?.name === 'AbortError' || error?.name === 'TimeoutError') return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
-  return json({ error: 'The beta API request failed.' }, 500);
+  return authenticationError(error) || snapshotQuotaError(error) || requestTimeoutError(error) || json({ error: 'The beta API request failed.' }, 500);
+}
+
+function authenticationError(error) {
+  const unavailable = error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING';
+  return unavailable ? json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503) : null;
+}
+
+function requestTimeoutError(error) {
+  const timedOut = error?.name === 'AbortError' || error?.name === 'TimeoutError';
+  return timedOut ? json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504) : null;
 }
 
 async function handleBetaApiRequest(request, env, url) {
