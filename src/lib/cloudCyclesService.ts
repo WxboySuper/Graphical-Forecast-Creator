@@ -450,7 +450,8 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
     if (params.existingId) {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
       const body = (await response.json().catch(() => ({}))) ?? {};
-      if (!response.ok || !isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
+      if (!response.ok) return { error: body?.error || 'Unable to save cloud cycle' as const };
+      if (!isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
       const owner = body.cycle.userId ?? (isPlainObject(body.cycle.metadata) ? body.cycle.metadata.userId : undefined);
       if (owner !== params.userId) return { error: 'Cloud cycle not found' as const };
       existingMetadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;

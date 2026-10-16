@@ -23,7 +23,6 @@ export const isBetaClerkD1Mode = (): boolean => Boolean(
 
 /** Registers the active Clerk session token source for non-component data services. */
 export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): void => {
-  if (provider && tokenProvider === provider) return;
   tokenProviderGeneration += 1;
   tokenProvider = provider;
   if (!provider) {

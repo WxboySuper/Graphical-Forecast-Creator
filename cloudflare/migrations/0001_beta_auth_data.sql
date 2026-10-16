@@ -51,7 +51,8 @@ CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_user_limit
 BEFORE INSERT ON cloud_cycles
 WHEN NOT EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = NEW.user_id AND id = NEW.id)
   AND NEW.migration_import = 0
-  AND (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = NEW.user_id) >= 100
+  -- Imported history stays available without consuming the quota for new cycles.
+  AND (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = NEW.user_id AND migration_import = 0) >= 100
 BEGIN
   SELECT RAISE(ABORT, 'cloud_cycle_quota_reached');
 END;
@@ -74,7 +75,8 @@ CREATE TRIGGER IF NOT EXISTS enforce_workflow_awareness_user_limit
 BEFORE INSERT ON workflow_awareness
 WHEN NOT EXISTS (SELECT 1 FROM workflow_awareness WHERE user_id = NEW.user_id AND cycle_id = NEW.cycle_id)
   AND NEW.migration_import = 0
-  AND (SELECT COUNT(*) FROM workflow_awareness WHERE user_id = NEW.user_id) >= 200
+  -- Imported history stays available without consuming the quota for new records.
+  AND (SELECT COUNT(*) FROM workflow_awareness WHERE user_id = NEW.user_id AND migration_import = 0) >= 200
 BEGIN
   SELECT RAISE(ABORT, 'workflow_awareness_quota_reached');
 END;
@@ -93,7 +95,8 @@ CREATE TRIGGER IF NOT EXISTS enforce_custom_product_user_limit
 BEFORE INSERT ON custom_products
 WHEN NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = NEW.user_id AND product_id = NEW.product_id)
   AND NEW.migration_import = 0
-  AND (SELECT COUNT(*) FROM custom_products WHERE user_id = NEW.user_id) >= 16
+  -- Imported products stay available without consuming the quota for new products.
+  AND (SELECT COUNT(*) FROM custom_products WHERE user_id = NEW.user_id AND migration_import = 0) >= 16
 BEGIN
   SELECT RAISE(ABORT, 'custom_product_quota_reached');
 END;

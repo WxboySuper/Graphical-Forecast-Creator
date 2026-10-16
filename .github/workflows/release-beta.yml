@@ -507,6 +507,7 @@ jobs:
                 attempt=$((attempt + 1))
               done
               test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
+              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
             ' _ '{}' < beta-firestore-email-hashes.txt
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc

@@ -33,6 +33,18 @@ const sha256Hex = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
+const timingSafeStringEqual = async (left, right) => {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(left)),
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(right)),
+  ]);
+  const leftBytes = new Uint8Array(leftDigest);
+  const rightBytes = new Uint8Array(rightDigest);
+  let difference = 0;
+  for (let index = 0; index < leftBytes.length; index += 1) difference |= leftBytes[index] ^ rightBytes[index];
+  return difference === 0;
+};
 const tokenCacheKey = async (subject, token) => `${subject}:${await sha256Hex(token)}`;
 const clearAuthProfileCache = (clerkId) => {
   for (const key of authProfileCache.keys()) {
@@ -209,13 +221,16 @@ function appendSnapshotWorkflows(workflowAwareness, user, env, statements, accou
 }
 
 async function appendSnapshotProducts(customProducts, user, env, statements, accountForMigrationBytes) {
-      const occupiedProductSlots = new Set(((await env.DB.prepare('SELECT slot_id FROM custom_products WHERE user_id = ?')
-        .bind(user.clerkId).all()).results || []).map((row) => row.slot_id));
+      const existingProducts = ((await env.DB.prepare('SELECT slot_id, product_id FROM custom_products WHERE user_id = ?')
+        .bind(user.clerkId).all()).results || []);
+      const occupiedProductSlots = new Set(existingProducts.map((row) => row.slot_id));
+      const existingProductIds = new Set(existingProducts.map((row) => row.product_id));
       for (const [index, product] of customProducts.entries()) {
         if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+        if (existingProductIds.has(productId)) continue;
         migratedProduct.id = productId;
         if (migratedProduct.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
         migratedProduct.version = 1;
@@ -226,13 +241,14 @@ async function appendSnapshotProducts(customProducts, user, env, statements, acc
           .find((candidate) => !occupiedProductSlots.has(candidate));
         if (!slotId) {
           slotId = `legacy-${index + 1}`;
-          let suffix = occupiedProductSlots.size + 1;
+          let suffix = 1;
           while (occupiedProductSlots.has(slotId)) {
-            slotId = `legacy-migrated-${index + 1}-${suffix}`;
+            slotId = `legacy-${index + 1}-${suffix}`;
             suffix += 1;
           }
         }
         occupiedProductSlots.add(slotId);
+        existingProductIds.add(productId);
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
           .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
       }
@@ -294,6 +310,8 @@ async function executeSnapshotMigration(db, user, now, statements) {
     .bind('complete', now, now, user.clerkId));
   await db.prepare("UPDATE users SET migration_status = 'migrating', updated_at = ? WHERE clerk_id = ?")
     .bind(now, user.clerkId).run();
+  // D1 batches are atomic individually; imported-row writes use INSERT OR IGNORE / merge semantics,
+  // so a later sign-in can safely retry after a batch failure before the final status update runs.
   for (let offset = 0; offset < statements.length; offset += 50) await db.batch(statements.slice(offset, offset + 50));
 }
 
@@ -363,6 +381,7 @@ async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
   try {
     await insertMigratingUser(db, user, snapshot, now);
   } catch (error) {
+    if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
     const racedUser = await findClerkUser(db, user.clerkId);
     if (!racedUser) {
       await assertEmailAvailable(db, user);
@@ -539,7 +558,9 @@ async function handleAccountBootstrapAndBilling(request, env, url, path, user) {
       'subscription_data[metadata][plan]': plan,
       ...(entitlement.stripeCustomerId ? { customer: entitlement.stripeCustomerId } : {}),
     };
-    const session = await stripeRequest(env, 'checkout/sessions', params);
+    let session;
+    try { session = await stripeRequest(env, 'checkout/sessions', params); }
+    catch { return json({ error: 'Unable to start checkout with Stripe.' }, 502); }
     if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
     return json({ url: session.url });
   }
@@ -549,10 +570,13 @@ async function handleAccountBootstrapAndBilling(request, env, url, path, user) {
     if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (!entitlement?.stripeCustomerId) return json({ error: 'No billing account is associated with this user.' }, 400);
-    const portal = await stripeRequest(env, 'billing_portal/sessions', {
-      customer: entitlement.stripeCustomerId,
-      return_url: `${env.PUBLIC_ORIGIN}/account`,
-    });
+    let portal;
+    try {
+      portal = await stripeRequest(env, 'billing_portal/sessions', {
+        customer: entitlement.stripeCustomerId,
+        return_url: `${env.PUBLIC_ORIGIN}/account`,
+      });
+    } catch { return json({ error: 'Unable to open the Stripe billing portal.' }, 502); }
     if (typeof portal?.url !== 'string' || !portal.url) return json({ error: 'Stripe billing portal session did not include a URL.' }, 502);
     return json({ url: portal.url });
   }
@@ -561,7 +585,7 @@ async function handleAccountBootstrapAndBilling(request, env, url, path, user) {
     if (!user.beta_access && env.BETA_INVITE_TOKEN) {
       const body = await readBody(request);
       if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      if (!body || body.token !== env.BETA_INVITE_TOKEN || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
+      if (!body || !(await timingSafeStringEqual(body.token, env.BETA_INVITE_TOKEN)) || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
       await env.DB.prepare('UPDATE users SET beta_access = 1, updated_at = ? WHERE clerk_id = ?').bind(new Date().toISOString(), user.clerk_id).run();
     }
     const updated = await env.DB.prepare('SELECT beta_access FROM users WHERE clerk_id = ?').bind(user.clerk_id).first();
@@ -674,7 +698,7 @@ async function handleCloudCycleRoutes(request, env, url, path, user) {
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
-        OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ?) < ?
+        OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ? AND migration_import = 0) < ?
       ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
         metadata_json = json_set(excluded.metadata_json, '$.createdAt', COALESCE(json_extract(cloud_cycles.metadata_json, '$.createdAt'), json_extract(excluded.metadata_json, '$.createdAt'))),
         payload_json = excluded.payload_json,
@@ -738,7 +762,7 @@ async function handleWorkflowAwarenessRoutes(request, env, url, path, user) {
     body.record.metadata.cycleId = cycleId;
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
-    const existingCount = await env.DB.prepare('SELECT COUNT(*) AS count FROM workflow_awareness WHERE user_id = ?').bind(user.clerk_id).first();
+    const existingCount = await env.DB.prepare('SELECT COUNT(*) AS count FROM workflow_awareness WHERE user_id = ? AND migration_import = 0').bind(user.clerk_id).first();
     if (Number(existingCount?.count || 0) >= MAX_WORKFLOW_RECORDS) {
       const existing = await env.DB.prepare('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
         .bind(user.clerk_id, cycleId).first();
@@ -784,14 +808,17 @@ async function handleCustomProductRoutes(request, env, url, path, user) {
     product.id = productId;
     const dataJson = JSON.stringify(product);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Custom product is too large.' }, 413);
-    const slotValues = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
+    const slotValues = [
+      ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`),
+      ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`),
+    ].join(', ');
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slotValues})
           INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
           SELECT ?, slots.slot_id, ?, ? FROM slots
           WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
-            AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ?) < ?
+            AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
           ORDER BY slots.slot_id LIMIT 1`)
           .bind(user.clerk_id, product.id, dataJson, user.clerk_id, user.clerk_id, MAX_CUSTOM_PRODUCTS).run();
         if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
@@ -966,7 +993,6 @@ async function handleStripeWebhook(request, env) {
           billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
             .bind(`stripe:${event.id}:cancellation`, eventDate, event.id, 'cancellations', owner.clerk_id));
         }
-        await env.DB.batch(billingStatements.slice(0, 1));
         if (billingStatements.length > 1) {
           try { await env.DB.batch(billingStatements.slice(1)); }
           catch (error) {
@@ -974,6 +1000,7 @@ async function handleStripeWebhook(request, env) {
             console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
           }
         }
+        await env.DB.batch(billingStatements.slice(0, 1));
       } else {
         if (!clerkId && !legacyUid) {
           await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')

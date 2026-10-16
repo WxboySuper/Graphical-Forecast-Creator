@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import BetaAuthCard from './BetaAuthCard';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -42,7 +42,6 @@ describe('BetaAuthCard', () => {
   });
 
   afterEach(() => {
-    cleanup();
     window.history.replaceState(null, '', '/');
   });
 
@@ -135,5 +134,17 @@ describe('BetaAuthCard', () => {
     await waitFor(() => expect(window.location.hash).toBe(''));
     expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(false);
     expect(signInButton).toBeEnabled();
+  });
+
+  test('allows a sign-in-only gate to recover from a stale Clerk verification route', async () => {
+    window.history.replaceState(null, '', '/beta#/sso-callback');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
+    render(<BetaAuthCard title="T" description="D" />);
+
+    const restartButton = await screen.findByRole('button', { name: 'Restart sign-in' });
+    fireEvent.click(restartButton);
+
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
   });
 });

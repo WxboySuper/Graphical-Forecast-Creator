@@ -1502,7 +1502,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!isLoaded) return;
     setBetaApiTokenProvider(isSignedIn ? betaTokenProviderRef.current : null);
-  }, [isLoaded, isSignedIn]);
+  }, [clerkUser?.id, isLoaded, isSignedIn]);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
@@ -1524,6 +1524,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
   useEffect(() => {
     if (!(isSignedIn && clerkUser?.id && bootstrapKey !== '' && bootstrapKey !== clerkUser.id)) return;
+    betaAccessRequestIdRef.current += 1;
+    betaAccessAbortRef.current?.abort();
     settingsRequestIdRef.current += 1;
     setSettingsSyncStatus('idle');
     lastSyncedSettingsRef.current = null;
@@ -1647,9 +1649,12 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
     const decodeTokenClaims = (token: string): IdTokenResult['claims'] => {
       try {
-        const encoded = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+        let encoded = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
         if (!encoded) return {};
-        return JSON.parse(globalThis.atob(encoded)) as IdTokenResult['claims'];
+        encoded += '='.repeat((4 - (encoded.length % 4)) % 4);
+        const json = decodeURIComponent(Array.from(globalThis.atob(encoded), (character) =>
+          `%${character.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''));
+        return JSON.parse(json) as IdTokenResult['claims'];
       } catch {
         return {};
       }

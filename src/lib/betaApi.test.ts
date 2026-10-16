@@ -36,7 +36,7 @@ describe('beta Worker token provider lifecycle', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('keeps an in-flight request when the same stable provider is registered again', async () => {
+  it('invalidates an in-flight request when the stable provider is re-registered for a new account', async () => {
     let resolveToken!: (token: string) => void;
     const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
@@ -45,10 +45,8 @@ describe('beta Worker token provider lifecycle', () => {
     await Promise.resolve();
     setBetaApiTokenProvider(provider);
     resolveToken('clerk-token');
-    await expect(pending).resolves.toBeInstanceOf(Response);
-    expect(fetchSpy).toHaveBeenCalledWith('/api/user/settings', expect.objectContaining({
-      headers: expect.any(Headers),
-    }));
+    await expect(pending).rejects.toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('shares one bounded token wait and stops polling when aborted', async () => {

@@ -169,6 +169,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [clerkVerificationInProgress, setClerkVerificationInProgress] = useState(false);
+  const [clerkRoutingInProgress, setClerkRoutingInProgress] = useState(false);
   const isBusy = submitting || status === 'loading';
   const clerkRedirectUrl = typeof window === 'undefined' ? undefined : (() => {
     const nextUrl = new URL(window.location.href);
@@ -185,8 +186,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     if (authProvider !== 'clerk' || typeof window === 'undefined') return;
     const syncVerificationState = () => {
       const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-      const verificationSegments = new Set(['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback']);
-      setClerkVerificationInProgress(segments.some((segment) => verificationSegments.has(segment.toLowerCase())));
+      const routeSegments = new Set(['sign-in', 'sign-up', 'forgot-password', 'reset-password', 'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback', 'choose']);
+      const normalizedSegments = segments.map((segment) => segment.toLowerCase());
+      setClerkRoutingInProgress(normalizedSegments.some((segment) => routeSegments.has(segment)));
+      setClerkVerificationInProgress(normalizedSegments.some((segment) => ['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback'].includes(segment)));
     };
     syncVerificationState();
     window.addEventListener('hashchange', syncVerificationState);
@@ -220,7 +223,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const setClerkMode = (nextMode: AuthMode) => {
     if (nextMode === mode) return;
     if (typeof window === 'undefined') return;
-    if (clerkVerificationInProgress) return;
+    if (clerkRoutingInProgress) return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
@@ -297,15 +300,15 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy || clerkVerificationInProgress} aria-pressed={mode === 'sign_in'}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_in'}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy || clerkVerificationInProgress} aria-pressed={mode === 'sign_up'}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_up'}>
                 Create account
               </Button>
             </div>
           ) : null}
-          {allowSignUp && clerkVerificationInProgress ? (
+          {clerkVerificationInProgress ? (
             <div className="text-sm text-muted-foreground">
               <p role="status">Finish verification before switching account actions.</p>
               <Button type="button" variant="outline" onClick={restartClerkVerification}>Restart sign-in</Button>

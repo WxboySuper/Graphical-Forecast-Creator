@@ -188,6 +188,8 @@ async function main() {
         if (typeof payloadJson !== 'string') {
           throw new Error(`Missing cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`);
         }
+        try { JSON.parse(payloadJson); }
+        catch { throw new Error(`Invalid cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`); }
         const normalizedPayload = payloadJson;
         migratedCycles.push({
           id: cycleDoc.id,

@@ -47,9 +47,7 @@ class D1Mock {
   prepare(sql) { return new D1Statement(this, sql); }
   async batch(statements) {
     this.batchSizes.push(statements.length);
-    const results = [];
-    for (const statement of statements) results.push(await statement.run());
-    return results;
+    return Promise.all(statements.map((statement) => statement.run()));
   }
   async first(sql, params) {
     if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return this.users.get(params[0]) || null;
@@ -83,11 +81,11 @@ class D1Mock {
       return this.cloudCycles.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
     }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM cloud_cycles')) {
-      return { count: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0]).length };
+      return { count: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
     }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM users')) return { count: this.users.size };
     if (sql.startsWith('SELECT COUNT(*) AS count FROM workflow_awareness')) {
-      return { count: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0]).length };
+      return { count: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
     }
     if (sql.startsWith('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')) {
       return this.workflowAwareness.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
@@ -113,8 +111,8 @@ class D1Mock {
       date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
       signups: 1, signIns: 2, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
     }] };
-    if (sql.startsWith('SELECT slot_id FROM custom_products WHERE user_id = ?')) {
-      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map((row) => ({ slot_id: row.slot_id })) };
+    if (sql.startsWith('SELECT slot_id, product_id FROM custom_products WHERE user_id = ?')) {
+      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map(({ slot_id, product_id }) => ({ slot_id, product_id })) };
     }
     if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records')) {
       const [, userId, type] = [null, params[0], params[1]];
@@ -175,7 +173,10 @@ class D1Mock {
         this.settings.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
       } else if (!this.settings.has(params[0])) this.settings.set(params[0], params[1]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO user_entitlements') || sql.startsWith('INSERT INTO user_entitlements')) {
-      if (sql.includes('ON CONFLICT') || !this.entitlements.has(params[0])) this.entitlements.set(params[0], params[1]);
+      if (sql.includes('json_patch')) {
+        const existing = JSON.parse(this.entitlements.get(params[0]) || '{}');
+        this.entitlements.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
+      } else if (sql.includes('ON CONFLICT') || !this.entitlements.has(params[0])) this.entitlements.set(params[0], params[1]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO user_metrics') || sql.startsWith('INSERT INTO user_metrics')) {
       if (sql.includes('ON CONFLICT')) {
         const existing = JSON.parse(this.metrics.get(params[0]) || '{}');
@@ -186,7 +187,7 @@ class D1Mock {
       const key = `${user_id}:${id}`;
       const exists = this.cloudCycles.has(key);
       const limit = sql.includes('SELECT ?') ? params.at(-1) : Number.MAX_SAFE_INTEGER;
-      const count = [...this.cloudCycles.values()].filter((row) => row.user_id === user_id).length;
+      const count = [...this.cloudCycles.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length;
       if (sql.includes('SELECT ?') && !exists && count >= limit) return { meta: { changes: 0 } };
       if (!sql.startsWith('INSERT OR IGNORE') || !exists) {
         const previous = this.cloudCycles.get(key);
@@ -194,6 +195,7 @@ class D1Mock {
         const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
         if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
         this.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
+          migration_import: sql.includes('migration_import') ? 1 : previous?.migration_import || 0,
           created_at: previous?.created_at || created_at, updated_at });
       }
     } else if (sql.startsWith('UPDATE cloud_cycles SET label')) {
@@ -237,7 +239,7 @@ class D1Mock {
       this.billingCleanupQueue.delete(params[0]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO workflow_awareness') || sql.startsWith('INSERT INTO workflow_awareness')) {
       const [user_id, cycle_id, data_json] = params;
-      this.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json });
+      this.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json, migration_import: sql.includes('migration_import') ? 1 : 0 });
     } else if (sql.startsWith('WITH slots(slot_id) AS (VALUES')) {
       const [user_id, product_id, data_json] = params;
       if (this.failNextCustomProductSlotInsert) {
@@ -247,14 +249,17 @@ class D1Mock {
       if ([...this.customProducts.values()].some((row) => row.user_id === user_id && row.product_id === product_id)) {
         throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.product_id');
       }
-      if ([...this.customProducts.values()].filter((row) => row.user_id === user_id).length >= params.at(-1)) return { meta: { changes: 0 } };
-      const slotId = Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`)
+      if ([...this.customProducts.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length >= params.at(-1)) return { meta: { changes: 0 } };
+      const slotId = [
+        ...Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`),
+        ...Array.from({ length: 16 }, (_, index) => `active-${String(index + 1).padStart(2, '0')}`),
+      ]
         .find((candidate) => !this.customProducts.has(`${user_id}:${candidate}`));
       if (!slotId) return { meta: { changes: 0 } };
       this.customProducts.set(`${user_id}:${slotId}`, { user_id, slot_id: slotId, product_id, data_json });
     } else if (sql.startsWith('INSERT OR IGNORE INTO custom_products')) {
       const [user_id, slot_id, product_id, data_json] = params;
-      this.customProducts.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json });
+       this.customProducts.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json, migration_import: 1 });
     } else if (sql.startsWith('UPDATE custom_products SET data_json')) {
       const [data_json, user_id, slot_id, product_id, expectedVersion] = params;
       const row = this.customProducts.get(`${user_id}:${slot_id}`);
@@ -536,7 +541,8 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });
-    assert.equal(overQuota.status, 409);
+    assert.equal(overQuota.status, 200);
+    assert.equal(db.customProducts.size, 21);
   });
 });
 
@@ -675,7 +681,10 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     const concurrentNormalWrite = sqlite.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       VALUES ('concurrent', 'user_migrating', 'cycle', '2026-10-15', '{}', '{}', 2, 'created', 'updated')`);
-    assert.throws(() => concurrentNormalWrite.run(), /cloud_cycle_quota_reached/);
+    assert.doesNotThrow(() => concurrentNormalWrite.run());
+    const activeCycleWrite = sqlite.prepare("INSERT INTO cloud_cycles (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at) VALUES (?, 'user_migrating', 'cycle', '2026-10-15', '{}', '{}', 2, 'created', 'updated')");
+    for (let index = 0; index < 99; index += 1) activeCycleWrite.run(`active-${index}`);
+    assert.throws(() => activeCycleWrite.run('active-over-limit'), /cloud_cycle_quota_reached/);
 
     const metricInsert = sqlite.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
       VALUES (?, ?, ?, ?, ?)`);
@@ -696,7 +705,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
-        OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ?) < ?
+        OR (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = ? AND migration_import = 0) < ?
       ON CONFLICT(user_id, id) DO UPDATE SET label = excluded.label, cycle_date = excluded.cycle_date,
         metadata_json = json_set(excluded.metadata_json, '$.createdAt', COALESCE(json_extract(cloud_cycles.metadata_json, '$.createdAt'), json_extract(excluded.metadata_json, '$.createdAt'))),
         payload_json = excluded.payload_json, payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`);
@@ -719,7 +728,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
       SELECT ?, slots.slot_id, ?, ? FROM slots
       WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
-        AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ?) < ?
+        AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
       ORDER BY slots.slot_id LIMIT 1`);
     insertSlot.run('user_sqlite', 'one', '{}', 'user_sqlite', 'user_sqlite', 2);
     insertSlot.run('user_sqlite', 'two', '{}', 'user_sqlite', 'user_sqlite', 2);
