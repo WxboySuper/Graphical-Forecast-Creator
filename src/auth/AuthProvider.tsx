@@ -10,7 +10,6 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
-  type IdTokenResult,
   type User,
 } from 'firebase/auth';
 import {
@@ -23,7 +22,7 @@ import {
 } from 'firebase/firestore';
 import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings, initialState as defaultOverlaySettings } from '../store/overlaysSlice';
+import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
