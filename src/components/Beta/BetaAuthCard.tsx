@@ -228,6 +228,15 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     setMode(nextMode);
   };
 
+  const restartClerkVerification = () => {
+    if (typeof window === 'undefined') return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.hash = '';
+    window.history.replaceState(null, '', nextUrl.href);
+    setClerkVerificationInProgress(false);
+    setMode('sign_in');
+  };
+
   /** Submits the email/password form in either sign-in or sign-up mode. */
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -294,7 +303,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
             </div>
           ) : null}
           {allowSignUp && clerkVerificationInProgress ? (
-            <p role="status" className="text-sm text-muted-foreground">Finish verification before switching account actions.</p>
+            <div className="text-sm text-muted-foreground">
+              <p role="status">Finish verification before switching account actions.</p>
+              <Button type="button" variant="outline" onClick={restartClerkVerification}>Restart sign-in</Button>
+            </div>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />

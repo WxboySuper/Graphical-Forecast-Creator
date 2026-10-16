@@ -5,7 +5,7 @@ describe('productMetrics extra', () => {
     jest.resetModules();
     jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: false }));
 
-    const fetchMock: FetchMock = jest.fn(() => Promise.resolve({ ok: true }));
+    const fetchMock = jest.fn(() => Promise.resolve({ ok: true })) as unknown as FetchMock;
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     window.localStorage.removeItem('gfcInstallationId');
 

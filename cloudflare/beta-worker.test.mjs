@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac, generateKeyPairSync, sign } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { DatabaseSync } from 'node:sqlite';
-import worker, { __test } from './beta-worker.mjs';
+import worker, { __test, MAX_PRODUCT_METRIC_DAILY_EVENTS } from './beta-worker.mjs';
 import { verifyToken } from '@clerk/backend';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -38,6 +38,7 @@ class D1Mock {
     this.cloudCycles = new Map();
     this.workflowAwareness = new Map();
     this.customProducts = new Map();
+    this.failNextCustomProductSlotInsert = false;
     this.stripeEvents = new Map();
     this.metricEvents = new Set();
     this.billingCleanupQueue = new Map();
@@ -239,6 +240,10 @@ class D1Mock {
       this.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json });
     } else if (sql.startsWith('WITH slots(slot_id) AS (VALUES')) {
       const [user_id, product_id, data_json] = params;
+      if (this.failNextCustomProductSlotInsert) {
+        this.failNextCustomProductSlotInsert = false;
+        throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.slot_id');
+      }
       if ([...this.customProducts.values()].some((row) => row.user_id === user_id && row.product_id === product_id)) {
         throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.product_id');
       }
@@ -346,7 +351,10 @@ test('the Worker serves health and public billing configuration without a user s
   const unavailable = createEnv({ prepare: () => ({ first: async () => { throw new Error('no migrated schema'); } }) });
   const unhealthy = await worker.fetch(new Request('https://beta.gfcweather.com/api/health'), unavailable);
   assert.equal(unhealthy.status, 503);
-  assert.equal((await unhealthy.json()).database, false);
+  assert.deepStrictEqual(await unhealthy.json(), { status: 'error', service: 'gfc-beta-worker', database: false });
+  const missingDatabase = await worker.fetch(new Request('https://beta.gfcweather.com/api/health'), { ...createEnv(), DB: undefined });
+  assert.equal(missingDatabase.status, 503);
+  assert.equal((await missingDatabase.json()).status, 'error');
 });
 
 test('authentication rejects signed sessions when no authorized party is configured', async () => {
@@ -449,6 +457,8 @@ test('first verified Clerk request migrates matching snapshot settings and owner
     assert.equal(body.user.migrationStatus, 'complete');
     assert.equal(body.settings.darkMode, true);
     assert.equal(body.entitlement.uid, 'user_beta_test');
+    assert.equal(body.entitlement.premiumActive, false);
+    assert.equal(body.entitlement.billingStatus, 'inactive');
     assert.equal(body.metrics.uid, 'user_beta_test');
     assert.equal(db.users.get('user_beta_test').legacy_uid, 'firebase_old_uid');
   });
@@ -503,7 +513,7 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
 test('snapshot migration preserves cycles and products beyond new-account quotas in bounded batches', async () => {
   const db = new D1Mock();
   const env = createEnv(db, {
-    cloudCycles: Array.from({ length: 105 }, (_, index) => ({ id: `cycle-${index}`, payloadJson: '{}', metadata: {} })),
+    cloudCycles: Array.from({ length: 105 }, (_, index) => ({ id: `cycle-${index}`, label: `Cycle ${index}`, cycleDate: '2026-10-15', payloadJson: '{}', metadata: {} })),
     customProducts: Array.from({ length: 20 }, (_, index) => ({ id: `legacy-${index}`, data: { id: `product-${index}`, version: 1 } })),
   });
   await withClerkFetch(async () => {
@@ -571,6 +581,19 @@ test('snapshot migration rejects malformed account sub-documents as a permanent 
   });
 });
 
+test('snapshot migration rejects cycle fields that fail the API schema', async () => {
+  const env = createEnv(new D1Mock(), {
+    userProfile: { email: 'test@example.com' }, userSettings: {},
+    cloudCycles: [{ id: 'cycle-bad-label', label: { text: 'bad' }, cycleDate: '2026-10-15', payloadJson: '{}', metadata: {} }],
+    workflowAwareness: [], customProducts: [],
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', env);
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /could not be migrated automatically/);
+  });
+});
+
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
   const db = new D1Mock();
   db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
@@ -624,7 +647,8 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
     ]);
     sqlite.exec(schema);
-    for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200], ['MAX_WORKFLOW_RECORDS', 200]]) {
+    assert.equal(MAX_PRODUCT_METRIC_DAILY_EVENTS, 500);
+    for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200], ['MAX_WORKFLOW_RECORDS', 200], ['MAX_PRODUCT_METRIC_DAILY_EVENTS', MAX_PRODUCT_METRIC_DAILY_EVENTS]]) {
       assert.match(workerSource, new RegExp(`const ${constant} = ${limit};`));
       assert.ok(schema.includes(`>= ${limit}`), `${constant} SQL quota should remain ${limit}`);
     }
@@ -681,6 +705,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       VALUES (?, ?, ?, ?, '{}', '{}', 2, 'created', 'updated')`);
     for (let index = 1; index < 100; index += 1) directCycle.run(`cycle-${index + 1}`, 'user_sqlite', 'cycle', '2026-10-15');
     assert.throws(() => directCycle.run('cycle-over-limit', 'user_sqlite', 'cycle', '2026-10-15'), /cloud_cycle_quota_reached/);
+    assert.throws(() => sqlite.prepare('UPDATE cloud_cycles SET payload_bytes = ? WHERE user_id = ? AND id = ?').run(750001, 'user_sqlite', 'cycle-1'), /cloud_cycle_too_large/);
 
     const slots = Array.from({ length: 2 }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
     const insertSlot = sqlite.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
@@ -792,6 +817,18 @@ test('custom products validate IDs and support account-scoped CRUD with version 
     const remove = await call('/api/custom-products/product-1', env, { method: 'DELETE', body: { expectedVersion: 2 } });
     assert.equal(remove.status, 200);
     assert.equal(db.customProducts.size, 0);
+  });
+});
+
+test('custom product creation retries a concurrent slot collision', async () => {
+  const db = new D1Mock();
+  db.failNextCustomProductSlotInsert = true;
+  await withClerkFetch(async () => {
+    const response = await call('/api/custom-products', createEnv(db), { method: 'POST', body: {
+      product: { id: 'race-product', userId: 'user_beta_test', version: 1 },
+    } });
+    assert.equal(response.status, 200);
+    assert.equal(db.customProducts.get('user_beta_test:product-01')?.product_id, 'race-product');
   });
 });
 
@@ -1013,8 +1050,8 @@ test('Stripe webhook retries when Clerk rejects a temporary or misconfigured loo
     const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
       method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
     }), env);
-    assert.equal(response.status, 503);
-    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), false);
+    assert.equal(response.status, 500);
+    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), true);
   } finally { globalThis.fetch = originalFetch; }
 });
 

@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS cloud_cycles (
   cycle_date TEXT NOT NULL,
   metadata_json TEXT NOT NULL CHECK (json_valid(metadata_json)),
   payload_json TEXT NOT NULL CHECK (json_valid(payload_json)),
-  payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0),
+  -- Keep the 750000-byte ceiling synchronized with MAX_CYCLE_BYTES in beta-worker.mjs.
+  payload_bytes INTEGER NOT NULL CHECK (payload_bytes >= 0 AND payload_bytes <= 750000),
   migration_import INTEGER NOT NULL DEFAULT 0 CHECK (migration_import IN (0, 1)),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -53,6 +54,12 @@ WHEN NOT EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = NEW.user_id AND id =
   AND (SELECT COUNT(*) FROM cloud_cycles WHERE user_id = NEW.user_id) >= 100
 BEGIN
   SELECT RAISE(ABORT, 'cloud_cycle_quota_reached');
+END;
+CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_payload_update_limit
+BEFORE UPDATE OF payload_bytes ON cloud_cycles
+WHEN NEW.payload_bytes > 750000
+BEGIN
+  SELECT RAISE(ABORT, 'cloud_cycle_too_large');
 END;
 
 CREATE TABLE IF NOT EXISTS workflow_awareness (
@@ -118,6 +125,7 @@ CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric
 CREATE INDEX IF NOT EXISTS product_metric_events_user_idx ON product_metric_events(user_id);
 CREATE INDEX IF NOT EXISTS product_metric_events_reporting_idx ON product_metric_events(event_date, event_type, installation_id);
 -- Limit event growth to 500 per account per day.
+-- Keep this quota synchronized with MAX_PRODUCT_METRIC_DAILY_EVENTS in beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_product_metric_daily_user_limit
 BEFORE INSERT ON product_metric_events
 WHEN (SELECT COUNT(*) FROM product_metric_events WHERE user_id = NEW.user_id AND event_date = NEW.event_date) >= 500

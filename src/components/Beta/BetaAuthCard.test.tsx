@@ -14,6 +14,12 @@ jest.mock('lucide-react', () => ({
   Mail: () => <div data-testid="mail-icon" />,
 }));
 
+jest.mock('@clerk/react', () => ({
+  GoogleOneTap: () => <div data-testid="clerk-google-one-tap" />,
+  SignIn: () => <div data-testid="clerk-sign-in" />,
+  SignUp: () => <div data-testid="clerk-sign-up" />,
+}));
+
 describe('BetaAuthCard', () => {
   const signInWithEmail = jest.fn();
   const signInWithGoogle = jest.fn();
@@ -110,5 +116,18 @@ describe('BetaAuthCard', () => {
     });
     render(<BetaAuthCard title="T" description="D" />);
     expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+  });
+
+  test('lets a user restart when Clerk verification hash is stale', async () => {
+    window.history.replaceState(null, '', '/beta#/verify-email-address');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
+    render(<BetaAuthCard title="T" description="D" allowSignUp />);
+
+    const signInButton = screen.getByRole('button', { name: 'Sign in' });
+    expect(signInButton).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Restart sign-in' }));
+
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(signInButton).toBeEnabled();
   });
 });

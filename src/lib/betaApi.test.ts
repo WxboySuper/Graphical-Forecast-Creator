@@ -36,6 +36,21 @@ describe('beta Worker token provider lifecycle', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps an in-flight request when the same stable provider is registered again', async () => {
+    let resolveToken!: (token: string) => void;
+    const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    setBetaApiTokenProvider(provider);
+    const pending = fetchBetaApi('/api/user/settings');
+    await Promise.resolve();
+    setBetaApiTokenProvider(provider);
+    resolveToken('clerk-token');
+    await expect(pending).resolves.toBeInstanceOf(Response);
+    expect(fetchSpy).toHaveBeenCalledWith('/api/user/settings', expect.objectContaining({
+      headers: expect.any(Headers),
+    }));
+  });
+
   it('shares one bounded token wait and stops polling when aborted', async () => {
     jest.useFakeTimers();
     const provider = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('clerk-token');
