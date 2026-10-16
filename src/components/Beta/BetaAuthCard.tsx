@@ -6,6 +6,16 @@ import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
 import { BetaInfoCard } from './BetaPageLayout';
 
+const CLERK_ROUTING_SEGMENTS = new Set([
+  'sign-in', 'sign-up', 'forgot-password', 'reset-password', 'choose',
+  'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
+  'email-code', 'phone-code', 'sso-callback',
+]);
+const CLERK_VERIFICATION_SEGMENTS = new Set([
+  'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
+  'email-code', 'phone-code', 'sso-callback',
+]);
+
 type AuthMode = 'sign_in' | 'sign_up';
 
 interface BetaAuthCardProps {
@@ -185,11 +195,9 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   useEffect(() => {
     if (authProvider !== 'clerk' || typeof window === 'undefined') return;
     const syncVerificationState = () => {
-      const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
-      const routeSegments = new Set(['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback']);
-      const normalizedSegments = segments.map((segment) => segment.toLowerCase());
-      setClerkRoutingInProgress(normalizedSegments.some((segment) => routeSegments.has(segment)));
-      setClerkVerificationInProgress(normalizedSegments.some((segment) => ['verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two', 'email-code', 'phone-code', 'sso-callback'].includes(segment)));
+      const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map((segment) => segment.toLowerCase());
+      setClerkRoutingInProgress(segments.some((segment) => CLERK_ROUTING_SEGMENTS.has(segment)));
+      setClerkVerificationInProgress(segments.some((segment) => CLERK_VERIFICATION_SEGMENTS.has(segment)));
     };
     syncVerificationState();
     window.addEventListener('hashchange', syncVerificationState);
@@ -236,10 +244,9 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     if (typeof window === 'undefined') return;
     const nextUrl = new URL(window.location.href);
     nextUrl.hash = '';
-    nextUrl.searchParams.delete('clerkSignUp');
     window.history.replaceState(null, '', nextUrl.href);
     setClerkVerificationInProgress(false);
-    setMode('sign_in');
+    setMode(nextUrl.searchParams.has('clerkSignUp') ? 'sign_up' : 'sign_in');
     try { window.dispatchEvent(new Event('hashchange')); } catch { /* Local state is already reset. */ }
   };
 

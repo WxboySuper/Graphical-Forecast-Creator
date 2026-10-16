@@ -68,6 +68,20 @@ WHEN NEW.payload_bytes > 750000
 BEGIN
   SELECT RAISE(ABORT, 'cloud_cycle_too_large');
 END;
+CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_payload_json_insert_limit
+BEFORE INSERT ON cloud_cycles
+WHEN length(CAST(NEW.payload_json AS BLOB)) > 750000
+  OR NEW.payload_bytes != length(CAST(NEW.payload_json AS BLOB))
+BEGIN
+  SELECT RAISE(ABORT, 'cloud_cycle_too_large');
+END;
+CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_payload_json_update_limit
+BEFORE UPDATE OF payload_json, payload_bytes ON cloud_cycles
+WHEN length(CAST(NEW.payload_json AS BLOB)) > 750000
+  OR NEW.payload_bytes != length(CAST(NEW.payload_json AS BLOB))
+BEGIN
+  SELECT RAISE(ABORT, 'cloud_cycle_too_large');
+END;
 
 CREATE TABLE IF NOT EXISTS workflow_awareness (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
@@ -91,7 +105,7 @@ CREATE TABLE IF NOT EXISTS custom_products (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,
   slot_id TEXT NOT NULL,
   product_id TEXT NOT NULL,
-  data_json TEXT NOT NULL CHECK (json_valid(data_json)),
+  data_json TEXT NOT NULL CHECK (json_valid(data_json) AND length(CAST(data_json AS BLOB)) <= 750000),
   migration_import INTEGER NOT NULL DEFAULT 0 CHECK (migration_import IN (0, 1)),
   PRIMARY KEY (user_id, slot_id),
   UNIQUE (user_id, product_id)
@@ -122,6 +136,7 @@ CREATE TABLE IF NOT EXISTS billing_cleanup_queue (
   last_error TEXT
 );
 CREATE INDEX IF NOT EXISTS billing_cleanup_queue_next_attempt_idx ON billing_cleanup_queue(next_attempt_at);
+CREATE INDEX IF NOT EXISTS billing_cleanup_queue_due_order_idx ON billing_cleanup_queue(next_attempt_at, created_at);
 
 CREATE TABLE IF NOT EXISTS product_metric_events (
   event_id TEXT PRIMARY KEY,

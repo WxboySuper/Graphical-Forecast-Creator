@@ -32,6 +32,7 @@ describe('BetaAuthCard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    window.history.replaceState(null, '', '/');
     (useAuth as jest.Mock).mockReturnValue({
       status: 'signed_out',
       error: null,
@@ -132,7 +133,8 @@ describe('BetaAuthCard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restart sign-in' }));
 
     await waitFor(() => expect(window.location.hash).toBe(''));
-    expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(false);
+    expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(true);
+    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
     expect(signInButton).toBeEnabled();
   });
 

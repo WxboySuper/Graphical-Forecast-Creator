@@ -26,6 +26,101 @@ const serializeFirestoreValue = (value) => {
   return value;
 };
 
+function validateCycleMetadata(metadata, cycleId, uid, malformedLegacyCycles) {
+  const label = typeof metadata?.label === 'string' ? metadata.label.trim() : '';
+  const cycleDate = typeof metadata?.cycleDate === 'string' ? metadata.cycleDate : '';
+  if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) {
+    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(cycleId) });
+    throw new Error(`Invalid cycle label or date for account hash ${sha256(uid)} cycle hash ${sha256(cycleId)}.`);
+  }
+  return { label, cycleDate };
+}
+
+function parseLegacyCloudCycles(legacyValue, uid, malformedLegacyCycles) {
+  if (legacyValue === undefined || legacyValue === null) return null;
+  let legacy = legacyValue;
+  if (typeof legacyValue === 'string') {
+    try { legacy = JSON.parse(legacyValue); }
+    catch { throw new Error(`Unparseable legacy cloudCycles for account hash ${sha256(uid)}.`); }
+  }
+  if (!legacy || typeof legacy !== 'object' || Array.isArray(legacy)) {
+    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256('cloudCycles') });
+    throw new Error(`Malformed legacy cloudCycles for account hash ${sha256(uid)}.`);
+  }
+  return legacy;
+}
+
+function normalizeLegacyCloudCycle(id, raw, uid, malformedLegacyCycles) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)
+    || (raw.metadata !== undefined && (!raw.metadata || typeof raw.metadata !== 'object' || Array.isArray(raw.metadata)))) {
+    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
+    throw new Error(`Malformed legacy cycle for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
+  }
+  const metadata = raw.metadata ?? raw;
+  const { label, cycleDate } = validateCycleMetadata(metadata, id, uid, malformedLegacyCycles);
+  const rawPayload = raw.payloadJson ?? raw.payload;
+  let payloadJson = '{}';
+  if (typeof rawPayload === 'string') {
+    payloadJson = rawPayload;
+    try { JSON.parse(payloadJson); }
+    catch {
+      malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
+      throw new Error(`Invalid legacy cycle payload for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
+    }
+  } else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
+  return {
+    id, label, cycleDate, metadata, payloadJson, payloadBytes: Buffer.byteLength(payloadJson),
+    createdAt: metadata.createdAt || new Date(0).toISOString(),
+    updatedAt: metadata.updatedAt || metadata.createdAt || new Date(0).toISOString(),
+  };
+}
+
+function readLegacyCloudCycles(account, malformedLegacyCycles) {
+  const cycles = parseLegacyCloudCycles(account.userSettings?.cloudCycles, account.uid, malformedLegacyCycles);
+  if (!cycles) return;
+  for (const [id, raw] of Object.entries(cycles)) {
+    account.cloudCycles.push(normalizeLegacyCloudCycle(id, raw, account.uid, malformedLegacyCycles));
+  }
+}
+
+async function readCloudCyclePage(account, cycleDocs, malformedLegacyCycles) {
+  const migratedCycles = [];
+  for (let offset = 0; offset < cycleDocs.length; offset += 10) {
+    const cycleBatch = cycleDocs.slice(offset, offset + 10);
+    const payloadDocs = await Promise.all(cycleBatch.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
+    for (const [index, cycleDoc] of cycleBatch.entries()) {
+      const metadata = cycleDoc.data();
+      const { label, cycleDate } = validateCycleMetadata(metadata, cycleDoc.id, account.uid, malformedLegacyCycles);
+      const payloadDoc = payloadDocs[index];
+      const payloadValue = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
+      const payloadJson = typeof payloadValue === 'string' ? payloadValue
+        : payloadValue !== null && payloadValue !== undefined ? JSON.stringify(payloadValue) : null;
+      if (typeof payloadJson !== 'string') {
+        throw new Error(`Missing cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`);
+      }
+      try { JSON.parse(payloadJson); }
+      catch { throw new Error(`Invalid cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`); }
+      migratedCycles.push({
+        id: cycleDoc.id, label, cycleDate, metadata, payloadJson, payloadBytes: Buffer.byteLength(payloadJson),
+        createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
+        updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
+      });
+    }
+  }
+  return migratedCycles;
+}
+
+function mergeMigratedCloudCycles(account, migratedCycles) {
+  const legacyCycleIndexes = new Map(account.cloudCycles.map((cycle, index) => [cycle.id, index]));
+  for (const cycle of migratedCycles) {
+    const legacyIndex = legacyCycleIndexes.get(cycle.id);
+    if (legacyIndex === undefined) {
+      legacyCycleIndexes.set(cycle.id, account.cloudCycles.length);
+      account.cloudCycles.push(cycle);
+    } else account.cloudCycles[legacyIndex] = cycle;
+  }
+}
+
 const readArguments = () => {
   const args = process.argv.slice(2);
   const outputAt = args.indexOf('--output');
@@ -100,18 +195,16 @@ async function main() {
   const exportCollection = async (collectionRef) => {
     fullSnapshotCount += await exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection);
   };
-  const readAllDocuments = async (query) => {
-    const documents = [];
+  const forEachDocumentPage = async (query, visitPage) => {
     let cursor = null;
     while (true) {
       let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
-      documents.push(...page.docs);
+      await visitPage(page.docs);
       if (page.docs.length < 500) break;
       cursor = page.docs.at(-1);
     }
-    return documents;
   };
   try {
     for (const collection of await db.listCollections()) await exportCollection(collection);
@@ -131,15 +224,6 @@ async function main() {
   const accountFailures = [];
   const malformedLegacyCycles = [];
   const migrateAccount = async (account) => {
-    const validateCycleMetadata = (metadata, cycleId) => {
-      const label = typeof metadata?.label === 'string' ? metadata.label.trim() : '';
-      const cycleDate = typeof metadata?.cycleDate === 'string' ? metadata.cycleDate : '';
-      if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) {
-        malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(cycleId) });
-        throw new Error(`Invalid cycle label or date for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleId)}.`);
-      }
-      return { label, cycleDate };
-    };
     const [settingsDoc, entitlementDoc, metricsDoc] = await Promise.all([
       db.collection('userSettings').doc(account.uid).get(),
       db.collection('userEntitlements').doc(account.uid).get(),
@@ -148,100 +232,21 @@ async function main() {
     if (settingsDoc.exists) account.userSettings = settingsDoc.data();
     if (entitlementDoc.exists) account.userEntitlement = entitlementDoc.data();
     if (metricsDoc.exists) account.userMetrics = metricsDoc.data();
-    const legacyValue = account.userSettings?.cloudCycles;
-    if (legacyValue !== undefined && legacyValue !== null) {
-      let legacy = legacyValue;
-      if (typeof legacyValue === 'string') {
-        try { legacy = JSON.parse(legacyValue); } catch {
-          throw new Error(`Unparseable legacy cloudCycles for account hash ${sha256(account.uid)}.`);
-        }
-      }
-      if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
-        for (const [id, raw] of Object.entries(legacy)) {
-          if (!raw || typeof raw !== 'object') {
-            malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
-            throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
-          }
-          if (raw.metadata !== undefined && (!raw.metadata || typeof raw.metadata !== 'object' || Array.isArray(raw.metadata))) {
-            malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
-            throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
-          }
-          const metadata = raw.metadata ?? raw;
-          const { label, cycleDate } = validateCycleMetadata(metadata, id);
-          const rawPayload = raw.payloadJson ?? raw.payload;
-          let payloadJson = '{}';
-          if (typeof rawPayload === 'string') {
-            payloadJson = rawPayload;
-            try { JSON.parse(payloadJson); } catch {
-              malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
-              throw new Error(`Invalid legacy cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
-            }
-          }
-          else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
-          account.cloudCycles.push({
-            id,
-            label,
-            cycleDate,
-            metadata,
-            payloadJson,
-            payloadBytes: Buffer.byteLength(payloadJson),
-            createdAt: metadata.createdAt || new Date(0).toISOString(),
-            updatedAt: metadata.updatedAt || metadata.createdAt || new Date(0).toISOString(),
-          });
-        }
-      } else {
-        malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256('cloudCycles') });
-        throw new Error(`Malformed legacy cloudCycles for account hash ${sha256(account.uid)}.`);
-      }
-    }
-    const cycleDocs = await readAllDocuments(db.collection('cloudCycles').where('userId', '==', account.uid));
+    readLegacyCloudCycles(account, malformedLegacyCycles);
     const migratedCycles = [];
-    for (let offset = 0; offset < cycleDocs.length; offset += 10) {
-      const cycleBatch = cycleDocs.slice(offset, offset + 10);
-      const payloadDocs = await Promise.all(cycleBatch.map((cycleDoc) => cycleDoc.ref.collection('payload').doc('payload').get()));
-      for (const [index, cycleDoc] of cycleBatch.entries()) {
-        const metadata = cycleDoc.data();
-        const { label, cycleDate } = validateCycleMetadata(metadata, cycleDoc.id);
-        const payloadDoc = payloadDocs[index];
-        const payloadValue = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-        let payloadJson = null;
-        if (typeof payloadValue === 'string') payloadJson = payloadValue;
-        else if (payloadValue !== null && payloadValue !== undefined) payloadJson = JSON.stringify(payloadValue);
-        if (typeof payloadJson !== 'string') {
-          throw new Error(`Missing cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`);
-        }
-        try { JSON.parse(payloadJson); }
-        catch { throw new Error(`Invalid cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`); }
-        const normalizedPayload = payloadJson;
-        migratedCycles.push({
-          id: cycleDoc.id,
-          label,
-          cycleDate,
-          metadata,
-          payloadJson: normalizedPayload,
-          payloadBytes: Buffer.byteLength(normalizedPayload),
-          createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
-          updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
-        });
-      }
-    }
-    const legacyCycleIndexes = new Map(account.cloudCycles.map((cycle, index) => [cycle.id, index]));
-    for (const cycle of migratedCycles) {
-      const legacyIndex = legacyCycleIndexes.get(cycle.id);
-      if (legacyIndex === undefined) {
-        legacyCycleIndexes.set(cycle.id, account.cloudCycles.length);
-        account.cloudCycles.push(cycle);
-      } else {
-        account.cloudCycles[legacyIndex] = cycle;
-      }
-    }
+    await forEachDocumentPage(db.collection('cloudCycles').where('userId', '==', account.uid), async (cycleDocs) => {
+      migratedCycles.push(...await readCloudCyclePage(account, cycleDocs, malformedLegacyCycles));
+    });
+    mergeMigratedCloudCycles(account, migratedCycles);
 
-    const [awareness, products] = await Promise.all([
-      readAllDocuments(db.collection('users').doc(account.uid).collection('workflowAwareness')),
-      readAllDocuments(db.collection('users').doc(account.uid).collection('customProducts')),
+    await Promise.all([
+      forEachDocumentPage(db.collection('users').doc(account.uid).collection('workflowAwareness'), (page) => {
+        account.workflowAwareness.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
+      }),
+      forEachDocumentPage(db.collection('users').doc(account.uid).collection('customProducts'), (page) => {
+        account.customProducts.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
+      }),
     ]);
-    account.workflowAwareness = awareness.map((doc) => ({ id: doc.id, data: doc.data() }));
-    account.customProducts = products.map((doc) => ({ id: doc.id, data: doc.data() }));
     const key = `by-email/${sha256(account.email)}.json`;
     const outPath = path.join(output, key);
     await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });

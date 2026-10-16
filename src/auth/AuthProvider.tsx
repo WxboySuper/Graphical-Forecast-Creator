@@ -1740,13 +1740,13 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const response = await putSettings(next, userId);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
-      if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
+      if (requestId !== settingsRequestIdRef.current || clerkIdentityRef.current.userId !== userId) return;
       lastSyncedSettingsRef.current = next;
       setSyncedSettings(next);
       setSettingsSyncStatus('synced');
       writeStoredForecastUiVariant(next.forecastUiVariant);
     } catch (nextError) {
-      if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
+      if (requestId !== settingsRequestIdRef.current || clerkIdentityRef.current.userId !== userId) return;
       setSettingsSyncStatus('error');
       setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
       throw nextError;
@@ -1820,6 +1820,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     signUpWithEmail: disabledAuthAction,
     signOutUser: async () => {
       setError(null);
+      setBetaAccess(false);
+      setBetaAccessLoading(true);
       try {
         await clerk.signOut();
         resetClerkAccountState();
@@ -1832,6 +1834,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     deleteAccount: async (_password?: string) => {
       setError(null);
+      setBetaAccess(false);
+      setBetaAccessLoading(true);
       try {
         await deleteClerkUser();
         resetClerkAccountState();
