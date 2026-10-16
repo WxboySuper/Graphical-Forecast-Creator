@@ -194,14 +194,18 @@ export const saveWorkflowAwareness = async ({
 }): Promise<void> => {
   if (!isCurrentAwarenessConsent(consent)) return;
   if (!isValidWorkflowAwarenessMetadata(metadata)) throw new Error('Invalid workflow awareness metadata');
-  if (isBetaClerkD1Mode()) {
-    const response = await fetchBetaApi('/api/workflow-awareness', { method: 'PUT', body: JSON.stringify({ record: toRecord(metadata) }) });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body?.error || 'Unable to save workflow awareness.');
-    return;
-  }
-  await setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
+  if (isBetaClerkD1Mode()) return saveBetaWorkflowAwareness(metadata);
+  await saveFirestoreWorkflowAwareness(userId, metadata);
 };
+
+const saveBetaWorkflowAwareness = async (metadata: WorkflowAwarenessMetadata): Promise<void> => {
+  const response = await fetchBetaApi('/api/workflow-awareness', { method: 'PUT', body: JSON.stringify({ record: toRecord(metadata) }) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body?.error || 'Unable to save workflow awareness.');
+};
+
+const saveFirestoreWorkflowAwareness = (userId: string, metadata: WorkflowAwarenessMetadata) =>
+  setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
 
 const readBetaAwarenessPage = async (userId: string, page: number): Promise<{ records: unknown[]; nextPage?: number }> => {
   const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}&page=${page}`);

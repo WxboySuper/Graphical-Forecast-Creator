@@ -27,15 +27,26 @@ const serializeFirestoreValue = (value) => {
 };
 
 function validateCycleMetadata(metadata, cycleId, uid, malformedLegacyCycles) {
-  const label = typeof metadata?.label === 'string' ? metadata.label.trim() : '';
-  const cycleDate = typeof metadata?.cycleDate === 'string' ? metadata.cycleDate : '';
-  const validLabel = Boolean(label) && label.length <= 200;
-  const validCycleDate = Boolean(cycleDate) && cycleDate.length <= 32;
-  if (!validLabel || !validCycleDate) {
-    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(cycleId) });
-    throw new Error(`Invalid cycle label or date for account hash ${sha256(uid)} cycle hash ${sha256(cycleId)}.`);
-  }
+  const label = normalizeCycleLabel(metadata?.label, cycleId, uid, malformedLegacyCycles);
+  const cycleDate = normalizeCycleDate(metadata?.cycleDate, cycleId, uid, malformedLegacyCycles);
   return { label, cycleDate };
+}
+
+function normalizeCycleLabel(value, cycleId, uid, malformedLegacyCycles) {
+  const label = typeof value === 'string' ? value.trim() : '';
+  if (!label || label.length > 200) throwInvalidCycleMetadata(cycleId, uid, malformedLegacyCycles);
+  return label;
+}
+
+function normalizeCycleDate(value, cycleId, uid, malformedLegacyCycles) {
+  const cycleDate = typeof value === 'string' ? value : '';
+  if (!cycleDate || cycleDate.length > 32) throwInvalidCycleMetadata(cycleId, uid, malformedLegacyCycles);
+  return cycleDate;
+}
+
+function throwInvalidCycleMetadata(cycleId, uid, malformedLegacyCycles) {
+  malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(cycleId) });
+  throw new Error(`Invalid cycle label or date for account hash ${sha256(uid)} cycle hash ${sha256(cycleId)}.`);
 }
 
 const isLegacyCycleCollection = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
