@@ -9,6 +9,12 @@ class D1Statement {
 const UNHANDLED_QUERY = Symbol('unhandled query');
 
 function firstUserQuery(database, sql, params) {
+  const lookup = firstUserLookup(database, sql, params);
+  if (lookup !== UNHANDLED_QUERY) return lookup;
+  return sql.startsWith('SELECT COUNT(*) AS count FROM users') ? { count: database.users.size } : UNHANDLED_QUERY;
+}
+
+function firstUserLookup(database, sql, params) {
   if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return database.users.get(params[0]) || null;
   if (sql.startsWith('SELECT beta_access FROM users WHERE clerk_id')) {
     const user = database.users.get(params[0]);
@@ -26,18 +32,33 @@ function firstUserQuery(database, sql, params) {
     const user = [...database.users.values()].find((entry) => entry.legacy_uid === params[0]);
     return user ? { clerk_id: user.clerk_id } : null;
   }
-  if (sql.startsWith('SELECT COUNT(*) AS count FROM users')) return { count: database.users.size };
   return UNHANDLED_QUERY;
 }
 
 function firstAccountQuery(database, sql, params) {
+  const record = firstAccountRecord(database, sql, params);
+  if (record !== UNHANDLED_QUERY) return record;
+  const owner = findEntitlementOwner(database, sql, params);
+  if (owner !== UNHANDLED_QUERY) return owner;
+  return countEntitledUsers(database, sql);
+}
+
+function firstAccountRecord(database, sql, params) {
   if (sql.startsWith('SELECT data_json FROM user_settings')) return database.settings.has(params[0]) ? { data_json: database.settings.get(params[0]) } : null;
   if (sql.startsWith('SELECT data_json FROM user_entitlements')) return database.entitlements.has(params[0]) ? { data_json: database.entitlements.get(params[0]) } : null;
   if (sql.startsWith('SELECT data_json FROM user_metrics')) return database.metrics.has(params[0]) ? { data_json: database.metrics.get(params[0]) } : null;
+  return UNHANDLED_QUERY;
+}
+
+function findEntitlementOwner(database, sql, params) {
   if (sql.startsWith('SELECT user_id AS clerk_id FROM user_entitlements')) {
     for (const [user_id, data_json] of database.entitlements) if (JSON.parse(data_json).stripeCustomerId === params[0]) return { clerk_id: user_id };
     return null;
   }
+  return UNHANDLED_QUERY;
+}
+
+function countEntitledUsers(database, sql) {
   if (sql.startsWith('SELECT COUNT(*) AS count FROM user_entitlements')) {
     const count = [...database.entitlements.values()].filter((dataJson) => ['active', 'trialing'].includes(JSON.parse(dataJson)?.billingStatus)).length;
     return { count };
@@ -46,16 +67,23 @@ function firstAccountQuery(database, sql, params) {
 }
 
 function firstRecordQuery(database, sql, params) {
+  const queries = [
+    () => firstRecordLookup(database, sql, params),
+    () => firstRecordCounts(database, sql, params),
+    () => firstRecordBytes(database, sql),
+  ];
+  for (const query of queries) {
+    const result = query();
+    if (result !== UNHANDLED_QUERY) return result;
+  }
+  return UNHANDLED_QUERY;
+}
+
+function firstRecordLookup(database, sql, params) {
   if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records') && sql.includes('record_id = ?')) {
     return database.records.get(`${params[0]}:${params[1]}:${params[2]}`) || null;
   }
   if (sql.startsWith('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')) return database.cloudCycles.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
-  if (sql.startsWith('SELECT COUNT(*) AS count FROM cloud_cycles')) {
-    return { count: [...database.cloudCycles.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
-  }
-  if (sql.startsWith('SELECT COUNT(*) AS count FROM workflow_awareness')) {
-    return { count: [...database.workflowAwareness.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
-  }
   if (sql.startsWith('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')) {
     return database.workflowAwareness.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
   }
@@ -63,14 +91,86 @@ function firstRecordQuery(database, sql, params) {
   if (sql.startsWith('SELECT slot_id, data_json FROM custom_products WHERE user_id = ?')) {
     return [...database.customProducts.values()].find((row) => row.user_id === params[0] && row.product_id === params[1]) || null;
   }
-  if (sql.startsWith('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles')) {
-    return { bytes: [...database.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
-  }
   if (sql.startsWith('SELECT status, processed_at FROM stripe_events')) {
     const row = database.stripeEvents.get(params[0]);
     return row ? { ...row } : null;
   }
   return UNHANDLED_QUERY;
+}
+
+function firstRecordCounts(database, sql, params) {
+  if (sql.startsWith('SELECT COUNT(*) AS count FROM cloud_cycles')) {
+    return { count: [...database.cloudCycles.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
+  }
+  if (sql.startsWith('SELECT COUNT(*) AS count FROM workflow_awareness')) {
+    return { count: [...database.workflowAwareness.values()].filter((row) => row.user_id === params[0] && row.migration_import !== 1).length };
+  }
+  return UNHANDLED_QUERY;
+}
+
+function firstRecordBytes(database, sql) {
+  if (sql.startsWith('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles')) {
+    return { bytes: [...database.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
+  }
+  return UNHANDLED_QUERY;
+}
+
+function listMetrics(_database, sql) {
+  if (!sql.startsWith('SELECT event_date AS date, COUNT(DISTINCT')) return UNHANDLED_QUERY;
+  return { results: [{ date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
+    signups: 1, signIns: 2, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0 }] };
+}
+
+function listCustomProductSlots(database, sql, params) {
+  if (!sql.startsWith('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')) return UNHANDLED_QUERY;
+  return { results: [...database.customProducts.values()].filter((row) => row.user_id === params[0])
+    .map(({ slot_id, product_id, migration_import }) => ({ slot_id, product_id, migration_import })) };
+}
+
+function listRecords(database, sql, params) {
+  if (!sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records')) return UNHANDLED_QUERY;
+  const [userId, type] = params;
+  const offset = params.at(-1);
+  return { results: [...database.records.values()].filter((record) => record.user_id === userId && record.record_type === type).slice(offset, offset + 10) };
+}
+
+function listCloudCycles(database, sql, params) {
+  if (!sql.includes('FROM cloud_cycles WHERE user_id = ?')) return UNHANDLED_QUERY;
+  const offset = params.at(-1);
+  return { results: [...database.cloudCycles.values()].filter((row) => row.user_id === params[0]).slice(offset, offset + 10)
+    .map((row) => ({ ...row, userId: row.user_id, cycleDate: row.cycle_date, createdAt: row.created_at, updatedAt: row.updated_at })) };
+}
+
+function listWorkflowRecords(database, sql, params) {
+  if (!sql.includes('FROM workflow_awareness WHERE user_id = ?')) return UNHANDLED_QUERY;
+  const offset = params.at(-1);
+  return { results: [...database.workflowAwareness.values()].filter((row) => row.user_id === params[0])
+    .sort((left, right) => left.cycle_id.localeCompare(right.cycle_id))
+    .slice(offset, offset + 10).map((row) => ({ id: row.cycle_id, data_json: row.data_json })) };
+}
+
+function listCustomProducts(database, sql, params) {
+  if (sql.startsWith('SELECT * FROM custom_products WHERE user_id = ?')) {
+    return { results: [...database.customProducts.values()].filter((row) => row.user_id === params[0]) };
+  }
+  if (!sql.startsWith('SELECT data_json FROM custom_products WHERE user_id = ?')) return UNHANDLED_QUERY;
+  const offset = params.at(-1);
+  return { results: [...database.customProducts.values()].filter((row) => row.user_id === params[0])
+    .sort((left, right) => left.slot_id.localeCompare(right.slot_id)).slice(offset, offset + 10).map((row) => ({ data_json: row.data_json })) };
+}
+
+function listBillingCleanup(database, sql) {
+  if (!sql.startsWith('SELECT stripe_customer_id, attempts FROM billing_cleanup_queue')) return UNHANDLED_QUERY;
+  return { results: [...database.billingCleanupQueue.values()].map(({ customer_id, attempts = 0 }) => ({ stripe_customer_id: customer_id, attempts })) };
+}
+
+function listAll(database, sql, params) {
+  const queries = [listMetrics, listCustomProductSlots, listRecords, listCloudCycles, listWorkflowRecords, listCustomProducts, listBillingCleanup];
+  for (const query of queries) {
+    const result = query(database, sql, params);
+    if (result !== UNHANDLED_QUERY) return result;
+  }
+  return { results: [] };
 }
 
 class D1Mock {
@@ -113,42 +213,7 @@ class D1Mock {
     return null;
   }
   async all(sql, params) {
-    if (sql.startsWith('SELECT event_date AS date, COUNT(DISTINCT')) return { results: [{
-      date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
-      signups: 1, signIns: 2, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
-    }] };
-    if (sql.startsWith('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')) {
-      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map(({ slot_id, product_id, migration_import }) => ({ slot_id, product_id, migration_import })) };
-    }
-    if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records')) {
-      const [, userId, type] = [null, params[0], params[1]];
-      const offset = params.at(-1);
-      return { results: [...this.records.values()].filter((record) => record.user_id === userId && record.record_type === type).slice(offset, offset + 10) };
-    }
-    if (sql.includes('FROM cloud_cycles WHERE user_id = ?')) {
-      const offset = params.at(-1);
-      return { results: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0]).slice(offset, offset + 10)
-        .map((row) => ({ ...row, userId: row.user_id, cycleDate: row.cycle_date, createdAt: row.created_at, updatedAt: row.updated_at })) };
-    }
-    if (sql.includes('FROM workflow_awareness WHERE user_id = ?')) {
-      const offset = params.at(-1);
-      return { results: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0])
-        .sort((left, right) => left.cycle_id.localeCompare(right.cycle_id))
-        .slice(offset, offset + 10).map((row) => ({ id: row.cycle_id, data_json: row.data_json })) };
-    }
-    if (sql.startsWith('SELECT * FROM custom_products WHERE user_id = ?')) {
-      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]) };
-    }
-    if (sql.startsWith('SELECT data_json FROM custom_products WHERE user_id = ?')) {
-      const offset = params.at(-1);
-      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0])
-        .sort((left, right) => left.slot_id.localeCompare(right.slot_id)).slice(offset, offset + 10)
-        .map((row) => ({ data_json: row.data_json })) };
-    }
-    if (sql.startsWith('SELECT stripe_customer_id, attempts FROM billing_cleanup_queue')) {
-      return { results: [...this.billingCleanupQueue.values()].map(({ customer_id, attempts = 0 }) => ({ stripe_customer_id: customer_id, attempts })) };
-    }
-    return { results: [] };
+    return listAll(this, sql, params);
   }
   async run(sql, params) {
     let changes = 1;
@@ -247,14 +312,7 @@ class D1Mock {
       this.stripeEvents.delete(params[0]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO product_metric_events') || sql.startsWith('INSERT INTO product_metric_events')) {
       const [eventId, date, installation, type, userId] = params;
-      if (!['upgrades', 'cancellations'].includes(type)) {
-        const dayCount = [...this.metricEvents].filter((key) => {
-          const fields = key.split(':');
-          return fields.length === 5 && fields[1] === date && fields[4] === userId
-            && !['upgrades', 'cancellations'].includes(fields[3]);
-        }).length;
-        if (dayCount >= 500) throw new Error('product_metric_daily_quota_reached');
-      }
+      requireMetricQuota(this.metricEvents, date, type, userId);
       this.metricEvents.add(`${eventId}:${date}:${installation}:${type}:${userId}`);
     } else if (sql.startsWith('INSERT OR IGNORE INTO billing_cleanup_queue')) {
       this.billingCleanupQueue.set(params[0], { customer_id: params[0], created_at: params[1], attempts: 0 });
@@ -338,6 +396,16 @@ class D1Mock {
     }
     return { meta: { changes } };
   }
+}
+
+function requireMetricQuota(metricEvents, date, type, userId) {
+  if (['upgrades', 'cancellations'].includes(type)) return;
+  const dayCount = [...metricEvents].filter((key) => {
+    const fields = key.split(':');
+    return fields.length === 5 && fields[1] === date && fields[4] === userId
+      && !['upgrades', 'cancellations'].includes(fields[3]);
+  }).length;
+  if (dayCount >= 500) throw new Error('product_metric_daily_quota_reached');
 }
 
 export { D1Mock };

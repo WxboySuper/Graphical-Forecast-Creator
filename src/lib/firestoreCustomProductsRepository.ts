@@ -90,19 +90,22 @@ export const findOpenProductSlot = (occupiedSlotIds: Iterable<string>): string =
   return slot;
 };
 
+const readBetaProductPage = async (page: number): Promise<{ products: unknown[]; nextPage?: number }> => {
+  const response = await fetchBetaApi(`/api/custom-products?page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
+  return { products: Array.isArray(body.products) ? body.products : [], nextPage: typeof body.nextPage === 'number' ? body.nextPage : undefined };
+};
+
 const readBetaProducts = async (userId: string): Promise<HostedCustomProduct[]> => {
   const products: unknown[] = [];
-  let page = 0;
-  while (true) {
-    const response = await fetchBetaApi(`/api/custom-products?page=${page}`);
-    const body = (await response.json().catch(() => ({}))) ?? {};
-    if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
-    if (Array.isArray(body?.products)) products.push(...body.products);
-    if (typeof body?.nextPage !== 'number') break;
-    page = body.nextPage;
+  let nextPage: number | undefined = 0;
+  while (nextPage !== undefined) {
+    const result = await readBetaProductPage(nextPage);
+    products.push(...result.products);
+    nextPage = result.nextPage;
   }
-  return sortProducts(products
-    .filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
+  return sortProducts(products.filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
 };
 
 const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, next: HostedCustomProduct | null): Promise<HostedCustomProduct | null> => {

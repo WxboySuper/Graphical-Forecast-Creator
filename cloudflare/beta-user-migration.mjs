@@ -274,7 +274,7 @@ function createMigrationByteCounter() {
   };
 }
 
-async function buildSnapshotStatements(user, env, snapshot, now, collections) {
+async function buildSnapshotStatements({ user, env, snapshot, now, collections }) {
   const accountForMigrationBytes = createMigrationByteCounter();
   const statements = [];
   const context = { snapshot, user, env, now, statements, accountForMigrationBytes };
@@ -309,7 +309,7 @@ async function applySnapshotMigration(user, env, snapshot, now) {
   try {
     const collections = readSnapshotCollections(snapshot);
     validateSnapshotCollections(collections);
-    const statements = await buildSnapshotStatements(user, env, snapshot, now, collections);
+    const statements = await buildSnapshotStatements({ user, env, snapshot, now, collections });
     await executeSnapshotMigration(env.DB, user, now, statements);
   } catch (error) {
     await markSnapshotMigrationFailed(env.DB, user);
@@ -392,23 +392,40 @@ async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
   await updateMigratingUser(db, user, snapshot, now);
 }
 
-export const createUserEnsurer = (refreshMigratedStripeEntitlement) => async (user, env) => {
+async function prepareClerkUser(env, user) {
   const existing = await findClerkUser(env.DB, user.clerkId);
   await assertEmailAvailable(env.DB, user);
   if (existing && (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || ''))) {
     await updateClerkProfile(env.DB, user);
   }
-  if (existing?.migration_status === 'complete') {
-    await refreshMigratedStripeEntitlement(env, user.clerkId);
-    return findClerkUser(env.DB, user.clerkId);
-  }
+  return existing;
+}
 
-  const snapshot = await readUserSnapshot(env, user.email);
-  if (existing && !snapshot && existing.migration_status === 'no_match') return findClerkUser(env.DB, user.clerkId);
+async function finishCompletedUser(env, user, refreshMigratedStripeEntitlement) {
+  await refreshMigratedStripeEntitlement(env, user.clerkId);
+  return findClerkUser(env.DB, user.clerkId);
+}
+
+function canSkipSnapshotMigration(existing, snapshot) {
+  return existing && !snapshot && existing.migration_status === 'no_match';
+}
+
+async function migrateClerkUserSnapshot(env, user, existing, snapshot) {
   const now = new Date().toISOString();
   if (existing) await updateMigratingUser(env.DB, user, snapshot, now);
   else await insertOrUpdateMigratingUser(env.DB, user, snapshot, now);
   await applySnapshotMigration(user, env, snapshot, now);
+}
+
+export const createUserEnsurer = (refreshMigratedStripeEntitlement) => async (user, env) => {
+  const existing = await prepareClerkUser(env, user);
+  if (existing?.migration_status === 'complete') {
+    return finishCompletedUser(env, user, refreshMigratedStripeEntitlement);
+  }
+
+  const snapshot = await readUserSnapshot(env, user.email);
+  if (canSkipSnapshotMigration(existing, snapshot)) return findClerkUser(env.DB, user.clerkId);
+  await migrateClerkUserSnapshot(env, user, existing, snapshot);
   await refreshMigratedStripeEntitlement(env, user.clerkId);
   return findClerkUser(env.DB, user.clerkId);
 }

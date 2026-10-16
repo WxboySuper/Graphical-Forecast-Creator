@@ -203,6 +203,35 @@ export const saveWorkflowAwareness = async ({
   await setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
 };
 
+const readBetaAwarenessPage = async (userId: string, page: number): Promise<{ records: unknown[]; nextPage?: number }> => {
+  const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}&page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body.error || 'Unable to load workflow awareness.');
+  return { records: Array.isArray(body.records) ? body.records : [], nextPage: typeof body.nextPage === 'number' ? body.nextPage : undefined };
+};
+
+const readAllBetaAwareness = async (userId: string): Promise<unknown[]> => {
+  const records: unknown[] = [];
+  let page: number | undefined = 0;
+  while (page !== undefined) {
+    const result = await readBetaAwarenessPage(userId, page);
+    records.push(...result.records);
+    page = result.nextPage;
+  }
+  return records;
+};
+
+const unwrapBetaAwarenessRecord = (record: unknown): unknown => {
+  if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
+  const envelope = record as Partial<WorkflowAwarenessDocument>;
+  if (typeof envelope.metadata !== 'object' || envelope.metadata === null || Array.isArray(envelope.metadata)) return record;
+  return { ...envelope.metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
+};
+
+const readBetaAwareness = async (userId: string): Promise<WorkflowAwarenessRecord[]> =>
+  (await readAllBetaAwareness(userId)).map(unwrapBetaAwarenessRecord)
+    .filter(isValidWorkflowAwarenessRecord) as WorkflowAwarenessRecord[];
+
 /** Reads only the current user's nested awareness records and removes malformed records from that same path. */
 export const listWorkflowAwareness = async ({
   userId,
@@ -212,25 +241,7 @@ export const listWorkflowAwareness = async ({
   consent: WorkflowAwarenessConsent;
 }): Promise<WorkflowAwarenessRecord[]> => {
   if (!isCurrentAwarenessConsent(consent)) return [];
-  if (isBetaClerkD1Mode()) {
-    const records: unknown[] = [];
-    let page = 0;
-    while (true) {
-      const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}&page=${page}`);
-      const body = (await response.json().catch(() => ({}))) ?? {};
-      if (!response.ok) throw new Error(body?.error || 'Unable to load workflow awareness.');
-      if (Array.isArray(body.records)) records.push(...body.records);
-      if (typeof body.nextPage !== 'number') break;
-      page = body.nextPage;
-    }
-    return records.map((record: unknown) => {
-      if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
-      const envelope = record as Partial<WorkflowAwarenessDocument>;
-      if (typeof envelope.metadata !== 'object' || envelope.metadata === null || Array.isArray(envelope.metadata)) return record;
-      return { ...envelope.metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
-    })
-      .filter(isValidWorkflowAwarenessRecord) as WorkflowAwarenessRecord[];
-  }
+  if (isBetaClerkD1Mode()) return readBetaAwareness(userId);
   const snapshot = await getDocs(query(getAwarenessCollection(userId)));
   const { valid, malformedIds } = readSnapshotRecords(snapshot);
   // A malformed record must not hide valid recommendations if its cleanup is
