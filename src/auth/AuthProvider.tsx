@@ -28,7 +28,7 @@ import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
-import { isBetaClerkD1Mode, setBetaApiTokenProvider } from '../lib/betaApi';
+import { getBetaApiToken, isBetaClerkD1Mode, setBetaApiTokenProvider } from '../lib/betaApi';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { MonitorSettings } from '../monitor/types';
@@ -1496,8 +1496,9 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   getTokenRef.current = getToken;
   const betaTokenProviderRef = useRef(async () => (await getTokenRef.current()) ?? null);
   useEffect(() => {
-    if (isLoaded) setBetaApiTokenProvider(betaTokenProviderRef.current);
-  }, [isLoaded]);
+    if (!isLoaded) return;
+    setBetaApiTokenProvider(isSignedIn ? betaTokenProviderRef.current : null);
+  }, [isLoaded, isSignedIn]);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
@@ -1510,6 +1511,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
+  const betaAccessAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { currentDarkModeRef.current = darkMode; }, [darkMode]);
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
@@ -1519,12 +1521,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [clerkUser?.id, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
-    let token = await getToken();
-    for (let attempt = 0; !token && attempt < 20; attempt += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
-      token = await getToken();
-    }
-    if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
+    const token = await getBetaApiToken(async () => (await getToken()) ?? null, init.signal ?? undefined);
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
@@ -1533,15 +1530,19 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const clerkUserId = clerkUser?.id;
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
+    betaAccessAbortRef.current?.abort();
+    const abortController = new AbortController();
+    betaAccessAbortRef.current = abortController;
     const requestId = ++betaAccessRequestIdRef.current;
     if (!isSignedIn || !clerkUserId) {
       setBetaAccess(false);
       setBetaAccessLoading(false);
+      if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
       return;
     }
     setBetaAccessLoading(true);
     try {
-      const response = await request('/api/me/bootstrap');
+      const response = await request('/api/me/bootstrap', { signal: abortController.signal });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to load your beta account.');
       if (requestId !== betaAccessRequestIdRef.current) return;
@@ -1564,6 +1565,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setBetaAccess(false);
     } finally {
       if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
+      if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
     }
   }, [clerkUserId, dispatch, isSignedIn, request]);
 
@@ -1575,6 +1577,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     if (!isSignedIn || !clerkUserId) {
       betaAccessRequestIdRef.current += 1;
+      betaAccessAbortRef.current?.abort();
+      betaAccessAbortRef.current = null;
       setSyncedSettings(null);
       setSettingsSyncStatus('idle');
       setBetaAccess(false);
@@ -1593,8 +1597,8 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
     const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
     const photoURL = clerkUser.imageUrl || null;
-    const tokenForClerkSession = async () => {
-      const token = await getToken();
+    const tokenForClerkSession = async (forceRefresh?: boolean) => {
+      const token = await getToken({ skipCache: Boolean(forceRefresh) });
       if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
       return token;
     };
@@ -1653,7 +1657,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           signInProvider: typeof claims.firebase?.sign_in_provider === 'string' ? claims.firebase.sign_in_provider : null,
         };
       },
-      reload: async () => undefined,
+      reload: async () => { await clerkUser.reload(); },
       delete: async () => { await deleteClerkUser(); },
       toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
     };
@@ -1696,12 +1700,13 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (areUserSettingsEqual(lastSyncedSettingsRef.current, next)) return;
     let active = true;
     const userId = currentUser.uid;
+    const abortController = new AbortController();
     const timer = window.setTimeout(() => {
       const requestId = ++settingsRequestIdRef.current;
       setSettingsSyncStatus('syncing');
       const syncSettings = async () => {
         try {
-          const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
+          const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }), signal: abortController.signal });
           const body = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
           if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
@@ -1716,10 +1721,11 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       };
       syncSettings();
     }, 750);
-    return () => { active = false; window.clearTimeout(timer); };
+    return () => { active = false; abortController.abort(); window.clearTimeout(timer); };
   }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
 
   const resetClerkAccountState = useCallback(() => {
+    setBetaApiTokenProvider(null);
     betaAccessRequestIdRef.current += 1;
     settingsRequestIdRef.current += 1;
     setBetaAccess(false);
@@ -1762,7 +1768,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw nextError;
       }
     },
-    deleteAccount: async () => {
+    deleteAccount: async (_password?: string) => {
       setError(null);
       try {
         await deleteClerkUser();

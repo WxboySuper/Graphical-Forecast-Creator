@@ -1,4 +1,4 @@
-import { fetchBetaApi, setBetaApiTokenProvider } from './betaApi';
+import { fetchBetaApi, getBetaApiToken, setBetaApiTokenProvider } from './betaApi';
 
 describe('beta Worker token provider lifecycle', () => {
   afterEach(() => {
@@ -19,7 +19,22 @@ describe('beta Worker token provider lifecycle', () => {
     jest.useFakeTimers();
     const pending = fetchBetaApi('/api/user/settings');
     const rejection = pending.catch((error: Error) => error);
-    await jest.advanceTimersByTimeAsync(5_000);
+    await jest.advanceTimersByTimeAsync(1_000);
     expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is still initializing.' }));
+  });
+
+  it('shares one bounded token wait and stops polling when aborted', async () => {
+    jest.useFakeTimers();
+    const provider = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('clerk-token');
+    const pending = getBetaApiToken(provider);
+    await jest.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toBe('clerk-token');
+
+    const controller = new AbortController();
+    const noToken = jest.fn().mockResolvedValue(null);
+    const cancelled = getBetaApiToken(noToken, controller.signal);
+    const rejection = cancelled.catch((error: Error) => error);
+    controller.abort();
+    await expect(rejection).resolves.toEqual(expect.objectContaining({ name: 'AbortError' }));
   });
 });

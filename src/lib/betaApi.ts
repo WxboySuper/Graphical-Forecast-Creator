@@ -33,7 +33,7 @@ export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): 
   waiters.forEach(({ resolve }) => resolve(provider));
 };
 
-const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
+const waitForTokenProvider = (timeoutMs = 1_000): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
   if (tokenProvider) {
     resolve(tokenProvider);
     return;
@@ -55,16 +55,36 @@ const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> 
   tokenProviderWaiters.push(waiter);
 });
 
+/** Waits briefly for a Clerk token, respecting caller cancellation. */
+export const getBetaApiToken = async (provider: BetaApiTokenProvider, signal?: AbortSignal): Promise<string> => {
+  if (signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
+  let token = await provider();
+  for (let attempt = 0; !token && attempt < 20; attempt += 1) {
+    await new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
+        return;
+      }
+      const cleanup = () => signal?.removeEventListener('abort', onAbort);
+      const timer = globalThis.setTimeout(() => { cleanup(); resolve(); }, 250);
+      const onAbort = () => {
+        globalThis.clearTimeout(timer);
+        cleanup();
+        reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+    token = await provider();
+  }
+  if (!token) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  return token;
+};
+
 /** Sends an authenticated request to the same-origin beta Worker API. */
 export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const provider = tokenProvider ?? await waitForTokenProvider();
-  let token = await provider();
-  for (let attempt = 0; !token && attempt < 20; attempt += 1) {
-    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-    token = await provider();
-  }
-  if (!token) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  const token = await getBetaApiToken(provider, init.signal ?? undefined);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');

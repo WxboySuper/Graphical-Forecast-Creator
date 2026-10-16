@@ -414,7 +414,7 @@ test('Firebase beta mode proxies API requests to the configured VPS origin', asy
     const env = { BETA_AUTH_BACKEND: 'firebase', BETA_API_ORIGIN: 'https://beta-gfc.weatherboysuper.com', ASSETS: { fetch: async () => new Response('assets') } };
     const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/user/settings?scope=beta'), env);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { from: 'vps' });
+    assert.deepStrictEqual(await response.json(), { from: 'vps' });
     assert.equal(forwarded, 'https://beta-gfc.weatherboysuper.com/api/user/settings?scope=beta');
   } finally { globalThis.fetch = originalFetch; }
 });
@@ -928,6 +928,26 @@ test('Stripe webhook acknowledges missing metadata and deleted Clerk accounts', 
     } } });
     assert.equal(deleted.status, 200);
     assert.equal((await deleted.json()).ignored, 'deleted-account');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test('Stripe webhook retries when Clerk rejects a temporary or misconfigured lookup', async () => {
+  const env = { ...createEnv(new D1Mock()), STRIPE_WEBHOOK_SECRET: 'whsec_beta_test' };
+  const raw = JSON.stringify({ id: 'evt_clerk_denied', type: 'customer.subscription.updated', data: { object: {
+    id: 'sub_clerk_denied', status: 'active', metadata: { clerkId: 'clerk-user' },
+  } } });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${raw}`).digest('hex');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => String(input) === 'https://api.clerk.com/v1/users/clerk-user'
+    ? new Response(null, { status: 401 })
+    : originalFetch(input, init);
+  try {
+    const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+      method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+    }), env);
+    assert.equal(response.status, 503);
+    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), false);
   } finally { globalThis.fetch = originalFetch; }
 });
 

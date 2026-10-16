@@ -218,15 +218,14 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   }, [authProvider]);
 
   const setClerkMode = (nextMode: AuthMode) => {
-    if (clerkVerificationInProgress || nextMode === mode) return;
-    setMode(nextMode);
-    setClerkVerificationInProgress(false);
+    if (nextMode === mode) return;
     if (typeof window === 'undefined') return;
+    if (clerkVerificationInProgress && !window.confirm('Switching account actions restarts sign-in. Any verification code you entered will need to be entered again. Continue?')) return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
-    nextUrl.hash = nextMode === 'sign_up' ? '#/sign-up' : '#/sign-in';
-    window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    nextUrl.hash = '';
+    window.location.assign(nextUrl.href);
   };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
@@ -286,10 +285,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={clerkVerificationInProgress || mode === 'sign_in'}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={mode === 'sign_in'}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={clerkVerificationInProgress || mode === 'sign_up'}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={mode === 'sign_up'}>
                 Create account
               </Button>
             </div>

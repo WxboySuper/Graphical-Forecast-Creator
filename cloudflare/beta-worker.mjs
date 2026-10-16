@@ -150,6 +150,9 @@ async function ensureUser(user, env) {
         throw error;
       }
       existing = racedUser;
+      await env.DB.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
+        beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
+        .bind(migrationStatus, snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
     }
   } else {
     await env.DB.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
@@ -417,9 +420,8 @@ async function handleApi(request, env) {
           }
           if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
           if (!clerkUser.ok) {
-            await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
-              .bind('completed', new Date().toISOString(), event.id).run();
-            return json({ received: true, ignored: 'clerk-lookup-failed' });
+            await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+            return json({ received: false, error: 'Clerk user lookup failed.' }, 503);
           }
         }
         await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();

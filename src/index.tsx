@@ -34,17 +34,14 @@ const clerkD1BuildSelected = typeof __GFC_BETA_CLERK_D1__ !== 'undefined' && __G
 let application: React.ReactNode;
 if (clerkD1BuildSelected && betaClerkPublishableKey) {
   application = <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>;
-} else {
+} else if (clerkD1BuildSelected) {
   application = (
-    <>
-      {clerkD1BuildSelected ? (
-        <section role="alert" className="flex items-center justify-between gap-4 bg-destructive px-4 py-3 text-destructive-foreground">
-          <span>Beta Clerk authentication is enabled, but its publishable key is missing. This deployment needs a corrected key and redeploy before Clerk sign-in can be used.</span>
-        </section>
-      ) : null}
-      <App />
-    </>
+    <section role="alert" className="flex min-h-screen items-center justify-center bg-destructive px-4 py-3 text-destructive-foreground">
+      <p className="max-w-xl text-center">Beta Clerk authentication is enabled, but its publishable key is missing. This deployment needs a corrected key and redeploy before sign-in can be used.</p>
+    </section>
   );
+} else {
+  application = <App />;
 }
 
 root.render(<React.StrictMode>{application}</React.StrictMode>);
