@@ -157,6 +157,12 @@ async function createCheckoutSession(env, params) {
   }
 }
 
+function checkoutSessionResponse(session) {
+  if (!session) return json({ error: 'Unable to start checkout with Stripe.' }, 502);
+  if (typeof session.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
+  return json({ url: session.url });
+}
+
 async function startBillingCheckout(request, env, user) {
   const stripeUnavailable = getStripeUnavailableError(env);
   if (stripeUnavailable) return stripeUnavailable;
@@ -169,9 +175,7 @@ async function startBillingCheckout(request, env, user) {
   const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
   const params = buildCheckoutParams({ env, user, plan, price, entitlement });
   const session = await createCheckoutSession(env, params);
-  if (!session) return json({ error: 'Unable to start checkout with Stripe.' }, 502);
-  if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
-  return json({ url: session.url });
+  return checkoutSessionResponse(session);
 }
 
 function buildCheckoutParams({ env, user, plan, price, entitlement }) {
