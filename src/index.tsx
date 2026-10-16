@@ -39,8 +39,7 @@ if (clerkD1BuildSelected && betaClerkPublishableKey) {
     <>
       {clerkD1BuildSelected ? (
         <section role="alert" className="flex items-center justify-between gap-4 bg-destructive px-4 py-3 text-destructive-foreground">
-          <span>Beta Clerk authentication is enabled, but its publishable key is missing. The app is using Firebase auth; retry after the deployment configuration is repaired.</span>
-          <button type="button" onClick={() => window.location.reload()}>Retry</button>
+          <span>Beta Clerk authentication is enabled, but its publishable key is missing. This deployment needs a corrected key and redeploy before Clerk sign-in can be used.</span>
         </section>
       ) : null}
       <App />

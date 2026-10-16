@@ -343,10 +343,13 @@ async function handleApi(request, env) {
         const status = subscription.status || (event.type === 'checkout.session.completed' ? 'active' : 'inactive');
         const periodEnd = Number(subscription.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
         const active = ['active', 'trialing'].includes(status);
+        let effectiveSource = 'none';
+        if (prior.betaOverrideActive === true) effectiveSource = 'beta_override';
+        else if (active) effectiveSource = 'stripe';
         const entitlement = { ...prior, uid: owner.clerk_id, stripeCustomerId: subscription.customer || object.customer || prior.stripeCustomerId || null,
           stripeSubscriptionId: subscription.id || object.subscription || null, billingStatus: status,
           premiumActive: prior.betaOverrideActive === true || active,
-          effectiveSource: prior.betaOverrideActive === true ? 'beta_override' : active ? 'stripe' : 'none',
+          effectiveSource,
           cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
           planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly', updatedAt: new Date().toISOString() };
         const billingStatements = [env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)

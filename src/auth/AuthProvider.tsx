@@ -10,6 +10,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  type IdTokenResult,
   type User,
 } from 'firebase/auth';
 import { useAuth as useClerkAuth, useClerk, useReverification, useUser } from '@clerk/react';
@@ -1588,19 +1589,64 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const currentUser = useMemo(() => {
     if (!clerkUser) return null;
+    const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
+    const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
+    const photoURL = clerkUser.imageUrl || null;
+    const tokenForClerkSession = async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
+      return token;
+    };
+    const decodeTokenClaims = (token: string): IdTokenResult['claims'] => {
+      try {
+        const encoded = token.split('.')[1]?.replace(/-/g, '+').replace(/_/g, '/');
+        if (!encoded) return {};
+        return JSON.parse(globalThis.atob(encoded)) as IdTokenResult['claims'];
+      } catch {
+        return {};
+      }
+    };
     const facade = {
       uid: clerkUser.id,
-      email: clerkUser.primaryEmailAddress?.emailAddress ?? null,
-      displayName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' '),
-      photoURL: clerkUser.imageUrl,
-      providerData: [
-        ...(clerkUser.externalAccounts ?? []).map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com` })),
-      ],
-      getIdToken: async () => {
-        const token = await getToken();
-        if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
-        return token;
+      email,
+      displayName,
+      photoURL,
+      emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
+      isAnonymous: false,
+      metadata: {
+        creationTime: clerkUser.createdAt?.toISOString() ?? null,
+        lastSignInTime: clerkUser.lastSignInAt?.toISOString() ?? null,
       },
+      phoneNumber: clerkUser.primaryPhoneNumber?.phoneNumber ?? null,
+      refreshToken: '',
+      tenantId: null,
+      providerData: [
+        ...(clerkUser.externalAccounts ?? []).map((account) => ({
+          uid: account.id,
+          displayName: account.username ?? displayName,
+          email: account.emailAddress ?? email,
+          phoneNumber: null,
+          photoURL: account.imageUrl ?? photoURL,
+          providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com`,
+        })),
+      ],
+      getIdToken: tokenForClerkSession,
+      getIdTokenResult: async () => {
+        const token = await tokenForClerkSession();
+        const claims = decodeTokenClaims(token);
+        const time = (value: unknown) => typeof value === 'number' ? new Date(value * 1000).toUTCString() : '';
+        return {
+          claims,
+          token,
+          authTime: time(claims.auth_time),
+          issuedAtTime: time(claims.iat),
+          expirationTime: time(claims.exp),
+          signInProvider: typeof claims.firebase?.sign_in_provider === 'string' ? claims.firebase.sign_in_provider : null,
+        };
+      },
+      reload: async () => undefined,
+      delete: async () => { await clerkUser.delete(); },
+      toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
     };
     return facade as unknown as User;
   }, [clerkUser, getToken]);

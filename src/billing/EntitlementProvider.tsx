@@ -9,6 +9,20 @@ export type EntitlementStatus = 'disabled' | 'loading' | 'free' | 'premium' | 'e
 export type PlanInterval = 'monthly' | 'annual' | null;
 type EffectiveSource = 'stripe' | 'beta_override' | 'none';
 
+const normalizeBetaPeriodEnd = (value: unknown): Date | null => {
+  let date: Date;
+  if (typeof value === 'string' || typeof value === 'number') {
+    date = new Date(value);
+  } else if (typeof value === 'object' && value !== null && 'seconds' in value
+    && typeof value.seconds === 'number') {
+    const nanos = 'nanoseconds' in value && typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
+    date = new Date(value.seconds * 1000 + Math.trunc(nanos / 1_000_000));
+  } else {
+    return null;
+  }
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 interface BillingConfig {
   billingEnabled: boolean;
   checkoutEnabled: boolean;
@@ -349,12 +363,8 @@ const resolveEntitlementEffect = (
         const rawValues = { ...(raw ?? {}) };
         delete rawValues.currentPeriodEnd;
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
-        if (typeof rawEnd === 'string') {
-          const parsedEnd = new Date(rawEnd);
-          if (!Number.isNaN(parsedEnd.getTime())) {
-            normalized.currentPeriodEnd = { toDate: () => parsedEnd } as unknown as Timestamp;
-          }
-        }
+        const endDate = normalizeBetaPeriodEnd(rawEnd);
+        if (endDate) normalized.currentPeriodEnd = { toDate: () => endDate } as unknown as Timestamp;
         const state = createEntitlementListenerState(normalized);
         handlers.setEntitlement(state.entitlement);
         handlers.setEntitlementStatus(state.status);
@@ -413,6 +423,13 @@ const fetchBillingAction = async (
   endpoint: string,
   body?: Record<string, unknown>
 ) => {
+  if (isBetaClerkD1Mode()) {
+    const response = await fetchBetaApi(endpoint, {
+      method: 'POST',
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { response, data: await response.json().catch(() => ({})) };
+  }
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: await createAuthHeaders(() => currentUser.getIdToken()),

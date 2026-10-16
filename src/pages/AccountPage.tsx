@@ -1424,7 +1424,7 @@ const DisabledStateView: React.FC = () => (
 
 /** Production-facing account page for hosted sign-in, synced defaults, and local-only fallback. */
 const AccountPage: React.FC = () => {
-  const { authProvider, hostedAuthEnabled, status } = useAuth();
+  const { authProvider, error, hostedAuthEnabled, status } = useAuth();
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
@@ -1435,6 +1435,12 @@ const AccountPage: React.FC = () => {
         ) : null}
         {hostedAuthEnabled && status === "signed_out" && authProvider === 'clerk' ? (
           <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
+        ) : null}
+        {hostedAuthEnabled && authProvider === 'clerk' && status === 'loading' ? (
+          <div role="status" className="mx-auto max-w-xl rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading your beta account…</div>
+        ) : null}
+        {hostedAuthEnabled && authProvider === 'clerk' && status === 'error' ? (
+          <div role="alert" className="mx-auto max-w-xl rounded-xl border border-destructive/40 bg-card p-8 text-center text-destructive">{error ?? 'Unable to load your beta account. Refresh the page and try again.'}</div>
         ) : null}
         {hostedAuthEnabled && status !== "signed_in" && authProvider !== 'clerk' ? (
           <SignedOutAccountView />

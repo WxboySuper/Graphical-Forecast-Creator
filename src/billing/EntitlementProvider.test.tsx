@@ -3,6 +3,7 @@ import { EntitlementProvider, useEntitlement } from './EntitlementProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { onSnapshot } from 'firebase/firestore';
 import { readLocalTestAccount } from '../lib/localTestAccount';
+import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
 
 // Mock useAuth
 jest.mock('../auth/AuthProvider', () => ({
@@ -11,6 +12,11 @@ jest.mock('../auth/AuthProvider', () => ({
 
 jest.mock('../lib/localTestAccount', () => ({
   readLocalTestAccount: jest.fn(() => null),
+}));
+
+jest.mock('../lib/betaApi', () => ({
+  fetchBetaApi: jest.fn(),
+  isBetaClerkD1Mode: jest.fn(() => false),
 }));
 
 // Mock lib/firebase
@@ -29,6 +35,7 @@ describe('EntitlementProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (isBetaClerkD1Mode as jest.Mock).mockReturnValue(false);
     global.fetch = jest.fn();
     (useAuth as jest.Mock).mockReturnValue({
       hostedAuthEnabled: false,
@@ -194,6 +201,36 @@ describe('EntitlementProvider', () => {
     }
 
     expect(global.fetch).toHaveBeenCalledWith('/api/billing/checkout', expect.any(Object));
+  });
+
+  test('openCheckout uses the Clerk-authenticated beta Worker in beta mode', async () => {
+    (isBetaClerkD1Mode as jest.Mock).mockReturnValue(true);
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'clerk-user', getIdToken: jest.fn() },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ billingEnabled: true, checkoutEnabled: true }),
+    });
+    (fetchBetaApi as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ url: 'https://checkout.stripe.com/checkout' }),
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    await act(async () => {
+      try { await result.current.openCheckout('monthly'); } catch { /* Ignore JSDOM navigation errors. */ }
+    });
+
+    expect(fetchBetaApi).toHaveBeenCalledWith('/api/billing/checkout', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ plan: 'monthly' }),
+    }));
+    expect((useAuth as jest.Mock).mock.results[0].value.user.getIdToken).not.toHaveBeenCalled();
   });
 
   test('openCheckout throws error if user not signed in', async () => {

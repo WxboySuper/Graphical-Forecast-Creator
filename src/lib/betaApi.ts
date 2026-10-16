@@ -3,6 +3,7 @@ type BetaApiTokenProvider = () => Promise<string | null>;
 let tokenProvider: BetaApiTokenProvider | null = null;
 let tokenProviderWaiters: Array<(provider: BetaApiTokenProvider) => void> = [];
 const SESSION_INITIALIZING_ERROR = 'The beta session is still initializing.';
+const SESSION_SIGNED_OUT_ERROR = 'The beta session is signed out.';
 export const isBetaSessionInitializing = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   return message.includes(SESSION_INITIALIZING_ERROR);
@@ -44,7 +45,7 @@ export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promis
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const provider = tokenProvider ?? await waitForTokenProvider();
   const token = await provider();
-  if (!token) throw new Error(SESSION_INITIALIZING_ERROR);
+  if (!token) throw new Error(SESSION_SIGNED_OUT_ERROR);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
