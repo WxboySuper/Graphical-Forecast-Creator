@@ -341,6 +341,7 @@ const resolveEntitlementEffect = (
   }
 
   if (args.status === 'error' && args.user) {
+    handlers.setEntitlement(DEFAULT_ENTITLEMENT);
     handlers.setEntitlementStatus('error');
     handlers.setError('Unable to verify your signed-in account. Try again.');
     return null;

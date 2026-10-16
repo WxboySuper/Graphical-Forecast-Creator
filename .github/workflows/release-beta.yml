@@ -463,8 +463,8 @@ jobs:
             BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
             pnpm dlx wrangler@4.149.0 r2 object put "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup.sql
             pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql
-            test -s beta-d1-backup-verified.sql
-            cmp --silent beta-d1-backup.sql beta-d1-backup-verified.sql
+            test -s beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip verification produced an empty file." >&2; exit 1; }
+            cmp --silent beta-d1-backup.sql beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip mismatch." >&2; exit 1; }
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl
             test -s beta-firestore-full-snapshot.jsonl
@@ -494,6 +494,7 @@ jobs:
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
+            # One pinned install serves the complete per-email verification batch.
             for attempt in 1 2 3; do
               if npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0; then break; fi
               if [ "$attempt" -eq 3 ]; then echo "::error::Unable to install the pinned Wrangler snapshot verifier after three attempts." >&2; exit 1; fi

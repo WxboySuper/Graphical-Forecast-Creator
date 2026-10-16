@@ -70,14 +70,17 @@ async function main() {
       let pageQuery = collectionRef.orderBy(FieldPath.documentId()).limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const collectionSnapshot = await pageQuery.get();
-      for (const document of collectionSnapshot.docs) {
-        await writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) });
-        fullSnapshotCount += 1;
-        const childCollections = await document.ref.listCollections();
-        for (let offset = 0; offset < childCollections.length; offset += 10) {
-          const results = await Promise.allSettled(childCollections.slice(offset, offset + 10).map(exportCollection));
-          const failed = results.find((result) => result.status === 'rejected');
-          if (failed) throw failed.reason;
+      for (let offset = 0; offset < collectionSnapshot.docs.length; offset += 10) {
+        const page = collectionSnapshot.docs.slice(offset, offset + 10);
+        await Promise.all(page.map((document) => writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })));
+        fullSnapshotCount += page.length;
+        const childLists = await Promise.all(page.map((document) => document.ref.listCollections()));
+        for (const childCollections of childLists) {
+          for (let childOffset = 0; childOffset < childCollections.length; childOffset += 10) {
+            const results = await Promise.allSettled(childCollections.slice(childOffset, childOffset + 10).map(exportCollection));
+            const failed = results.find((result) => result.status === 'rejected');
+            if (failed) throw failed.reason;
+          }
         }
       }
       if (collectionSnapshot.docs.length < 500) break;
@@ -88,6 +91,7 @@ async function main() {
     const documents = [];
     let cursor = null;
     while (true) {
+      // Standard Firestore adds document ID ordering by default; keeping the query unchanged avoids extra index requirements.
       let pageQuery = query.limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();

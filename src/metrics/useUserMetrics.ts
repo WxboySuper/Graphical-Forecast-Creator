@@ -49,10 +49,13 @@ const readMetricsDateString = (value: unknown): string | null =>
 const readMetricsCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
 
 /** Reads an optional Firestore timestamp field into a native Date. */
-const readMetricsTimestamp = (value: Timestamp | string | null | undefined): Date | null =>
-  typeof value === 'string'
-    ? Number.isNaN(new Date(value).getTime()) ? null : new Date(value)
-    : value?.toDate?.() ?? null;
+const readMetricsTimestamp = (value: Timestamp | string | null | undefined): Date | null => {
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return value?.toDate?.() ?? null;
+};
 
 /** Normalizes one Firestore metrics document into the client-safe account metrics contract. */
 const readUserMetricsDocument = (value: UserMetricsSnapshot | undefined): UserMetricsDocument => {

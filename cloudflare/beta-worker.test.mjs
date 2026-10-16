@@ -100,7 +100,10 @@ class D1Mock {
     if (sql.startsWith('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')) {
       return this.workflowAwareness.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
     }
-    if (sql.startsWith('SELECT COUNT(*) AS count FROM user_entitlements')) return { count: 0 };
+    if (sql.startsWith('SELECT COUNT(*) AS count FROM user_entitlements')) {
+      const count = [...this.entitlements.values()].filter((dataJson) => ['active', 'trialing'].includes(JSON.parse(dataJson)?.billingStatus)).length;
+      return { count };
+    }
     if (sql.startsWith('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?')) {
       return this.cloudCycles.get(`${params[1]}:${params[0]}`) || null;
     }
@@ -1077,7 +1080,7 @@ test('Stripe webhook retries when Clerk rejects a temporary or misconfigured loo
       method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
     }), env);
     assert.equal(response.status, 500);
-    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), true);
+    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), false);
   } finally { globalThis.fetch = originalFetch; }
 });
 

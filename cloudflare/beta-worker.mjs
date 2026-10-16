@@ -28,6 +28,13 @@ const json = (body, status = 200, headers = {}) => Response.json(body, {
 });
 
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
+const normalizePlanInterval = (value) => value === 'annual' || value === 'monthly' ? value : null;
+const mapStripeInterval = (subscription) => {
+  const interval = subscription?.items?.data?.[0]?.price?.recurring?.interval;
+  if (interval === 'year') return 'annual';
+  if (interval === 'month') return 'monthly';
+  return null;
+};
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 const sha256Hex = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -136,7 +143,7 @@ const emailSnapshotKey = async (email) => {
 
 function appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes) {
   const settings = snapshot.userSettings;
-  if (settings == null) return;
+  if (settings === null || settings === undefined) return;
   if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
   const settingsWithoutLegacyCycles = { ...settings };
   delete settingsWithoutLegacyCycles.cloudCycles;
@@ -148,7 +155,7 @@ function appendSnapshotSettings(snapshot, user, env, now, statements, accountFor
 
 function appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes) {
   const entitlement = snapshot.userEntitlement;
-  if (entitlement == null) return;
+  if (entitlement === null || entitlement === undefined) return;
   if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
   accountForMigrationBytes(entitlement);
   statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
@@ -160,7 +167,7 @@ function appendSnapshotEntitlement(snapshot, user, env, now, statements, account
           effectiveSource: 'none',
           stripeCustomerId: typeof entitlement.stripeCustomerId === 'string' ? entitlement.stripeCustomerId : null,
           stripeSubscriptionId: typeof entitlement.stripeSubscriptionId === 'string' ? entitlement.stripeSubscriptionId : null,
-          planInterval: entitlement.planInterval === 'annual' ? 'annual' : entitlement.planInterval === 'monthly' ? 'monthly' : null,
+          planInterval: normalizePlanInterval(entitlement.planInterval),
           cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd === true,
           currentPeriodEnd: typeof entitlement.currentPeriodEnd === 'string' ? entitlement.currentPeriodEnd : null,
           pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
@@ -170,7 +177,7 @@ function appendSnapshotEntitlement(snapshot, user, env, now, statements, account
 
 function appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes) {
   const metrics = snapshot.userMetrics;
-  if (metrics == null) return;
+  if (metrics === null || metrics === undefined) return;
   if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
   accountForMigrationBytes(metrics);
   statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
@@ -192,7 +199,10 @@ function appendSnapshotCycles(cloudCycles, user, env, now, statements, accountFo
         const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
         if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
         if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
-        const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson === null || cycle.payloadJson === undefined ? '{}' : JSON.stringify(cycle.payloadJson);
+        let payloadJson;
+        if (typeof cycle.payloadJson === 'string') payloadJson = cycle.payloadJson;
+        else if (cycle.payloadJson === null || cycle.payloadJson === undefined) payloadJson = '{}';
+        else payloadJson = JSON.stringify(cycle.payloadJson);
         const payloadBytes = new TextEncoder().encode(payloadJson).length;
         if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
         accountForMigrationBytes(payloadJson);
@@ -260,7 +270,7 @@ async function appendSnapshotProducts(customProducts, user, env, statements, acc
 function readSnapshotCollections(snapshot) {
   const read = (key) => {
     const value = snapshot[key];
-    if (value == null) return [];
+    if (value === null || value === undefined) return [];
     if (!Array.isArray(value)) throw new Error(`SNAPSHOT_${key.toUpperCase()}_INVALID`);
     return value;
   };
@@ -442,18 +452,20 @@ async function refreshMigratedStripeEntitlement(env, userId) {
     const status = subscription?.status || 'inactive';
     const active = ['active', 'trialing'].includes(status);
     const betaOverrideActive = entitlement.betaOverrideActive === true;
+    let effectiveSource = 'none';
+    if (betaOverrideActive) effectiveSource = 'beta_override';
+    else if (active) effectiveSource = 'stripe';
     const updated = {
       ...attempted,
       uid: userId,
       premiumActive: betaOverrideActive || active,
-      effectiveSource: betaOverrideActive ? 'beta_override' : active ? 'stripe' : 'none',
+      effectiveSource,
       billingStatus: status,
       stripeSubscriptionId: subscription?.id || entitlement.stripeSubscriptionId || null,
       cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end),
       currentPeriodEnd: Number(subscription?.current_period_end)
         ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null,
-      planInterval: subscription?.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual'
-          : subscription?.items?.data?.[0]?.price?.recurring?.interval === 'month' ? 'monthly' : entitlement.planInterval || null,
+      planInterval: mapStripeInterval(subscription) || entitlement.planInterval || null,
       pendingStripeSync: false,
       stripeSyncAttemptAt: undefined,
       updatedAt: attemptedAt,
@@ -691,9 +703,9 @@ async function handleCloudCycleRoutes(request, env, url, path, user) {
     const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
     const bytes = new TextEncoder().encode(payloadJson).length;
     if (!id || id.length > 128 || id.includes('/') || !label || label.length > 200 || !cycleDate || cycleDate.length > 32 || bytes > MAX_CYCLE_BYTES || !isObject(body?.metadata)) return json({ error: 'Invalid cloud cycle payload.' }, 400);
-    try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
+    try { JSON.parse(payloadJson); } catch { return json({ error: 'Invalid cloud cycle payload.' }, 400); }
     const now = new Date().toISOString();
     let saveResult;
     try {
@@ -928,115 +940,136 @@ async function handleUserRecordRoutes(request, env, url, path, user) {
   return null;
 }
 
-async function handleStripeWebhook(request, env) {
+async function claimStripeEvent(db, eventId) {
+  const claim = await db.prepare('INSERT OR IGNORE INTO stripe_events (event_id, processed_at, status) VALUES (?, ?, ?)')
+    .bind(eventId, new Date().toISOString(), 'processing').run();
+  if (claim.meta.changes !== 0) return null;
+  const prior = await db.prepare('SELECT status, processed_at FROM stripe_events WHERE event_id = ?').bind(eventId).first();
+  if (prior?.status === 'completed') return json({ received: true, duplicate: true });
+  const age = Date.now() - Date.parse(prior?.processed_at || '');
+  if (prior?.status !== 'processing' || age <= 10 * 60 * 1000) {
+    return json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
+  }
+  const refreshed = await db.prepare(`UPDATE stripe_events SET processed_at = ? WHERE event_id = ? AND status = ? AND processed_at = ?`)
+    .bind(new Date().toISOString(), eventId, 'processing', prior.processed_at).run();
+  return refreshed.meta.changes ? null : json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
+}
 
-    if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
-    if (!env.STRIPE_WEBHOOK_SECRET) return json({ error: 'Billing webhook is not configured.' }, 503);
-    const rawBytes = await readLimitedBody(request, MAX_CYCLE_BYTES);
-    if (rawBytes === null) return json({ error: 'Webhook payload is too large.' }, 413);
-    const raw = new TextDecoder().decode(rawBytes);
-    if (!(await verifyStripeSignature(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) return json({ error: 'Invalid Stripe signature.' }, 400);
-    let event;
-    try { event = JSON.parse(raw); } catch { return json({ error: 'Invalid webhook payload.' }, 400); }
-    if (typeof event?.id !== 'string' || !event.id || typeof event.type !== 'string') return json({ error: 'Invalid webhook payload.' }, 400);
-    const object = event.data?.object || {};
-    if (event.type === 'checkout.session.completed' && object.subscription && !env.STRIPE_SECRET_KEY) {
-      return json({ error: 'Billing is not configured.' }, 503);
-    }
-    const claim = await env.DB.prepare('INSERT OR IGNORE INTO stripe_events (event_id, processed_at, status) VALUES (?, ?, ?)')
-      .bind(event.id, new Date().toISOString(), 'processing').run();
-    if (claim.meta.changes === 0) {
-      const priorEvent = await env.DB.prepare('SELECT status, processed_at FROM stripe_events WHERE event_id = ?').bind(event.id).first();
-      if (priorEvent?.status === 'completed') return json({ received: true, duplicate: true });
-      const claimAge = Date.now() - Date.parse(priorEvent?.processed_at || '');
-      if (priorEvent?.status === 'processing' && claimAge > 10 * 60 * 1000) {
-        const refreshed = await env.DB.prepare(`UPDATE stripe_events SET processed_at = ?
-          WHERE event_id = ? AND status = ? AND processed_at = ?`)
-          .bind(new Date().toISOString(), event.id, 'processing', priorEvent.processed_at).run();
-        if (!refreshed.meta.changes) return json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
-      } else {
-        return json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
-      }
-    }
-    try {
-    let subscription = object;
-    if (event.type === 'checkout.session.completed' && object.subscription) subscription = await stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET');
-    if (event.type.startsWith('customer.subscription.') || (event.type === 'checkout.session.completed' && object.subscription)) {
-      const metadata = subscription.metadata || object.metadata || {};
-      const clerkId = metadata.clerkId || object.client_reference_id || '';
-      const legacyUid = metadata.legacyUid || '';
-      let owner = null;
-      if (clerkId) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first();
-      if (!owner && legacyUid) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
-      if (!owner && typeof (subscription.customer || object.customer) === 'string') {
-        owner = await env.DB.prepare(`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`)
-          .bind(subscription.customer || object.customer).first();
-      }
-      if (owner) {
-        const prior = await readJsonRecord(env.DB, 'user_entitlements', owner.clerk_id) || {};
-        const status = subscription.status || (event.type === 'checkout.session.completed' ? 'active' : 'inactive');
-        const periodEnd = Number(subscription.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
-        const active = ['active', 'trialing'].includes(status);
-        let effectiveSource = 'none';
-        if (prior.betaOverrideActive === true) effectiveSource = 'beta_override';
-        else if (active) effectiveSource = 'stripe';
-        const entitlement = { ...prior, uid: owner.clerk_id, stripeCustomerId: subscription.customer || object.customer || prior.stripeCustomerId || null,
-          stripeSubscriptionId: subscription.id || object.subscription || null, billingStatus: status,
-          premiumActive: prior.betaOverrideActive === true || active,
-          effectiveSource,
-          cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
-          planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual'
-            : subscription.items?.data?.[0]?.price?.recurring?.interval === 'month' ? 'monthly' : prior.planInterval || null,
-          updatedAt: new Date().toISOString() };
-        const billingStatements = [env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-          .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt)];
-        const eventDate = entitlement.updatedAt.slice(0, 10);
-        if (!prior.premiumActive && active) {
-          billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(`stripe:${event.id}:upgrade`, eventDate, event.id, 'upgrades', owner.clerk_id));
-        } else if (prior.premiumActive && !active) {
-          billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(`stripe:${event.id}:cancellation`, eventDate, event.id, 'cancellations', owner.clerk_id));
-        }
-        try {
-          await env.DB.batch(billingStatements);
-        } catch (error) {
-          if (billingStatements.length < 2 || !String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
-          console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
-          await env.DB.batch(billingStatements.slice(0, 1));
-        }
-      } else {
-        if (!clerkId && !legacyUid) {
-          await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
-            .bind('completed', new Date().toISOString(), event.id).run();
-          return json({ received: true, ignored: 'missing-account-metadata' });
-        }
-        if (clerkId && env.CLERK_SECRET_KEY) {
-          const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkId)}`, {
-            headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
-          });
-          if (clerkUser.status === 404) {
-            await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
-              .bind('completed', new Date().toISOString(), event.id).run();
-            return json({ received: true, ignored: 'deleted-account' });
-          }
-          if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
-          if (!clerkUser.ok) {
-            return json({ received: false, error: 'Clerk user lookup failed.' }, 500);
-          }
-        }
-        await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
-        return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
-      }
+async function resolveStripeOwner(db, metadata, object, subscription) {
+  const clerkId = metadata.clerkId || object.client_reference_id || '';
+  const legacyUid = metadata.legacyUid || '';
+  let owner = null;
+  if (clerkId) owner = await db.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first();
+  if (!owner && legacyUid) owner = await db.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
+  const customerId = subscription.customer || object.customer;
+  if (!owner && typeof customerId === 'string') {
+    owner = await db.prepare(`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`).bind(customerId).first();
+  }
+  return { owner, clerkId, legacyUid };
+}
+
+function buildStripeEntitlement(ownerId, prior, subscription, object, eventType) {
+  const status = subscription.status || (eventType === 'checkout.session.completed' ? 'active' : 'inactive');
+  const active = ['active', 'trialing'].includes(status);
+  const periodEnd = Number(subscription.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
+  let effectiveSource = 'none';
+  if (prior.betaOverrideActive === true) effectiveSource = 'beta_override';
+  else if (active) effectiveSource = 'stripe';
+  return {
+    ...prior, uid: ownerId, stripeCustomerId: subscription.customer || object.customer || prior.stripeCustomerId || null,
+    stripeSubscriptionId: subscription.id || object.subscription || null, billingStatus: status,
+    premiumActive: prior.betaOverrideActive === true || active, effectiveSource,
+    cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
+    planInterval: mapStripeInterval(subscription) || prior.planInterval || null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+async function writeStripeEntitlement(db, event, ownerId, prior, subscription, object) {
+  const entitlement = buildStripeEntitlement(ownerId, prior, subscription, object, event.type);
+  const statements = [db.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+    .bind(ownerId, JSON.stringify(entitlement), entitlement.updatedAt)];
+  const metricType = !prior.premiumActive && entitlement.premiumActive ? 'upgrades'
+    : prior.premiumActive && !entitlement.premiumActive ? 'cancellations' : null;
+  if (metricType) {
+    statements.push(db.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+      .bind(`stripe:${event.id}:${metricType === 'upgrades' ? 'upgrade' : 'cancellation'}`, entitlement.updatedAt.slice(0, 10), event.id, metricType, ownerId));
+  }
+  try { await db.batch(statements); }
+  catch (error) {
+    if (!metricType || !String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
+    console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
+    await db.batch(statements.slice(0, 1));
+  }
+}
+
+async function processStripeSubscriptionEvent(event, object, env) {
+  const isCheckout = event.type === 'checkout.session.completed' && object.subscription;
+  if (!event.type.startsWith('customer.subscription.') && !isCheckout) return null;
+  const subscription = isCheckout
+    ? await stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET')
+    : object;
+  const identity = await resolveStripeOwner(env.DB, subscription.metadata || object.metadata || {}, object, subscription);
+  if (identity.owner) {
+    const prior = await readJsonRecord(env.DB, 'user_entitlements', identity.owner.clerk_id) || {};
+    await writeStripeEntitlement(env.DB, event, identity.owner.clerk_id, prior, subscription, object);
+    return null;
+  }
+  if (!identity.clerkId && !identity.legacyUid) return json({ received: true, ignored: 'missing-account-metadata' });
+  if (identity.clerkId && env.CLERK_SECRET_KEY) {
+    const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(identity.clerkId)}`, {
+      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
+    });
+    if (clerkUser.status === 404) return json({ received: true, ignored: 'deleted-account' });
+    if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
+    if (!clerkUser.ok) return json({ received: false, error: 'Clerk user lookup failed.' }, 500);
+  }
+  await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+  return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
+}
+
+async function readStripeWebhookEvent(request, env) {
+  if (!env.DB) return { response: json({ error: 'Beta database is unavailable.' }, 503) };
+  if (!env.STRIPE_WEBHOOK_SECRET) return { response: json({ error: 'Billing webhook is not configured.' }, 503) };
+  const rawBytes = await readLimitedBody(request, MAX_CYCLE_BYTES);
+  if (rawBytes === null) return { response: json({ error: 'Webhook payload is too large.' }, 413) };
+  const raw = new TextDecoder().decode(rawBytes);
+  if (!(await verifyStripeSignature(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) {
+    return { response: json({ error: 'Invalid Stripe signature.' }, 400) };
+  }
+  let event;
+  try { event = JSON.parse(raw); } catch { return { response: json({ error: 'Invalid webhook payload.' }, 400) }; }
+  if (typeof event?.id !== 'string' || !event.id || typeof event.type !== 'string') {
+    return { response: json({ error: 'Invalid webhook payload.' }, 400) };
+  }
+  return { event, object: event.data?.object || {} };
+}
+
+async function handleStripeWebhook(request, env) {
+  const parsed = await readStripeWebhookEvent(request, env);
+  if (parsed.response) return parsed.response;
+  const { event, object } = parsed;
+  if (event.type === 'checkout.session.completed' && object.subscription && !env.STRIPE_SECRET_KEY) {
+    return json({ error: 'Billing is not configured.' }, 503);
+  }
+  const claimResponse = await claimStripeEvent(env.DB, event.id);
+  if (claimResponse) return claimResponse;
+  try {
+    const response = await processStripeSubscriptionEvent(event, object, env);
+    if (response) {
+      if (response.status >= 400) await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+      else await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
+          .bind('completed', new Date().toISOString(), event.id).run();
+      return response;
     }
     await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
       .bind('completed', new Date().toISOString(), event.id).run();
     return json({ received: true });
-    } catch (error) {
-      await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
-      throw error;
-    }
+  } catch (error) {
+    await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
+    throw error;
+  }
 }
 
 async function handleApi(request, env) {

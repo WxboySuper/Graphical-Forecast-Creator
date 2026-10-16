@@ -17,6 +17,7 @@ jest.mock('../lib/localTestAccount', () => ({
 jest.mock('../lib/betaApi', () => ({
   fetchBetaApi: jest.fn(),
   isBetaClerkD1Mode: jest.fn(() => false),
+  isBetaSessionInitializing: jest.fn(() => false),
 }));
 
 // Mock lib/firebase
