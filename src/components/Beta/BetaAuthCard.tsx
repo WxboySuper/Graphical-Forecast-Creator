@@ -220,6 +220,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
+    nextUrl.hash = nextMode === 'sign_up' ? '#/sign-up' : '#/sign-in';
     window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
   };
 
@@ -280,16 +281,16 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
                 Sign in
               </Button>
-              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
                 Create account
               </Button>
             </div>
           ) : null}
           {clerkVerificationInProgress ? (
-            <p role="status" className="text-sm text-muted-foreground">Finish the current verification step below before switching account actions.</p>
+            <p role="status" className="text-sm text-muted-foreground">Switching account actions restarts sign-in, so you will need to enter any verification code again.</p>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />

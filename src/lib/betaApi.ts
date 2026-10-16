@@ -1,7 +1,11 @@
 type BetaApiTokenProvider = () => Promise<string | null>;
+type TokenProviderWaiter = {
+  resolve: (provider: BetaApiTokenProvider) => void;
+  reject: (error: Error) => void;
+};
 
 let tokenProvider: BetaApiTokenProvider | null = null;
-let tokenProviderWaiters: Array<(provider: BetaApiTokenProvider) => void> = [];
+let tokenProviderWaiters: TokenProviderWaiter[] = [];
 const SESSION_INITIALIZING_ERROR = 'The beta session is still initializing.';
 const SESSION_SIGNED_OUT_ERROR = 'The beta session is signed out.';
 export const isBetaSessionInitializing = (error: unknown): boolean => {
@@ -18,10 +22,15 @@ export const isBetaClerkD1Mode = (): boolean => Boolean(
 /** Registers the active Clerk session token source for non-component data services. */
 export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): void => {
   tokenProvider = provider;
-  if (!provider) return;
+  if (!provider) {
+    const waiters = tokenProviderWaiters;
+    tokenProviderWaiters = [];
+    waiters.forEach(({ reject }) => reject(new Error(SESSION_SIGNED_OUT_ERROR)));
+    return;
+  }
   const waiters = tokenProviderWaiters;
   tokenProviderWaiters = [];
-  waiters.forEach((resolve) => resolve(provider));
+  waiters.forEach(({ resolve }) => resolve(provider));
 };
 
 const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
@@ -29,9 +38,15 @@ const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> 
     resolve(tokenProvider);
     return;
   }
-  const waiter = (provider: BetaApiTokenProvider) => {
+  const waiter: TokenProviderWaiter = {
+    resolve: (provider) => {
     globalThis.clearTimeout(timeout);
     resolve(provider);
+    },
+    reject: (error) => {
+      globalThis.clearTimeout(timeout);
+      reject(error);
+    },
   };
   const timeout = globalThis.setTimeout(() => {
     tokenProviderWaiters = tokenProviderWaiters.filter((pending) => pending !== waiter);
@@ -45,7 +60,7 @@ export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promis
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const provider = tokenProvider ?? await waitForTokenProvider();
   let token = await provider();
-  for (let attempt = 0; !token && attempt < 20; attempt += 1) {
+  for (let attempt = 0; !token && attempt < 2; attempt += 1) {
     await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
     token = await provider();
   }

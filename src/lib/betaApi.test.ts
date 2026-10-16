@@ -7,20 +7,12 @@ describe('beta Worker token provider lifecycle', () => {
     jest.useRealTimers();
   });
 
-  it('keeps pending API calls waiting while the provider is temporarily cleared', async () => {
+  it('fails pending API calls immediately when the provider is cleared', async () => {
     jest.useFakeTimers();
-    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      status: 204,
-    } as Response);
     const pending = fetchBetaApi('/api/user/settings');
+    const rejection = pending.catch((error: Error) => error);
     setBetaApiTokenProvider(null);
-    await jest.advanceTimersByTimeAsync(1_000);
-    setBetaApiTokenProvider(async () => 'beta-token');
-    const response = await pending;
-    expect(response.status).toBe(204);
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(new Headers(fetch.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer beta-token');
+    expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
   });
 
   it('times out while waiting for Clerk to register a token provider', async () => {

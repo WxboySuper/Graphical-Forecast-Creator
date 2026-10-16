@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS cloud_cycles (
   PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS cloud_cycles_user_updated_idx ON cloud_cycles(user_id, updated_at DESC);
+-- Keep this quota synchronized with MAX_CLOUD_CYCLES in cloudflare/beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_user_limit
 BEFORE INSERT ON cloud_cycles
 WHEN NOT EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = NEW.user_id AND id = NEW.id)
@@ -68,6 +69,7 @@ CREATE TABLE IF NOT EXISTS custom_products (
   PRIMARY KEY (user_id, slot_id),
   UNIQUE (user_id, product_id)
 );
+-- Keep this quota synchronized with MAX_CUSTOM_PRODUCTS in cloudflare/beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_custom_product_user_limit
 BEFORE INSERT ON custom_products
 WHEN NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = NEW.user_id AND product_id = NEW.product_id)
@@ -117,6 +119,7 @@ CREATE TABLE IF NOT EXISTS user_records (
   PRIMARY KEY (user_id, record_type, record_id)
 );
 CREATE INDEX IF NOT EXISTS user_records_user_type_updated_idx ON user_records(user_id, record_type, updated_at DESC);
+-- Keep this quota synchronized with MAX_USER_RECORDS in cloudflare/beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_user_record_user_limit
 BEFORE INSERT ON user_records
 WHEN NOT EXISTS (SELECT 1 FROM user_records WHERE user_id = NEW.user_id AND record_type = NEW.record_type AND record_id = NEW.record_id)

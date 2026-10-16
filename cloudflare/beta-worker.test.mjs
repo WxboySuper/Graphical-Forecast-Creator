@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac, generateKeyPairSync, sign } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -8,12 +8,13 @@ import { verifyToken } from '@clerk/backend';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwtKey = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+beforeEach(() => __test.clearAuthCache());
 
-const createToken = () => {
+const createToken = (sessionId = 'sess_beta_test') => {
   const now = Math.floor(Date.now() / 1000);
   const base64url = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const content = `${base64url({ alg: 'RS256', typ: 'JWT' })}.${base64url({
-    iss: 'https://test.clerk.accounts.dev', sub: 'user_beta_test', sid: 'sess_beta_test',
+    iss: 'https://test.clerk.accounts.dev', sub: 'user_beta_test', sid: sessionId,
     iat: now, nbf: now - 1, exp: now + 300, azp: 'https://beta.gfcweather.com',
   })}`;
   return `${content}.${sign('RSA-SHA256', Buffer.from(content), privateKey).toString('base64url')}`;
@@ -334,7 +335,7 @@ const call = (path, env, { method = 'GET', body } = {}) => worker.fetch(new Requ
 
 test('the Worker serves health and public billing configuration without a user session', async () => {
   const verified = await verifyToken(createToken(), { jwtKey, authorizedParties: ['https://beta.gfcweather.com'] });
-  assert.deepEqual(verified.errors, undefined);
+  assert.deepStrictEqual(verified.errors, undefined);
   assert.equal((verified.data || verified).sub, 'user_beta_test');
   const health = await worker.fetch(new Request('https://beta.gfcweather.com/api/health'), createEnv());
   assert.equal(health.status, 200);
@@ -356,6 +357,37 @@ test('authentication rejects signed sessions when no authorized party is configu
     headers: { Authorization: `Bearer ${createToken()}` },
   }), env);
   assert.equal(identity, null);
+});
+
+test('Clerk profile cache does not reuse identity across different session tokens', async () => {
+  const originalFetch = globalThis.fetch;
+  let verification = 'verified';
+  let profileFetches = 0;
+  globalThis.fetch = async (input, init) => {
+    if (String(input).startsWith('https://api.clerk.com/v1/users/')) {
+      profileFetches += 1;
+      return Response.json({
+        id: 'user_beta_test', first_name: 'Beta', last_name: 'Tester', primary_email_address_id: 'email_test',
+        email_addresses: [{ id: 'email_test', email_address: 'test@example.com', verification: { status: verification } }],
+      });
+    }
+    return originalFetch(input, init);
+  };
+  try {
+    const env = createEnv();
+    const first = await __test.authenticate(new Request('https://beta.gfcweather.com/api/me/bootstrap', {
+      headers: { Authorization: `Bearer ${createToken('session-one')}` },
+    }), env);
+    verification = 'unverified';
+    const second = await __test.authenticate(new Request('https://beta.gfcweather.com/api/me/bootstrap', {
+      headers: { Authorization: `Bearer ${createToken('session-two')}` },
+    }), env);
+    assert.equal(first.email, 'test@example.com');
+    assert.equal(second, null);
+    assert.equal(profileFetches, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('beta invite claim updates the authenticated user with the D1 bind order', async () => {
@@ -762,7 +794,7 @@ test('forecast, discussion and verification writes enforce their per-account rec
       data_json: '{}', created_at: '2026-10-01', updated_at: '2026-10-01',
     });
   }
-  const response = await call('/api/forecasts', env, { method: 'PUT', body: { id: 'forecast-over-limit', data: {} } });
+  const response = await withClerkFetch(() => call('/api/forecasts', env, { method: 'PUT', body: { id: 'forecast-over-limit', data: {} } }));
   assert.equal(response.status, 409);
   assert.deepEqual(await response.json(), { error: 'Record quota reached.' });
 });

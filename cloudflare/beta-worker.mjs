@@ -21,6 +21,16 @@ const json = (body, status = 200, headers = {}) => Response.json(body, {
 
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const tokenCacheKey = async (subject, token) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${subject}:${hash}`;
+};
+const clearAuthProfileCache = (clerkId) => {
+  for (const key of authProfileCache.keys()) {
+    if (key === clerkId || key.startsWith(`${clerkId}:`)) authProfileCache.delete(key);
+  }
+};
 const decodePathId = (value) => {
   try { return decodeURIComponent(value); } catch { return null; }
 };
@@ -47,9 +57,10 @@ async function authenticate(request, env) {
       if (errors?.length) console.warn('[beta-worker] Clerk token rejected', errors.map((error) => error.message).join('; '));
       return null;
     }
-    const cached = authProfileCache.get(data.sub);
+    const cacheKey = await tokenCacheKey(data.sub, token);
+    const cached = authProfileCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return cached.identity;
-    if (cached) authProfileCache.delete(data.sub);
+    if (cached) authProfileCache.delete(cacheKey);
     if (authProfileCache.size >= AUTH_PROFILE_CACHE_MAX) {
       const oldestKey = authProfileCache.keys().next().value;
       if (oldestKey) authProfileCache.delete(oldestKey);
@@ -81,7 +92,7 @@ async function authenticate(request, env) {
     const displayName = [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
     const identity = { clerkId: data.sub, email, displayName };
     const now = Date.now();
-    authProfileCache.set(data.sub, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
+    authProfileCache.set(cacheKey, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
     return identity;
   } catch (error) {
     if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') throw error;
@@ -195,7 +206,11 @@ async function ensureUser(user, env) {
           .find((candidate) => !occupiedProductSlots.has(candidate));
         if (!slotId) {
           slotId = `legacy-${index + 1}`;
-          while (occupiedProductSlots.has(slotId)) slotId = `legacy-migrated-${index + 1}-${occupiedProductSlots.size + 1}`;
+          let suffix = occupiedProductSlots.size + 1;
+          while (occupiedProductSlots.has(slotId)) {
+            slotId = `legacy-migrated-${index + 1}-${suffix}`;
+            suffix += 1;
+          }
         }
         occupiedProductSlots.add(slotId);
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
@@ -393,7 +408,11 @@ async function handleApi(request, env) {
             return json({ received: true, ignored: 'deleted-account' });
           }
           if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
-          if (!clerkUser.ok) throw new Error('Clerk user lookup failed.');
+          if (!clerkUser.ok) {
+            await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
+              .bind('completed', new Date().toISOString(), event.id).run();
+            return json({ received: true, ignored: 'clerk-lookup-failed' });
+          }
         }
         await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
         return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
@@ -571,7 +590,9 @@ async function handleApi(request, env) {
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
     if (entitlement?.premiumActive !== true) return json({ error: 'Premium cloud storage is required.' }, 403);
     const now = new Date().toISOString();
-    const saveResult = await env.DB.prepare(`INSERT INTO cloud_cycles
+    let saveResult;
+    try {
+      saveResult = await env.DB.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE EXISTS (SELECT 1 FROM cloud_cycles WHERE user_id = ? AND id = ?)
@@ -582,6 +603,10 @@ async function handleApi(request, env) {
         payload_bytes = excluded.payload_bytes, updated_at = excluded.updated_at`)
       .bind(id, user.clerk_id, label, cycleDate, JSON.stringify({ ...body.metadata, userId: user.clerk_id }), payloadJson, bytes, now, now,
         user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
+    } catch (error) {
+      if (String(error?.message || '').includes('cloud_cycle_quota_reached')) return json({ error: 'Cloud storage quota reached.' }, 409);
+      throw error;
+    }
     if (!saveResult.meta.changes) {
       const existing = await env.DB.prepare('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')
         .bind(user.clerk_id, id).first();
@@ -674,6 +699,7 @@ async function handleApi(request, env) {
         .bind(user.clerk_id, product.id, dataJson, user.clerk_id, user.clerk_id, MAX_CUSTOM_PRODUCTS).run();
       if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
     } catch (error) {
+      if (String(error?.message || '').includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
       if (String(error?.message || '').includes('UNIQUE constraint failed')) {
         const duplicate = await env.DB.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?')
           .bind(user.clerk_id, product.id).first();
@@ -738,11 +764,17 @@ async function handleApi(request, env) {
       const dataJson = JSON.stringify(body.data);
       if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
       const now = new Date().toISOString();
-      const saveResult = await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
+      let saveResult;
+      try {
+        saveResult = await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
         SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?)
           OR (SELECT COUNT(*) FROM user_records WHERE user_id = ? AND record_type = ?) < ?
         ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-        .bind(user.clerk_id, recordType, id, dataJson, now, now, user.clerk_id, recordType, id, user.clerk_id, recordType, MAX_USER_RECORDS).run();
+          .bind(user.clerk_id, recordType, id, dataJson, now, now, user.clerk_id, recordType, id, user.clerk_id, recordType, MAX_USER_RECORDS).run();
+      } catch (error) {
+        if (String(error?.message || '').includes('user_record_quota_reached')) return json({ error: 'Record quota reached.' }, 409);
+        throw error;
+      }
       if (!saveResult.meta.changes) return json({ error: 'Record quota reached.' }, 409);
       return json({ success: true, id });
     }
@@ -862,9 +894,9 @@ export default {
         return json({ error: 'Invalid Clerk webhook signature.' }, 400);
       }
       if (event.type === 'user.deleted' && typeof event.data?.id === 'string') {
+        clearAuthProfileCache(event.data.id);
         if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
         try {
-          authProfileCache.delete(event.data.id);
           await deleteBetaUserData(event.data.id, env);
           await flushStripeCleanupQueue(env);
         }
@@ -873,6 +905,7 @@ export default {
           return json({ error: 'Clerk account cleanup failed.' }, 500);
         }
       }
+      if (event.type === 'user.updated' && typeof event.data?.id === 'string') clearAuthProfileCache(event.data.id);
       return json({ received: true });
     }
     try { return await handleApi(request, env); }
@@ -920,4 +953,4 @@ async function readLimitedBody(request, limit) {
   return result;
 }
 
-export const __test = { authenticate, emailSnapshotKey, deleteBetaUserData };
+export const __test = { authenticate, emailSnapshotKey, deleteBetaUserData, clearAuthCache: () => authProfileCache.clear() };

@@ -138,7 +138,11 @@ async function main() {
             malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
             throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
           }
-          const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : raw;
+          if (raw.metadata !== undefined && (!raw.metadata || typeof raw.metadata !== 'object' || Array.isArray(raw.metadata))) {
+            malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256(id) });
+            throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
+          }
+          const metadata = raw.metadata ?? raw;
           const payload = raw.payloadJson || raw.payload || '{}';
           account.cloudCycles.push({
             id,

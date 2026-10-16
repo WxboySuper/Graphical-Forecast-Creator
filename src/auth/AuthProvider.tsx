@@ -1621,6 +1621,14 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       refreshToken: '',
       tenantId: null,
       providerData: [
+        ...(clerkUser.passwordEnabled ? [{
+          uid: clerkUser.id,
+          displayName,
+          email,
+          phoneNumber: null,
+          photoURL,
+          providerId: 'password',
+        }] : []),
         ...(clerkUser.externalAccounts ?? []).map((account) => ({
           uid: account.id,
           displayName: account.username ?? displayName,
@@ -1722,10 +1730,14 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     hasInitializedSettingsRef.current = false;
   }, []);
 
+  const hasInitializedSettings = bootstrapKey !== '' || hasInitializedSettingsRef.current;
+  let authStatus: AuthStatus = 'signed_out';
+  if (!isLoaded || !isUserLoaded) authStatus = 'loading';
+  else if (error && isSignedIn && !hasInitializedSettings) authStatus = 'error';
+  else if (isSignedIn && currentUser) authStatus = 'signed_in';
+
   const value = useMemo<AuthContextValue>(() => ({
-    status: !isLoaded || !isUserLoaded ? 'loading'
-      : error && isSignedIn && !hasInitializedSettingsRef.current ? 'error'
-        : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
+    status: authStatus,
     settingsSyncStatus,
     user: currentUser,
     authProvider: 'clerk',
@@ -1763,7 +1775,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     updateSyncedSettings,
     refreshBetaAccess,
-  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess, resetClerkAccountState, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
+  }), [authStatus, betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, refreshBetaAccess, resetClerkAccountState, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
