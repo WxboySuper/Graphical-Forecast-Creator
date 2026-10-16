@@ -179,7 +179,7 @@ async function ensureUser(user, env) {
         .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
       for (const cycle of snapshot.cloudCycles || []) {
         if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
-        const payloadJson = typeof cycle.payloadJson === 'string' && cycle.payloadJson ? cycle.payloadJson : '{}';
+        const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson == null ? '{}' : JSON.stringify(cycle.payloadJson);
         const payloadBytes = new TextEncoder().encode(payloadJson).length;
         if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
         try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
@@ -202,6 +202,10 @@ async function ensureUser(user, env) {
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
         migratedProduct.id = productId;
+        if (migratedProduct.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+        migratedProduct.version = 1;
+        const productJson = JSON.stringify(migratedProduct);
+        if (new TextEncoder().encode(productJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
         let slotId = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, slotIndex) => `product-${String(slotIndex + 1).padStart(2, '0')}`)
           .find((candidate) => !occupiedProductSlots.has(candidate));
         if (!slotId) {
@@ -218,7 +222,11 @@ async function ensureUser(user, env) {
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('complete', now, now, user.clerkId));
-      await env.DB.batch(statements);
+      await env.DB.prepare("UPDATE users SET migration_status = 'migrating', updated_at = ? WHERE clerk_id = ?")
+        .bind(now, user.clerkId).run();
+      for (let offset = 0; offset < statements.length; offset += 50) {
+        await env.DB.batch(statements.slice(offset, offset + 50));
+      }
     } catch (error) {
       await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('failed', new Date().toISOString(), user.clerkId).run();
@@ -475,6 +483,7 @@ async function handleApi(request, env) {
       ...(entitlement.stripeCustomerId ? { customer: entitlement.stripeCustomerId } : {}),
     };
     const session = await stripeRequest(env, 'checkout/sessions', params);
+    if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
     return json({ url: session.url });
   }
 
@@ -487,6 +496,7 @@ async function handleApi(request, env) {
       customer: entitlement.stripeCustomerId,
       return_url: `${env.PUBLIC_ORIGIN}/account`,
     });
+    if (typeof portal?.url !== 'string' || !portal.url) return json({ error: 'Stripe billing portal session did not include a URL.' }, 502);
     return json({ url: portal.url });
   }
 

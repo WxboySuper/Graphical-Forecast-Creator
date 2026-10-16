@@ -1492,11 +1492,12 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!clerkUser) throw new Error('Sign in before deleting your account.');
     await clerkUser.delete();
   });
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+  const betaTokenProviderRef = useRef(async () => (await getTokenRef.current()) ?? null);
   useEffect(() => {
-    if (!isLoaded) return;
-    setBetaApiTokenProvider(async () => (await getToken()) ?? null);
-    return () => setBetaApiTokenProvider(null);
-  }, [getToken, isLoaded]);
+    if (isLoaded) setBetaApiTokenProvider(betaTokenProviderRef.current);
+  }, [isLoaded]);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
   const [betaAccess, setBetaAccess] = useState(false);
@@ -1653,11 +1654,11 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         };
       },
       reload: async () => undefined,
-      delete: async () => { await clerkUser.delete(); },
+      delete: async () => { await deleteClerkUser(); },
       toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
     };
     return facade as unknown as User;
-  }, [clerkUser, getToken]);
+  }, [clerkUser, deleteClerkUser, getToken]);
 
   const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
     if (!currentUser) throw new Error('Sign in before changing account settings.');

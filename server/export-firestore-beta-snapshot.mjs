@@ -143,7 +143,7 @@ async function main() {
             throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
           }
           const metadata = raw.metadata ?? raw;
-          const payload = raw.payloadJson || raw.payload || '{}';
+          const payload = raw.payloadJson ?? raw.payload ?? '{}';
           account.cloudCycles.push({
             id,
             label: metadata.label || '',

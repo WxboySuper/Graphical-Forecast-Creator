@@ -60,7 +60,7 @@ export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promis
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const provider = tokenProvider ?? await waitForTokenProvider();
   let token = await provider();
-  for (let attempt = 0; !token && attempt < 2; attempt += 1) {
+  for (let attempt = 0; !token && attempt < 20; attempt += 1) {
     await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
     token = await provider();
   }

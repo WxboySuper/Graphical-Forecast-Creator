@@ -162,7 +162,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   googleLabel = 'Continue with Google',
 }) => {
   const { authProvider, error, signInWithEmail, signInWithGoogle, signUpWithEmail, status } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('sign_in');
+  const [mode, setMode] = useState<AuthMode>(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -190,7 +190,11 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     };
     syncVerificationState();
     window.addEventListener('hashchange', syncVerificationState);
-    return () => window.removeEventListener('hashchange', syncVerificationState);
+    window.addEventListener('popstate', syncVerificationState);
+    return () => {
+      window.removeEventListener('hashchange', syncVerificationState);
+      window.removeEventListener('popstate', syncVerificationState);
+    };
   }, [authProvider]);
 
   useEffect(() => {
@@ -214,6 +218,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   }, [authProvider]);
 
   const setClerkMode = (nextMode: AuthMode) => {
+    if (clerkVerificationInProgress || nextMode === mode) return;
     setMode(nextMode);
     setClerkVerificationInProgress(false);
     if (typeof window === 'undefined') return;
@@ -281,10 +286,10 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={clerkVerificationInProgress || mode === 'sign_in'}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={clerkVerificationInProgress || mode === 'sign_up'}>
                 Create account
               </Button>
             </div>

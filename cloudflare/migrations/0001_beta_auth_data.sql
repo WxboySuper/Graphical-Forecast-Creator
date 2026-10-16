@@ -123,6 +123,7 @@ CREATE INDEX IF NOT EXISTS user_records_user_type_updated_idx ON user_records(us
 CREATE TRIGGER IF NOT EXISTS enforce_user_record_user_limit
 BEFORE INSERT ON user_records
 WHEN NOT EXISTS (SELECT 1 FROM user_records WHERE user_id = NEW.user_id AND record_type = NEW.record_type AND record_id = NEW.record_id)
+  AND COALESCE((SELECT migration_status FROM users WHERE clerk_id = NEW.user_id), '') <> 'migrating'
   AND (SELECT COUNT(*) FROM user_records WHERE user_id = NEW.user_id AND record_type = NEW.record_type) >= 200
 BEGIN
   SELECT RAISE(ABORT, 'user_record_quota_reached');

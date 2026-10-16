@@ -74,16 +74,9 @@ class D1Mock {
     if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records') && sql.includes('record_id = ?')) {
       return this.records.get(`${params[0]}:${params[1]}:${params[2]}`) || null;
     }
-    if (sql.startsWith('SELECT clerk_id, legacy_uid FROM users WHERE legacy_uid')) {
-      const user = [...this.users.values()].find((entry) => entry.legacy_uid === params[0]);
-      return user ? { clerk_id: user.clerk_id, legacy_uid: user.legacy_uid } : null;
-    }
     if (sql.startsWith('SELECT clerk_id FROM users WHERE legacy_uid')) {
       const user = [...this.users.values()].find((entry) => entry.legacy_uid === params[0]);
       return user ? { clerk_id: user.clerk_id } : null;
-    }
-    if (sql.startsWith('SELECT id FROM cloud_cycles WHERE id = ? AND user_id = ?')) {
-      return this.cloudCycles.get(`${params[1]}:${params[0]}`) || null;
     }
     if (sql.startsWith('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')) {
       return this.cloudCycles.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
@@ -99,9 +92,10 @@ class D1Mock {
     if (sql.startsWith('SELECT slot_id, data_json FROM custom_products WHERE user_id = ?')) {
       return [...this.customProducts.values()].find((row) => row.user_id === params[0] && row.product_id === params[1]) || null;
     }
-    if (sql.startsWith('SELECT event_date, COUNT(*)')) return { results: [] };
-    if (sql.startsWith('SELECT COUNT(*) AS total FROM product_metric_events')) return { total: this.metricEvents.size };
-    if (sql.startsWith('SELECT COUNT(*) AS users FROM users')) return { users: this.users.size };
+    if (sql.startsWith('SELECT event_date AS date, COUNT(DISTINCT')) return { results: [{
+      date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
+      signups: 0, signIns: 0, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
+    }] };
     if (sql.startsWith('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles')) {
       return { bytes: [...this.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
     }
@@ -147,6 +141,10 @@ class D1Mock {
     if (sql.startsWith('INSERT INTO users')) {
       const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
       this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
+    } else if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
+      const [updated_at, clerk_id] = params;
+      const user = this.users.get(clerk_id);
+      if (user) Object.assign(user, { migration_status: 'migrating', updated_at });
     } else if (sql.startsWith('UPDATE users SET migration_status = ?, migrated_at')) {
       const [migration_status, migrated_at, updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
@@ -493,7 +491,7 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
   });
 });
 
-test('snapshot migration preserves cycles and products beyond new-account quotas', async () => {
+test('snapshot migration preserves cycles and products beyond new-account quotas in bounded batches', async () => {
   const db = new D1Mock();
   const env = createEnv(db, {
     cloudCycles: Array.from({ length: 105 }, (_, index) => ({ id: `cycle-${index}`, payloadJson: '{}', metadata: {} })),
@@ -504,10 +502,11 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     assert.equal(response.status, 200);
     assert.equal(db.cloudCycles.size, 105);
     assert.equal(db.customProducts.size, 20);
+    assert.ok(db.batchSizes.every((size) => size <= 50));
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
     assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
-      assert.deepEqual(db.batchSizes, [126]);
+    assert.equal(db.batchSizes.reduce((sum, size) => sum + size, 0), 126);
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });
@@ -586,7 +585,15 @@ test('cloud cycle quota check rejects writes at the limit', async () => {
 test('the D1 schema and capacity/merge SQL execute against SQLite', async () => {
   const sqlite = new DatabaseSync(':memory:');
   try {
-    sqlite.exec(await readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'));
+    const [schema, workerSource] = await Promise.all([
+      readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'),
+      readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
+    ]);
+    sqlite.exec(schema);
+    for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200]]) {
+      assert.match(workerSource, new RegExp(`const ${constant} = ${limit};`));
+      assert.ok(schema.includes(`>= ${limit}`), `${constant} SQL quota should remain ${limit}`);
+    }
     assert.doesNotThrow(() => sqlite.prepare(`SELECT (SELECT 1 FROM users LIMIT 1) AS users,
       (SELECT 1 FROM user_settings LIMIT 1) AS settings, (SELECT 1 FROM user_entitlements LIMIT 1) AS entitlements,
       (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
