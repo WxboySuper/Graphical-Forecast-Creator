@@ -6,6 +6,11 @@ const MAX_CYCLE_BYTES = 750_000;
 const MAX_CLOUD_CYCLES = 100;
 const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_USER_RECORDS = 200;
+const MAX_WORKFLOW_RECORDS = 200;
+const MAX_MIGRATED_CLOUD_CYCLES = 300;
+const MAX_MIGRATED_WORKFLOW_RECORDS = MAX_WORKFLOW_RECORDS;
+const MAX_MIGRATED_CUSTOM_PRODUCTS = 48;
+const MAX_MIGRATION_BYTES = 20_000_000;
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
 const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
 const AUTH_PROFILE_CACHE_MAX = 1_000;
@@ -21,11 +26,11 @@ const json = (body, status = 200, headers = {}) => Response.json(body, {
 
 const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
-const tokenCacheKey = async (subject, token) => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
-  const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `${subject}:${hash}`;
+const sha256Hex = async (value) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
+const tokenCacheKey = async (subject, token) => `${subject}:${await sha256Hex(token)}`;
 const clearAuthProfileCache = (clerkId) => {
   for (const key of authProfileCache.keys()) {
     if (key === clerkId || key.startsWith(`${clerkId}:`)) authProfileCache.delete(key);
@@ -102,9 +107,7 @@ async function authenticate(request, env) {
 }
 
 const emailSnapshotKey = async (email) => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalizeEmail(email)));
-  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `by-email/${hex}.json`;
+  return `by-email/${await sha256Hex(normalizeEmail(email))}.json`;
 };
 
 async function ensureUser(user, env) {
@@ -162,45 +165,75 @@ async function ensureUser(user, env) {
 
   if (snapshot) {
     try {
+      const readSnapshotArray = (key) => {
+        const value = snapshot[key];
+        if (value === undefined || value === null) return [];
+        if (!Array.isArray(value)) throw new Error(`SNAPSHOT_${key.toUpperCase()}_INVALID`);
+        return value;
+      };
+      const cloudCycles = readSnapshotArray('cloudCycles');
+      const workflowAwareness = readSnapshotArray('workflowAwareness');
+      const customProducts = readSnapshotArray('customProducts');
+      if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
+      if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
+      if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
+      let migrationBytes = 0;
+      const accountForMigrationBytes = (value) => {
+        migrationBytes += new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).length;
+        if (migrationBytes > MAX_MIGRATION_BYTES) throw new Error('SNAPSHOT_MIGRATION_TOO_LARGE');
+      };
       const statements = [];
       const settings = snapshot.userSettings;
       if (settings) {
         const settingsWithoutLegacyCycles = { ...settings };
         delete settingsWithoutLegacyCycles.cloudCycles;
+        accountForMigrationBytes(settingsWithoutLegacyCycles);
         // Snapshot values seed missing keys; current D1 values win on collisions.
         statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
           .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
       }
       const entitlement = snapshot.userEntitlement;
-      if (entitlement) statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+      if (entitlement) {
+        accountForMigrationBytes(entitlement);
+        statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...entitlement, uid: user.clerkId }), now));
+      }
       const metrics = snapshot.userMetrics;
-      if (metrics) statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
+      if (metrics) {
+        accountForMigrationBytes(metrics);
+        statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
-      for (const cycle of snapshot.cloudCycles || []) {
+      }
+      for (const cycle of cloudCycles) {
         if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+        if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
         const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson == null ? '{}' : JSON.stringify(cycle.payloadJson);
         const payloadBytes = new TextEncoder().encode(payloadJson).length;
         if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
+        accountForMigrationBytes(payloadJson);
         try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
+        const metadataJson = JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId });
+        accountForMigrationBytes(metadataJson);
         statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
           (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-          .bind(cycle.id, user.clerkId, cycle.label || '', cycle.cycleDate || '', JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId }),
+          .bind(cycle.id, user.clerkId, cycle.label || '', cycle.cycleDate || '', metadataJson,
             payloadJson, payloadBytes,
             cycle.createdAt || now, cycle.updatedAt || now));
       }
-      for (const record of snapshot.workflowAwareness || []) {
+      for (const record of workflowAwareness) {
         if (typeof record.id !== 'string' || !record.id || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+        const workflowJson = JSON.stringify(record.data);
+        accountForMigrationBytes(workflowJson);
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)')
-          .bind(user.clerkId, record.id, JSON.stringify(record.data)));
+          .bind(user.clerkId, record.id, workflowJson));
       }
       const occupiedProductSlots = new Set(((await env.DB.prepare('SELECT slot_id FROM custom_products WHERE user_id = ?')
         .bind(user.clerkId).all()).results || []).map((row) => row.slot_id));
-      for (const [index, product] of (snapshot.customProducts || []).entries()) {
+      for (const [index, product] of customProducts.entries()) {
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
@@ -209,6 +242,7 @@ async function ensureUser(user, env) {
         migratedProduct.version = 1;
         const productJson = JSON.stringify(migratedProduct);
         if (new TextEncoder().encode(productJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
+        accountForMigrationBytes(productJson);
         let slotId = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, slotIndex) => `product-${String(slotIndex + 1).padStart(2, '0')}`)
           .find((candidate) => !occupiedProductSlots.has(candidate));
         if (!slotId) {
@@ -446,6 +480,9 @@ async function handleApi(request, env) {
   catch (error) {
     if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
     if (error?.message === 'SNAPSHOT_INVALID') return json({ error: 'Account migration data is temporarily unavailable.' }, 503);
+    if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
+      return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
+    }
     console.error('[beta-worker] migration failed', error);
     return json({ error: 'Account data could not be migrated. Please retry later.' }, 503);
   }
@@ -668,9 +705,20 @@ async function handleApi(request, env) {
     body.record.metadata.cycleId = cycleId;
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
-    await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
-      ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
-      .bind(user.clerk_id, cycleId, dataJson).run();
+    const existingCount = await env.DB.prepare('SELECT COUNT(*) AS count FROM workflow_awareness WHERE user_id = ?').bind(user.clerk_id).first();
+    if (Number(existingCount?.count || 0) >= MAX_WORKFLOW_RECORDS) {
+      const existing = await env.DB.prepare('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')
+        .bind(user.clerk_id, cycleId).first();
+      if (!existing) return json({ error: 'Workflow record quota reached.' }, 409);
+    }
+    try {
+      await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
+        ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
+        .bind(user.clerk_id, cycleId, dataJson).run();
+    } catch (error) {
+      if (String(error?.message || '').includes('workflow_awareness_quota_reached')) return json({ error: 'Workflow record quota reached.' }, 409);
+      throw error;
+    }
     return json({ success: true });
   }
   if (path === '/api/workflow-awareness' && request.method === 'DELETE') {
@@ -910,7 +958,6 @@ export default {
         if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
         try {
           await deleteBetaUserData(event.data.id, env);
-          await flushStripeCleanupQueue(env);
         }
         catch (error) {
           console.error('[beta-worker] Clerk deletion cleanup failed', error instanceof Error ? error.message : 'cleanup failed');
@@ -924,6 +971,9 @@ export default {
     catch (error) {
       console.error('[beta-worker] request failed', error);
       if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
+      if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
+        return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
+      }
       if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
         return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
       }

@@ -487,11 +487,13 @@ jobs:
             NODE
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
-            export SNAPSHOT_VERIFY_DIR
+            WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
+            npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0
+            export SNAPSHOT_VERIFY_DIR WRANGLER_BIN
             xargs -r -P 4 -I '{}' bash -euo pipefail -c '
               EMAIL_HASH="$1"
               attempt=1
-              until pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"; do
+              until "$WRANGLER_BIN" r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"; do
                 if [[ "$attempt" -ge 3 ]]; then exit 1; fi
                 sleep "$((attempt * 2))"
                 attempt=$((attempt + 1))

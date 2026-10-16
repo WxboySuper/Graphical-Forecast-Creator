@@ -129,15 +129,15 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
       const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
         if (!active) return;
         if (isBetaSessionInitializing(error)) {
-          if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-          retryTimer = window.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
+          if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer);
+          retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
           return;
         }
         onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
       });
       refresh().catch(() => undefined);
-      const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);
-      return () => { active = false; window.clearInterval(timer); if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
+      const timer = globalThis.setInterval(() => refresh().catch(() => undefined), 15_000);
+      return () => { active = false; globalThis.clearInterval(timer); if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer); };
     }
     return onSnapshot(collectionRef(userId), (snapshot) => {
       const products = snapshot.docs.map((item) => item.data()).filter((value) => ownedProduct(value, userId));

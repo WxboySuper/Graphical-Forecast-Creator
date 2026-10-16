@@ -60,6 +60,15 @@ CREATE TABLE IF NOT EXISTS workflow_awareness (
   data_json TEXT NOT NULL CHECK (json_valid(data_json)),
   PRIMARY KEY (user_id, cycle_id)
 );
+-- Keep this quota synchronized with MAX_WORKFLOW_RECORDS in cloudflare/beta-worker.mjs.
+CREATE TRIGGER IF NOT EXISTS enforce_workflow_awareness_user_limit
+BEFORE INSERT ON workflow_awareness
+WHEN NOT EXISTS (SELECT 1 FROM workflow_awareness WHERE user_id = NEW.user_id AND cycle_id = NEW.cycle_id)
+  AND COALESCE((SELECT migration_status FROM users WHERE clerk_id = NEW.user_id), '') <> 'migrating'
+  AND (SELECT COUNT(*) FROM workflow_awareness WHERE user_id = NEW.user_id) >= 200
+BEGIN
+  SELECT RAISE(ABORT, 'workflow_awareness_quota_reached');
+END;
 
 CREATE TABLE IF NOT EXISTS custom_products (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE,

@@ -143,14 +143,17 @@ async function main() {
             throw new Error(`Malformed legacy cycle for account hash ${sha256(account.uid)} cycle hash ${sha256(id)}.`);
           }
           const metadata = raw.metadata ?? raw;
-          const payload = raw.payloadJson ?? raw.payload ?? '{}';
+          const rawPayload = raw.payloadJson ?? raw.payload;
+          let payloadJson = '{}';
+          if (typeof rawPayload === 'string') payloadJson = rawPayload;
+          else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
           account.cloudCycles.push({
             id,
             label: metadata.label || '',
             cycleDate: metadata.cycleDate || '',
             metadata,
-            payloadJson: typeof payload === 'string' ? payload : JSON.stringify(payload),
-            payloadBytes: Buffer.byteLength(typeof payload === 'string' ? payload : JSON.stringify(payload)),
+            payloadJson,
+            payloadBytes: Buffer.byteLength(payloadJson),
             createdAt: metadata.createdAt || new Date(0).toISOString(),
             updatedAt: metadata.updatedAt || metadata.createdAt || new Date(0).toISOString(),
           });
@@ -169,15 +172,17 @@ async function main() {
         const metadata = cycleDoc.data();
         const payloadDoc = payloadDocs[index];
         const payloadValue = payloadDoc.exists ? payloadDoc.data()?.payloadJson : metadata.payloadJson;
-        const payloadJson = typeof payloadValue === 'string' ? payloadValue : payloadValue == null ? null : JSON.stringify(payloadValue);
+        let payloadJson = null;
+        if (typeof payloadValue === 'string') payloadJson = payloadValue;
+        else if (payloadValue !== null && payloadValue !== undefined) payloadJson = JSON.stringify(payloadValue);
         if (typeof payloadJson !== 'string') {
           throw new Error(`Missing cycle payload for account hash ${sha256(account.uid)} cycle hash ${sha256(cycleDoc.id)}.`);
         }
         const normalizedPayload = payloadJson;
         migratedCycles.push({
           id: cycleDoc.id,
-          label: metadata.label,
-          cycleDate: metadata.cycleDate,
+          label: metadata.label || '',
+          cycleDate: metadata.cycleDate || '',
           metadata,
           payloadJson: normalizedPayload,
           payloadBytes: Buffer.byteLength(normalizedPayload),

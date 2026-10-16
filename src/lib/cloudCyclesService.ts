@@ -620,10 +620,11 @@ export async function listCloudCycles(
       const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
       const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
-        .map((raw: unknown) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
+        .filter((raw: unknown) => isPlainObject(raw) && raw.userId === userId && typeof raw.id === 'string' && raw.id)
+        .map((raw: Record<string, unknown>) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
           ? normalizeCloudCycleMetadataRecord({ cycleId: raw.id, rawRecord: raw, fallbackUserId: userId })
           : null)
-        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id));
+        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId));
       return { success: true, data: sortCloudCycleMetadata(cycles) };
     }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
@@ -662,7 +663,7 @@ export const subscribeToCloudCycles = (
     let retryTimer: number | undefined;
     const scheduleRetry = () => {
       if (!active || retryTimer !== undefined) return;
-      retryTimer = window.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
+      retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
     };
     const refresh = async () => {
       try {
@@ -678,8 +679,8 @@ export const subscribeToCloudCycles = (
       }
     };
     refresh().catch(() => undefined);
-    const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);
-    return () => { active = false; window.clearInterval(timer); if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
+    const timer = globalThis.setInterval(() => refresh().catch(() => undefined), 15_000);
+    return () => { active = false; globalThis.clearInterval(timer); if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer); };
   }
   let active = true;
   try {

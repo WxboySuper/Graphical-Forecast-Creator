@@ -85,6 +85,12 @@ class D1Mock {
       return { count: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0]).length };
     }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM users')) return { count: this.users.size };
+    if (sql.startsWith('SELECT COUNT(*) AS count FROM workflow_awareness')) {
+      return { count: [...this.workflowAwareness.values()].filter((row) => row.user_id === params[0]).length };
+    }
+    if (sql.startsWith('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')) {
+      return this.workflowAwareness.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
+    }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM user_entitlements')) return { count: 0 };
     if (sql.startsWith('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?')) {
       return this.cloudCycles.get(`${params[1]}:${params[0]}`) || null;
@@ -92,16 +98,8 @@ class D1Mock {
     if (sql.startsWith('SELECT slot_id, data_json FROM custom_products WHERE user_id = ?')) {
       return [...this.customProducts.values()].find((row) => row.user_id === params[0] && row.product_id === params[1]) || null;
     }
-    if (sql.startsWith('SELECT event_date AS date, COUNT(DISTINCT')) return { results: [{
-      date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
-      signups: 0, signIns: 0, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
-    }] };
     if (sql.startsWith('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles')) {
       return { bytes: [...this.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
-    }
-    if (sql.startsWith('SELECT status FROM stripe_events')) {
-      const row = this.stripeEvents.get(params[0]);
-      return row ? { status: row.status } : null;
     }
     if (sql.startsWith('SELECT status, processed_at FROM stripe_events')) {
       const row = this.stripeEvents.get(params[0]);
@@ -110,6 +108,10 @@ class D1Mock {
     return null;
   }
   async all(sql, params) {
+    if (sql.startsWith('SELECT event_date AS date, COUNT(DISTINCT')) return { results: [{
+      date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
+      signups: 1, signIns: 2, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
+    }] };
     if (sql.startsWith('SELECT slot_id FROM custom_products WHERE user_id = ?')) {
       return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map((row) => ({ slot_id: row.slot_id })) };
     }
@@ -537,6 +539,20 @@ test('snapshot migration allocates products around products already created in D
   assert.equal([...db.customProducts.values()].find((row) => row.product_id === 'snapshot-product')?.slot_id, 'product-02');
 });
 
+test('snapshot migration rejects archives above automatic limits before writing child rows', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db, {
+    uid: 'firebase_large_uid', userProfile: { email: 'test@example.com' },
+    cloudCycles: Array.from({ length: 301 }, (_, index) => ({ id: `cycle-${index}`, payloadJson: '{}', metadata: {} })),
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', env);
+    assert.equal(response.status, 409);
+    assert.equal(db.cloudCycles.size, 0);
+    assert.equal(db.users.get('user_beta_test')?.migration_status, 'failed');
+  });
+});
+
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
   const db = new D1Mock();
   db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
@@ -590,7 +606,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
     ]);
     sqlite.exec(schema);
-    for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200]]) {
+    for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200], ['MAX_WORKFLOW_RECORDS', 200]]) {
       assert.match(workerSource, new RegExp(`const ${constant} = ${limit};`));
       assert.ok(schema.includes(`>= ${limit}`), `${constant} SQL quota should remain ${limit}`);
     }
@@ -657,6 +673,10 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     assert.equal(runRecordWrite('forecast-over-limit').changes, 0);
     assert.throws(() => directRecord.run('user_sqlite', 'forecast', 'forecast-over-limit'), /user_record_quota_reached/);
 
+    const awarenessWrite = sqlite.prepare('INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)');
+    for (let index = 0; index < 200; index += 1) awarenessWrite.run('user_sqlite', `cycle-${index}`, '{}');
+    assert.throws(() => awarenessWrite.run('user_sqlite', 'cycle-over-limit', '{}'), /workflow_awareness_quota_reached/);
+
     const insertMetric = sqlite.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)');
     const today = new Date().toISOString().slice(0, 10);
     insertMetric.run('evt-1', today, 'install-1', 'cloud_cycle_saved', 'user_sqlite');
@@ -687,7 +707,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
   }
 });
 
-test('workflow awareness rejects empty cycle IDs and returns persisted envelopes', async () => {
+test('workflow awareness rejects invalid and over-quota writes and returns persisted envelopes', async () => {
   const db = new D1Mock();
   await withClerkFetch(async () => {
     const invalid = await call('/api/workflow-awareness', createEnv(db), {
@@ -701,6 +721,15 @@ test('workflow awareness rejects empty cycle IDs and returns persisted envelopes
     assert.equal(wrongAccount.status, 403);
     const list = await call('/api/workflow-awareness', createEnv(db));
     assert.deepEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
+    for (let index = 1; index <= 200; index += 1) {
+      db.workflowAwareness.set(`user_beta_test:cycle-${index}`, { user_id: 'user_beta_test', cycle_id: `cycle-${index}`, data_json: '{}' });
+    }
+    const overQuota = await call('/api/workflow-awareness', createEnv(db), {
+      method: 'PUT', body: { record: { metadata: { cycleId: 'cycle-over-limit' } } },
+    });
+    assert.equal(overQuota.status, 409);
+    const updateExisting = await call('/api/workflow-awareness', createEnv(db), { method: 'PUT', body: { record } });
+    assert.equal(updateExisting.status, 200);
   });
 });
 
@@ -765,6 +794,9 @@ test('admin metrics validates the allowlist window and aggregates the requested 
     const data = await valid.json();
     assert.equal(data.window, 7);
     assert.equal(data.metricsEnabled, true);
+    assert.equal(data.summary.activeDevices, 1);
+    assert.equal(data.summary.signups, 1);
+    assert.equal(data.summary.signIns, 2);
   });
 });
 
