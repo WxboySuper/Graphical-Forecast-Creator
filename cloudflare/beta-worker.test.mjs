@@ -335,8 +335,20 @@ test('cloud cycle writes reject malformed payloads and preserve ownership and ti
     const originalCreatedAt = db.cloudCycles.get('user_beta_test:cycle-1').created_at;
     const update = await call('/api/cloud-cycles', env, { method: 'POST', body: { ...cycle, label: 'Afternoon' } });
     assert.equal(update.status, 200);
-    const listed = await call('/api/cloud-cycles', env);
-    const [saved] = (await listed.json()).cycles;
+    for (let index = 0; index < 11; index += 1) {
+      const id = `cycle-${String(index + 2).padStart(2, '0')}`;
+      db.cloudCycles.set(`user_beta_test:${id}`, { id, user_id: 'user_beta_test', label: id, cycle_date: '2026-10-15',
+        metadata_json: JSON.stringify({}), payload_json: '{}', payload_bytes: 2, created_at: originalCreatedAt, updated_at: originalCreatedAt });
+    }
+    const listed = await call('/api/cloud-cycles?page=0', env);
+    const firstPage = await listed.json();
+    assert.equal(firstPage.cycles.length, 10);
+    assert.equal(firstPage.nextPage, 1);
+    const secondPage = await call('/api/cloud-cycles?page=1', env);
+    const secondBody = await secondPage.json();
+    assert.equal(secondBody.cycles.length, 2);
+    assert.equal(secondBody.nextPage, null);
+    const saved = [...firstPage.cycles, ...secondBody.cycles].find((item) => item.id === 'cycle-1');
     assert.equal(saved.label, 'Afternoon');
     assert.equal(saved.createdAt, originalCreatedAt);
     const remove = await call('/api/cloud-cycles/cycle-1', env, { method: 'DELETE' });

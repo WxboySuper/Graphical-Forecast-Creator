@@ -1594,8 +1594,16 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         applySettingsToState(settings, { currentDarkModeRef, currentOverlaysRef, dispatch, setSyncedSettings, lastSyncedSettingsRef });
         setSettingsSyncStatus('synced');
       } else {
+        const displayName = [clerkUser?.firstName, clerkUser?.lastName].filter(Boolean).join(' ');
+        const fallbackSettings = buildHostedAccountFallbackSettings(
+          currentDarkModeRef.current,
+          currentOverlaysRef.current,
+          displayName,
+          readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT,
+          monitorSettings,
+        );
         lastSyncedSettingsRef.current = null;
-        setSyncedSettings(null);
+        setSyncedSettings(fallbackSettings);
         setSettingsSyncStatus('idle');
       }
       hasInitializedSettingsRef.current = true;
@@ -1615,7 +1623,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
       if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
     }
-  }, [clerkUserId, dispatch, isSignedIn, request]);
+  }, [clerkUserId, clerkUser?.firstName, clerkUser?.lastName, dispatch, isSignedIn, monitorSettings, request]);
 
   useEffect(() => {
     if (!isLoaded || !isUserLoaded) {

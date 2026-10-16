@@ -278,13 +278,21 @@ async function claimBetaAccess(request, env, user) {
 }
 
 async function handleAccountSettingsAndMetrics({ request, env, url, path, user }) {
-  if (path === '/api/user/settings' && request.method === 'GET') return json({ settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id) });
-  if (path === '/api/user/settings' && request.method === 'PUT') return saveUserSettings(request, env, user);
-  if (path === '/api/user/entitlement' && request.method === 'GET') return json({ entitlement: await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) });
-  if (path === '/api/user/metrics' && request.method === 'GET') return json({ metrics: await readJsonRecord(env.DB, 'user_metrics', user.clerk_id) });
-  if (path === '/api/admin/metrics' && request.method === 'GET') return readAdminMetrics(url, env, user);
-  if (path === '/api/metrics/event' && request.method === 'POST') return recordProductMetric(request, env, user);
-  return null;
+  const context = { request, env, url, user };
+  return ACCOUNT_SETTINGS_ROUTES[`${request.method} ${path}`]?.(context) ?? null;
+}
+
+const ACCOUNT_SETTINGS_ROUTES = {
+  'GET /api/user/settings': ({ env, user }) => readAccountRecord(env, 'user_settings', 'settings', user),
+  'PUT /api/user/settings': ({ request, env, user }) => saveUserSettings(request, env, user),
+  'GET /api/user/entitlement': ({ env, user }) => readAccountRecord(env, 'user_entitlements', 'entitlement', user),
+  'GET /api/user/metrics': ({ env, user }) => readAccountRecord(env, 'user_metrics', 'metrics', user),
+  'GET /api/admin/metrics': ({ url, env, user }) => readAdminMetrics(url, env, user),
+  'POST /api/metrics/event': ({ request, env, user }) => recordProductMetric(request, env, user),
+};
+
+async function readAccountRecord(env, table, key, user) {
+  return json({ [key]: await readJsonRecord(env.DB, table, user.clerk_id) });
 }
 
 async function saveUserSettings(request, env, user) {
@@ -302,13 +310,12 @@ async function saveUserSettings(request, env, user) {
 async function recordProductMetric(request, env, user) {
   const body = await readBody(request);
   if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-  const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
-  if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || installationId.length < 8 || installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
-  const eventDate = new Date().toISOString().slice(0, 10);
+  const metric = parseProductMetric(body);
+  if (metric.error) return metric.error;
   try {
     await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
       VALUES (?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
+      .bind(crypto.randomUUID(), metric.eventDate, metric.installationId, metric.event, user.clerk_id).run();
   } catch (error) {
     if (String(error?.message || '').includes('product_metric_daily_quota_reached')) return json({ error: 'Daily metrics event limit reached.' }, 429);
     throw error;
@@ -316,10 +323,22 @@ async function recordProductMetric(request, env, user) {
   return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
 }
 
-async function listCloudCycles(env, user) {
+function parseProductMetric(body) {
+  const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
+  if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event)) return { error: json({ error: 'Invalid product metric event.' }, 400) };
+  if (installationId.length < 8) return { error: json({ error: 'Invalid product metric event.' }, 400) };
+  if (installationId.length > 128) return { error: json({ error: 'Invalid product metric event.' }, 400) };
+  return { installationId, event: body.event, eventDate: new Date().toISOString().slice(0, 10) };
+}
+
+async function listCloudCycles(env, user, url) {
+  const page = Number(url.searchParams.get('page') || 0);
+  if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
   const result = await env.DB.prepare(`SELECT id, user_id AS userId, label, cycle_date AS cycleDate, metadata_json, created_at AS createdAt, updated_at AS updatedAt
-    FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC`).bind(user.clerk_id).all();
-  return json({ cycles: (result.results || []).map((row) => {
+    FROM cloud_cycles WHERE user_id = ? ORDER BY updated_at DESC, id DESC LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
+    .bind(user.clerk_id, page * MAX_LIST_PAGE_SIZE).all();
+  const rows = result.results || [];
+  return json({ cycles: rows.map((row) => {
     const stored = parseJson(row.metadata_json) || {};
     const metadata = { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
       createdAt: row.createdAt, updatedAt: row.updatedAt, forecastDays: stored.forecastDays,
@@ -327,7 +346,7 @@ async function listCloudCycles(env, user) {
       payloadHash: stored.payloadHash, workspaceId: stored.workspaceId, workflowMetadata: stored.workflowMetadata };
     return { id: row.id, userId: row.userId, label: row.label, cycleDate: row.cycleDate,
       createdAt: row.createdAt, updatedAt: row.updatedAt, workflowMetadata: stored.workflowMetadata, metadata };
-  }) });
+  }), nextPage: rows.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
 }
 
 async function writeCloudCycle(env, user, data) {
@@ -406,8 +425,8 @@ async function handleCloudCycleById({ request, env, path, user }) {
 }
 
 async function handleCloudCycleRoutes(context) {
-  const { request, env, path, user } = context;
-  if (path === '/api/cloud-cycles' && request.method === 'GET') return listCloudCycles(env, user);
+  const { request, env, path, user, url } = context;
+  if (path === '/api/cloud-cycles' && request.method === 'GET') return listCloudCycles(env, user, url);
   if (path === '/api/cloud-cycles' && request.method === 'POST') return saveCloudCycle(request, env, user);
   return handleCloudCycleById(context);
 }
@@ -482,28 +501,41 @@ async function listCustomProducts(env, url, user) {
 }
 
 async function reserveCustomProductSlot(env, userId, product, dataJson) {
-  const slots = [...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`),
-    ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`)].join(', ');
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
-        INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
-        SELECT ?, slots.slot_id, ?, ? FROM slots
-        WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
-          AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
-        ORDER BY CASE WHEN slots.slot_id LIKE 'product-%' THEN 0 ELSE 1 END, slots.slot_id LIMIT 1`)
-        .bind(userId, product.id, dataJson, userId, userId, MAX_CUSTOM_PRODUCTS).run();
-      if (!result.meta.changes) return json({ error: 'Custom product limit reached.' }, 409);
-      return null;
+      return await insertCustomProductSlot(env, userId, product.id, dataJson);
     } catch (error) {
-      if (String(error?.message || '').includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
-      if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
-      const duplicate = await env.DB.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?').bind(userId, product.id).first();
-      if (duplicate) return json({ error: 'Custom product already exists.' }, 409);
-      if (attempt === 1) return json({ error: 'Custom product limit reached. Refresh and try again.' }, 409);
+      const failure = await classifyCustomProductSlotFailure(env.DB, error, userId, product.id, attempt);
+      if (failure) return failure;
     }
   }
   return null;
+}
+
+async function insertCustomProductSlot(env, userId, productId, dataJson) {
+  const slots = customProductSlotValues();
+  const result = await env.DB.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
+    INSERT INTO custom_products (user_id, slot_id, product_id, data_json)
+    SELECT ?, slots.slot_id, ?, ? FROM slots
+    WHERE NOT EXISTS (SELECT 1 FROM custom_products WHERE user_id = ? AND slot_id = slots.slot_id)
+      AND (SELECT COUNT(*) FROM custom_products WHERE user_id = ? AND migration_import = 0) < ?
+    ORDER BY CASE WHEN slots.slot_id LIKE 'product-%' THEN 0 ELSE 1 END, slots.slot_id LIMIT 1`)
+    .bind(userId, productId, dataJson, userId, userId, MAX_CUSTOM_PRODUCTS).run();
+  return result.meta.changes ? null : json({ error: 'Custom product limit reached.' }, 409);
+}
+
+function customProductSlotValues() {
+  return [...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`),
+    ...Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, index) => `('active-${String(index + 1).padStart(2, '0')}')`)].join(', ');
+}
+
+async function classifyCustomProductSlotFailure(db, error, userId, productId, attempt) {
+  const message = String(error?.message || '');
+  if (message.includes('custom_product_quota_reached')) return json({ error: 'Custom product limit reached.' }, 409);
+  if (!message.includes('UNIQUE constraint failed')) throw error;
+  const duplicate = await db.prepare('SELECT 1 AS found FROM custom_products WHERE user_id = ? AND product_id = ?').bind(userId, productId).first();
+  if (duplicate) return json({ error: 'Custom product already exists.' }, 409);
+  return attempt ? json({ error: 'Custom product limit reached. Refresh and try again.' }, 409) : null;
 }
 
 async function createCustomProduct(request, env, user) {
@@ -624,7 +656,10 @@ async function saveUserRecord({ request, env, user, recordType }) {
 
 function parseRecordWrite(body) {
   const id = typeof body?.id === 'string' ? body.id.trim() : '';
-  if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return { error: json({ error: 'Invalid record.' }, 400) };
+  if (!id) return { error: json({ error: 'Invalid record.' }, 400) };
+  if (id.length > 128) return { error: json({ error: 'Invalid record.' }, 400) };
+  if (id.includes('/')) return { error: json({ error: 'Invalid record.' }, 400) };
+  if (!isObject(body?.data)) return { error: json({ error: 'Invalid record.' }, 400) };
   const dataJson = JSON.stringify(body.data);
   if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return { error: json({ error: 'Record is too large.' }, 413) };
   return { id, dataJson };

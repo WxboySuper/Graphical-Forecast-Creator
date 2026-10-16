@@ -126,7 +126,8 @@ class D1Mock {
       return { results: [...this.records.values()].filter((record) => record.user_id === userId && record.record_type === type).slice(offset, offset + 10) };
     }
     if (sql.includes('FROM cloud_cycles WHERE user_id = ?')) {
-      return { results: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0])
+      const offset = params.at(-1);
+      return { results: [...this.cloudCycles.values()].filter((row) => row.user_id === params[0]).slice(offset, offset + 10)
         .map((row) => ({ ...row, userId: row.user_id, cycleDate: row.cycle_date, createdAt: row.created_at, updatedAt: row.updated_at })) };
     }
     if (sql.includes('FROM workflow_awareness WHERE user_id = ?')) {

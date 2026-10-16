@@ -617,16 +617,8 @@ export async function listCloudCycles(
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> {
   try {
     if (isBetaClerkD1Mode()) {
-      const response = await fetchBetaApi('/api/cloud-cycles');
-      const body = (await response.json().catch(() => ({}))) ?? {};
-      if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
-      const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
-        .filter((raw: unknown) => isPlainObject(raw) && (raw.userId ?? (isPlainObject(raw.metadata) ? raw.metadata.userId : undefined)) === userId && typeof raw.id === 'string' && raw.id)
-        .map((raw: Record<string, unknown>) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
-          ? normalizeCloudCycleMetadataRecord({ cycleId: raw.id, rawRecord: raw, fallbackUserId: userId })
-          : null)
-        .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId));
-      return { success: true, data: sortCloudCycleMetadata(cycles) };
+      const result = await listBetaCloudCyclePages(userId);
+      return result.success && result.data ? { success: true, data: sortCloudCycleMetadata(result.data) } : result;
     }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
@@ -652,6 +644,32 @@ export async function listCloudCycles(
     };
   }
 }
+
+type BetaCloudCyclePage = { cycles: CloudCycleMetadata[]; nextPage: number | null };
+type BetaCloudCyclePageResult = { success: true; data: BetaCloudCyclePage } | { success: false; error: string };
+
+const listBetaCloudCyclePages = async (userId: string): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
+  const cycles: CloudCycleMetadata[] = [];
+  let page = 0;
+  while (true) {
+    const result = await fetchBetaCloudCyclePage(userId, page);
+    if (!result.success) return result;
+    cycles.push(...result.data.cycles);
+    if (result.data.nextPage === null) return { success: true, data: cycles };
+    page = result.data.nextPage;
+  }
+};
+
+const fetchBetaCloudCyclePage = async (userId: string, page: number): Promise<BetaCloudCyclePageResult> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles?page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
+  const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
+    .filter((raw: unknown) => isPlainObject(raw) && (raw.userId ?? (isPlainObject(raw.metadata) ? raw.metadata.userId : undefined)) === userId && typeof raw.id === 'string' && raw.id)
+    .map((raw: Record<string, unknown>) => normalizeCloudCycleMetadataRecord({ cycleId: raw.id as string, rawRecord: raw, fallbackUserId: userId }))
+    .filter((cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId));
+  return { success: true, data: { cycles, nextPage: Number.isSafeInteger(body?.nextPage) ? body.nextPage : null } };
+};
 
 /**
  * Subscribes to cloud cycles list for real-time updates

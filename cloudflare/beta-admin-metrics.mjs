@@ -13,18 +13,27 @@ function readMetricsWindow(url) {
 }
 
 async function readAdminMetrics(url, env, user) {
-  if (!isAdminUser(env, user)) return json({ error: 'Admin access denied.' }, 403);
+  const accessError = getAdminAccessError(env, user);
+  if (accessError) return accessError;
   const days = readMetricsWindow(url);
   if (!days) return json({ error: 'Invalid metrics window.' }, 400);
   const [accounts, premium, storage, rows] = await loadAdminMetricRows(env.DB, days);
   const dailyMetrics = rows.results || [];
+  const summary = createAdminMetricsSummary({ accounts, premium, storage, dailyMetrics });
+  return json({ metricsEnabled: true, window: days, summary, dailyMetrics });
+}
+
+function getAdminAccessError(env, user) {
+  return isAdminUser(env, user) ? null : json({ error: 'Admin access denied.' }, 403);
+}
+
+function createAdminMetricsSummary({ accounts, premium, storage, dailyMetrics }) {
   const latest = dailyMetrics.at(-1) || {};
-  const summary = {
+  return {
     totalAccounts: Number(accounts?.count || 0), activeDevices: Number(latest.activeDevices || 0),
     activeSignedInAccounts: Number(latest.activeSignedInAccounts || 0), premiumSubscriptions: Number(premium?.count || 0),
     storageBytes: Number(storage?.bytes || 0), ...sumAdminMetrics(dailyMetrics),
   };
-  return json({ metricsEnabled: true, window: days, summary, dailyMetrics });
 }
 
 async function loadAdminMetricRows(db, days) {
