@@ -48,11 +48,21 @@ async function main() {
   });
   const db = getFirestore(app);
   await fs.mkdir(output, { recursive: true, mode: 0o700 });
+  await fs.chmod(output, 0o700);
   const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
   let fullSnapshotCount = 0;
+  let snapshotWriteError = null;
   let snapshotWriteQueue = Promise.resolve();
   const writeSnapshotLine = (record) => {
-    snapshotWriteQueue = snapshotWriteQueue.then(() => fullSnapshotFile.write(`${JSON.stringify(record)}\n`));
+    snapshotWriteQueue = snapshotWriteQueue.catch(() => undefined).then(async () => {
+      if (snapshotWriteError) throw snapshotWriteError;
+      try {
+        await fullSnapshotFile.write(`${JSON.stringify(record)}\n`);
+      } catch (error) {
+        snapshotWriteError = error;
+        throw error;
+      }
+    });
     return snapshotWriteQueue;
   };
   const exportCollection = async (collectionRef) => {
@@ -96,6 +106,9 @@ async function main() {
   }
 
   const seenEmails = new Set();
+  const userSnapshotDirectory = path.join(output, 'by-email');
+  await fs.mkdir(userSnapshotDirectory, { recursive: true, mode: 0o700 });
+  await fs.chmod(userSnapshotDirectory, 0o700);
   let count = 0;
   let skippedNoEmail = 0;
   const userSnapshotEmailHashes = [];
@@ -112,7 +125,7 @@ async function main() {
     if (entitlementDoc.exists) account.userEntitlement = entitlementDoc.data();
     if (metricsDoc.exists) account.userMetrics = metricsDoc.data();
     const legacyValue = account.userSettings?.cloudCycles;
-    if (legacyValue) {
+    if (legacyValue !== undefined && legacyValue !== null) {
       let legacy = legacyValue;
       if (typeof legacyValue === 'string') {
         try { legacy = JSON.parse(legacyValue); } catch {
@@ -138,9 +151,13 @@ async function main() {
             updatedAt: metadata.updatedAt || metadata.createdAt || new Date(0).toISOString(),
           });
         }
+      } else {
+        malformedLegacyCycles.push({ uidHash: sha256(account.uid), cycleHash: sha256('cloudCycles') });
+        throw new Error(`Malformed legacy cloudCycles for account hash ${sha256(account.uid)}.`);
       }
     }
-    const cycleDocs = await readAllDocuments(db.collection('cloudCycles').where('userId', '==', account.uid));
+    const cycleSnapshot = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
+    const cycleDocs = cycleSnapshot.docs;
     const migratedCycles = [];
     for (let offset = 0; offset < cycleDocs.length; offset += 10) {
       const cycleBatch = cycleDocs.slice(offset, offset + 10);
@@ -229,6 +246,7 @@ async function main() {
     if (profilePage.docs.length < 500) break;
     profileCursor = profilePage.docs.at(-1);
   }
+  const complete = accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0;
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({
     projectId,
     fullSnapshotCount,
@@ -239,11 +257,11 @@ async function main() {
     accountFailures,
     malformedLegacyCycleCount: malformedLegacyCycles.length,
     malformedLegacyCycleHashes: malformedLegacyCycles,
-    complete: accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0,
+    complete,
   }, null, 2), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+  if (!complete) throw new Error(`Snapshot export incomplete: ${accountFailures.length} account failures, ${skippedNoEmail} profiles without email, and ${malformedLegacyCycles.length} malformed legacy cycles; review manifest.json and rerun into a new output directory.`);
   console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}; skipped ${skippedNoEmail} profiles without email.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
-  if (accountFailures.length) throw new Error(`Snapshot export incomplete: ${accountFailures.length} user records failed; review manifest.json and rerun to a new output directory.`);
 }
 
 main().catch((error) => {

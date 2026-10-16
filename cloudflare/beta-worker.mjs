@@ -8,6 +8,8 @@ const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
 const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
 const AUTH_PROFILE_CACHE_MAX = 1_000;
+const DEFAULT_MONTHLY_DISPLAY_PRICE = '$3/month';
+const DEFAULT_ANNUAL_DISPLAY_PRICE = '$30/year';
 const authProfileCache = new Map();
 const PRODUCT_METRIC_EVENT_TYPES = new Set(['account_signup', 'account_signin', 'cycle_saved', 'discussion_saved', 'verification_run', 'cloud_cycle_saved', 'cloud_cycle_loaded']);
 
@@ -270,7 +272,8 @@ async function handleApi(request, env) {
   if (path === '/api/billing/config' && request.method === 'GET') {
     const checkoutEnabled = Boolean(env.STRIPE_SECRET_KEY && (env.STRIPE_PRICE_MONTHLY || env.STRIPE_PRICE_ANNUAL_STANDARD));
     return json({ billingEnabled: Boolean(env.STRIPE_SECRET_KEY), checkoutEnabled, annualPromoActive: false,
-      monthlyDisplayPrice: env.MONTHLY_DISPLAY_PRICE || '$3/month', annualDisplayPrice: env.ANNUAL_DISPLAY_PRICE || '$30/year' });
+      monthlyDisplayPrice: env.MONTHLY_DISPLAY_PRICE || DEFAULT_MONTHLY_DISPLAY_PRICE,
+      annualDisplayPrice: env.ANNUAL_DISPLAY_PRICE || DEFAULT_ANNUAL_DISPLAY_PRICE });
   }
   if (path === '/api/capabilities/status' && request.method === 'GET') {
     return json({ capabilities: { TSTM_GENERATION_ENABLED: { available: false, reason: 'deployment_disabled' } } });
@@ -490,11 +493,12 @@ async function handleApi(request, env) {
   if (path === '/api/metrics/event' && request.method === 'POST') {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || typeof body.installationId !== 'string' || body.installationId.length < 8 || body.installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
+    const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
+    if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || installationId.length < 8 || installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
     const eventDate = new Date().toISOString().slice(0, 10);
     await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
       VALUES (?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), eventDate, body.installationId, body.event, user.clerk_id).run();
+      .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -514,7 +518,7 @@ async function handleApi(request, env) {
   if (path === '/api/cloud-cycles' && request.method === 'POST') {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    const id = typeof body?.id === 'string' ? body.id : '';
+    const id = typeof body?.id === 'string' ? body.id.trim() : '';
     const label = typeof body?.label === 'string' ? body.label.trim() : '';
     const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
     const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
@@ -576,12 +580,15 @@ async function handleApi(request, env) {
   if (path === '/api/workflow-awareness' && request.method === 'PUT') {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string' || !body.record.metadata.cycleId.trim() || body.record.metadata.cycleId.includes('/')) return json({ error: 'Invalid workflow record.' }, 400);
+    if (!isObject(body?.record?.metadata) || typeof body.record.metadata.cycleId !== 'string') return json({ error: 'Invalid workflow record.' }, 400);
+    const cycleId = body.record.metadata.cycleId.trim();
+    if (!cycleId || cycleId.includes('/')) return json({ error: 'Invalid workflow record.' }, 400);
+    body.record.metadata.cycleId = cycleId;
     const dataJson = JSON.stringify(body.record);
     if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Workflow record is too large.' }, 413);
     await env.DB.prepare(`INSERT INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)
       ON CONFLICT(user_id, cycle_id) DO UPDATE SET data_json = excluded.data_json`)
-      .bind(user.clerk_id, body.record.metadata.cycleId, dataJson).run();
+      .bind(user.clerk_id, cycleId, dataJson).run();
     return json({ success: true });
   }
   if (path === '/api/workflow-awareness' && request.method === 'DELETE') {

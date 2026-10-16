@@ -59,6 +59,10 @@ class D1Mock {
       const user = [...this.users.values()].find((entry) => entry.email.toLowerCase() === String(params[0]).toLowerCase());
       return user ? { clerk_id: user.clerk_id } : null;
     }
+    if (sql.startsWith('SELECT clerk_id FROM users WHERE clerk_id')) {
+      const user = this.users.get(params[0]);
+      return user ? { clerk_id: user.clerk_id } : null;
+    }
     if (sql.startsWith('SELECT data_json FROM user_settings')) return this.settings.has(params[0]) ? { data_json: this.settings.get(params[0]) } : null;
     if (sql.startsWith('SELECT data_json FROM user_entitlements')) return this.entitlements.has(params[0]) ? { data_json: this.entitlements.get(params[0]) } : null;
     if (sql.startsWith('SELECT data_json FROM user_metrics')) return this.metrics.has(params[0]) ? { data_json: this.metrics.get(params[0]) } : null;
@@ -587,11 +591,11 @@ test('workflow awareness rejects empty cycle IDs and returns persisted envelopes
       method: 'PUT', body: { record: { metadata: { cycleId: '' } } },
     });
     assert.equal(invalid.status, 400);
-    const record = { consentVersion: 1, schemaVersion: 1, metadata: { cycleId: 'cycle-1' } };
+    const record = { consentVersion: 1, schemaVersion: 1, metadata: { cycleId: ' cycle-1 ' } };
     const saved = await call('/api/workflow-awareness', createEnv(db), { method: 'PUT', body: { record } });
     assert.equal(saved.status, 200);
     const list = await call('/api/workflow-awareness', createEnv(db));
-    assert.deepEqual((await list.json()).records, [record]);
+    assert.deepEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
   });
 });
 
@@ -693,6 +697,16 @@ test('authenticated JSON writes reject oversized request bodies before parsing',
   assert.deepEqual(await response.json(), { error: 'Request body is too large.' });
 });
 
+test('product metrics reject malformed JSON with a client error', async () => {
+  const response = await withClerkFetch(() => worker.fetch(new Request('https://beta.gfcweather.com/api/metrics/event', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${createToken()}`, 'Content-Type': 'application/json' },
+    body: '{',
+  }), createEnv()));
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'Invalid product metric event.' });
+});
+
 test('Clerk deletion cleanup removes D1-owned user records idempotently', async () => {
   const db = new D1Mock();
   const env = createEnv(db);
@@ -743,6 +757,13 @@ test('Stripe subscription events remain retryable until the Clerk user exists', 
   }), env);
   assert.equal(response.status, 503);
   assert.equal(db.stripeEvents.has('evt_unprovisioned'), false);
+
+  db.users.set('not-created-yet', { clerk_id: 'not-created-yet', email: 'beta@example.com', beta_access: 1 });
+  const retry = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+    method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+  }), env);
+  assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal(JSON.parse(db.entitlements.get('not-created-yet')).billingStatus, 'active');
 });
 
 test('Stripe webhook rejects malformed JSON even when its signature is valid', async () => {

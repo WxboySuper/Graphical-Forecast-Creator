@@ -11,7 +11,7 @@ import App from './App';
 import { store } from './store';
 import { initializeStorePersistence } from './store/persistence';
 import { ClerkProvider } from '@clerk/react';
-import { betaClerkPublishableKey, isBetaClerkD1Mode } from './lib/betaApi';
+import { betaClerkPublishableKey } from './lib/betaApi';
 
 // Browser-only hydration and persistence are explicit application bootstrap,
 // not import-time behavior of the Redux store modules.
@@ -30,8 +30,11 @@ const root = ReactDOM.createRoot(
       }
     : undefined
 );
-const application = isBetaClerkD1Mode()
-  ? <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>
+const clerkD1BuildSelected = typeof __GFC_BETA_CLERK_D1__ !== 'undefined' && __GFC_BETA_CLERK_D1__;
+const application = clerkD1BuildSelected
+  ? betaClerkPublishableKey
+    ? <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>
+    : <main role="alert" className="p-6">Beta Clerk authentication is enabled, but its publishable key is missing. Contact the site administrator.</main>
   : <App />;
 
 root.render(<React.StrictMode>{application}</React.StrictMode>);

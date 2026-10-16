@@ -1279,7 +1279,6 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    betaAccessRequestIdRef.current += 1;
     const requestId = ++betaAccessRequestIdRef.current;
     setBetaAccessLoading(true);
 
@@ -1529,9 +1528,10 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return fetch(path, { ...init, headers });
   }, [getToken]);
 
+  const clerkUserId = clerkUser?.id;
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
     const requestId = ++betaAccessRequestIdRef.current;
-    if (!isSignedIn || !clerkUser) {
+    if (!isSignedIn || !clerkUserId) {
       setBetaAccess(false);
       setBetaAccessLoading(false);
       return;
@@ -1553,7 +1553,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setSettingsSyncStatus('idle');
       }
       hasInitializedSettingsRef.current = true;
-      setBootstrapKey(clerkUser.id);
+      setBootstrapKey(clerkUserId);
       setError(null);
     } catch (nextError) {
       if (requestId !== betaAccessRequestIdRef.current) return;
@@ -1562,7 +1562,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
     }
-  }, [clerkUser, dispatch, isSignedIn, request]);
+  }, [clerkUserId, dispatch, isSignedIn, request]);
 
   useEffect(() => {
     if (!isLoaded || !isUserLoaded) {
@@ -1570,7 +1570,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setBetaAccessLoading(true);
       return;
     }
-    if (!isSignedIn || !clerkUser) {
+    if (!isSignedIn || !clerkUserId) {
       betaAccessRequestIdRef.current += 1;
       setSyncedSettings(null);
       setSettingsSyncStatus('idle');
@@ -1583,7 +1583,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return;
     }
     refreshBetaAccess().catch(() => undefined);
-  }, [clerkUser, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess]);
+  }, [clerkUserId, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess]);
 
   const currentUser = useMemo(() => {
     if (!clerkUser) return null;
@@ -1594,7 +1594,6 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       photoURL: clerkUser.imageUrl,
       providerData: [
         ...(clerkUser.externalAccounts ?? []).map((account) => ({ providerId: account.provider === 'google' ? 'google.com' : `${account.provider}.com` })),
-        ...(clerkUser.passwordEnabled ? [{ providerId: 'password' }] : []),
       ],
       getIdToken: async () => {
         const token = await getToken();

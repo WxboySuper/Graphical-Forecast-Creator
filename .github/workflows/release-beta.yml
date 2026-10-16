@@ -104,6 +104,7 @@ jobs:
     needs: final_changelog_audit
     if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RELEASE-BETA' && !inputs.dry_run
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -138,6 +139,7 @@ jobs:
         )
       )
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
@@ -443,8 +445,9 @@ jobs:
           BETA_D1_DATABASE_ID: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_D1_DATABASE_ID || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.BETA_CLERK_PUBLISHABLE_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
         run: |
+          set -euo pipefail
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
             if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
               echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
@@ -456,6 +459,7 @@ jobs:
             pnpm dlx wrangler@4.149.0 r2 object put "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup.sql --remote
             pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql --remote
             test -s beta-d1-backup-verified.sql
+            cmp --silent beta-d1-backup.sql beta-d1-backup-verified.sql
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --remote
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --remote
             test -s beta-firestore-full-snapshot.jsonl
@@ -484,6 +488,7 @@ jobs:
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             while IFS= read -r EMAIL_HASH; do
+              [[ -z "$EMAIL_HASH" ]] && continue
               pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --remote
               test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
             done < beta-firestore-email-hashes.txt
@@ -507,6 +512,8 @@ jobs:
           fi
           echo "pnpm dlx wrangler@4.149.0 rollback --config $CONFIG"
 
+  # Clerk+D1 requests use the beta hostname's same-origin Worker API. Keep the
+  # VPS service untouched as a rollback target; this path does not route traffic to it.
   deploy_beta_api:
     name: Deploy beta API server (VPS)
     needs: [release, deploy]

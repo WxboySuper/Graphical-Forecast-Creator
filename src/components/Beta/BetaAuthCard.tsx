@@ -288,6 +288,9 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
               </Button>
             </div>
           ) : null}
+          {clerkVerificationInProgress ? (
+            <p role="status" className="text-sm text-muted-foreground">Finish the verification step in the form below. You can switch account actions after verification.</p>
+          ) : null}
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />
           ) : (
