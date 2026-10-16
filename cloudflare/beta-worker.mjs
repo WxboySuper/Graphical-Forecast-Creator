@@ -477,10 +477,16 @@ async function persistWorkflowAwareness(env, userId, cycleId, dataJson) {
 async function handleWorkflowDelete(env, path, user) {
   const awarenessMatch = path.match(/^\/api\/workflow-awareness\/([^/]+)$/);
   const cycleId = awarenessMatch ? decodePathId(awarenessMatch[1]) : null;
-  if (awarenessMatch && (!cycleId || cycleId.includes('/'))) return json({ error: 'Invalid cycle ID.' }, 400);
+  if (hasInvalidWorkflowDeleteCycleId(awarenessMatch, cycleId)) return json({ error: 'Invalid cycle ID.' }, 400);
   const query = workflowDeleteQuery(env.DB, user.clerk_id, cycleId);
   await query.run();
   return json({ success: true });
+}
+
+function hasInvalidWorkflowDeleteCycleId(awarenessMatch, cycleId) {
+  if (!awarenessMatch) return false;
+  if (!cycleId) return true;
+  return cycleId.includes('/');
 }
 
 function workflowDeleteQuery(db, userId, cycleId) {

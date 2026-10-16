@@ -551,6 +551,10 @@ test('workflow awareness rejects invalid and over-quota writes and returns persi
     assert.equal(wrongAccount.status, 403);
     const list = await call('/api/workflow-awareness', createEnv(db));
     assert.deepStrictEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
+    const invalidDelete = await call('/api/workflow-awareness/%2F', createEnv(db), { method: 'DELETE' });
+    assert.equal(invalidDelete.status, 400);
+    const deleteCycle = await call('/api/workflow-awareness/cycle-1', createEnv(db), { method: 'DELETE' });
+    assert.equal(deleteCycle.status, 200);
     for (let index = 1; index <= 200; index += 1) {
       db.workflowAwareness.set(`user_beta_test:cycle-${index}`, { user_id: 'user_beta_test', cycle_id: `cycle-${index}`, data_json: '{}' });
     }
