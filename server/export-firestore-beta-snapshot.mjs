@@ -57,27 +57,33 @@ function parseLegacyCloudCycles(legacyValue, uid, malformedLegacyCycles) {
 }
 
 function normalizeLegacyCloudCycle(id, raw, uid, malformedLegacyCycles) {
-  if (!isValidLegacyCycle(raw)) {
-    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
-    throw new Error(`Malformed legacy cycle for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
-  }
+  assertLegacyCycle(raw, id, uid, malformedLegacyCycles);
   const metadata = raw.metadata ?? raw;
   const { label, cycleDate } = validateCycleMetadata(metadata, id, uid, malformedLegacyCycles);
-  const rawPayload = raw.payloadJson ?? raw.payload;
-  let payloadJson = '{}';
-  if (typeof rawPayload === 'string') {
-    payloadJson = rawPayload;
-    try { JSON.parse(payloadJson); }
-    catch {
-      malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
-      throw new Error(`Invalid legacy cycle payload for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
-    }
-  } else if (rawPayload !== null && rawPayload !== undefined) payloadJson = JSON.stringify(rawPayload);
+  const payloadJson = normalizeLegacyCyclePayload(raw.payloadJson ?? raw.payload, id, uid, malformedLegacyCycles);
   return {
     id, label, cycleDate, metadata, payloadJson, payloadBytes: Buffer.byteLength(payloadJson),
     createdAt: metadata.createdAt || new Date(0).toISOString(),
     updatedAt: metadata.updatedAt || metadata.createdAt || new Date(0).toISOString(),
   };
+}
+
+function assertLegacyCycle(raw, id, uid, malformedLegacyCycles) {
+  if (isValidLegacyCycle(raw)) return;
+  malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
+  throw new Error(`Malformed legacy cycle for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
+}
+
+function normalizeLegacyCyclePayload(rawPayload, id, uid, malformedLegacyCycles) {
+  if (typeof rawPayload !== 'string') {
+    return rawPayload !== null && rawPayload !== undefined ? JSON.stringify(rawPayload) : '{}';
+  }
+  try { JSON.parse(rawPayload); }
+  catch {
+    malformedLegacyCycles.push({ uidHash: sha256(uid), cycleHash: sha256(id) });
+    throw new Error(`Invalid legacy cycle payload for account hash ${sha256(uid)} cycle hash ${sha256(id)}.`);
+  }
+  return rawPayload;
 }
 
 function readLegacyCloudCycles(account, malformedLegacyCycles) {

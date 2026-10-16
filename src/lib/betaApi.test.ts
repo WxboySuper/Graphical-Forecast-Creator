@@ -23,30 +23,29 @@ describe('beta Worker token provider lifecycle', () => {
     expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is still initializing.' }));
   });
 
-  it('discards a token that resolves after the provider is cleared', async () => {
+  const resolveStaleTokenRequest = async (clearProvider: boolean) => {
     let resolveToken!: (token: string) => void;
     const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
     setBetaApiTokenProvider(provider);
     const pending = fetchBetaApi('/api/user/settings');
     await Promise.resolve();
-    setBetaApiTokenProvider(null);
+    setBetaApiTokenProvider(clearProvider ? null : provider);
     resolveToken('stale-clerk-token');
-    await expect(pending).rejects.toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
-    expect(fetchSpy).not.toHaveBeenCalled();
+    const error = await pending.then(() => null, (caught: Error) => caught);
+    return { error, fetchSpy };
+  };
+
+  it('discards a token that resolves after the provider is cleared', async () => {
+    const result = await resolveStaleTokenRequest(true);
+    expect(result.error).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(result.fetchSpy).not.toHaveBeenCalled();
   });
 
   it('invalidates an in-flight request when the stable provider is re-registered for a new account', async () => {
-    let resolveToken!: (token: string) => void;
-    const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
-    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
-    setBetaApiTokenProvider(provider);
-    const pending = fetchBetaApi('/api/user/settings');
-    await Promise.resolve();
-    setBetaApiTokenProvider(provider);
-    resolveToken('clerk-token');
-    await expect(pending).rejects.toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
-    expect(fetchSpy).not.toHaveBeenCalled();
+    const result = await resolveStaleTokenRequest(false);
+    expect(result.error).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(result.fetchSpy).not.toHaveBeenCalled();
   });
 
   it('shares one bounded token wait and stops polling when aborted', async () => {
