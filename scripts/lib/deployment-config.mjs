@@ -16,12 +16,70 @@ export function normalizeDeploymentConfig(config) {
     throw new Error('Deployment config must declare a serverEnv object.');
   }
 
-  const normalizedServerEnv = {};
-  for (const [key, value] of Object.entries(serverEnv)) {
-    normalizedServerEnv[normalizeServerEnvKey(key)] = normalizeServerEnvValue(key, value);
+  return {
+    ...normalizeEnvironment(config.environment),
+    serverEnv: normalizeServerEnv(serverEnv),
+  };
+}
+
+/** Normalizes every deployment environment variable after validating its key and value. */
+function normalizeServerEnv(serverEnv) {
+  return Object.fromEntries(
+    Object.entries(serverEnv).map(([key, value]) => [
+      normalizeServerEnvKey(key),
+      normalizeServerEnvValue(key, value),
+    ]),
+  );
+}
+
+/** Validates and normalizes the optional deployment environment label. */
+function normalizeEnvironment(environment) {
+  if (environment !== undefined && typeof environment !== 'string') {
+    throw new Error('Deployment config environment must be a string.');
   }
 
-  return { serverEnv: normalizedServerEnv };
+  return environment === undefined ? {} : { environment };
+}
+
+/** Merges a shared config with an environment override and validates the result. */
+export function mergeDeploymentConfigs(baseConfig, overrideConfig) {
+  validateDeploymentConfigObjects(baseConfig, overrideConfig);
+
+  return normalizeDeploymentConfig({
+    ...resolveMergedEnvironment(baseConfig, overrideConfig),
+    serverEnv: mergeServerEnv(baseConfig, overrideConfig),
+  });
+}
+
+/** Validates the object shapes needed before an inherited merge. */
+function validateDeploymentConfigObjects(baseConfig, overrideConfig) {
+  if (!isPlainObject(baseConfig) || !isPlainObject(overrideConfig)) {
+    throw new Error('Deployment configs must be JSON objects.');
+  }
+
+  if (!isPlainObject(baseConfig.serverEnv)) {
+    throw new Error('Base deployment config must declare a serverEnv object.');
+  }
+  if ('serverEnv' in overrideConfig && !isPlainObject(overrideConfig.serverEnv)) {
+    throw new Error('Deployment override serverEnv must be an object.');
+  }
+}
+
+/** Keeps an explicit environment override, or inherits the base environment. */
+function resolveMergedEnvironment(baseConfig, overrideConfig) {
+  return {
+    environment: overrideConfig.environment === undefined
+      ? baseConfig.environment
+      : overrideConfig.environment,
+  };
+}
+
+/** Combines shared server defaults with optional environment-specific values. */
+function mergeServerEnv(baseConfig, overrideConfig) {
+  return {
+    ...baseConfig.serverEnv,
+    ...(overrideConfig.serverEnv ?? {}),
+  };
 }
 
 /** Validates one env key and returns it unchanged for map construction. */
