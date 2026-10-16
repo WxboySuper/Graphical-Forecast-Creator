@@ -18,7 +18,7 @@ import {
   sortProducts,
 } from './customProductRepositoryModel';
 import { requireDb } from './firebase';
-import { fetchBetaApi, isBetaClerkD1Mode } from './betaApi';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
 
 export const CUSTOM_PRODUCT_DOCUMENT_SLOTS = Array.from(
   { length: CUSTOM_PRODUCT_LIMITS.productsPerAccount },
@@ -128,8 +128,9 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
       let retryTimer: number | undefined;
       const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
         if (!active) return;
-        if (error instanceof Error && error.message.includes('The beta session is still initializing')) {
-          retryTimer = window.setTimeout(() => { void refresh(); }, 250);
+        if (isBetaSessionInitializing(error)) {
+          if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+          retryTimer = window.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
           return;
         }
         onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
@@ -145,6 +146,10 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
   },
   async create(userId, draft) {
     if (isBetaClerkD1Mode()) {
+      const products = await readBetaProducts(userId);
+      if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
+        throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
+      }
       const product = createHostedProduct({ id: uuidv4(), userId, draft });
       const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
       const body = (await response.json().catch(() => ({}))) ?? {};

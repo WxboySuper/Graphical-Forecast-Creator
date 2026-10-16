@@ -8,7 +8,7 @@ import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 import { DEFAULT_FORECAST_WORKSPACE, resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { fetchBetaApi, isBetaClerkD1Mode } from './betaApi';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -451,6 +451,8 @@ const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
       const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok || !isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
+      const owner = body.cycle.userId ?? (isPlainObject(body.cycle.metadata) ? body.cycle.metadata.userId : undefined);
+      if (owner !== params.userId) return { error: 'Cloud cycle not found' as const };
       existingMetadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
     }
     const metadata: CloudCycleMetadata = {
@@ -506,6 +508,8 @@ export const loadCloudCycle = async (
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
       const body = await response.json().catch(() => ({}));
       if (!response.ok || !body?.cycle) return { success: false, error: body?.error || 'Cloud cycle not found' };
+      const owner = body.cycle.userId ?? (isPlainObject(body.cycle.metadata) ? body.cycle.metadata.userId : undefined);
+      if (owner !== params.userId) return { success: false, error: 'Cloud cycle not found' };
       const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
       const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
       return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
@@ -657,16 +661,17 @@ export const subscribeToCloudCycles = (
     let active = true;
     let retryTimer: number | undefined;
     const scheduleRetry = () => {
-      if (active) retryTimer = window.setTimeout(() => { void refresh(); }, 250);
+      if (!active || retryTimer !== undefined) return;
+      retryTimer = window.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
     };
     const refresh = async () => {
       try {
         const result = await listCloudCycles({ userId });
         if (active && result.success && result.data) onUpdate(result.data);
-        else if (active && !result.success && result.error?.includes('The beta session is still initializing')) scheduleRetry();
+        else if (active && !result.success && isBetaSessionInitializing(result.error)) scheduleRetry();
         else if (active && !result.success) onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
       } catch (error) {
-        if (active && error instanceof Error && error.message.includes('The beta session is still initializing')) scheduleRetry();
+        if (active && isBetaSessionInitializing(error)) scheduleRetry();
         else if (active) {
           onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.'));
         }

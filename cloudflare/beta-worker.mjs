@@ -573,6 +573,8 @@ async function handleApi(request, env) {
   }
 
   if (path === '/api/workflow-awareness' && request.method === 'GET') {
+    const requestedUserId = url.searchParams.get('userId');
+    if (requestedUserId && requestedUserId !== user.clerk_id) return json({ error: 'Account does not match session.' }, 403);
     const result = await env.DB.prepare('SELECT cycle_id AS id, data_json FROM workflow_awareness WHERE user_id = ?')
       .bind(user.clerk_id).all();
     return json({ records: (result.results || []).map((row) => parseJson(row.data_json)).filter(Boolean) });

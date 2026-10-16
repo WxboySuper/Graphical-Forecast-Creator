@@ -1517,7 +1517,11 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [clerkUser?.id, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
-    const token = await getToken();
+    let token = await getToken();
+    for (let attempt = 0; !token && attempt < 20; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      token = await getToken();
+    }
     if (!token) throw new Error('Your Clerk session is not ready. Sign in again.');
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Bearer ${token}`);
@@ -1687,9 +1691,9 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     signUpWithEmail: disabledAuthAction,
     signOutUser: async () => {
       setError(null);
-      resetClerkAccountState();
       try {
         await clerk.signOut();
+        resetClerkAccountState();
       } catch (nextError) {
         const message = nextError instanceof Error ? nextError.message : 'Unable to sign out right now.';
         await refreshBetaAccess().catch(() => undefined);
@@ -1699,9 +1703,9 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     deleteAccount: async () => {
       setError(null);
-      resetClerkAccountState();
       try {
         await deleteClerkUser();
+        resetClerkAccountState();
       } catch (nextError) {
         const message = nextError instanceof Error ? nextError.message : 'Unable to delete your account right now.';
         await refreshBetaAccess().catch(() => undefined);

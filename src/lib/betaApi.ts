@@ -3,6 +3,10 @@ type BetaApiTokenProvider = () => Promise<string | null>;
 let tokenProvider: BetaApiTokenProvider | null = null;
 let tokenProviderWaiters: Array<(provider: BetaApiTokenProvider) => void> = [];
 const SESSION_INITIALIZING_ERROR = 'The beta session is still initializing.';
+export const isBetaSessionInitializing = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return message.includes(SESSION_INITIALIZING_ERROR);
+};
 
 /** True only for an explicitly selected beta build using Clerk and D1. */
 export const betaClerkPublishableKey = typeof __GFC_CLERK_PUBLISHABLE_KEY__ === 'undefined' ? '' : __GFC_CLERK_PUBLISHABLE_KEY__;
@@ -20,6 +24,10 @@ export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): 
 };
 
 const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
+  if (tokenProvider) {
+    resolve(tokenProvider);
+    return;
+  }
   const waiter = (provider: BetaApiTokenProvider) => {
     globalThis.clearTimeout(timeout);
     resolve(provider);

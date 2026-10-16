@@ -213,7 +213,7 @@ export const listWorkflowAwareness = async ({
 }): Promise<WorkflowAwarenessRecord[]> => {
   if (!isCurrentAwarenessConsent(consent)) return [];
   if (isBetaClerkD1Mode()) {
-    const response = await fetchBetaApi('/api/workflow-awareness');
+    const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}`);
     const body = (await response.json().catch(() => ({}))) ?? {};
     if (!response.ok) throw new Error(body?.error || 'Unable to load workflow awareness.');
     return (Array.isArray(body.records) ? body.records : []).map((record: unknown) => {

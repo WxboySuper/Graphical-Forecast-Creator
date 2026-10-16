@@ -594,6 +594,8 @@ test('workflow awareness rejects empty cycle IDs and returns persisted envelopes
     const record = { consentVersion: 1, schemaVersion: 1, metadata: { cycleId: ' cycle-1 ' } };
     const saved = await call('/api/workflow-awareness', createEnv(db), { method: 'PUT', body: { record } });
     assert.equal(saved.status, 200);
+    const wrongAccount = await call('/api/workflow-awareness?userId=another-user', createEnv(db));
+    assert.equal(wrongAccount.status, 403);
     const list = await call('/api/workflow-awareness', createEnv(db));
     assert.deepEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
   });

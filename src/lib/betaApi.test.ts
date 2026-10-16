@@ -2,6 +2,7 @@ import { fetchBetaApi, setBetaApiTokenProvider } from './betaApi';
 
 describe('beta Worker token provider lifecycle', () => {
   afterEach(() => {
+    jest.restoreAllMocks();
     setBetaApiTokenProvider(null);
     jest.useRealTimers();
   });
