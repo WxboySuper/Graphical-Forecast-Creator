@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import BetaAuthCard from './BetaAuthCard';
 import { useAuth } from '../../auth/AuthProvider';
 
@@ -39,6 +39,11 @@ describe('BetaAuthCard', () => {
       signInWithGoogle,
       signUpWithEmail,
     });
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.history.replaceState(null, '', '/');
   });
 
   test('renders basic sign-in form', () => {

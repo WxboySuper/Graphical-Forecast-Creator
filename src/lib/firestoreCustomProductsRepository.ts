@@ -154,7 +154,7 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
       const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
       const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
-      return body?.product && typeof body.product === 'object' ? body.product as HostedCustomProduct : product;
+      return body?.product && ownedProduct(body.product, userId) ? body.product : product;
     }
     const slot = findOpenProductSlot(await readOccupiedSlots(userId));
     const product = createHostedProduct({ id: uuidv4(), userId, draft });

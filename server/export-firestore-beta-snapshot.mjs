@@ -88,7 +88,7 @@ async function main() {
     const documents = [];
     let cursor = null;
     while (true) {
-      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
+      let pageQuery = query.limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
       documents.push(...page.docs);

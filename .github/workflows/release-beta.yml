@@ -453,6 +453,10 @@ jobs:
               echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
               exit 1
             fi
+            if [ -z "$BETA_D1_DATABASE_ID" ]; then
+              echo "::error::BETA_D1_DATABASE_ID is required for clerk-d1" >&2
+              exit 1
+            fi
             node scripts/prepare-beta-clerk-d1-config.mjs
             pnpm dlx wrangler@4.149.0 d1 export gfc-beta --remote --skip-confirmation --output beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"

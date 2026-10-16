@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,4 +16,5 @@ if (!template.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 c
 const generated = template.replaceAll('SET_AFTER_CREATING_BETA_D1', databaseId);
 if (generated.includes('SET_AFTER_CREATING_BETA_D1')) throw new Error('Beta D1 config still contains an unresolved database id marker.');
 await writeFile(generatedPath, generated, { encoding: 'utf8', mode: 0o600 });
+await chmod(generatedPath, 0o600);
 console.log(`Prepared ${generatedPath} using the configured beta D1 database id.`);

@@ -122,23 +122,24 @@ const emailSnapshotKey = async (email) => {
   return `by-email/${await sha256Hex(normalizeEmail(email))}.json`;
 };
 
-function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes) {
-      const settings = snapshot.userSettings;
-      if (settings !== undefined && settings !== null) {
-        if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
-        const settingsWithoutLegacyCycles = { ...settings };
-        delete settingsWithoutLegacyCycles.cloudCycles;
-        accountForMigrationBytes(settingsWithoutLegacyCycles);
-        // Snapshot values seed missing keys; current D1 values win on collisions.
-        statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
-          .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
-      }
-      const entitlement = snapshot.userEntitlement;
-      if (entitlement !== undefined && entitlement !== null) {
-        if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
-        accountForMigrationBytes(entitlement);
-        statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+function appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes) {
+  const settings = snapshot.userSettings;
+  if (settings == null) return;
+  if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
+  const settingsWithoutLegacyCycles = { ...settings };
+  delete settingsWithoutLegacyCycles.cloudCycles;
+  accountForMigrationBytes(settingsWithoutLegacyCycles);
+  statements.push(env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
+    .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
+}
+
+function appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes) {
+  const entitlement = snapshot.userEntitlement;
+  if (entitlement == null) return;
+  if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
+  accountForMigrationBytes(entitlement);
+  statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({
           uid: user.clerkId,
@@ -152,16 +153,23 @@ function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, ac
           currentPeriodEnd: typeof entitlement.currentPeriodEnd === 'string' ? entitlement.currentPeriodEnd : null,
           pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
           migratedFromSnapshot: true,
-        }), now));
-      }
-      const metrics = snapshot.userMetrics;
-      if (metrics !== undefined && metrics !== null) {
-        if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
-        accountForMigrationBytes(metrics);
-        statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
+    }), now));
+}
+
+function appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes) {
+  const metrics = snapshot.userMetrics;
+  if (metrics == null) return;
+  if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
+  accountForMigrationBytes(metrics);
+  statements.push(env.DB.prepare(`INSERT INTO user_metrics (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_metrics.data_json), updated_at = excluded.updated_at`)
-        .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
-      }
+    .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
+}
+
+function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes) {
+  appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes);
+  appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes);
+  appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes);
 }
 
 function appendSnapshotCycles(cloudCycles, user, env, now, statements, accountForMigrationBytes) {
@@ -230,50 +238,80 @@ async function appendSnapshotProducts(customProducts, user, env, statements, acc
       }
 }
 
+function readSnapshotCollections(snapshot) {
+  const read = (key) => {
+    const value = snapshot[key];
+    if (value == null) return [];
+    if (!Array.isArray(value)) throw new Error(`SNAPSHOT_${key.toUpperCase()}_INVALID`);
+    return value;
+  };
+  return {
+    cloudCycles: read('cloudCycles'),
+    workflowAwareness: read('workflowAwareness'),
+    customProducts: read('customProducts'),
+  };
+}
+
+function assertUniqueSnapshotIds(records, readId, code) {
+  const ids = new Set();
+  for (const record of records) {
+    const id = readId(record);
+    if (typeof id !== 'string' || !id) continue;
+    if (ids.has(id)) throw new Error(code);
+    ids.add(id);
+  }
+}
+
+function validateSnapshotCollections({ cloudCycles, workflowAwareness, customProducts }) {
+  assertUniqueSnapshotIds(cloudCycles, (record) => record?.id, 'SNAPSHOT_CYCLE_DUPLICATE_ID');
+  assertUniqueSnapshotIds(workflowAwareness, (record) => record?.id, 'SNAPSHOT_WORKFLOW_DUPLICATE_ID');
+  assertUniqueSnapshotIds(customProducts, (record) => record?.data?.id || record?.id, 'SNAPSHOT_PRODUCT_DUPLICATE_ID');
+  if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
+  if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
+  if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
+}
+
+function createMigrationByteCounter() {
+  let bytes = 0;
+  return (value) => {
+    bytes += new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).length;
+    if (bytes > MAX_MIGRATION_BYTES) throw new Error('SNAPSHOT_MIGRATION_TOO_LARGE');
+  };
+}
+
+async function buildSnapshotStatements(user, env, snapshot, now, collections) {
+  const accountForMigrationBytes = createMigrationByteCounter();
+  const statements = [];
+  appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes);
+  appendSnapshotCycles(collections.cloudCycles, user, env, now, statements, accountForMigrationBytes);
+  appendSnapshotWorkflows(collections.workflowAwareness, user, env, statements, accountForMigrationBytes);
+  await appendSnapshotProducts(collections.customProducts, user, env, statements, accountForMigrationBytes);
+  return statements;
+}
+
+async function executeSnapshotMigration(db, user, now, statements) {
+  statements.push(db.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
+    .bind('complete', now, now, user.clerkId));
+  await db.prepare("UPDATE users SET migration_status = 'migrating', updated_at = ? WHERE clerk_id = ?")
+    .bind(now, user.clerkId).run();
+  for (let offset = 0; offset < statements.length; offset += 50) await db.batch(statements.slice(offset, offset + 50));
+}
+
+async function markSnapshotMigrationFailed(db, user) {
+  await db.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
+    .bind('failed', new Date().toISOString(), user.clerkId).run();
+}
+
 async function applySnapshotMigration(user, env, snapshot, now) {
-  if (snapshot) {
-    try {
-      const readSnapshotArray = (key) => {
-        const value = snapshot[key];
-        if (value === undefined || value === null) return [];
-        if (!Array.isArray(value)) throw new Error(`SNAPSHOT_${key.toUpperCase()}_INVALID`);
-        return value;
-      };
-      const cloudCycles = readSnapshotArray('cloudCycles');
-      const workflowAwareness = readSnapshotArray('workflowAwareness');
-      const customProducts = readSnapshotArray('customProducts');
-      const assertUniqueSnapshotIds = (records, readId, code) => {
-        const ids = new Set();
-        for (const record of records) {
-          const id = readId(record);
-          if (typeof id === 'string' && id && ids.has(id)) throw new Error(code);
-          if (typeof id === 'string' && id) ids.add(id);
-        }
-      };
-      assertUniqueSnapshotIds(cloudCycles, (record) => record?.id, 'SNAPSHOT_CYCLE_DUPLICATE_ID');
-      assertUniqueSnapshotIds(workflowAwareness, (record) => record?.id, 'SNAPSHOT_WORKFLOW_DUPLICATE_ID');
-      assertUniqueSnapshotIds(customProducts, (record) => record?.data?.id || record?.id, 'SNAPSHOT_PRODUCT_DUPLICATE_ID');
-      if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
-      if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
-      if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
-      let migrationBytes = 0;
-      const accountForMigrationBytes = (value) => {
-        migrationBytes += new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).length;
-        if (migrationBytes > MAX_MIGRATION_BYTES) throw new Error('SNAPSHOT_MIGRATION_TOO_LARGE');
-      };
-      const statements = [];
-      appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes);      appendSnapshotCycles(cloudCycles, user, env, now, statements, accountForMigrationBytes);      appendSnapshotWorkflows(workflowAwareness, user, env, statements, accountForMigrationBytes);      await appendSnapshotProducts(customProducts, user, env, statements, accountForMigrationBytes);      statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
-        .bind('complete', now, now, user.clerkId));
-      await env.DB.prepare("UPDATE users SET migration_status = 'migrating', updated_at = ? WHERE clerk_id = ?")
-        .bind(now, user.clerkId).run();
-      for (let offset = 0; offset < statements.length; offset += 50) {
-        await env.DB.batch(statements.slice(offset, offset + 50));
-      }
-    } catch (error) {
-      await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
-        .bind('failed', new Date().toISOString(), user.clerkId).run();
-      throw error;
-    }
+  if (!snapshot) return;
+  try {
+    const collections = readSnapshotCollections(snapshot);
+    validateSnapshotCollections(collections);
+    const statements = await buildSnapshotStatements(user, env, snapshot, now, collections);
+    await executeSnapshotMigration(env.DB, user, now, statements);
+  } catch (error) {
+    await markSnapshotMigrationFailed(env.DB, user);
+    throw error;
   }
 }
 
@@ -291,7 +329,8 @@ async function updateClerkProfile(db, user) {
     await db.prepare('UPDATE users SET email = ?, email_verified = 1, display_name = ?, updated_at = ? WHERE clerk_id = ?')
       .bind(user.email, user.displayName, new Date().toISOString(), user.clerkId).run();
   } catch (error) {
-    if (String(error?.message || '').includes('UNIQUE constraint failed: users.email')) throw new Error('EMAIL_ALREADY_LINKED');
+    const message = String(error?.message || '');
+    if (message.includes('UNIQUE constraint failed') && message.includes('users.email')) throw new Error('EMAIL_ALREADY_LINKED');
     throw error;
   }
 }
@@ -345,7 +384,7 @@ async function ensureUser(user, env) {
   }
 
   const snapshot = await readUserSnapshot(env, user.email);
-  if (existing && !snapshot && existing.migration_status === 'no_match') return existing;
+  if (existing && !snapshot && existing.migration_status === 'no_match') return findClerkUser(env.DB, user.clerkId);
   const now = new Date().toISOString();
   if (existing) await updateMigratingUser(env.DB, user, snapshot, now);
   else await insertOrUpdateMigratingUser(env.DB, user, snapshot, now);
@@ -392,7 +431,7 @@ async function refreshMigratedStripeEntitlement(env, userId) {
       currentPeriodEnd: Number(subscription?.current_period_end)
         ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null,
       planInterval: subscription?.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual'
-        : subscription ? 'monthly' : entitlement.planInterval || null,
+          : subscription?.items?.data?.[0]?.price?.recurring?.interval === 'month' ? 'monthly' : entitlement.planInterval || null,
       pendingStripeSync: false,
       stripeSyncAttemptAt: undefined,
       updatedAt: attemptedAt,
@@ -913,7 +952,9 @@ async function handleStripeWebhook(request, env) {
           premiumActive: prior.betaOverrideActive === true || active,
           effectiveSource,
           cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end), currentPeriodEnd: periodEnd,
-          planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual' : 'monthly', updatedAt: new Date().toISOString() };
+          planInterval: subscription.items?.data?.[0]?.price?.recurring?.interval === 'year' ? 'annual'
+            : subscription.items?.data?.[0]?.price?.recurring?.interval === 'month' ? 'monthly' : prior.planInterval || null,
+          updatedAt: new Date().toISOString() };
         const billingStatements = [env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
           .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt)];
@@ -930,6 +971,7 @@ async function handleStripeWebhook(request, env) {
           try { await env.DB.batch(billingStatements.slice(1)); }
           catch (error) {
             if (!String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
+            console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
           }
         }
       } else {
