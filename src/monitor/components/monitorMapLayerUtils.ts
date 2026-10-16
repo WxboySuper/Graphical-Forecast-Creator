@@ -4,7 +4,6 @@ import TileLayer from 'ol/layer/Tile';
 import VectorSource from 'ol/source/Vector';
 import TileWMS from 'ol/source/TileWMS';
 import OSM from 'ol/source/OSM';
-import XYZ from 'ol/source/XYZ';
 import GeoJSON from 'ol/format/GeoJSON';
 import { Fill, Stroke, Style } from 'ol/style';
 import type { WmsLayerConfig } from '../wms';
