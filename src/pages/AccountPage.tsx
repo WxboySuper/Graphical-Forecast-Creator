@@ -1433,7 +1433,7 @@ const AccountPage: React.FC = () => {
         {hostedAuthEnabled && status === "signed_in" ? (
           <SignedInAccountView />
         ) : null}
-        {hostedAuthEnabled && status !== "signed_in" && authProvider === 'clerk' ? (
+        {hostedAuthEnabled && status === "signed_out" && authProvider === 'clerk' ? (
           <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
         ) : null}
         {hostedAuthEnabled && status !== "signed_in" && authProvider !== 'clerk' ? (

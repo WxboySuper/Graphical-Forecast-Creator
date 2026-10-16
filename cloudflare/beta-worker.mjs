@@ -5,6 +5,7 @@ const API_PREFIX = '/api';
 const MAX_CYCLE_BYTES = 750_000;
 const MAX_CLOUD_CYCLES = 100;
 const MAX_CUSTOM_PRODUCTS = 16;
+const MAX_USER_RECORDS = 200;
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
 const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
 const AUTH_PROFILE_CACHE_MAX = 1_000;
@@ -330,9 +331,13 @@ async function handleApi(request, env) {
       const metadata = subscription.metadata || object.metadata || {};
       const clerkId = metadata.clerkId || object.client_reference_id || '';
       const legacyUid = metadata.legacyUid || '';
-      const owner = clerkId
-        ? await env.DB.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first()
-        : legacyUid ? await env.DB.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first() : null;
+      let owner = null;
+      if (clerkId) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first();
+      else if (legacyUid) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
+      if (!owner && typeof (subscription.customer || object.customer) === 'string') {
+        owner = await env.DB.prepare(`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`)
+          .bind(subscription.customer || object.customer).first();
+      }
       if (owner) {
         const prior = await readJsonRecord(env.DB, 'user_entitlements', owner.clerk_id) || {};
         const status = subscription.status || (event.type === 'checkout.session.completed' ? 'active' : 'inactive');
@@ -349,14 +354,31 @@ async function handleApi(request, env) {
           .bind(owner.clerk_id, JSON.stringify(entitlement), entitlement.updatedAt)];
         const eventDate = entitlement.updatedAt.slice(0, 10);
         if (!prior.premiumActive && active) {
-          billingStatements.push(env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(event.id, eventDate, event.id, 'upgrades', owner.clerk_id));
+          billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(`stripe:${event.id}:upgrade`, eventDate, event.id, 'upgrades', owner.clerk_id));
         } else if (prior.premiumActive && !active) {
-          billingStatements.push(env.DB.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-            .bind(event.id, eventDate, event.id, 'cancellations', owner.clerk_id));
+          billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
+            .bind(`stripe:${event.id}:cancellation`, eventDate, event.id, 'cancellations', owner.clerk_id));
         }
         await env.DB.batch(billingStatements);
       } else {
+        if (!clerkId && !legacyUid) {
+          await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
+            .bind('completed', new Date().toISOString(), event.id).run();
+          return json({ received: true, ignored: 'missing-account-metadata' });
+        }
+        if (clerkId && env.CLERK_SECRET_KEY) {
+          const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(clerkId)}`, {
+            headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
+          });
+          if (clerkUser.status === 404) {
+            await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
+              .bind('completed', new Date().toISOString(), event.id).run();
+            return json({ received: true, ignored: 'deleted-account' });
+          }
+          if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
+          if (!clerkUser.ok) throw new Error('Clerk user lookup failed.');
+        }
         await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
         return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
       }
@@ -395,7 +417,9 @@ async function handleApi(request, env) {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     const plan = body?.plan;
-    const price = plan === 'monthly' ? env.STRIPE_PRICE_MONTHLY : plan === 'annual' ? env.STRIPE_PRICE_ANNUAL_STANDARD : null;
+    let price = null;
+    if (plan === 'monthly') price = env.STRIPE_PRICE_MONTHLY;
+    else if (plan === 'annual') price = env.STRIPE_PRICE_ANNUAL_STANDARD;
     if (!price) return json({ error: 'This billing plan is not available.' }, 400);
     if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
     const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
@@ -460,7 +484,10 @@ async function handleApi(request, env) {
   if (path === '/api/admin/metrics' && request.method === 'GET') {
     const allowed = (env.ADMIN_CLERK_ID_ALLOWLIST || env.ADMIN_UID_ALLOWLIST || '').split(',').map((value) => value.trim()).filter(Boolean);
     if (!allowed.includes(user.clerk_id) && !(user.legacy_uid && allowed.includes(user.legacy_uid))) return json({ error: 'Admin access denied.' }, 403);
-    const days = url.searchParams.get('window') === '30' ? 30 : url.searchParams.get('window') === '7' ? 7 : null;
+    const requestedWindow = url.searchParams.get('window');
+    let days = null;
+    if (requestedWindow === '30') days = 30;
+    else if (requestedWindow === '7') days = 7;
     if (!days) return json({ error: 'Invalid metrics window.' }, 400);
     const windowStart = `-${days - 1} days`;
     const [accounts, premium, storage, rows] = await Promise.all([
@@ -695,9 +722,12 @@ async function handleApi(request, env) {
       const dataJson = JSON.stringify(body.data);
       if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
       const now = new Date().toISOString();
-      await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-        .bind(user.clerk_id, recordType, id, dataJson, now, now).run();
+      const saveResult = await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
+        SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?)
+          OR (SELECT COUNT(*) FROM user_records WHERE user_id = ? AND record_type = ?) < ?
+        ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+        .bind(user.clerk_id, recordType, id, dataJson, now, now, user.clerk_id, recordType, id, user.clerk_id, recordType, MAX_USER_RECORDS).run();
+      if (!saveResult.meta.changes) return json({ error: 'Record quota reached.' }, 409);
       return json({ success: true, id });
     }
     if (request.method === 'GET' && recordId) {

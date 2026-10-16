@@ -215,11 +215,12 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
 
   const setClerkMode = (nextMode: AuthMode) => {
     setMode(nextMode);
+    setClerkVerificationInProgress(false);
     if (typeof window === 'undefined') return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
-    window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}`);
   };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */

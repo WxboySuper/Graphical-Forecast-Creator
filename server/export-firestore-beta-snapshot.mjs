@@ -156,8 +156,7 @@ async function main() {
         throw new Error(`Malformed legacy cloudCycles for account hash ${sha256(account.uid)}.`);
       }
     }
-    const cycleSnapshot = await db.collection('cloudCycles').where('userId', '==', account.uid).get();
-    const cycleDocs = cycleSnapshot.docs;
+    const cycleDocs = await readAllDocuments(db.collection('cloudCycles').where('userId', '==', account.uid));
     const migratedCycles = [];
     for (let offset = 0; offset < cycleDocs.length; offset += 10) {
       const cycleBatch = cycleDocs.slice(offset, offset + 10);
@@ -219,7 +218,11 @@ async function main() {
         console.warn(`Skipping beta user profile without an email (uid hash ${sha256(profileDoc.id)}).`);
         continue;
       }
-      if (seenEmails.has(email)) throw new Error(`Duplicate account email hash in beta userProfiles: ${sha256(email)}`);
+      if (seenEmails.has(email)) {
+        accountFailures.push({ uidHash: sha256(profileDoc.id), emailHash: sha256(email), reason: 'duplicate-email' });
+        console.error(`Duplicate beta email hash ${sha256(email)}; skipping profile ${sha256(profileDoc.id)}.`);
+        continue;
+      }
       seenEmails.add(email);
       pageAccounts.push({
         uid: profileDoc.id,

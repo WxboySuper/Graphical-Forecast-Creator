@@ -65,6 +65,10 @@ class D1Mock {
     }
     if (sql.startsWith('SELECT data_json FROM user_settings')) return this.settings.has(params[0]) ? { data_json: this.settings.get(params[0]) } : null;
     if (sql.startsWith('SELECT data_json FROM user_entitlements')) return this.entitlements.has(params[0]) ? { data_json: this.entitlements.get(params[0]) } : null;
+    if (sql.startsWith('SELECT user_id AS clerk_id FROM user_entitlements')) {
+      for (const [user_id, data_json] of this.entitlements) if (JSON.parse(data_json).stripeCustomerId === params[0]) return { clerk_id: user_id };
+      return null;
+    }
     if (sql.startsWith('SELECT data_json FROM user_metrics')) return this.metrics.has(params[0]) ? { data_json: this.metrics.get(params[0]) } : null;
     if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records') && sql.includes('record_id = ?')) {
       return this.records.get(`${params[0]}:${params[1]}:${params[2]}`) || null;
@@ -246,6 +250,11 @@ class D1Mock {
       else changes = 0;
     } else if (sql.startsWith('INSERT INTO user_records')) {
       const [user_id, record_type, record_id, data_json, created_at, updated_at] = params;
+      const key = `${user_id}:${record_type}:${record_id}`;
+      if (sql.includes('SELECT ?')) {
+        const count = [...this.records.values()].filter((record) => record.user_id === user_id && record.record_type === record_type).length;
+        if (!this.records.has(key) && count >= params.at(-1)) return { meta: { changes: 0 } };
+      }
       this.records.set(`${user_id}:${record_type}:${record_id}`, { user_id, record_type, record_id, data_json, created_at, updated_at });
     } else if (sql.startsWith('DELETE FROM user_records')) {
       const before = this.records.size;
@@ -542,6 +551,11 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     assert.equal(noOpRetry.changes, 1);
     runCycleWrite('cycle-2', 1);
     assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM cloud_cycles').get().count, 1);
+    const directCycle = sqlite.prepare(`INSERT INTO cloud_cycles
+      (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
+      VALUES (?, ?, ?, ?, '{}', '{}', 2, 'created', 'updated')`);
+    for (let index = 1; index < 100; index += 1) directCycle.run(`cycle-${index + 1}`, 'user_sqlite', 'cycle', '2026-10-15');
+    assert.throws(() => directCycle.run('cycle-over-limit', 'user_sqlite', 'cycle', '2026-10-15'), /cloud_cycle_quota_reached/);
 
     const slots = Array.from({ length: 2 }, (_, index) => `('product-${String(index + 1).padStart(2, '0')}')`).join(', ');
     const insertSlot = sqlite.prepare(`WITH slots(slot_id) AS (VALUES ${slots})
@@ -553,6 +567,21 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     insertSlot.run('user_sqlite', 'one', '{}', 'user_sqlite', 'user_sqlite', 2);
     insertSlot.run('user_sqlite', 'two', '{}', 'user_sqlite', 'user_sqlite', 2);
     assert.equal(insertSlot.run('user_sqlite', 'three', '{}', 'user_sqlite', 'user_sqlite', 2).changes, 0);
+    const directProduct = sqlite.prepare('INSERT INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)');
+    for (let index = 2; index < 16; index += 1) directProduct.run('user_sqlite', `product-${index + 1}`, `product-${index + 1}`, '{}');
+    assert.throws(() => directProduct.run('user_sqlite', 'product-17', 'product-17', '{}'), /custom_product_quota_reached/);
+
+    const recordWrite = sqlite.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?)
+        OR (SELECT COUNT(*) FROM user_records WHERE user_id = ? AND record_type = ?) < ?
+      ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`);
+    const runRecordWrite = (id) => recordWrite.run('user_sqlite', 'forecast', id, '{}', 'created', 'updated', 'user_sqlite', 'forecast', id, 'user_sqlite', 'forecast', 200);
+    assert.equal(runRecordWrite('forecast-save').changes, 1);
+    assert.equal(runRecordWrite('forecast-save').changes, 1);
+    const directRecord = sqlite.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at) VALUES (?, ?, ?, '{}', 'created', 'updated')`);
+    for (let index = 0; index < 199; index += 1) directRecord.run('user_sqlite', 'forecast', `forecast-${index}`);
+    assert.equal(runRecordWrite('forecast-over-limit').changes, 0);
+    assert.throws(() => directRecord.run('user_sqlite', 'forecast', 'forecast-over-limit'), /user_record_quota_reached/);
 
     const insertMetric = sqlite.prepare('INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)');
     const today = new Date().toISOString().slice(0, 10);
@@ -688,6 +717,21 @@ test('forecast, discussion, verification and settings endpoints enforce account-
   });
 });
 
+test('forecast, discussion and verification writes enforce their per-account record quota', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db);
+  for (let index = 0; index < 200; index += 1) {
+    const id = `forecast-${index}`;
+    db.records.set(`user_beta_test:forecast:${id}`, {
+      user_id: 'user_beta_test', record_type: 'forecast', record_id: id,
+      data_json: '{}', created_at: '2026-10-01', updated_at: '2026-10-01',
+    });
+  }
+  const response = await call('/api/forecasts', env, { method: 'PUT', body: { id: 'forecast-over-limit', data: {} } });
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), { error: 'Record quota reached.' });
+});
+
 test('authenticated JSON writes reject oversized request bodies before parsing', async () => {
   const env = createEnv();
   const response = await withClerkFetch(() => worker.fetch(new Request('https://beta.gfcweather.com/api/user/settings', {
@@ -754,9 +798,9 @@ test('Stripe subscription events remain retryable until the Clerk user exists', 
   } } });
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = createHmac('sha256', env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${raw}`).digest('hex');
-  const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+  const response = await withClerkFetch(() => worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
     method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
-  }), env);
+  }), env));
   assert.equal(response.status, 503);
   assert.equal(db.stripeEvents.has('evt_unprovisioned'), false);
 
@@ -766,6 +810,34 @@ test('Stripe subscription events remain retryable until the Clerk user exists', 
   }), env);
   assert.equal(retry.status, 200, await retry.clone().text());
   assert.equal(JSON.parse(db.entitlements.get('not-created-yet')).billingStatus, 'active');
+});
+
+test('Stripe webhook acknowledges missing metadata and deleted Clerk accounts', async () => {
+  const db = new D1Mock();
+  const env = { ...createEnv(db), STRIPE_WEBHOOK_SECRET: 'whsec_beta_test' };
+  const send = async (event) => {
+    const raw = JSON.stringify(event);
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac('sha256', env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${raw}`).digest('hex');
+    const action = () => worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+      method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+    }), env);
+    return await action();
+  };
+  const missing = await send({ id: 'evt_missing_owner', type: 'customer.subscription.updated', data: { object: {} } });
+  assert.equal(missing.status, 200);
+  assert.equal((await missing.json()).ignored, 'missing-account-metadata');
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => String(input) === 'https://api.clerk.com/v1/users/deleted-user'
+    ? new Response(null, { status: 404 })
+    : originalFetch(input, init);
+  try {
+    const deleted = await send({ id: 'evt_deleted_owner', type: 'customer.subscription.deleted', data: { object: {
+      id: 'sub_deleted', status: 'canceled', metadata: { clerkId: 'deleted-user' },
+    } } });
+    assert.equal(deleted.status, 200);
+    assert.equal((await deleted.json()).ignored, 'deleted-account');
+  } finally { globalThis.fetch = originalFetch; }
 });
 
 test('Stripe webhook rejects malformed JSON even when its signature is valid', async () => {
