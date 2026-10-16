@@ -408,6 +408,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache the pinned beta migration verifier
+        if: inputs.auth_backend == 'clerk-d1'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/beta-migration-tools
+          key: ${{ runner.os }}-beta-wrangler-4.149.0-node24
+
       - name: Build beta frontend
         run: pnpm run build
         env:
@@ -494,12 +501,14 @@ jobs:
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
-            # One pinned install serves the complete per-email verification batch.
-            for attempt in 1 2 3; do
-              if npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0; then break; fi
-              if [ "$attempt" -eq 3 ]; then echo "::error::Unable to install the pinned Wrangler snapshot verifier after three attempts." >&2; exit 1; fi
-              sleep "$((attempt * 3))"
-            done
+            if [ ! -x "$WRANGLER_BIN" ]; then
+              # One pinned install serves the complete per-email verification batch.
+              for attempt in 1 2 3; do
+                if npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0; then break; fi
+                if [ "$attempt" -eq 3 ]; then echo "::error::Unable to install the pinned Wrangler snapshot verifier after three attempts." >&2; exit 1; fi
+                sleep "$((attempt * 3))"
+              done
+            fi
             export SNAPSHOT_VERIFY_DIR WRANGLER_BIN
             WRANGLER_CONFIG=cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             export WRANGLER_CONFIG
