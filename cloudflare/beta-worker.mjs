@@ -287,15 +287,22 @@ function cloudCycleWriteError(error) {
 
 function parseCloudCycleInput(body) {
   if (body === BODY_TOO_LARGE) return { response: json({ error: 'Request body is too large.' }, 413) };
-  const id = typeof body?.id === 'string' ? body.id.trim() : '';
-  const label = typeof body?.label === 'string' ? body.label.trim() : '';
-  const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
-  const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
-  const data = { id, label, cycleDate, payloadJson, bytes: new TextEncoder().encode(payloadJson).length, metadata: body?.metadata };
+  const data = normalizeCloudCycleInput(body);
   if (!hasValidCloudCycleFields(data)) return invalidCloudCycleInput();
-  if (!isJsonText(payloadJson)) return invalidCloudCycleInput();
+  if (!isJsonText(data.payloadJson)) return invalidCloudCycleInput();
   return { data };
 }
+
+function normalizeCloudCycleInput(body) {
+  const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
+  return {
+    id: normalizedString(body?.id), label: normalizedString(body?.label),
+    cycleDate: typeof body?.cycleDate === 'string' ? body.cycleDate : '', payloadJson,
+    bytes: new TextEncoder().encode(payloadJson).length, metadata: body?.metadata,
+  };
+}
+
+function normalizedString(value) { return typeof value === 'string' ? value.trim() : ''; }
 
 function hasValidCloudCycleFields(data) {
   return hasValidCloudCycleId(data.id) && hasValidCloudCycleLabel(data.label)
@@ -517,12 +524,14 @@ function parseNewCustomProduct(body, userId) {
 
 function normalizeNewCustomProduct(product, userId) {
   const productId = typeof product?.id === 'string' ? product.id.trim() : '';
-  if (!isObject(product) || !isValidNewProductId(productId) || !isNewProductOwner(product, userId)) {
-    return { response: json({ error: 'Invalid custom product.' }, 400) };
-  }
+  if (!isObject(product)) return invalidCustomProduct();
+  if (!isValidNewProductId(productId)) return invalidCustomProduct();
+  if (!isNewProductOwner(product, userId)) return invalidCustomProduct();
   product.id = productId;
   return { product, dataJson: JSON.stringify(product) };
 }
+
+function invalidCustomProduct() { return { response: json({ error: 'Invalid custom product.' }, 400) }; }
 
 function isValidNewProductId(id) { return Boolean(id && id.length <= 128 && !id.includes('/')); }
 function isNewProductOwner(product, userId) { return product?.userId === userId && product?.version === 1 && product?.builtIn !== true; }
@@ -543,12 +552,12 @@ async function patchCustomProduct({ request, env, user, productId, currentRow, c
 function parseCustomProductPatch(body, productId, userId, currentVersion) {
   const product = body?.product;
   if (!isObject(body)) return { response: json({ error: 'Invalid custom product.' }, 400) };
-  if (!matchesProductPatch(product, productId, userId, body.expectedVersion, currentVersion)) return changedProductResponse();
+  if (!matchesProductPatch({ product, productId, userId, expectedVersion: body.expectedVersion, currentVersion })) return changedProductResponse();
   const dataJson = JSON.stringify(product);
   return hasValidPayloadSize(dataJson) ? { product, dataJson } : oversizedCustomProduct();
 }
 
-function matchesProductPatch(product, productId, userId, expectedVersion, currentVersion) {
+function matchesProductPatch({ product, productId, userId, expectedVersion, currentVersion }) {
   return matchesProductIdentity(product, productId, userId) && isNextProductVersion(product, expectedVersion, currentVersion);
 }
 

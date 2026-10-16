@@ -278,36 +278,62 @@ function result(changes = 1) { return { meta: { changes } }; }
 function runUserMutation(db, sql, params) {
   if (sql.startsWith('INSERT INTO users')) return result(insertUser(db, sql, params));
   if (!sql.startsWith('UPDATE users')) return UNHANDLED_QUERY;
-  const [updated_at, clerk_id] = [params.at(-2), params.at(-1)];
-  const user = db.users.get(clerk_id);
-  if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
-    if (user) Object.assign(user, { migration_status: 'migrating', updated_at: params[0] });
-  } else if (sql.startsWith('UPDATE users SET migration_status = ?, migrated_at')) {
-    if (user) Object.assign(user, { migration_status: params[0], migrated_at: params[1], updated_at: params[2] });
-  } else if (sql.startsWith('UPDATE users SET migration_status')) {
-    updateMigrationStatus(user, sql, params, clerk_id, updated_at);
-  } else if (sql.startsWith('UPDATE users SET email')) {
-    updateUserEmail(user, params);
-  } else if (sql.startsWith('UPDATE users SET beta_access')) {
-    if (user) Object.assign(user, { beta_access: 1, updated_at: params[0] });
-  }
+  return applyUserUpdate(db, sql, params);
+}
+
+const USER_UPDATE_HANDLERS = [
+  ["UPDATE users SET migration_status = 'migrating'", (db, _sql, params) => updateMigratingUser(db, params)],
+  ['UPDATE users SET migration_status = ?, migrated_at', (db, _sql, params) => updateCompletedUser(db, params)],
+  ['UPDATE users SET migration_status', (db, sql, params) => updateMigrationStatus(db, sql, params)],
+  ['UPDATE users SET email', (db, _sql, params) => updateUserEmail(db, params)],
+  ['UPDATE users SET beta_access', (db, _sql, params) => updateBetaAccess(db, params)],
+];
+
+function applyUserUpdate(db, sql, params) {
+  const match = USER_UPDATE_HANDLERS.find(([prefix]) => sql.startsWith(prefix));
+  if (!match) return UNHANDLED_QUERY;
+  match[1](db, sql, params);
   return result();
 }
 
-function updateMigrationStatus(user, sql, params, clerkId, updatedAt) {
-  if (!user) return;
-  const changes = { migration_status: params[0], updated_at: updatedAt };
-  if (sql.includes('legacy_uid = COALESCE')) {
-    changes.legacy_uid = user.legacy_uid || params[1];
-    if (params[2] === 1) changes.beta_access = 1;
-  }
-  Object.assign(user, changes);
+function updateMigratingUser(db, params) {
+  const [updated_at, clerk_id] = params;
+  const user = db.users.get(clerk_id);
+  if (user) Object.assign(user, { migration_status: 'migrating', updated_at });
 }
 
-function updateUserEmail(user, params) {
+function updateCompletedUser(db, params) {
+  const [migration_status, migrated_at, updated_at, clerk_id] = params;
+  const user = db.users.get(clerk_id);
+  if (user) Object.assign(user, { migration_status, migrated_at, updated_at });
+}
+
+function updateMigrationStatus(db, sql, params) {
+  const user = db.users.get(params.at(-1));
   if (!user) return;
+  Object.assign(user, migrationStatusValues(user, sql, params));
+}
+
+function migrationStatusValues(user, sql, params) {
+  const changes = { migration_status: params[0], updated_at: params.at(-2) };
+  if (sql.includes('legacy_uid = COALESCE')) Object.assign(changes, migrationLinkValues(user, params));
+  return changes;
+}
+
+function migrationLinkValues(user, params) {
+  const betaAccess = params[2] === 1 ? { beta_access: 1 } : {};
+  return { legacy_uid: user.legacy_uid || params[1], ...betaAccess };
+}
+
+function updateUserEmail(db, params) {
   const [email, display_name, updated_at] = params;
-  Object.assign(user, { email, display_name, updated_at, email_verified: 1 });
+  const userRow = db.users.get(params[3]);
+  if (userRow) Object.assign(userRow, { email, display_name, updated_at, email_verified: 1 });
+}
+
+function updateBetaAccess(db, params) {
+  const user = db.users.get(params[1]);
+  if (user) Object.assign(user, { beta_access: 1, updated_at: params[0] });
 }
 
 function runJsonMutation(db, sql, params) {
@@ -320,16 +346,24 @@ function runJsonMutation(db, sql, params) {
 function saveJsonMap(map, sql, params, table) {
   const [userId, data] = params;
   const existing = map.get(userId);
-  const preserveExisting = (table === 'settings' && sql.includes('ON CONFLICT'))
-    || (table === 'entitlements' && sql.includes('json_patch'))
-    || (table === 'metrics' && sql.includes('ON CONFLICT'));
-  if (preserveExisting) {
+  if (shouldPreserveJsonRecord(table, sql)) {
     const preserved = existing ? JSON.parse(existing) : {};
     map.set(userId, JSON.stringify({ ...JSON.parse(data), ...preserved }));
-  } else if (!existing || sql.includes('ON CONFLICT')) {
+  } else if (shouldWriteJsonRecord(existing, sql)) {
     map.set(userId, data);
   }
   return result();
+}
+
+function shouldPreserveJsonRecord(table, sql) {
+  const conflict = sql.includes('ON CONFLICT');
+  if (table === 'settings') return conflict;
+  if (table === 'metrics') return conflict;
+  return table === 'entitlements' && sql.includes('json_patch');
+}
+
+function shouldWriteJsonRecord(existing, sql) {
+  return !existing || sql.includes('ON CONFLICT');
 }
 
 function runCycleMutation(db, sql, params) {
@@ -343,19 +377,38 @@ function saveCloudCycle(db, sql, params) {
   const [id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at] = params;
   const key = `${user_id}:${id}`;
   const previous = db.cloudCycles.get(key);
-  const limit = sql.includes('SELECT ?') ? params.at(-1) : Number.MAX_SAFE_INTEGER;
-  const count = [...db.cloudCycles.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length;
-  if (sql.includes('SELECT ?') && !previous && count >= limit) return result(0);
-  if (!sql.startsWith('INSERT OR IGNORE') || !previous) {
-    const incomingMetadata = JSON.parse(metadata_json || '{}');
-    const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
-    if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
-    db.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
-      migration_import: sql.startsWith('INSERT OR IGNORE INTO cloud_cycles') ? 1 : previous?.migration_import || 0,
-      created_at: previous?.created_at || created_at, updated_at });
-  }
+  if (cloudCycleQuotaExceeded(db, sql, user_id, previous, params)) return result(0);
+  if (!shouldWriteCloudCycle(sql, previous)) return result();
+  const row = buildMockCloudCycle({ sql, id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at, previous });
+  db.cloudCycles.set(key, row);
   return result();
 }
+
+function cloudCycleQuotaExceeded(db, sql, userId, previous, params) {
+  if (!sql.includes('SELECT ?') || previous) return false;
+  const count = [...db.cloudCycles.values()].filter((row) => row.user_id === userId && row.migration_import !== 1).length;
+  return count >= params.at(-1);
+}
+
+function shouldWriteCloudCycle(sql, previous) { return !sql.startsWith('INSERT OR IGNORE') || !previous; }
+
+function buildMockCloudCycle({ sql, id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at, previous }) {
+  const metadata = mergeCloudCycleMetadata(metadata_json, previous, sql);
+  const migrationImport = isCloudCycleMigration(sql) ? 1 : previous?.migration_import || 0;
+  return { id, user_id, label, cycle_date, metadata_json: JSON.stringify(metadata), payload_json, payload_bytes,
+    migration_import: migrationImport, created_at: previous?.created_at || created_at, updated_at };
+}
+
+function mergeCloudCycleMetadata(metadataJson, previous, sql) {
+  const metadata = JSON.parse(metadataJson || '{}');
+  if (previous && sql.includes('ON CONFLICT')) {
+    const priorMetadata = JSON.parse(previous.metadata_json || '{}');
+    metadata.createdAt = priorMetadata.createdAt;
+  }
+  return metadata;
+}
+
+function isCloudCycleMigration(sql) { return sql.startsWith('INSERT OR IGNORE INTO cloud_cycles'); }
 
 function updateCloudCycle(db, params) {
   const [label, updated_at, , , id, user_id] = params;
@@ -475,9 +528,15 @@ function insertMigratedProduct(products, params) {
 function updateProduct(products, params) {
   const [data_json, user_id, slot_id, product_id, expectedVersion] = params;
   const row = products.get(`${user_id}:${slot_id}`);
-  if (!row || row.product_id !== product_id || JSON.parse(row.data_json).version !== expectedVersion) return result(0);
+  if (!matchesProductVersion(row, product_id, expectedVersion)) return result(0);
   row.data_json = data_json;
   return result();
+}
+
+function matchesProductVersion(row, productId, expectedVersion) {
+  if (!row) return false;
+  if (row.product_id !== productId) return false;
+  return JSON.parse(row.data_json).version === expectedVersion;
 }
 
 function deleteProduct(products, params) {

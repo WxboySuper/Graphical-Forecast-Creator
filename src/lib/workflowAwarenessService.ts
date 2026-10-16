@@ -222,14 +222,10 @@ const readAllBetaAwareness = async (userId: string): Promise<unknown[]> => {
 };
 
 const unwrapBetaAwarenessRecord = (record: unknown): unknown => {
-  if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
-  const envelope = record as Partial<WorkflowAwarenessDocument>;
-  if (!hasAwarenessMetadata(envelope.metadata)) return record;
-  return { ...envelope.metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
+  const envelope = Object(record) as Partial<WorkflowAwarenessDocument>;
+  const metadata = Object(envelope.metadata) as Record<string, unknown>;
+  return { ...metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
 };
-
-const hasAwarenessMetadata = (metadata: unknown): metadata is Record<string, unknown> =>
-  typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata);
 
 const readBetaAwareness = async (userId: string): Promise<WorkflowAwarenessRecord[]> =>
   (await readAllBetaAwareness(userId)).map(unwrapBetaAwarenessRecord)
