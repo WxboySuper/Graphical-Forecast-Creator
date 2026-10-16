@@ -12,9 +12,6 @@ import type { HazardKind } from './gradeContract';
 /** SPC neighborhood radius: severe within 25 miles of any point in the contour. */
 export const SPC_NEIGHBORHOOD_MILES = 25;
 
-/** 25 miles expressed in kilometers (~40 km) for buffer/grid math. */
-export const SPC_NEIGHBORHOOD_KM = 40.2336;
-
 /** Target verification grid spacing (~10 km) over the forecast + buffer envelope. */
 export const GRID_SPACING_KM = 10;
 
