@@ -125,7 +125,7 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
   subscribe(userId, onUpdate, onError) {
     if (isBetaClerkD1Mode()) {
       let active = true;
-      let retryTimer: number | undefined;
+      let retryTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
       const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
         if (!active) return;
         if (isBetaSessionInitializing(error)) {

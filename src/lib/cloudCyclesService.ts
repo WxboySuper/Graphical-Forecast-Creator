@@ -660,7 +660,7 @@ export const subscribeToCloudCycles = (
 ): (() => void) => {
   if (isBetaClerkD1Mode()) {
     let active = true;
-    let retryTimer: number | undefined;
+    let retryTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const scheduleRetry = () => {
       if (!active || retryTimer !== undefined) return;
       retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
