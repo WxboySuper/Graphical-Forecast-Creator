@@ -16,7 +16,7 @@ const emailSnapshotKey = async (email) => {
   return `by-email/${await sha256Hex(normalizeEmail(email))}.json`;
 };
 
-function appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes) {
+function appendSnapshotSettings({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
   const settings = snapshot.userSettings;
   if (settings === null || settings === undefined) return;
   if (!isObject(settings)) throw new Error('SNAPSHOT_SETTINGS_INVALID');
@@ -28,7 +28,7 @@ function appendSnapshotSettings(snapshot, user, env, now, statements, accountFor
     .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
 }
 
-function appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes) {
+function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
   const entitlement = snapshot.userEntitlement;
   if (entitlement === null || entitlement === undefined) return;
   if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
@@ -50,7 +50,7 @@ function appendSnapshotEntitlement(snapshot, user, env, now, statements, account
     }), now));
 }
 
-function appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes) {
+function appendSnapshotMetrics({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
   const metrics = snapshot.userMetrics;
   if (metrics === null || metrics === undefined) return;
   if (!isObject(metrics)) throw new Error('SNAPSHOT_METRICS_INVALID');
@@ -60,87 +60,102 @@ function appendSnapshotMetrics(snapshot, user, env, now, statements, accountForM
     .bind(user.clerkId, JSON.stringify({ ...metrics, uid: user.clerkId }), now));
 }
 
-function appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes) {
-  appendSnapshotSettings(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotEntitlement(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotMetrics(snapshot, user, env, now, statements, accountForMigrationBytes);
+function appendSnapshotAccountDocuments(context) {
+  appendSnapshotSettings(context);
+  appendSnapshotEntitlement(context);
+  appendSnapshotMetrics(context);
 }
 
-function appendSnapshotCycles(cloudCycles, user, env, now, statements, accountForMigrationBytes) {
-      for (const cycle of cloudCycles) {
-        if (!isObject(cycle)) throw new Error('SNAPSHOT_CYCLE_INVALID');
-        if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
-        const label = typeof cycle.label === 'string' ? cycle.label.trim() : '';
-        const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
-        if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
-        if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
-        let payloadJson;
-        if (typeof cycle.payloadJson === 'string') payloadJson = cycle.payloadJson;
-        else if (cycle.payloadJson === null || cycle.payloadJson === undefined) payloadJson = '{}';
-        else payloadJson = JSON.stringify(cycle.payloadJson);
-        const payloadBytes = new TextEncoder().encode(payloadJson).length;
-        if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
-        accountForMigrationBytes(payloadJson);
-        try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
-        const metadataJson = JSON.stringify({ ...(cycle.metadata || {}), userId: user.clerkId });
-        accountForMigrationBytes(metadataJson);
-        statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
+function validateSnapshotCycle(cycle) {
+  if (!isObject(cycle)) throw new Error('SNAPSHOT_CYCLE_INVALID');
+  if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+  const label = typeof cycle.label === 'string' ? cycle.label.trim() : '';
+  const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
+  if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
+  if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
+  const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : JSON.stringify(cycle.payloadJson ?? {});
+  const payloadBytes = new TextEncoder().encode(payloadJson).length;
+  if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
+  try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
+  return { ...cycle, label, cycleDate, payloadJson, payloadBytes };
+}
+
+function appendSnapshotCycle(cycle, context) {
+  const validated = validateSnapshotCycle(cycle);
+  const { user, env, now, statements, accountForMigrationBytes } = context;
+  accountForMigrationBytes(validated.payloadJson);
+  const metadataJson = JSON.stringify({ ...(validated.metadata || {}), userId: user.clerkId });
+  accountForMigrationBytes(metadataJson);
+  statements.push(env.DB.prepare(`INSERT OR IGNORE INTO cloud_cycles
           (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, migration_import, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`)
-          .bind(cycle.id, user.clerkId, label, cycleDate, metadataJson,
-            payloadJson, payloadBytes,
-            cycle.createdAt || now, cycle.updatedAt || now));
-      }
+    .bind(validated.id, user.clerkId, validated.label, validated.cycleDate, metadataJson,
+      validated.payloadJson, validated.payloadBytes, validated.createdAt || now, validated.updatedAt || now));
 }
 
-function appendSnapshotWorkflows(workflowAwareness, user, env, statements, accountForMigrationBytes) {
-      for (const record of workflowAwareness) {
-        if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-        if (typeof record.id !== 'string' || !record.id || record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
-        if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-        const workflowJson = JSON.stringify(record.data);
-        if (new TextEncoder().encode(workflowJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_WORKFLOW_TOO_LARGE');
-        accountForMigrationBytes(workflowJson);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json, migration_import) VALUES (?, ?, ?, 1)')
-          .bind(user.clerkId, record.id, workflowJson));
-      }
+function appendSnapshotCycles(cloudCycles, context) {
+  for (const cycle of cloudCycles) appendSnapshotCycle(cycle, context);
 }
 
-async function appendSnapshotProducts(customProducts, user, env, statements, accountForMigrationBytes) {
-      const existingProducts = ((await env.DB.prepare('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')
-        .bind(user.clerkId).all()).results || []);
-      const occupiedProductSlots = new Set(existingProducts.map((row) => row.slot_id));
-      const existingProductIds = new Map(existingProducts.map((row) => [row.product_id, row.migration_import === 1]));
-      for (const [index, product] of customProducts.entries()) {
-        if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
-        const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
-        const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
-        if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
-        if (existingProductIds.has(productId)) {
-          if (existingProductIds.get(productId)) continue;
-          throw new Error('SNAPSHOT_PRODUCT_ID_CONFLICT');
-        }
-        migratedProduct.id = productId;
-        if (migratedProduct.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
-        migratedProduct.version = 1;
-        const productJson = JSON.stringify(migratedProduct);
-        if (new TextEncoder().encode(productJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
-        accountForMigrationBytes(productJson);
-        let slotId = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, slotIndex) => `product-${String(slotIndex + 1).padStart(2, '0')}`)
-          .find((candidate) => !occupiedProductSlots.has(candidate));
-        if (!slotId) {
-          slotId = `legacy-${index + 1}`;
-          let suffix = 1;
-          while (occupiedProductSlots.has(slotId)) {
-            slotId = `legacy-${index + 1}-${suffix}`;
-            suffix += 1;
-          }
-        }
-        occupiedProductSlots.add(slotId);
-        existingProductIds.set(productId, true);
-        statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
-          .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
-      }
+function appendSnapshotWorkflow(record, context) {
+  if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+  if (typeof record.id !== 'string' || !record.id || record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+  if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+  const workflowJson = JSON.stringify(record.data);
+  if (new TextEncoder().encode(workflowJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_WORKFLOW_TOO_LARGE');
+  context.accountForMigrationBytes(workflowJson);
+  context.statements.push(context.env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json, migration_import) VALUES (?, ?, ?, 1)')
+    .bind(context.user.clerkId, record.id, workflowJson));
+}
+
+function appendSnapshotWorkflows(workflowAwareness, context) {
+  for (const record of workflowAwareness) appendSnapshotWorkflow(record, context);
+}
+
+function normalizeSnapshotProduct(product, userId) {
+  if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  const migrated = { ...(product.data || {}), userId };
+  const id = typeof migrated.id === 'string' && migrated.id ? migrated.id : product.id;
+  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+  if (migrated.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  migrated.id = id;
+  migrated.version = 1;
+  const dataJson = JSON.stringify(migrated);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
+  return { id, migrated, dataJson };
+}
+
+function findProductSlot(index, occupied) {
+  const slot = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, n) => `product-${String(n + 1).padStart(2, '0')}`).find((id) => !occupied.has(id));
+  if (slot) return slot;
+  let suffix = 0;
+  let candidate = `legacy-${index + 1}`;
+  while (occupied.has(candidate)) candidate = `legacy-${index + 1}-${++suffix}`;
+  return candidate;
+}
+
+async function appendSnapshotProduct(product, index, context, state) {
+  const { id, migrated, dataJson } = normalizeSnapshotProduct(product, context.user.clerkId);
+  if (state.existingIds.has(id)) {
+    if (state.existingIds.get(id)) return;
+    throw new Error('SNAPSHOT_PRODUCT_ID_CONFLICT');
+  }
+  context.accountForMigrationBytes(dataJson);
+  const slotId = findProductSlot(index, state.occupiedSlots);
+  state.occupiedSlots.add(slotId);
+  state.existingIds.set(id, true);
+  context.statements.push(context.env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
+    .bind(context.user.clerkId, slotId, id, JSON.stringify(migrated)));
+}
+
+async function appendSnapshotProducts(customProducts, context) {
+  const rows = (await context.env.DB.prepare('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')
+    .bind(context.user.clerkId).all()).results || [];
+  const state = {
+    occupiedSlots: new Set(rows.map((row) => row.slot_id)),
+    existingIds: new Map(rows.map((row) => [row.product_id, row.migration_import === 1])),
+  };
+  for (const [index, product] of customProducts.entries()) await appendSnapshotProduct(product, index, context, state);
 }
 
 function readSnapshotCollections(snapshot) {
@@ -168,12 +183,23 @@ function assertUniqueSnapshotIds(records, readId, code) {
 }
 
 function validateSnapshotCollections({ cloudCycles, workflowAwareness, customProducts }) {
+  validateUniqueCollections({ cloudCycles, workflowAwareness, customProducts });
+  validateCollectionLimits({ cloudCycles, workflowAwareness, customProducts });
+}
+
+function validateUniqueCollections({ cloudCycles, workflowAwareness, customProducts }) {
   assertUniqueSnapshotIds(cloudCycles, (record) => record?.id, 'SNAPSHOT_CYCLE_DUPLICATE_ID');
   assertUniqueSnapshotIds(workflowAwareness, (record) => record?.id, 'SNAPSHOT_WORKFLOW_DUPLICATE_ID');
   assertUniqueSnapshotIds(customProducts, (record) => record?.data?.id || record?.id, 'SNAPSHOT_PRODUCT_DUPLICATE_ID');
-  if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
-  if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
-  if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
+}
+
+function validateCollectionLimits({ cloudCycles, workflowAwareness, customProducts }) {
+  const limits = [
+    [cloudCycles, MAX_MIGRATED_CLOUD_CYCLES, 'SNAPSHOT_CYCLE_QUOTA_EXCEEDED'],
+    [workflowAwareness, MAX_MIGRATED_WORKFLOW_RECORDS, 'SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED'],
+    [customProducts, MAX_MIGRATED_CUSTOM_PRODUCTS, 'SNAPSHOT_PRODUCT_QUOTA_EXCEEDED'],
+  ];
+  for (const [records, limit, error] of limits) if (records.length > limit) throw new Error(error);
 }
 
 function createMigrationByteCounter() {
@@ -187,10 +213,11 @@ function createMigrationByteCounter() {
 async function buildSnapshotStatements(user, env, snapshot, now, collections) {
   const accountForMigrationBytes = createMigrationByteCounter();
   const statements = [];
-  appendSnapshotAccountDocuments(snapshot, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotCycles(collections.cloudCycles, user, env, now, statements, accountForMigrationBytes);
-  appendSnapshotWorkflows(collections.workflowAwareness, user, env, statements, accountForMigrationBytes);
-  await appendSnapshotProducts(collections.customProducts, user, env, statements, accountForMigrationBytes);
+  const context = { snapshot, user, env, now, statements, accountForMigrationBytes };
+  appendSnapshotAccountDocuments(context);
+  appendSnapshotCycles(collections.cloudCycles, context);
+  appendSnapshotWorkflows(collections.workflowAwareness, context);
+  await appendSnapshotProducts(collections.customProducts, context);
   return statements;
 }
 
