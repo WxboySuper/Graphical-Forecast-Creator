@@ -119,13 +119,15 @@ const scheduleBetaProductRetry = (
   }, 250);
 };
 
-const handleBetaProductSubscriptionError = (
-  error: unknown,
-  isActive: () => boolean,
-  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined },
-  refresh: () => void,
-  onError?: (error: Error) => void,
-) => {
+interface BetaProductSubscriptionContext {
+  isActive: () => boolean;
+  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined };
+  refresh: () => void;
+  onError?: (error: Error) => void;
+}
+
+const handleBetaProductSubscriptionError = (error: unknown, context: BetaProductSubscriptionContext) => {
+  const { isActive, retryTimer, refresh, onError } = context;
   if (!isActive()) return;
   if (isBetaSessionInitializing(error)) {
     scheduleBetaProductRetry(retryTimer, refresh);
@@ -144,7 +146,12 @@ const subscribeBetaProducts = (
   const refresh = () => {
     void readBetaProducts(userId)
       .then((products) => { if (active) onUpdate(products); })
-      .catch((error) => handleBetaProductSubscriptionError(error, () => active, retryTimer, refresh, onError));
+      .catch((error) => handleBetaProductSubscriptionError(error, {
+        isActive: () => active,
+        retryTimer,
+        refresh,
+        onError,
+      }));
   };
 
   refresh();
@@ -156,10 +163,16 @@ const subscribeBetaProducts = (
   };
 };
 
-const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, next: HostedCustomProduct | null): Promise<HostedCustomProduct | null> => {
+const requireCurrentBetaProduct = async (userId: string, expected: HostedCustomProduct) => {
   const products = await readBetaProducts(userId);
   const current = products.find((candidate) => candidate.id === expected.id);
   if (!current || current.version !== expected.version) throw new Error('This product changed in another session. Refresh and try again.');
+};
+
+const sendBetaProductRevision = async (
+  expected: HostedCustomProduct,
+  next: HostedCustomProduct | null,
+): Promise<HostedCustomProduct | null> => {
   const response = await fetchBetaApi(`/api/custom-products/${encodeURIComponent(expected.id)}`, {
     method: next ? 'PATCH' : 'DELETE',
     headers: { 'If-Match': String(expected.version) },
@@ -170,9 +183,39 @@ const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, 
   return next;
 };
 
+const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, next: HostedCustomProduct | null) => {
+  await requireCurrentBetaProduct(userId, expected);
+  return sendBetaProductRevision(expected, next);
+};
+
 const readOccupiedSlots = async (userId: string): Promise<Set<string>> => {
   const snapshot = await getDocs(collectionRef(userId));
   return new Set(snapshot.docs.map((item) => item.id));
+};
+
+const createBetaProduct = async (userId: string, draft: CustomProductDraft): Promise<HostedCustomProduct> => {
+  const products = await readBetaProducts(userId);
+  if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
+    throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
+  }
+  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+  const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
+  return body?.product && ownedProduct(body.product, userId) ? body.product : product;
+};
+
+const createFirestoreProduct = async (userId: string, draft: CustomProductDraft): Promise<HostedCustomProduct> => {
+  const slot = findOpenProductSlot(await readOccupiedSlots(userId));
+  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+  await runTransaction(requireDb(), async (transaction) => {
+    const reference = productRef(userId, slot);
+    if ((await transaction.get(reference)).exists()) {
+      throw new Error('The selected product slot was claimed. Please try again.');
+    }
+    transaction.set(reference, product);
+  });
+  return product;
 };
 
 export const firestoreCustomProductsRepository: CustomProductsRepository = {
@@ -187,28 +230,9 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
       onUpdate(sortProducts(products));
     }, (error) => onError?.(error));
   },
-  async create(userId, draft) {
-    if (isBetaClerkD1Mode()) {
-      const products = await readBetaProducts(userId);
-      if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
-        throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
-      }
-      const product = createHostedProduct({ id: uuidv4(), userId, draft });
-      const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
-      const body = (await response.json().catch(() => ({}))) ?? {};
-      if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
-      return body?.product && ownedProduct(body.product, userId) ? body.product : product;
-    }
-    const slot = findOpenProductSlot(await readOccupiedSlots(userId));
-    const product = createHostedProduct({ id: uuidv4(), userId, draft });
-    await runTransaction(requireDb(), async (transaction) => {
-      const reference = productRef(userId, slot);
-      if ((await transaction.get(reference)).exists()) {
-        throw new Error('The selected product slot was claimed. Please try again.');
-      }
-      transaction.set(reference, product);
-    });
-    return product;
+  create(userId, draft) {
+    if (isBetaClerkD1Mode()) return createBetaProduct(userId, draft);
+    return createFirestoreProduct(userId, draft);
   },
   update(userId, product, draft) {
     if (isBetaClerkD1Mode()) return reviseBetaProduct(userId, product, reviseProduct(product, draft)).then((next) => next as HostedCustomProduct);
