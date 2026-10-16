@@ -266,10 +266,6 @@ export const useServerCapabilityAvailable = (feature: FeatureKey): boolean => {
   return isServerCapabilityAvailable(capabilityKey, status);
 };
 
-/** Returns whether a server-backed feature should allow server API calls. */
-export const useServerCapabilityApiEnabled = (feature: FeatureKey): boolean =>
-  useServerCapabilityAvailable(feature);
-
 /** Returns runtime UI state for a server-backed registry feature. */
 export const useServerBackedFeatureRuntimeState = (
   feature: FeatureKey
