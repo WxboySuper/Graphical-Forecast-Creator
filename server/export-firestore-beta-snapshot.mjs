@@ -15,6 +15,12 @@ const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const MAX_SNAPSHOT_CYCLES = 300;
 const MAX_SNAPSHOT_WORKFLOW_RECORDS = 200;
 const MAX_SNAPSHOT_CUSTOM_PRODUCTS = 48;
+const FIRESTORE_VALUE_SERIALIZERS = new Map([
+  [Timestamp, (value) => value.toDate().toISOString()],
+  [GeoPoint, (value) => ({ __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude })],
+  [DocumentReference, (value) => ({ __type: 'documentReference', path: value.path })],
+  [Bytes, (value) => ({ __type: 'bytes', base64: value.toBase64() })],
+]);
 
 function assertSnapshotCollectionLimit(currentCount, pageCount, limit, collectionName, accountId) {
   if (currentCount + pageCount > limit) {
@@ -37,12 +43,8 @@ function createAccountFailure(uid, email, error) {
   return { uidHash: sha256(uid), emailHash: sha256(email), reason: reason.slice(0, 500) };
 }
 const serializeFirestoreValue = (value) => {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (value instanceof GeoPoint) {
-    return { __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude };
-  }
-  if (value instanceof DocumentReference) return { __type: 'documentReference', path: value.path };
-  if (value instanceof Bytes) return { __type: 'bytes', base64: value.toBase64() };
+  const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
+  if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, serializeFirestoreValue(child)]));
