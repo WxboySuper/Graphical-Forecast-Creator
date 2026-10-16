@@ -34,13 +34,11 @@ function buildMigratedStripeEntitlement({ entitlement, attempted, userId, subscr
   const status = stripeStatus(subscription, 'inactive');
   const active = hasActiveStripeStatus(status);
   const betaOverrideActive = hasBetaOverride(entitlement);
-  const periodEnd = Number(subscription?.current_period_end)
-    ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
   return {
     ...attempted, uid: userId, premiumActive: betaOverrideActive || active,
-    billingStatus: status, stripeSubscriptionId: subscription?.id || entitlement.stripeSubscriptionId || null,
-    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end), currentPeriodEnd: periodEnd,
-    planInterval: mapStripeInterval(subscription) || entitlement.planInterval || null,
+    billingStatus: status, stripeSubscriptionId: getSubscriptionId(subscription, entitlement.stripeSubscriptionId),
+    cancelAtPeriodEnd: hasCancelAtPeriodEnd(subscription), currentPeriodEnd: stripePeriodEnd(subscription),
+    planInterval: stripePlanInterval(subscription, entitlement.planInterval),
     effectiveSource: resolveEffectiveSource(betaOverrideActive, active),
     pendingStripeSync: false, stripeSyncAttemptAt: undefined, updatedAt: attemptedAt,
   };
@@ -294,12 +292,21 @@ function parseCloudCycleInput(body) {
   const cycleDate = typeof body?.cycleDate === 'string' ? body.cycleDate : '';
   const payloadJson = typeof body?.payloadJson === 'string' ? body.payloadJson : '';
   const data = { id, label, cycleDate, payloadJson, bytes: new TextEncoder().encode(payloadJson).length, metadata: body?.metadata };
-  const valid = id && id.length <= 128 && !id.includes('/') && label && label.length <= 200
-    && cycleDate && cycleDate.length <= 32 && data.bytes <= MAX_CYCLE_BYTES && isObject(data.metadata);
-  if (!valid) return { response: json({ error: 'Invalid cloud cycle payload.' }, 400) };
-  try { JSON.parse(payloadJson); } catch { return { response: json({ error: 'Invalid cloud cycle payload.' }, 400) }; }
+  if (!hasValidCloudCycleFields(data)) return invalidCloudCycleInput();
+  if (!isJsonText(payloadJson)) return invalidCloudCycleInput();
   return { data };
 }
+
+function hasValidCloudCycleFields(data) {
+  return hasValidCloudCycleId(data.id) && hasValidCloudCycleLabel(data.label)
+    && hasValidCloudCycleDate(data.cycleDate) && data.bytes <= MAX_CYCLE_BYTES && isObject(data.metadata);
+}
+
+function hasValidCloudCycleId(id) { return Boolean(id && id.length <= 128 && !id.includes('/')); }
+function hasValidCloudCycleLabel(label) { return Boolean(label && label.length <= 200); }
+function hasValidCloudCycleDate(cycleDate) { return Boolean(cycleDate && cycleDate.length <= 32); }
+function isJsonText(value) { try { JSON.parse(value); return true; } catch { return false; } }
+function invalidCloudCycleInput() { return { response: json({ error: 'Invalid cloud cycle payload.' }, 400) }; }
 
 async function requirePremiumCloudStorage(env, user) {
   const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
@@ -503,15 +510,24 @@ async function createCustomProduct(request, env, user) {
 function parseNewCustomProduct(body, userId) {
   if (body === BODY_TOO_LARGE) return { response: json({ error: 'Request body is too large.' }, 413) };
   const product = body?.product;
-  const productId = typeof product?.id === 'string' ? product.id.trim() : '';
-  const validId = productId && productId.length <= 128 && !productId.includes('/');
-  const validOwner = product?.userId === userId && product?.version === 1 && product?.builtIn !== true;
-  if (!isObject(product) || !validId || !validOwner) return { response: json({ error: 'Invalid custom product.' }, 400) };
-  product.id = productId;
-  const dataJson = JSON.stringify(product);
-  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return { response: json({ error: 'Custom product is too large.' }, 413) };
-  return { product, dataJson };
+  const result = normalizeNewCustomProduct(product, userId);
+  if (result.response) return result;
+  return hasValidPayloadSize(result.dataJson) ? result : oversizedCustomProduct();
 }
+
+function normalizeNewCustomProduct(product, userId) {
+  const productId = typeof product?.id === 'string' ? product.id.trim() : '';
+  if (!isObject(product) || !isValidNewProductId(productId) || !isNewProductOwner(product, userId)) {
+    return { response: json({ error: 'Invalid custom product.' }, 400) };
+  }
+  product.id = productId;
+  return { product, dataJson: JSON.stringify(product) };
+}
+
+function isValidNewProductId(id) { return Boolean(id && id.length <= 128 && !id.includes('/')); }
+function isNewProductOwner(product, userId) { return product?.userId === userId && product?.version === 1 && product?.builtIn !== true; }
+function hasValidPayloadSize(dataJson) { return new TextEncoder().encode(dataJson).length <= MAX_CYCLE_BYTES; }
+function oversizedCustomProduct() { return { response: json({ error: 'Custom product is too large.' }, 413) }; }
 
 async function patchCustomProduct({ request, env, user, productId, currentRow, current }) {
   const body = await readBody(request);
@@ -526,14 +542,26 @@ async function patchCustomProduct({ request, env, user, productId, currentRow, c
 
 function parseCustomProductPatch(body, productId, userId, currentVersion) {
   const product = body?.product;
-  const validBody = isObject(body);
-  const validProduct = isObject(product) && product.id === productId && product.userId === userId && product.builtIn !== true;
-  const validVersion = Number.isInteger(body?.expectedVersion) && body.expectedVersion === currentVersion && product?.version === currentVersion + 1;
-  if (!validBody) return { response: json({ error: 'Invalid custom product.' }, 400) };
-  if (!validProduct || !validVersion) return { response: json({ error: 'This product changed in another session. Refresh and try again.' }, 409) };
+  if (!isObject(body)) return { response: json({ error: 'Invalid custom product.' }, 400) };
+  if (!matchesProductPatch(product, productId, userId, body.expectedVersion, currentVersion)) return changedProductResponse();
   const dataJson = JSON.stringify(product);
-  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return { response: json({ error: 'Custom product is too large.' }, 413) };
-  return { product, dataJson };
+  return hasValidPayloadSize(dataJson) ? { product, dataJson } : oversizedCustomProduct();
+}
+
+function matchesProductPatch(product, productId, userId, expectedVersion, currentVersion) {
+  return matchesProductIdentity(product, productId, userId) && isNextProductVersion(product, expectedVersion, currentVersion);
+}
+
+function matchesProductIdentity(product, productId, userId) {
+  return isObject(product) && product.id === productId && product.userId === userId && product.builtIn !== true;
+}
+
+function isNextProductVersion(product, expectedVersion, currentVersion) {
+  return Number.isInteger(expectedVersion) && expectedVersion === currentVersion && product?.version === currentVersion + 1;
+}
+
+function changedProductResponse() {
+  return { response: json({ error: 'This product changed in another session. Refresh and try again.' }, 409) };
 }
 
 async function deleteCustomProduct({ request, env, user, productId, currentRow, current }) {
@@ -686,25 +714,49 @@ async function resolveStripeOwner(db, metadata, object, subscription) {
   const clerkId = metadata.clerkId || object.client_reference_id || '';
   const legacyUid = metadata.legacyUid || '';
   const customerId = [subscription?.customer, object?.customer].find((value) => typeof value === 'string' && value) || '';
-  const owner = await lookupStripeOwner(db, 'SELECT clerk_id FROM users WHERE clerk_id = ?', clerkId)
-    || await lookupStripeOwner(db, 'SELECT clerk_id FROM users WHERE legacy_uid = ?', legacyUid)
-    || await lookupStripeOwner(db, `SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`, customerId);
+  const owner = await findStripeOwner(db, [
+    ['SELECT clerk_id FROM users WHERE clerk_id = ?', clerkId],
+    ['SELECT clerk_id FROM users WHERE legacy_uid = ?', legacyUid],
+    [`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`, customerId],
+  ]);
   return { owner, clerkId, legacyUid };
+}
+
+async function findStripeOwner(db, candidates) {
+  for (const [query, value] of candidates) {
+    const owner = await lookupStripeOwner(db, query, value);
+    if (owner) return owner;
+  }
+  return null;
 }
 
 function buildStripeEntitlement({ ownerId, prior, subscription, object, eventType }) {
   const status = stripeStatus(subscription, checkoutFallbackStatus(eventType));
   const active = hasActiveStripeStatus(status);
-  const periodEnd = Number(subscription?.current_period_end) ? new Date(Number(subscription.current_period_end) * 1000).toISOString() : null;
   const betaOverrideActive = hasBetaOverride(prior);
   return {
-    ...prior, uid: ownerId, stripeCustomerId: subscription?.customer || object?.customer || prior.stripeCustomerId || null,
-    stripeSubscriptionId: subscription?.id || object?.subscription || null, billingStatus: status,
+    ...prior, uid: ownerId, stripeCustomerId: firstNonEmptyString(subscription?.customer, object?.customer, prior.stripeCustomerId),
+    stripeSubscriptionId: getSubscriptionId(subscription, object?.subscription), billingStatus: status,
     premiumActive: betaOverrideActive || active, effectiveSource: resolveEffectiveSource(betaOverrideActive, active),
-    cancelAtPeriodEnd: Boolean(subscription?.cancel_at_period_end), currentPeriodEnd: periodEnd,
-    planInterval: mapStripeInterval(subscription) || prior.planInterval || null,
+    cancelAtPeriodEnd: hasCancelAtPeriodEnd(subscription), currentPeriodEnd: stripePeriodEnd(subscription),
+    planInterval: stripePlanInterval(subscription, prior.planInterval),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function stripePeriodEnd(subscription) {
+  const seconds = Number(subscription?.current_period_end);
+  if (!seconds) return null;
+  return new Date(seconds * 1000).toISOString();
+}
+
+function hasCancelAtPeriodEnd(subscription) { return Boolean(subscription?.cancel_at_period_end); }
+function getSubscriptionId(subscription, fallback) { return firstNonEmptyString(subscription?.id, fallback); }
+function stripePlanInterval(subscription, fallback) { return mapStripeInterval(subscription) || fallback || null; }
+
+function firstNonEmptyString(...values) {
+  for (const value of values) if (typeof value === 'string' && value) return value;
+  return null;
 }
 
 const checkoutFallbackStatus = (eventType) => eventType === 'checkout.session.completed' ? 'active' : 'inactive';
@@ -718,10 +770,15 @@ async function saveStripeEntitlementBatch(db, statements, eventId, metricType) {
   try {
     await db.batch(statements);
   } catch (error) {
-    if (!metricType || !String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
+    if (!isStripeMetricQuotaError(error, metricType)) throw error;
     console.warn('[beta-worker] Stripe billing metric dropped by daily quota', eventId);
     await db.batch(statements.slice(0, 1));
   }
+}
+
+function isStripeMetricQuotaError(error, metricType) {
+  if (!metricType) return false;
+  return String(error?.message || '').includes('product_metric_daily_quota_reached');
 }
 
 async function writeStripeEntitlement(db, { event, ownerId, prior, subscription, object }) {

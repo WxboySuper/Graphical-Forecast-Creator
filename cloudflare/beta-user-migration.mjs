@@ -395,10 +395,15 @@ async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
 async function prepareClerkUser(env, user) {
   const existing = await findClerkUser(env.DB, user.clerkId);
   await assertEmailAvailable(env.DB, user);
-  if (existing && (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || ''))) {
-    await updateClerkProfile(env.DB, user);
-  }
+  if (needsClerkProfileUpdate(existing, user)) await updateClerkProfile(env.DB, user);
   return existing;
+}
+
+function needsClerkProfileUpdate(existing, user) {
+  if (!existing) return false;
+  const emailChanged = normalizeEmail(existing.email) !== user.email;
+  const displayNameChanged = (existing.display_name || '') !== (user.displayName || '');
+  return emailChanged || displayNameChanged;
 }
 
 async function finishCompletedUser(env, user, refreshMigratedStripeEntitlement) {

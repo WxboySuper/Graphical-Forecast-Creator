@@ -15,24 +15,34 @@ function firstUserQuery(database, sql, params) {
 }
 
 function firstUserLookup(database, sql, params) {
+  const direct = firstUserDirectLookup(database, sql, params);
+  if (direct !== UNHANDLED_QUERY) return direct;
+  const linked = firstUserLinkedLookup(database, sql, params);
+  if (linked !== UNHANDLED_QUERY) return linked;
+  return firstUserLegacyLookup(database, sql, params);
+}
+
+function firstUserDirectLookup(database, sql, params) {
   if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return database.users.get(params[0]) || null;
-  if (sql.startsWith('SELECT beta_access FROM users WHERE clerk_id')) {
-    const user = database.users.get(params[0]);
-    return user ? { beta_access: user.beta_access } : null;
-  }
+  if (!sql.startsWith('SELECT beta_access FROM users WHERE clerk_id')) return UNHANDLED_QUERY;
+  const user = database.users.get(params[0]);
+  return user ? { beta_access: user.beta_access } : null;
+}
+
+function firstUserLinkedLookup(database, sql, params) {
   if (sql.startsWith('SELECT clerk_id FROM users WHERE email')) {
     const user = [...database.users.values()].find((entry) => entry.email.toLowerCase() === String(params[0]).toLowerCase());
     return user ? { clerk_id: user.clerk_id } : null;
   }
-  if (sql.startsWith('SELECT clerk_id FROM users WHERE clerk_id')) {
-    const user = database.users.get(params[0]);
-    return user ? { clerk_id: user.clerk_id } : null;
-  }
-  if (sql.startsWith('SELECT clerk_id FROM users WHERE legacy_uid')) {
-    const user = [...database.users.values()].find((entry) => entry.legacy_uid === params[0]);
-    return user ? { clerk_id: user.clerk_id } : null;
-  }
-  return UNHANDLED_QUERY;
+  if (!sql.startsWith('SELECT clerk_id FROM users WHERE clerk_id')) return UNHANDLED_QUERY;
+  const user = database.users.get(params[0]);
+  return user ? { clerk_id: user.clerk_id } : null;
+}
+
+function firstUserLegacyLookup(database, sql, params) {
+  if (!sql.startsWith('SELECT clerk_id FROM users WHERE legacy_uid')) return UNHANDLED_QUERY;
+  const user = [...database.users.values()].find((entry) => entry.legacy_uid === params[0]);
+  return user ? { clerk_id: user.clerk_id } : null;
 }
 
 function firstAccountQuery(database, sql, params) {
@@ -80,17 +90,37 @@ function firstRecordQuery(database, sql, params) {
 }
 
 function firstRecordLookup(database, sql, params) {
-  if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records') && sql.includes('record_id = ?')) {
+  const record = firstUserRecordLookup(database, sql, params);
+  if (record !== UNHANDLED_QUERY) return record;
+  const cycle = firstCycleLookup(database, sql, params);
+  if (cycle !== UNHANDLED_QUERY) return cycle;
+  const product = firstProductLookup(database, sql, params);
+  if (product !== UNHANDLED_QUERY) return product;
+  return firstStripeLookup(database, sql, params);
+}
+
+function firstUserRecordLookup(database, sql, params) {
+  if (!sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records') || !sql.includes('record_id = ?')) return UNHANDLED_QUERY;
     return database.records.get(`${params[0]}:${params[1]}:${params[2]}`) || null;
-  }
+}
+
+function firstCycleLookup(database, sql, params) {
   if (sql.startsWith('SELECT 1 AS found FROM cloud_cycles WHERE user_id = ? AND id = ?')) return database.cloudCycles.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
   if (sql.startsWith('SELECT 1 AS found FROM workflow_awareness WHERE user_id = ? AND cycle_id = ?')) {
     return database.workflowAwareness.has(`${params[0]}:${params[1]}`) ? { found: 1 } : null;
   }
   if (sql.startsWith('SELECT * FROM cloud_cycles WHERE id = ? AND user_id = ?')) return database.cloudCycles.get(`${params[1]}:${params[0]}`) || null;
+  return UNHANDLED_QUERY;
+}
+
+function firstProductLookup(database, sql, params) {
   if (sql.startsWith('SELECT slot_id, data_json FROM custom_products WHERE user_id = ?')) {
     return [...database.customProducts.values()].find((row) => row.user_id === params[0] && row.product_id === params[1]) || null;
   }
+  return UNHANDLED_QUERY;
+}
+
+function firstStripeLookup(database, sql, params) {
   if (sql.startsWith('SELECT status, processed_at FROM stripe_events')) {
     const row = database.stripeEvents.get(params[0]);
     return row ? { ...row } : null;
@@ -227,179 +257,292 @@ class D1Mock {
     return listAll(this, sql, params);
   }
   async run(sql, params) {
-    let changes = 1;
-    if (sql.startsWith('INSERT INTO users')) {
-      changes = insertUser(this, sql, params);
-    } else if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
-      const [updated_at, clerk_id] = params;
-      const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { migration_status: 'migrating', updated_at });
-    } else if (sql.startsWith('UPDATE users SET migration_status = ?, migrated_at')) {
-      const [migration_status, migrated_at, updated_at, clerk_id] = params;
-      const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { migration_status, migrated_at, updated_at });
-    } else if (sql.startsWith('UPDATE users SET migration_status')) {
-      const migration_status = params[0];
-      const clerk_id = params.at(-1);
-      const updated_at = params.at(-2);
-      const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, {
-        migration_status, updated_at,
-        ...(sql.includes('legacy_uid = COALESCE') ? { legacy_uid: user.legacy_uid || params[1], ...(params[2] === 1 ? { beta_access: 1 } : {}) } : {}),
-      });
-    } else if (sql.startsWith('UPDATE users SET email')) {
-      const [email, display_name, updated_at, clerk_id] = params;
-      const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { email, display_name, updated_at, email_verified: 1 });
-    } else if (sql.startsWith('UPDATE users SET beta_access')) {
-      const [updated_at, clerk_id] = params;
-      const user = this.users.get(clerk_id);
-      if (user) Object.assign(user, { beta_access: 1, updated_at });
-    } else if (sql.startsWith('INSERT OR IGNORE INTO user_settings') || sql.startsWith('INSERT INTO user_settings')) {
-      if (sql.includes('ON CONFLICT')) {
-        const existing = JSON.parse(this.settings.get(params[0]) || '{}');
-        this.settings.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
-      } else if (!this.settings.has(params[0])) this.settings.set(params[0], params[1]);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO user_entitlements') || sql.startsWith('INSERT INTO user_entitlements')) {
-      if (sql.includes('json_patch')) {
-        const existing = JSON.parse(this.entitlements.get(params[0]) || '{}');
-        this.entitlements.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
-      } else if (sql.includes('ON CONFLICT') || !this.entitlements.has(params[0])) this.entitlements.set(params[0], params[1]);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO user_metrics') || sql.startsWith('INSERT INTO user_metrics')) {
-      if (sql.includes('ON CONFLICT')) {
-        const existing = JSON.parse(this.metrics.get(params[0]) || '{}');
-        this.metrics.set(params[0], JSON.stringify({ ...JSON.parse(params[1]), ...existing }));
-      } else if (!this.metrics.has(params[0])) this.metrics.set(params[0], params[1]);
-    } else if (sql.startsWith('INSERT INTO cloud_cycles') || sql.startsWith('INSERT OR IGNORE INTO cloud_cycles')) {
-      const [id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at] = params;
-      const key = `${user_id}:${id}`;
-      const exists = this.cloudCycles.has(key);
-      const limit = sql.includes('SELECT ?') ? params.at(-1) : Number.MAX_SAFE_INTEGER;
-      const count = [...this.cloudCycles.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length;
-      if (sql.includes('SELECT ?') && !exists && count >= limit) return { meta: { changes: 0 } };
-      if (!sql.startsWith('INSERT OR IGNORE') || !exists) {
-        const previous = this.cloudCycles.get(key);
-        const incomingMetadata = JSON.parse(metadata_json || '{}');
-        const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
-        if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
-        this.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
-          migration_import: sql.startsWith('INSERT OR IGNORE INTO cloud_cycles') ? 1 : previous?.migration_import || 0,
-          created_at: previous?.created_at || created_at, updated_at });
-      }
-    } else if (sql.startsWith('UPDATE cloud_cycles SET label')) {
-      const [label, updated_at, , , id, user_id] = params;
-      const row = this.cloudCycles.get(`${user_id}:${id}`);
-      if (row) {
-        const metadata = JSON.parse(row.metadata_json || '{}');
-        Object.assign(row, { label, updated_at, metadata_json: JSON.stringify({ ...metadata, label, updatedAt: updated_at }) });
-      } else changes = 0;
-    } else if (sql.startsWith('DELETE FROM cloud_cycles')) {
-      const before = this.cloudCycles.size;
-      if (params.length === 1) {
-        for (const [key, row] of this.cloudCycles) if (row.user_id === params[0]) this.cloudCycles.delete(key);
-      } else this.cloudCycles.delete(`${params[1]}:${params[0]}`);
-      changes = before - this.cloudCycles.size;
-    } else if (sql.startsWith('INSERT OR IGNORE INTO stripe_events')) {
-      const [eventId, processedAt, status] = params;
-      if (this.stripeEvents.has(eventId)) return { meta: { changes: 0 } };
-      this.stripeEvents.set(eventId, { status, processed_at: processedAt });
-      return { meta: { changes: 1 }, processed_at: processedAt };
-    } else if (sql.startsWith('UPDATE stripe_events SET processed_at')) {
-      const [processedAt, eventId, status, priorTimestamp] = params;
-      const row = this.stripeEvents.get(eventId);
-      if (row?.status === status && row.processed_at === priorTimestamp) row.processed_at = processedAt;
-      else changes = 0;
-    } else if (sql.startsWith('UPDATE stripe_events SET status')) {
-      const [status, processed_at, eventId] = params;
-      if (this.stripeEvents.has(eventId)) this.stripeEvents.set(eventId, { status, processed_at });
-    } else if (sql.startsWith('DELETE FROM stripe_events')) {
-      this.stripeEvents.delete(params[0]);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO product_metric_events') || sql.startsWith('INSERT INTO product_metric_events')) {
-      const [eventId, date, installation, type, userId] = params;
-      requireMetricQuota(this.metricEvents, date, type, userId);
-      this.metricEvents.add(`${eventId}:${date}:${installation}:${type}:${userId}`);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO billing_cleanup_queue')) {
-      this.billingCleanupQueue.set(params[0], { customer_id: params[0], created_at: params[1], attempts: 0 });
-    } else if (sql.startsWith('UPDATE billing_cleanup_queue')) {
-      const [last_error, next_attempt_at, customer_id] = params;
-      const row = this.billingCleanupQueue.get(customer_id);
-      if (row) Object.assign(row, { attempts: row.attempts + 1, last_error, next_attempt_at });
-    } else if (sql.startsWith('DELETE FROM billing_cleanup_queue')) {
-      this.billingCleanupQueue.delete(params[0]);
-    } else if (sql.startsWith('INSERT OR IGNORE INTO workflow_awareness') || sql.startsWith('INSERT INTO workflow_awareness')) {
-      const [user_id, cycle_id, data_json] = params;
-      if (Buffer.byteLength(data_json) > 750_000) throw new Error('workflow_awareness_too_large');
-      this.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json, migration_import: sql.includes('migration_import') ? 1 : 0 });
-    } else if (sql.startsWith('WITH slots(slot_id) AS (VALUES')) {
-      const [user_id, product_id, data_json] = params;
-      if (this.failNextCustomProductSlotInsert) {
-        this.failNextCustomProductSlotInsert = false;
-        throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.slot_id');
-      }
-      if ([...this.customProducts.values()].some((row) => row.user_id === user_id && row.product_id === product_id)) {
-        throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.product_id');
-      }
-      if ([...this.customProducts.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length >= params.at(-1)) return { meta: { changes: 0 } };
-      const slotId = [
-        ...Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`),
-        ...Array.from({ length: 16 }, (_, index) => `active-${String(index + 1).padStart(2, '0')}`),
-      ]
-        .find((candidate) => !this.customProducts.has(`${user_id}:${candidate}`));
-      if (!slotId) return { meta: { changes: 0 } };
-      this.customProducts.set(`${user_id}:${slotId}`, { user_id, slot_id: slotId, product_id, data_json });
-    } else if (sql.startsWith('INSERT OR IGNORE INTO custom_products')) {
-      const [user_id, slot_id, product_id, data_json] = params;
-      const duplicate = [...this.customProducts.values()].some((row) => row.user_id === user_id && (row.slot_id === slot_id || row.product_id === product_id));
-      if (!duplicate) this.customProducts.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json, migration_import: 1 });
-    } else if (sql.startsWith('UPDATE custom_products SET data_json')) {
-      const [data_json, user_id, slot_id, product_id, expectedVersion] = params;
-      const row = this.customProducts.get(`${user_id}:${slot_id}`);
-      if (row && row.product_id === product_id && JSON.parse(row.data_json).version === expectedVersion) row.data_json = data_json;
-      else changes = 0;
-    } else if (sql.startsWith('DELETE FROM custom_products WHERE user_id = ? AND slot_id = ?')) {
-      const [, user_id, slot_id, product_id] = [null, ...params];
-      const key = `${user_id}:${slot_id}`;
-      const row = this.customProducts.get(key);
-      if (row && row.product_id === product_id) this.customProducts.delete(key);
-      else changes = 0;
-    } else if (sql.startsWith('INSERT INTO user_records')) {
-      const [user_id, record_type, record_id, data_json, created_at, updated_at] = params;
-      const key = `${user_id}:${record_type}:${record_id}`;
-      if (sql.includes('SELECT ?')) {
-        const count = [...this.records.values()].filter((record) => record.user_id === user_id && record.record_type === record_type).length;
-        if (!this.records.has(key) && count >= params.at(-1)) return { meta: { changes: 0 } };
-      }
-      this.records.set(`${user_id}:${record_type}:${record_id}`, { user_id, record_type, record_id, data_json, created_at, updated_at });
-    } else if (sql.startsWith('DELETE FROM user_records')) {
-      const before = this.records.size;
-      const [user_id, record_type, record_id] = params;
-      if (record_type === undefined) {
-        for (const [key, record] of this.records) if (record.user_id === user_id) this.records.delete(key);
-      } else this.records.delete(`${user_id}:${record_type}:${record_id}`);
-      changes = before - this.records.size;
-    } else if (sql.startsWith('DELETE FROM user_settings')) {
-      changes = Number(this.settings.has(params[0]));
-      this.settings.delete(params[0]);
-    } else if (sql.startsWith('DELETE FROM user_entitlements')) {
-      changes = Number(this.entitlements.has(params[0]));
-      this.entitlements.delete(params[0]);
-    } else if (sql.startsWith('DELETE FROM user_metrics')) {
-      changes = Number(this.metrics.has(params[0]));
-      this.metrics.delete(params[0]);
-    } else if (sql.startsWith('DELETE FROM workflow_awareness')) {
-      for (const [key, row] of this.workflowAwareness) if (row.user_id === params[0]) this.workflowAwareness.delete(key);
-    } else if (sql.startsWith('DELETE FROM custom_products')) {
-      for (const [key, row] of this.customProducts) if (row.user_id === params[0]) this.customProducts.delete(key);
-    } else if (sql.startsWith('DELETE FROM product_metric_events')) {
-      for (const key of this.metricEvents) if (key.endsWith(`:${params[0]}`)) this.metricEvents.delete(key);
-    } else if (sql.startsWith('DELETE FROM users')) {
-      changes = Number(this.users.has(params[0]));
-      this.users.delete(params[0]);
-    } else {
-      throw new Error(`Unhandled D1 mock SQL: ${sql}`);
-    }
-    return { meta: { changes } };
+    const result = runMutation(this, sql, params);
+    if (result === UNHANDLED_QUERY) throw new Error(`Unhandled D1 mock SQL: ${sql}`);
+    return result;
   }
+}
+
+function runMutation(database, sql, params) {
+  const handlers = [runUserMutation, runJsonMutation, runCycleMutation, runStripeMutation,
+    runBillingMutation, runWorkflowMutation, runProductMutation, runRecordMutation, runDeleteMutation];
+  for (const handler of handlers) {
+    const result = handler(database, sql, params);
+    if (result !== UNHANDLED_QUERY) return result;
+  }
+  return UNHANDLED_QUERY;
+}
+
+function result(changes = 1) { return { meta: { changes } }; }
+
+function runUserMutation(db, sql, params) {
+  if (sql.startsWith('INSERT INTO users')) return result(insertUser(db, sql, params));
+  if (!sql.startsWith('UPDATE users')) return UNHANDLED_QUERY;
+  const [updated_at, clerk_id] = [params.at(-2), params.at(-1)];
+  const user = db.users.get(clerk_id);
+  if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
+    if (user) Object.assign(user, { migration_status: 'migrating', updated_at: params[0] });
+  } else if (sql.startsWith('UPDATE users SET migration_status = ?, migrated_at')) {
+    if (user) Object.assign(user, { migration_status: params[0], migrated_at: params[1], updated_at: params[2] });
+  } else if (sql.startsWith('UPDATE users SET migration_status')) {
+    updateMigrationStatus(user, sql, params, clerk_id, updated_at);
+  } else if (sql.startsWith('UPDATE users SET email')) {
+    updateUserEmail(user, params);
+  } else if (sql.startsWith('UPDATE users SET beta_access')) {
+    if (user) Object.assign(user, { beta_access: 1, updated_at: params[0] });
+  }
+  return result();
+}
+
+function updateMigrationStatus(user, sql, params, clerkId, updatedAt) {
+  if (!user) return;
+  const changes = { migration_status: params[0], updated_at: updatedAt };
+  if (sql.includes('legacy_uid = COALESCE')) {
+    changes.legacy_uid = user.legacy_uid || params[1];
+    if (params[2] === 1) changes.beta_access = 1;
+  }
+  Object.assign(user, changes);
+}
+
+function updateUserEmail(user, params) {
+  if (!user) return;
+  const [email, display_name, updated_at] = params;
+  Object.assign(user, { email, display_name, updated_at, email_verified: 1 });
+}
+
+function runJsonMutation(db, sql, params) {
+  if (sql.includes('INTO user_settings')) return saveJsonMap(db.settings, sql, params, 'settings');
+  if (sql.includes('INTO user_entitlements')) return saveJsonMap(db.entitlements, sql, params, 'entitlements');
+  if (sql.includes('INTO user_metrics')) return saveJsonMap(db.metrics, sql, params, 'metrics');
+  return UNHANDLED_QUERY;
+}
+
+function saveJsonMap(map, sql, params, table) {
+  const [userId, data] = params;
+  const existing = map.get(userId);
+  const preserveExisting = (table === 'settings' && sql.includes('ON CONFLICT'))
+    || (table === 'entitlements' && sql.includes('json_patch'))
+    || (table === 'metrics' && sql.includes('ON CONFLICT'));
+  if (preserveExisting) {
+    const preserved = existing ? JSON.parse(existing) : {};
+    map.set(userId, JSON.stringify({ ...JSON.parse(data), ...preserved }));
+  } else if (!existing || sql.includes('ON CONFLICT')) {
+    map.set(userId, data);
+  }
+  return result();
+}
+
+function runCycleMutation(db, sql, params) {
+  if (sql.startsWith('INSERT INTO cloud_cycles') || sql.startsWith('INSERT OR IGNORE INTO cloud_cycles')) return saveCloudCycle(db, sql, params);
+  if (sql.startsWith('UPDATE cloud_cycles SET label')) return updateCloudCycle(db, params);
+  if (sql.startsWith('DELETE FROM cloud_cycles')) return deleteCloudCycles(db.cloudCycles, params);
+  return UNHANDLED_QUERY;
+}
+
+function saveCloudCycle(db, sql, params) {
+  const [id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at] = params;
+  const key = `${user_id}:${id}`;
+  const previous = db.cloudCycles.get(key);
+  const limit = sql.includes('SELECT ?') ? params.at(-1) : Number.MAX_SAFE_INTEGER;
+  const count = [...db.cloudCycles.values()].filter((row) => row.user_id === user_id && row.migration_import !== 1).length;
+  if (sql.includes('SELECT ?') && !previous && count >= limit) return result(0);
+  if (!sql.startsWith('INSERT OR IGNORE') || !previous) {
+    const incomingMetadata = JSON.parse(metadata_json || '{}');
+    const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
+    if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
+    db.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
+      migration_import: sql.startsWith('INSERT OR IGNORE INTO cloud_cycles') ? 1 : previous?.migration_import || 0,
+      created_at: previous?.created_at || created_at, updated_at });
+  }
+  return result();
+}
+
+function updateCloudCycle(db, params) {
+  const [label, updated_at, , , id, user_id] = params;
+  const row = db.cloudCycles.get(`${user_id}:${id}`);
+  if (!row) return result(0);
+  const metadata = JSON.parse(row.metadata_json || '{}');
+  Object.assign(row, { label, updated_at, metadata_json: JSON.stringify({ ...metadata, label, updatedAt: updated_at }) });
+  return result();
+}
+
+function deleteCloudCycles(cycles, params) {
+  const before = cycles.size;
+  if (params.length === 1) {
+    for (const [key, row] of cycles) if (row.user_id === params[0]) cycles.delete(key);
+  } else cycles.delete(`${params[1]}:${params[0]}`);
+  return result(before - cycles.size);
+}
+
+function runStripeMutation(db, sql, params) {
+  if (sql.startsWith('INSERT OR IGNORE INTO stripe_events')) return insertStripeEvent(db.stripeEvents, params);
+  if (sql.startsWith('UPDATE stripe_events SET processed_at')) return updateStripeClaim(db.stripeEvents, params);
+  if (sql.startsWith('UPDATE stripe_events SET status')) return setStripeEventStatus(db.stripeEvents, params);
+  if (sql.startsWith('DELETE FROM stripe_events')) { db.stripeEvents.delete(params[0]); return result(); }
+  if (sql.includes('INTO product_metric_events')) return addProductMetric(db.metricEvents, params);
+  return UNHANDLED_QUERY;
+}
+
+function insertStripeEvent(events, params) {
+  const [eventId, processedAt, status] = params;
+  if (events.has(eventId)) return { meta: { changes: 0 } };
+  events.set(eventId, { status, processed_at: processedAt });
+  return { meta: { changes: 1 }, processed_at: processedAt };
+}
+
+function updateStripeClaim(events, params) {
+  const [processedAt, eventId, status, priorTimestamp] = params;
+  const row = events.get(eventId);
+  if (row?.status !== status || row.processed_at !== priorTimestamp) return result(0);
+  row.processed_at = processedAt;
+  return result();
+}
+
+function setStripeEventStatus(events, params) {
+  const [status, processed_at, eventId] = params;
+  if (events.has(eventId)) events.set(eventId, { status, processed_at });
+  return result();
+}
+
+function addProductMetric(events, params) {
+  const [eventId, date, installation, type, userId] = params;
+  requireMetricQuota(events, date, type, userId);
+  events.add(`${eventId}:${date}:${installation}:${type}:${userId}`);
+  return result();
+}
+
+function runBillingMutation(db, sql, params) {
+  if (sql.startsWith('INSERT OR IGNORE INTO billing_cleanup_queue')) {
+    db.billingCleanupQueue.set(params[0], { customer_id: params[0], created_at: params[1], attempts: 0 });
+  } else if (sql.startsWith('UPDATE billing_cleanup_queue')) {
+    updateCleanupRecord(db.billingCleanupQueue, params);
+  } else if (sql.startsWith('DELETE FROM billing_cleanup_queue')) {
+    db.billingCleanupQueue.delete(params[0]);
+  } else return UNHANDLED_QUERY;
+  return result();
+}
+
+function updateCleanupRecord(queue, params) {
+  const [last_error, next_attempt_at, customer_id] = params;
+  const row = queue.get(customer_id);
+  if (row) Object.assign(row, { attempts: row.attempts + 1, last_error, next_attempt_at });
+}
+
+function runWorkflowMutation(db, sql, params) {
+  if (!sql.includes('INTO workflow_awareness')) return UNHANDLED_QUERY;
+  const [user_id, cycle_id, data_json] = params;
+  if (Buffer.byteLength(data_json) > 750_000) throw new Error('workflow_awareness_too_large');
+  db.workflowAwareness.set(`${user_id}:${cycle_id}`, { user_id, cycle_id, data_json, migration_import: sql.includes('migration_import') ? 1 : 0 });
+  return result();
+}
+
+function runProductMutation(db, sql, params) {
+  if (sql.startsWith('WITH slots(slot_id) AS (VALUES')) return createProductSlot(db, params);
+  if (sql.startsWith('INSERT OR IGNORE INTO custom_products')) return insertMigratedProduct(db.customProducts, params);
+  if (sql.startsWith('UPDATE custom_products SET data_json')) return updateProduct(db.customProducts, params);
+  if (sql.startsWith('DELETE FROM custom_products WHERE user_id = ? AND slot_id = ?')) return deleteProduct(db.customProducts, params);
+  return UNHANDLED_QUERY;
+}
+
+function createProductSlot(db, params) {
+  const [user_id, product_id, data_json] = params;
+  if (db.failNextCustomProductSlotInsert) {
+    db.failNextCustomProductSlotInsert = false;
+    throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.slot_id');
+  }
+  const products = [...db.customProducts.values()];
+  if (products.some((row) => row.user_id === user_id && row.product_id === product_id)) throw new Error('UNIQUE constraint failed: custom_products.user_id, custom_products.product_id');
+  if (products.filter((row) => row.user_id === user_id && row.migration_import !== 1).length >= params.at(-1)) return result(0);
+  const slotId = findAvailableMockProductSlot(db.customProducts, user_id);
+  if (!slotId) return result(0);
+  db.customProducts.set(`${user_id}:${slotId}`, { user_id, slot_id: slotId, product_id, data_json });
+  return result();
+}
+
+function findAvailableMockProductSlot(products, userId) {
+  const slots = [...Array.from({ length: 16 }, (_, index) => `product-${String(index + 1).padStart(2, '0')}`),
+    ...Array.from({ length: 16 }, (_, index) => `active-${String(index + 1).padStart(2, '0')}`)];
+  return slots.find((candidate) => !products.has(`${userId}:${candidate}`));
+}
+
+function insertMigratedProduct(products, params) {
+  const [user_id, slot_id, product_id, data_json] = params;
+  const duplicate = [...products.values()].some((row) => row.user_id === user_id && (row.slot_id === slot_id || row.product_id === product_id));
+  if (!duplicate) products.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json, migration_import: 1 });
+  return result();
+}
+
+function updateProduct(products, params) {
+  const [data_json, user_id, slot_id, product_id, expectedVersion] = params;
+  const row = products.get(`${user_id}:${slot_id}`);
+  if (!row || row.product_id !== product_id || JSON.parse(row.data_json).version !== expectedVersion) return result(0);
+  row.data_json = data_json;
+  return result();
+}
+
+function deleteProduct(products, params) {
+  const [userId, slotId, productId] = params;
+  const key = `${userId}:${slotId}`;
+  const row = products.get(key);
+  if (!row || row.product_id !== productId) return result(0);
+  products.delete(key);
+  return result();
+}
+
+function runRecordMutation(db, sql, params) {
+  if (sql.startsWith('INSERT INTO user_records')) return saveUserRecord(db.records, sql, params);
+  if (sql.startsWith('DELETE FROM user_records')) return deleteUserRecords(db.records, params);
+  return UNHANDLED_QUERY;
+}
+
+function saveUserRecord(records, sql, params) {
+  const [user_id, record_type, record_id, data_json, created_at, updated_at] = params;
+  const key = `${user_id}:${record_type}:${record_id}`;
+  if (sql.includes('SELECT ?')) {
+    const count = [...records.values()].filter((record) => record.user_id === user_id && record.record_type === record_type).length;
+    if (!records.has(key) && count >= params.at(-1)) return result(0);
+  }
+  records.set(key, { user_id, record_type, record_id, data_json, created_at, updated_at });
+  return result();
+}
+
+function deleteUserRecords(records, params) {
+  const before = records.size;
+  const [user_id, record_type, record_id] = params;
+  if (record_type === undefined) {
+    for (const [key, record] of records) if (record.user_id === user_id) records.delete(key);
+  } else records.delete(`${user_id}:${record_type}:${record_id}`);
+  return result(before - records.size);
+}
+
+function runDeleteMutation(db, sql, params) {
+  const deletion = [
+    ['DELETE FROM user_settings', db.settings],
+    ['DELETE FROM user_entitlements', db.entitlements],
+    ['DELETE FROM user_metrics', db.metrics],
+    ['DELETE FROM users', db.users],
+  ].find(([prefix]) => sql.startsWith(prefix));
+  if (deletion) return deleteKey(deletion[1], params[0]);
+  if (sql.startsWith('DELETE FROM workflow_awareness')) return deleteOwnedRows(db.workflowAwareness, params[0]);
+  if (sql.startsWith('DELETE FROM custom_products')) return deleteOwnedRows(db.customProducts, params[0]);
+  if (sql.startsWith('DELETE FROM product_metric_events')) return deleteMetricEvents(db.metricEvents, params[0]);
+  return UNHANDLED_QUERY;
+}
+
+function deleteKey(map, key) {
+  const changes = Number(map.has(key));
+  map.delete(key);
+  return result(changes);
+}
+
+function deleteOwnedRows(map, userId) {
+  for (const [key, row] of map) if (row.user_id === userId) map.delete(key);
+  return result();
+}
+
+function deleteMetricEvents(events, userId) {
+  for (const key of events) if (key.endsWith(`:${userId}`)) events.delete(key);
+  return result();
 }
 
 function requireMetricQuota(metricEvents, date, type, userId) {

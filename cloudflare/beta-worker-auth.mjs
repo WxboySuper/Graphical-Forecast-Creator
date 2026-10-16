@@ -72,13 +72,20 @@ function isClerkProfileUnavailable(status) {
 }
 
 function readVerifiedPrimaryEmail(profile) {
-  const addresses = Array.isArray(profile.email_addresses) ? profile.email_addresses : [];
-  const primary = addresses.find((entry) => entry?.id === profile.primary_email_address_id);
-  const email = normalizeEmail(primary?.email_address);
-  if (email && primary?.verification?.status === 'verified') return email;
+  const primary = findPrimaryEmailAddress(profile);
+  const email = normalizedEmail(primary);
+  if (isVerifiedEmailAddress(primary, email)) return email;
   console.warn('[beta-worker] Clerk primary email is not verified', Boolean(email), primary?.verification?.status);
   return null;
 }
+
+function findPrimaryEmailAddress(profile) {
+  const addresses = Array.isArray(profile.email_addresses) ? profile.email_addresses : [];
+  return addresses.find((entry) => entry?.id === profile.primary_email_address_id) || {};
+}
+
+function normalizedEmail(primary) { return normalizeEmail(primary.email_address); }
+function isVerifiedEmailAddress(primary, email) { return Boolean(email && primary.verification?.status === 'verified'); }
 
 function formatDisplayName(profile) {
   return [profile.first_name, profile.last_name].filter((part) => typeof part === 'string' && part).join(' ');
