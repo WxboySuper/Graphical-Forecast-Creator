@@ -46,7 +46,12 @@ const readBearer = (request) => {
 
 async function authenticate(request, env) {
   const token = readBearer(request);
-  if (!token || !env.CLERK_JWT_KEY || !env.CLERK_SECRET_KEY) { console.warn('[beta-worker] missing token or Clerk verification key', Boolean(token), Boolean(env.CLERK_JWT_KEY)); return null; }
+  if (!token) return null;
+  if (!env.CLERK_JWT_KEY || !env.CLERK_SECRET_KEY) {
+    const error = new Error('Clerk verification keys are not configured.');
+    error.code = 'CLERK_CONFIG_MISSING';
+    throw error;
+  }
   try {
     const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
     const parties = configuredParties
@@ -483,7 +488,7 @@ async function handleApi(request, env) {
   try { user = await ensureUser(identity, env); }
   catch (error) {
     if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
-    if (error?.message === 'SNAPSHOT_INVALID') return json({ error: 'Account migration data is temporarily unavailable.' }, 503);
+    if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
     if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
       return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
     }

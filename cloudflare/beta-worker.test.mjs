@@ -359,6 +359,11 @@ test('authentication rejects signed sessions when no authorized party is configu
   await assert.rejects(__test.authenticate(request, env), { code: 'CLERK_CONFIG_MISSING' });
   const response = await worker.fetch(request, env);
   assert.equal(response.status, 503);
+  env.CLERK_AUTHORIZED_PARTIES = 'https://beta.gfcweather.com';
+  delete env.CLERK_SECRET_KEY;
+  await assert.rejects(__test.authenticate(request, env), { code: 'CLERK_CONFIG_MISSING' });
+  const missingKeyResponse = await worker.fetch(request, env);
+  assert.equal(missingKeyResponse.status, 503);
 });
 
 test('Clerk profile cache does not reuse identity across different session tokens', async () => {
