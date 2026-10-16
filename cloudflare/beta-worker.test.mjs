@@ -40,9 +40,11 @@ class D1Mock {
     this.stripeEvents = new Map();
     this.metricEvents = new Set();
     this.billingCleanupQueue = new Map();
+    this.batchSizes = [];
   }
   prepare(sql) { return new D1Statement(this, sql); }
   async batch(statements) {
+    this.batchSizes.push(statements.length);
     const results = [];
     for (const statement of statements) results.push(await statement.run());
     return results;
@@ -448,6 +450,7 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
     assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
+    assert.deepEqual(db.batchSizes, [50, 50, 26]);
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });
@@ -659,6 +662,8 @@ test('admin metrics validates the allowlist window and aggregates the requested 
 test('forecast, discussion, verification and settings endpoints enforce account-scoped CRUD', async () => {
   const env = createEnv();
   await withClerkFetch(async () => {
+    const emptyId = await call('/api/forecasts', env, { method: 'PUT', body: { id: '   ', data: {} } });
+    assert.equal(emptyId.status, 400);
     for (const [route, id] of [['forecasts', 'forecast-1'], ['discussions', 'discussion-1'], ['verifications', 'verification-1']]) {
       const write = await call(`/api/${route}`, env, { method: 'PUT', body: { id, data: { value: route } } });
       assert.equal(write.status, 200);

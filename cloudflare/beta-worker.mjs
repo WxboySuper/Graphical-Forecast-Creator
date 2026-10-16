@@ -192,7 +192,9 @@ async function ensureUser(user, env) {
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('complete', now, now, user.clerkId));
-      await env.DB.batch(statements);
+      for (let offset = 0; offset < statements.length; offset += 50) {
+        await env.DB.batch(statements.slice(offset, offset + 50));
+      }
     } catch (error) {
       await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('failed', new Date().toISOString(), user.clerkId).run();
@@ -633,14 +635,15 @@ async function handleApi(request, env) {
   }
   const productMatch = path.match(/^\/api\/custom-products\/([^/]+)$/);
   if (productMatch) {
+    if (request.method !== 'PATCH' && request.method !== 'DELETE') return json({ error: 'Method not allowed.' }, 405);
     const productId = decodePathId(productMatch[1]);
     if (!productId || productId.includes('/')) return json({ error: 'Invalid custom product ID.' }, 400);
     const currentRow = await env.DB.prepare('SELECT slot_id, data_json FROM custom_products WHERE user_id = ? AND product_id = ?')
       .bind(user.clerk_id, productId).first();
     if (!currentRow) return json({ error: 'Custom product not found.' }, 404);
     const current = parseJson(currentRow.data_json) || {};
-    if (request.method !== 'PATCH' && request.method !== 'DELETE') return json({ error: 'Method not allowed.' }, 405);
-    const body = await readBody(request);
+    const ifMatch = request.method === 'DELETE' ? request.headers.get('If-Match')?.trim() : '';
+    const body = request.method === 'PATCH' || !ifMatch ? await readBody(request) : null;
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (request.method === 'PATCH') {
       const product = body?.product;
@@ -654,9 +657,8 @@ async function handleApi(request, env) {
       return result.meta.changes ? json({ success: true, product }) : json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
     }
     if (request.method === 'DELETE') {
-      const ifMatch = request.headers.get('If-Match')?.trim();
       const headerVersions = [...(ifMatch || '').matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
-      const expectedVersion = headerVersions.length
+      const expectedVersion = ifMatch
         ? headerVersions.includes(current.version) ? current.version : NaN
         : body?.expectedVersion;
       if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
@@ -679,7 +681,7 @@ async function handleApi(request, env) {
     if (request.method === 'PUT' && !recordId) {
       const body = await readBody(request);
       if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      const id = typeof body?.id === 'string' ? body.id : '';
+      const id = typeof body?.id === 'string' ? body.id.trim() : '';
       if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
       const dataJson = JSON.stringify(body.data);
       if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
