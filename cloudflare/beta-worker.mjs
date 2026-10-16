@@ -265,64 +265,76 @@ async function applySnapshotMigration(user, env, snapshot, now) {
   }
 }
 
+async function findClerkUser(db, clerkId) {
+  return db.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(clerkId).first();
+}
+
+async function assertEmailAvailable(db, user) {
+  const owner = await db.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
+  if (owner && owner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
+}
+
+async function updateClerkProfile(db, user) {
+  try {
+    await db.prepare('UPDATE users SET email = ?, email_verified = 1, display_name = ?, updated_at = ? WHERE clerk_id = ?')
+      .bind(user.email, user.displayName, new Date().toISOString(), user.clerkId).run();
+  } catch (error) {
+    if (String(error?.message || '').includes('UNIQUE constraint failed: users.email')) throw new Error('EMAIL_ALREADY_LINKED');
+    throw error;
+  }
+}
+
+async function readUserSnapshot(env, email) {
+  if (!env.FIRESTORE_SNAPSHOT) return null;
+  const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(email));
+  if (!object) return null;
+  let snapshot;
+  try { snapshot = await object.json(); } catch { throw new Error('SNAPSHOT_INVALID'); }
+  if (!isObject(snapshot)) throw new Error('SNAPSHOT_INVALID');
+  if (snapshot.userProfile !== undefined && snapshot.userProfile !== null && !isObject(snapshot.userProfile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
+  return snapshot;
+}
+
+async function insertMigratingUser(db, user, snapshot, now) {
+  await db.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
+    migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
+    .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
+      snapshot ? 'migrating' : 'no_match', now, now).run();
+}
+
+async function updateMigratingUser(db, user, snapshot, now) {
+  await db.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
+    beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
+    .bind(snapshot ? 'migrating' : 'no_match', snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
+}
+
+async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
+  try {
+    await insertMigratingUser(db, user, snapshot, now);
+  } catch (error) {
+    const racedUser = await findClerkUser(db, user.clerkId);
+    if (!racedUser) {
+      await assertEmailAvailable(db, user);
+      throw error;
+    }
+    await updateMigratingUser(db, user, snapshot, now);
+  }
+}
+
 async function ensureUser(user, env) {
-  let existing = await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
-  const emailOwner = await env.DB.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
-  if (emailOwner && emailOwner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
-  if (existing) {
-    if (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || '')) {
-      try {
-        await env.DB.prepare('UPDATE users SET email = ?, email_verified = 1, display_name = ?, updated_at = ? WHERE clerk_id = ?')
-          .bind(user.email, user.displayName, new Date().toISOString(), user.clerkId).run();
-      } catch (error) {
-        if (String(error?.message || '').includes('UNIQUE constraint failed: users.email')) throw new Error('EMAIL_ALREADY_LINKED');
-        throw error;
-      }
-    }
-    if (existing.migration_status === 'complete') {
-      return await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
-    }
+  const existing = await findClerkUser(env.DB, user.clerkId);
+  await assertEmailAvailable(env.DB, user);
+  if (existing && (normalizeEmail(existing.email) !== user.email || (existing.display_name || '') !== (user.displayName || ''))) {
+    await updateClerkProfile(env.DB, user);
   }
+  if (existing?.migration_status === 'complete') return findClerkUser(env.DB, user.clerkId);
 
-  let snapshot = null;
-  if (env.FIRESTORE_SNAPSHOT) {
-    const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(user.email));
-    if (object) {
-      try { snapshot = await object.json(); } catch { throw new Error('SNAPSHOT_INVALID'); }
-      if (!isObject(snapshot)) throw new Error('SNAPSHOT_INVALID');
-      if (snapshot.userProfile !== undefined && snapshot.userProfile !== null && !isObject(snapshot.userProfile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
-    }
-  }
-
+  const snapshot = await readUserSnapshot(env, user.email);
   const now = new Date().toISOString();
-  const migrationStatus = snapshot ? 'migrating' : 'no_match';
-  if (!existing) {
-    try {
-      await env.DB.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
-        migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
-        .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
-          migrationStatus, now, now).run();
-    } catch (error) {
-      const racedUser = await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
-      if (!racedUser) {
-        const racedEmail = await env.DB.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
-        if (racedEmail && racedEmail.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
-        throw error;
-      }
-      existing = racedUser;
-      await env.DB.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
-        beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
-        .bind(migrationStatus, snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
-    }
-  } else {
-    await env.DB.prepare(`UPDATE users SET migration_status = ?, legacy_uid = COALESCE(legacy_uid, ?),
-      beta_access = CASE WHEN ? = 1 THEN 1 ELSE beta_access END, updated_at = ? WHERE clerk_id = ?`)
-      .bind(migrationStatus, snapshot?.uid || null, snapshot?.userProfile?.betaAccess === true ? 1 : 0, now, user.clerkId).run();
-  }
-
+  if (existing) await updateMigratingUser(env.DB, user, snapshot, now);
+  else await insertOrUpdateMigratingUser(env.DB, user, snapshot, now);
   await applySnapshotMigration(user, env, snapshot, now);
-
-  return await env.DB.prepare('SELECT * FROM users WHERE clerk_id = ?').bind(user.clerkId).first();
+  return findClerkUser(env.DB, user.clerkId);
 }
 
 const BODY_TOO_LARGE = Symbol('body-too-large');
