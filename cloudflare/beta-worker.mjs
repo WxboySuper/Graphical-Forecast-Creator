@@ -2,6 +2,7 @@ import { createUserEnsurer, emailSnapshotKey } from './beta-user-migration.mjs';
 import { decodePathId, isObject, json, mapStripeInterval, normalizeEmail, parseJson, readBearer, readLimitedBody, timingSafeStringEqual, tokenCacheKey, verifyStripeSignature } from './beta-worker-utils.mjs';
 import { parseSentryDsn, parseSentryEnvelopeDsn } from './beta-sentry-utils.mjs';
 import { proxyFirebaseApi } from './beta-worker-routing.mjs';
+import { readAdminMetrics } from './beta-admin-metrics.mjs';
 import { verifyToken } from '@clerk/backend';
 import { verifyWebhook } from '@clerk/backend/webhooks';
 
@@ -232,7 +233,7 @@ async function startBillingCheckout(request, env, user) {
   if (!price) return json({ error: 'This billing plan is not available.' }, 400);
   if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
   const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
-  const params = buildCheckoutParams(env, user, plan, price, entitlement);
+  const params = buildCheckoutParams({ env, user, plan, price, entitlement });
   let session;
   try { session = await stripeRequest(env, 'checkout/sessions', params); }
   catch { return json({ error: 'Unable to start checkout with Stripe.' }, 502); }
@@ -240,7 +241,7 @@ async function startBillingCheckout(request, env, user) {
   return json({ url: session.url });
 }
 
-function buildCheckoutParams(env, user, plan, price, entitlement) {
+function buildCheckoutParams({ env, user, plan, price, entitlement }) {
   return {
     mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1',
     success_url: `${env.PUBLIC_ORIGIN}/account?checkout=success`, cancel_url: `${env.PUBLIC_ORIGIN}/pricing?checkout=cancelled`,
@@ -278,73 +279,41 @@ async function claimBetaAccess(request, env, user) {
 
 async function handleAccountSettingsAndMetrics({ request, env, url, path, user }) {
   if (path === '/api/user/settings' && request.method === 'GET') return json({ settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id) });
-  if (path === '/api/user/settings' && request.method === 'PUT') {
-    const body = await readBody(request);
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    if (!isObject(body?.settings)) return json({ error: 'Invalid settings.' }, 400);
-    const dataJson = JSON.stringify(body.settings);
-    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Settings are too large.' }, 413);
-    await env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
-      ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-      .bind(user.clerk_id, dataJson, new Date().toISOString()).run();
-    return json({ success: true });
-  }
-
+  if (path === '/api/user/settings' && request.method === 'PUT') return saveUserSettings(request, env, user);
   if (path === '/api/user/entitlement' && request.method === 'GET') return json({ entitlement: await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) });
   if (path === '/api/user/metrics' && request.method === 'GET') return json({ metrics: await readJsonRecord(env.DB, 'user_metrics', user.clerk_id) });
-  if (path === '/api/admin/metrics' && request.method === 'GET') {
-    const allowed = `${env.ADMIN_CLERK_ID_ALLOWLIST || ''},${env.ADMIN_UID_ALLOWLIST || ''}`.split(',').map((value) => value.trim()).filter(Boolean);
-    if (!allowed.includes(user.clerk_id) && !(user.legacy_uid && allowed.includes(user.legacy_uid))) return json({ error: 'Admin access denied.' }, 403);
-    const requestedWindow = url.searchParams.get('window');
-    let days = null;
-    if (requestedWindow === '30') days = 30;
-    else if (requestedWindow === '7') days = 7;
-    if (!days) return json({ error: 'Invalid metrics window.' }, 400);
-    const windowStart = `-${days - 1} days`;
-    const [accounts, premium, storage, rows] = await Promise.all([
-      env.DB.prepare('SELECT COUNT(*) AS count FROM users').first(),
-      env.DB.prepare("SELECT COUNT(*) AS count FROM user_entitlements WHERE json_extract(data_json, '$.billingStatus') IN ('active', 'trialing')").first(),
-      env.DB.prepare('SELECT COALESCE(SUM(payload_bytes), 0) AS bytes FROM cloud_cycles').first(),
-      env.DB.prepare(`SELECT event_date AS date, COUNT(DISTINCT CASE WHEN event_type NOT IN ('upgrades', 'cancellations') THEN installation_id END) AS activeDevices,
-        COUNT(DISTINCT user_id) AS activeSignedInAccounts,
-        SUM(CASE WHEN event_type = 'account_signup' THEN 1 ELSE 0 END) AS signups,
-        SUM(CASE WHEN event_type = 'account_signin' THEN 1 ELSE 0 END) AS signIns,
-        SUM(CASE WHEN event_type = 'upgrades' THEN 1 ELSE 0 END) AS upgrades,
-        SUM(CASE WHEN event_type = 'cancellations' THEN 1 ELSE 0 END) AS cancellations,
-        SUM(CASE WHEN event_type IN ('cloud_cycle_saved', 'cycle_saved') THEN 1 ELSE 0 END) AS cloudSaves,
-        SUM(CASE WHEN event_type = 'cloud_cycle_loaded' THEN 1 ELSE 0 END) AS cloudLoads
-        FROM product_metric_events WHERE event_date >= date('now', ?) GROUP BY event_date ORDER BY event_date ASC`)
-        .bind(windowStart).all(),
-    ]);
-    const dailyMetrics = rows.results || [];
-    const totals = dailyMetrics.reduce((result, row) => {
-      for (const key of ['signups', 'signIns', 'upgrades', 'cancellations', 'cloudSaves', 'cloudLoads']) result[key] += Number(row[key] || 0);
-      return result;
-    }, { signups: 0, signIns: 0, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0 });
-    const latest = dailyMetrics.at(-1) || {};
-    const summary = { totalAccounts: Number(accounts?.count || 0), activeDevices: Number(latest.activeDevices || 0),
-      activeSignedInAccounts: Number(latest.activeSignedInAccounts || 0), premiumSubscriptions: Number(premium?.count || 0),
-      storageBytes: Number(storage?.bytes || 0), ...totals };
-    return json({ metricsEnabled: true, window: days, summary, dailyMetrics });
-  }
-
-  if (path === '/api/metrics/event' && request.method === 'POST') {
-    const body = await readBody(request);
-    if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
-    if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || installationId.length < 8 || installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
-    const eventDate = new Date().toISOString().slice(0, 10);
-    try {
-      await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
-        VALUES (?, ?, ?, ?, ?)`)
-        .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
-    } catch (error) {
-      if (String(error?.message || '').includes('product_metric_daily_quota_reached')) return json({ error: 'Daily metrics event limit reached.' }, 429);
-      throw error;
-    }
-    return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
-  }
+  if (path === '/api/admin/metrics' && request.method === 'GET') return readAdminMetrics(url, env, user);
+  if (path === '/api/metrics/event' && request.method === 'POST') return recordProductMetric(request, env, user);
   return null;
+}
+
+async function saveUserSettings(request, env, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  if (!isObject(body?.settings)) return json({ error: 'Invalid settings.' }, 400);
+  const dataJson = JSON.stringify(body.settings);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Settings are too large.' }, 413);
+  await env.DB.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+    .bind(user.clerk_id, dataJson, new Date().toISOString()).run();
+  return json({ success: true });
+}
+
+async function recordProductMetric(request, env, user) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
+  if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || installationId.length < 8 || installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
+  const eventDate = new Date().toISOString().slice(0, 10);
+  try {
+    await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
+      VALUES (?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
+  } catch (error) {
+    if (String(error?.message || '').includes('product_metric_daily_quota_reached')) return json({ error: 'Daily metrics event limit reached.' }, 429);
+    throw error;
+  }
+  return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
 }
 
 async function listCloudCycles(env, user) {
@@ -599,17 +568,25 @@ async function handleCustomProductRoutes(context) {
 }
 
 async function handleUserRecordRoutes({ request, env, url, path, user }) {
-  const recordRoute = path.match(/^\/api\/(forecasts|discussions|verifications)(?:\/([^/]+))?$/);
-  if (!recordRoute) return null;
-  const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
-  const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
-  if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
-  const context = { request, env, url, user, recordType, recordId };
-  if (request.method === 'GET' && !recordId) return listUserRecords(context);
-  if (request.method === 'PUT' && !recordId) return saveUserRecord(context);
-  if (request.method === 'GET' && recordId) return readUserRecord(context);
-  if (request.method === 'DELETE' && recordId) return deleteUserRecord(context);
-  return null;
+  const context = parseUserRecordContext({ request, env, url, path, user });
+  if (!context) return null;
+  if (context.error) return context.error;
+  return dispatchUserRecordRoute(context);
+}
+
+function parseUserRecordContext({ request, env, url, path, user }) {
+  const match = path.match(/^\/api\/(forecasts|discussions|verifications)(?:\/([^/]+))?$/);
+  if (!match) return null;
+  const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[match[1]];
+  const recordId = match[2] ? decodePathId(match[2]) : '';
+  if (recordId === null || recordId.includes('/')) return { error: json({ error: 'Invalid record ID.' }, 400) };
+  return { request, env, url, user, recordType, recordId };
+}
+
+async function dispatchUserRecordRoute(context) {
+  const { request, recordId } = context;
+  const operation = recordId ? { GET: readUserRecord, DELETE: deleteUserRecord }[request.method] : { GET: listUserRecords, PUT: saveUserRecord }[request.method];
+  return operation ? operation(context) : null;
 }
 
 async function listUserRecords({ env, url, user, recordType }) {
@@ -626,10 +603,9 @@ async function listUserRecords({ env, url, user, recordType }) {
 async function saveUserRecord({ request, env, user, recordType }) {
   const body = await readBody(request);
   if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-  const id = typeof body?.id === 'string' ? body.id.trim() : '';
-  if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
-  const dataJson = JSON.stringify(body.data);
-  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
+  const parsed = parseRecordWrite(body);
+  if (parsed.error) return parsed.error;
+  const { id, dataJson } = parsed;
   const now = new Date().toISOString();
   let result;
   try {
@@ -644,6 +620,14 @@ async function saveUserRecord({ request, env, user, recordType }) {
   }
   if (!result.meta.changes) return json({ error: 'Record quota reached.' }, 409);
   return json({ success: true, id });
+}
+
+function parseRecordWrite(body) {
+  const id = typeof body?.id === 'string' ? body.id.trim() : '';
+  if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return { error: json({ error: 'Invalid record.' }, 400) };
+  const dataJson = JSON.stringify(body.data);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return { error: json({ error: 'Record is too large.' }, 413) };
+  return { id, dataJson };
 }
 
 async function readUserRecord({ env, user, recordType, recordId }) {
