@@ -220,7 +220,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   const setClerkMode = (nextMode: AuthMode) => {
     if (nextMode === mode) return;
     if (typeof window === 'undefined') return;
-    if (clerkVerificationInProgress && !window.confirm('Switching account actions restarts sign-in. Any verification code you entered will need to be entered again. Continue?')) return;
+    if (window.location.hash && !window.confirm('Switching account actions restarts sign-in. Any verification code you entered will need to be entered again. Continue?')) return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');

@@ -50,4 +50,9 @@ describe('beta Worker token provider lifecycle', () => {
     controller.abort();
     await expect(rejection).resolves.toEqual(expect.objectContaining({ name: 'AbortError' }));
   });
+
+  it('preserves Clerk token provider errors for callers', async () => {
+    const providerError = new Error('Clerk session expired.');
+    await expect(getBetaApiToken(jest.fn().mockRejectedValue(providerError))).rejects.toBe(providerError);
+  });
 });

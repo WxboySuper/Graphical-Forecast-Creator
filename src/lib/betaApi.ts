@@ -88,7 +88,7 @@ export const getBetaApiToken = async (provider: BetaApiTokenProvider, signal?: A
       return await withAbort(provider(), signal);
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') throw error;
-      throw new Error(SESSION_INITIALIZING_ERROR, { cause: error });
+      throw error;
     }
   };
   let token = await readToken();
