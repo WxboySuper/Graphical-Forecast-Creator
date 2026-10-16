@@ -22,14 +22,12 @@ import {
 } from 'firebase/firestore';
 import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings } from '../store/overlaysSlice';
-import type { OverlaysState } from '../store/overlaysSlice';
+import { applyOverlaySettings, type OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
-import type { MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
