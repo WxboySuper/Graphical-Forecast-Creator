@@ -22,7 +22,8 @@ const FIRESTORE_VALUE_SERIALIZERS = new Map([
   [Bytes, (value) => ({ __type: 'bytes', base64: value.toBase64() })],
 ]);
 
-function assertSnapshotCollectionLimit({ currentCount, pageCount, limit, collectionName, accountId }) {
+function assertSnapshotCollectionLimit(context) {
+  const { currentCount, pageCount, limit, collectionName, accountId } = context;
   if (currentCount + pageCount > limit) {
     throw new Error(`Snapshot ${collectionName} limit exceeded for account hash ${sha256(accountId)}.`);
   }
