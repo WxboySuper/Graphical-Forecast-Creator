@@ -444,27 +444,37 @@ const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): P
  */
 const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   const cycleId = params.existingId || createCloudCycleId(params.userId, params.cycleDate);
-  if (isBetaClerkD1Mode()) {
-    const now = new Date().toISOString();
-    let existingMetadata: Record<string, unknown> | null = null;
-    if (params.existingId) {
-      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
-      const body = (await response.json().catch(() => ({}))) ?? {};
-      if (!response.ok) return { error: body?.error || 'Unable to save cloud cycle' as const };
-      if (!isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
-      const owner = body.cycle.userId ?? (isPlainObject(body.cycle.metadata) ? body.cycle.metadata.userId : undefined);
-      if (owner !== params.userId) return { error: 'Cloud cycle not found' as const };
-      existingMetadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
-    }
-    const metadata: CloudCycleMetadata = {
-      id: cycleId, userId: params.userId, label: params.label, cycleDate: params.cycleDate,
-      createdAt: readTimestampString(existingMetadata?.createdAt, now), updatedAt: now, forecastDays: params.stats.forecastDays,
-      totalOutlooks: params.stats.totalOutlooks, totalFeatures: params.stats.totalFeatures,
-      isReadOnly: params.isReadOnly ?? false, payloadHash: computePayloadHash(params.payload),
-      workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
-    };
-    return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
-  }
+  if (isBetaClerkD1Mode()) return buildBetaCloudCycleSaveContext(params, cycleId);
+  return buildFirestoreCloudCycleSaveContext(params, cycleId);
+};
+
+const buildBetaCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycleId: string) => {
+  const existingMetadata = await readBetaCloudCycleMetadata(params);
+  if (existingMetadata && 'error' in existingMetadata) return existingMetadata;
+  const now = new Date().toISOString();
+  const metadata: CloudCycleMetadata = {
+    id: cycleId, userId: params.userId, label: params.label, cycleDate: params.cycleDate,
+    createdAt: readTimestampString(existingMetadata?.createdAt, now), updatedAt: now, forecastDays: params.stats.forecastDays,
+    totalOutlooks: params.stats.totalOutlooks, totalFeatures: params.stats.totalFeatures,
+    isReadOnly: params.isReadOnly ?? false, payloadHash: computePayloadHash(params.payload),
+    workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
+  };
+  return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
+};
+
+const readBetaCloudCycleMetadata = async (params: SaveCloudCycleParams) => {
+  if (!params.existingId) return null;
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) return { error: body?.error || 'Unable to save cloud cycle' as const };
+  if (!isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
+  const metadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
+  const owner = body.cycle.userId ?? metadata.userId;
+  if (owner !== params.userId) return { error: 'Cloud cycle not found' as const };
+  return metadata;
+};
+
+const buildFirestoreCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycleId: string) => {
   const existingCycle = params.existingId ? await getOwnedCloudCycle({ userId: params.userId, cycleId: params.existingId }) : null;
   if (params.existingId && !existingCycle) return { error: 'Cloud cycle not found' as const };
   const now = new Date().toISOString();
@@ -679,6 +689,42 @@ const normalizeBetaCloudCycle = (raw: unknown, userId: string): CloudCycleMetada
 const isOwnedCycle = (userId: string) => (cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId);
 const readNextCyclePage = (nextPage: unknown): number | null => Number.isSafeInteger(nextPage) ? nextPage as number : null;
 
+const refreshBetaCloudCycles = async (
+  params: CloudCycleSubscriptionParams,
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  try {
+    const result = await listCloudCycles({ userId: params.userId });
+    applyCloudCycleRefreshResult(result, params, isActive, scheduleRetry);
+  } catch (error) {
+    reportCloudCycleRefreshError(error, params.onError, isActive, scheduleRetry);
+  }
+};
+
+const applyCloudCycleRefreshResult = (
+  result: CloudOperationResult<CloudCycleMetadata[]>,
+  params: CloudCycleSubscriptionParams,
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  if (!isActive()) return;
+  if (result.success && result.data) params.onUpdate(result.data);
+  else if (!result.success && isBetaSessionInitializing(result.error)) scheduleRetry();
+  else if (!result.success) params.onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
+};
+
+const reportCloudCycleRefreshError = (
+  error: unknown,
+  onError: CloudCycleSubscriptionParams['onError'],
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  if (!isActive()) return;
+  if (isBetaSessionInitializing(error)) scheduleRetry();
+  else onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.'));
+};
+
 /**
  * Subscribes to cloud cycles list for real-time updates
  */
@@ -692,19 +738,7 @@ export const subscribeToCloudCycles = (
       if (!active || retryTimer !== undefined) return;
       retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
     };
-    const refresh = async () => {
-      try {
-        const result = await listCloudCycles({ userId });
-        if (active && result.success && result.data) onUpdate(result.data);
-        else if (active && !result.success && isBetaSessionInitializing(result.error)) scheduleRetry();
-        else if (active && !result.success) onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
-      } catch (error) {
-        if (active && isBetaSessionInitializing(error)) scheduleRetry();
-        else if (active) {
-          onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.'));
-        }
-      }
-    };
+    const refresh = () => refreshBetaCloudCycles({ userId, onUpdate, onError }, () => active, scheduleRetry);
     refresh().catch(() => undefined);
     const timer = globalThis.setInterval(() => refresh().catch(() => undefined), 15_000);
     return () => { active = false; globalThis.clearInterval(timer); if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer); };

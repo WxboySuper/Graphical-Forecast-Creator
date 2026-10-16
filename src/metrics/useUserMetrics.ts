@@ -76,6 +76,18 @@ const readUserMetricsDocument = (value: UserMetricsSnapshot | undefined): UserMe
   };
 };
 
+const fetchUserMetricsSnapshot = async (userId: string): Promise<UserMetricsSnapshot | undefined> => {
+  if (!isBetaClerkD1Mode()) {
+    const snapshot = await getDoc(doc(db!, 'userMetrics', userId));
+    return snapshot.data() as UserMetricsSnapshot | undefined;
+  }
+
+  const response = await fetchBetaApi('/api/user/metrics');
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body?.error || 'Unable to load account metrics.');
+  return body?.metrics as UserMetricsSnapshot | undefined;
+};
+
 /** Subscribes to the signed-in user's progress-only metrics document. */
 export const useUserMetrics = (): UseUserMetricsResult => {
   const { user, status } = useAuth();
@@ -112,16 +124,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
     let retryTimer: number | undefined;
     const loadMetrics = async (): Promise<void> => {
       try {
-        let value: UserMetricsSnapshot | undefined;
-        if (isBetaClerkD1Mode()) {
-          const response = await fetchBetaApi('/api/user/metrics');
-          const body = (await response.json().catch(() => ({}))) ?? {};
-          if (!response.ok) throw new Error(body?.error || 'Unable to load account metrics.');
-          value = body?.metrics as UserMetricsSnapshot | undefined;
-        } else {
-          const snapshot = await getDoc(doc(db!, 'userMetrics', user.uid));
-          value = snapshot.data() as UserMetricsSnapshot | undefined;
-        }
+        const value = await fetchUserMetricsSnapshot(user.uid);
         if (!active || requestId !== requestIdRef.current) return;
         setMetrics(
           readUserMetricsDocument(value)

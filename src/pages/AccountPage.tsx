@@ -1425,35 +1425,56 @@ const DisabledStateView: React.FC = () => (
 /** Production-facing account page for hosted sign-in, synced defaults, and local-only fallback. */
 const AccountPage: React.FC = () => {
   const { authProvider, error, hostedAuthEnabled, status } = useAuth();
+  const accountView = resolveAccountView(authProvider, hostedAuthEnabled, status);
 
   return (
     <div className="h-full overflow-auto bg-gradient-to-br from-background via-background to-muted/20">
       <div className="mx-auto max-w-7xl px-6 py-8 md:px-8 md:py-10">
-        {!hostedAuthEnabled ? <DisabledStateView /> : null}
-        {hostedAuthEnabled && status === "signed_in" ? (
-          <SignedInAccountView />
-        ) : null}
-        {hostedAuthEnabled && status === "signed_out" && authProvider === 'clerk' ? (
-          <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
-        ) : null}
-        {hostedAuthEnabled && authProvider === 'clerk' && status === 'loading' ? (
-          <div role="status" className="mx-auto max-w-xl rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading your beta account…</div>
-        ) : null}
-        {hostedAuthEnabled && authProvider === 'clerk' && status === 'error' ? (
-          <div className="mx-auto max-w-xl rounded-xl border border-destructive/40 bg-card p-8 text-center">
-            <p role="alert" className="text-destructive">
-            {error ?? 'Unable to load your beta account. Refresh the page and try again.'}
-            </p>
-            <div className="mt-4"><BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp /></div>
-          </div>
-        ) : null}
-        {hostedAuthEnabled && status !== "signed_in" && authProvider !== 'clerk' ? (
-          <SignedOutAccountView />
-        ) : null}
+        {accountView === 'disabled' ? <DisabledStateView /> : null}
+        {accountView === 'signed-in' ? <SignedInAccountView /> : null}
+        {accountView === 'clerk-signed-out' ? <BetaSignInCard /> : null}
+        {accountView === 'clerk-loading' ? <BetaAccountLoading /> : null}
+        {accountView === 'clerk-error' ? <BetaAccountError error={error} /> : null}
+        {accountView === 'legacy-signed-out' ? <SignedOutAccountView /> : null}
       </div>
     </div>
   );
 };
+
+type AccountView = 'disabled' | 'signed-in' | 'clerk-signed-out' | 'clerk-loading' | 'clerk-error' | 'legacy-signed-out' | 'empty';
+
+const resolveAccountView = (
+  authProvider: ReturnType<typeof useAuth>['authProvider'],
+  hostedAuthEnabled: boolean,
+  status: ReturnType<typeof useAuth>['status']
+): AccountView => {
+  if (!hostedAuthEnabled) return 'disabled';
+  if (status === 'signed_in') return 'signed-in';
+  if (authProvider === 'clerk') {
+    if (status === 'signed_out') return 'clerk-signed-out';
+    if (status === 'loading') return 'clerk-loading';
+    if (status === 'error') return 'clerk-error';
+    return 'empty';
+  }
+  return 'legacy-signed-out';
+};
+
+const BetaSignInCard = () => (
+  <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
+);
+
+const BetaAccountLoading = () => (
+  <div role="status" className="mx-auto max-w-xl rounded-xl border bg-card p-8 text-center text-muted-foreground">Loading your beta account…</div>
+);
+
+const BetaAccountError = ({ error }: { error: string | null }) => (
+  <div className="mx-auto max-w-xl rounded-xl border border-destructive/40 bg-card p-8 text-center">
+    <p role="alert" className="text-destructive">
+      {error ?? 'Unable to load your beta account. Refresh the page and try again.'}
+    </p>
+    <div className="mt-4"><BetaSignInCard /></div>
+  </div>
+);
 
 export default AccountPage;
 export { AccountPage };

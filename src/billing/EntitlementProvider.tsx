@@ -276,17 +276,63 @@ const applyLoadingEntitlementState = (
 const isSignedOutEntitlementState = (status: ReturnType<typeof useAuth>['status'], user: ReturnType<typeof useAuth>['user']) =>
   status !== 'signed_in' || !user;
 
+type EntitlementEffectHandlers = {
+  setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+  setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+};
+
 /** Starts the signed-in entitlement subscription and returns its cleanup callback. */
 const startSignedInEntitlementSubscription = (
   userId: string,
-  handlers: {
-    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
-    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
+  handlers: EntitlementEffectHandlers
 ) => {
   handlers.setEntitlementStatus('loading');
   return subscribeToEntitlements(userId, handlers);
+};
+
+const startBetaEntitlementSubscription = (
+  handlers: EntitlementEffectHandlers
+) => {
+  let active = true;
+  let attempts = 0;
+  let retryTimer: number | undefined;
+  handlers.setEntitlementStatus('loading');
+
+  const loadEntitlement = async (): Promise<void> => {
+    try {
+      const response = await fetchBetaApi('/api/user/entitlement');
+      const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
+      if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
+      if (!active) return;
+      const raw = body?.entitlement ?? null;
+      const rawEnd = raw?.currentPeriodEnd;
+      if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
+      const rawValues = { ...(raw ?? {}) };
+      delete rawValues.currentPeriodEnd;
+      const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
+      const endDate = normalizeBetaPeriodEnd(rawEnd);
+      if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
+      const state = createEntitlementListenerState(normalized);
+      handlers.setEntitlement(state.entitlement);
+      handlers.setEntitlementStatus(state.status);
+      handlers.setError(null);
+    } catch (nextError) {
+      if (!active) return;
+      const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
+      if (isBetaSessionInitializing(message) && attempts < 4) {
+        attempts += 1;
+        retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
+        return;
+      }
+      handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+      handlers.setEntitlementStatus('error');
+      handlers.setError(message);
+    }
+  };
+
+  void loadEntitlement();
+  return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
 };
 
 /** Applies deterministic entitlement state for a local account fixture. */
@@ -318,11 +364,7 @@ const resolveEntitlementEffect = (
     status: ReturnType<typeof useAuth>['status'];
     user: ReturnType<typeof useAuth>['user'];
   },
-  handlers: {
-    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
-    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
+  handlers: EntitlementEffectHandlers
 ) => {
   const localTestAccount = readLocalTestAccount();
   if (localTestAccount) {
@@ -356,45 +398,7 @@ const resolveEntitlementEffect = (
     return null;
   }
 
-  if (isBetaClerkD1Mode()) {
-    let active = true;
-    let attempts = 0;
-    let retryTimer: number | undefined;
-    handlers.setEntitlementStatus('loading');
-    const loadEntitlement = async (): Promise<void> => {
-      try {
-        const response = await fetchBetaApi('/api/user/entitlement');
-        const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
-        if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
-        if (!active) return;
-        const raw = body?.entitlement ?? null;
-        const rawEnd = raw?.currentPeriodEnd;
-        if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
-        const rawValues = { ...(raw ?? {}) };
-        delete rawValues.currentPeriodEnd;
-        const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
-        const endDate = normalizeBetaPeriodEnd(rawEnd);
-        if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
-        const state = createEntitlementListenerState(normalized);
-        handlers.setEntitlement(state.entitlement);
-        handlers.setEntitlementStatus(state.status);
-        handlers.setError(null);
-      } catch (nextError) {
-        if (!active) return;
-        const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
-        if (isBetaSessionInitializing(message) && attempts < 4) {
-          attempts += 1;
-          retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
-          return;
-        }
-        handlers.setEntitlement(DEFAULT_ENTITLEMENT);
-        handlers.setEntitlementStatus('error');
-        handlers.setError(message);
-      }
-    };
-    void loadEntitlement();
-    return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
-  }
+  if (isBetaClerkD1Mode()) return startBetaEntitlementSubscription(handlers);
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 

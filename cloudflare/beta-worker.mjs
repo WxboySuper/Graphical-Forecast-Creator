@@ -86,23 +86,28 @@ const readBody = async (request) => {
 
 async function stripeRequest(env, endpoint, params, method = 'POST') {
   const response = await fetch(`https://api.stripe.com/v1/${endpoint}`, {
-    method,
-    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
-    ...(params ? { body: new URLSearchParams(params) } : {}),
-    signal: AbortSignal.timeout(8_000),
+    ...createStripeRequestOptions(env, params, method),
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error(body?.error?.message || 'Stripe request failed.');
-    error.code = body?.error?.code;
-    error.stripeType = body?.error?.type;
-    throw error;
-  }
+  if (!response.ok) throw createStripeRequestError(body);
   return body;
 }
 
-async function handleAuthenticatedApi(request, env, url, path, user) {
-  const context = { request, env, url, path, user };
+const createStripeRequestOptions = (env, params, method) => ({
+  method,
+  headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, ...(params ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+  ...(params ? { body: new URLSearchParams(params) } : {}),
+  signal: AbortSignal.timeout(8_000),
+});
+
+const createStripeRequestError = (body) => {
+  const error = new Error(body?.error?.message || 'Stripe request failed.');
+  error.code = body?.error?.code;
+  error.stripeType = body?.error?.type;
+  return error;
+};
+
+async function handleAuthenticatedApi(context) {
   const handlers = [
     handleAccountBootstrapAndBilling,
     handleAccountSettingsAndMetrics,
@@ -804,17 +809,34 @@ async function writeStripeEntitlement(db, { event, ownerId, prior, subscription,
 }
 
 async function processStripeSubscriptionEvent(event, object, env) {
-  const isCheckout = event.type === 'checkout.session.completed' && object.subscription;
-  if (!event.type.startsWith('customer.subscription.') && !isCheckout) return null;
-  const subscription = isCheckout
-    ? await stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET')
-    : object;
+  const isCheckout = isCheckoutSubscriptionEvent(event, object);
+  if (!isStripeSubscriptionEvent(event, isCheckout)) return null;
+  const subscription = await readStripeSubscription(event, object, env, isCheckout);
   const identity = await resolveStripeOwner(env.DB, subscription.metadata || object.metadata || {}, object, subscription);
   if (identity.owner) {
-    const prior = await readJsonRecord(env.DB, 'user_entitlements', identity.owner.clerk_id) || {};
-    await writeStripeEntitlement(env.DB, { event, ownerId: identity.owner.clerk_id, prior, subscription, object });
+    await updateStripeEntitlementForOwner(event, identity.owner, subscription, object, env.DB);
     return null;
   }
+  return handleStripeOwnerNotFound(identity, env);
+}
+
+const isCheckoutSubscriptionEvent = (event, object) =>
+  event.type === 'checkout.session.completed' && Boolean(object.subscription);
+
+const isStripeSubscriptionEvent = (event, isCheckout) =>
+  event.type.startsWith('customer.subscription.') || isCheckout;
+
+const readStripeSubscription = (event, object, env, isCheckout) => {
+  if (!isCheckout) return Promise.resolve(object);
+  return stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET');
+};
+
+async function updateStripeEntitlementForOwner(event, owner, subscription, object, db) {
+  const prior = await readJsonRecord(db, 'user_entitlements', owner.clerk_id) || {};
+  await writeStripeEntitlement(db, { event, ownerId: owner.clerk_id, prior, subscription, object });
+}
+
+async function handleStripeOwnerNotFound(identity, env) {
   if (!identity.clerkId && !identity.legacyUid) return json({ received: true, ignored: 'missing-account-metadata' });
   if (identity.clerkId && env.CLERK_SECRET_KEY) {
     const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(identity.clerkId)}`, {
@@ -833,22 +855,28 @@ async function readStripeWebhookEvent(request, env) {
   const rawBytes = await readLimitedBody(request, MAX_CYCLE_BYTES);
   if (rawBytes === null) return { response: json({ error: 'Webhook payload is too large.' }, 413) };
   const raw = new TextDecoder().decode(rawBytes);
-  if (!(await verifyStripeSignature(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET))) {
-    return { response: json({ error: 'Invalid Stripe signature.' }, 400) };
-  }
-  let event;
-  try { event = JSON.parse(raw); } catch { return { response: json({ error: 'Invalid webhook payload.' }, 400) }; }
-  if (typeof event?.id !== 'string' || !event.id || typeof event.type !== 'string') {
+  return parseVerifiedStripeEvent(raw, request.headers.get('Stripe-Signature'), env.STRIPE_WEBHOOK_SECRET);
+}
+
+async function parseVerifiedStripeEvent(raw, signature, secret) {
+  const verified = await verifyStripeSignature(raw, signature, secret);
+  if (!verified) return { response: json({ error: 'Invalid Stripe signature.' }, 400) };
+  const event = parseStripeEvent(raw);
+  if (!event || typeof event.id !== 'string' || !event.id || typeof event.type !== 'string') {
     return { response: json({ error: 'Invalid webhook payload.' }, 400) };
   }
   return { event, object: event.data?.object || {} };
 }
 
+const parseStripeEvent = (raw) => {
+  try { return JSON.parse(raw); } catch { return null; }
+};
+
 async function handleStripeWebhook(request, env) {
   const parsed = await readStripeWebhookEvent(request, env);
   if (parsed.response) return parsed.response;
   const { event, object } = parsed;
-  if (event.type === 'checkout.session.completed' && object.subscription && !env.STRIPE_SECRET_KEY) {
+  if (isUnconfiguredCheckoutSubscription(event, object, env)) {
     return json({ error: 'Billing is not configured.' }, 503);
   }
   const claimResponse = await claimStripeEvent(env.DB, event.id);
@@ -868,6 +896,9 @@ async function handleStripeWebhook(request, env) {
     throw error;
   }
 }
+
+const isUnconfiguredCheckoutSubscription = (event, object, env) =>
+  event.type === 'checkout.session.completed' && Boolean(object.subscription) && !env.STRIPE_SECRET_KEY;
 
 const PUBLIC_API_ROUTES = {
   'GET /api/health': ({ env }) => handleHealthCheck(env),
@@ -900,7 +931,7 @@ async function handleApi(request, env) {
 
   const user = await ensureUserForRequest(identity, env);
   if (user instanceof Response) return user;
-  return handleAuthenticatedApi(request, env, url, path, user);
+  return handleAuthenticatedApi({ request, env, url, path, user });
 }
 
 async function ensureUserForRequest(identity, env) {
