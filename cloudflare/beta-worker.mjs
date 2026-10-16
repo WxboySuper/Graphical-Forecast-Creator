@@ -815,7 +815,7 @@ async function processStripeSubscriptionEvent(event, object, env) {
   const subscription = await readStripeSubscription(event, object, env, isCheckout);
   const identity = await resolveStripeOwner(env.DB, subscription.metadata || object.metadata || {}, object, subscription);
   if (identity.owner) {
-    await updateStripeEntitlementForOwner(event, identity.owner, subscription, object, env.DB);
+    await updateStripeEntitlementForOwner({ event, owner: identity.owner, subscription, object, db: env.DB });
     return null;
   }
   return handleStripeOwnerNotFound(identity, env);
@@ -832,22 +832,27 @@ const readStripeSubscription = (event, object, env, isCheckout) => {
   return stripeRequest(env, `subscriptions/${encodeURIComponent(object.subscription)}`, null, 'GET');
 };
 
-async function updateStripeEntitlementForOwner(event, owner, subscription, object, db) {
+async function updateStripeEntitlementForOwner({ event, owner, subscription, object, db }) {
   const prior = await readJsonRecord(db, 'user_entitlements', owner.clerk_id) || {};
   await writeStripeEntitlement(db, { event, ownerId: owner.clerk_id, prior, subscription, object });
 }
 
 async function handleStripeOwnerNotFound(identity, env) {
   if (!identity.clerkId && !identity.legacyUid) return json({ received: true, ignored: 'missing-account-metadata' });
-  if (identity.clerkId && env.CLERK_SECRET_KEY) {
-    const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(identity.clerkId)}`, {
-      headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
-    });
-    if (clerkUser.status === 404) return json({ received: true, ignored: 'deleted-account' });
-    if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
-    if (!clerkUser.ok) return json({ received: false, error: 'Clerk user lookup failed.' }, 500);
-  }
+  const clerkResult = await readClerkStripeOwner(identity, env);
+  if (clerkResult) return clerkResult;
   return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
+}
+
+async function readClerkStripeOwner(identity, env) {
+  if (!identity.clerkId || !env.CLERK_SECRET_KEY) return null;
+  const clerkUser = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(identity.clerkId)}`, {
+    headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` }, signal: AbortSignal.timeout(3_000),
+  });
+  if (clerkUser.status === 404) return json({ received: true, ignored: 'deleted-account' });
+  if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
+  if (!clerkUser.ok) return json({ received: false, error: 'Clerk user lookup failed.' }, 500);
+  return null;
 }
 
 async function readStripeWebhookEvent(request, env) {
@@ -863,10 +868,17 @@ async function parseVerifiedStripeEvent(raw, signature, secret) {
   const verified = await verifyStripeSignature(raw, signature, secret);
   if (!verified) return { response: json({ error: 'Invalid Stripe signature.' }, 400) };
   const event = parseStripeEvent(raw);
-  if (!event || typeof event.id !== 'string' || !event.id || typeof event.type !== 'string') {
+  if (!isValidStripeEvent(event)) {
     return { response: json({ error: 'Invalid webhook payload.' }, 400) };
   }
   return { event, object: event.data?.object || {} };
+}
+
+function isValidStripeEvent(event) {
+  if (!isObject(event)) return false;
+  if (typeof event.id !== 'string') return false;
+  if (!event.id) return false;
+  return typeof event.type === 'string';
 }
 
 const parseStripeEvent = (raw) => {

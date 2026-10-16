@@ -1479,6 +1479,43 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+const shouldResetForClerkAccountChange = (isSignedIn: boolean, userId: string | undefined, bootstrapKey: string): boolean => {
+  if (!isSignedIn) return false;
+  if (!userId) return false;
+  if (!bootstrapKey) return false;
+  return bootstrapKey !== userId;
+};
+
+const isClerkSettingsSyncReady = (
+  isSignedIn: boolean,
+  user: User | null,
+  initialized: boolean,
+  bootstrapKey: string,
+): user is User => {
+  if (!isSignedIn) return false;
+  if (!user) return false;
+  if (!initialized) return false;
+  return bootstrapKey === user.uid;
+};
+
+const isCurrentClerkSettingsSync = ({
+  active, requestId, latestRequestId, isSignedIn, userId, currentUserId, bootstrapKey,
+}: {
+  active: boolean;
+  requestId: number;
+  latestRequestId: number;
+  isSignedIn: boolean;
+  userId: string;
+  currentUserId: string;
+  bootstrapKey: string;
+}): boolean => {
+  if (!active) return false;
+  if (requestId !== latestRequestId) return false;
+  if (!isSignedIn) return false;
+  if (currentUserId !== userId) return false;
+  return bootstrapKey === userId;
+};
+
 /** Provides Clerk sessions and the beta Worker profile/settings API for the Clerk+D1 beta build. */
 const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const dispatch = useDispatch();
@@ -1526,7 +1563,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => { currentOverlaysRef.current = overlays; }, [overlays]);
   useEffect(() => { bootstrapKeyRef.current = bootstrapKey; }, [bootstrapKey]);
   useEffect(() => {
-    if (!(isSignedIn && clerkUser?.id && bootstrapKey !== '' && bootstrapKey !== clerkUser.id)) return;
+    if (!shouldResetForClerkAccountChange(Boolean(isSignedIn), clerkUser?.id, bootstrapKey)) return;
     betaAccessRequestIdRef.current += 1;
     betaAccessAbortRef.current?.abort();
     settingsRequestIdRef.current += 1;
@@ -1755,7 +1792,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [bootstrapKey, currentUser, darkMode, monitorSettings, overlays, putSettings]);
 
   useEffect(() => {
-    if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || bootstrapKey !== currentUser.uid) return;
+    if (!isClerkSettingsSyncReady(Boolean(isSignedIn), currentUser, hasInitializedSettingsRef.current, bootstrapKey)) return;
     const baseline = syncedSettings ?? buildHostedAccountFallbackSettings(
       darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
     );
@@ -1772,12 +1809,12 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           const response = await putSettings(next, userId, abortController.signal);
           const body = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
-          if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          if (!isCurrentClerkSettingsSync({ active, requestId, latestRequestId: settingsRequestIdRef.current, isSignedIn: Boolean(isSignedIn), userId, currentUserId: currentUser.uid, bootstrapKey })) return;
           lastSyncedSettingsRef.current = next;
           setSyncedSettings(next);
           setSettingsSyncStatus('synced');
         } catch (syncError) {
-          if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
+          if (!isCurrentClerkSettingsSync({ active, requestId, latestRequestId: settingsRequestIdRef.current, isSignedIn: Boolean(isSignedIn), userId, currentUserId: currentUser.uid, bootstrapKey })) return;
           setSettingsSyncStatus('error');
           setError(syncError instanceof Error ? syncError.message : 'Unable to sync account settings.');
         }

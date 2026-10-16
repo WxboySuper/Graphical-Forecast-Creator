@@ -88,6 +88,63 @@ const fetchUserMetricsSnapshot = async (userId: string): Promise<UserMetricsSnap
   return body?.metrics as UserMetricsSnapshot | undefined;
 };
 
+type MetricsStateHandlers = {
+  setMetrics: React.Dispatch<React.SetStateAction<UserMetricsDocument>>;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+};
+
+const resetUserMetrics = ({ setMetrics, setLoading, setError }: MetricsStateHandlers): void => {
+  setMetrics(DEFAULT_USER_METRICS);
+  setLoading(false);
+  setError(null);
+};
+
+const isCurrentMetricsRequest = (active: boolean, requestId: number, currentRequestId: number): boolean =>
+  active && requestId === currentRequestId;
+
+const retryMetricsLoad = (message: string, attempts: number, schedule: () => void): boolean => {
+  if (!isBetaClerkD1Mode() || !isBetaSessionInitializing(message) || attempts >= 20) return false;
+  schedule();
+  return true;
+};
+
+const startUserMetricsRequest = (userId: string, handlers: MetricsStateHandlers, requestIdRef: React.MutableRefObject<number>) => {
+  handlers.setLoading(true);
+  requestIdRef.current += 1;
+  const requestId = requestIdRef.current;
+  let active = true;
+  let attempts = 0;
+  let retryTimer: number | undefined;
+  const isCurrent = () => isCurrentMetricsRequest(active, requestId, requestIdRef.current);
+  const scheduleRetry = () => {
+    attempts += 1;
+    retryTimer = window.setTimeout(() => { void loadMetrics(); }, 250);
+  };
+  const loadMetrics = async (): Promise<void> => {
+    try {
+      const value = await fetchUserMetricsSnapshot(userId);
+      if (!isCurrent()) return;
+      handlers.setMetrics(readUserMetricsDocument(value));
+      handlers.setLoading(false);
+      handlers.setError(null);
+    } catch (nextError) {
+      if (!isCurrent()) return;
+      const message = nextError instanceof Error ? nextError.message : 'Unable to load account metrics.';
+      if (retryMetricsLoad(message, attempts, scheduleRetry)) return;
+      handlers.setMetrics(DEFAULT_USER_METRICS);
+      handlers.setLoading(false);
+      handlers.setError(message);
+    }
+  };
+  void loadMetrics();
+  return () => {
+    active = false;
+    requestIdRef.current += 1;
+    if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+  };
+};
+
 /** Subscribes to the signed-in user's progress-only metrics document. */
 export const useUserMetrics = (): UseUserMetricsResult => {
   const { user, status } = useAuth();
@@ -97,59 +154,13 @@ export const useUserMetrics = (): UseUserMetricsResult => {
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if ((!isHostedAuthEnabled || !db) && !isBetaClerkD1Mode()) {
-      setMetrics(DEFAULT_USER_METRICS);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
+    if ((!isHostedAuthEnabled || !db) && !isBetaClerkD1Mode()) return resetUserMetrics({ setMetrics, setLoading, setError });
     if (status === 'loading') {
       setLoading(true);
       return;
     }
-
-    if (!user) {
-      setMetrics(DEFAULT_USER_METRICS);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    setLoading(true);
-    requestIdRef.current += 1;
-    const requestId = requestIdRef.current;
-    let active = true;
-    let attempts = 0;
-    let retryTimer: number | undefined;
-    const loadMetrics = async (): Promise<void> => {
-      try {
-        const value = await fetchUserMetricsSnapshot(user.uid);
-        if (!active || requestId !== requestIdRef.current) return;
-        setMetrics(
-          readUserMetricsDocument(value)
-        );
-        setLoading(false);
-        setError(null);
-      } catch (nextError) {
-        if (!active || requestId !== requestIdRef.current) return;
-        const message = nextError instanceof Error ? nextError.message : 'Unable to load account metrics.';
-        if (isBetaClerkD1Mode() && isBetaSessionInitializing(message) && attempts < 20) {
-          attempts += 1;
-          retryTimer = window.setTimeout(() => { void loadMetrics(); }, 250);
-          return;
-        }
-        setMetrics(DEFAULT_USER_METRICS);
-        setLoading(false);
-        setError(message);
-      }
-    };
-    void loadMetrics();
-    return () => {
-      active = false;
-      requestIdRef.current += 1;
-      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-    };
+    if (!user) return resetUserMetrics({ setMetrics, setLoading, setError });
+    return startUserMetricsRequest(user.uid, { setMetrics, setLoading, setError }, requestIdRef);
   }, [status, user]);
 
   return { metrics, loading, error };

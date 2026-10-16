@@ -9,18 +9,20 @@ export type EntitlementStatus = 'disabled' | 'loading' | 'free' | 'premium' | 'e
 export type PlanInterval = 'monthly' | 'annual' | null;
 type EffectiveSource = 'stripe' | 'beta_override' | 'none';
 
+const readPeriodEndDate = (value: unknown): Date | null => {
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return null;
+};
+
+const readPeriodEndTimestamp = (value: unknown): Date | null => {
+  if (typeof value !== 'object' || value === null || !('seconds' in value) || typeof value.seconds !== 'number') return null;
+  const nanos = 'nanoseconds' in value && typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
+  return new Date(value.seconds * 1000 + Math.trunc(nanos / 1_000_000));
+};
+
 const normalizeBetaPeriodEnd = (value: unknown): Date | null => {
-  let date: Date;
-  if (typeof value === 'string' || typeof value === 'number') {
-    date = new Date(value);
-  } else if (typeof value === 'object' && value !== null && 'seconds' in value
-    && typeof value.seconds === 'number') {
-    const nanos = 'nanoseconds' in value && typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
-    date = new Date(value.seconds * 1000 + Math.trunc(nanos / 1_000_000));
-  } else {
-    return null;
-  }
-  return Number.isNaN(date.getTime()) ? null : date;
+  const date = readPeriodEndDate(value) ?? readPeriodEndTimestamp(value);
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 };
 
 const hasInvalidBetaPeriodEnd = (value: unknown): boolean => value !== null && value !== undefined && normalizeBetaPeriodEnd(value) === null;
@@ -301,38 +303,55 @@ const startBetaEntitlementSubscription = (
 
   const loadEntitlement = async (): Promise<void> => {
     try {
-      const response = await fetchBetaApi('/api/user/entitlement');
-      const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
-      if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
+      const state = await fetchBetaEntitlementState();
       if (!active) return;
-      const raw = body?.entitlement ?? null;
-      const rawEnd = raw?.currentPeriodEnd;
-      if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
-      const rawValues = { ...(raw ?? {}) };
-      delete rawValues.currentPeriodEnd;
-      const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
-      const endDate = normalizeBetaPeriodEnd(rawEnd);
-      if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
-      const state = createEntitlementListenerState(normalized);
-      handlers.setEntitlement(state.entitlement);
-      handlers.setEntitlementStatus(state.status);
-      handlers.setError(null);
+      applyBetaEntitlementState(state, handlers);
     } catch (nextError) {
       if (!active) return;
       const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
-      if (isBetaSessionInitializing(message) && attempts < 4) {
+      if (scheduleEntitlementRetry(message, attempts, () => {
         attempts += 1;
         retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
-        return;
-      }
-      handlers.setEntitlement(DEFAULT_ENTITLEMENT);
-      handlers.setEntitlementStatus('error');
-      handlers.setError(message);
+      })) return;
+      applyEntitlementFailure(message, handlers);
     }
   };
 
   void loadEntitlement();
   return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
+};
+
+const fetchBetaEntitlementState = async (): Promise<EntitlementListenerState> => {
+  const response = await fetchBetaApi('/api/user/entitlement');
+  const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
+  if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
+  const raw = body?.entitlement ?? null;
+  const rawEnd = raw?.currentPeriodEnd;
+  if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
+  const rawValues = { ...(raw ?? {}) };
+  delete rawValues.currentPeriodEnd;
+  const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
+  const endDate = normalizeBetaPeriodEnd(rawEnd);
+  if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
+  return createEntitlementListenerState(normalized);
+};
+
+const applyBetaEntitlementState = (state: EntitlementListenerState, handlers: EntitlementEffectHandlers): void => {
+  handlers.setEntitlement(state.entitlement);
+  handlers.setEntitlementStatus(state.status);
+  handlers.setError(null);
+};
+
+const scheduleEntitlementRetry = (message: string, attempts: number, schedule: () => void): boolean => {
+  if (!isBetaSessionInitializing(message) || attempts >= 4) return false;
+  schedule();
+  return true;
+};
+
+const applyEntitlementFailure = (message: string, handlers: EntitlementEffectHandlers): void => {
+  handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+  handlers.setEntitlementStatus('error');
+  handlers.setError(message);
 };
 
 /** Applies deterministic entitlement state for a local account fixture. */

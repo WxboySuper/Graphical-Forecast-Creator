@@ -15,6 +15,27 @@ const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 const MAX_SNAPSHOT_CYCLES = 300;
 const MAX_SNAPSHOT_WORKFLOW_RECORDS = 200;
 const MAX_SNAPSHOT_CUSTOM_PRODUCTS = 48;
+
+function assertSnapshotCollectionLimit(currentCount, pageCount, limit, collectionName, accountId) {
+  if (currentCount + pageCount > limit) {
+    throw new Error(`Snapshot ${collectionName} limit exceeded for account hash ${sha256(accountId)}.`);
+  }
+}
+
+async function writeUserSnapshot(output, account) {
+  const key = `by-email/${sha256(account.email)}.json`;
+  const outPath = path.join(output, key);
+  await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });
+  const json = JSON.stringify(serializeFirestoreValue(account));
+  await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+  console.log(`${key} ${Buffer.byteLength(json)} bytes`);
+  return sha256(account.email);
+}
+
+function createAccountFailure(uid, email, error) {
+  const reason = error instanceof Error ? error.message : String(error || 'unknown error');
+  return { uidHash: sha256(uid), emailHash: sha256(email), reason: reason.slice(0, 500) };
+}
 const serializeFirestoreValue = (value) => {
   if (value instanceof Timestamp) return value.toDate().toISOString();
   if (value instanceof GeoPoint) {
@@ -139,9 +160,8 @@ function normalizeFirestoreTimestamp(value) {
 }
 
 async function readCloudCyclePage(account, cycleDocs, malformedLegacyCycles) {
-  if (account.cloudCycles.length + cycleDocs.length > MAX_SNAPSHOT_CYCLES) {
-    throw new Error(`Snapshot cycle limit exceeded for account hash ${sha256(account.uid)}.`);
-  }
+  assertSnapshotCollectionLimit(account.cloudCycles.length, cycleDocs.length,
+    MAX_SNAPSHOT_CYCLES, 'cycle', account.uid);
   const migratedCycles = [];
   for (let offset = 0; offset < cycleDocs.length; offset += 10) {
     const cycleBatch = cycleDocs.slice(offset, offset + 10);
@@ -286,25 +306,17 @@ async function main() {
 
     await Promise.all([
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('workflowAwareness'), (page) => {
-        if (account.workflowAwareness.length + page.length > MAX_SNAPSHOT_WORKFLOW_RECORDS) {
-          throw new Error(`Snapshot workflow record limit exceeded for account hash ${sha256(account.uid)}.`);
-        }
+        assertSnapshotCollectionLimit(account.workflowAwareness.length, page.length,
+          MAX_SNAPSHOT_WORKFLOW_RECORDS, 'workflow record', account.uid);
         account.workflowAwareness.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('customProducts'), (page) => {
-        if (account.customProducts.length + page.length > MAX_SNAPSHOT_CUSTOM_PRODUCTS) {
-          throw new Error(`Snapshot custom product limit exceeded for account hash ${sha256(account.uid)}.`);
-        }
+        assertSnapshotCollectionLimit(account.customProducts.length, page.length,
+          MAX_SNAPSHOT_CUSTOM_PRODUCTS, 'custom product', account.uid);
         account.customProducts.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
     ]);
-    const key = `by-email/${sha256(account.email)}.json`;
-    const outPath = path.join(output, key);
-    await fs.mkdir(path.dirname(outPath), { recursive: true, mode: 0o700 });
-    const json = JSON.stringify(serializeFirestoreValue(account));
-    await fs.writeFile(outPath, json, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-    console.log(`${key} ${Buffer.byteLength(json)} bytes`);
-    userSnapshotEmailHashes.push(sha256(account.email));
+    userSnapshotEmailHashes.push(await writeUserSnapshot(output, account));
     count += 1;
   };
 
@@ -346,8 +358,7 @@ async function main() {
       for (const [index, result] of results.entries()) {
         if (result.status === 'rejected') {
           const failedAccount = pageAccounts[offset + index];
-          const reason = result.reason instanceof Error ? result.reason.message : String(result.reason || 'unknown error');
-          accountFailures.push({ uidHash: sha256(failedAccount.uid), emailHash: sha256(failedAccount.email), reason: reason.slice(0, 500) });
+          accountFailures.push(createAccountFailure(failedAccount.uid, failedAccount.email, result.reason));
           console.error(`Failed beta snapshot for account hash ${sha256(failedAccount.uid)}: ${result.reason?.message || 'unknown error'}`);
         }
       }

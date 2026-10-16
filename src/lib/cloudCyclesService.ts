@@ -462,16 +462,21 @@ const buildBetaCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycl
   return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
 };
 
-const readBetaCloudCycleMetadata = async (params: SaveCloudCycleParams) => {
+type ExistingBetaCycleMetadata = { createdAt: unknown };
+
+const readBetaCloudCycleMetadata = async (params: SaveCloudCycleParams): Promise<ExistingBetaCycleMetadata | { error: string } | null> => {
   if (!params.existingId) return null;
   const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
   const body = (await response.json().catch(() => ({}))) ?? {};
-  if (!response.ok) return { error: body?.error || 'Unable to save cloud cycle' as const };
-  if (!isPlainObject(body.cycle)) return { error: 'Cloud cycle not found' as const };
-  const metadata = isPlainObject(body.cycle.metadata) ? body.cycle.metadata : body.cycle;
-  const owner = body.cycle.userId ?? metadata.userId;
-  if (owner !== params.userId) return { error: 'Cloud cycle not found' as const };
-  return metadata;
+  if (!response.ok) return { error: typeof body?.error === 'string' ? body.error : 'Unable to save cloud cycle' };
+  return readOwnedBetaCycleMetadata(body.cycle, params.userId);
+};
+
+const readOwnedBetaCycleMetadata = (cycle: unknown, userId: string): ExistingBetaCycleMetadata | { error: 'Cloud cycle not found' } => {
+  if (!isPlainObject(cycle)) return { error: 'Cloud cycle not found' as const };
+  const metadata = isPlainObject(cycle.metadata) ? cycle.metadata : cycle;
+  if ((cycle.userId ?? metadata.userId) !== userId) return { error: 'Cloud cycle not found' as const };
+  return { createdAt: metadata.createdAt };
 };
 
 const buildFirestoreCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycleId: string) => {
@@ -515,16 +520,7 @@ export const loadCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
   try {
-    if (isBetaClerkD1Mode()) {
-      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok || !body?.cycle) return { success: false, error: body?.error || 'Cloud cycle not found' };
-      const owner = body.cycle.userId ?? (isPlainObject(body.cycle.metadata) ? body.cycle.metadata.userId : undefined);
-      if (owner !== params.userId) return { success: false, error: 'Cloud cycle not found' };
-      const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
-      const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
-      return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
-    }
+    if (isBetaClerkD1Mode()) return await loadBetaCloudCycle(params);
     const record = await fetchCloudCycleById(params);
 
     if (!record) {
@@ -547,18 +543,22 @@ export const loadCloudCycle = async (
   }
 };
 
+const loadBetaCloudCycle = async (params: UserCycleLookupParams): Promise<CloudOperationResult<CloudCycle>> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
+  const body = await response.json().catch(() => ({}));
+  const ownedCycle = readOwnedBetaCycleMetadata(body?.cycle, params.userId);
+  if (!response.ok || 'error' in ownedCycle) return { success: false, error: body?.error || 'Cloud cycle not found' };
+  const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
+  const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
+  return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
+};
+
 /** Deletes a cloud cycle only when it belongs to the requested user. */
 export const deleteCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
   try {
-    if (isBetaClerkD1Mode()) {
-      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
-      if (response.ok) return { success: true };
-      if (response.status === 404) return { success: true };
-      const body = await response.json().catch(() => ({}));
-      return { success: false, error: body?.error || 'Unable to delete cloud cycle.' };
-    }
+    if (isBetaClerkD1Mode()) return await deleteBetaCloudCycle(params);
     const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
       return { success: true };
@@ -575,6 +575,13 @@ export const deleteCloudCycle = async (
       error: `Failed to delete cloud cycle: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
   }
+};
+
+const deleteBetaCloudCycle = async (params: UserCycleLookupParams): Promise<CloudOperationResult> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
+  if (response.ok || response.status === 404) return { success: true };
+  const body = await response.json().catch(() => ({}));
+  return { success: false, error: body?.error || 'Unable to delete cloud cycle.' };
 };
 
 /** Renames a cloud cycle only when it belongs to the requested user. */
@@ -709,9 +716,23 @@ const applyCloudCycleRefreshResult = (
   scheduleRetry: () => void
 ) => {
   if (!isActive()) return;
-  if (result.success && result.data) params.onUpdate(result.data);
-  else if (!result.success && isBetaSessionInitializing(result.error)) scheduleRetry();
-  else if (!result.success) params.onError?.(new Error(result.error || 'Unable to refresh cloud cycles.'));
+  if (result.success && result.data) {
+    params.onUpdate(result.data);
+    return;
+  }
+  if (!result.success) applyCloudCycleRefreshFailure(result.error, params.onError, scheduleRetry);
+};
+
+const applyCloudCycleRefreshFailure = (
+  message: string | undefined,
+  onError: CloudCycleSubscriptionParams['onError'],
+  scheduleRetry: () => void,
+) => {
+  if (isBetaSessionInitializing(message)) {
+    scheduleRetry();
+    return;
+  }
+  onError?.(new Error(message || 'Unable to refresh cloud cycles.'));
 };
 
 const reportCloudCycleRefreshError = (
