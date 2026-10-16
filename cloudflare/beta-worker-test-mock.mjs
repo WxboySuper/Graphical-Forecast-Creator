@@ -173,6 +173,17 @@ function listAll(database, sql, params) {
   return { results: [] };
 }
 
+function insertUser(database, sql, params) {
+  const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
+  const emailOwner = [...database.users.values()].find((user) => user.email.toLowerCase() === String(email).toLowerCase() && user.clerk_id !== clerk_id);
+  if (!database.users.has(clerk_id) && !emailOwner) {
+    database.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
+    return 1;
+  }
+  if (!sql.includes('ON CONFLICT DO NOTHING')) throw new Error('UNIQUE constraint failed: users.email');
+  return 0;
+}
+
 class D1Mock {
   constructor() {
     this.users = new Map();
@@ -218,14 +229,7 @@ class D1Mock {
   async run(sql, params) {
     let changes = 1;
     if (sql.startsWith('INSERT INTO users')) {
-      const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
-      const emailOwner = [...this.users.values()].find((user) => user.email.toLowerCase() === String(email).toLowerCase() && user.clerk_id !== clerk_id);
-      if (this.users.has(clerk_id) || emailOwner) {
-        if (!sql.includes('ON CONFLICT DO NOTHING')) throw new Error('UNIQUE constraint failed: users.email');
-        changes = 0;
-      } else {
-        this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
-      }
+      changes = insertUser(this, sql, params);
     } else if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
       const [updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);
