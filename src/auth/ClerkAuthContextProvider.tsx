@@ -127,13 +127,32 @@ const createClerkProviderData = (
   return [...passwordProvider, ...externalProviders];
 };
 
+const getClerkDisplayName = (clerkUser: ClerkUserResource): string | null =>
+  [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
+
+const isClerkEmailVerified = (clerkUser: ClerkUserResource): boolean =>
+  clerkUser.primaryEmailAddress?.verification?.status === 'verified';
+
+const createClerkUserMetadata = (clerkUser: ClerkUserResource) => ({
+  creationTime: clerkUser.createdAt?.toISOString() ?? null,
+  lastSignInTime: clerkUser.lastSignInAt?.toISOString() ?? null,
+});
+
+const createClerkUserJson = (clerkUser: ClerkUserResource, email: string | null, displayName: string | null, photoURL: string | null) => ({
+  uid: clerkUser.id,
+  email,
+  displayName,
+  photoURL,
+  emailVerified: isClerkEmailVerified(clerkUser),
+});
+
 const createClerkUserFacade = (
   clerkUser: ClerkUserResource | null | undefined,
   getToken: ClerkGetToken,
   deleteClerkUser: () => Promise<void>,
 ): User | null => {
   if (!clerkUser) return null;
-  const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null;
+  const displayName = getClerkDisplayName(clerkUser);
   const email = clerkUser.primaryEmailAddress?.emailAddress ?? null;
   const photoURL = clerkUser.imageUrl || null;
   return {
@@ -141,12 +160,9 @@ const createClerkUserFacade = (
     email,
     displayName,
     photoURL,
-    emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
+    emailVerified: isClerkEmailVerified(clerkUser),
     isAnonymous: false,
-    metadata: {
-      creationTime: clerkUser.createdAt?.toISOString() ?? null,
-      lastSignInTime: clerkUser.lastSignInAt?.toISOString() ?? null,
-    },
+    metadata: createClerkUserMetadata(clerkUser),
     phoneNumber: clerkUser.primaryPhoneNumber?.phoneNumber ?? null,
     refreshToken: '',
     tenantId: null,
@@ -155,7 +171,7 @@ const createClerkUserFacade = (
     getIdTokenResult: () => createClerkTokenResult(getToken),
     reload: async () => { await clerkUser.reload(); },
     delete: async () => { await deleteClerkUser(); },
-    toJSON: () => ({ uid: clerkUser.id, email, displayName, photoURL, emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified' }),
+    toJSON: () => createClerkUserJson(clerkUser, email, displayName, photoURL),
   } as unknown as User;
 };
 
