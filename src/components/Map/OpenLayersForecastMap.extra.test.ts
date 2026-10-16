@@ -63,7 +63,7 @@ describe('OpenLayersForecastMap additional helpers', () => {
     const t2 = createTileSource('esri-satellite');
     expect(t2).toBeTruthy();
 
-    expect(createTileSource('carto-dark' as never)).toBeTruthy();
+    expect(createTileSource('carto-dark' as never).getUrls()?.[0]).toContain('tile.openstreetmap.org');
   });
 
   test('hideOverlay clears overlay position', () => {

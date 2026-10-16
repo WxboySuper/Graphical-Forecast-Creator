@@ -176,9 +176,10 @@ describe('openLayersMapStyles', () => {
     expect(createTileSource('unknown' as never)).toBeTruthy(); // falls back to OSM
   });
 
-  test('routes the retired dark style to Carto light sources', () => {
-    expect(createLabelOverlaySource('carto-dark')?.getUrls()?.[0]).toContain('light_only_labels');
-    expect(createTileSource('carto-dark').getUrls()?.[0]).toContain('light_nolabels');
+  test('keeps OSM place labels above forecast polygons without CARTO tiles', () => {
+    expect(createLabelOverlaySource('osm')?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
+    expect(createTileSource('osm').getUrls()?.[0]).toContain('tile.openstreetmap.org');
+    expect(createTileSource('carto-dark' as never).getUrls()?.[0]).toContain('tile.openstreetmap.org');
   });
 
   test('hideOverlay clears the overlay position', () => {

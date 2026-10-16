@@ -24,7 +24,6 @@ describe('openFreeMap helpers', () => {
 
   test('recognizes OpenFreeMap-backed base map styles', () => {
     expect(isOpenFreeMapStyle('osm')).toBe(true);
-    expect(isOpenFreeMapStyle('carto-light')).toBe(true);
     expect(isOpenFreeMapStyle('satellite')).toBe(false);
   });
 
@@ -44,7 +43,7 @@ describe('openFreeMap helpers', () => {
   });
 
   test('rejects non OpenFreeMap styles and clears failed fetches from cache', async () => {
-    await expect(getOpenFreeMapStyleSet('satellite')).rejects.toThrow(/does not use OpenFreeMap/);
+    await expect(getOpenFreeMapStyleSet('esri-satellite')).rejects.toThrow(/does not use OpenFreeMap/);
 
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({ ok: false })
@@ -53,8 +52,8 @@ describe('openFreeMap helpers', () => {
         json: jest.fn().mockResolvedValue(stylePayload),
       });
 
-    await expect(getOpenFreeMapStyleSet('carto-light')).rejects.toThrow(/Unable to load/);
-    await expect(getOpenFreeMapStyleSet('carto-light')).resolves.toEqual(
+    await expect(getOpenFreeMapStyleSet('osm')).rejects.toThrow(/Unable to load/);
+    await expect(getOpenFreeMapStyleSet('osm')).resolves.toEqual(
       expect.objectContaining({ baseStyle: expect.any(Object), overlayStyle: expect.any(Object) })
     );
     expect(global.fetch).toHaveBeenCalledTimes(2);
