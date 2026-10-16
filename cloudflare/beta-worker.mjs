@@ -846,6 +846,7 @@ async function handleApi(request, env) {
   let user;
   try { user = await ensureUser(identity, env); }
   catch (error) {
+    if (error?.code === 'SNAPSHOT_CONFIG_MISSING') return json({ error: 'Beta snapshot storage is temporarily unavailable.' }, 503);
     if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
     if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
       return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
@@ -935,6 +936,7 @@ export default {
       }
     }
     if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
+      if (!env.CLERK_WEBHOOK_SIGNING_SECRET) return json({ error: 'Clerk webhook is not configured.' }, 503);
       let event;
       try {
         event = await verifyWebhook(request, { signingSecret: env.CLERK_WEBHOOK_SIGNING_SECRET });

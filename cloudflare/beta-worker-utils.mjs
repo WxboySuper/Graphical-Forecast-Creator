@@ -49,13 +49,9 @@ async function verifyStripeSignature(payload, header, secret) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`));
   const expected = Array.from(new Uint8Array(signed), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const valid = signatures.some((signature) => {
-    if (expected.length !== signature.length) return false;
-    let difference = 0;
-    for (let index = 0; index < expected.length; index += 1) difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
-    return difference === 0;
-  });
-  return valid && Math.abs(Date.now() / 1000 - Number(timestamp)) <= 300;
+  const valid = (await Promise.all(signatures.map((signature) => timingSafeStringEqual(expected, signature)))).some(Boolean);
+  const age = Date.now() / 1000 - Number(timestamp);
+  return valid && age >= 0 && age <= 300;
 }
 
 async function readLimitedBody(request, limit) {

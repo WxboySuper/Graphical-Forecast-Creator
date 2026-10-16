@@ -29,7 +29,7 @@ const createEnv = (db = new D1Mock(), snapshot = null) => ({
   CLERK_SECRET_KEY: 'sk_test_worker',
   BETA_AUTH_BACKEND: 'clerk-d1',
   ASSETS: { fetch: async () => new Response('assets') },
-  ...(snapshot ? { FIRESTORE_SNAPSHOT: { get: async () => ({ json: async () => snapshot }) } } : {}),
+  FIRESTORE_SNAPSHOT: { get: async () => snapshot ? ({ json: async () => snapshot }) : null },
 });
 
 const call = (path, env, { method = 'GET', body } = {}) => worker.fetch(new Request(`https://beta.gfcweather.com${path}`, {
@@ -367,13 +367,15 @@ test('cloud cycle quota check rejects writes at the limit', async () => {
 test('the D1 schema and capacity/merge SQL execute against SQLite', async () => {
   const sqlite = new DatabaseSync(':memory:');
   try {
-    const [schema, payloadLimitMigration, workerSource] = await Promise.all([
+    const [schema, payloadLimitMigration, cyclePayloadLimitMigration, workerSource] = await Promise.all([
       readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'),
       readFile(new URL('./migrations/0002_workflow_payload_limit.sql', import.meta.url), 'utf8'),
+      readFile(new URL('./migrations/0003_cloud_cycle_payload_bytes_limit.sql', import.meta.url), 'utf8'),
       readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
     ]);
     sqlite.exec(schema);
     sqlite.exec(payloadLimitMigration);
+    sqlite.exec(cyclePayloadLimitMigration);
     assert.equal(MAX_PRODUCT_METRIC_DAILY_EVENTS, 500);
     for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200], ['MAX_WORKFLOW_RECORDS', 200], ['MAX_PRODUCT_METRIC_DAILY_EVENTS', MAX_PRODUCT_METRIC_DAILY_EVENTS]]) {
       assert.match(workerSource, new RegExp(`const ${constant} = ${limit};`));
@@ -386,6 +388,10 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).get());
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run('user_sqlite', 'sqlite@example.com', '2026-10-15', '2026-10-15');
+    const oversizedCyclePayload = 'x'.repeat(750_001);
+    assert.throws(() => sqlite.prepare(`INSERT INTO cloud_cycles
+      (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
+      VALUES ('oversized', 'user_sqlite', 'cycle', '2026-10-15', '{}', ?, 1, 'created', 'updated')`).run(oversizedCyclePayload), /cloud_cycle_too_large/);
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, migration_status, created_at, updated_at) VALUES (?, ?, 1, ?, ?, ?)')
       .run('user_migrating', 'migrating@example.com', 'migrating', '2026-10-15', '2026-10-15');
     const importCycle = sqlite.prepare(`INSERT INTO cloud_cycles

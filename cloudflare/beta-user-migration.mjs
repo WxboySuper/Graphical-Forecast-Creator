@@ -1,3 +1,5 @@
+import { isObject, normalizeEmail, sha256Hex } from './beta-worker-utils.mjs';
+
 const MAX_CYCLE_BYTES = 750_000;
 const MAX_CUSTOM_PRODUCTS = 16;
 const MAX_WORKFLOW_RECORDS = 200;
@@ -5,13 +7,7 @@ const MAX_MIGRATED_CLOUD_CYCLES = 300;
 const MAX_MIGRATED_WORKFLOW_RECORDS = MAX_WORKFLOW_RECORDS;
 const MAX_MIGRATED_CUSTOM_PRODUCTS = 48;
 const MAX_MIGRATION_BYTES = 20_000_000;
-const normalizeEmail = (value) => typeof value === 'string' ? value.trim().toLowerCase() : '';
 const normalizePlanInterval = (value) => value === 'annual' || value === 'monthly' ? value : null;
-const isObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
-const sha256Hex = async (value) => {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-};
 const emailSnapshotKey = async (email) => {
   return `by-email/${await sha256Hex(normalizeEmail(email))}.json`;
 };
@@ -34,7 +30,14 @@ function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accou
   if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
   accountForMigrationBytes(entitlement);
   statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_entitlements.data_json), updated_at = excluded.updated_at`)
+        ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(
+          json_patch(excluded.data_json, user_entitlements.data_json),
+          json_object(
+            'stripeCustomerId', COALESCE(json_extract(user_entitlements.data_json, '$.stripeCustomerId'), json_extract(excluded.data_json, '$.stripeCustomerId')),
+            'stripeSubscriptionId', COALESCE(json_extract(user_entitlements.data_json, '$.stripeSubscriptionId'), json_extract(excluded.data_json, '$.stripeSubscriptionId')),
+            'pendingStripeSync', CASE WHEN json_extract(user_entitlements.data_json, '$.pendingStripeSync') = 1 OR json_extract(excluded.data_json, '$.pendingStripeSync') = 1 THEN json('true') ELSE json('false') END
+          )
+        ), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({
           uid: user.clerkId,
           premiumActive: false,
@@ -67,17 +70,42 @@ function appendSnapshotAccountDocuments(context) {
 }
 
 function validateSnapshotCycle(cycle) {
+  assertCycleObject(cycle);
+  assertCycleId(cycle.id);
+  const { label, cycleDate } = readCycleLabels(cycle);
+  assertCycleMetadata(cycle.metadata);
+  const payloadJson = serializeCyclePayload(cycle.payloadJson);
+  const payloadBytes = new TextEncoder().encode(payloadJson).length;
+  if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
+  assertJsonPayload(payloadJson);
+  return { ...cycle, label, cycleDate, payloadJson, payloadBytes };
+}
+
+function assertCycleObject(cycle) {
   if (!isObject(cycle)) throw new Error('SNAPSHOT_CYCLE_INVALID');
-  if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+}
+
+function assertCycleId(id) {
+  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+}
+
+function readCycleLabels(cycle) {
   const label = typeof cycle.label === 'string' ? cycle.label.trim() : '';
   const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
   if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
-  if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
-  const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : JSON.stringify(cycle.payloadJson ?? {});
-  const payloadBytes = new TextEncoder().encode(payloadJson).length;
-  if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
+  return { label, cycleDate };
+}
+
+function assertCycleMetadata(metadata) {
+  if (metadata !== undefined && metadata !== null && !isObject(metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
+}
+
+function serializeCyclePayload(payload) {
+  return typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
+}
+
+function assertJsonPayload(payloadJson) {
   try { JSON.parse(payloadJson); } catch { throw new Error('SNAPSHOT_CYCLE_INVALID'); }
-  return { ...cycle, label, cycleDate, payloadJson, payloadBytes };
 }
 
 function appendSnapshotCycle(cycle, context) {
@@ -98,14 +126,21 @@ function appendSnapshotCycles(cloudCycles, context) {
 }
 
 function appendSnapshotWorkflow(record, context) {
-  if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-  if (typeof record.id !== 'string' || !record.id || record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
-  if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-  const workflowJson = JSON.stringify(record.data);
+  validateWorkflowRecord(record);
+  const workflowJson = serializeWorkflowData(record.data);
   if (new TextEncoder().encode(workflowJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_WORKFLOW_TOO_LARGE');
   context.accountForMigrationBytes(workflowJson);
   context.statements.push(context.env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json, migration_import) VALUES (?, ?, ?, 1)')
     .bind(context.user.clerkId, record.id, workflowJson));
+}
+
+function validateWorkflowRecord(record) {
+  if (!isObject(record) || !isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+  if (typeof record.id !== 'string' || !record.id || record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+}
+
+function serializeWorkflowData(data) {
+  return JSON.stringify(data);
 }
 
 function appendSnapshotWorkflows(workflowAwareness, context) {
@@ -113,16 +148,28 @@ function appendSnapshotWorkflows(workflowAwareness, context) {
 }
 
 function normalizeSnapshotProduct(product, userId) {
-  if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  assertProductObject(product);
   const migrated = { ...(product.data || {}), userId };
   const id = typeof migrated.id === 'string' && migrated.id ? migrated.id : product.id;
-  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
-  if (migrated.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  assertProductId(id);
+  assertNotBuiltIn(migrated);
   migrated.id = id;
   migrated.version = 1;
   const dataJson = JSON.stringify(migrated);
   if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_PRODUCT_TOO_LARGE');
   return { id, migrated, dataJson };
+}
+
+function assertProductObject(product) {
+  if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+}
+
+function assertProductId(id) {
+  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+}
+
+function assertNotBuiltIn(product) {
+  if (product.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
 }
 
 function findProductSlot(index, occupied) {
@@ -270,7 +317,11 @@ async function updateClerkProfile(db, user) {
 }
 
 async function readUserSnapshot(env, email) {
-  if (!env.FIRESTORE_SNAPSHOT) return null;
+  if (!env.FIRESTORE_SNAPSHOT) {
+    const error = new Error('FIRESTORE_SNAPSHOT binding is not configured.');
+    error.code = 'SNAPSHOT_CONFIG_MISSING';
+    throw error;
+  }
   const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(email));
   if (!object) return null;
   let snapshot;
