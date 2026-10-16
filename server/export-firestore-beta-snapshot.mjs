@@ -47,8 +47,7 @@ async function main() {
     }),
   });
   const db = getFirestore(app);
-  await fs.mkdir(output, { recursive: true, mode: 0o700 });
-  await fs.chmod(output, 0o700);
+  await fs.mkdir(output, { recursive: false, mode: 0o700 });
   const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
   let fullSnapshotCount = 0;
   let snapshotWriteError = null;

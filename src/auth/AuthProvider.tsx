@@ -24,7 +24,7 @@ import {
 } from 'firebase/firestore';
 import type { RootState } from '../store';
 import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings } from '../store/overlaysSlice';
+import { applyOverlaySettings, initialState as defaultOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { applyMonitorSettings } from '../store/monitorSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
@@ -1519,7 +1519,20 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     settingsRequestIdRef.current += 1;
     setSettingsSyncStatus('idle');
-  }, [clerkUser?.id, isSignedIn]);
+    if (isSignedIn && clerkUser?.id && bootstrapKey !== clerkUser.id) {
+      lastSyncedSettingsRef.current = null;
+      hasInitializedSettingsRef.current = false;
+      setSyncedSettings(null);
+      setBootstrapKey('');
+      setBetaAccess(false);
+      setBetaAccessLoading(true);
+      setError(null);
+      dispatch(setDarkMode(false));
+      dispatch(applyOverlaySettings(defaultOverlaySettings));
+      dispatch(applyMonitorSettings(DEFAULT_MONITOR_SETTINGS));
+      writeStoredForecastUiVariant(DEFAULT_FORECAST_UI_VARIANT);
+    }
+  }, [bootstrapKey, clerkUser?.id, dispatch, isSignedIn]);
 
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
     const token = await getBetaApiToken(async () => (await getToken()) ?? null, init.signal ?? undefined);
@@ -1528,17 +1541,18 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     return fetch(path, { ...init, headers });
   }, [getToken]);
-  const putSettings = useCallback(async (settings: UserSettingsDocument, signal?: AbortSignal): Promise<Response> => {
+  const putSettings = useCallback(async (settings: UserSettingsDocument, userId: string, signal?: AbortSignal): Promise<Response> => {
     const previous = settingsWriteQueueRef.current;
     let release!: () => void;
     settingsWriteQueueRef.current = new Promise<void>((resolve) => { release = resolve; });
     await previous.catch(() => undefined);
     try {
+      if (clerkUser?.id !== userId) throw new Error('The beta session is still initializing. Try changing settings again in a moment.');
       return await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings }), signal });
     } finally {
       release();
     }
-  }, [request]);
+  }, [clerkUser?.id, request]);
 
   const clerkUserId = clerkUser?.id;
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
@@ -1573,13 +1587,19 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setError(null);
     } catch (nextError) {
       if (requestId !== betaAccessRequestIdRef.current) return;
+      if (bootstrapKey !== clerkUserId) {
+        lastSyncedSettingsRef.current = null;
+        hasInitializedSettingsRef.current = false;
+        setSyncedSettings(null);
+        setBootstrapKey('');
+      }
       setError(nextError instanceof Error ? nextError.message : 'Unable to load your beta account.');
       setBetaAccess(false);
     } finally {
       if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
       if (betaAccessAbortRef.current === abortController) betaAccessAbortRef.current = null;
     }
-  }, [clerkUserId, dispatch, isSignedIn, request]);
+  }, [bootstrapKey, clerkUserId, dispatch, isSignedIn, request]);
 
   useEffect(() => {
     if (!isLoaded || !isUserLoaded) {
@@ -1678,16 +1698,19 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const updateSyncedSettings = useCallback(async (patch: Partial<UserSettingsDocument>) => {
     if (!currentUser) throw new Error('Sign in before changing account settings.');
+    if (bootstrapKey !== currentUser.uid || !hasInitializedSettingsRef.current) {
+      throw new Error('The beta session is still initializing. Try changing settings again in a moment.');
+    }
     const requestId = ++settingsRequestIdRef.current;
     const userId = currentUser.uid;
-    const baseline = lastSyncedSettingsRef.current ?? buildHostedAccountFallbackSettings(
+    const baseline = (bootstrapKey === currentUser.uid ? lastSyncedSettingsRef.current : null) ?? buildHostedAccountFallbackSettings(
       darkMode, overlays, currentUser.displayName ?? '', readStoredForecastUiVariant() ?? DEFAULT_FORECAST_UI_VARIANT, monitorSettings,
     );
     const next = mergeUserSettingsDocument(baseline, patch);
     setSettingsSyncStatus('syncing');
     setError(null);
     try {
-      const response = await putSettings(next);
+      const response = await putSettings(next, userId);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
       if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
@@ -1701,7 +1724,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
       throw nextError;
     }
-  }, [currentUser, darkMode, monitorSettings, overlays, putSettings]);
+  }, [bootstrapKey, currentUser, darkMode, monitorSettings, overlays, putSettings]);
 
   useEffect(() => {
     if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || bootstrapKey !== currentUser.uid) return;
@@ -1718,7 +1741,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setSettingsSyncStatus('syncing');
       const syncSettings = async () => {
         try {
-          const response = await putSettings(next, abortController.signal);
+          const response = await putSettings(next, userId, abortController.signal);
           const body = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
           if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
@@ -1749,7 +1772,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     hasInitializedSettingsRef.current = false;
   }, []);
 
-  const hasInitializedSettings = bootstrapKey !== '' || hasInitializedSettingsRef.current;
+  const hasInitializedSettings = Boolean(currentUser && bootstrapKey === currentUser.uid && hasInitializedSettingsRef.current);
   let authStatus: AuthStatus = 'signed_out';
   if (!isLoaded || !isUserLoaded) authStatus = 'loading';
   else if (error && isSignedIn && !hasInitializedSettings) authStatus = 'error';
@@ -1760,7 +1783,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     settingsSyncStatus,
     user: currentUser,
     authProvider: 'clerk',
-    syncedSettings,
+    syncedSettings: bootstrapKey === currentUser?.uid ? syncedSettings : null,
     error,
     hostedAuthEnabled: typeof __GFC_CLERK_PUBLISHABLE_KEY__ !== 'undefined' && Boolean(__GFC_CLERK_PUBLISHABLE_KEY__),
     betaAccess,

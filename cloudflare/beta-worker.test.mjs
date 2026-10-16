@@ -474,7 +474,7 @@ test('existing Clerk accounts refresh their email and display name safely', asyn
   await withClerkFetch(async () => {
     const response = await call('/api/me/bootstrap', createEnv(db));
     assert.equal(response.status, 200);
-    assert.deepEqual((await response.json()).user, {
+    assert.deepStrictEqual((await response.json()).user, {
       id: 'user_beta_test', email: 'test@example.com', displayName: 'Beta Tester', betaAccess: true, migrationStatus: 'complete',
     });
   });
@@ -496,7 +496,7 @@ test('a user with no initial snapshot match can migrate when the retained snapsh
     const migrated = await afterUpload.json();
     assert.equal(migrated.user.migrationStatus, 'complete');
     assert.equal(migrated.user.betaAccess, true);
-    assert.deepEqual(migrated.settings, { darkMode: true, localOnly: 'keep this', migratedField: 'from snapshot' });
+    assert.deepStrictEqual(migrated.settings, { darkMode: true, localOnly: 'keep this', migratedField: 'from snapshot' });
   });
 });
 
@@ -625,13 +625,20 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run('user_sqlite', 'sqlite@example.com', '2026-10-15', '2026-10-15');
 
+    const metricInsert = sqlite.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
+      VALUES (?, ?, ?, ?, ?)`);
+    for (let index = 0; index < 500; index += 1) {
+      metricInsert.run(`event-${index}`, '2026-10-15', 'installation-123', 'account_signin', 'user_sqlite');
+    }
+    assert.throws(() => metricInsert.run('event-over-limit', '2026-10-15', 'installation-123', 'account_signin', 'user_sqlite'), /product_metric_daily_quota_reached/);
+
     sqlite.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
       .run('user_sqlite', JSON.stringify({ theme: 'local' }), '2026-10-15');
     sqlite.prepare(`INSERT INTO user_settings (user_id, data_json, updated_at) VALUES (?, ?, ?)
       ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(excluded.data_json, user_settings.data_json), updated_at = excluded.updated_at`)
       .run('user_sqlite', JSON.stringify({ legacy: true, theme: 'legacy' }), '2026-10-15');
-    assert.deepEqual(JSON.parse(sqlite.prepare('SELECT data_json FROM user_settings WHERE user_id = ?').get('user_sqlite').data_json), { legacy: true, theme: 'local' });
+    assert.deepStrictEqual(JSON.parse(sqlite.prepare('SELECT data_json FROM user_settings WHERE user_id = ?').get('user_sqlite').data_json), { legacy: true, theme: 'local' });
 
     const cycleWrite = sqlite.prepare(`INSERT INTO cloud_cycles
       (id, user_id, label, cycle_date, metadata_json, payload_json, payload_bytes, created_at, updated_at)
@@ -688,7 +695,7 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
     const today = new Date().toISOString().slice(0, 10);
     insertMetric.run('evt-1', today, 'install-1', 'cloud_cycle_saved', 'user_sqlite');
     insertMetric.run('evt-2', today, 'install-1', 'cloud_cycle_saved', 'user_sqlite');
-    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM product_metric_events').get().count, 2);
+    assert.equal(sqlite.prepare('SELECT COUNT(*) AS count FROM product_metric_events').get().count, 502);
     const reportRows = sqlite.prepare(`SELECT event_date AS date, COUNT(DISTINCT CASE WHEN event_type NOT IN ('upgrades', 'cancellations') THEN installation_id END) AS activeDevices,
       COUNT(DISTINCT user_id) AS activeSignedInAccounts,
       SUM(CASE WHEN event_type = 'account_signup' THEN 1 ELSE 0 END) AS signups,
@@ -727,7 +734,7 @@ test('workflow awareness rejects invalid and over-quota writes and returns persi
     const wrongAccount = await call('/api/workflow-awareness?userId=another-user', createEnv(db));
     assert.equal(wrongAccount.status, 403);
     const list = await call('/api/workflow-awareness', createEnv(db));
-    assert.deepEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
+    assert.deepStrictEqual((await list.json()).records, [{ ...record, metadata: { cycleId: 'cycle-1' } }]);
     for (let index = 1; index <= 200; index += 1) {
       db.workflowAwareness.set(`user_beta_test:cycle-${index}`, { user_id: 'user_beta_test', cycle_id: `cycle-${index}`, data_json: '{}' });
     }
@@ -781,7 +788,7 @@ test('billing checkout requires a configured public origin and builds a trusted 
   try {
     const response = await call('/api/billing/checkout', env, { method: 'POST', body: { plan: 'monthly' } });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { url: 'https://checkout.stripe.test/session' });
+    assert.deepStrictEqual(await response.json(), { url: 'https://checkout.stripe.test/session' });
     assert.equal(urls.length, 1);
     assert.match(urls[0], /^https:\/\/api\.stripe\.com\/v1\/checkout\/sessions$/);
     delete env.PUBLIC_ORIGIN;
@@ -816,17 +823,17 @@ test('forecast, discussion, verification and settings endpoints enforce account-
       const write = await call(`/api/${route}`, env, { method: 'PUT', body: { id, data: { value: route } } });
       assert.equal(write.status, 200);
       const list = await call(`/api/${route}`, env);
-      assert.deepEqual((await list.json()).records.map((record) => record.id), [id]);
+      assert.deepStrictEqual((await list.json()).records.map((record) => record.id), [id]);
       const read = await call(`/api/${route}/${id}`, env);
       assert.equal((await read.json()).record.data.value, route);
       const remove = await call(`/api/${route}/${id}`, env, { method: 'DELETE' });
       assert.equal(remove.status, 200);
-      assert.deepEqual((await (await call(`/api/${route}`, env)).json()).records, []);
+      assert.deepStrictEqual((await (await call(`/api/${route}`, env)).json()).records, []);
     }
     const settingsWrite = await call('/api/user/settings', env, { method: 'PUT', body: { settings: { darkMode: true } } });
     assert.equal(settingsWrite.status, 200);
     const settingsRead = await call('/api/user/settings', env);
-    assert.deepEqual((await settingsRead.json()).settings, { darkMode: true });
+    assert.deepStrictEqual((await settingsRead.json()).settings, { darkMode: true });
   });
 });
 
@@ -842,7 +849,7 @@ test('forecast, discussion and verification writes enforce their per-account rec
   }
   const response = await withClerkFetch(() => call('/api/forecasts', env, { method: 'PUT', body: { id: 'forecast-over-limit', data: {} } }));
   assert.equal(response.status, 409);
-  assert.deepEqual(await response.json(), { error: 'Record quota reached.' });
+  assert.deepStrictEqual(await response.json(), { error: 'Record quota reached.' });
 });
 
 test('authenticated JSON writes reject oversized request bodies before parsing', async () => {
@@ -853,7 +860,7 @@ test('authenticated JSON writes reject oversized request bodies before parsing',
     body: JSON.stringify({ settings: { value: 'x'.repeat(750_001) } }),
   }), env));
   assert.equal(response.status, 413);
-  assert.deepEqual(await response.json(), { error: 'Request body is too large.' });
+  assert.deepStrictEqual(await response.json(), { error: 'Request body is too large.' });
 });
 
 test('product metrics reject malformed JSON with a client error', async () => {
@@ -863,7 +870,7 @@ test('product metrics reject malformed JSON with a client error', async () => {
     body: '{',
   }), createEnv()));
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: 'Invalid product metric event.' });
+  assert.deepStrictEqual(await response.json(), { error: 'Invalid product metric event.' });
 });
 
 test('Clerk deletion cleanup removes D1-owned user records idempotently', async () => {
@@ -897,10 +904,10 @@ test('Stripe webhook verifies any valid v1 signature and ignores duplicate event
 
   const first = await send();
   assert.equal(first.status, 200, await first.clone().text());
-  assert.deepEqual(await first.json(), { received: true });
+  assert.deepStrictEqual(await first.json(), { received: true });
   const duplicate = await send();
   assert.equal(duplicate.status, 200);
-  assert.deepEqual(await duplicate.json(), { received: true, duplicate: true });
+  assert.deepStrictEqual(await duplicate.json(), { received: true, duplicate: true });
 });
 
 test('Stripe webhook recovers a stale processing claim and processes the delivery', async () => {
@@ -916,7 +923,7 @@ test('Stripe webhook recovers a stale processing claim and processes the deliver
   }), env);
 
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { received: true });
+  assert.deepStrictEqual(await response.json(), { received: true });
   assert.equal(db.stripeEvents.get('evt_stale_claim').status, 'completed');
 });
 
@@ -998,7 +1005,7 @@ test('Stripe webhook rejects malformed JSON even when its signature is valid', a
     method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
   }), { ...createEnv(), STRIPE_WEBHOOK_SECRET: 'whsec_beta_test' });
   assert.equal(response.status, 400);
-  assert.deepEqual(await response.json(), { error: 'Invalid webhook payload.' });
+  assert.deepStrictEqual(await response.json(), { error: 'Invalid webhook payload.' });
 });
 
 test('the Sentry tunnel only forwards envelopes for the configured project', async () => {

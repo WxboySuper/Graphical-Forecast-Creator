@@ -225,7 +225,8 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
     nextUrl.hash = '';
-    window.location.assign(nextUrl.href);
+    window.history.pushState(null, '', nextUrl.href);
+    setMode(nextMode);
   };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
@@ -285,15 +286,15 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={mode === 'sign_in'}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy} aria-pressed={mode === 'sign_in'}>
                 Sign in
               </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={mode === 'sign_up'}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy} aria-pressed={mode === 'sign_up'}>
                 Create account
               </Button>
             </div>
           ) : null}
-          {clerkVerificationInProgress ? (
+          {allowSignUp && clerkVerificationInProgress ? (
             <p role="status" className="text-sm text-muted-foreground">Switching account actions restarts sign-in, so you will need to enter any verification code again.</p>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (

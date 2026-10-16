@@ -183,6 +183,17 @@ async function ensureUser(user, env) {
       const cloudCycles = readSnapshotArray('cloudCycles');
       const workflowAwareness = readSnapshotArray('workflowAwareness');
       const customProducts = readSnapshotArray('customProducts');
+      const assertUniqueSnapshotIds = (records, readId, code) => {
+        const ids = new Set();
+        for (const record of records) {
+          const id = readId(record);
+          if (typeof id === 'string' && id && ids.has(id)) throw new Error(code);
+          if (typeof id === 'string' && id) ids.add(id);
+        }
+      };
+      assertUniqueSnapshotIds(cloudCycles, (record) => record?.id, 'SNAPSHOT_CYCLE_DUPLICATE_ID');
+      assertUniqueSnapshotIds(workflowAwareness, (record) => record?.id, 'SNAPSHOT_WORKFLOW_DUPLICATE_ID');
+      assertUniqueSnapshotIds(customProducts, (record) => record?.data?.id || record?.id, 'SNAPSHOT_PRODUCT_DUPLICATE_ID');
       if (cloudCycles.length > MAX_MIGRATED_CLOUD_CYCLES) throw new Error('SNAPSHOT_CYCLE_QUOTA_EXCEEDED');
       if (workflowAwareness.length > MAX_MIGRATED_WORKFLOW_RECORDS) throw new Error('SNAPSHOT_WORKFLOW_QUOTA_EXCEEDED');
       if (customProducts.length > MAX_MIGRATED_CUSTOM_PRODUCTS) throw new Error('SNAPSHOT_PRODUCT_QUOTA_EXCEEDED');
@@ -415,7 +426,7 @@ async function handleApi(request, env) {
       const legacyUid = metadata.legacyUid || '';
       let owner = null;
       if (clerkId) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE clerk_id = ?').bind(clerkId).first();
-      else if (legacyUid) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
+      if (!owner && legacyUid) owner = await env.DB.prepare('SELECT clerk_id FROM users WHERE legacy_uid = ?').bind(legacyUid).first();
       if (!owner && typeof (subscription.customer || object.customer) === 'string') {
         owner = await env.DB.prepare(`SELECT user_id AS clerk_id FROM user_entitlements WHERE json_extract(data_json, '$.stripeCustomerId') = ?`)
           .bind(subscription.customer || object.customer).first();
@@ -488,10 +499,10 @@ async function handleApi(request, env) {
   try { user = await ensureUser(identity, env); }
   catch (error) {
     if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
-    if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
     if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
       return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
     }
+    if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
     console.error('[beta-worker] migration failed', error);
     return json({ error: 'Account data could not be migrated. Please retry later.' }, 503);
   }
@@ -616,9 +627,14 @@ async function handleApi(request, env) {
     const installationId = typeof body?.installationId === 'string' ? body.installationId : '';
     if (!PRODUCT_METRIC_EVENT_TYPES.has(body?.event) || installationId.length < 8 || installationId.length > 128) return json({ error: 'Invalid product metric event.' }, 400);
     const eventDate = new Date().toISOString().slice(0, 10);
-    await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
-      VALUES (?, ?, ?, ?, ?)`)
-      .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
+    try {
+      await env.DB.prepare(`INSERT INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
+        VALUES (?, ?, ?, ?, ?)`)
+        .bind(crypto.randomUUID(), eventDate, installationId, body.event, user.clerk_id).run();
+    } catch (error) {
+      if (String(error?.message || '').includes('product_metric_daily_quota_reached')) return json({ error: 'Daily metrics event limit reached.' }, 429);
+      throw error;
+    }
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
   }
 
@@ -793,6 +809,7 @@ async function handleApi(request, env) {
     const body = request.method === 'PATCH' || !ifMatch ? await readBody(request) : null;
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
     if (request.method === 'PATCH') {
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid custom product.' }, 400);
       const product = body?.product;
       if (!isObject(product) || product.id !== productId || product.userId !== user.clerk_id || product.builtIn === true || !Number.isInteger(body.expectedVersion) || body.expectedVersion !== current.version || product.version !== current.version + 1) {
         return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);

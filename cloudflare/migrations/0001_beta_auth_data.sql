@@ -114,6 +114,13 @@ CREATE TABLE IF NOT EXISTS product_metric_events (
 CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric_events(event_date, user_id);
 CREATE INDEX IF NOT EXISTS product_metric_events_user_idx ON product_metric_events(user_id);
 CREATE INDEX IF NOT EXISTS product_metric_events_reporting_idx ON product_metric_events(event_date, event_type, installation_id);
+-- Limit event growth to 500 per account per day.
+CREATE TRIGGER IF NOT EXISTS enforce_product_metric_daily_user_limit
+BEFORE INSERT ON product_metric_events
+WHEN (SELECT COUNT(*) FROM product_metric_events WHERE user_id = NEW.user_id AND event_date = NEW.event_date) >= 500
+BEGIN
+  SELECT RAISE(ABORT, 'product_metric_daily_quota_reached');
+END;
 
 -- Forecast drafts, discussions and verification sessions are currently local
 -- browser workflow state. This table supports future opt-in server persistence

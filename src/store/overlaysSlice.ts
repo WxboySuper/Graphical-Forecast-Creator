@@ -22,7 +22,7 @@ export interface OverlaysState {
   outlookTrimPreviewOnly: boolean;
 }
 
-const initialState: OverlaysState = {
+export const initialState: OverlaysState = {
   stateBorders: true, // Default to showing state borders
   counties: false,
   baseMapStyle: 'osm',
