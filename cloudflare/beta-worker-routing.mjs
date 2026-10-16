@@ -4,7 +4,9 @@ function validateBetaApiOrigin(value) {
   if (!value) return json({ error: 'The beta API origin is not configured.' }, 503);
   let origin;
   try { origin = new URL(value); } catch { return json({ error: 'The beta API origin is invalid.' }, 503); }
-  if (origin.protocol !== 'https:' || origin.username || origin.password) return json({ error: 'The beta API origin must be an HTTPS URL.' }, 503);
+  if (origin.protocol !== 'https:') return json({ error: 'The beta API origin must be an HTTPS URL.' }, 503);
+  if (origin.username) return json({ error: 'The beta API origin must be an HTTPS URL.' }, 503);
+  if (origin.password) return json({ error: 'The beta API origin must be an HTTPS URL.' }, 503);
   return origin;
 }
 

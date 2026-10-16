@@ -148,10 +148,22 @@ function appendSnapshotWorkflow(record, context) {
 }
 
 function validateWorkflowRecord(record) {
+  assertWorkflowRecordObject(record);
+  assertWorkflowRecordData(record.data);
+  assertWorkflowRecordId(record.id);
+}
+
+function assertWorkflowRecordObject(record) {
   if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-  if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-  if (typeof record.id !== 'string' || !record.id) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
-  if (record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+}
+
+function assertWorkflowRecordData(data) {
+  if (!isObject(data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+}
+
+function assertWorkflowRecordId(id) {
+  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
 }
 
 function serializeWorkflowData(data) {

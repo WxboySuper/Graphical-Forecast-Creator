@@ -109,9 +109,13 @@ function normalizeCloudCycleDocument(cycleDoc, payloadDoc, account, malformedLeg
   const payloadJson = validateMigratedCyclePayload(readCyclePayloadValue(payloadDoc, metadata), account.uid, cycleDoc.id);
   return {
     id: cycleDoc.id, label, cycleDate, metadata, payloadJson, payloadBytes: Buffer.byteLength(payloadJson),
-    createdAt: metadata.createdAt?.toDate?.()?.toISOString?.() || metadata.createdAt || new Date(0).toISOString(),
-    updatedAt: metadata.updatedAt?.toDate?.()?.toISOString?.() || metadata.updatedAt || new Date(0).toISOString(),
+    createdAt: normalizeFirestoreTimestamp(metadata.createdAt),
+    updatedAt: normalizeFirestoreTimestamp(metadata.updatedAt),
   };
+}
+
+function normalizeFirestoreTimestamp(value) {
+  return value?.toDate?.()?.toISOString?.() || value || new Date(0).toISOString();
 }
 
 async function readCloudCyclePage(account, cycleDocs, malformedLegacyCycles) {

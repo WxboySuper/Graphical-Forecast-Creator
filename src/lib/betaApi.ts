@@ -80,34 +80,30 @@ const withAbort = <T,>(promise: Promise<T>, signal?: AbortSignal): Promise<T> =>
   promise.then(resolve, reject).finally(() => signal?.removeEventListener('abort', onAbort));
 });
 
+const readProviderToken = (provider: BetaApiTokenProvider, signal?: AbortSignal) => withAbort(provider(), signal);
+
+const waitForTokenRetry = (signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
+  if (signal?.aborted) {
+    reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
+    return;
+  }
+  const cleanup = () => signal?.removeEventListener('abort', onAbort);
+  const timer = globalThis.setTimeout(() => { cleanup(); resolve(); }, 250);
+  const onAbort = () => {
+    globalThis.clearTimeout(timer);
+    cleanup();
+    reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
+  };
+  signal?.addEventListener('abort', onAbort, { once: true });
+});
+
 /** Waits briefly for a Clerk token, respecting caller cancellation. */
 export const getBetaApiToken = async (provider: BetaApiTokenProvider, signal?: AbortSignal): Promise<string> => {
   if (signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
-  const readToken = async (): Promise<string | null> => {
-    try {
-      return await withAbort(provider(), signal);
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') throw error;
-      throw error;
-    }
-  };
-  let token = await readToken();
+  let token = await readProviderToken(provider, signal);
   for (let attempt = 0; !token && attempt < 4; attempt += 1) {
-    await new Promise<void>((resolve, reject) => {
-      if (signal?.aborted) {
-        reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
-        return;
-      }
-      const cleanup = () => signal?.removeEventListener('abort', onAbort);
-      const timer = globalThis.setTimeout(() => { cleanup(); resolve(); }, 250);
-      const onAbort = () => {
-        globalThis.clearTimeout(timer);
-        cleanup();
-        reject(new DOMException('The beta API request was cancelled.', 'AbortError'));
-      };
-      signal?.addEventListener('abort', onAbort, { once: true });
-    });
-    token = await readToken();
+    await waitForTokenRetry(signal);
+    token = await readProviderToken(provider, signal);
   }
   if (!token) throw new Error(SESSION_INITIALIZING_ERROR);
   return token;
