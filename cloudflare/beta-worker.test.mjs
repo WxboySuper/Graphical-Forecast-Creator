@@ -579,6 +579,10 @@ test('custom products validate IDs and support account-scoped CRUD with version 
       expectedVersion: 1, product: { id: 'product-1', userId: 'user_beta_test', version: 2 },
     } });
     assert.equal(stale.status, 409);
+    const invalidPatch = await call('/api/custom-products/product-1', env, { method: 'PATCH', body: {
+      expectedVersion: 2, product: { id: 'another-product', userId: 'user_beta_test', version: 3 },
+    } });
+    assert.equal(invalidPatch.status, 400);
     const remove = await call('/api/custom-products/product-1', env, { method: 'DELETE', body: { expectedVersion: 2 } });
     assert.equal(remove.status, 200);
     assert.equal(db.customProducts.size, 0);
@@ -851,8 +855,8 @@ test('Stripe webhook rejects malformed JSON even when its signature is valid', a
   assert.deepStrictEqual(await response.json(), { error: 'Invalid webhook payload.' });
 });
 
-test('the Sentry tunnel only forwards envelopes for the configured project', async () => {
-  const env = { ...createEnv(), SENTRY_BROWSER_DSN: 'https://public-key@o123.ingest.sentry.io/456' };
+test('the Sentry tunnel accepts regional hosted DSNs and rejects untrusted hosts', async () => {
+  const env = { ...createEnv(), SENTRY_BROWSER_DSN: 'https://public-key@o123.ingest.eu.sentry.io/456' };
   const originalFetch = globalThis.fetch;
   let forwardedUrl = '';
   globalThis.fetch = async (input) => {
@@ -860,10 +864,10 @@ test('the Sentry tunnel only forwards envelopes for the configured project', asy
     return new Response(null, { status: 200 });
   };
   try {
-    const envelope = '{"dsn":"https://public-key@o123.ingest.sentry.io/456","event_id":"event"}\n{"type":"event"}\n{}';
+    const envelope = '{"dsn":"https://public-key@o123.ingest.eu.sentry.io/456","event_id":"event"}\n{"type":"event"}\n{}';
     const valid = await worker.fetch(new Request('https://beta.gfcweather.com/api/sentry-tunnel', { method: 'POST', body: envelope }), env);
     assert.equal(valid.status, 200);
-    assert.equal(forwardedUrl, 'https://o123.ingest.sentry.io/api/456/envelope/');
+    assert.equal(forwardedUrl, 'https://o123.ingest.eu.sentry.io/api/456/envelope/');
     const invalid = await worker.fetch(new Request('https://beta.gfcweather.com/api/sentry-tunnel', {
       method: 'POST', body: '{"dsn":"https://public-key@evil.example/999"}\n{}',
     }), env);

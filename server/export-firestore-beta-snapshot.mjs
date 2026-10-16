@@ -232,10 +232,12 @@ async function main() {
   const exportCollection = async (collectionRef) => {
     fullSnapshotCount += await exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection);
   };
-  const forEachDocumentPage = async (query, visitPage) => {
+  const forEachDocumentPage = async (query, visitPage, { orderByDocumentId = true } = {}) => {
     let cursor = null;
     while (true) {
-      let pageQuery = query.orderBy(FieldPath.documentId()).limit(500);
+      // Firestore's default document-name order supports snapshot cursors without a composite index.
+      let pageQuery = orderByDocumentId ? query.orderBy(FieldPath.documentId()) : query;
+      pageQuery = pageQuery.limit(500);
       if (cursor) pageQuery = pageQuery.startAfter(cursor);
       const page = await pageQuery.get();
       await visitPage(page.docs);
@@ -273,7 +275,7 @@ async function main() {
     const migratedCycles = [];
     await forEachDocumentPage(db.collection('cloudCycles').where('userId', '==', account.uid), async (cycleDocs) => {
       migratedCycles.push(...await readCloudCyclePage(account, cycleDocs, malformedLegacyCycles));
-    });
+    }, { orderByDocumentId: false });
     mergeMigratedCloudCycles(account, migratedCycles);
 
     await Promise.all([

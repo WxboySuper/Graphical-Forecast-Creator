@@ -334,17 +334,18 @@ async function findClerkUser(db, clerkId) {
 }
 
 async function assertEmailAvailable(db, user) {
-  const owner = await db.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(user.email).first();
+  const email = normalizeEmail(user.email);
+  const owner = await db.prepare('SELECT clerk_id FROM users WHERE email = ?').bind(email).first();
   if (owner && owner.clerk_id !== user.clerkId) throw new Error('EMAIL_ALREADY_LINKED');
 }
 
 async function updateClerkProfile(db, user) {
   try {
     await db.prepare('UPDATE users SET email = ?, email_verified = 1, display_name = ?, updated_at = ? WHERE clerk_id = ?')
-      .bind(user.email, user.displayName, new Date().toISOString(), user.clerkId).run();
+      .bind(normalizeEmail(user.email), user.displayName, new Date().toISOString(), user.clerkId).run();
   } catch (error) {
     const message = String(error?.message || '');
-    if (message.includes('UNIQUE constraint failed') && message.includes('users.email')) throw new Error('EMAIL_ALREADY_LINKED');
+    if (/UNIQUE constraint failed:\s*users\.email\b/i.test(message)) throw new Error('EMAIL_ALREADY_LINKED');
     throw error;
   }
 }

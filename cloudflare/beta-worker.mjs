@@ -557,21 +557,24 @@ async function patchCustomProduct({ request, env, user, productId, currentRow, c
 function parseCustomProductPatch(body, productId, userId, currentVersion) {
   const product = body?.product;
   if (!isObject(body)) return { response: json({ error: 'Invalid custom product.' }, 400) };
-  if (!matchesProductPatch({ product, productId, userId, expectedVersion: body.expectedVersion, currentVersion })) return changedProductResponse();
+  if (!matchesProductIdentity(product, productId, userId) || !hasValidProductPatchVersion(product, body.expectedVersion)) {
+    return { response: json({ error: 'Invalid custom product.' }, 400) };
+  }
+  if (!isCurrentProductVersion(product, body.expectedVersion, currentVersion)) return changedProductResponse();
   const dataJson = JSON.stringify(product);
   return hasValidPayloadSize(dataJson) ? { product, dataJson } : oversizedCustomProduct();
-}
-
-function matchesProductPatch({ product, productId, userId, expectedVersion, currentVersion }) {
-  return matchesProductIdentity(product, productId, userId) && isNextProductVersion(product, expectedVersion, currentVersion);
 }
 
 function matchesProductIdentity(product, productId, userId) {
   return isObject(product) && product.id === productId && product.userId === userId && product.builtIn !== true;
 }
 
-function isNextProductVersion(product, expectedVersion, currentVersion) {
-  return Number.isInteger(expectedVersion) && expectedVersion === currentVersion && product?.version === currentVersion + 1;
+function hasValidProductPatchVersion(product, expectedVersion) {
+  return Number.isInteger(expectedVersion) && Number.isInteger(product.version) && product.version === expectedVersion + 1;
+}
+
+function isCurrentProductVersion(product, expectedVersion, currentVersion) {
+  return expectedVersion === currentVersion && product.version === currentVersion + 1;
 }
 
 function changedProductResponse() {
