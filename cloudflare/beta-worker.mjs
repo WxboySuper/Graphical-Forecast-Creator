@@ -840,9 +840,10 @@ export default {
   async scheduled(_controller, env) {
     try { await flushStripeCleanupQueue(env); }
     catch (error) { console.error('[beta-worker] Stripe cleanup queue failed', error); }
+    if (!env.DB) return;
     try {
-      await env.DB?.prepare("DELETE FROM product_metric_events WHERE event_date < date('now', '-90 days')").run();
-      await env.DB?.prepare("DELETE FROM stripe_events WHERE processed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')").run();
+      await env.DB.prepare("DELETE FROM product_metric_events WHERE event_date < date('now', '-90 days')").run();
+      await env.DB.prepare("DELETE FROM stripe_events WHERE processed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-90 days')").run();
     } catch (error) { console.error('[beta-worker] retention cleanup failed', error); }
   },
 };

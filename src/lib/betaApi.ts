@@ -1,7 +1,7 @@
 type BetaApiTokenProvider = () => Promise<string | null>;
 
 let tokenProvider: BetaApiTokenProvider | null = null;
-let tokenProviderWaiters: Array<(provider: BetaApiTokenProvider | null) => void> = [];
+let tokenProviderWaiters: Array<(provider: BetaApiTokenProvider) => void> = [];
 const SESSION_INITIALIZING_ERROR = 'The beta session is still initializing.';
 
 /** True only for an explicitly selected beta build using Clerk and D1. */
@@ -13,18 +13,18 @@ export const isBetaClerkD1Mode = (): boolean => Boolean(
 /** Registers the active Clerk session token source for non-component data services. */
 export const setBetaApiTokenProvider = (provider: BetaApiTokenProvider | null): void => {
   tokenProvider = provider;
+  if (!provider) return;
   const waiters = tokenProviderWaiters;
   tokenProviderWaiters = [];
   waiters.forEach((resolve) => resolve(provider));
 };
 
 const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> => new Promise((resolve, reject) => {
-  const waiter = (provider: BetaApiTokenProvider | null) => {
-    window.clearTimeout(timeout);
-    if (provider) resolve(provider);
-    else reject(new Error(SESSION_INITIALIZING_ERROR));
+  const waiter = (provider: BetaApiTokenProvider) => {
+    globalThis.clearTimeout(timeout);
+    resolve(provider);
   };
-  const timeout = window.setTimeout(() => {
+  const timeout = globalThis.setTimeout(() => {
     tokenProviderWaiters = tokenProviderWaiters.filter((pending) => pending !== waiter);
     reject(new Error(SESSION_INITIALIZING_ERROR));
   }, timeoutMs);

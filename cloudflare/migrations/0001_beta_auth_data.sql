@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS product_metric_events (
   user_id TEXT NOT NULL REFERENCES users(clerk_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS product_metric_events_date_user_idx ON product_metric_events(event_date, user_id);
+CREATE INDEX IF NOT EXISTS product_metric_events_user_idx ON product_metric_events(user_id);
 CREATE INDEX IF NOT EXISTS product_metric_events_reporting_idx ON product_metric_events(event_date, event_type, installation_id);
 
 -- Forecast drafts, discussions and verification sessions are currently local

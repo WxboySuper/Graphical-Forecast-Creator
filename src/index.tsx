@@ -31,10 +31,21 @@ const root = ReactDOM.createRoot(
     : undefined
 );
 const clerkD1BuildSelected = typeof __GFC_BETA_CLERK_D1__ !== 'undefined' && __GFC_BETA_CLERK_D1__;
-const application = clerkD1BuildSelected
-  ? betaClerkPublishableKey
-    ? <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>
-    : <main role="alert" className="p-6">Beta Clerk authentication is enabled, but its publishable key is missing. Contact the site administrator.</main>
-  : <App />;
+let application: React.ReactNode;
+if (clerkD1BuildSelected && betaClerkPublishableKey) {
+  application = <ClerkProvider publishableKey={betaClerkPublishableKey}><App /></ClerkProvider>;
+} else {
+  application = (
+    <>
+      {clerkD1BuildSelected ? (
+        <section role="alert" className="flex items-center justify-between gap-4 bg-destructive px-4 py-3 text-destructive-foreground">
+          <span>Beta Clerk authentication is enabled, but its publishable key is missing. The app is using Firebase auth; retry after the deployment configuration is repaired.</span>
+          <button type="button" onClick={() => window.location.reload()}>Retry</button>
+        </section>
+      ) : null}
+      <App />
+    </>
+  );
+}
 
 root.render(<React.StrictMode>{application}</React.StrictMode>);

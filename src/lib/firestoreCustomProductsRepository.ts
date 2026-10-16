@@ -125,13 +125,18 @@ export const firestoreCustomProductsRepository: CustomProductsRepository = {
   subscribe(userId, onUpdate, onError) {
     if (isBetaClerkD1Mode()) {
       let active = true;
+      let retryTimer: number | undefined;
       const refresh = () => readBetaProducts(userId).then((products) => { if (active) onUpdate(products); }).catch((error) => {
-        if (!active || (error instanceof Error && error.message.includes('The beta session is still initializing'))) return;
+        if (!active) return;
+        if (error instanceof Error && error.message.includes('The beta session is still initializing')) {
+          retryTimer = window.setTimeout(() => { void refresh(); }, 250);
+          return;
+        }
         onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
       });
       refresh().catch(() => undefined);
       const timer = window.setInterval(() => refresh().catch(() => undefined), 15_000);
-      return () => { active = false; window.clearInterval(timer); };
+      return () => { active = false; window.clearInterval(timer); if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
     }
     return onSnapshot(collectionRef(userId), (snapshot) => {
       const products = snapshot.docs.map((item) => item.data()).filter((value) => ownedProduct(value, userId));

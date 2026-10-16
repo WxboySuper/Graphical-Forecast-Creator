@@ -22,6 +22,10 @@ interface UseUserMetricsResult {
   error: string | null;
 }
 
+type UserMetricsSnapshot = Partial<Omit<UserMetricsDocument, 'updatedAt'>> & {
+  updatedAt?: Timestamp | string | null;
+};
+
 const DEFAULT_USER_METRICS: UserMetricsDocument = {
   uid: '',
   activeDayStreak: 0,
@@ -51,7 +55,7 @@ const readMetricsTimestamp = (value: Timestamp | string | null | undefined): Dat
     : value?.toDate?.() ?? null;
 
 /** Normalizes one Firestore metrics document into the client-safe account metrics contract. */
-const readUserMetricsDocument = (value: Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined): UserMetricsDocument => {
+const readUserMetricsDocument = (value: UserMetricsSnapshot | undefined): UserMetricsDocument => {
   if (!value) {
     return DEFAULT_USER_METRICS;
   }
@@ -100,34 +104,46 @@ export const useUserMetrics = (): UseUserMetricsResult => {
     setLoading(true);
     requestIdRef.current += 1;
     const requestId = requestIdRef.current;
-    const readMetrics = isBetaClerkD1Mode()
-      ? fetchBetaApi('/api/user/metrics').then(async (response) => {
-          const body = await response.json().catch(() => ({}));
+    let active = true;
+    let attempts = 0;
+    let retryTimer: number | undefined;
+    const loadMetrics = async (): Promise<void> => {
+      try {
+        let value: UserMetricsSnapshot | undefined;
+        if (isBetaClerkD1Mode()) {
+          const response = await fetchBetaApi('/api/user/metrics');
+          const body = (await response.json().catch(() => ({}))) ?? {};
           if (!response.ok) throw new Error(body?.error || 'Unable to load account metrics.');
-          return body.metrics as Partial<UserMetricsDocument> | undefined;
-        })
-      : getDoc(doc(db!, 'userMetrics', user.uid)).then((snapshot) => snapshot.data() as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined);
-    readMetrics
-      .then((value) => {
-        if (requestId !== requestIdRef.current) {
-          return;
+          value = body?.metrics as UserMetricsSnapshot | undefined;
+        } else {
+          const snapshot = await getDoc(doc(db!, 'userMetrics', user.uid));
+          value = snapshot.data() as UserMetricsSnapshot | undefined;
         }
-
+        if (!active || requestId !== requestIdRef.current) return;
         setMetrics(
-          readUserMetricsDocument(value as Partial<UserMetricsDocument & { updatedAt?: Timestamp | null }> | undefined)
+          readUserMetricsDocument(value)
         );
         setLoading(false);
         setError(null);
-      })
-      .catch((nextError: Error) => {
-        if (requestId !== requestIdRef.current) {
+      } catch (nextError) {
+        if (!active || requestId !== requestIdRef.current) return;
+        const message = nextError instanceof Error ? nextError.message : 'Unable to load account metrics.';
+        if (isBetaClerkD1Mode() && message.includes('The beta session is still initializing') && attempts < 20) {
+          attempts += 1;
+          retryTimer = window.setTimeout(() => { void loadMetrics(); }, 250);
           return;
         }
-
         setMetrics(DEFAULT_USER_METRICS);
         setLoading(false);
-        setError(nextError.message);
-      });
+        setError(message);
+      }
+    };
+    void loadMetrics();
+    return () => {
+      active = false;
+      requestIdRef.current += 1;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [status, user]);
 
   return { metrics, loading, error };

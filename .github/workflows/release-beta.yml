@@ -489,7 +489,12 @@ jobs:
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             while IFS= read -r EMAIL_HASH; do
               [[ -z "$EMAIL_HASH" ]] && continue
-              pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --remote
+              attempt=1
+              until pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --remote; do
+                if [ "$attempt" -ge 3 ]; then exit 1; fi
+                sleep "$((attempt * 2))"
+                attempt=$((attempt + 1))
+              done
               test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
             done < beta-firestore-email-hashes.txt
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc

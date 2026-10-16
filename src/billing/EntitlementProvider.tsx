@@ -346,7 +346,8 @@ const resolveEntitlementEffect = (
         if (!active) return;
         const raw = body?.entitlement ?? null;
         const rawEnd = raw?.currentPeriodEnd;
-        const { currentPeriodEnd: _remoteEnd, ...rawValues } = raw ?? {};
+        const rawValues = { ...(raw ?? {}) };
+        delete rawValues.currentPeriodEnd;
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
         if (typeof rawEnd === 'string') {
           const parsedEnd = new Date(rawEnd);

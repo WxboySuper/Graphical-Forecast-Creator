@@ -214,13 +214,13 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   }, [authProvider]);
 
   const setClerkMode = (nextMode: AuthMode) => {
-    if (clerkVerificationInProgress) return;
     setMode(nextMode);
     if (typeof window === 'undefined') return;
     const nextUrl = new URL(window.location.href);
     if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
     else nextUrl.searchParams.delete('clerkSignUp');
     window.history.replaceState(null, '', `${nextUrl.pathname}${nextUrl.search}`);
+    setClerkVerificationInProgress(false);
   };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
@@ -280,16 +280,16 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
           {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
           {allowSignUp ? (
             <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')}>
                 Sign in
               </Button>
-              <Button type="button" disabled={clerkVerificationInProgress} variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')}>
                 Create account
               </Button>
             </div>
           ) : null}
           {clerkVerificationInProgress ? (
-            <p role="status" className="text-sm text-muted-foreground">Finish the verification step in the form below. You can switch account actions after verification.</p>
+            <p role="status" className="text-sm text-muted-foreground">Finish verification below, or choose Sign in/Create account above to restart with a different action.</p>
           ) : null}
           {mode === 'sign_up' && allowSignUp ? (
             <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl} />
@@ -297,7 +297,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
             <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl}
               appearance={allowSignUp ? undefined : { elements: { footerAction: { display: 'none' } } }} />
           )}
-          {error || formError ? <div className="beta-auth-error">{formError ?? error}</div> : null}
+          {error || formError ? <div className="beta-auth-error">{error ?? formError}</div> : null}
         </div>
       ) : (
       <BetaAuthCardBody

@@ -1492,10 +1492,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await clerkUser.delete();
   });
   useEffect(() => {
-    if (!isLoaded) {
-      setBetaApiTokenProvider(null);
-      return () => setBetaApiTokenProvider(null);
-    }
+    if (!isLoaded) return;
     setBetaApiTokenProvider(async () => (await getToken()) ?? null);
     return () => setBetaApiTokenProvider(null);
   }, [getToken, isLoaded]);
@@ -1663,6 +1660,18 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => { active = false; window.clearTimeout(timer); };
   }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
 
+  const resetClerkAccountState = useCallback(() => {
+    betaAccessRequestIdRef.current += 1;
+    settingsRequestIdRef.current += 1;
+    setBetaAccess(false);
+    setBetaAccessLoading(false);
+    setBootstrapKey('');
+    setSyncedSettings(null);
+    setSettingsSyncStatus('idle');
+    lastSyncedSettingsRef.current = null;
+    hasInitializedSettingsRef.current = false;
+  }, []);
+
   const value = useMemo<AuthContextValue>(() => ({
     status: !isLoaded || !isUserLoaded ? 'loading' : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
     settingsSyncStatus,
@@ -1678,33 +1687,41 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     signUpWithEmail: disabledAuthAction,
     signOutUser: async () => {
       setError(null);
+      resetClerkAccountState();
       try {
         await clerk.signOut();
       } catch (nextError) {
-        setError(nextError instanceof Error ? nextError.message : 'Unable to sign out right now.');
+        const message = nextError instanceof Error ? nextError.message : 'Unable to sign out right now.';
+        await refreshBetaAccess().catch(() => undefined);
+        setError(message);
         throw nextError;
       }
     },
     deleteAccount: async () => {
-      await deleteClerkUser();
-      setSyncedSettings(null);
-      setBetaAccess(false);
+      setError(null);
+      resetClerkAccountState();
+      try {
+        await deleteClerkUser();
+      } catch (nextError) {
+        const message = nextError instanceof Error ? nextError.message : 'Unable to delete your account right now.';
+        await refreshBetaAccess().catch(() => undefined);
+        setError(message);
+        throw nextError;
+      }
     },
     updateSyncedSettings,
     refreshBetaAccess,
-  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
+  }), [betaAccess, betaAccessLoading, clerk, currentUser, deleteClerkUser, error, isLoaded, isSignedIn, isUserLoaded, refreshBetaAccess, resetClerkAccountState, settingsSyncStatus, syncedSettings, updateSyncedSettings]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  readLocalTestAccount()
-    ? <LocalAuthContextProvider>{children}</LocalAuthContextProvider>
-    : isBetaClerkD1Mode()
-      ? <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>
-      : <HostedAuthContextProvider>{children}</HostedAuthContextProvider>
-);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (readLocalTestAccount()) return <LocalAuthContextProvider>{children}</LocalAuthContextProvider>;
+  if (isBetaClerkD1Mode()) return <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>;
+  return <HostedAuthContextProvider>{children}</HostedAuthContextProvider>;
+};
 
 /** Reads the current hosted-auth state and actions for the app. */
 export const useAuth = (): AuthContextValue => {

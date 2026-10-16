@@ -214,8 +214,8 @@ export const listWorkflowAwareness = async ({
   if (!isCurrentAwarenessConsent(consent)) return [];
   if (isBetaClerkD1Mode()) {
     const response = await fetchBetaApi('/api/workflow-awareness');
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || 'Unable to load workflow awareness.');
+    const body = (await response.json().catch(() => ({}))) ?? {};
+    if (!response.ok) throw new Error(body?.error || 'Unable to load workflow awareness.');
     return (Array.isArray(body.records) ? body.records : []).map((record: unknown) => {
       if (typeof record !== 'object' || record === null || Array.isArray(record)) return record;
       const envelope = record as Partial<WorkflowAwarenessDocument>;
