@@ -105,12 +105,19 @@ class D1Mock {
       return { bytes: [...this.cloudCycles.values()].reduce((sum, row) => sum + (row.payload_bytes || 0), 0) };
     }
     if (sql.startsWith('SELECT status FROM stripe_events')) {
-      const status = this.stripeEvents.get(params[0]);
-      return status ? { status } : null;
+      const row = this.stripeEvents.get(params[0]);
+      return row ? { status: row.status } : null;
+    }
+    if (sql.startsWith('SELECT status, processed_at FROM stripe_events')) {
+      const row = this.stripeEvents.get(params[0]);
+      return row ? { ...row } : null;
     }
     return null;
   }
   async all(sql, params) {
+    if (sql.startsWith('SELECT slot_id FROM custom_products WHERE user_id = ?')) {
+      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map((row) => ({ slot_id: row.slot_id })) };
+    }
     if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records')) {
       const [, userId, type] = [null, params[0], params[1]];
       return { results: [...this.records.values()].filter((record) => record.user_id === userId && record.record_type === type) };
@@ -203,11 +210,16 @@ class D1Mock {
     } else if (sql.startsWith('INSERT OR IGNORE INTO stripe_events')) {
       const [eventId, processedAt, status] = params;
       if (this.stripeEvents.has(eventId)) return { meta: { changes: 0 } };
-      this.stripeEvents.set(eventId, status);
+      this.stripeEvents.set(eventId, { status, processed_at: processedAt });
       return { meta: { changes: 1 }, processed_at: processedAt };
+    } else if (sql.startsWith('UPDATE stripe_events SET processed_at')) {
+      const [processedAt, eventId, status, priorTimestamp] = params;
+      const row = this.stripeEvents.get(eventId);
+      if (row?.status === status && row.processed_at === priorTimestamp) row.processed_at = processedAt;
+      else changes = 0;
     } else if (sql.startsWith('UPDATE stripe_events SET status')) {
-      const [status, , eventId] = params;
-      if (this.stripeEvents.has(eventId)) this.stripeEvents.set(eventId, status);
+      const [status, processed_at, eventId] = params;
+      if (this.stripeEvents.has(eventId)) this.stripeEvents.set(eventId, { status, processed_at });
     } else if (sql.startsWith('DELETE FROM stripe_events')) {
       this.stripeEvents.delete(params[0]);
     } else if (sql.startsWith('INSERT OR IGNORE INTO product_metric_events') || sql.startsWith('INSERT INTO product_metric_events')) {
@@ -463,12 +475,35 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
     assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
-    assert.deepEqual(db.batchSizes, [50, 50, 26]);
+      assert.deepEqual(db.batchSizes, [126]);
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });
     assert.equal(overQuota.status, 409);
   });
+});
+
+test('snapshot migration allocates products around products already created in D1', async () => {
+  const db = new D1Mock();
+  db.users.set('user_beta_test', {
+    clerk_id: 'user_beta_test', email: 'test@example.com', legacy_uid: null, display_name: 'Beta Tester',
+    beta_access: 1, migration_status: 'no_match', created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  });
+  db.customProducts.set('user_beta_test:product-01', {
+    user_id: 'user_beta_test', slot_id: 'product-01', product_id: 'created-before-migration',
+    data_json: JSON.stringify({ id: 'created-before-migration', version: 1 }),
+  });
+  const env = createEnv(db, {
+    uid: 'firebase_old_uid', userProfile: { email: 'test@example.com', betaAccess: true },
+    userSettings: {}, cloudCycles: [], workflowAwareness: [],
+    customProducts: [{ id: 'snapshot-product', data: { id: 'snapshot-product', version: 1 } }],
+  });
+
+  const response = await withClerkFetch(() => call('/api/me/bootstrap', env));
+  assert.equal(response.status, 200);
+  assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
+  assert.equal(db.customProducts.has('user_beta_test:product-02'), true);
+  assert.equal([...db.customProducts.values()].find((row) => row.product_id === 'snapshot-product')?.slot_id, 'product-02');
 });
 
 test('cloud cycle writes reject malformed payloads and preserve ownership and timestamps', async () => {
@@ -788,6 +823,23 @@ test('Stripe webhook verifies any valid v1 signature and ignores duplicate event
   const duplicate = await send();
   assert.equal(duplicate.status, 200);
   assert.deepEqual(await duplicate.json(), { received: true, duplicate: true });
+});
+
+test('Stripe webhook recovers a stale processing claim and processes the delivery', async () => {
+  const db = new D1Mock();
+  db.stripeEvents.set('evt_stale_claim', { status: 'processing', processed_at: new Date(Date.now() - 11 * 60 * 1000).toISOString() });
+  const env = { ...createEnv(db), STRIPE_WEBHOOK_SECRET: 'whsec_beta_test' };
+  const raw = JSON.stringify({ id: 'evt_stale_claim', type: 'customer.updated', data: { object: {} } });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', env.STRIPE_WEBHOOK_SECRET).update(`${timestamp}.${raw}`).digest('hex');
+
+  const response = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+    method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+  }), env);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { received: true });
+  assert.equal(db.stripeEvents.get('evt_stale_claim').status, 'completed');
 });
 
 test('Stripe subscription events remain retryable until the Clerk user exists', async () => {

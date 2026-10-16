@@ -44,7 +44,11 @@ const waitForTokenProvider = (timeoutMs = 5_000): Promise<BetaApiTokenProvider> 
 export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const provider = tokenProvider ?? await waitForTokenProvider();
-  const token = await provider();
+  let token = await provider();
+  for (let attempt = 0; !token && attempt < 20; attempt += 1) {
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+    token = await provider();
+  }
   if (!token) throw new Error(SESSION_SIGNED_OUT_ERROR);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);

@@ -1723,7 +1723,9 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    status: !isLoaded || !isUserLoaded ? 'loading' : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
+    status: !isLoaded || !isUserLoaded ? 'loading'
+      : error && isSignedIn && !hasInitializedSettingsRef.current ? 'error'
+        : isSignedIn && currentUser ? 'signed_in' : 'signed_out',
     settingsSyncStatus,
     user: currentUser,
     authProvider: 'clerk',

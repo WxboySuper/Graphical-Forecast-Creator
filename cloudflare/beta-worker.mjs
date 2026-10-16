@@ -184,20 +184,26 @@ async function ensureUser(user, env) {
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO workflow_awareness (user_id, cycle_id, data_json) VALUES (?, ?, ?)')
           .bind(user.clerkId, record.id, JSON.stringify(record.data)));
       }
+      const occupiedProductSlots = new Set(((await env.DB.prepare('SELECT slot_id FROM custom_products WHERE user_id = ?')
+        .bind(user.clerkId).all()).results || []).map((row) => row.slot_id));
       for (const [index, product] of (snapshot.customProducts || []).entries()) {
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
         migratedProduct.id = productId;
-        const slotId = index < MAX_CUSTOM_PRODUCTS ? `product-${String(index + 1).padStart(2, '0')}` : `legacy-${index + 1}`;
+        let slotId = Array.from({ length: MAX_CUSTOM_PRODUCTS }, (_, slotIndex) => `product-${String(slotIndex + 1).padStart(2, '0')}`)
+          .find((candidate) => !occupiedProductSlots.has(candidate));
+        if (!slotId) {
+          slotId = `legacy-${index + 1}`;
+          while (occupiedProductSlots.has(slotId)) slotId = `legacy-migrated-${index + 1}-${occupiedProductSlots.size + 1}`;
+        }
+        occupiedProductSlots.add(slotId);
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json) VALUES (?, ?, ?, ?)')
           .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
       }
       statements.push(env.DB.prepare('UPDATE users SET migration_status = ?, migrated_at = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('complete', now, now, user.clerkId));
-      for (let offset = 0; offset < statements.length; offset += 50) {
-        await env.DB.batch(statements.slice(offset, offset + 50));
-      }
+      await env.DB.batch(statements);
     } catch (error) {
       await env.DB.prepare('UPDATE users SET migration_status = ?, updated_at = ? WHERE clerk_id = ?')
         .bind('failed', new Date().toISOString(), user.clerkId).run();
@@ -319,10 +325,17 @@ async function handleApi(request, env) {
     const claim = await env.DB.prepare('INSERT OR IGNORE INTO stripe_events (event_id, processed_at, status) VALUES (?, ?, ?)')
       .bind(event.id, new Date().toISOString(), 'processing').run();
     if (claim.meta.changes === 0) {
-      const priorEvent = await env.DB.prepare('SELECT status FROM stripe_events WHERE event_id = ?').bind(event.id).first();
-      return priorEvent?.status === 'completed'
-        ? json({ received: true, duplicate: true })
-        : json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
+      const priorEvent = await env.DB.prepare('SELECT status, processed_at FROM stripe_events WHERE event_id = ?').bind(event.id).first();
+      if (priorEvent?.status === 'completed') return json({ received: true, duplicate: true });
+      const claimAge = Date.now() - Date.parse(priorEvent?.processed_at || '');
+      if (priorEvent?.status === 'processing' && claimAge > 10 * 60 * 1000) {
+        const refreshed = await env.DB.prepare(`UPDATE stripe_events SET processed_at = ?
+          WHERE event_id = ? AND status = ? AND processed_at = ?`)
+          .bind(new Date().toISOString(), event.id, 'processing', priorEvent.processed_at).run();
+        if (!refreshed.meta.changes) return json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
+      } else {
+        return json({ received: false, error: 'Webhook delivery is already being processed.' }, 503);
+      }
     }
     try {
     let subscription = object;
@@ -713,7 +726,7 @@ async function handleApi(request, env) {
     const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
     if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
     if (request.method === 'GET' && !recordId) {
-      const rows = await env.DB.prepare('SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC LIMIT 200')
+      const rows = await env.DB.prepare(`SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC LIMIT ${MAX_USER_RECORDS}`)
         .bind(user.clerk_id, recordType).all();
       return json({ records: (rows.results || []).map((row) => ({ id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at })) });
     }
