@@ -446,6 +446,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
+          EXPECTED_BETA_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
         run: |
           set -euo pipefail
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
@@ -472,7 +473,8 @@ jobs:
             import readline from 'node:readline';
             import { createReadStream } from 'node:fs';
             const manifest = JSON.parse(fs.readFileSync('beta-firestore-manifest.json', 'utf8'));
-            if (manifest.complete !== true || manifest.skippedNoEmailCount !== 0 || manifest.malformedLegacyCycleCount !== 0
+            if (!process.env.EXPECTED_BETA_FIREBASE_PROJECT_ID || manifest.projectId !== process.env.EXPECTED_BETA_FIREBASE_PROJECT_ID
+              || manifest.complete !== true || manifest.skippedNoEmailCount !== 0 || manifest.malformedLegacyCycleCount !== 0
               || !Array.isArray(manifest.accountFailures) || manifest.accountFailures.length !== 0
               || !Number.isInteger(manifest.fullSnapshotCount) || manifest.fullSnapshotCount < 1
               || !Number.isInteger(manifest.userSnapshotCount) || manifest.userSnapshotCount < 1
@@ -507,7 +509,7 @@ jobs:
                 attempt=$((attempt + 1))
               done
               test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
-              node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json"
+              node -e 'const fs=require("node:fs"), crypto=require("node:crypto"); const snapshot=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); const email=typeof snapshot.email==="string"?snapshot.email.trim().toLowerCase():""; if (!email || !snapshot.uid || !snapshot.userProfile || crypto.createHash("sha256").update(email).digest("hex")!==process.argv[2]) process.exit(1)' "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" "$EMAIL_HASH"
             ' _ '{}' < beta-firestore-email-hashes.txt
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc

@@ -23,6 +23,8 @@ const normalizeBetaPeriodEnd = (value: unknown): Date | null => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const hasInvalidBetaPeriodEnd = (value: unknown): boolean => value !== null && value !== undefined && normalizeBetaPeriodEnd(value) === null;
+
 interface BillingConfig {
   billingEnabled: boolean;
   checkoutEnabled: boolean;
@@ -338,6 +340,12 @@ const resolveEntitlementEffect = (
     return null;
   }
 
+  if (args.status === 'error' && args.user) {
+    handlers.setEntitlementStatus('error');
+    handlers.setError('Unable to verify your signed-in account. Try again.');
+    return null;
+  }
+
   if (isSignedOutEntitlementState(args.status, args.user)) {
     applySignedOutEntitlementState(handlers.setEntitlement, handlers.setEntitlementStatus, handlers.setError);
     return null;
@@ -360,6 +368,7 @@ const resolveEntitlementEffect = (
         if (!active) return;
         const raw = body?.entitlement ?? null;
         const rawEnd = raw?.currentPeriodEnd;
+        if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
         const rawValues = { ...(raw ?? {}) };
         delete rawValues.currentPeriodEnd;
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
@@ -372,7 +381,7 @@ const resolveEntitlementEffect = (
       } catch (nextError) {
         if (!active) return;
         const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
-        if (isBetaSessionInitializing(message) && attempts < 20) {
+        if (isBetaSessionInitializing(message) && attempts < 4) {
           attempts += 1;
           retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
           return;

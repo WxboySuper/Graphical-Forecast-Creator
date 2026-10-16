@@ -15,7 +15,7 @@ const MAX_MIGRATION_BYTES = 20_000_000;
 const MAX_PRODUCT_METRIC_DAILY_EVENTS = 500;
 export { MAX_PRODUCT_METRIC_DAILY_EVENTS };
 const MAX_SENTRY_ENVELOPE_BYTES = 100 * 1024;
-const AUTH_PROFILE_CACHE_TTL_MS = 30_000;
+const AUTH_PROFILE_CACHE_TTL_MS = 5_000;
 const AUTH_PROFILE_CACHE_MAX = 1_000;
 const DEFAULT_MONTHLY_DISPLAY_PRICE = '$3/month';
 const DEFAULT_ANNUAL_DISPLAY_PRICE = '$30/year';
@@ -221,16 +221,19 @@ function appendSnapshotWorkflows(workflowAwareness, user, env, statements, accou
 }
 
 async function appendSnapshotProducts(customProducts, user, env, statements, accountForMigrationBytes) {
-      const existingProducts = ((await env.DB.prepare('SELECT slot_id, product_id FROM custom_products WHERE user_id = ?')
+      const existingProducts = ((await env.DB.prepare('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')
         .bind(user.clerkId).all()).results || []);
       const occupiedProductSlots = new Set(existingProducts.map((row) => row.slot_id));
-      const existingProductIds = new Set(existingProducts.map((row) => row.product_id));
+      const existingProductIds = new Map(existingProducts.map((row) => [row.product_id, row.migration_import === 1]));
       for (const [index, product] of customProducts.entries()) {
         if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
         const migratedProduct = { ...(product.data || {}), userId: user.clerkId };
         const productId = typeof migratedProduct.id === 'string' && migratedProduct.id ? migratedProduct.id : product.id;
         if (typeof productId !== 'string' || !productId || productId.length > 128 || productId.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
-        if (existingProductIds.has(productId)) continue;
+        if (existingProductIds.has(productId)) {
+          if (existingProductIds.get(productId)) continue;
+          throw new Error('SNAPSHOT_PRODUCT_ID_CONFLICT');
+        }
         migratedProduct.id = productId;
         if (migratedProduct.builtIn === true) throw new Error('SNAPSHOT_PRODUCT_INVALID');
         migratedProduct.version = 1;
@@ -248,7 +251,7 @@ async function appendSnapshotProducts(customProducts, user, env, statements, acc
           }
         }
         occupiedProductSlots.add(slotId);
-        existingProductIds.add(productId);
+        existingProductIds.set(productId, true);
         statements.push(env.DB.prepare('INSERT OR IGNORE INTO custom_products (user_id, slot_id, product_id, data_json, migration_import) VALUES (?, ?, ?, ?, 1)')
           .bind(user.clerkId, slotId, productId, JSON.stringify(migratedProduct)));
       }
@@ -434,7 +437,7 @@ async function refreshMigratedStripeEntitlement(env, userId) {
     } else {
       subscriptions = [];
     }
-    const subscription = subscriptions.find((item) => item.customer === entitlement.stripeCustomerId
+    const subscription = subscriptions.find((item) => (!entitlement.stripeCustomerId || item.customer === entitlement.stripeCustomerId)
       && (!entitlement.stripeSubscriptionId || item.id === entitlement.stripeSubscriptionId)) || null;
     const status = subscription?.status || 'inactive';
     const active = ['active', 'trialing'].includes(status);
@@ -707,6 +710,7 @@ async function handleCloudCycleRoutes(request, env, url, path, user) {
         user.clerk_id, id, user.clerk_id, MAX_CLOUD_CYCLES).run();
     } catch (error) {
       if (String(error?.message || '').includes('cloud_cycle_quota_reached')) return json({ error: 'Cloud storage quota reached.' }, 409);
+      if (String(error?.message || '').includes('cloud_cycle_too_large') || String(error?.message || '').includes('CHECK constraint failed')) return json({ error: 'Cloud cycle is too large.' }, 413);
       throw error;
     }
     if (!saveResult.meta.changes) {
@@ -861,7 +865,9 @@ async function handleCustomProductRoutes(request, env, url, path, user) {
     if (request.method === 'DELETE') {
       const headerVersions = [...(ifMatch || '').matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
       let expectedVersion;
-      if (ifMatch) {
+      if (ifMatch === '*') {
+        expectedVersion = current.version;
+      } else if (ifMatch) {
         expectedVersion = headerVersions.includes(current.version) ? current.version : NaN;
       } else {
         expectedVersion = body?.expectedVersion;
@@ -993,14 +999,13 @@ async function handleStripeWebhook(request, env) {
           billingStatements.push(env.DB.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
             .bind(`stripe:${event.id}:cancellation`, eventDate, event.id, 'cancellations', owner.clerk_id));
         }
-        if (billingStatements.length > 1) {
-          try { await env.DB.batch(billingStatements.slice(1)); }
-          catch (error) {
-            if (!String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
-            console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
-          }
+        try {
+          await env.DB.batch(billingStatements);
+        } catch (error) {
+          if (billingStatements.length < 2 || !String(error?.message || '').includes('product_metric_daily_quota_reached')) throw error;
+          console.warn('[beta-worker] Stripe billing metric dropped by daily quota', event.id);
+          await env.DB.batch(billingStatements.slice(0, 1));
         }
-        await env.DB.batch(billingStatements.slice(0, 1));
       } else {
         if (!clerkId && !legacyUid) {
           await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
@@ -1241,6 +1246,8 @@ export default {
 };
 
 async function readLimitedBody(request, limit) {
+  const contentLength = Number(request.headers.get('Content-Length'));
+  if (Number.isFinite(contentLength) && contentLength > limit) return null;
   if (!request.body) return new Uint8Array();
   const reader = request.body.getReader();
   const chunks = [];

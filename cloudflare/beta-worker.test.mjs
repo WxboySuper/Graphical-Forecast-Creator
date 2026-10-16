@@ -47,7 +47,17 @@ class D1Mock {
   prepare(sql) { return new D1Statement(this, sql); }
   async batch(statements) {
     this.batchSizes.push(statements.length);
-    return Promise.all(statements.map((statement) => statement.run()));
+    const state = Object.fromEntries(['users', 'settings', 'records', 'entitlements', 'metrics', 'cloudCycles', 'workflowAwareness', 'customProducts', 'stripeEvents', 'billingCleanupQueue'].map((key) => [key, new Map(this[key])]));
+    const metricEvents = new Set(this.metricEvents);
+    try {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    } catch (error) {
+      for (const [key, value] of Object.entries(state)) this[key] = value;
+      this.metricEvents = metricEvents;
+      throw error;
+    }
   }
   async first(sql, params) {
     if (sql.startsWith('SELECT * FROM users WHERE clerk_id')) return this.users.get(params[0]) || null;
@@ -111,8 +121,8 @@ class D1Mock {
       date: new Date().toISOString().slice(0, 10), activeDevices: 1, activeSignedInAccounts: 1,
       signups: 1, signIns: 2, upgrades: 0, cancellations: 0, cloudSaves: 0, cloudLoads: 0,
     }] };
-    if (sql.startsWith('SELECT slot_id, product_id FROM custom_products WHERE user_id = ?')) {
-      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map(({ slot_id, product_id }) => ({ slot_id, product_id })) };
+    if (sql.startsWith('SELECT slot_id, product_id, migration_import FROM custom_products WHERE user_id = ?')) {
+      return { results: [...this.customProducts.values()].filter((row) => row.user_id === params[0]).map(({ slot_id, product_id, migration_import }) => ({ slot_id, product_id, migration_import })) };
     }
     if (sql.startsWith('SELECT record_id, data_json, created_at, updated_at FROM user_records')) {
       const [, userId, type] = [null, params[0], params[1]];
@@ -195,7 +205,7 @@ class D1Mock {
         const previousMetadata = previous ? JSON.parse(previous.metadata_json || '{}') : {};
         if (previous && sql.includes('ON CONFLICT')) incomingMetadata.createdAt = previousMetadata.createdAt;
         this.cloudCycles.set(key, { id, user_id, label, cycle_date, metadata_json: JSON.stringify(incomingMetadata), payload_json, payload_bytes,
-          migration_import: sql.includes('migration_import') ? 1 : previous?.migration_import || 0,
+          migration_import: sql.startsWith('INSERT OR IGNORE INTO cloud_cycles') ? 1 : previous?.migration_import || 0,
           created_at: previous?.created_at || created_at, updated_at });
       }
     } else if (sql.startsWith('UPDATE cloud_cycles SET label')) {

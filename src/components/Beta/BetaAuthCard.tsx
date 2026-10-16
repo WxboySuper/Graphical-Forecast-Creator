@@ -308,9 +308,9 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
               </Button>
             </div>
           ) : null}
-          {clerkVerificationInProgress ? (
+          {clerkRoutingInProgress ? (
             <div className="text-sm text-muted-foreground">
-              <p role="status">Finish verification before switching account actions.</p>
+              <p role="status">{clerkVerificationInProgress ? 'Finish verification before switching account actions.' : 'A sign-in route is still active.'}</p>
               <Button type="button" variant="outline" onClick={restartClerkVerification}>Restart sign-in</Button>
             </div>
           ) : null}

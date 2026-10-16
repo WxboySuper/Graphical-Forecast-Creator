@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS cloud_cycles (
   PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS cloud_cycles_user_updated_idx ON cloud_cycles(user_id, updated_at DESC);
+CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_payload_insert_limit
+BEFORE INSERT ON cloud_cycles
+WHEN NEW.payload_bytes > 750000
+BEGIN
+  SELECT RAISE(ABORT, 'cloud_cycle_too_large');
+END;
 -- Keep this quota synchronized with MAX_CLOUD_CYCLES in cloudflare/beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_cloud_cycle_user_limit
 BEFORE INSERT ON cloud_cycles
@@ -131,7 +137,8 @@ CREATE INDEX IF NOT EXISTS product_metric_events_reporting_idx ON product_metric
 -- Keep this quota synchronized with MAX_PRODUCT_METRIC_DAILY_EVENTS in beta-worker.mjs.
 CREATE TRIGGER IF NOT EXISTS enforce_product_metric_daily_user_limit
 BEFORE INSERT ON product_metric_events
-WHEN (SELECT COUNT(*) FROM product_metric_events WHERE user_id = NEW.user_id AND event_date = NEW.event_date) >= 500
+WHEN NEW.event_type NOT IN ('upgrades', 'cancellations')
+  AND (SELECT COUNT(*) FROM product_metric_events WHERE user_id = NEW.user_id AND event_date = NEW.event_date AND event_type NOT IN ('upgrades', 'cancellations')) >= 500
 BEGIN
   SELECT RAISE(ABORT, 'product_metric_daily_quota_reached');
 END;
