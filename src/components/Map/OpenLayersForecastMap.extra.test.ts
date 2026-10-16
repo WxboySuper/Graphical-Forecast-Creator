@@ -42,11 +42,11 @@ describe('OpenLayersForecastMap additional helpers', () => {
     global.fetch = originalFetch;
   });
 
-  test('OpenStreetMap styles use full tiles and no separate label overlay', () => {
+  test('OpenStreetMap styles keep place labels above forecast fills', () => {
     const s1 = createLabelOverlaySource('osm');
     const s2 = createLabelOverlaySource('carto-dark');
-    expect(s1).toBeNull();
-    expect(s2).toBeNull();
+    expect(s1?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
+    expect(s2?.getUrls()?.[0]).toContain('World_Boundaries_and_Places');
     expect(createLabelOverlaySource('esri-satellite')).toBeTruthy();
     expect(createLabelOverlaySource('nonexistent' as never)).toBeNull();
   });

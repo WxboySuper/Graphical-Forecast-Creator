@@ -596,7 +596,6 @@ export const createLabelOverlaySource = (
     case "osm":
     case "carto-light":
     case "carto-dark":
-      return null;
     case "esri-satellite":
       return new XYZ({
         url: "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
