@@ -150,15 +150,12 @@ describe('BetaAuthCard', () => {
     expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
   });
 
-  test('allows recovery from a stale non-verification Clerk route', async () => {
+  test('keeps account mode controls available on normal Clerk routes', async () => {
     window.history.replaceState(null, '', '/beta#/forgot-password');
     (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
     render(<BetaAuthCard title="T" description="D" allowSignUp />);
 
-    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Restart sign-in' }));
-
-    await waitFor(() => expect(window.location.hash).toBe(''));
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Restart sign-in' })).not.toBeInTheDocument();
   });
 });

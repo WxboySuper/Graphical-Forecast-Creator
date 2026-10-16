@@ -6,15 +6,11 @@ import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
 import { BetaInfoCard } from './BetaPageLayout';
 
-const CLERK_ROUTING_SEGMENTS = new Set([
-  'sign-in', 'sign-up', 'forgot-password', 'reset-password', 'choose',
-  'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
-  'email-code', 'phone-code', 'sso-callback',
-]);
 const CLERK_VERIFICATION_SEGMENTS = new Set([
   'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
   'email-code', 'phone-code', 'sso-callback',
 ]);
+const CLERK_ROUTING_SEGMENTS = new Set(CLERK_VERIFICATION_SEGMENTS);
 
 type AuthMode = 'sign_in' | 'sign_up';
 

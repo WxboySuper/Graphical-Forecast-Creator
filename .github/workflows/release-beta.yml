@@ -544,7 +544,7 @@ jobs:
           echo "pnpm dlx wrangler@4.149.0 rollback --config $CONFIG"
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
             BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
-            echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
+            echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql --config $CONFIG && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
           fi
 
   # Clerk+D1 requests use the beta hostname's same-origin Worker API. Keep the
