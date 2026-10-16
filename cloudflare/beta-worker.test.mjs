@@ -364,18 +364,23 @@ test('cloud cycle quota check rejects writes at the limit', async () => {
   });
 });
 
-test('the D1 schema and capacity/merge SQL execute against SQLite', async () => {
+async function createD1SQLite() {
   const sqlite = new DatabaseSync(':memory:');
+  const [schema, workflowLimitMigration, cyclePayloadLimitMigration, workerSource] = await Promise.all([
+    readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'),
+    readFile(new URL('./migrations/0002_workflow_payload_limit.sql', import.meta.url), 'utf8'),
+    readFile(new URL('./migrations/0003_cloud_cycle_payload_bytes_limit.sql', import.meta.url), 'utf8'),
+    readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
+  ]);
+  sqlite.exec(schema);
+  sqlite.exec(workflowLimitMigration);
+  sqlite.exec(cyclePayloadLimitMigration);
+  return { sqlite, schema, workerSource };
+}
+
+test('the D1 schema and Worker quota constants agree in SQLite', async () => {
+  const { sqlite, schema, workerSource } = await createD1SQLite();
   try {
-    const [schema, payloadLimitMigration, cyclePayloadLimitMigration, workerSource] = await Promise.all([
-      readFile(new URL('./migrations/0001_beta_auth_data.sql', import.meta.url), 'utf8'),
-      readFile(new URL('./migrations/0002_workflow_payload_limit.sql', import.meta.url), 'utf8'),
-      readFile(new URL('./migrations/0003_cloud_cycle_payload_bytes_limit.sql', import.meta.url), 'utf8'),
-      readFile(new URL('./beta-worker.mjs', import.meta.url), 'utf8'),
-    ]);
-    sqlite.exec(schema);
-    sqlite.exec(payloadLimitMigration);
-    sqlite.exec(cyclePayloadLimitMigration);
     assert.equal(MAX_PRODUCT_METRIC_DAILY_EVENTS, 500);
     for (const [constant, limit] of [['MAX_CLOUD_CYCLES', 100], ['MAX_CUSTOM_PRODUCTS', 16], ['MAX_USER_RECORDS', 200], ['MAX_WORKFLOW_RECORDS', 200], ['MAX_PRODUCT_METRIC_DAILY_EVENTS', MAX_PRODUCT_METRIC_DAILY_EVENTS]]) {
       assert.match(workerSource, new RegExp(`const ${constant} = ${limit};`));
@@ -386,6 +391,12 @@ test('the D1 schema and capacity/merge SQL execute against SQLite', async () => 
       (SELECT 1 FROM user_metrics LIMIT 1) AS metrics, (SELECT 1 FROM cloud_cycles LIMIT 1) AS cloud_cycles,
       (SELECT 1 FROM workflow_awareness LIMIT 1) AS awareness, (SELECT 1 FROM custom_products LIMIT 1) AS products,
       (SELECT 1 FROM user_records LIMIT 1) AS records, (SELECT 1 FROM stripe_events LIMIT 1) AS stripe_events`).get());
+  } finally { sqlite.close(); }
+});
+
+test('D1 capacity and merge SQL execute against SQLite', async () => {
+  const { sqlite } = await createD1SQLite();
+  try {
     sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
       .run('user_sqlite', 'sqlite@example.com', '2026-10-15', '2026-10-15');
     const oversizedCyclePayload = 'x'.repeat(750_001);

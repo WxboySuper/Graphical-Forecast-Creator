@@ -86,18 +86,21 @@ function assertCycleObject(cycle) {
 }
 
 function assertCycleId(id) {
-  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
+  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
 }
 
 function readCycleLabels(cycle) {
   const label = typeof cycle.label === 'string' ? cycle.label.trim() : '';
   const cycleDate = typeof cycle.cycleDate === 'string' ? cycle.cycleDate : '';
-  if (!label || label.length > 200 || !cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
+  if (!label || label.length > 200) throw new Error('SNAPSHOT_CYCLE_INVALID');
+  if (!cycleDate || cycleDate.length > 32) throw new Error('SNAPSHOT_CYCLE_INVALID');
   return { label, cycleDate };
 }
 
 function assertCycleMetadata(metadata) {
-  if (metadata !== undefined && metadata !== null && !isObject(metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
+  if (metadata === undefined || metadata === null) return;
+  if (!isObject(metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
 }
 
 function serializeCyclePayload(payload) {
@@ -135,8 +138,10 @@ function appendSnapshotWorkflow(record, context) {
 }
 
 function validateWorkflowRecord(record) {
-  if (!isObject(record) || !isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
-  if (typeof record.id !== 'string' || !record.id || record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+  if (!isObject(record)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+  if (!isObject(record.data)) throw new Error('SNAPSHOT_WORKFLOW_INVALID');
+  if (typeof record.id !== 'string' || !record.id) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
+  if (record.id.length > 128 || record.id.includes('/')) throw new Error('SNAPSHOT_WORKFLOW_ID_INVALID');
 }
 
 function serializeWorkflowData(data) {
@@ -161,11 +166,14 @@ function normalizeSnapshotProduct(product, userId) {
 }
 
 function assertProductObject(product) {
-  if (!isObject(product) || (product.data !== undefined && product.data !== null && !isObject(product.data))) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  if (!isObject(product)) throw new Error('SNAPSHOT_PRODUCT_INVALID');
+  if (product.data === undefined || product.data === null) return;
+  if (!isObject(product.data)) throw new Error('SNAPSHOT_PRODUCT_INVALID');
 }
 
 function assertProductId(id) {
-  if (typeof id !== 'string' || !id || id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+  if (typeof id !== 'string' || !id) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
+  if (id.length > 128 || id.includes('/')) throw new Error('SNAPSHOT_PRODUCT_ID_INVALID');
 }
 
 function assertNotBuiltIn(product) {
@@ -317,18 +325,33 @@ async function updateClerkProfile(db, user) {
 }
 
 async function readUserSnapshot(env, email) {
-  if (!env.FIRESTORE_SNAPSHOT) {
-    const error = new Error('FIRESTORE_SNAPSHOT binding is not configured.');
-    error.code = 'SNAPSHOT_CONFIG_MISSING';
-    throw error;
-  }
+  requireSnapshotBinding(env);
   const object = await env.FIRESTORE_SNAPSHOT.get(await emailSnapshotKey(email));
   if (!object) return null;
-  let snapshot;
-  try { snapshot = await object.json(); } catch { throw new Error('SNAPSHOT_INVALID'); }
-  if (!isObject(snapshot)) throw new Error('SNAPSHOT_INVALID');
-  if (snapshot.userProfile !== undefined && snapshot.userProfile !== null && !isObject(snapshot.userProfile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
+  const snapshot = await parseSnapshotObject(object);
+  validateSnapshotProfile(snapshot);
   return snapshot;
+}
+
+function requireSnapshotBinding(env) {
+  if (env.FIRESTORE_SNAPSHOT) return;
+  const error = new Error('FIRESTORE_SNAPSHOT binding is not configured.');
+  error.code = 'SNAPSHOT_CONFIG_MISSING';
+  throw error;
+}
+
+async function parseSnapshotObject(object) {
+  try {
+    const snapshot = await object.json();
+    if (isObject(snapshot)) return snapshot;
+  } catch { /* handled as invalid snapshot below */ }
+  throw new Error('SNAPSHOT_INVALID');
+}
+
+function validateSnapshotProfile(snapshot) {
+  const profile = snapshot.userProfile;
+  if (profile === undefined || profile === null) return;
+  if (!isObject(profile)) throw new Error('SNAPSHOT_PROFILE_INVALID');
 }
 
 async function insertMigratingUser(db, user, snapshot, now) {

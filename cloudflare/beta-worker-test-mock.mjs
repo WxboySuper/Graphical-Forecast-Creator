@@ -92,7 +92,8 @@ class D1Mock {
   prepare(sql) { return new D1Statement(this, sql); }
   async batch(statements) {
     this.batchSizes.push(statements.length);
-    const state = Object.fromEntries(['users', 'settings', 'records', 'entitlements', 'metrics', 'cloudCycles', 'workflowAwareness', 'customProducts', 'stripeEvents', 'billingCleanupQueue'].map((key) => [key, new Map(this[key])]));
+    const state = Object.fromEntries(['users', 'settings', 'records', 'entitlements', 'metrics', 'cloudCycles', 'workflowAwareness', 'customProducts', 'stripeEvents', 'billingCleanupQueue']
+      .map((key) => [key, new Map([...this[key]].map(([id, value]) => [id, structuredClone(value)]))]));
     const metricEvents = new Set(this.metricEvents);
     try {
       const results = [];
@@ -152,6 +153,7 @@ class D1Mock {
     let changes = 1;
     if (sql.startsWith('INSERT INTO users')) {
       const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
+      if ([...this.users.values()].some((user) => user.email.toLowerCase() === String(email).toLowerCase() && user.clerk_id !== clerk_id)) throw new Error('UNIQUE constraint failed: users.email');
       this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
     } else if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
       const [updated_at, clerk_id] = params;
@@ -279,7 +281,8 @@ class D1Mock {
       this.customProducts.set(`${user_id}:${slotId}`, { user_id, slot_id: slotId, product_id, data_json });
     } else if (sql.startsWith('INSERT OR IGNORE INTO custom_products')) {
       const [user_id, slot_id, product_id, data_json] = params;
-       this.customProducts.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json, migration_import: 1 });
+      const duplicate = [...this.customProducts.values()].some((row) => row.user_id === user_id && (row.slot_id === slot_id || row.product_id === product_id));
+      if (!duplicate) this.customProducts.set(`${user_id}:${slot_id}`, { user_id, slot_id, product_id, data_json, migration_import: 1 });
     } else if (sql.startsWith('UPDATE custom_products SET data_json')) {
       const [data_json, user_id, slot_id, product_id, expectedVersion] = params;
       const row = this.customProducts.get(`${user_id}:${slot_id}`);

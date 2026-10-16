@@ -207,74 +207,73 @@ async function handleAuthenticatedApi(request, env, url, path, user) {
   return json({ error: 'Not found.' }, 404);
 }
 async function handleAccountBootstrapAndBilling({ request, env, path, user }) {
-  if (path === '/api/me/bootstrap' && request.method === 'GET') {
-    return json({ user: { id: user.clerk_id, email: user.email, displayName: user.display_name, betaAccess: Boolean(user.beta_access), migrationStatus: user.migration_status },
-      settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id),
-      entitlement: await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id),
-      metrics: await readJsonRecord(env.DB, 'user_metrics', user.clerk_id) });
-  }
+  if (path === '/api/me/bootstrap' && request.method === 'GET') return bootstrapAccount(env, user);
+  if (path === '/api/billing/checkout' && request.method === 'POST') return startBillingCheckout(request, env, user);
+  if (path === '/api/billing/portal' && request.method === 'POST') return openBillingPortal(env, user);
+  if (path === '/api/beta/claim' && request.method === 'POST') return claimBetaAccess(request, env, user);
+  return null;
+}
 
-  if (path === '/api/billing/checkout' && request.method === 'POST') {
-    if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
+async function bootstrapAccount(env, user) {
+  return json({
+    user: { id: user.clerk_id, email: user.email, displayName: user.display_name, betaAccess: Boolean(user.beta_access), migrationStatus: user.migration_status },
+    settings: await readJsonRecord(env.DB, 'user_settings', user.clerk_id),
+    entitlement: await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id),
+    metrics: await readJsonRecord(env.DB, 'user_metrics', user.clerk_id),
+  });
+}
+
+async function startBillingCheckout(request, env, user) {
+  if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const plan = body?.plan;
+  const price = ({ monthly: env.STRIPE_PRICE_MONTHLY, annual: env.STRIPE_PRICE_ANNUAL_STANDARD })[plan] || null;
+  if (!price) return json({ error: 'This billing plan is not available.' }, 400);
+  if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
+  const params = buildCheckoutParams(env, user, plan, price, entitlement);
+  let session;
+  try { session = await stripeRequest(env, 'checkout/sessions', params); }
+  catch { return json({ error: 'Unable to start checkout with Stripe.' }, 502); }
+  if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
+  return json({ url: session.url });
+}
+
+function buildCheckoutParams(env, user, plan, price, entitlement) {
+  return {
+    mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1',
+    success_url: `${env.PUBLIC_ORIGIN}/account?checkout=success`, cancel_url: `${env.PUBLIC_ORIGIN}/pricing?checkout=cancelled`,
+    ...(!entitlement.stripeCustomerId ? { customer_email: user.email } : {}),
+    client_reference_id: user.clerk_id,
+    'metadata[clerkId]': user.clerk_id, 'metadata[legacyUid]': user.legacy_uid || '', 'metadata[plan]': plan,
+    'subscription_data[metadata][clerkId]': user.clerk_id, 'subscription_data[metadata][legacyUid]': user.legacy_uid || '',
+    'subscription_data[metadata][plan]': plan,
+    ...(entitlement.stripeCustomerId ? { customer: entitlement.stripeCustomerId } : {}),
+  };
+}
+
+async function openBillingPortal(env, user) {
+  if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
+  if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
+  if (!entitlement?.stripeCustomerId) return json({ error: 'No billing account is associated with this user.' }, 400);
+  let portal;
+  try { portal = await stripeRequest(env, 'billing_portal/sessions', { customer: entitlement.stripeCustomerId, return_url: `${env.PUBLIC_ORIGIN}/account` }); }
+  catch { return json({ error: 'Unable to open the Stripe billing portal.' }, 502); }
+  if (typeof portal?.url !== 'string' || !portal.url) return json({ error: 'Stripe billing portal session did not include a URL.' }, 502);
+  return json({ url: portal.url });
+}
+
+async function claimBetaAccess(request, env, user) {
+  if (!user.beta_access && env.BETA_INVITE_TOKEN) {
     const body = await readBody(request);
     if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-    const plan = body?.plan;
-    let price = null;
-    if (plan === 'monthly') price = env.STRIPE_PRICE_MONTHLY;
-    else if (plan === 'annual') price = env.STRIPE_PRICE_ANNUAL_STANDARD;
-    if (!price) return json({ error: 'This billing plan is not available.' }, 400);
-    if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
-    const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id) || {};
-    const params = {
-      mode: 'subscription',
-      'line_items[0][price]': price,
-      'line_items[0][quantity]': '1',
-      success_url: `${env.PUBLIC_ORIGIN}/account?checkout=success`,
-      cancel_url: `${env.PUBLIC_ORIGIN}/pricing?checkout=cancelled`,
-      ...(!entitlement.stripeCustomerId ? { customer_email: user.email } : {}),
-      client_reference_id: user.clerk_id,
-      'metadata[clerkId]': user.clerk_id,
-      'metadata[legacyUid]': user.legacy_uid || '',
-      'metadata[plan]': plan,
-      'subscription_data[metadata][clerkId]': user.clerk_id,
-      'subscription_data[metadata][legacyUid]': user.legacy_uid || '',
-      'subscription_data[metadata][plan]': plan,
-      ...(entitlement.stripeCustomerId ? { customer: entitlement.stripeCustomerId } : {}),
-    };
-    let session;
-    try { session = await stripeRequest(env, 'checkout/sessions', params); }
-    catch { return json({ error: 'Unable to start checkout with Stripe.' }, 502); }
-    if (typeof session?.url !== 'string' || !session.url) return json({ error: 'Stripe checkout session did not include a URL.' }, 502);
-    return json({ url: session.url });
+    if (!body || !(await timingSafeStringEqual(body.token, env.BETA_INVITE_TOKEN)) || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
+    await env.DB.prepare('UPDATE users SET beta_access = 1, updated_at = ? WHERE clerk_id = ?').bind(new Date().toISOString(), user.clerk_id).run();
   }
-
-  if (path === '/api/billing/portal' && request.method === 'POST') {
-    if (!env.STRIPE_SECRET_KEY) return json({ error: 'Billing is not available on this deployment.' }, 503);
-    if (!env.PUBLIC_ORIGIN) return json({ error: 'Billing is not configured.' }, 503);
-    const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
-    if (!entitlement?.stripeCustomerId) return json({ error: 'No billing account is associated with this user.' }, 400);
-    let portal;
-    try {
-      portal = await stripeRequest(env, 'billing_portal/sessions', {
-        customer: entitlement.stripeCustomerId,
-        return_url: `${env.PUBLIC_ORIGIN}/account`,
-      });
-    } catch { return json({ error: 'Unable to open the Stripe billing portal.' }, 502); }
-    if (typeof portal?.url !== 'string' || !portal.url) return json({ error: 'Stripe billing portal session did not include a URL.' }, 502);
-    return json({ url: portal.url });
-  }
-
-  if (path === '/api/beta/claim' && request.method === 'POST') {
-    if (!user.beta_access && env.BETA_INVITE_TOKEN) {
-      const body = await readBody(request);
-      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      if (!body || !(await timingSafeStringEqual(body.token, env.BETA_INVITE_TOKEN)) || (env.BETA_INVITE_PATH && body.invitePath !== env.BETA_INVITE_PATH)) return json({ error: 'Invalid invite.' }, 403);
-      await env.DB.prepare('UPDATE users SET beta_access = 1, updated_at = ? WHERE clerk_id = ?').bind(new Date().toISOString(), user.clerk_id).run();
-    }
-    const updated = await env.DB.prepare('SELECT beta_access FROM users WHERE clerk_id = ?').bind(user.clerk_id).first();
-    return json({ betaAccess: Boolean(updated?.beta_access) });
-  }
-  return null;
+  const updated = await env.DB.prepare('SELECT beta_access FROM users WHERE clerk_id = ?').bind(user.clerk_id).first();
+  return json({ betaAccess: Boolean(updated?.beta_access) });
 }
 
 async function handleAccountSettingsAndMetrics({ request, env, url, path, user }) {
@@ -601,54 +600,62 @@ async function handleCustomProductRoutes(context) {
 
 async function handleUserRecordRoutes({ request, env, url, path, user }) {
   const recordRoute = path.match(/^\/api\/(forecasts|discussions|verifications)(?:\/([^/]+))?$/);
-  if (recordRoute) {
-    const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
-    const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
-    if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
-    if (request.method === 'GET' && !recordId) {
-      const page = Number(url.searchParams.get('page') || 0);
-      if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
-      const rows = await env.DB.prepare(`SELECT record_id, data_json, created_at, updated_at FROM user_records
-        WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC, record_id DESC LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
-        .bind(user.clerk_id, recordType, page * MAX_LIST_PAGE_SIZE).all();
-      const results = rows.results || [];
-      return json({ records: results.map((row) => ({ id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at })),
-        nextPage: results.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
-    }
-    if (request.method === 'PUT' && !recordId) {
-      const body = await readBody(request);
-      if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
-      const id = typeof body?.id === 'string' ? body.id.trim() : '';
-      if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
-      const dataJson = JSON.stringify(body.data);
-    if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
-      const now = new Date().toISOString();
-      let saveResult;
-      try {
-        saveResult = await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
-        SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?)
-          OR (SELECT COUNT(*) FROM user_records WHERE user_id = ? AND record_type = ?) < ?
-        ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
-          .bind(user.clerk_id, recordType, id, dataJson, now, now, user.clerk_id, recordType, id, user.clerk_id, recordType, MAX_USER_RECORDS).run();
-      } catch (error) {
-        if (String(error?.message || '').includes('user_record_quota_reached')) return json({ error: 'Record quota reached.' }, 409);
-        throw error;
-      }
-      if (!saveResult.meta.changes) return json({ error: 'Record quota reached.' }, 409);
-      return json({ success: true, id });
-    }
-    if (request.method === 'GET' && recordId) {
-      const row = await env.DB.prepare('SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?')
-        .bind(user.clerk_id, recordType, recordId).first();
-      return row ? json({ record: { id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at } }) : json({ error: 'Record not found.' }, 404);
-    }
-    if (request.method === 'DELETE' && recordId) {
-      await env.DB.prepare('DELETE FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?')
-        .bind(user.clerk_id, recordType, recordId).run();
-      return json({ success: true });
-    }
-  }
+  if (!recordRoute) return null;
+  const recordType = { forecasts: 'forecast', discussions: 'discussion', verifications: 'verification' }[recordRoute[1]];
+  const recordId = recordRoute[2] ? decodePathId(recordRoute[2]) : '';
+  if (recordId === null || recordId.includes('/')) return json({ error: 'Invalid record ID.' }, 400);
+  const context = { request, env, url, user, recordType, recordId };
+  if (request.method === 'GET' && !recordId) return listUserRecords(context);
+  if (request.method === 'PUT' && !recordId) return saveUserRecord(context);
+  if (request.method === 'GET' && recordId) return readUserRecord(context);
+  if (request.method === 'DELETE' && recordId) return deleteUserRecord(context);
   return null;
+}
+
+async function listUserRecords({ env, url, user, recordType }) {
+  const page = Number(url.searchParams.get('page') || 0);
+  if (!Number.isSafeInteger(page) || page < 0) return json({ error: 'Invalid page.' }, 400);
+  const rows = await env.DB.prepare(`SELECT record_id, data_json, created_at, updated_at FROM user_records
+    WHERE user_id = ? AND record_type = ? ORDER BY updated_at DESC, record_id DESC LIMIT ${MAX_LIST_PAGE_SIZE} OFFSET ?`)
+    .bind(user.clerk_id, recordType, page * MAX_LIST_PAGE_SIZE).all();
+  const results = rows.results || [];
+  return json({ records: results.map((row) => ({ id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at })),
+    nextPage: results.length === MAX_LIST_PAGE_SIZE ? page + 1 : null });
+}
+
+async function saveUserRecord({ request, env, user, recordType }) {
+  const body = await readBody(request);
+  if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
+  const id = typeof body?.id === 'string' ? body.id.trim() : '';
+  if (!id || id.length > 128 || id.includes('/') || !isObject(body?.data)) return json({ error: 'Invalid record.' }, 400);
+  const dataJson = JSON.stringify(body.data);
+  if (new TextEncoder().encode(dataJson).length > MAX_CYCLE_BYTES) return json({ error: 'Record is too large.' }, 413);
+  const now = new Date().toISOString();
+  let result;
+  try {
+    result = await env.DB.prepare(`INSERT INTO user_records (user_id, record_type, record_id, data_json, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?)
+        OR (SELECT COUNT(*) FROM user_records WHERE user_id = ? AND record_type = ?) < ?
+      ON CONFLICT(user_id, record_type, record_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+      .bind(user.clerk_id, recordType, id, dataJson, now, now, user.clerk_id, recordType, id, user.clerk_id, recordType, MAX_USER_RECORDS).run();
+  } catch (error) {
+    if (String(error?.message || '').includes('user_record_quota_reached')) return json({ error: 'Record quota reached.' }, 409);
+    throw error;
+  }
+  if (!result.meta.changes) return json({ error: 'Record quota reached.' }, 409);
+  return json({ success: true, id });
+}
+
+async function readUserRecord({ env, user, recordType, recordId }) {
+  const row = await env.DB.prepare('SELECT record_id, data_json, created_at, updated_at FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?')
+    .bind(user.clerk_id, recordType, recordId).first();
+  return row ? json({ record: { id: row.record_id, data: parseJson(row.data_json), createdAt: row.created_at, updatedAt: row.updated_at } }) : json({ error: 'Record not found.' }, 404);
+}
+
+async function deleteUserRecord({ env, user, recordType, recordId }) {
+  await env.DB.prepare('DELETE FROM user_records WHERE user_id = ? AND record_type = ? AND record_id = ?')
+    .bind(user.clerk_id, recordType, recordId).run();
+  return json({ success: true });
 }
 
 async function claimStripeEvent(db, eventId) {
