@@ -245,6 +245,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     const nextUrl = new URL(window.location.href);
     nextUrl.hash = '';
     window.history.replaceState(null, '', nextUrl.href);
+    setClerkRoutingInProgress(false);
     setClerkVerificationInProgress(false);
     setMode(nextUrl.searchParams.has('clerkSignUp') ? 'sign_up' : 'sign_in');
     try { window.dispatchEvent(new Event('hashchange')); } catch { /* Local state is already reset. */ }

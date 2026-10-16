@@ -1530,6 +1530,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     betaAccessRequestIdRef.current += 1;
     betaAccessAbortRef.current?.abort();
     settingsRequestIdRef.current += 1;
+    settingsWriteQueueRef.current = Promise.resolve();
     setSettingsSyncStatus('idle');
     lastSyncedSettingsRef.current = null;
     hasInitializedSettingsRef.current = false;
@@ -1790,6 +1791,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setBetaApiTokenProvider(null);
     betaAccessRequestIdRef.current += 1;
     settingsRequestIdRef.current += 1;
+    settingsWriteQueueRef.current = Promise.resolve();
     setBetaAccess(false);
     setBetaAccessLoading(false);
     setBootstrapKey('');

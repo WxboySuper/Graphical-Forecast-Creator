@@ -776,13 +776,20 @@ test('Stripe subscription events remain retryable until the Clerk user exists', 
     method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
   }), env));
   assert.equal(response.status, 503);
-  assert.equal(db.stripeEvents.has('evt_unprovisioned'), false);
+  assert.equal(db.stripeEvents.get('evt_unprovisioned').status, 'processing');
+  const earlyRetry = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
+    method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
+  }), env);
+  assert.equal(earlyRetry.status, 503);
 
   db.users.set('not-created-yet', { clerk_id: 'not-created-yet', email: 'beta@example.com', beta_access: 1 });
+  const claim = db.stripeEvents.get('evt_unprovisioned');
+  claim.processed_at = new Date(Date.now() - 11 * 60 * 1000).toISOString();
   const retry = await worker.fetch(new Request('https://beta.gfcweather.com/api/billing/webhook', {
     method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
   }), env);
   assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal(db.stripeEvents.get('evt_unprovisioned').status, 'completed');
   assert.equal(JSON.parse(db.entitlements.get('not-created-yet')).billingStatus, 'active');
 });
 
@@ -830,7 +837,7 @@ test('Stripe webhook retries when Clerk rejects a temporary or misconfigured loo
       method: 'POST', headers: { 'Stripe-Signature': `t=${timestamp},v1=${signature}` }, body: raw,
     }), env);
     assert.equal(response.status, 500);
-    assert.equal(env.DB.stripeEvents.has('evt_clerk_denied'), false);
+    assert.equal(env.DB.stripeEvents.get('evt_clerk_denied').status, 'processing');
   } finally { globalThis.fetch = originalFetch; }
 });
 

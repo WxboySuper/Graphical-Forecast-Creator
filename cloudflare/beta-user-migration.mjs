@@ -368,8 +368,9 @@ function validateSnapshotProfile(snapshot) {
 }
 
 async function insertMigratingUser(db, user, snapshot, now) {
-  await db.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
-    migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)`)
+  return db.prepare(`INSERT INTO users (clerk_id, email, legacy_uid, email_verified, display_name, beta_access,
+    migration_status, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)
+    ON CONFLICT DO NOTHING`)
     .bind(user.clerkId, user.email, snapshot?.uid || null, user.displayName, snapshot?.userProfile?.betaAccess === true ? 1 : 0,
       snapshot ? 'migrating' : 'no_match', now, now).run();
 }
@@ -381,17 +382,14 @@ async function updateMigratingUser(db, user, snapshot, now) {
 }
 
 async function insertOrUpdateMigratingUser(db, user, snapshot, now) {
-  try {
-    await insertMigratingUser(db, user, snapshot, now);
-  } catch (error) {
-    if (!String(error?.message || '').includes('UNIQUE constraint failed')) throw error;
-    const racedUser = await findClerkUser(db, user.clerkId);
-    if (!racedUser) {
-      await assertEmailAvailable(db, user);
-      throw error;
-    }
-    await updateMigratingUser(db, user, snapshot, now);
+  const result = await insertMigratingUser(db, user, snapshot, now);
+  if (result.meta.changes) return;
+  const racedUser = await findClerkUser(db, user.clerkId);
+  if (!racedUser) {
+    await assertEmailAvailable(db, user);
+    throw new Error('EMAIL_ALREADY_LINKED');
   }
+  await updateMigratingUser(db, user, snapshot, now);
 }
 
 export const createUserEnsurer = (refreshMigratedStripeEntitlement) => async (user, env) => {

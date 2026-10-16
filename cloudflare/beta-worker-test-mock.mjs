@@ -154,8 +154,13 @@ class D1Mock {
     let changes = 1;
     if (sql.startsWith('INSERT INTO users')) {
       const [clerk_id, email, legacy_uid, display_name, beta_access, migration_status, created_at, updated_at] = params;
-      if ([...this.users.values()].some((user) => user.email.toLowerCase() === String(email).toLowerCase() && user.clerk_id !== clerk_id)) throw new Error('UNIQUE constraint failed: users.email');
-      this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
+      const emailOwner = [...this.users.values()].find((user) => user.email.toLowerCase() === String(email).toLowerCase() && user.clerk_id !== clerk_id);
+      if (this.users.has(clerk_id) || emailOwner) {
+        if (!sql.includes('ON CONFLICT DO NOTHING')) throw new Error('UNIQUE constraint failed: users.email');
+        changes = 0;
+      } else {
+        this.users.set(clerk_id, { clerk_id, email, legacy_uid, email_verified: 1, display_name, beta_access, migration_status, created_at, updated_at });
+      }
     } else if (sql.startsWith("UPDATE users SET migration_status = 'migrating'")) {
       const [updated_at, clerk_id] = params;
       const user = this.users.get(clerk_id);

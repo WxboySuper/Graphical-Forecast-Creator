@@ -762,7 +762,6 @@ async function processStripeSubscriptionEvent(event, object, env) {
     if (clerkUser.status === 429 || clerkUser.status >= 500) throw new Error('Clerk user lookup is temporarily unavailable.');
     if (!clerkUser.ok) return json({ received: false, error: 'Clerk user lookup failed.' }, 500);
   }
-  await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
   return json({ received: false, error: 'Billing user is not provisioned yet.' }, 503);
 }
 
@@ -795,8 +794,7 @@ async function handleStripeWebhook(request, env) {
   try {
     const response = await processStripeSubscriptionEvent(event, object, env);
     if (response) {
-      if (response.status >= 400) await env.DB.prepare('DELETE FROM stripe_events WHERE event_id = ?').bind(event.id).run();
-      else await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
+      if (response.status < 500) await env.DB.prepare('UPDATE stripe_events SET status = ?, processed_at = ? WHERE event_id = ?')
           .bind('completed', new Date().toISOString(), event.id).run();
       return response;
     }
