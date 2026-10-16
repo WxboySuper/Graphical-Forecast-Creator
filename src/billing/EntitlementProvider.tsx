@@ -15,9 +15,16 @@ const readPeriodEndDate = (value: unknown): Date | null => {
 };
 
 const readPeriodEndTimestamp = (value: unknown): Date | null => {
-  if (typeof value !== 'object' || value === null || !('seconds' in value) || typeof value.seconds !== 'number') return null;
-  const nanos = 'nanoseconds' in value && typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
+  if (typeof value !== 'object' || value === null) return null;
+  if (!('seconds' in value)) return null;
+  if (typeof value.seconds !== 'number') return null;
+  const nanos = readPeriodEndNanoseconds(value);
   return new Date(value.seconds * 1000 + Math.trunc(nanos / 1_000_000));
+};
+
+const readPeriodEndNanoseconds = (value: object): number => {
+  if (!('nanoseconds' in value)) return 0;
+  return typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
 };
 
 const normalizeBetaPeriodEnd = (value: unknown): Date | null => {
@@ -323,9 +330,11 @@ const startBetaEntitlementSubscription = (
 
 const fetchBetaEntitlementState = async (): Promise<EntitlementListenerState> => {
   const response = await fetchBetaApi('/api/user/entitlement');
-  const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
-  if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
-  const raw = body?.entitlement ?? null;
+  const body = await readBetaEntitlementBody(response);
+  return normalizeBetaEntitlementState(body.entitlement);
+};
+
+const normalizeBetaEntitlementState = (raw: Record<string, unknown> | null): EntitlementListenerState => {
   const rawEnd = raw?.currentPeriodEnd;
   if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
   const rawValues = { ...(raw ?? {}) };
@@ -334,6 +343,12 @@ const fetchBetaEntitlementState = async (): Promise<EntitlementListenerState> =>
   const endDate = normalizeBetaPeriodEnd(rawEnd);
   if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
   return createEntitlementListenerState(normalized);
+};
+
+const readBetaEntitlementBody = async (response: Response): Promise<{ entitlement: Record<string, unknown> | null }> => {
+  const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
+  if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
+  return { entitlement: body?.entitlement ?? null };
 };
 
 const applyBetaEntitlementState = (state: EntitlementListenerState, handlers: EntitlementEffectHandlers): void => {

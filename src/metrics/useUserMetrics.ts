@@ -104,9 +104,16 @@ const isCurrentMetricsRequest = (active: boolean, requestId: number, currentRequ
   active && requestId === currentRequestId;
 
 const retryMetricsLoad = (message: string, attempts: number, schedule: () => void): boolean => {
-  if (!isBetaClerkD1Mode() || !isBetaSessionInitializing(message) || attempts >= 20) return false;
+  if (!isBetaClerkD1Mode()) return false;
+  if (!isBetaSessionInitializing(message)) return false;
+  if (attempts >= 20) return false;
   schedule();
   return true;
+};
+
+const canLoadUserMetrics = (): boolean => {
+  if (isBetaClerkD1Mode()) return true;
+  return isHostedAuthEnabled && Boolean(db);
 };
 
 const startUserMetricsRequest = (userId: string, handlers: MetricsStateHandlers, requestIdRef: React.MutableRefObject<number>) => {
@@ -154,7 +161,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if ((!isHostedAuthEnabled || !db) && !isBetaClerkD1Mode()) return resetUserMetrics({ setMetrics, setLoading, setError });
+    if (!canLoadUserMetrics()) return resetUserMetrics({ setMetrics, setLoading, setError });
     if (status === 'loading') {
       setLoading(true);
       return;

@@ -22,7 +22,7 @@ const FIRESTORE_VALUE_SERIALIZERS = new Map([
   [Bytes, (value) => ({ __type: 'bytes', base64: value.toBase64() })],
 ]);
 
-function assertSnapshotCollectionLimit(currentCount, pageCount, limit, collectionName, accountId) {
+function assertSnapshotCollectionLimit({ currentCount, pageCount, limit, collectionName, accountId }) {
   if (currentCount + pageCount > limit) {
     throw new Error(`Snapshot ${collectionName} limit exceeded for account hash ${sha256(accountId)}.`);
   }
@@ -162,8 +162,10 @@ function normalizeFirestoreTimestamp(value) {
 }
 
 async function readCloudCyclePage(account, cycleDocs, malformedLegacyCycles) {
-  assertSnapshotCollectionLimit(account.cloudCycles.length, cycleDocs.length,
-    MAX_SNAPSHOT_CYCLES, 'cycle', account.uid);
+  assertSnapshotCollectionLimit({
+    currentCount: account.cloudCycles.length, pageCount: cycleDocs.length,
+    limit: MAX_SNAPSHOT_CYCLES, collectionName: 'cycle', accountId: account.uid,
+  });
   const migratedCycles = [];
   for (let offset = 0; offset < cycleDocs.length; offset += 10) {
     const cycleBatch = cycleDocs.slice(offset, offset + 10);
@@ -308,13 +310,17 @@ async function main() {
 
     await Promise.all([
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('workflowAwareness'), (page) => {
-        assertSnapshotCollectionLimit(account.workflowAwareness.length, page.length,
-          MAX_SNAPSHOT_WORKFLOW_RECORDS, 'workflow record', account.uid);
+        assertSnapshotCollectionLimit({
+          currentCount: account.workflowAwareness.length, pageCount: page.length,
+          limit: MAX_SNAPSHOT_WORKFLOW_RECORDS, collectionName: 'workflow record', accountId: account.uid,
+        });
         account.workflowAwareness.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
       forEachDocumentPage(db.collection('users').doc(account.uid).collection('customProducts'), (page) => {
-        assertSnapshotCollectionLimit(account.customProducts.length, page.length,
-          MAX_SNAPSHOT_CUSTOM_PRODUCTS, 'custom product', account.uid);
+        assertSnapshotCollectionLimit({
+          currentCount: account.customProducts.length, pageCount: page.length,
+          limit: MAX_SNAPSHOT_CUSTOM_PRODUCTS, collectionName: 'custom product', accountId: account.uid,
+        });
         account.customProducts.push(...page.map((doc) => ({ id: doc.id, data: doc.data() })));
       }),
     ]);
