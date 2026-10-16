@@ -1,6 +1,7 @@
 import { createUserEnsurer, emailSnapshotKey } from './beta-user-migration.mjs';
 import { decodePathId, isObject, json, mapStripeInterval, normalizeEmail, parseJson, readBearer, readLimitedBody, timingSafeStringEqual, tokenCacheKey, verifyStripeSignature } from './beta-worker-utils.mjs';
 import { parseSentryDsn, parseSentryEnvelopeDsn } from './beta-sentry-utils.mjs';
+import { proxyFirebaseApi } from './beta-worker-routing.mjs';
 import { verifyToken } from '@clerk/backend';
 import { verifyWebhook } from '@clerk/backend/webhooks';
 
@@ -843,20 +844,25 @@ async function handleApi(request, env) {
   const identity = await authenticate(request, env);
   if (!identity) return json({ error: 'A verified Clerk session is required.' }, 401);
 
-  let user;
-  try { user = await ensureUser(identity, env); }
-  catch (error) {
-    if (error?.code === 'SNAPSHOT_CONFIG_MISSING') return json({ error: 'Beta snapshot storage is temporarily unavailable.' }, 503);
-    if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
-    if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
-      return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
-    }
-    if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
-    console.error('[beta-worker] migration failed', error);
-    return json({ error: 'Account data could not be migrated. Please retry later.' }, 503);
-  }
-
+  const user = await ensureUserForRequest(identity, env);
+  if (user instanceof Response) return user;
   return handleAuthenticatedApi(request, env, url, path, user);
+}
+
+async function ensureUserForRequest(identity, env) {
+  try { return await ensureUser(identity, env); }
+  catch (error) { return migrationErrorResponse(error); }
+}
+
+function migrationErrorResponse(error) {
+  if (error?.code === 'SNAPSHOT_CONFIG_MISSING') return json({ error: 'Beta snapshot storage is temporarily unavailable.' }, 503);
+  if (error?.message === 'EMAIL_ALREADY_LINKED') return json({ error: 'This email is already linked to another beta account.' }, 409);
+  if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
+    return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
+  }
+  if (/^SNAPSHOT_/.test(error?.message || '')) return json({ error: 'Your saved beta data could not be migrated automatically. The Firestore snapshot is retained; contact support before retrying.' }, 409);
+  console.error('[beta-worker] migration failed', error);
+  return json({ error: 'Account data could not be migrated. Please retry later.' }, 503);
 }
 
 const JSON_RECORD_TABLES = new Set(['user_settings', 'user_entitlements', 'user_metrics']);
@@ -913,63 +919,53 @@ async function deleteBetaUserData(userId, env) {
   await env.DB.batch(statements);
 }
 
+async function handleClerkWebhook(request, env) {
+  if (!env.CLERK_WEBHOOK_SIGNING_SECRET) return json({ error: 'Clerk webhook is not configured.' }, 503);
+  let event;
+  try { event = await verifyWebhook(request, { signingSecret: env.CLERK_WEBHOOK_SIGNING_SECRET }); }
+  catch (error) {
+    console.warn('[beta-worker] Clerk webhook signature rejected', error instanceof Error ? error.message : 'verification failed');
+    return json({ error: 'Invalid Clerk webhook signature.' }, 400);
+  }
+  if (event.type === 'user.deleted') return handleClerkUserDeleted(event.data?.id, env);
+  if (event.type === 'user.updated' && typeof event.data?.id === 'string') clearAuthProfileCache(event.data.id);
+  return json({ received: true });
+}
+
+async function handleClerkUserDeleted(userId, env) {
+  if (typeof userId !== 'string') return json({ received: true });
+  clearAuthProfileCache(userId);
+  if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
+  try { await deleteBetaUserData(userId, env); }
+  catch (error) {
+    console.error('[beta-worker] Clerk deletion cleanup failed', error instanceof Error ? error.message : 'cleanup failed');
+    return json({ error: 'Clerk account cleanup failed.' }, 500);
+  }
+  return json({ received: true });
+}
+
+function workerErrorResponse(error) {
+  console.error('[beta-worker] request failed', error);
+  if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
+  if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
+    return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
+  }
+  if (error?.name === 'AbortError' || error?.name === 'TimeoutError') return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
+  return json({ error: 'The beta API request failed.' }, 500);
+}
+
+async function handleBetaApiRequest(request, env, url) {
+  if (env.BETA_AUTH_BACKEND !== 'clerk-d1') return proxyFirebaseApi(request, url, env);
+  if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') return handleClerkWebhook(request, env);
+  try { return await handleApi(request, env); }
+  catch (error) { return workerErrorResponse(error); }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (!(url.pathname === API_PREFIX || url.pathname.startsWith(`${API_PREFIX}/`))) return env.ASSETS.fetch(request);
-    if (env.BETA_AUTH_BACKEND !== 'clerk-d1') {
-      const configuredOrigin = env.BETA_API_ORIGIN;
-      if (!configuredOrigin) return json({ error: 'The beta API origin is not configured.' }, 503);
-      let apiOrigin;
-      try { apiOrigin = new URL(configuredOrigin); } catch { return json({ error: 'The beta API origin is invalid.' }, 503); }
-      if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) return json({ error: 'The beta API origin must be an HTTPS URL.' }, 503);
-      apiOrigin.pathname = `${apiOrigin.pathname.replace(/\/$/, '')}${url.pathname}`;
-      apiOrigin.search = url.search;
-      apiOrigin.hash = '';
-      try {
-        const response = await fetch(new Request(apiOrigin, request), { cf: { cacheTtl: 0 } });
-        const headers = new Headers(response.headers);
-        headers.set('Cache-Control', 'no-store');
-        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-      } catch {
-        return json({ error: 'The beta API is temporarily unavailable.' }, 502);
-      }
-    }
-    if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
-      if (!env.CLERK_WEBHOOK_SIGNING_SECRET) return json({ error: 'Clerk webhook is not configured.' }, 503);
-      let event;
-      try {
-        event = await verifyWebhook(request, { signingSecret: env.CLERK_WEBHOOK_SIGNING_SECRET });
-      } catch (error) {
-        console.warn('[beta-worker] Clerk webhook signature rejected', error instanceof Error ? error.message : 'verification failed');
-        return json({ error: 'Invalid Clerk webhook signature.' }, 400);
-      }
-      if (event.type === 'user.deleted' && typeof event.data?.id === 'string') {
-        clearAuthProfileCache(event.data.id);
-        if (!env.DB) return json({ error: 'Beta database is unavailable.' }, 503);
-        try {
-          await deleteBetaUserData(event.data.id, env);
-        }
-        catch (error) {
-          console.error('[beta-worker] Clerk deletion cleanup failed', error instanceof Error ? error.message : 'cleanup failed');
-          return json({ error: 'Clerk account cleanup failed.' }, 500);
-        }
-      }
-      if (event.type === 'user.updated' && typeof event.data?.id === 'string') clearAuthProfileCache(event.data.id);
-      return json({ received: true });
-    }
-    try { return await handleApi(request, env); }
-    catch (error) {
-      console.error('[beta-worker] request failed', error);
-      if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
-      if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
-        return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
-      }
-      if (error?.name === 'AbortError' || error?.name === 'TimeoutError') {
-        return json({ error: 'The beta API request timed out while contacting a billing provider.' }, 504);
-      }
-      return json({ error: 'The beta API request failed.' }, 500);
-    }
+    return handleBetaApiRequest(request, env, url);
   },
   async scheduled(_controller, env) {
     try { await flushStripeCleanupQueue(env); }

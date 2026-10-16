@@ -38,6 +38,14 @@ const readBearer = (request) => {
   return value.startsWith('Bearer ') ? value.slice(7) : '';
 };
 async function verifyStripeSignature(payload, header, secret) {
+  const { timestamp, signatures } = parseStripeSignatureHeader(header);
+  if (!timestamp || signatures.length === 0) return false;
+  const expected = await createStripeSignature(payload, timestamp, secret);
+  return (await Promise.all(signatures.map((signature) => timingSafeStringEqual(expected, signature)))).some(Boolean)
+    && isFreshStripeTimestamp(timestamp);
+}
+
+function parseStripeSignatureHeader(header) {
   const parts = (header || '').split(',').map((part) => {
     const separator = part.indexOf('=');
     if (separator < 0) return ['', ''];
@@ -45,13 +53,19 @@ async function verifyStripeSignature(payload, header, secret) {
   });
   const timestamp = parts.find(([key]) => key === 't')?.[1];
   const signatures = parts.filter(([key, value]) => key === 'v1' && value).map(([, value]) => value);
-  if (!timestamp || signatures.length === 0 || !/^\d+$/.test(timestamp)) return false;
+  if (!/^\d+$/.test(timestamp || '')) return { timestamp: null, signatures: [] };
+  return { timestamp, signatures };
+}
+
+async function createStripeSignature(payload, timestamp, secret) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${payload}`));
-  const expected = Array.from(new Uint8Array(signed), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const valid = (await Promise.all(signatures.map((signature) => timingSafeStringEqual(expected, signature)))).some(Boolean);
+  return Array.from(new Uint8Array(signed), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function isFreshStripeTimestamp(timestamp) {
   const age = Date.now() / 1000 - Number(timestamp);
-  return valid && age >= 0 && age <= 300;
+  return age >= 0 && age <= 300;
 }
 
 async function readLimitedBody(request, limit) {
