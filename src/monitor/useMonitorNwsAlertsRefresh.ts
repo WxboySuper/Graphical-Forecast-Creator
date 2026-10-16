@@ -9,6 +9,8 @@ interface MonitorNwsAlertsRefreshOptions {
   animationSpeedMs: number;
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
+  /** Optional failure channel so background poll errors stay explicit instead of silent. */
+  onError?: (message: string | null) => void;
 }
 
 /** Polls animated NWS alerts without overlapping or stale requests. */
@@ -18,6 +20,7 @@ export const useMonitorNwsAlertsRefresh = ({
   animationSpeedMs,
   setRawFrames,
   setFetchedAt,
+  onError,
 }: MonitorNwsAlertsRefreshOptions) => {
   useEffect(() => {
     if (!enabled || !animationEnabled) {
@@ -34,8 +37,14 @@ export const useMonitorNwsAlertsRefresh = ({
           if (!active) return;
           setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
           setFetchedAt(new Date().toISOString());
+          onError?.(null);
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (!active) return;
+          // Keep existing frames but make the failure explicit: without this,
+          // the animation silently presents stale alert frames indefinitely.
+          onError?.('NWS alert refresh failed; showing last available data.');
+        })
         .finally(() => {
           requestInFlight = false;
         });
@@ -45,5 +54,5 @@ export const useMonitorNwsAlertsRefresh = ({
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [animationEnabled, animationSpeedMs, enabled, setFetchedAt, setRawFrames]);
+  }, [animationEnabled, animationSpeedMs, enabled, onError, setFetchedAt, setRawFrames]);
 };
