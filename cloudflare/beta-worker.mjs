@@ -51,7 +51,11 @@ async function authenticate(request, env) {
     const configuredParties = env.CLERK_AUTHORIZED_PARTIES || env.PUBLIC_ORIGIN || '';
     const parties = configuredParties
       .split(',').map((party) => party.trim()).filter(Boolean);
-    if (parties.length === 0) return null;
+    if (parties.length === 0) {
+      const error = new Error('Clerk authorized parties are not configured.');
+      error.code = 'CLERK_CONFIG_MISSING';
+      throw error;
+    }
     const verified = await verifyToken(token, {
       jwtKey: env.CLERK_JWT_KEY,
       authorizedParties: parties,
@@ -100,7 +104,7 @@ async function authenticate(request, env) {
     authProfileCache.set(cacheKey, { identity, expiresAt: now + AUTH_PROFILE_CACHE_TTL_MS });
     return identity;
   } catch (error) {
-    if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') throw error;
+    if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') throw error;
     console.warn('[beta-worker] Clerk token rejected', error instanceof Error ? error.message : 'verification failed');
     return null;
   }
@@ -210,7 +214,7 @@ async function ensureUser(user, env) {
       for (const cycle of cloudCycles) {
         if (typeof cycle.id !== 'string' || !cycle.id || cycle.id.length > 128 || cycle.id.includes('/')) throw new Error('SNAPSHOT_CYCLE_ID_INVALID');
         if (cycle.metadata !== undefined && cycle.metadata !== null && !isObject(cycle.metadata)) throw new Error('SNAPSHOT_CYCLE_METADATA_INVALID');
-        const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson == null ? '{}' : JSON.stringify(cycle.payloadJson);
+        const payloadJson = typeof cycle.payloadJson === 'string' ? cycle.payloadJson : cycle.payloadJson === null || cycle.payloadJson === undefined ? '{}' : JSON.stringify(cycle.payloadJson);
         const payloadBytes = new TextEncoder().encode(payloadJson).length;
         if (payloadBytes > MAX_CYCLE_BYTES) throw new Error('SNAPSHOT_CYCLE_TOO_LARGE');
         accountForMigrationBytes(payloadJson);
@@ -737,7 +741,7 @@ async function handleApi(request, env) {
   if (path === '/api/custom-products' && request.method === 'GET') {
     const result = await env.DB.prepare('SELECT data_json FROM custom_products WHERE user_id = ? ORDER BY slot_id')
       .bind(user.clerk_id).all();
-    return json({ products: (result.results || []).map((row) => parseJson(row.data_json)) });
+    return json({ products: (result.results || []).map((row) => parseJson(row.data_json)).filter(Boolean) });
   }
   if (path === '/api/custom-products' && request.method === 'POST') {
     const body = await readBody(request);
@@ -796,9 +800,12 @@ async function handleApi(request, env) {
     }
     if (request.method === 'DELETE') {
       const headerVersions = [...(ifMatch || '').matchAll(/(?:^|,\s*)(?:W\/)?"?(\d+)"?(?=\s*(?:,|$))/g)].map((match) => Number(match[1]));
-      const expectedVersion = ifMatch
-        ? headerVersions.includes(current.version) ? current.version : NaN
-        : body?.expectedVersion;
+      let expectedVersion;
+      if (ifMatch) {
+        expectedVersion = headerVersions.includes(current.version) ? current.version : NaN;
+      } else {
+        expectedVersion = body?.expectedVersion;
+      }
       if (!Number.isInteger(expectedVersion) || expectedVersion !== current.version) return json({ error: 'This product changed in another session. Refresh and try again.' }, 409);
       const result = await env.DB.prepare(`DELETE FROM custom_products WHERE user_id = ? AND slot_id = ? AND product_id = ?
         AND json_extract(data_json, '$.version') = ?`).bind(user.clerk_id, currentRow.slot_id, productId, expectedVersion).run();
@@ -970,7 +977,7 @@ export default {
     try { return await handleApi(request, env); }
     catch (error) {
       console.error('[beta-worker] request failed', error);
-      if (error?.code === 'CLERK_PROFILE_UNAVAILABLE') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
+      if (error?.code === 'CLERK_PROFILE_UNAVAILABLE' || error?.code === 'CLERK_CONFIG_MISSING') return json({ error: 'Authentication service is temporarily unavailable. Retry shortly.' }, 503);
       if (/^SNAPSHOT_(CYCLE|WORKFLOW|PRODUCT)_QUOTA_EXCEEDED$|^SNAPSHOT_MIGRATION_TOO_LARGE$/.test(error?.message || '')) {
         return json({ error: 'Your saved beta data exceeds the automatic migration limits. The Firestore snapshot is retained; contact support before retrying migration.' }, 409);
       }

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';
-import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from '../lib/betaApi';
 import { useAuth } from '../auth/AuthProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 
@@ -364,7 +364,7 @@ const resolveEntitlementEffect = (
         delete rawValues.currentPeriodEnd;
         const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
         const endDate = normalizeBetaPeriodEnd(rawEnd);
-        if (endDate) normalized.currentPeriodEnd = { toDate: () => endDate } as unknown as Timestamp;
+        if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
         const state = createEntitlementListenerState(normalized);
         handlers.setEntitlement(state.entitlement);
         handlers.setEntitlementStatus(state.status);
@@ -372,7 +372,7 @@ const resolveEntitlementEffect = (
       } catch (nextError) {
         if (!active) return;
         const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
-        if (message.includes('The beta session is still initializing') && attempts < 20) {
+        if (isBetaSessionInitializing(message) && attempts < 20) {
           attempts += 1;
           retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
           return;

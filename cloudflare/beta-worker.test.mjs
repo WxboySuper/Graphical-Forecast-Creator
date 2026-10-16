@@ -353,10 +353,12 @@ test('authentication rejects signed sessions when no authorized party is configu
   const env = createEnv();
   env.CLERK_AUTHORIZED_PARTIES = '';
   delete env.PUBLIC_ORIGIN;
-  const identity = await __test.authenticate(new Request('https://attacker.example/api/me/bootstrap', {
+  const request = new Request('https://attacker.example/api/me/bootstrap', {
     headers: { Authorization: `Bearer ${createToken()}` },
-  }), env);
-  assert.equal(identity, null);
+  });
+  await assert.rejects(__test.authenticate(request, env), { code: 'CLERK_CONFIG_MISSING' });
+  const response = await worker.fetch(request, env);
+  assert.equal(response.status, 503);
 });
 
 test('Clerk profile cache does not reuse identity across different session tokens', async () => {
@@ -453,7 +455,7 @@ test('email ownership conflicts return 409 without changing the existing account
   await withClerkFetch(async () => {
     const response = await call('/api/me/bootstrap', createEnv(db));
     assert.equal(response.status, 409);
-    assert.deepEqual(db.users.get('other_clerk_user'), { clerk_id: 'other_clerk_user', email: 'test@example.com', legacy_uid: 'legacy_owner' });
+    assert.deepStrictEqual(db.users.get('other_clerk_user'), { clerk_id: 'other_clerk_user', email: 'test@example.com', legacy_uid: 'legacy_owner' });
     assert.equal(db.users.has('user_beta_test'), false);
   });
 });

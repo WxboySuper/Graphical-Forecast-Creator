@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { doc, getDoc, type Timestamp } from 'firebase/firestore';
 import { db, isHostedAuthEnabled } from '../lib/firebase';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from '../lib/betaApi';
 
 export interface UserMetricsDocument {
   uid: string;
@@ -128,7 +128,7 @@ export const useUserMetrics = (): UseUserMetricsResult => {
       } catch (nextError) {
         if (!active || requestId !== requestIdRef.current) return;
         const message = nextError instanceof Error ? nextError.message : 'Unable to load account metrics.';
-        if (isBetaClerkD1Mode() && message.includes('The beta session is still initializing') && attempts < 20) {
+        if (isBetaClerkD1Mode() && isBetaSessionInitializing(message) && attempts < 20) {
           attempts += 1;
           retryTimer = window.setTimeout(() => { void loadMetrics(); }, 250);
           return;

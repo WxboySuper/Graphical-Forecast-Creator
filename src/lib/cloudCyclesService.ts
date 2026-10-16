@@ -620,7 +620,7 @@ export async function listCloudCycles(
       const body = (await response.json().catch(() => ({}))) ?? {};
       if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
       const cycles = (Array.isArray(body?.cycles) ? body.cycles : [])
-        .filter((raw: unknown) => isPlainObject(raw) && raw.userId === userId && typeof raw.id === 'string' && raw.id)
+        .filter((raw: unknown) => isPlainObject(raw) && (raw.userId ?? (isPlainObject(raw.metadata) ? raw.metadata.userId : undefined)) === userId && typeof raw.id === 'string' && raw.id)
         .map((raw: Record<string, unknown>) => isPlainObject(raw) && typeof raw.id === 'string' && raw.id
           ? normalizeCloudCycleMetadataRecord({ cycleId: raw.id, rawRecord: raw, fallbackUserId: userId })
           : null)

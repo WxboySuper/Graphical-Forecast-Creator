@@ -1493,7 +1493,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await clerkUser.delete();
   });
   const getTokenRef = useRef(getToken);
-  getTokenRef.current = getToken;
+  useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
   const betaTokenProviderRef = useRef(async () => (await getTokenRef.current()) ?? null);
   useEffect(() => {
     if (!isLoaded) return;
@@ -1508,6 +1508,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const betaAccessRequestIdRef = useRef(0);
   const settingsRequestIdRef = useRef(0);
+  const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
   const currentDarkModeRef = useRef(darkMode);
   const currentOverlaysRef = useRef(overlays);
   const hasInitializedSettingsRef = useRef(false);
@@ -1527,6 +1528,17 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     return fetch(path, { ...init, headers });
   }, [getToken]);
+  const putSettings = useCallback(async (settings: UserSettingsDocument, signal?: AbortSignal): Promise<Response> => {
+    const previous = settingsWriteQueueRef.current;
+    let release!: () => void;
+    settingsWriteQueueRef.current = new Promise<void>((resolve) => { release = resolve; });
+    await previous.catch(() => undefined);
+    try {
+      return await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings }), signal });
+    } finally {
+      release();
+    }
+  }, [request]);
 
   const clerkUserId = clerkUser?.id;
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
@@ -1675,7 +1687,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setSettingsSyncStatus('syncing');
     setError(null);
     try {
-      const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }) });
+      const response = await putSettings(next);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body?.error || 'Unable to update account settings.');
       if (requestId !== settingsRequestIdRef.current || currentUser.uid !== userId) return;
@@ -1689,7 +1701,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setError(nextError instanceof Error ? nextError.message : 'Unable to update account settings.');
       throw nextError;
     }
-  }, [currentUser, darkMode, monitorSettings, overlays, request]);
+  }, [currentUser, darkMode, monitorSettings, overlays, putSettings]);
 
   useEffect(() => {
     if (!isSignedIn || !currentUser || !hasInitializedSettingsRef.current || bootstrapKey !== currentUser.uid) return;
@@ -1706,7 +1718,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setSettingsSyncStatus('syncing');
       const syncSettings = async () => {
         try {
-          const response = await request('/api/user/settings', { method: 'PUT', body: JSON.stringify({ settings: next }), signal: abortController.signal });
+          const response = await putSettings(next, abortController.signal);
           const body = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(body?.error || 'Unable to sync account settings.');
           if (!active || requestId !== settingsRequestIdRef.current || !isSignedIn || currentUser.uid !== userId || bootstrapKey !== userId) return;
@@ -1722,7 +1734,7 @@ const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       syncSettings();
     }, 750);
     return () => { active = false; abortController.abort(); window.clearTimeout(timer); };
-  }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, request, syncedSettings]);
+  }, [bootstrapKey, currentUser, darkMode, isSignedIn, monitorSettings, overlays, putSettings, syncedSettings]);
 
   const resetClerkAccountState = useCallback(() => {
     setBetaApiTokenProvider(null);
