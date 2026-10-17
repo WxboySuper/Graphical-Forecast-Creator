@@ -116,6 +116,9 @@ jobs:
           language: English
           effort: medium
           review_task_timeout: '20'
+          # This endpoint rate-limited the previous 42 parallel file reviews.
+          # Serialize requests until the provider quota supports higher concurrency.
+          review_concurrency: '1'
           # Cost control on a subscription: medium reasoning depth. Bump to
           # high if reviews go quiet or shallow; drop to low only if medium
           # proves consistently chatty enough.
