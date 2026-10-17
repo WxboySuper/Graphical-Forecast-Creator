@@ -14,6 +14,12 @@ jest.mock('lucide-react', () => ({
   Mail: () => <div data-testid="mail-icon" />,
 }));
 
+jest.mock('@clerk/react', () => ({
+  GoogleOneTap: () => <div data-testid="clerk-google-one-tap" />,
+  SignIn: () => <div data-testid="clerk-sign-in" />,
+  SignUp: () => <div data-testid="clerk-sign-up" />,
+}));
+
 describe('BetaAuthCard', () => {
   const signInWithEmail = jest.fn();
   const signInWithGoogle = jest.fn();
@@ -26,6 +32,7 @@ describe('BetaAuthCard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    window.history.replaceState(null, '', '/');
     (useAuth as jest.Mock).mockReturnValue({
       status: 'signed_out',
       error: null,
@@ -33,6 +40,10 @@ describe('BetaAuthCard', () => {
       signInWithGoogle,
       signUpWithEmail,
     });
+  });
+
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
   });
 
   test('renders basic sign-in form', () => {
@@ -110,5 +121,41 @@ describe('BetaAuthCard', () => {
     });
     render(<BetaAuthCard title="T" description="D" />);
     expect(screen.getByTestId('loader-icon')).toBeInTheDocument();
+  });
+
+  test('lets a user restart when Clerk verification hash is stale', async () => {
+    window.history.replaceState(null, '', '/beta?clerkSignUp=1#/verify-email-address');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
+    render(<BetaAuthCard title="T" description="D" allowSignUp />);
+
+    const signInButton = screen.getByRole('button', { name: 'Sign in' });
+    expect(signInButton).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Restart sign-in' }));
+
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(true);
+    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(signInButton).toBeEnabled();
+  });
+
+  test('allows a sign-in-only gate to recover from a stale Clerk verification route', async () => {
+    window.history.replaceState(null, '', '/beta#/sso-callback');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
+    render(<BetaAuthCard title="T" description="D" />);
+
+    const restartButton = await screen.findByRole('button', { name: 'Restart sign-in' });
+    fireEvent.click(restartButton);
+
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+  });
+
+  test('keeps account mode controls available on normal Clerk routes', async () => {
+    window.history.replaceState(null, '', '/beta#/forgot-password');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out' });
+    render(<BetaAuthCard title="T" description="D" allowSignUp />);
+
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Restart sign-in' })).not.toBeInTheDocument();
   });
 });

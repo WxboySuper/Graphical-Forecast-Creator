@@ -18,6 +18,7 @@ import {
   sortProducts,
 } from './customProductRepositoryModel';
 import { requireDb } from './firebase';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
 
 export const CUSTOM_PRODUCT_DOCUMENT_SLOTS = Array.from(
   { length: CUSTOM_PRODUCT_LIMITS.productsPerAccount },
@@ -89,40 +90,169 @@ export const findOpenProductSlot = (occupiedSlotIds: Iterable<string>): string =
   return slot;
 };
 
+const readBetaProductPage = async (page: number): Promise<{ products: unknown[]; nextPage?: number }> => {
+  const response = await fetchBetaApi(`/api/custom-products?page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body.error || 'Unable to load custom products.');
+  return { products: Array.isArray(body.products) ? body.products : [], nextPage: typeof body.nextPage === 'number' ? body.nextPage : undefined };
+};
+
+const readBetaProducts = async (userId: string): Promise<HostedCustomProduct[]> => {
+  const products: unknown[] = [];
+  let nextPage: number | undefined = 0;
+  while (nextPage !== undefined) {
+    const result = await readBetaProductPage(nextPage);
+    products.push(...result.products);
+    nextPage = result.nextPage;
+  }
+  return sortProducts(products.filter((value: unknown): value is HostedCustomProduct => ownedProduct(value, userId)));
+};
+
+const scheduleBetaProductRetry = (
+  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined },
+  refresh: () => void,
+) => {
+  if (retryTimer.current !== undefined) globalThis.clearTimeout(retryTimer.current);
+  retryTimer.current = globalThis.setTimeout(() => {
+    retryTimer.current = undefined;
+    refresh();
+  }, 250);
+};
+
+interface BetaProductSubscriptionContext {
+  isActive: () => boolean;
+  retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined };
+  refresh: () => void;
+  onError?: (error: Error) => void;
+}
+
+const handleBetaProductSubscriptionError = (error: unknown, context: BetaProductSubscriptionContext) => {
+  const { isActive, retryTimer, refresh, onError } = context;
+  if (!isActive()) return;
+  if (isBetaSessionInitializing(error)) {
+    scheduleBetaProductRetry(retryTimer, refresh);
+    return;
+  }
+  onError?.(error instanceof Error ? error : new Error('Unable to load custom products.'));
+};
+
+const subscribeBetaProducts = (
+  userId: string,
+  onUpdate: (products: HostedCustomProduct[]) => void,
+  onError?: (error: Error) => void,
+) => {
+  let active = true;
+  const retryTimer: { current: ReturnType<typeof globalThis.setTimeout> | undefined } = { current: undefined };
+  const refresh = () => {
+    void readBetaProducts(userId)
+      .then((products) => { if (active) onUpdate(products); })
+      .catch((error) => handleBetaProductSubscriptionError(error, {
+        isActive: () => active,
+        retryTimer,
+        refresh,
+        onError,
+      }));
+  };
+
+  refresh();
+  const timer = globalThis.setInterval(refresh, 15_000);
+  return () => {
+    active = false;
+    globalThis.clearInterval(timer);
+    if (retryTimer.current !== undefined) globalThis.clearTimeout(retryTimer.current);
+  };
+};
+
+const requireCurrentBetaProduct = async (userId: string, expected: HostedCustomProduct) => {
+  const products = await readBetaProducts(userId);
+  const current = products.find((candidate) => candidate.id === expected.id);
+  if (!current || current.version !== expected.version) throw new Error('This product changed in another session. Refresh and try again.');
+};
+
+const sendBetaProductRevision = async (
+  expected: HostedCustomProduct,
+  next: HostedCustomProduct | null,
+): Promise<HostedCustomProduct | null> => {
+  const response = await fetchBetaApi(`/api/custom-products/${encodeURIComponent(expected.id)}`, {
+    method: next ? 'PATCH' : 'DELETE',
+    headers: { 'If-Match': String(expected.version) },
+    body: next ? JSON.stringify({ product: next, expectedVersion: expected.version }) : undefined,
+  });
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body?.error || 'Unable to save custom product.');
+  return next;
+};
+
+const reviseBetaProduct = async (userId: string, expected: HostedCustomProduct, next: HostedCustomProduct | null) => {
+  await requireCurrentBetaProduct(userId, expected);
+  return sendBetaProductRevision(expected, next);
+};
+
 const readOccupiedSlots = async (userId: string): Promise<Set<string>> => {
   const snapshot = await getDocs(collectionRef(userId));
   return new Set(snapshot.docs.map((item) => item.id));
 };
 
+const assertBetaProductCapacity = (products: HostedCustomProduct[]) => {
+  if (products.length >= CUSTOM_PRODUCT_LIMITS.productsPerAccount) {
+    throw new Error(`Custom product limit reached (${CUSTOM_PRODUCT_LIMITS.productsPerAccount}).`);
+  }
+};
+
+const postBetaProduct = async (product: HostedCustomProduct) => {
+  const response = await fetchBetaApi('/api/custom-products', { method: 'POST', body: JSON.stringify({ product }) });
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body?.error || 'Unable to create custom product.');
+  return body?.product;
+};
+
+const createBetaProduct = async ({ userId, draft }: { userId: string; draft: CustomProductDraft }): Promise<HostedCustomProduct> => {
+  const products = await readBetaProducts(userId);
+  assertBetaProductCapacity(products);
+  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+  const created = await postBetaProduct(product);
+  return ownedProduct(created, userId) ? created : product;
+};
+
+const createFirestoreProduct = async (userId: string, draft: CustomProductDraft): Promise<HostedCustomProduct> => {
+  const slot = findOpenProductSlot(await readOccupiedSlots(userId));
+  const product = createHostedProduct({ id: uuidv4(), userId, draft });
+  await runTransaction(requireDb(), async (transaction) => {
+    const reference = productRef(userId, slot);
+    if ((await transaction.get(reference)).exists()) {
+      throw new Error('The selected product slot was claimed. Please try again.');
+    }
+    transaction.set(reference, product);
+  });
+  return product;
+};
+
 export const firestoreCustomProductsRepository: CustomProductsRepository = {
   async list(userId) {
+    if (isBetaClerkD1Mode()) return readBetaProducts(userId);
     return sortProducts((await readRecords(userId)).map(({ product }) => product));
   },
   subscribe(userId, onUpdate, onError) {
+    if (isBetaClerkD1Mode()) return subscribeBetaProducts(userId, onUpdate, onError);
     return onSnapshot(collectionRef(userId), (snapshot) => {
       const products = snapshot.docs.map((item) => item.data()).filter((value) => ownedProduct(value, userId));
       onUpdate(sortProducts(products));
     }, (error) => onError?.(error));
   },
-  async create(userId, draft) {
-    const slot = findOpenProductSlot(await readOccupiedSlots(userId));
-    const product = createHostedProduct({ id: uuidv4(), userId, draft });
-    await runTransaction(requireDb(), async (transaction) => {
-      const reference = productRef(userId, slot);
-      if ((await transaction.get(reference)).exists()) {
-        throw new Error('The selected product slot was claimed. Please try again.');
-      }
-      transaction.set(reference, product);
-    });
-    return product;
+  create(userId, draft) {
+    if (isBetaClerkD1Mode()) return createBetaProduct({ userId, draft });
+    return createFirestoreProduct(userId, draft);
   },
   update(userId, product, draft) {
+    if (isBetaClerkD1Mode()) return reviseBetaProduct(userId, product, reviseProduct(product, draft)).then((next) => next as HostedCustomProduct);
     return writeRevision(userId, product, draft);
   },
   setStatus(userId, product, status) {
+    if (isBetaClerkD1Mode()) return reviseBetaProduct(userId, product, reviseProduct(product, product, status)).then((next) => next as HostedCustomProduct);
     return writeRevision(userId, product, product, status);
   },
   async delete(userId, product) {
+    if (isBetaClerkD1Mode()) { await reviseBetaProduct(userId, product, null); return; }
     await withStoredProduct(userId, product, (transaction, reference) => transaction.delete(reference));
   },
 };

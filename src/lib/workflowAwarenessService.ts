@@ -10,6 +10,7 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { fetchBetaApi, isBetaClerkD1Mode } from './betaApi';
 import {
   WORKFLOW_AWARENESS_CONSENT_VERSION,
   WORKFLOW_AWARENESS_SCHEMA_VERSION,
@@ -193,8 +194,46 @@ export const saveWorkflowAwareness = async ({
 }): Promise<void> => {
   if (!isCurrentAwarenessConsent(consent)) return;
   if (!isValidWorkflowAwarenessMetadata(metadata)) throw new Error('Invalid workflow awareness metadata');
-  await setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
+  if (isBetaClerkD1Mode()) return saveBetaWorkflowAwareness(metadata);
+  await saveFirestoreWorkflowAwareness(userId, metadata);
 };
+
+const saveBetaWorkflowAwareness = async (metadata: WorkflowAwarenessMetadata): Promise<void> => {
+  const response = await fetchBetaApi('/api/workflow-awareness', { method: 'PUT', body: JSON.stringify({ record: toRecord(metadata) }) });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body?.error || 'Unable to save workflow awareness.');
+};
+
+const saveFirestoreWorkflowAwareness = (userId: string, metadata: WorkflowAwarenessMetadata) =>
+  setDoc(getAwarenessDoc(userId, metadata.cycleId), toRecord(metadata));
+
+const readBetaAwarenessPage = async (userId: string, page: number): Promise<{ records: unknown[]; nextPage?: number }> => {
+  const response = await fetchBetaApi(`/api/workflow-awareness?userId=${encodeURIComponent(userId)}&page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) throw new Error(body.error || 'Unable to load workflow awareness.');
+  return { records: Array.isArray(body.records) ? body.records : [], nextPage: typeof body.nextPage === 'number' ? body.nextPage : undefined };
+};
+
+const readAllBetaAwareness = async (userId: string): Promise<unknown[]> => {
+  const records: unknown[] = [];
+  let page: number | undefined = 0;
+  while (page !== undefined) {
+    const result = await readBetaAwarenessPage(userId, page);
+    records.push(...result.records);
+    page = result.nextPage;
+  }
+  return records;
+};
+
+const unwrapBetaAwarenessRecord = (record: unknown): unknown => {
+  const envelope = Object(record) as Partial<WorkflowAwarenessDocument>;
+  const metadata = Object(envelope.metadata) as Record<string, unknown>;
+  return { ...metadata, consentVersion: envelope.consentVersion, schemaVersion: envelope.schemaVersion };
+};
+
+const readBetaAwareness = async (userId: string): Promise<WorkflowAwarenessRecord[]> =>
+  (await readAllBetaAwareness(userId)).map(unwrapBetaAwarenessRecord)
+    .filter(isValidWorkflowAwarenessRecord) as WorkflowAwarenessRecord[];
 
 /** Reads only the current user's nested awareness records and removes malformed records from that same path. */
 export const listWorkflowAwareness = async ({
@@ -205,6 +244,7 @@ export const listWorkflowAwareness = async ({
   consent: WorkflowAwarenessConsent;
 }): Promise<WorkflowAwarenessRecord[]> => {
   if (!isCurrentAwarenessConsent(consent)) return [];
+  if (isBetaClerkD1Mode()) return readBetaAwareness(userId);
   const snapshot = await getDocs(query(getAwarenessCollection(userId)));
   const { valid, malformedIds } = readSnapshotRecords(snapshot);
   // A malformed record must not hide valid recommendations if its cleanup is
@@ -215,12 +255,22 @@ export const listWorkflowAwareness = async ({
 
 /** Deletes every awareness record for the current user; never touches full cloud-cycle documents. */
 export const deleteWorkflowAwareness = async (userId: string): Promise<void> => {
+  if (isBetaClerkD1Mode()) {
+    const response = await fetchBetaApi('/api/workflow-awareness', { method: 'DELETE' });
+    if (!response.ok) throw new Error('Unable to clear workflow awareness.');
+    return;
+  }
   const snapshot = await getDocs(query(getAwarenessCollection(userId)));
   await Promise.all(snapshot.docs.map((entry) => removeDoc(getAwarenessDoc(userId, entry.id))));
 };
 
 /** Deletes one cycle-scoped awareness record for the current user. */
 export const deleteOneWorkflowAwareness = async (userId: string, cycleId: string): Promise<void> => {
+  if (isBetaClerkD1Mode()) {
+    const response = await fetchBetaApi(`/api/workflow-awareness/${encodeURIComponent(cycleId)}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Unable to delete workflow awareness.');
+    return;
+  }
   await deleteDoc(getAwarenessDoc(userId, cycleId));
 };
 
