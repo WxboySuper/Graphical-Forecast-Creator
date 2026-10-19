@@ -128,19 +128,18 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_DRAFT: ${{ github.event.pull_request.draft }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          # GitHub's contains() ignores case, so this keeps the old job-level
+          # behavior: "wip: feature" and "Hold: investigation" skip the
+          # review just like "WIP: feature" and "HOLD" did.
+          PR_TITLE_HOLDS: ${{ contains(github.event.pull_request.title, 'HOLD') || contains(github.event.pull_request.title, 'WIP') }}
         run: |
           # A draft PR or a HOLD/WIP title is not ready for review. The job
           # still runs so the required check reports on this head SHA; only
           # the review itself is skipped.
           skip=false
           if [ "$EVENT_NAME" = "pull_request_target" ]; then
-            if [ "$PR_DRAFT" = "true" ]; then
+            if [ "$PR_DRAFT" = "true" ] || [ "$PR_TITLE_HOLDS" = "true" ]; then
               skip=true
-            else
-              case "$PR_TITLE" in
-                *HOLD*|*WIP*) skip=true ;;
-              esac
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"

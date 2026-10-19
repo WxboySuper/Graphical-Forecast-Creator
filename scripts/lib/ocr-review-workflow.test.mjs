@@ -36,8 +36,6 @@ test('a draft or HOLD/WIP pull request skips the review and still passes the gat
   const skip = stepById('skip');
   assert.ok(skip, 'the job needs a step-level skip decision');
   assert.match(skip.env.PR_DRAFT, /github\.event\.pull_request\.draft/);
-  assert.match(skip.env.PR_TITLE, /github\.event\.pull_request\.title/);
-  assert.match(skip.run, /\*HOLD\*\|\*WIP\*/);
   assert.match(skip.run, /skip=\$skip/);
 
   const ocr = stepById('ocr');
@@ -57,6 +55,30 @@ test('a draft or HOLD/WIP pull request skips the review and still passes the gat
   assert.match(gate.with.script, /outcome !== 'success'/);
   assert.match(gate.with.script, /core\.setFailed\(`OCR review did not complete/);
   assert.match(gate.with.script, /\\bcritical\\b\|\\bhigh\\b\|\\bmedium\\b/);
+});
+
+test('a hold marker in the title skips the review whatever its case', () => {
+  const skip = stepById('skip');
+  // The old job-level condition used contains(), which ignores case. The
+  // shell match that replaced it did not, so "wip: feature" started a full
+  // review that the old workflow skipped. The hold check has to stay a
+  // case-insensitive expression for that reason.
+  const titleHolds = skip.env.PR_TITLE_HOLDS;
+  assert.ok(titleHolds, 'the skip step needs the hold-marker decision');
+  const markers = [...titleHolds.matchAll(/contains\(github\.event\.pull_request\.title, '([^']+)'\)/g)]
+    .map((match) => match[1]);
+  assert.deepEqual(markers, ['HOLD', 'WIP']);
+  assert.match(skip.run, /PR_TITLE_HOLDS/);
+  assert.doesNotMatch(skip.run, /\*HOLD\*/, 'a shell glob would match the case the old expression ignored');
+
+  // GitHub compares strings without case, so the markers match in any case.
+  const holds = (title) => markers.some((marker) => title.toLowerCase().includes(marker.toLowerCase()));
+  for (const title of ['HOLD: work in progress', 'wip: feature', 'Hold: investigation', 'WIP', 'hold']) {
+    assert.ok(holds(title), `"${title}" should skip the review`);
+  }
+  for (const title of ['Add a feature', 'Ship the fix', 'Refactor the map layer']) {
+    assert.ok(!holds(title), `"${title}" should not skip the review`);
+  }
 });
 
 test('a manual /ocr run reports a commit status on the pull request head', () => {
