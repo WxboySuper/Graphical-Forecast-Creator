@@ -15,24 +15,48 @@ const steps = job.steps;
 const stepById = (id) => steps.find((step) => step.id === id);
 
 test('OCR review runs on every pull request head SHA', () => {
-  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'ready_for_review', 'synchronize', 'reopened']);
+  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'ready_for_review', 'synchronize', 'reopened', 'edited']);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.equal(workflow.concurrency['cancel-in-progress'], false, 'a newer head must not cancel the run that still owes a result');
   assert.match(workflow.concurrency.group, /gfc-ocr-/);
 });
 
+test('the automatic and the manual review do not share a concurrency group', () => {
+  // GitHub drops a queued run when a newer run enters the same group. A
+  // manual /ocr review queued behind an automatic run would vanish the next
+  // time somebody pushed, so the two paths get separate per-PR groups.
+  const group = workflow.concurrency.group;
+  assert.match(group, /gfc-ocr-pr-/);
+  assert.match(group, /gfc-ocr-manual-/);
+});
+
 test('the job itself never filters a pull request event', () => {
   // A job-level `if` that skips a PR event leaves the required check pending
-  // on that head SHA, which is exactly what blocks the merge. Draft and
-  // HOLD/WIP PRs are handled by a step-level skip instead.
-  assert.match(job.if, /github\.event_name == 'pull_request_target'/);
+  // on that head SHA, which is exactly what blocks the merge. Draft, HOLD/WIP,
+  // and fork PRs are handled by a step-level skip instead.
+  const pullRequestBranch = job.if.split('||')[0];
+  assert.match(pullRequestBranch, /github\.event_name == 'pull_request_target'/);
+  assert.doesNotMatch(pullRequestBranch, /&&/, 'the pull request branch of the job `if` must stay unconditional');
   assert.doesNotMatch(job.if, /draft/);
   assert.doesNotMatch(job.if, /HOLD/);
   assert.doesNotMatch(job.if, /WIP/);
   assert.doesNotMatch(source, /actions\/checkout/, 'pull_request_target must never check out pull request head code');
 });
 
-test('a draft or HOLD/WIP pull request skips the review and still passes the gate', () => {
+test('the pull request title never reaches a shell', () => {
+  // pull_request_target runs with a write-scoped token and the API key
+  // secret, so a title that lands in a run: block is a shell injection. The
+  // title may only be read through env: or an expression.
+  for (const step of steps.filter((candidate) => typeof candidate.run === 'string')) {
+    assert.doesNotMatch(
+      step.run,
+      /github\.event\.pull_request\.title/,
+      `the title must not be interpolated into "${step.name}"`,
+    );
+  }
+});
+
+test('a draft, HOLD/WIP, or fork pull request skips the review and still passes the gate', () => {
   const skip = stepById('skip');
   assert.ok(skip, 'the job needs a step-level skip decision');
   assert.match(skip.env.PR_DRAFT, /github\.event\.pull_request\.draft/);
@@ -55,6 +79,16 @@ test('a draft or HOLD/WIP pull request skips the review and still passes the gat
   assert.match(gate.with.script, /outcome !== 'success'/);
   assert.match(gate.with.script, /core\.setFailed\(`OCR review did not complete/);
   assert.match(gate.with.script, /\\bcritical\\b\|\\bhigh\\b\|\\bmedium\\b/);
+});
+
+test('a fork head is not reviewed by the automatic run', () => {
+  // The run holds a write-scoped token and the API key secret, and a
+  // synchronize event lets a fork author re-arm it on every push. The
+  // automatic review therefore stays inside this repository.
+  const skip = stepById('skip');
+  assert.match(skip.env.PR_HEAD_REPO, /github\.event\.pull_request\.head\.repo\.full_name/);
+  assert.match(skip.env.REPOSITORY, /github\.repository/);
+  assert.match(skip.run, /PR_HEAD_REPO.*!=.*REPOSITORY/);
 });
 
 test('a hold marker in the title skips the review whatever its case', () => {

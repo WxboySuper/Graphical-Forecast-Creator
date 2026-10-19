@@ -10,13 +10,17 @@ name: Review | OCR
 #
 # The required `ocr-review` check has to land on every PR head SHA, otherwise
 # branch protection blocks the PR the moment someone pushes or rebases:
-# - pull_request_target fires on opened, ready_for_review, synchronize, and
-#   reopened, so a new head SHA gets its own run.
-# - The job always runs for a pull_request_target event. A draft PR or a
-#   HOLD/WIP title skips the review inside the job (a step-level skip), so the
-#   check still reports on that head instead of staying pending.
+# - pull_request_target fires on opened, ready_for_review, synchronize,
+#   reopened, and edited, so a new head SHA gets its own run and a title
+#   change re-runs the review on the same head.
+# - The job always runs for a pull_request_target event. A draft PR, a
+#   HOLD/WIP title, or a fork head skips the review inside the job (a
+#   step-level skip), so the check still reports on that head instead of
+#   staying pending.
 # - cancel-in-progress is false. A newer head must not cancel the run that
-#   still owes a result for the head it started on.
+#   still owes a result for the head it started on. The automatic and the
+#   manual path use separate per-PR groups, so a queued /ocr review is not
+#   dropped when a newer run enters the automatic group.
 # - A manual /ocr comment run has no check run of its own on the PR head, so
 #   it reports a commit status with the `ocr-review` context on the head.
 #
@@ -28,7 +32,7 @@ name: Review | OCR
 
 on:
   pull_request_target:
-    types: [opened, ready_for_review, synchronize, reopened]
+    types: [opened, ready_for_review, synchronize, reopened, edited]
   issue_comment:
     types: [created]
 permissions:
@@ -37,15 +41,21 @@ permissions:
   statuses: write
 
 concurrency:
+  # Two per-PR groups. The automatic group holds one run per PR, so a new
+  # head replaces the queued one and never cancels the running one. The
+  # manual group is separate, because GitHub drops a queued run when a newer
+  # run enters the same group, and a requested /ocr review must not vanish
+  # because somebody pushed in the meantime.
   group: >-
     ${{
       (github.event_name == 'pull_request_target'
+        && format('gfc-ocr-pr-{0}', github.event.pull_request.number))
         || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
           && startsWith(github.event.comment.body, '/ocr')
-          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
-        && format('gfc-ocr-{0}', github.event.pull_request.number || github.event.issue.number)
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+          && format('gfc-ocr-manual-{0}', github.event.issue.number))
         || format('gfc-ocr-noop-{0}', github.run_id)
     }}
   cancel-in-progress: false
@@ -54,8 +64,8 @@ jobs:
   ocr-review:
     # Only the manual comment path is filtered here. A pull_request_target
     # event always runs the job: the job's own check run is what branch
-    # protection waits for, so it must report on every head SHA. Draft and
-    # HOLD/WIP PRs are handled by a step-level skip further down.
+    # protection waits for, so it must report on every head SHA. Draft,
+    # HOLD/WIP, and fork PRs are handled by a step-level skip further down.
     if: |
       github.event_name == 'pull_request_target'
       || (
@@ -132,18 +142,34 @@ jobs:
           # behavior: "wip: feature" and "Hold: investigation" skip the
           # review just like "WIP: feature" and "HOLD" did.
           PR_TITLE_HOLDS: ${{ contains(github.event.pull_request.title, 'HOLD') || contains(github.event.pull_request.title, 'WIP') }}
+          # A fork head is attacker-controlled. This run holds a write-scoped
+          # token and the OPENCODE_API_KEY secret, and a synchronize event
+          # lets a fork author re-arm it on every push, so the automatic
+          # review only runs for heads that live in this repository. The
+          # manual /ocr path is unaffected: a trusted author asked for it.
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          # A draft PR or a HOLD/WIP title is not ready for review. The job
-          # still runs so the required check reports on this head SHA; only
-          # the review itself is skipped.
+          # A draft PR, a HOLD/WIP title, or a fork head is not ready for
+          # review. The job still runs so the required check reports on this
+          # head SHA; only the review itself is skipped.
           skip=false
+          reason=""
           if [ "$EVENT_NAME" = "pull_request_target" ]; then
-            if [ "$PR_DRAFT" = "true" ] || [ "$PR_TITLE_HOLDS" = "true" ]; then
+            if [ "$PR_DRAFT" = "true" ]; then
               skip=true
+              reason="draft pull request"
+            elif [ "$PR_TITLE_HOLDS" = "true" ]; then
+              skip=true
+              reason="HOLD/WIP title"
+            elif [ "$PR_HEAD_REPO" != "$REPOSITORY" ]; then
+              skip=true
+              reason="head from a fork"
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
-          echo "OCR review skip=$skip"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "OCR review skip=$skip ($reason)"
 
       - name: Run OCR review with MiniMax M3.1 Flash Free
         id: ocr
@@ -427,7 +453,7 @@ jobs:
           {
             echo "OCR outcome=${{ steps.ocr.outcome }}.";
             if [ "${{ steps.skip.outputs.skip }}" = "true" ]; then
-              echo "OCR review skipped (draft PR or HOLD/WIP title).";
+              echo "OCR review skipped (${{ steps.skip.outputs.reason }}).";
             elif [ "${{ steps.ocr.outcome }}" = "success" ]; then
               echo "OCR review posted.";
             else
