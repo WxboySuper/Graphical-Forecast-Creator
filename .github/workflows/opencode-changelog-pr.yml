@@ -2,7 +2,7 @@ name: Changelog | PR generation
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, reopened, ready_for_review]
 
 concurrency:
   group: gfc-opencode-maintenance-queue
