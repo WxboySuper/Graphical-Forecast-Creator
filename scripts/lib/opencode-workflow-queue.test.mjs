@@ -32,7 +32,7 @@ test('OpenCode workflows use the shared queue except first-look, which is per PR
   const firstLook = parse(readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8'));
   assert.ok(firstLook.concurrency === undefined, 'CI waiting must stay outside the OpenCode queue');
   assert.ok(firstLook.jobs['wait-for-ci'].concurrency === undefined);
-  assert.deepEqual(firstLook.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': true });
+  assert.deepEqual(firstLook.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': false });
 });
 
 test('changelog audit keeps runner context references at step scope', () => {

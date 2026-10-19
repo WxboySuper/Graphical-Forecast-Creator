@@ -37,7 +37,7 @@ test('trusted PR changelog automation runs only in pull_request_target with read
   }
   assert.equal(workflow.jobs['generate-changelog'].needs, 'prepare-automated-changelog');
   assert.match(workflow.jobs['generate-changelog'].if, /dependabot\[bot\]/);
-  assert.match(workflow.jobs['generate-changelog'].if, /edited/);
+  assert.doesNotMatch(workflow.jobs['generate-changelog'].if, /github\.event\.action.*edited/);
 });
 
 test('default-branch tools are isolated before PR checkout and credential-bearing execution', () => {

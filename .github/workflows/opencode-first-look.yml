@@ -112,7 +112,7 @@ jobs:
             core.setOutput('head_sha', expectedSha)
             core.setOutput('ci_run_url', ciWait.run.html_url)
             core.setOutput('ci_conclusion', ciWait.run.conclusion)
-            core.info(`Checks | CI completed with ${ciWait.run.conclusion}. The review will now enter the shared OpenCode queue.`)
+            core.info(`Checks | CI completed with ${ciWait.run.conclusion}. The review will now start in its per-PR queue.`)
 
   review:
     needs: wait-for-ci
@@ -122,7 +122,7 @@ jobs:
     timeout-minutes: 75
     concurrency:
       group: fl-${{ github.event.pull_request.number || github.event.issue.number }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: read
@@ -362,22 +362,35 @@ jobs:
             }))
             const MAX_DIFF_CHARS = 30000
             let diffCharsRemaining = MAX_DIFF_CHARS
-            let cappedPatchCount = 0
-            const diffFiles = files.map((file) => {
+            const clipPatchToBudget = (file, path, clippedPaths) => {
               const fullPatch = file.patch ?? '[GitHub supplied no textual patch for this file]'
-              const patch = fullPatch.slice(0, diffCharsRemaining)
-              diffCharsRemaining -= patch.length
-              if (patch.length < fullPatch.length) cappedPatchCount += 1
-              return {
-                path: file.filename,
-                status: file.status,
-                additions: file.additions,
-                deletions: file.deletions,
-                patch,
+              if (fullPatch.length <= diffCharsRemaining) {
+                diffCharsRemaining -= fullPatch.length
+                return { ...file, path, patch: fullPatch }
               }
-            })
+              const lastNewline = fullPatch.lastIndexOf('\n', diffCharsRemaining - 1)
+              const patch = lastNewline < 0 ? '' : fullPatch.slice(0, lastNewline + 1)
+              diffCharsRemaining -= patch.length
+              clippedPaths.push(path)
+              return { ...file, path, patch }
+            }
+            const clippedCurrentPaths = []
+            const diffFiles = files.map((file) => clipPatchToBudget({
+              status: file.status,
+              additions: file.additions,
+              deletions: file.deletions,
+              patch: file.patch ?? '[GitHub supplied no textual patch for this file]',
+            }, file.filename, clippedCurrentPaths))
+            const clippedRevisionPaths = []
+            if (revisionDiff) {
+              revisionDiff.files = revisionDiff.files.map((file) => clipPatchToBudget(file, file.path, clippedRevisionPaths))
+              if (clippedRevisionPaths.length) {
+                revisionDiff.truncationReasons.push(`The shared ${MAX_DIFF_CHARS}-character review cap clipped revision diff patches at line boundaries: ${clippedRevisionPaths.slice(0, 10).join(', ')}${clippedRevisionPaths.length > 10 ? ', and others' : ''}.`)
+                revisionDiff.truncated = true
+              }
+            }
             const diffTruncationReasons = []
-            if (cappedPatchCount) diffTruncationReasons.push(`The PR diff exceeded the ${MAX_DIFF_CHARS}-character review cap; ${cappedPatchCount} patch(es) were clipped.`)
+            if (clippedCurrentPaths.length) diffTruncationReasons.push(`The shared ${MAX_DIFF_CHARS}-character review cap clipped current PR patches at line boundaries: ${clippedCurrentPaths.slice(0, 10).join(', ')}${clippedCurrentPaths.length > 10 ? ', and others' : ''}.`)
             if (files.length >= 3000) diffTruncationReasons.push('GitHub returned the PR-files endpoint maximum of 3,000 changed files.')
             const filesWithoutPatch = files.filter((file) => !file.patch && (file.additions || file.deletions))
             if (filesWithoutPatch.length) {
@@ -386,10 +399,11 @@ jobs:
             }
             if (revisionDiff?.truncated) diffTruncationReasons.push(...revisionDiff.truncationReasons)
             const diffTruncated = diffTruncationReasons.length > 0
-            const changedLineNumbers = Object.fromEntries(diffFiles.map((file) => {
+            const changedLineNumbers = Object.fromEntries(files.map((file) => {
+              const fullPatch = file.patch ?? '[GitHub supplied no textual patch for this file]'
               const lines = new Set()
               let currentLine = null
-              for (const line of file.patch.split('\n')) {
+              for (const line of fullPatch.split('\n')) {
                 const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/)
                 if (hunk) { currentLine = Number(hunk[1]); continue }
                 if (currentLine === null || line.startsWith('\\')) continue
@@ -398,7 +412,7 @@ jobs:
                   currentLine += 1
                 }
               }
-              return [file.path, [...lines]]
+              return [file.filename, [...lines]]
             }))
             const unresolvedReviewThreads = allReviewThreads.filter((thread) => !thread.isResolved)
             const contextData = {
