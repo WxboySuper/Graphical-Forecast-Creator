@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC - Option C: Learning Trail</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --ink: #17212b;
+    --muted: #55626e;
+    --card: #ffffff;
+    --coral: #ff6b5b;
+    --teal: #14b8a6;
+    --sun: #ffc83d;
+    --violet: #7c5cff;
+    --sky: #4aa8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Nunito", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+  .blob { position: fixed; border-radius: 50%; filter: blur(60px); opacity: .35; z-index: -1; pointer-events: none; animation: drift 18s ease-in-out infinite alternate; }
+  .blob.a { width: 46vw; height: 46vw; background: var(--sun); top: -12vw; left: -10vw; }
+  .blob.b { width: 40vw; height: 40vw; background: var(--teal); bottom: -10vw; right: -8vw; animation-duration: 22s; }
+  .blob.c { width: 28vw; height: 28vw; background: var(--violet); top: 40vh; left: 45vw; animation-duration: 26s; }
+  @keyframes drift { to { transform: translate(40px, -30px) scale(1.08); } }
+
+  header { display: flex; justify-content: space-between; align-items: center; padding: 18px clamp(16px, 4vw, 48px); }
+  .wordmark { font-weight: 900; font-size: 1.15rem; }
+  nav a { margin-left: 18px; text-decoration: none; color: var(--muted); font-weight: 800; }
+
+  .hero { text-align: center; padding: clamp(28px, 6vh, 70px) 20px 20px; }
+  .hero h1 { font-size: clamp(2.6rem, 6.5vw, 5rem); line-height: .98; letter-spacing: -.03em; margin: 0 0 18px; }
+  .hero h1 .mark { background: linear-gradient(120deg, var(--sun) 0%, var(--coral) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero .sub { max-width: 600px; margin: 0 auto; font-size: 1.2rem; color: var(--muted); line-height: 1.55; }
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .btn { padding: 15px 26px; border-radius: 999px; font-weight: 900; text-decoration: none; font-size: 1rem; transition: transform .2s ease; }
+  .btn:hover { transform: translateY(-2px) rotate(-1deg); }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-secondary { background: #fff; color: var(--ink); box-shadow: inset 0 0 0 2px #d6dee7; }
+  .fine { color: var(--muted); font-weight: 700; font-size: .95rem; margin-top: 14px; }
+
+  .doors { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1100px; margin: 36px auto 10px; padding: 0 clamp(16px, 4vw, 40px); }
+  .door {
+    background: var(--card); border-radius: 32px; padding: 34px; min-height: 340px; position: relative; overflow: hidden;
+    box-shadow: 0 16px 40px rgba(23, 33, 43, .08);
+    transition: transform .5s cubic-bezier(.2,.9,.25,1), box-shadow .4s ease, flex .5s;
+    display: flex; flex-direction: column; justify-content: space-between; outline: none;
+  }
+  .door:focus-visible { box-shadow: 0 0 0 4px var(--sky); }
+  .door .emoji-ish {
+    width: 88px; height: 88px; border-radius: 28px; display: grid; place-items: center; font-size: 2.4rem; margin-bottom: 18px;
+    transition: transform .6s cubic-bezier(.2,.9,.25,1);
+  }
+  .door-beginner .emoji-ish { background: #d8f5ec; }
+  .door-experienced .emoji-ish { background: #e6deff; }
+  .door.open { transform: translateY(-6px); box-shadow: 0 26px 60px rgba(23, 33, 43, .14); }
+  .door.open .emoji-ish { transform: rotate(-8deg) scale(1.08); }
+  .door .tag { font-weight: 900; font-size: .8rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+  .door h2 { font-size: 2rem; margin: 6px 0 10px; letter-spacing: -.02em; }
+  .door p { color: var(--muted); line-height: 1.55; font-size: 1.05rem; margin: 0 0 22px; }
+  .door .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .door .actions a { padding: 12px 18px; border-radius: 16px; font-weight: 900; text-decoration: none; }
+  .door-beginner .actions a:first-child { background: #d8f5ec; color: #0b5d51; }
+  .door-beginner .actions a:last-child { background: var(--teal); color: #fff; }
+  .door-experienced .actions a:first-child { background: #e6deff; color: #3b2a9c; }
+  .door-experienced .actions a:last-child { background: var(--violet); color: #fff; }
+  .door .progress { height: 8px; border-radius: 99px; background: #edf1f6; overflow: hidden; margin-top: 18px; }
+  .door .progress span { display: block; height: 100%; width: 0; border-radius: 99px; transition: width .9s ease; }
+  .door-beginner .progress span { background: var(--teal); }
+  .door-experienced .progress span { background: var(--violet); }
+  .door.open .progress span { width: 100%; }
+
+  .trail { max-width: 1000px; margin: 80px auto 40px; padding: 0 20px; }
+  .trail h2 { text-align: center; font-size: clamp(1.8rem, 3.5vw, 2.6rem); letter-spacing: -.02em; margin: 0 0 40px; }
+  .steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .steps::before { content: ""; position: absolute; top: 34px; left: 12%; right: 12%; height: 6px; border-radius: 99px; background: repeating-linear-gradient(90deg, #cbd5e1 0 14px, transparent 14px 24px); }
+  .step { text-align: center; opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s ease; }
+  .step.in { opacity: 1; transform: none; }
+  .step .dot { width: 68px; height: 68px; margin: 0 auto 14px; border-radius: 50%; background: #fff; box-shadow: 0 8px 20px rgba(23,33,43,.1); display: grid; place-items: center; font-weight: 900; font-size: 1.3rem; position: relative; z-index: 1; }
+  .step h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .step p { margin: 0; color: var(--muted); font-size: .95rem; line-height: 1.45; }
+
+  .account { text-align: center; padding: 30px 20px 10px; }
+  .account p { color: var(--muted); font-weight: 700; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: center; padding: 30px 20px 40px; color: var(--muted); font-weight: 800; font-size: .92rem; }
+  footer a { color: inherit; text-decoration: none; }
+
+  @media (max-width: 800px) {
+    nav { display: none; }
+    .doors { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr 1fr; }
+    .steps::before { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .door, .btn, .step { transition: none; animation: none; }
+    .step { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="blob a"></div><div class="blob b"></div><div class="blob c"></div>
+
+  <header>
+    <div class="wordmark">GFC</div>
+    <nav><a href="#">Changelog</a><a href="#">Help</a><a href="#">Pricing</a></nav>
+  </header>
+
+  <section class="hero">
+    <h1>Create forecasts. <span class="mark">Your way.</span></h1>
+    <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+      <a class="btn btn-secondary" href="https://app.gfcweather.com">Continue Without Account</a>
+    </div>
+    <p class="fine">Accounts unlock features, but you can start without one.</p>
+  </section>
+
+  <main class="doors" id="doors">
+    <section class="door door-beginner" tabindex="0" data-door="beginner">
+      <div>
+        <div class="emoji-ish" aria-hidden="true">🌱</div>
+        <div class="tag">Beginner</div>
+        <h2>New to forecasting?</h2>
+        <p>Start here — no experience needed. Draw your first forecast in minutes.</p>
+      </div>
+      <div>
+        <div class="actions">
+          <a href="/beginners">Learn More</a>
+          <a href="https://app.gfcweather.com">Open the App</a>
+        </div>
+        <div class="progress"><span></span></div>
+      </div>
+    </section>
+    <section class="door door-experienced" tabindex="0" data-door="experienced">
+      <div>
+        <div class="emoji-ish" aria-hidden="true">🧭</div>
+        <div class="tag">Experienced</div>
+        <h2>Experienced?</h2>
+        <p>Jump in — you already know what you're doing. Draw, verify, discuss.</p>
+      </div>
+      <div>
+        <div class="actions">
+          <a href="/experienced">Learn More</a>
+          <a href="https://app.gfcweather.com">Open the App</a>
+        </div>
+        <div class="progress"><span></span></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="trail">
+    <h2>Every forecast is a step on the trail</h2>
+    <div class="steps">
+      <div class="step"><div class="dot">1</div><h3>Draw</h3><p>Pick a risk area you feel sure about. Start small.</p></div>
+      <div class="step"><div class="dot">2</div><h3>Discuss</h3><p>Write the story behind your call, in your own words.</p></div>
+      <div class="step"><div class="dot">3</div><h3>Monitor</h3><p>Watch radar, reports, and alerts roll in against your forecast.</p></div>
+      <div class="step"><div class="dot">4</div><h3>Verify</h3><p>See how you did, learn where you were right, and try again.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Pricing</a><a href="#">About</a><a href="#">Help / Contact</a><a href="#">Changelog</a>
+  </footer>
+
+<script>
+  const doors = document.getElementById('doors');
+  const items = doors.querySelectorAll('.door');
+  function setOpen(target) { items.forEach(d => d.classList.toggle('open', d === target)); }
+  items.forEach(d => {
+    d.addEventListener('pointerenter', () => setOpen(d));
+    d.addEventListener('focusin', () => setOpen(d));
+    d.addEventListener('click', e => { if (!d.classList.contains('open')) { e.preventDefault(); setOpen(d); } });
+  });
+  doors.addEventListener('pointerleave', () => setOpen(null));
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+  }, { threshold: 0.3 });
+  document.querySelectorAll('.step').forEach((s, i) => { s.style.transitionDelay = (i * 0.12) + 's'; io.observe(s); });
+</script>
+</body>
+</html>

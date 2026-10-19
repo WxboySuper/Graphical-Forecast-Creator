@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC: Create forecasts. Your way.</title>
+<style>
+  :root {
+    --ink: #eef3f5;
+    --ink-soft: #a9bcc4;
+    --bg: #081522;
+    --bg-2: #0e2033;
+    --paper: #f6f1e7;
+    --paper-ink: #17232a;
+    --paper-soft: #55656e;
+    --line: rgba(255,255,255,.12);
+    --mrgl: #7cc576;
+    --slgt: #f5d33b;
+    --cyan: #7dd3fc;
+    --accent-blue: #60a5fa;
+    --brand-blue: #2563eb;
+    --ease: cubic-bezier(.2,.8,.2,1);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  img { display: block; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
+  .eyebrow { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+
+  /* ---------- Top bar ---------- */
+  .top {
+    position: fixed; inset: 0 0 auto 0; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px clamp(18px, 4vw, 56px);
+    transition: background .4s ease, backdrop-filter .4s ease, border-color .4s ease;
+    border-bottom: 1px solid transparent;
+  }
+  .top.scrolled { background: rgba(8,21,34,.82); backdrop-filter: blur(14px); border-color: var(--line); }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: .01em; }
+  .brand .mark { width: 36px; height: 36px; border-radius: 10px; background: rgba(90,215,255,.12); display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(90,215,255,.25); }
+  .brand .mark img { width: 22px; height: 22px; }
+  .top nav { display: flex; gap: 22px; align-items: center; }
+  .top nav a { text-decoration: none; color: var(--ink-soft); font-size: .95rem; }
+  .top nav a:hover { color: var(--ink); }
+  .top .cta { background: var(--ink); color: var(--bg) !important; padding: 9px 16px; border-radius: 999px; font-weight: 700; }
+
+  /* ---------- Buttons ---------- */
+  .ctas { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 15px 26px; border-radius: 999px; font-weight: 700; text-decoration: none; font-size: 1rem; transition: transform .35s var(--ease), box-shadow .35s var(--ease), background .3s ease; }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary { background: var(--brand-blue); color: #fff; box-shadow: 0 10px 40px rgba(37,99,235,.32); }
+  .btn-ghost { color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+  .btn-ghost:hover { background: rgba(255,255,255,.06); }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    position: relative; min-height: 100vh; display: grid; place-items: center; overflow: hidden;
+    padding: 112px clamp(18px, 4vw, 56px) 64px;
+    background: var(--bg);
+  }
+  .hero .bg { position: absolute; inset: -4% -2%; will-change: transform; }
+  .hero .bg img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .18; filter: saturate(.75) blur(2px); }
+  .hero .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,21,34,.22) 0%, rgba(8,21,34,.8) 55%, var(--bg) 100%), radial-gradient(70% 60% at 50% 40%, transparent 0%, var(--bg) 80%); }
+  .hero .copy { position: relative; z-index: 2; text-align: center; max-width: 960px; }
+  .hero h1 { font-size: clamp(3rem, 8vw, 7.2rem); line-height: .92; letter-spacing: -.035em; margin: 14px 0 20px; }
+  .hero h1 .light { color: var(--accent-blue); }
+  .hero .sub { max-width: 620px; margin: 0 auto; color: var(--ink-soft); font-size: clamp(1.05rem, 1.7vw, 1.3rem); line-height: 1.55; }
+  .hero .ctas { margin-top: 34px; }
+  .hero .fine { color: var(--ink-soft); font-size: .95rem; margin: 16px auto 0; max-width: none; text-align: center; }
+
+  .window {
+    position: relative; z-index: 2; width: min(1640px, 94vw); margin: 40px auto 0;
+    border-radius: 22px; overflow: hidden; background: #0a1a2a;
+    box-shadow: 0 60px 140px rgba(0,0,0,.6), 0 0 0 1px var(--line);
+    transform: perspective(1600px) rotateX(10deg) scale(.96);
+    transform-origin: 50% 0;
+    transition: transform 1.2s var(--ease);
+  }
+  .hero.in .window { transform: perspective(1600px) rotateX(0deg) scale(1); }
+  .window .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #0c1b2b; border-bottom: 1px solid var(--line); }
+  .window .bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.18); }
+  .window .bar span { margin-left: 10px; color: var(--ink-soft); font-size: .8rem; }
+  .window img { width: 100%; height: auto; display: block; }
+  .scroll-cue { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 2; color: var(--ink-soft); }
+  .scroll-cue span { display: block; width: 1px; height: 36px; margin: 8px auto 0; background: linear-gradient(var(--ink-soft), transparent); animation: cue 2.2s var(--ease) infinite; transform-origin: top; }
+  @keyframes cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
+
+  /* ---------- Story (pinned on desktop, stacked on mobile) ---------- */
+  .story { position: relative; height: 420vh; }
+  .stage { position: sticky; top: 0; height: 100vh; overflow: hidden; background: radial-gradient(120% 100% at 30% 50%, #102b45 0%, var(--bg) 70%); }
+  .beat {
+    position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, .6fr);
+    gap: clamp(24px, 3vw, 70px); align-items: center;
+    padding: 96px clamp(18px, 4vw, 80px) 48px;
+    opacity: 0; transition: opacity .8s var(--ease);
+  }
+  .beat.active { opacity: 1; }
+  .shot { position: relative; display: flex; flex-direction: column; width: 100%; max-height: 84vh; border: 1px solid rgba(125,211,252,.2); border-radius: 24px; overflow: hidden; background: #0c1b2b; box-shadow: 0 40px 100px rgba(0,0,0,.42), 0 0 40px rgba(37,99,235,.1); }
+  .shot .cap { display: none; }
+  /* Story beats show the real product, framed like the hero window. */
+  .shot-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #0c1b2b; border-bottom: 1px solid var(--line); }
+  .shot-bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.18); }
+  .shot-bar span { margin-left: 10px; color: var(--ink-soft); font-size: .8rem; }
+  .shot-img { flex: 0 1 auto; min-height: 0; width: 100%; aspect-ratio: 1920 / 1080; object-fit: cover; object-position: center; display: block; }
+  .copy h2 { font-size: clamp(2.2rem, 4.4vw, 3.9rem); line-height: 1; letter-spacing: -.03em; margin: 10px 0 16px; }
+  .copy .num { font-family: "IBM Plex Mono", Consolas, monospace; color: var(--accent-blue); font-size: .9rem; }
+  .copy p { color: var(--ink-soft); font-size: 1.12rem; line-height: 1.6; max-width: 440px; margin: 0; }
+  .rail { position: absolute; right: clamp(10px, 2vw, 26px); top: 50%; transform: translateY(-50%); display: grid; gap: 14px; z-index: 3; }
+  .rail span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.22); transition: background .4s ease, transform .4s ease; }
+  .rail span.active { background: var(--accent-blue); transform: scale(1.4); }
+
+  /* ---------- Doors ---------- */
+  .doors-section { position: relative; padding: 120px clamp(14px, 3vw, 40px) 100px; background: var(--bg); }
+  .section-head { max-width: 1640px; margin: 0 auto 36px; }
+  .section-head h2 { font-size: clamp(2.2rem, 4.8vw, 4.6rem); letter-spacing: -.03em; line-height: 1; margin: 12px 0 0; }
+  .doors { max-width: 1640px; margin: 0 auto; height: min(78vh, 880px); display: flex; gap: 14px; }
+  .door { position: relative; flex: 1 1 0; border: 1px solid rgba(125,211,252,.18); border-radius: 28px; overflow: hidden; outline: none; display: flex; flex-direction: column; justify-content: flex-end; padding: clamp(22px, 3vw, 40px); transition: flex .8s var(--ease), border-color .4s ease, box-shadow .4s ease; isolation: isolate; background: linear-gradient(180deg, #10243a 0%, #0b1b2c 68%, #0a1726 100%); box-shadow: 0 24px 60px rgba(0,0,0,.22); }
+  .door .art { position: absolute; inset: 22px 22px auto; z-index: -2; width: calc(100% - 44px); height: 58%; object-fit: contain; object-position: center; background: #e8eef3; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; box-shadow: 0 18px 42px rgba(0,0,0,.28); transition: transform 1.1s var(--ease), opacity .6s ease, filter .6s ease; }
+  .door::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 60%, #0b1b2c 74%); pointer-events: none; }
+  .door.beginner .art { object-position: center; }
+  .door.experienced .art { object-position: center; }
+  .door.open .art { transform: translateY(-3px); }
+  .doors.has-open .door:not(.open) .art { opacity: .42; filter: saturate(.75); }
+  .door.beginner { color: var(--ink); }
+  .door.beginner .eyebrow { color: var(--cyan); }
+  .door.beginner p { color: var(--ink-soft); }
+  .door.experienced { color: var(--ink); }
+  .door h3 { font-size: clamp(2.2rem, 4.4vw, 4.2rem); line-height: .95; letter-spacing: -.035em; margin: 12px 0 14px; }
+  .door p { font-size: clamp(1rem, 1.4vw, 1.2rem); line-height: 1.55; margin: 0; max-width: 460px; opacity: .9; }
+  .door .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .8s var(--ease), opacity .6s ease; }
+  .door.open .actions, .door:focus-within .actions { max-height: 120px; opacity: 1; }
+  .door .actions a { padding: 13px 20px; border-radius: 999px; font-weight: 700; text-decoration: none; }
+  .door.beginner .actions a:first-child { background: rgba(125,211,252,.12); color: var(--cyan); }
+  .door.beginner .actions a:last-child { background: var(--brand-blue); color: #fff; }
+  .door.experienced .actions a:first-child { box-shadow: inset 0 0 0 1px var(--cyan); color: var(--cyan); }
+  .door.experienced .actions a:last-child { background: var(--cyan); color: #04202a; }
+  .doors.has-open .door:not(.open) { flex: .6; }
+  .doors.has-open .door.open { flex: 2.5; }
+  .doors.has-open .door:not(.open) h3 { font-size: clamp(1.35rem, 2.2vw, 2rem); overflow-wrap: anywhere; }
+  .door:focus-visible { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--cyan); }
+
+  /* ---------- Gallery ---------- */
+  .gallery { padding: 40px 0 120px; }
+  .gallery-head { max-width: 1640px; margin: 0 auto 28px; padding: 0 clamp(18px, 4vw, 56px); display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+  .gallery-head h2 { font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -.03em; margin: 10px 0 0; line-height: 1; }
+  .gallery-head p { color: var(--ink-soft); max-width: 420px; margin: 0; line-height: 1.55; }
+  .track { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px clamp(18px, 4vw, 56px) 20px; scrollbar-width: none; }
+  .track::-webkit-scrollbar { display: none; }
+  .tile { flex: 0 0 min(820px, 84vw); scroll-snap-align: start; border-radius: 24px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+  .tile img { width: 100%; aspect-ratio: 2400 / 1403; object-fit: contain; background: #0b1928; padding: 12px 12px 0; }
+  .tile .meta { padding: 20px 22px 24px; }
+  .tile h3 { margin: 0 0 6px; font-size: 1.35rem; letter-spacing: -.02em; }
+  .tile p { margin: 0; color: var(--ink-soft); line-height: 1.55; font-size: .98rem; }
+
+  /* ---------- What GFC is ---------- */
+  .what { padding: 120px clamp(18px, 4vw, 56px); max-width: 1640px; margin: 0 auto; }
+  .what h2 { font-size: clamp(2.2rem, 4.6vw, 3.8rem); letter-spacing: -.03em; line-height: 1.02; margin: 12px 0 18px; max-width: 880px; }
+  .what .lede { color: var(--ink-soft); font-size: 1.2rem; line-height: 1.6; max-width: 680px; margin: 0 0 56px; }
+  .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .mode { position: relative; background: var(--bg-2); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transform: translateY(40px); transition: opacity .9s var(--ease), transform .9s var(--ease), border-color .4s ease; }
+  .mode.in { opacity: 1; transform: none; }
+  .mode:hover { border-color: rgba(96,165,250,.5); }
+  .mode .thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #0b1928; padding: 8px; }
+  .mode .thumb img { width: 100%; height: 100%; border-radius: 6px; object-fit: contain; }
+  .mode .body { padding: 22px 24px 28px; }
+  .mode .n { font-family: "IBM Plex Mono", Consolas, monospace; font-size: .75rem; color: var(--accent-blue); }
+  .mode h3 { font-size: 1.5rem; margin: 8px 0 8px; letter-spacing: -.02em; }
+  .mode p { color: var(--ink-soft); line-height: 1.55; margin: 0; font-size: .98rem; }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .panel { border-radius: 26px; padding: clamp(26px, 3.4vw, 46px); }
+  .panel.light { background: var(--paper); color: var(--paper-ink); }
+  .panel.light p { color: var(--paper-soft); }
+  .panel.dark { background: var(--bg-2); border: 1px solid var(--line); }
+  .panel h3 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); line-height: 1.05; letter-spacing: -.02em; margin: 10px 0 14px; }
+  .panel p { font-size: 1.05rem; line-height: 1.65; margin: 0 0 14px; }
+  .timeline { margin-top: 18px; display: grid; gap: 10px; }
+  .timeline div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; }
+  .timeline b { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 500; color: var(--accent-blue); font-size: .9rem; }
+  .timeline span { color: var(--ink-soft); font-size: .98rem; line-height: 1.5; }
+
+  /* ---------- Account ---------- */
+  .account { position: relative; overflow: hidden; text-align: center; padding: 140px clamp(18px, 4vw, 56px) 120px; background: radial-gradient(80% 80% at 50% 0%, #16385d 0%, var(--bg) 70%); }
+  .account h2 { font-size: clamp(2.6rem, 6vw, 5.4rem); letter-spacing: -.035em; line-height: .95; margin: 14px auto 22px; max-width: 980px; }
+  .account p { color: var(--ink-soft); font-size: 1.15rem; margin: 0 auto; max-width: 560px; line-height: 1.6; }
+  .account .ctas { margin-top: 36px; }
+
+  /* ---------- Footer ---------- */
+  footer { padding: 34px clamp(18px, 4vw, 56px) 40px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .92rem; }
+  footer .trust { text-align: center; margin: 0 0 18px; }
+  footer .trust span { display: inline-block; padding: 7px 14px; border-radius: 999px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px var(--line); font-family: "IBM Plex Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
+  footer .links { display: flex; flex-wrap: wrap; gap: 14px 26px; justify-content: center; }
+  footer .links a { text-decoration: none; }
+  footer .links a:hover { color: var(--ink); }
+
+  /* ---------- Scale demo ---------- */
+  .scale-demo { margin-top: 16px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 26px; padding: clamp(26px, 3.4vw, 50px); }
+  .scale-demo h3 { font-size: clamp(1.7rem, 2.8vw, 2.5rem); letter-spacing: -.02em; margin: 10px 0 0; }
+  .scale-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+  .scale-note { color: var(--ink-soft); max-width: 480px; margin: 0; line-height: 1.55; min-height: 3.1em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 20px; }
+  .chip { border: 0; border-radius: 12px; padding: 13px 18px; font: 700 .98rem "Bricolage Grotesque", system-ui, sans-serif; color: var(--t); background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); transition: transform .3s var(--ease), box-shadow .3s ease; }
+  .chip:hover { transform: translateY(-2px); }
+  .chip.hatch { background: repeating-linear-gradient(45deg, var(--c) 0 7px, rgba(255,255,255,.35) 7px 9px); }
+  .chip[aria-pressed="true"] { transform: translateY(-4px); box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 5px var(--ink); }
+  .chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .scale-foot { color: var(--ink-soft); font-size: .92rem; margin: 0; }
+
+  /* ---------- Reveal ---------- */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 860px) {
+    .top nav a:not(.cta) { display: none; }
+    .brand .name { display: none; }
+    .hero { min-height: auto; padding-top: 120px; padding-bottom: 40px; }
+    .window { margin-top: 40px; transform: none; border-radius: 16px; }
+    .window .bar span { display: none; }
+    .window img { aspect-ratio: 4 / 3; object-position: 30% 0%; }
+    .scroll-cue { display: none; }
+
+    .story { height: auto; }
+    .stage { position: relative; height: auto; overflow: visible; padding: 20px 0 10px; }
+    .beat { position: relative; inset: auto; display: block; opacity: 1; padding: 36px clamp(18px, 4vw, 30px) 56px; }
+    .shot { height: auto; max-height: none; margin-bottom: 26px; border-radius: 18px; }
+    .copy h2 { font-size: 2.4rem; }
+    .copy p { max-width: none; font-size: 1.05rem; }
+    .rail { display: none; }
+
+    .doors { flex-direction: column; height: auto; gap: 12px; }
+    .door { flex: 0 0 auto; min-height: 260px; }
+    .doors.has-open .door:not(.open) { flex: 0 0 auto; min-height: 150px; }
+    .doors.has-open .door:not(.open) h3 { font-size: 2rem; }
+    .doors.has-open .door:not(.open) p { display: none; }
+    .door .actions { max-height: none; opacity: 1; }
+
+    .modes { grid-template-columns: 1fr 1fr; }
+    .split { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .modes { grid-template-columns: 1fr; }
+    .timeline div { grid-template-columns: 74px 1fr; }
+    .top .cta { padding: 8px 12px; font-size: .9rem; }
+    .hero h1 { font-size: 3.1rem; }
+    .account { padding-top: 100px; }
+    .tile { flex-basis: 84vw; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal, .mode { opacity: 1; transform: none; }
+    .window { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top" id="top">
+  <a class="brand" href="#">
+    <span class="mark"><img src="assets/cloud.png" alt=""></span>
+    <span class="name">Graphical Forecast Creator</span>
+  </a>
+  <nav>
+    <a href="#what">What it is</a>
+    <a href="#doors">Start</a>
+    <a href="#changelog">Changelog</a>
+    <a href="#help">Help</a>
+    <a class="cta" href="https://app.gfcweather.com">Open the App</a>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="hero">
+  <div class="bg" id="heroBg"><img src="assets/live/live-forecast-desktop.png" alt=""></div>
+  <div class="copy">
+    <div class="eyebrow">Graphical Forecast Creator</div>
+    <h1>Create forecasts. <span class="light">Your way.</span></h1>
+    <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
+    <div class="ctas" style="margin-top:34px">
+      <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+      <a class="btn btn-ghost" href="https://app.gfcweather.com">Continue Without Account</a>
+    </div>
+    <p class="fine">Accounts unlock features, but you can start without one.</p>
+  </div>
+  <div class="window" id="heroWindow">
+    <div class="bar"><i></i><i></i><i></i><span class="mono">app.gfcweather.com · Forecast</span></div>
+    <img src="assets/live/live-drawn-outlook-desktop.png" alt="The GFC forecast editor with a drawn outlook over the central United States">
+  </div>
+  <div class="scroll-cue" aria-hidden="true"><div class="eyebrow">Scroll</div><span></span></div>
+</section>
+
+<!-- STORY -->
+<section class="story" id="story">
+  <div class="stage">
+    <div class="beat" data-step="0">
+      <figure class="shot" style="margin:0" aria-label="The GFC forecast editor with the drawing dock and tornado probability legend">
+        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Forecast</span></div>
+        <img class="shot-img" src="assets/live/live-draw-inuse.png" alt="The GFC forecast editor mid-draw: a tornado probability outlook with nested 15% and 30% polygons over the Plains, legend and drawing dock live">
+      </figure>
+      <div class="copy">
+        <div class="num">01 / DRAW</div>
+        <h2>Paint your call.</h2>
+        <p>Pick a category, pick an area, and draw the risk you think is coming. Start with something you feel sure about. You can always go bigger later.</p>
+      </div>
+    </div>
+    <div class="beat" data-step="1">
+      <figure class="shot" style="margin:0" aria-label="The GFC discussion workspace with an editor and live preview">
+        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Discussion</span></div>
+        <img class="shot-img" src="assets/live/live-discuss-inuse.png" alt="The GFC discussion editor with a written severe weather discussion and its formatted live preview">
+      </figure>
+      <div class="copy">
+        <div class="num">02 / DISCUSS</div>
+        <h2>Explain your reasoning.</h2>
+        <p>Write the story behind the call in your own words. What did the models show, what made you confident, and what would change your mind?</p>
+      </div>
+    </div>
+    <div class="beat" data-step="2">
+      <figure class="shot" style="margin:0" aria-label="GFC Monitor with live radar, satellite, and NWS alert controls beside the map">
+        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Monitor</span></div>
+        <img class="shot-img" src="assets/live/live-monitor-inuse.png" alt="The GFC monitor with live base reflectivity radar painting on the map and NWS watches and warnings enabled">
+      </figure>
+      <div class="copy">
+        <div class="num">03 / MONITOR</div>
+        <h2>Watch it play out.</h2>
+        <p>Follow radar, satellite, SPC reports, and NWS alerts against the forecast you made, as the day unfolds.</p>
+      </div>
+    </div>
+    <div class="beat" data-step="3">
+      <figure class="shot" style="margin:0" aria-label="The GFC verification workspace grading a forecast against SPC evidence">
+        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Verification</span></div>
+        <img class="shot-img" src="assets/live/live-verify-inuse.png" alt="The GFC verification workspace grading a tornado outlook against SPC storm reports, evidence map populated and an overall grade scored">
+      </figure>
+      <div class="copy">
+        <div class="num">04 / VERIFY</div>
+        <h2>See what held up.</h2>
+        <p>Compare your call with what happened. Find where you were right, where you missed, and what to try on your next forecast.</p>
+      </div>
+    </div>
+    <div class="rail" aria-hidden="true"><span class="active"></span><span></span><span></span><span></span></div>
+  </div>
+</section>
+
+<!-- DOORS -->
+<section class="doors-section" id="doors">
+  <div class="section-head reveal">
+    <div class="eyebrow">Two ways in</div>
+    <h2>Pick your door.</h2>
+  </div>
+  <main class="doors" id="doorsRow">
+    <section class="door beginner" tabindex="0" data-door="beginner" aria-label="Beginner">
+      <img class="art" src="assets/live/live-drawn-outlook-desktop.png" alt="">
+      <div class="eyebrow">Beginner</div>
+      <h3>New to forecasting?</h3>
+      <p>Start here — no experience needed. Draw your first forecast in minutes.</p>
+      <div class="actions">
+        <a href="/beginners">Learn More</a>
+        <a href="https://app.gfcweather.com">Open the App</a>
+      </div>
+    </section>
+    <section class="door experienced" tabindex="0" data-door="experienced" aria-label="Experienced">
+      <img class="art" src="assets/live/live-monitor-desktop.png" alt="">
+      <div class="eyebrow">Experienced</div>
+      <h3>Experienced?</h3>
+      <p>Jump in — you already know what you're doing. Draw, verify, discuss.</p>
+      <div class="actions">
+        <a href="/experienced">Learn More</a>
+        <a href="https://app.gfcweather.com">Open the App</a>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- GALLERY -->
+<section class="gallery" id="gallery">
+  <div class="gallery-head reveal">
+    <div>
+      <div class="eyebrow">Inside the app</div>
+      <h2>Tools you can see.</h2>
+    </div>
+    <p>Real screens from GFC. Swipe, or scroll sideways.</p>
+  </div>
+  <div class="track">
+    <article class="tile">
+      <img src="assets/live/live-drawn-outlook-desktop.png" alt="The GFC outlook map with a drawn probability outlook and drawing tools">
+      <div class="meta">
+        <h3>Outlook map</h3>
+        <p>Pan and zoom over a real map, pick a probability level from the scale, and draw the area you expect.</p>
+      </div>
+    </article>
+    <article class="tile tile-verification">
+      <img src="assets/live/live-verification-desktop.png" alt="The verification workspace grading a forecast">
+      <div class="meta">
+        <h3>Verification</h3>
+        <p>Grade a forecast against SPC storm reports and NOAA damage surveys, then see where it held up.</p>
+      </div>
+    </article>
+    <article class="tile tile-monitor">
+      <img src="assets/live/live-monitor-desktop.png" alt="The monitor with radar and satellite layers">
+      <div class="meta">
+        <h3>Monitor</h3>
+        <p>Radar, satellite, SPC reports, and NWS alerts, with playback and refresh.</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- WHAT GFC IS -->
+<section class="what" id="what">
+  <div class="reveal">
+    <div class="eyebrow">What GFC is</div>
+    <h2>A place to make your own forecasts, then check them.</h2>
+    <p class="lede">GFC gives you a map, the tools to draw a forecast on it, and a way to watch and score that forecast later. It is built for people who want to practice the craft: students, enthusiasts, and anyone who likes to know how a call turned out.</p>
+  </div>
+
+  <div class="modes">
+    <article class="mode">
+      <div class="thumb"><img src="assets/live/live-drawn-outlook-desktop.png" alt=""></div>
+      <div class="body">
+        <span class="n">01</span>
+        <h3>Forecast</h3>
+        <p>Draw risk areas on a map. Choose categories, set your confidence, and build the forecast from the ground up.</p>
+      </div>
+    </article>
+    <article class="mode">
+      <div class="thumb"><img src="assets/live/live-discussion-desktop.png" alt="" style="object-position:0% 0%"></div>
+      <div class="body">
+        <span class="n">02</span>
+        <h3>Discussion</h3>
+        <p>Write the reasoning behind each forecast. Share it, read others, and compare how different people read the same setup.</p>
+      </div>
+    </article>
+    <article class="mode">
+      <div class="thumb"><img src="assets/live/live-monitor-desktop.png" alt=""></div>
+      <div class="body">
+        <span class="n">03</span>
+        <h3>Monitor</h3>
+        <p>Keep radar, satellite, reports, and alerts beside your forecast while the event happens, so you can see the call and the reality together.</p>
+      </div>
+    </article>
+    <article class="mode">
+      <div class="thumb"><img src="assets/live/live-verification-desktop.png" alt=""></div>
+      <div class="body">
+        <span class="n">04</span>
+        <h3>Verification</h3>
+        <p>Look back at how a forecast held up. Review hits and misses, track trends in your own calls, and see what to adjust next time.</p>
+      </div>
+    </article>
+  </div>
+
+  <div class="scale-demo reveal">
+    <div class="scale-head">
+      <div>
+        <div class="eyebrow">Try the scale</div>
+        <h3>Pick a level. Read what it means.</h3>
+      </div>
+      <p class="scale-note" id="scaleNote" aria-live="polite">Select a level from the same probability scale the forecast editor uses.</p>
+    </div>
+    <div class="chips" role="group" aria-label="Probability scale">
+      <button class="chip" style="--c:#7cc576;--t:#10261a" aria-pressed="false" data-note="The lowest level. Broad areas with a small chance of a tornado.">2%</button>
+      <button class="chip" style="--c:#b99a86;--t:#241913" aria-pressed="false" data-note="A small step up from the lowest level.">5%</button>
+      <button class="chip" style="--c:#ffe066;--t:#2a2306" aria-pressed="false" data-note="Enough chance to watch closely. Often used on the outer edge of a setup.">10%</button>
+      <button class="chip" style="--c:#ff7f7f;--t:#2a0c0c" aria-pressed="false" data-note="An elevated chance for a tornado within the area.">15%</button>
+      <button class="chip" style="--c:#ff5ce6;--t:#2a0a26" aria-pressed="false" data-note="High enough that a tornado is a real concern in the area.">30%</button>
+      <button class="chip" style="--c:#c59bf0;--t:#1d1030" aria-pressed="false" data-note="A very high chance, usually in a smaller area.">45%</button>
+      <button class="chip" style="--c:#0f4c86;--t:#eaf4ff" aria-pressed="false" data-note="The highest levels are rare and reserved for the strongest setups.">60%</button>
+      <button class="chip hatch" style="--c:#c9ced2;--t:#1c2327" aria-pressed="false" data-note="Hatching marks conditional intensity: the potential for stronger tornadoes if they form.">CIG1</button>
+      <button class="chip hatch" style="--c:#b5bcc1;--t:#1c2327" aria-pressed="false" data-note="A higher intensity group, layered over a probability level.">CIG2</button>
+      <button class="chip hatch" style="--c:#9aa2a8;--t:#1c2327" aria-pressed="false" data-note="The highest intensity group on the scale.">CIG3</button>
+    </div>
+    <p class="scale-foot">Levels follow the SPC-style scale in the app. It is a tool for your own forecast, not an official product.</p>
+  </div>
+
+  <div class="split">
+    <div class="panel light reveal">
+      <div class="eyebrow" style="color:#55656e">Where it came from</div>
+      <h3>Started as an outlook builder.</h3>
+      <p>GFC began as a tool for drawing SPC-style convective outlooks, using the same categorical risk levels people see on official outlook maps.</p>
+      <p>It is growing to cover more kinds of weather: severe, winter, and tropical forecasting.</p>
+    </div>
+    <div class="panel dark reveal">
+      <div class="eyebrow">What it is not</div>
+      <h3>An official source.</h3>
+      <p>GFC is a tool for enthusiasts to build and check their own forecasts. Forecasts made in GFC are not official products and are not warnings.</p>
+      <p>For official forecasts and warnings, check your national weather service.</p>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="panel dark reveal">
+      <div class="eyebrow">How to start</div>
+      <h3>Start small. Build up.</h3>
+      <div class="timeline">
+        <div><b>Step 1</b><span>Draw one forecast on a day you feel confident about.</span></div>
+        <div><b>Step 2</b><span>Write a short reason for each risk area you drew.</span></div>
+        <div><b>Step 3</b><span>Watch what happened, then review where your call held up.</span></div>
+        <div><b>Step 4</b><span>Take on a harder setup when you are ready. Severe, winter, and tropical are all on the way.</span></div>
+      </div>
+    </div>
+    <div class="panel light reveal">
+      <div class="eyebrow" style="color:#55656e">Pricing</div>
+      <h3>Forecasting stays free.</h3>
+      <p>The core tools for drawing, discussing, monitoring, and verifying forecasts are free. Premium is optional and adds extras. It never gates the core tools.</p>
+      <p>Accounts unlock features, but you can start without one.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ACCOUNT -->
+<section class="account" id="account">
+  <div class="reveal">
+    <div class="eyebrow">Ready when you are</div>
+    <h2>Make your first forecast today.</h2>
+    <p>Create an account to save your work and unlock features. Or jump straight in and start drawing.</p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+      <a class="btn btn-ghost" href="https://app.gfcweather.com">Continue Without Account</a>
+    </div>
+  </div>
+</section>
+
+<footer id="help">
+  <p class="trust"><span>Unofficial forecasts · Not for safety decisions</span></p>
+  <div class="links">
+    <a href="#">Privacy Policy</a>
+    <a href="#">Terms of Service</a>
+    <a href="#">Pricing</a>
+    <a href="#">About</a>
+    <a href="#">Help / Contact</a>
+    <a href="#changelog" id="changelog">Changelog</a>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+  const top = document.getElementById('top');
+  const heroBg = document.getElementById('heroBg');
+  const heroWindow = document.getElementById('heroWindow');
+  const hero = document.getElementById('hero');
+  const storyEl = document.getElementById('story');
+  const beats = [...storyEl.querySelectorAll('.beat')];
+  const rail = [...storyEl.querySelectorAll('.rail span')];
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Scroll state: nav background, hero parallax, and which story beat is showing.
+  function onScroll() {
+    const y = window.scrollY;
+    top.classList.toggle('scrolled', y > 40);
+    if (!reduceMotion && y < window.innerHeight * 1.2) {
+      heroBg.style.transform = `translate3d(0, ${y * .18}px, 0)`;
+    }
+    const total = storyEl.offsetHeight - window.innerHeight;
+    const p = total > 0 ? clamp(-storyEl.getBoundingClientRect().top / total) : 0;
+    const idx = Math.min(beats.length - 1, Math.floor(clamp(p, 0, .9999) * beats.length));
+    beats.forEach((b, i) => b.classList.toggle('active', i === idx));
+    rail.forEach((r, i) => r.classList.toggle('active', i === idx));
+  }
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) { requestAnimationFrame(() => { onScroll(); ticking = false; }); ticking = true; }
+  }, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
+  // Hero window tilts flat once the page loads.
+  requestAnimationFrame(() => setTimeout(() => hero.classList.add('in'), 120));
+
+  // Doors: hover, focus, and tap expand.
+  const doorsRow = document.getElementById('doorsRow');
+  const doors = doorsRow.querySelectorAll('.door');
+  function setOpen(target) {
+    doors.forEach(d => d.classList.toggle('open', d === target));
+    doorsRow.classList.toggle('has-open', !!target);
+  }
+  doors.forEach(d => {
+    d.addEventListener('pointerenter', () => setOpen(d));
+    d.addEventListener('focusin', () => setOpen(d));
+    d.addEventListener('click', e => { if (!d.classList.contains('open')) { e.preventDefault(); setOpen(d); } });
+  });
+  doorsRow.addEventListener('pointerleave', () => setOpen(null));
+
+  // Probability scale demo.
+  const scaleNote = document.getElementById('scaleNote');
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
+      scaleNote.textContent = chip.dataset.note;
+    });
+  });
+
+  // Reveal on scroll.
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
+  }, { threshold: .18 });
+  document.querySelectorAll('.reveal, .mode').forEach((n, i) => {
+    if (n.classList.contains('mode')) n.style.transitionDelay = ((i % 4) * .08) + 's';
+    io.observe(n);
+  });
+})();
+</script>
+</body>
+</html>
