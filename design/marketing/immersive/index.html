@@ -1,612 +1,620 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GFC: Create forecasts. Your way.</title>
-<style>
-  :root {
-    --ink: #eef3f5;
-    --ink-soft: #a9bcc4;
-    --bg: #081522;
-    --bg-2: #0e2033;
-    --paper: #f6f1e7;
-    --paper-ink: #17232a;
-    --paper-soft: #55656e;
-    --line: rgba(255,255,255,.12);
-    --mrgl: #7cc576;
-    --slgt: #f5d33b;
-    --cyan: #7dd3fc;
-    --accent-blue: #60a5fa;
-    --brand-blue: #2563eb;
-    --ease: cubic-bezier(.2,.8,.2,1);
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
-  }
-  a { color: inherit; }
-  img { display: block; }
-  .mono { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
-  .eyebrow { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>GFC: Create forecasts. Your way.</title><style>
 
-  /* ---------- Top bar ---------- */
-  .top {
-    position: fixed; inset: 0 0 auto 0; z-index: 50;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px clamp(18px, 4vw, 56px);
-    transition: background .4s ease, backdrop-filter .4s ease, border-color .4s ease;
-    border-bottom: 1px solid transparent;
-  }
-  .top.scrolled { background: rgba(8,21,34,.82); backdrop-filter: blur(14px); border-color: var(--line); }
-  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; letter-spacing: .01em; }
-  .brand .mark { width: 36px; height: 36px; border-radius: 10px; background: rgba(90,215,255,.12); display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(90,215,255,.25); }
-  .brand .mark img { width: 22px; height: 22px; }
-  .top nav { display: flex; gap: 22px; align-items: center; }
-  .top nav a { text-decoration: none; color: var(--ink-soft); font-size: .95rem; }
-  .top nav a:hover { color: var(--ink); }
-  .top .cta { background: var(--ink); color: var(--bg) !important; padding: 9px 16px; border-radius: 999px; font-weight: 700; }
-
-  /* ---------- Buttons ---------- */
-  .ctas { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 15px 26px; border-radius: 999px; font-weight: 700; text-decoration: none; font-size: 1rem; transition: transform .35s var(--ease), box-shadow .35s var(--ease), background .3s ease; }
-  .btn:hover { transform: translateY(-2px); }
-  .btn-primary { background: var(--brand-blue); color: #fff; box-shadow: 0 10px 40px rgba(37,99,235,.32); }
-  .btn-ghost { color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
-  .btn-ghost:hover { background: rgba(255,255,255,.06); }
-
-  /* ---------- Hero ---------- */
-  .hero {
-    position: relative; min-height: 100vh; display: grid; place-items: center; overflow: hidden;
-    padding: 112px clamp(18px, 4vw, 56px) 64px;
-    background: var(--bg);
-  }
-  .hero .bg { position: absolute; inset: -4% -2%; will-change: transform; }
-  .hero .bg img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; opacity: .18; filter: saturate(.75) blur(2px); }
-  .hero .bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,21,34,.22) 0%, rgba(8,21,34,.8) 55%, var(--bg) 100%), radial-gradient(70% 60% at 50% 40%, transparent 0%, var(--bg) 80%); }
-  .hero .copy { position: relative; z-index: 2; text-align: center; max-width: 960px; }
-  .hero h1 { font-size: clamp(3rem, 8vw, 7.2rem); line-height: .92; letter-spacing: -.035em; margin: 14px 0 20px; }
-  .hero h1 .light { color: var(--accent-blue); }
-  .hero .sub { max-width: 620px; margin: 0 auto; color: var(--ink-soft); font-size: clamp(1.05rem, 1.7vw, 1.3rem); line-height: 1.55; }
-  .hero .ctas { margin-top: 34px; }
-  .hero .fine { color: var(--ink-soft); font-size: .95rem; margin: 16px auto 0; max-width: none; text-align: center; }
-
-  .window {
-    position: relative; z-index: 2; width: min(1640px, 94vw); margin: 40px auto 0;
-    border-radius: 22px; overflow: hidden; background: #0a1a2a;
-    box-shadow: 0 60px 140px rgba(0,0,0,.6), 0 0 0 1px var(--line);
-    transform: perspective(1600px) rotateX(10deg) scale(.96);
-    transform-origin: 50% 0;
-    transition: transform 1.2s var(--ease);
-  }
-  .hero.in .window { transform: perspective(1600px) rotateX(0deg) scale(1); }
-  .window .bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #0c1b2b; border-bottom: 1px solid var(--line); }
-  .window .bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.18); }
-  .window .bar span { margin-left: 10px; color: var(--ink-soft); font-size: .8rem; }
-  .window img { width: 100%; height: auto; display: block; }
-  .scroll-cue { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 2; color: var(--ink-soft); }
-  .scroll-cue span { display: block; width: 1px; height: 36px; margin: 8px auto 0; background: linear-gradient(var(--ink-soft), transparent); animation: cue 2.2s var(--ease) infinite; transform-origin: top; }
-  @keyframes cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(1); opacity: 0; } }
-
-  /* ---------- Story (pinned on desktop, stacked on mobile) ---------- */
-  .story { position: relative; height: 420vh; }
-  .stage { position: sticky; top: 0; height: 100vh; overflow: hidden; background: radial-gradient(120% 100% at 30% 50%, #102b45 0%, var(--bg) 70%); }
-  .beat {
-    position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, .6fr);
-    gap: clamp(24px, 3vw, 70px); align-items: center;
-    padding: 96px clamp(18px, 4vw, 80px) 48px;
-    opacity: 0; transition: opacity .8s var(--ease);
-  }
-  .beat.active { opacity: 1; }
-  .shot { position: relative; display: flex; flex-direction: column; width: 100%; max-height: 84vh; border: 1px solid rgba(125,211,252,.2); border-radius: 24px; overflow: hidden; background: #0c1b2b; box-shadow: 0 40px 100px rgba(0,0,0,.42), 0 0 40px rgba(37,99,235,.1); }
-  .shot .cap { display: none; }
-  /* Story beats show the real product, framed like the hero window. */
-  .shot-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #0c1b2b; border-bottom: 1px solid var(--line); }
-  .shot-bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.18); }
-  .shot-bar span { margin-left: 10px; color: var(--ink-soft); font-size: .8rem; }
-  .shot-img { flex: 0 1 auto; min-height: 0; width: 100%; aspect-ratio: 1920 / 1080; object-fit: cover; object-position: center; display: block; }
-  .copy h2 { font-size: clamp(2.2rem, 4.4vw, 3.9rem); line-height: 1; letter-spacing: -.03em; margin: 10px 0 16px; }
-  .copy .num { font-family: "IBM Plex Mono", Consolas, monospace; color: var(--accent-blue); font-size: .9rem; }
-  .copy p { color: var(--ink-soft); font-size: 1.12rem; line-height: 1.6; max-width: 440px; margin: 0; }
-  .rail { position: absolute; right: clamp(10px, 2vw, 26px); top: 50%; transform: translateY(-50%); display: grid; gap: 14px; z-index: 3; }
-  .rail span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.22); transition: background .4s ease, transform .4s ease; }
-  .rail span.active { background: var(--accent-blue); transform: scale(1.4); }
-
-  /* ---------- Doors ---------- */
-  .doors-section { position: relative; padding: 120px clamp(14px, 3vw, 40px) 100px; background: var(--bg); }
-  .section-head { max-width: 1640px; margin: 0 auto 36px; }
-  .section-head h2 { font-size: clamp(2.2rem, 4.8vw, 4.6rem); letter-spacing: -.03em; line-height: 1; margin: 12px 0 0; }
-  .doors { max-width: 1640px; margin: 0 auto; height: min(78vh, 880px); display: flex; gap: 14px; }
-  .door { position: relative; flex: 1 1 0; border: 1px solid rgba(125,211,252,.18); border-radius: 28px; overflow: hidden; outline: none; display: flex; flex-direction: column; justify-content: flex-end; padding: clamp(22px, 3vw, 40px); transition: flex .8s var(--ease), border-color .4s ease, box-shadow .4s ease; isolation: isolate; background: linear-gradient(180deg, #10243a 0%, #0b1b2c 68%, #0a1726 100%); box-shadow: 0 24px 60px rgba(0,0,0,.22); }
-  .door .art { position: absolute; inset: 22px 22px auto; z-index: -2; width: calc(100% - 44px); height: 58%; object-fit: contain; object-position: center; background: #e8eef3; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; box-shadow: 0 18px 42px rgba(0,0,0,.28); transition: transform 1.1s var(--ease), opacity .6s ease, filter .6s ease; }
-  .door::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 60%, #0b1b2c 74%); pointer-events: none; }
-  .door.beginner .art { object-position: center; }
-  .door.experienced .art { object-position: center; }
-  .door.open .art { transform: translateY(-3px); }
-  .doors.has-open .door:not(.open) .art { opacity: .42; filter: saturate(.75); }
-  .door.beginner { color: var(--ink); }
-  .door.beginner .eyebrow { color: var(--cyan); }
-  .door.beginner p { color: var(--ink-soft); }
-  .door.experienced { color: var(--ink); }
-  .door h3 { font-size: clamp(2.2rem, 4.4vw, 4.2rem); line-height: .95; letter-spacing: -.035em; margin: 12px 0 14px; }
-  .door p { font-size: clamp(1rem, 1.4vw, 1.2rem); line-height: 1.55; margin: 0; max-width: 460px; opacity: .9; }
-  .door .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; max-height: 0; opacity: 0; overflow: hidden; transition: max-height .8s var(--ease), opacity .6s ease; }
-  .door.open .actions, .door:focus-within .actions { max-height: 120px; opacity: 1; }
-  .door .actions a { padding: 13px 20px; border-radius: 999px; font-weight: 700; text-decoration: none; }
-  .door.beginner .actions a:first-child { background: rgba(125,211,252,.12); color: var(--cyan); }
-  .door.beginner .actions a:last-child { background: var(--brand-blue); color: #fff; }
-  .door.experienced .actions a:first-child { box-shadow: inset 0 0 0 1px var(--cyan); color: var(--cyan); }
-  .door.experienced .actions a:last-child { background: var(--cyan); color: #04202a; }
-  .doors.has-open .door:not(.open) { flex: .6; }
-  .doors.has-open .door.open { flex: 2.5; }
-  .doors.has-open .door:not(.open) h3 { font-size: clamp(1.35rem, 2.2vw, 2rem); overflow-wrap: anywhere; }
-  .door:focus-visible { box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--cyan); }
-
-  /* ---------- Gallery ---------- */
-  .gallery { padding: 40px 0 120px; }
-  .gallery-head { max-width: 1640px; margin: 0 auto 28px; padding: 0 clamp(18px, 4vw, 56px); display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
-  .gallery-head h2 { font-size: clamp(2rem, 4vw, 3.2rem); letter-spacing: -.03em; margin: 10px 0 0; line-height: 1; }
-  .gallery-head p { color: var(--ink-soft); max-width: 420px; margin: 0; line-height: 1.55; }
-  .track { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 6px clamp(18px, 4vw, 56px) 20px; scrollbar-width: none; }
-  .track::-webkit-scrollbar { display: none; }
-  .tile { flex: 0 0 min(820px, 84vw); scroll-snap-align: start; border-radius: 24px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
-  .tile img { width: 100%; aspect-ratio: 2400 / 1403; object-fit: contain; background: #0b1928; padding: 12px 12px 0; }
-  .tile .meta { padding: 20px 22px 24px; }
-  .tile h3 { margin: 0 0 6px; font-size: 1.35rem; letter-spacing: -.02em; }
-  .tile p { margin: 0; color: var(--ink-soft); line-height: 1.55; font-size: .98rem; }
-
-  /* ---------- What GFC is ---------- */
-  .what { padding: 120px clamp(18px, 4vw, 56px); max-width: 1640px; margin: 0 auto; }
-  .what h2 { font-size: clamp(2.2rem, 4.6vw, 3.8rem); letter-spacing: -.03em; line-height: 1.02; margin: 12px 0 18px; max-width: 880px; }
-  .what .lede { color: var(--ink-soft); font-size: 1.2rem; line-height: 1.6; max-width: 680px; margin: 0 0 56px; }
-  .modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .mode { position: relative; background: var(--bg-2); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; opacity: 0; transform: translateY(40px); transition: opacity .9s var(--ease), transform .9s var(--ease), border-color .4s ease; }
-  .mode.in { opacity: 1; transform: none; }
-  .mode:hover { border-color: rgba(96,165,250,.5); }
-  .mode .thumb { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: #0b1928; padding: 8px; }
-  .mode .thumb img { width: 100%; height: 100%; border-radius: 6px; object-fit: contain; }
-  .mode .body { padding: 22px 24px 28px; }
-  .mode .n { font-family: "IBM Plex Mono", Consolas, monospace; font-size: .75rem; color: var(--accent-blue); }
-  .mode h3 { font-size: 1.5rem; margin: 8px 0 8px; letter-spacing: -.02em; }
-  .mode p { color: var(--ink-soft); line-height: 1.55; margin: 0; font-size: .98rem; }
-
-  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-  .panel { border-radius: 26px; padding: clamp(26px, 3.4vw, 46px); }
-  .panel.light { background: var(--paper); color: var(--paper-ink); }
-  .panel.light p { color: var(--paper-soft); }
-  .panel.dark { background: var(--bg-2); border: 1px solid var(--line); }
-  .panel h3 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); line-height: 1.05; letter-spacing: -.02em; margin: 10px 0 14px; }
-  .panel p { font-size: 1.05rem; line-height: 1.65; margin: 0 0 14px; }
-  .timeline { margin-top: 18px; display: grid; gap: 10px; }
-  .timeline div { display: grid; grid-template-columns: 90px 1fr; gap: 12px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 10px; }
-  .timeline b { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 500; color: var(--accent-blue); font-size: .9rem; }
-  .timeline span { color: var(--ink-soft); font-size: .98rem; line-height: 1.5; }
-
-  /* ---------- Account ---------- */
-  .account { position: relative; overflow: hidden; text-align: center; padding: 140px clamp(18px, 4vw, 56px) 120px; background: radial-gradient(80% 80% at 50% 0%, #16385d 0%, var(--bg) 70%); }
-  .account h2 { font-size: clamp(2.6rem, 6vw, 5.4rem); letter-spacing: -.035em; line-height: .95; margin: 14px auto 22px; max-width: 980px; }
-  .account p { color: var(--ink-soft); font-size: 1.15rem; margin: 0 auto; max-width: 560px; line-height: 1.6; }
-  .account .ctas { margin-top: 36px; }
-
-  /* ---------- Footer ---------- */
-  footer { padding: 34px clamp(18px, 4vw, 56px) 40px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .92rem; }
-  footer .trust { text-align: center; margin: 0 0 18px; }
-  footer .trust span { display: inline-block; padding: 7px 14px; border-radius: 999px; background: rgba(255,255,255,.05); box-shadow: inset 0 0 0 1px var(--line); font-family: "IBM Plex Mono", Consolas, monospace; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; }
-  footer .links { display: flex; flex-wrap: wrap; gap: 14px 26px; justify-content: center; }
-  footer .links a { text-decoration: none; }
-  footer .links a:hover { color: var(--ink); }
-
-  /* ---------- Scale demo ---------- */
-  .scale-demo { margin-top: 16px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 26px; padding: clamp(26px, 3.4vw, 50px); }
-  .scale-demo h3 { font-size: clamp(1.7rem, 2.8vw, 2.5rem); letter-spacing: -.02em; margin: 10px 0 0; }
-  .scale-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
-  .scale-note { color: var(--ink-soft); max-width: 480px; margin: 0; line-height: 1.55; min-height: 3.1em; }
-  .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 26px 0 20px; }
-  .chip { border: 0; border-radius: 12px; padding: 13px 18px; font: 700 .98rem "Bricolage Grotesque", system-ui, sans-serif; color: var(--t); background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); transition: transform .3s var(--ease), box-shadow .3s ease; }
-  .chip:hover { transform: translateY(-2px); }
-  .chip.hatch { background: repeating-linear-gradient(45deg, var(--c) 0 7px, rgba(255,255,255,.35) 7px 9px); }
-  .chip[aria-pressed="true"] { transform: translateY(-4px); box-shadow: 0 0 0 3px var(--bg-2), 0 0 0 5px var(--ink); }
-  .chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
-  .scale-foot { color: var(--ink-soft); font-size: .92rem; margin: 0; }
-
-  /* ---------- Reveal ---------- */
-  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 1s var(--ease), transform 1s var(--ease); }
-  .reveal.in { opacity: 1; transform: none; }
-
-  /* ---------- Mobile ---------- */
-  @media (max-width: 860px) {
-    .top nav a:not(.cta) { display: none; }
-    .brand .name { display: none; }
-    .hero { min-height: auto; padding-top: 120px; padding-bottom: 40px; }
-    .window { margin-top: 40px; transform: none; border-radius: 16px; }
-    .window .bar span { display: none; }
-    .window img { aspect-ratio: 4 / 3; object-position: 30% 0%; }
-    .scroll-cue { display: none; }
-
-    .story { height: auto; }
-    .stage { position: relative; height: auto; overflow: visible; padding: 20px 0 10px; }
-    .beat { position: relative; inset: auto; display: block; opacity: 1; padding: 36px clamp(18px, 4vw, 30px) 56px; }
-    .shot { height: auto; max-height: none; margin-bottom: 26px; border-radius: 18px; }
-    .copy h2 { font-size: 2.4rem; }
-    .copy p { max-width: none; font-size: 1.05rem; }
-    .rail { display: none; }
-
-    .doors { flex-direction: column; height: auto; gap: 12px; }
-    .door { flex: 0 0 auto; min-height: 260px; }
-    .doors.has-open .door:not(.open) { flex: 0 0 auto; min-height: 150px; }
-    .doors.has-open .door:not(.open) h3 { font-size: 2rem; }
-    .doors.has-open .door:not(.open) p { display: none; }
-    .door .actions { max-height: none; opacity: 1; }
-
-    .modes { grid-template-columns: 1fr 1fr; }
-    .split { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 560px) {
-    .modes { grid-template-columns: 1fr; }
-    .timeline div { grid-template-columns: 74px 1fr; }
-    .top .cta { padding: 8px 12px; font-size: .9rem; }
-    .hero h1 { font-size: 3.1rem; }
-    .account { padding-top: 100px; }
-    .tile { flex-basis: 84vw; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    *, *::before, *::after { animation: none !important; transition: none !important; }
-    .reveal, .mode { opacity: 1; transform: none; }
-    .window { transform: none; }
-  }
-</style>
-</head>
-<body>
-
+:root{--ink:#eef3f5;--ink-soft:#a9bcc4;--bg:#081522;--bg-2:#0e2033;--line:rgba(255,255,255,.12);--cyan:#7dd3fc;--accent-blue:#60a5fa;--brand-blue:#2563eb;--ease:cubic-bezier(.2,.8,.2,1);
+/* real GFC colors (src/utils/outlookUtils.ts) */
+--tstm:#C1E9C1;--mrgl:#66A366;--slgt:#FFE066;--enh:#FFA366;--mdt:#E06666;--high:#EE99EE;
+--t2:#79BA7A;--t5:#BD998A;--t10:#FFE481;--t15:#FF8080;--t30:#FF80FF;--t45:#C896F7;--t60:#104E8B;
+--app-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}img{display:block}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 clamp(18px,4vw,56px)}
+h2.big{font-size:clamp(2.2rem,4.6vw,4.2rem);letter-spacing:-.03em;line-height:1;margin:12px 0 16px}
+.lede{color:var(--ink-soft);font-size:1.15rem;line-height:1.6;max-width:640px;margin:0}
+section{position:relative}
+/* nav */
+.top{position:fixed;inset:0 0 auto 0;z-index:50;display:flex;justify-content:space-between;align-items:center;padding:14px clamp(18px,4vw,56px);transition:background .4s,border-color .4s;border-bottom:1px solid transparent}
+.top.scrolled{background:rgba(8,21,34,.85);backdrop-filter:blur(14px);border-color:var(--line)}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700}
+.brand .mark{width:36px;height:36px;border-radius:10px;background:rgba(90,215,255,.12);display:grid;place-items:center;box-shadow:inset 0 0 0 1px rgba(90,215,255,.25)}
+.brand .mark img{width:22px;height:22px}
+.top nav{display:flex;gap:22px;align-items:center}
+.top nav a{text-decoration:none;color:var(--ink-soft);font-size:.95rem}.top nav a:hover{color:var(--ink)}
+.top .cta{background:var(--ink);color:var(--bg)!important;padding:9px 16px;border-radius:999px;font-weight:700}
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:15px 26px;border-radius:999px;font-weight:700;text-decoration:none;font-size:1rem;transition:transform .35s var(--ease),background .3s}
+.btn:hover{transform:translateY(-2px)}
+.btn-primary{background:var(--brand-blue);color:#fff;box-shadow:0 10px 40px rgba(37,99,235,.32)}
+.btn-ghost{color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.textlink{color:var(--ink);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(238,243,245,.35);padding:4px 0}
+.textlink:hover{border-color:var(--ink)}
+/* hero */
+.hero{min-height:100vh;padding:120px clamp(18px,4vw,56px) 70px;overflow:hidden;
+ background:radial-gradient(60% 50% at 50% 0%,#13304d 0%,transparent 70%),var(--bg)}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(70% 60% at 50% 30%,#000 0%,transparent 75%);pointer-events:none}
+.hero .copy{position:relative;text-align:center;max-width:960px;margin:0 auto}
+.hero h1{font-size:clamp(3rem,8vw,7.2rem);line-height:.92;letter-spacing:-.035em;margin:14px 0 20px}
+.hero h1 span{display:block}.hero h1 .light{color:var(--accent-blue)}
+.hero .sub{max-width:620px;margin:0 auto;color:var(--ink-soft);font-size:clamp(1.05rem,1.7vw,1.3rem);line-height:1.55}
+.hero .ctas{margin-top:34px;display:flex;justify-content:center;align-items:center;gap:26px;flex-wrap:wrap}
+.hero .fine{color:var(--ink-soft);font-size:.92rem;margin:18px auto 0;text-align:center}
+.hero .heroapp{position:relative;max-width:1180px;margin:52px auto 0}
+.hero .copy{position:relative;text-align:center;max-width:960px;margin:0 auto}
+.hero .heroapp{position:relative;max-width:1180px;margin:52px auto 0}
+.story{height:560vh}
+.stage{position:sticky;top:0;height:100vh;display:grid;grid-template-columns:minmax(0,.58fr) minmax(0,1.9fr);gap:clamp(24px,3.5vw,56px);align-items:center;padding:84px clamp(18px,3.5vw,56px) 30px;background:radial-gradient(100% 90% at 70% 50%,#11304d 0%,var(--bg) 70%)}
+.steps{position:relative;min-height:440px}
+.step{position:absolute;inset:0;opacity:0;transform:translateY(16px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.step.active{opacity:1;transform:none}
+.step .num{font:500 .9rem "IBM Plex Mono",Consolas,monospace;color:var(--accent-blue)}
+.step h2{font-size:clamp(2rem,3.6vw,3.4rem);line-height:1;letter-spacing:-.03em;margin:10px 0 16px}
+.step p{color:var(--ink-soft);font-size:1.06rem;line-height:1.6;margin:0;max-width:400px}
+.step ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:8px;font-size:.96rem}
+.step li:before{content:"→ ";color:var(--accent-blue)}
+.progress{display:flex;gap:8px;position:absolute;bottom:0;left:0}
+.progress span{width:30px;height:4px;border-radius:9px;background:rgba(255,255,255,.18);transition:background .4s}.progress span.on{background:var(--accent-blue)}
+.modechip{display:inline-flex;gap:6px;align-items:center;margin-top:14px;font:500 .78rem "IBM Plex Mono",monospace;color:var(--ink-soft);border:1px solid var(--line);border-radius:99px;padding:5px 11px}
+.pill{font:700 .8rem system-ui,-apple-system,sans-serif;min-width:52px;height:32px;border-radius:10px;border:1px solid rgba(0,0,0,.12);color:#1f2937;display:inline-grid;place-items:center;padding:0 10px}.probrow .pill{height:30px;font-size:.76rem}.pill.on{box-shadow:0 0 0 2px #0f172a,0 0 0 4px rgba(37,99,235,.35)}
+/* ===== App recreation (v1.7.8) ===== */
+.appbox{position:relative;overflow:hidden;border-radius:16px;box-shadow:0 50px 120px rgba(0,0,0,.55),0 0 0 1px rgba(125,211,252,.2);background:#fff}
+.appc{position:absolute;left:0;top:0;width:1000px;height:640px;transform-origin:0 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;color:#111827;background:#fff;overflow:hidden;transition:transform .8s var(--ease)}
+.appc *{box-sizing:border-box}
+.ab{position:absolute;inset:0 0 auto 0;height:44px;display:flex;align-items:center;padding:0 14px;background:#fff;border-bottom:1px solid #e5e7eb;z-index:20;transition:background .6s,border-color .6s,color .6s}
+.ab .lg{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px}
+.ab .lg i{width:28px;height:28px;border-radius:8px;background:#eef4ff;border:1px solid #dbe5f5;display:grid;place-items:center}
+.ab .lg i img{width:16px;height:16px;filter:hue-rotate(10deg) saturate(.6) brightness(.6)}
+.ab nav{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:4px}
+.ab nav span{display:flex;align-items:center;gap:6px;font-size:12px;color:#374151;padding:6px 9px;border-radius:8px;position:relative;font-weight:500}
+.ab nav span svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+.ab nav span.on{background:#eef2fb;color:#111827;font-weight:600}
+.ab nav span.on:after{content:"";position:absolute;left:8px;right:8px;bottom:2px;height:2px;border-radius:2px;background:#3b82f6}
+.ab .rt{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px;font-weight:600}
+.ab .rt .ver{color:#9ca3af;font-weight:500;font-size:10px;padding-right:12px;border-right:1px solid #e5e7eb}
+.ab .rt .moon{width:26px;height:26px;border-radius:99px;display:grid;place-items:center;transition:box-shadow .3s,background .3s}
+.ab .rt .moon.pulse{box-shadow:0 0 0 6px rgba(59,130,246,.35);background:#dbeafe}
+.view{position:absolute;inset:44px 0 0 0;opacity:0;visibility:hidden;transition:opacity .6s var(--ease),visibility .6s}
+.view.on{opacity:1;visibility:visible}
+/* forecast map */
+.vf .map{position:absolute;inset:0 0 70px 0;width:100%;height:calc(100% - 70px);display:block}
+.m-land{fill:#f3f1ea}.m-riv{fill:none;stroke:#a9c9f5;stroke-width:1.6}.m-road{fill:none;stroke:#dcd3c3;stroke-width:1.4}.appc.dark .m-riv{stroke:#1e3a5f}.appc.dark .m-road{stroke:#2b3445}.appc.dark .m-tint{opacity:0}.m-water{fill:#a9c9f5}.m-st{fill:none;stroke:#555;stroke-width:1;opacity:.75}
+.m-slbl{font:500 10px -apple-system,Segoe UI,sans-serif;fill:#6b7280;letter-spacing:.06em}
+.m-city{font:600 10.5px -apple-system,Segoe UI,sans-serif;fill:#1f2937;paint-order:stroke;stroke:#f3f1ea;stroke-width:3}
+.m-big{font:700 13px -apple-system,Segoe UI,sans-serif;fill:#111}
+.poly{stroke:#000;stroke-width:1.6;stroke-linejoin:round;fill-opacity:.82}
+.draw .poly{stroke-dasharray:var(--L);stroke-dashoffset:var(--L);fill-opacity:0;transition:stroke-dashoffset 1s var(--ease) var(--d),fill-opacity .5s ease calc(var(--d) + .75s)}
+.draw.done .poly{stroke-dashoffset:0;fill-opacity:.82}
+.zoom{position:absolute;left:10px;top:10px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.2);display:grid;font-size:14px;font-weight:600;z-index:3}
+.zoom b{width:24px;height:24px;display:grid;place-items:center}.zoom b+b{border-top:1px solid #e5e7eb}
+.lgd{position:absolute;left:14px;bottom:84px;background:rgba(248,250,255,.9);backdrop-filter:blur(14px);border:1px solid rgba(148,163,184,.25);box-shadow:0 18px 36px rgba(15,23,42,.16);border-radius:12px;padding:10px 12px;font-size:11px;color:#333;z-index:3;min-width:150px;transition:opacity .4s}
+.lgd h4{margin:0 0 7px;font-size:13px;font-weight:500;color:#333}
+.lgd .lt{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin:2px 0 4px}
+.lgd .it{display:flex;align-items:center;gap:8px;margin:4px 0}.lgd .sw{width:18px;height:18px;border-radius:2px;border:1px solid rgba(0,0,0,.4)}
+.lgd .muted{color:#555;font-size:11px}
+.unof{position:absolute;left:50%;bottom:80px;transform:translateX(-50%);background:rgba(31,41,55,.88);color:#fff;font-size:9.5px;font-weight:700;letter-spacing:.05em;padding:5px 11px;border-radius:99px;z-index:3;white-space:nowrap}
+.unof:before{content:"● ";color:#f59e0b}
+.dtools{position:absolute;right:12px;bottom:118px;background:#fff;border-radius:12px;box-shadow:0 6px 20px rgba(15,23,42,.18);padding:5px;display:flex;align-items:center;gap:3px;font-size:11px;font-weight:600;z-index:3;width:236px}
+.dtools span{padding:6px 10px;border-radius:8px;color:#111}
+.dtools span.on{background:#111;color:#fff}
+.dtools .sep{width:1px;height:20px;background:#e5e7eb;padding:0;margin:0 4px}
+.dtools .ur{margin-left:auto;color:#cbd5e1;letter-spacing:6px;padding-right:4px}
+.dhelp{position:absolute;right:12px;bottom:82px;width:236px;background:#fff;border-radius:10px;box-shadow:0 6px 20px rgba(15,23,42,.15);padding:7px 10px;font-size:9.5px;line-height:1.4;color:#374151;z-index:3}
+.attr{position:absolute;right:6px;bottom:72px;font-size:8px;color:#555;background:rgba(255,255,255,.7);padding:1px 4px;z-index:2}
+/* toolbar */
+.tbar{position:absolute;left:0;right:0;bottom:0;height:70px;background:#fff;border-top:1px solid #e5e7eb;z-index:4;transition:background .6s}
+.tabs{display:flex;align-items:center;gap:4px;padding:5px 8px 0;height:28px}
+.tabs span{display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:500;color:#374151;padding:4px 9px;border-radius:7px;border:1px solid transparent}
+.tabs span svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+.tabs span.on{border-color:#e5e7eb;box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600;background:#fff}
+.tabs .ctx{margin-left:auto;font-size:8.5px;font-weight:700;letter-spacing:.06em;color:#6b7280;display:flex;gap:8px;align-items:center;border:0;box-shadow:none}
+.tabs .ctx b{color:#111;font-size:10px;letter-spacing:0;font-weight:600}
+.rows{position:relative;height:42px}
+.row{position:absolute;inset:0;display:flex;align-items:center;gap:12px;padding:0 10px;opacity:0;visibility:hidden;transition:opacity .35s}
+.row.on{opacity:1;visibility:visible}
+.lb{font-size:7.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#111;line-height:1.25}
+.lb small{display:block;font-weight:500;color:#555;letter-spacing:.02em}
+.seg{display:flex;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:2px;gap:2px;box-shadow:0 0 0 2px #eef2f7}
+.seg span{font-size:9.5px;font-weight:700;padding:5px 10px;border-radius:6px;color:#334155;transition:background .3s,color .3s}
+.seg span.on{background:#1683f8;color:#fff}
+.tb{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;color:#111;white-space:nowrap}
+.tb.on{background:#1683f8;border-color:#1683f8;color:#fff}
+.tb svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2}
+.pp{min-width:34px;height:26px;border-radius:7px;display:inline-grid;place-items:center;font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.25);transition:box-shadow .3s}
+.pp.on{box-shadow:0 0 0 2px #fff,0 0 0 3.5px #111}
+.cur{display:flex;align-items:center;gap:6px;margin-left:auto}
+.cur .chip{background:#79BA7A;color:#fff;font-size:11px;font-weight:700;border-radius:8px;padding:6px 12px;transition:background .3s}
+.grpbox{display:flex;align-items:center;gap:8px;border:1px solid #e5e7eb;border-radius:10px;padding:4px 8px;background:#f9fafb}
+.sel{display:flex;align-items:center;gap:6px;background:#eef0f3;border-radius:7px;padding:5px 9px;font-size:9.5px;font-weight:600;min-width:120px;justify-content:space-between}
+.sel input{all:unset;font-size:10.5px;font-weight:700;width:110px;color:#111}
+.ib{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;color:#475569;font-size:13px;font-weight:600;transition:background .3s,box-shadow .3s}
+.ib.hot{background:#dbeafe;color:#1d4ed8;box-shadow:0 0 0 2px #93c5fd}
+.ib.dim{color:#cbd5e1}
+.cats{display:flex;gap:6px;align-items:center}
+.cat{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;border:1px solid #e5e7eb;background:#fff;border-radius:8px;padding:4px 9px 4px 5px;transition:box-shadow .3s}
+.cat i{width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.35)}
+.cat.on{box-shadow:0 0 0 2px #1683f8}
+.dn{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font-size:10.5px;font-weight:600;color:#111;transition:background .3s,color .3s}
+.dn.on{background:#1683f8;color:#fff}
+.dn.ghost{box-shadow:inset 0 0 0 1.5px #93c5fd;color:#1d4ed8}
+.stat{border:1px solid #e5e7eb;border-radius:8px;padding:3px 8px;font-size:9.5px;min-width:46px}.stat .lb{font-size:7px}
+/* category editor popover */
+.cated{position:absolute;left:300px;bottom:78px;width:330px;background:#fff;border-radius:12px;box-shadow:0 18px 40px rgba(15,23,42,.25);border:1px solid #e5e7eb;padding:12px;z-index:6;opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s}
+.cated.on{opacity:1;transform:none}
+.cated .h{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;margin-bottom:8px;display:flex;justify-content:space-between}
+.cated .r{display:grid;grid-template-columns:22px 1fr 64px 40px;gap:8px;align-items:center;padding:5px 0;border-top:1px solid #f1f5f9;font-size:11px}
+.cated .r i{width:20px;height:20px;border-radius:5px;border:1px solid rgba(0,0,0,.35)}
+.cated .r code{font:500 10px ui-monospace,Menlo,monospace;color:#475569}
+.cated .r span:last-child{color:#64748b;font-size:10px;text-align:right}
+.cated .add{margin-top:6px;font-size:10px;font-weight:600;color:#1d4ed8}
+.pen2{transition:opacity .3s}
+/* discussion view */
+.vd{background:#fff;display:grid;grid-template-columns:1fr 390px}
+.vd .hd{grid-column:1/3;display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid #e5e7eb;font-size:14px;font-weight:600}
+.badge{font-size:9px;font-weight:600;background:#e5e7eb;border-radius:99px;padding:2px 8px}
+.hd .btns{margin-left:auto;display:flex;gap:8px}.save{background:#22a356;color:#fff;border-color:#22a356}
+.vd .lc{padding:10px 14px;background:#f9fafb;overflow:hidden;border-right:1px solid #e5e7eb}
+.fields{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;font-size:10px;font-weight:600}
+.fields div div{border:1px solid #d1d5db;border-radius:6px;padding:5px 8px;font-weight:400;margin-top:3px;background:#fff;font-size:10.5px}
+.fields small{display:block;font-size:8px;color:#6b7280;font-weight:400;margin-top:2px}
+.ban{margin:10px 0;background:#fdecd6;border:1px solid #f3c48a;border-radius:6px;padding:7px 10px;font-size:10px;color:#9a3412}
+.ban b{color:#9a3412}
+.gtabs{display:flex;width:330px;margin:0 auto 10px;background:#eef0f3;border-radius:9px;padding:3px;font-size:10px}
+.gtabs span{flex:1;text-align:center;padding:5px;border-radius:7px;color:#374151}.gtabs span.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08);font-weight:600}
+.info{border-left:3px solid #3b82f6;background:#fff;padding:7px 10px;font-size:9.5px;color:#374151;margin-bottom:10px}
+.qcard{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.qcard .qh{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.02em}
+.qcard .qh b{width:20px;height:20px;border-radius:99px;background:#1683f8;color:#fff;display:grid;place-items:center;font-size:10px}
+.qcard em{display:block;font-size:9.5px;color:#4b5563;margin:5px 0 7px 28px}
+.qcard .ta{border:1px solid #d1d5db;border-radius:6px;min-height:58px;padding:7px 9px;font-size:10.5px;line-height:1.5;color:#111}
+.qcard .ta.ph{color:#6b7280}
+.caret{display:inline-block;width:1.5px;height:1em;background:#1683f8;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.vd .rc{padding:10px 12px;background:#fff}
+.vd .rc .ph2{font-size:10.5px;font-weight:600;display:flex;gap:6px;align-items:center;margin:4px 0 12px}
+.mono{border:1px solid #e5e7eb;border-radius:6px;padding:12px;font:10px/1.6 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;color:#111;white-space:pre-wrap;height:480px;overflow:hidden}
+/* monitor view */
+.vm{display:grid;grid-template-columns:235px 1fr;background:#f9fafb}
+.vm .side{padding:9px;overflow:hidden;border-right:1px solid #e5e7eb;transition:background .6s,border-color .6s}
+.vm .side h3{margin:0;font-size:15px;font-weight:700}.vm .side p{margin:2px 0 8px;font-size:8.5px;color:#6b7280;line-height:1.35}
+.pn{border:1px solid #e5e7eb;border-radius:8px;margin-bottom:7px;background:#fff;font-size:9.5px;transition:background .6s,border-color .6s}
+.pn .t{display:flex;justify-content:space-between;padding:6px 8px;font-weight:700;border-bottom:1px solid #eef0f3;font-size:9.5px}
+.pn .b{padding:6px 8px;display:grid;gap:6px}
+.pn .selx{border:1px solid #d1d5db;border-radius:5px;padding:4px 7px;display:flex;justify-content:space-between;font-weight:500}
+.ck{display:flex;align-items:center;gap:6px}.ck i{width:11px;height:11px;border-radius:2px;background:#1683f8;position:relative}.ck i:after{content:"✓";position:absolute;inset:-3px 0 0 1px;color:#fff;font-size:9px;font-style:normal}
+.ck.off i{background:#fff;border:1px solid #9ca3af}.ck.off i:after{content:""}
+.vm .mapm{position:relative;overflow:hidden}
+.vm .mapm svg{position:absolute;inset:0;width:100%;height:100%}
+.ro{position:absolute;right:10px;top:10px;background:#1f2937;color:#fff;font-size:9.5px;font-weight:700;padding:6px 10px;border-radius:7px;z-index:3}
+.cell{animation:drift 9s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate(40px,-26px)}}
+.sl{height:4px;border-radius:3px;background:#e5e7eb;position:relative;margin:2px 0}.sl i{position:absolute;left:0;top:0;bottom:0;background:#2563eb;border-radius:3px}.sl i:after{content:"";position:absolute;right:-5px;top:-3px;width:10px;height:10px;border-radius:50%;background:#2563eb}
+.pn small.mt{color:#6b7280;font-size:8.5px}.appc.dark .sl{background:#334155}.appc.dark .pn small.mt{color:#94a3b8}
+.rlg{position:absolute;left:10px;bottom:10px;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:0;background:rgba(15,23,42,.85);color:#cbd5e1;font-size:8px;padding:5px 7px;border-radius:4px;width:168px}.rlg span:first-child{margin-right:5px;font-weight:700}.rlg i{width:18px;height:7px}.rlg span:last-child{width:100%;padding-left:24px}
+.rts{position:absolute;left:10px;top:10px;z-index:3;font-size:8.5px;color:#e2e8f0;background:rgba(15,23,42,.85);padding:4px 7px;border-radius:4px}
+.pn{margin-bottom:5px}.pn .b{gap:4px;padding:5px 8px}
+/* dark mode */
+.appc.dark{background:#0f172a;color:#e5e7eb}
+.appc.dark .ab{background:#0f172a;border-color:#1e293b}
+.appc.dark .ab nav span{color:#cbd5e1}.appc.dark .ab nav span.on{background:#1e293b;color:#fff}
+.appc.dark .ab .lg i{background:#1e293b;border-color:#334155}
+.appc.dark .ab .lg i img{filter:none}
+.appc.dark .vm{background:#0b1220}.appc.dark .vm .side{background:#0f172a;border-color:#1e293b}
+.appc.dark .pn{background:#111c30;border-color:#1e293b}.appc.dark .pn .t{border-color:#1e293b}.appc.dark .pn .selx{border-color:#334155}
+.appc.dark .vm .side p{color:#94a3b8}
+.appc.dark .m-land{fill:#1c2433}.appc.dark .m-water{fill:#0d1626}.appc.dark .m-st{stroke:#64748b}
+.appc.dark .m-city{fill:#cbd5e1;stroke:#1c2433}.appc.dark .m-slbl{fill:#64748b}
+.m-land,.m-water,.m-st,.m-city{transition:fill .6s,stroke .6s}
+.radar,.warn{opacity:0;transition:opacity .8s .3s}.vm.live .radar,.vm.live .warn{opacity:1}
+/* verification */
+.vv{background:linear-gradient(180deg,#f0f5f7,#eef3f5);padding:10px 14px}
+.vv .k{font:700 8px ui-monospace,Menlo,monospace;letter-spacing:.14em;color:#0e7490}
+.vv h2{margin:2px 0 1px;font-size:22px;font-weight:800;letter-spacing:-.02em;color:#111}
+.vv .sub{font-size:9px;color:#4b5563}.vv .sub a{color:#0e7490;text-decoration:none}
+.vgrid{display:grid;grid-template-columns:150px 1fr 200px;gap:10px;margin-top:10px;height:510px}
+.vl{font-size:10px;border-right:1px solid #e2e8f0;padding-right:8px}
+.vl .k{display:block;margin:2px 0 3px}.vl h5{margin:0 0 6px;font-size:11px}
+.pk{background:#e7ecef;border:1px solid #d6dde2;border-radius:6px;padding:6px 8px;font:600 8px/1.7 ui-monospace,Menlo,monospace;color:#0e7490;margin-bottom:7px}.pk span{color:#374151;font-weight:400}
+.vl .tb{font-size:9.5px;margin-bottom:5px}
+.vl .hr{border-top:1px solid #e2e8f0;margin:10px 0}
+.gbtn{background:#0e7490;color:#fff;border-radius:7px;text-align:center;padding:8px;font-weight:700;font-size:10px;margin-top:8px;transition:background .3s}
+.vc .vt{display:flex;gap:4px;background:#fff;padding:5px;border-radius:6px 6px 0 0}
+.vc .vt span{font-size:9px;border:1px solid #e5e7eb;border-radius:5px;padding:5px 8px}
+.vc .vt span.on{background:#0e7490;color:#fff;border-color:#0e7490}
+.vc .vmap{position:relative;height:440px;border:1px solid #d6dde2;border-radius:10px;overflow:hidden;box-shadow:0 6px 20px rgba(15,23,42,.08)}
+.vc .vmap svg{width:100%;height:100%;display:block}
+.rpt{transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .4s cubic-bezier(.3,1.6,.5,1)}
+.vv.go .rpt{transform:scale(1)}
+.vr{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px;font-size:10px;align-self:start}
+.vr h5{margin:0 0 10px;font-size:10.5px}.vr .g{font-size:34px;font-weight:800;letter-spacing:-.03em}.vr .g small{font-size:14px;font-weight:500;color:#374151}
+.vr .smp{display:inline-block;background:#fef3c7;color:#92400e;font-size:8.5px;font-weight:700;border-radius:5px;padding:2px 6px;margin:2px 0 8px}
+.hz{display:grid;grid-template-columns:52px 1fr 24px;gap:6px;align-items:center;padding:5px 0;border-top:1px solid #f1f5f9}
+.hz .bb{height:6px;background:#e5e7eb;border-radius:9px;overflow:hidden}.hz .bb i{display:block;height:100%;width:0;background:#0e7490;transition:width 1.2s var(--ease)}
+.ev{margin-top:8px;font-size:9px;color:#475569;line-height:1.5}
+/* doors */
+.doors-section{padding:130px clamp(14px,3vw,40px) 100px}
+.section-head{max-width:1240px;margin:0 auto 36px}
+.doors{max-width:1240px;margin:0 auto;height:min(80vh,760px);display:flex;gap:14px}
+.door{position:relative;flex:1 1 0;min-width:0;border:1px solid rgba(125,211,252,.18);border-radius:28px;overflow:hidden;outline:none;display:flex;flex-direction:column;padding:clamp(22px,3vw,38px);transition:flex .8s var(--ease),border-color .4s;background:linear-gradient(180deg,#10243a 0%,#0b1b2c 70%);cursor:pointer}
+.door:focus-visible{border-color:var(--accent-blue);box-shadow:0 0 0 3px rgba(96,165,250,.4)}
+.door.open{flex:2.1 1 0;border-color:rgba(125,211,252,.4)}
+.door .eyebrow{color:var(--cyan)}.door.experienced .eyebrow{color:#f9a8d4}
+.door h3{font-size:clamp(2rem,3.6vw,3.4rem);line-height:.95;letter-spacing:-.035em;margin:10px 0 12px;transition:font-size .6s var(--ease)}
+.door .pitch{color:var(--ink-soft);font-size:1.05rem;line-height:1.55;margin:0;max-width:520px}
+.door .demo{margin-top:auto;padding-top:22px;display:grid;gap:12px;opacity:.55;transition:opacity .6s}
+.door.open .demo{opacity:1}
+.door .more{display:grid;gap:12px;max-height:0;opacity:0;overflow:hidden;transition:max-height .8s var(--ease),opacity .6s}
+.door.open .more{max-height:520px;opacity:1}
+.door .actions{display:flex;gap:16px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.door .hint{font:500 .75rem "IBM Plex Mono",monospace;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase}
+.door.open .hint{display:none}
+.doors.has-open .door:not(.open) h3{font-size:clamp(1.5rem,2.4vw,2.2rem)}
+.doors.has-open .door:not(.open) .pitch{display:none}
+.frag{font-family:var(--app-font);background:#fff;color:#0f172a;border-radius:14px;padding:14px;box-shadow:0 14px 34px rgba(0,0,0,.3)}
+.frag .t{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:8px;display:flex;justify-content:space-between}
+.guide{display:grid;gap:7px}
+.guide div{display:flex;gap:10px;align-items:center;font-size:.88rem}
+.guide b{width:22px;height:22px;border-radius:99px;display:grid;place-items:center;font-size:.72rem;background:#e2e8f0;color:#334155;flex:none}
+.guide .done b{background:#22c55e;color:#fff}.guide .now b{background:#2563eb;color:#fff}
+.guide .done span{color:#64748b;text-decoration:line-through}
+.tip{position:relative;display:flex;gap:12px;align-items:flex-start}
+.tip .sw{width:40px;height:40px;border-radius:8px;background:var(--slgt);border:2px solid #000;flex:none}
+.tip p{margin:0;font-size:.88rem;line-height:1.5}.tip strong{display:block;font-size:.95rem}
+.tpls{display:flex;gap:8px;flex-wrap:wrap}.tpls span{font-size:.8rem;font-weight:600;padding:7px 10px;border-radius:10px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+.probrow{display:flex;gap:5px;flex-wrap:wrap}.probrow .pill{min-width:46px;height:30px;font-size:.76rem}
+.kbd{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:.84rem;align-items:center}
+kbd{font:600 .74rem "IBM Plex Mono",monospace;background:#f1f5f9;border:1px solid #cbd5e1;border-bottom-width:2px;border-radius:6px;padding:2px 7px;color:#0f172a}
+.vstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.vstats div{background:#f8fafc;border-radius:10px;padding:8px}.vstats b{display:block;font-size:1.25rem}.vstats small{font-size:.7rem;color:#64748b}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hatches{display:flex;gap:8px}.hatches div{flex:1;text-align:center;font-size:.72rem;font-weight:700}
+.hatches i{display:block;height:34px;border:1.5px solid #000;border-radius:4px;margin-bottom:4px;background:#fff}
+/* bento */
+.bento-sec{padding:90px 0}
+.bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:minmax(200px,auto);gap:14px;margin-top:40px}
+.tile{border-radius:22px;padding:22px;background:linear-gradient(180deg,#0f2338,#0b1a2a);border:1px solid var(--line);display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.tile h3{margin:0;font-size:1.3rem;letter-spacing:-.02em}.tile p{margin:0;color:var(--ink-soft);line-height:1.5;font-size:.96rem}
+.tile .viz{margin-top:auto}
+.t-a{grid-column:span 2;grid-row:span 2}.t-b{grid-column:span 2}.t-f{grid-column:span 4}
+.mini-days{display:flex;gap:6px}.mini-days span{flex:1;padding:10px 0;text-align:center;border-radius:10px;font:600 .8rem var(--app-font);background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.mini-days span.on{background:#2563eb;border-color:#2563eb}
+.share{display:flex;align-items:center;gap:8px;background:#fff;color:#0f172a;border-radius:12px;padding:8px 8px 8px 12px;font:500 .82rem "IBM Plex Mono",monospace}
+.share span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.share button{margin-left:auto;font:700 .78rem var(--app-font);background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 10px}
+.exp{display:flex;gap:8px}.exp span{font:700 .78rem "IBM Plex Mono",monospace;padding:8px 10px;border-radius:9px;border:1px dashed rgba(255,255,255,.3)}
+.spark{width:100%;height:70px}
+/* timeline */
+.day{padding:90px 0 40px;background:linear-gradient(180deg,var(--bg),#0b1d30 50%,var(--bg))}
+.tl{position:relative;display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:18px;margin-top:50px;overflow-x:auto;padding-bottom:10px}
+.tl:before{content:"";position:absolute;left:0;right:0;top:15px;height:2px;background:linear-gradient(90deg,#60a5fa,#f59e0b,#ef4444,#a78bfa,#22c55e)}
+.tl .stop{position:relative;padding-top:42px}
+.tl .stop:before{content:"";position:absolute;top:6px;left:0;width:20px;height:20px;border-radius:99px;background:var(--bg);border:3px solid var(--c)}
+.tl time{font:600 .8rem "IBM Plex Mono",monospace;color:var(--c)}
+.tl h3{margin:6px 0 6px;font-size:1.2rem}.tl p{margin:0;color:var(--ink-soft);font-size:.95rem;line-height:1.5}
+/* what */
+.what{padding:100px 0}
+.isnt{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:44px;border-top:1px solid var(--line)}
+.isnt>div{padding:28px 28px 0 0}.isnt>div+div{padding-left:28px;border-left:1px solid var(--line)}
+.isnt h3{margin:0 0 14px;font-size:1.3rem}.isnt ul{margin:0;padding:0;list-style:none;display:grid;gap:12px;color:var(--ink-soft);line-height:1.5}
+.isnt .y li:before{content:"✓  ";color:#4ade80}.isnt .n li:before{content:"✕  ";color:#f87171}
+/* faq */
+.faq{padding:80px 0 100px}
+.qa{border-top:1px solid var(--line);max-width:860px}
+.qa:last-child{border-bottom:1px solid var(--line)}
+.qa button{all:unset;box-sizing:border-box;width:100%;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:22px 0;font-size:1.2rem;font-weight:600}
+.qa button:focus-visible{outline:2px solid var(--accent-blue);outline-offset:4px}
+.qa button span.pm{font:400 1.6rem monospace;color:var(--accent-blue);transition:transform .3s}
+.qa button[aria-expanded=true] span.pm{transform:rotate(45deg)}
+.qa .ans{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
+.qa .ans>div{overflow:hidden}.qa .ans p{margin:0 0 22px;color:var(--ink-soft);line-height:1.6;max-width:720px}
+.qa.open .ans{grid-template-rows:1fr}
+/* account + footer */
+.account{overflow:hidden;text-align:center;padding:140px clamp(18px,4vw,56px) 120px;background:radial-gradient(80% 80% at 50% 0%,#16385d 0%,var(--bg) 70%)}
+.account h2{font-size:clamp(2.6rem,6vw,5.4rem);letter-spacing:-.035em;line-height:.95;margin:14px auto 22px;max-width:980px}
+.account p{color:var(--ink-soft);font-size:1.15rem;margin:0 auto;max-width:560px;line-height:1.6}
+.account .ctas{margin-top:36px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+footer{padding:34px clamp(18px,4vw,56px) 40px;border-top:1px solid var(--line);color:var(--ink-soft);font-size:.92rem}
+footer .trust{text-align:center;margin:0 0 18px}
+footer .trust span{display:inline-block;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line);font-family:"IBM Plex Mono",Consolas,monospace;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}
+footer .links{display:flex;flex-wrap:wrap;gap:14px 26px;justify-content:center}footer .links a{text-decoration:none}
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .9s var(--ease),transform .9s var(--ease)}.reveal.in{opacity:1;transform:none}
+.mini-days span{padding:10px 0}
+@media (max-width:980px){
+ .top nav a:not(.cta){display:none}
+ .stage{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:start;padding:76px 14px 14px;gap:30px}
+ .steps{min-height:200px}.step h2{font-size:1.8rem;margin:6px 0 8px}.step p{font-size:.95rem}.step ul{display:none}
+ .progress{bottom:-6px}
+ .doors{flex-direction:column;height:auto}.door{flex:none!important;min-height:220px}
+ .doors.has-open .door:not(.open) .pitch{display:block}
+ .bento{grid-template-columns:1fr 1fr}.t-a,.t-b,.t-f{grid-column:span 2}.t-a{grid-row:auto}
+ .isnt{grid-template-columns:1fr}.isnt>div+div{padding-left:0;border-left:0;border-top:1px solid var(--line);margin-top:28px}
+}
+@media (max-width:600px){
+ .hero h1{font-size:11.4vw}.brand{font-size:0}.top .cta{padding:8px 13px;font-size:.88rem}
+ .two{grid-template-columns:1fr}.tl{grid-template-columns:repeat(5,78vw)}
+ .bento{grid-template-columns:1fr}.t-a,.t-b,.t-f{grid-column:auto}
+ .hero .heroapp{margin:36px -18px 0}.hero .appbox,.stage .appbox{border-radius:12px}
+}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}}
+</style></head><body>
 <header class="top" id="top">
-  <a class="brand" href="#">
-    <span class="mark"><img src="assets/cloud.png" alt=""></span>
-    <span class="name">Graphical Forecast Creator</span>
-  </a>
-  <nav>
-    <a href="#what">What it is</a>
-    <a href="#doors">Start</a>
-    <a href="#changelog">Changelog</a>
-    <a href="#help">Help</a>
-    <a class="cta" href="https://app.gfcweather.com">Open the App</a>
-  </nav>
+ <a class="brand" href="#hero"><span class="mark"><img src="assets/cloud.png" alt=""></span>Graphical Forecast Creator</a>
+ <nav aria-label="Primary"><a href="#story">How it works</a><a href="#doors">Who it's for</a><a href="#faq">FAQ</a><a href="#help">Help</a><a class="cta" href="https://app.gfcweather.com">Open the App</a></nav>
 </header>
 
-<!-- HERO -->
 <section class="hero" id="hero">
-  <div class="bg" id="heroBg"><img src="assets/live/live-forecast-desktop.png" alt=""></div>
-  <div class="copy">
-    <div class="eyebrow">Graphical Forecast Creator</div>
-    <h1>Create forecasts. <span class="light">Your way.</span></h1>
-    <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
-    <div class="ctas" style="margin-top:34px">
-      <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
-      <a class="btn btn-ghost" href="https://app.gfcweather.com">Continue Without Account</a>
-    </div>
-    <p class="fine">Accounts unlock features, but you can start without one.</p>
+ <div class="copy">
+  <div class="eyebrow">Graphical Forecast Creator</div>
+  <h1><span>Create forecasts.</span><span class="light">Your way.</span></h1>
+  <p class="sub">A forecast builder for weather people. Make your own products, draw them on the map across an eight-day cycle, explain your reasoning, and check how it verified.</p>
+  <div class="ctas">
+   <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+   <a class="textlink" href="https://app.gfcweather.com">Continue without account →</a>
   </div>
-  <div class="window" id="heroWindow">
-    <div class="bar"><i></i><i></i><i></i><span class="mono">app.gfcweather.com · Forecast</span></div>
-    <img src="assets/live/live-drawn-outlook-desktop.png" alt="The GFC forecast editor with a drawn outlook over the central United States">
-  </div>
-  <div class="scroll-cue" aria-hidden="true"><div class="eyebrow">Scroll</div><span></span></div>
+  <p class="fine">Accounts unlock features, but you can start without one.</p>
+ </div>
+ <div class="heroapp"><div class="appbox" id="heroBox"></div></div>
 </section>
 
-<!-- STORY -->
-<section class="story" id="story">
-  <div class="stage">
-    <div class="beat" data-step="0">
-      <figure class="shot" style="margin:0" aria-label="The GFC forecast editor with the drawing dock and tornado probability legend">
-        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Forecast</span></div>
-        <img class="shot-img" src="assets/live/live-draw-inuse.png" alt="The GFC forecast editor mid-draw: a tornado probability outlook with nested 15% and 30% polygons over the Plains, legend and drawing dock live">
-      </figure>
-      <div class="copy">
-        <div class="num">01 / DRAW</div>
-        <h2>Paint your call.</h2>
-        <p>Pick a category, pick an area, and draw the risk you think is coming. Start with something you feel sure about. You can always go bigger later.</p>
-      </div>
-    </div>
-    <div class="beat" data-step="1">
-      <figure class="shot" style="margin:0" aria-label="The GFC discussion workspace with an editor and live preview">
-        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Discussion</span></div>
-        <img class="shot-img" src="assets/live/live-discuss-inuse.png" alt="The GFC discussion editor with a written severe weather discussion and its formatted live preview">
-      </figure>
-      <div class="copy">
-        <div class="num">02 / DISCUSS</div>
-        <h2>Explain your reasoning.</h2>
-        <p>Write the story behind the call in your own words. What did the models show, what made you confident, and what would change your mind?</p>
-      </div>
-    </div>
-    <div class="beat" data-step="2">
-      <figure class="shot" style="margin:0" aria-label="GFC Monitor with live radar, satellite, and NWS alert controls beside the map">
-        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Monitor</span></div>
-        <img class="shot-img" src="assets/live/live-monitor-inuse.png" alt="The GFC monitor with live base reflectivity radar painting on the map and NWS watches and warnings enabled">
-      </figure>
-      <div class="copy">
-        <div class="num">03 / MONITOR</div>
-        <h2>Watch it play out.</h2>
-        <p>Follow radar, satellite, SPC reports, and NWS alerts against the forecast you made, as the day unfolds.</p>
-      </div>
-    </div>
-    <div class="beat" data-step="3">
-      <figure class="shot" style="margin:0" aria-label="The GFC verification workspace grading a forecast against SPC evidence">
-        <div class="shot-bar"><i></i><i></i><i></i><span>app.gfcweather.com · Verification</span></div>
-        <img class="shot-img" src="assets/live/live-verify-inuse.png" alt="The GFC verification workspace grading a tornado outlook against SPC storm reports, evidence map populated and an overall grade scored">
-      </figure>
-      <div class="copy">
-        <div class="num">04 / VERIFY</div>
-        <h2>See what held up.</h2>
-        <p>Compare your call with what happened. Find where you were right, where you missed, and what to try on your next forecast.</p>
-      </div>
-    </div>
-    <div class="rail" aria-hidden="true"><span class="active"></span><span></span><span></span><span></span></div>
+<section class="story" id="story" aria-label="How a forecast comes together">
+ <div class="stage">
+  <div class="steps">
+   <div class="step active"><div class="num">01 / Plan</div><h2>Pick the day. Pick the product.</h2><p>Choose a day in your cycle, Day 1 through 8. Then start the severe outlook that comes built in, or press + to create your own custom layer.</p><ul><li>Days 1–8 in one cycle</li><li>The severe outlook: Tor, Wind, Hail, Cat</li><li>Custom layers with your own categories</li></ul></div>
+   <div class="step"><div class="num">02 / Build</div><h2>Draw it on the map.</h2><p>Pick a category and draw polygons. Your legend builds itself as you go.</p><ul><li>Pan, Draw, Delete, undo and redo</li><li>Custom colors and opacity per category</li><li>Save to your library of products</li></ul></div>
+   <div class="step"><div class="num">03 / Explain</div><h2>Explain your reasoning.</h2><p>Write freeform in the DIY editor, or answer the Guided questions and watch a formatted discussion build in the live preview.</p><ul><li>Valid times and forecaster name</li><li>Guided sections: summary, setup, expectations</li><li>Export when you're done</li></ul></div>
+   <div class="step"><div class="num">04 / Monitor</div><h2>Monitor the day.</h2><p>Bring up radar, satellite, NWS watches and warnings, and SPC storm reports. Dark mode is one tap away.</p><ul><li>MRMS radar and GOES satellite</li><li>NWS warning polygons and SPC reports</li><li>Light and dark themes</li></ul></div>
+   <div class="step"><div class="num">05 / Verify</div><h2>See what held up.</h2><p>Load your forecast package and grade it against SPC storm reports and NOAA DAT surveys. You get a score out of 100.</p><ul><li>Hazard-by-hazard breakdown</li><li>Evidence you can inspect on the map</li></ul></div>
+   <div class="progress" aria-hidden="true"><span class="on"></span><span></span><span></span><span></span><span></span></div>
   </div>
+  <div class="appbox" id="storyBox"></div>
+ </div>
 </section>
 
-<!-- DOORS -->
-<section class="doors-section" id="doors">
-  <div class="section-head reveal">
-    <div class="eyebrow">Two ways in</div>
-    <h2>Pick your door.</h2>
+<section class="doors-section" id="doors" aria-labelledby="doors-h">
+ <div class="section-head reveal">
+  <div class="eyebrow">Beginners and experienced forecasters</div>
+  <h2 class="big" id="doors-h">Built for your first forecast and your hundredth.</h2>
+  <p class="lede">Same app, two starting points. Open the one that sounds like you.</p>
+ </div>
+ <div class="doors" id="doorsEl">
+  <div class="door beginner open" tabindex="0" role="button" aria-expanded="true" aria-label="New to forecasting">
+   <div class="eyebrow">New to forecasting</div>
+   <h3>Start with the guide rails.</h3>
+   <p class="pitch">Begin with the built-in severe outlook, follow the on-map hints, and let the Guided discussion ask you the right questions.</p>
+   <div class="demo">
+    <div class="frag"><div class="t"><span>Guided discussion</span><span>Step 1 of 4</span></div>
+     <div class="guide"><div class="now"><b>1</b><span>Summary: what's the overall threat?</span></div><div><b>2</b><span>Meteorological setup</span></div><div><b>3</b><span>Severe weather expectations</span></div><div><b>4</b><span>Save, and the preview formats it</span></div></div></div>
+    <div class="more">
+     <div class="frag"><div class="t"><span>On-map help</span><span>Pan mode</span></div><p style="margin:0;font-size:.88rem;line-height:1.5">Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.</p></div>
+     <div class="frag"><div class="t"><span>The severe outlook</span><span>Built in</span></div><div class="probrow"><span class="pill on" style="background:#1683f8;color:#fff">Tor</span><span class="pill" style="background:#f1f5f9">Wind</span><span class="pill" style="background:#f1f5f9">Hail</span><span class="pill" style="background:#f1f5f9">Cat</span></div></div>
+    </div>
+   </div>
+   <div class="actions"><a class="btn btn-primary" href="https://app.gfcweather.com">Try it without an account</a><span class="hint">Tap to open</span></div>
   </div>
-  <main class="doors" id="doorsRow">
-    <section class="door beginner" tabindex="0" data-door="beginner" aria-label="Beginner">
-      <img class="art" src="assets/live/live-drawn-outlook-desktop.png" alt="">
-      <div class="eyebrow">Beginner</div>
-      <h3>New to forecasting?</h3>
-      <p>Start here — no experience needed. Draw your first forecast in minutes.</p>
-      <div class="actions">
-        <a href="/beginners">Learn More</a>
-        <a href="https://app.gfcweather.com">Open the App</a>
-      </div>
-    </section>
-    <section class="door experienced" tabindex="0" data-door="experienced" aria-label="Experienced">
-      <img class="art" src="assets/live/live-monitor-desktop.png" alt="">
-      <div class="eyebrow">Experienced</div>
-      <h3>Experienced?</h3>
-      <p>Jump in — you already know what you're doing. Draw, verify, discuss.</p>
-      <div class="actions">
-        <a href="/experienced">Learn More</a>
-        <a href="https://app.gfcweather.com">Open the App</a>
-      </div>
-    </section>
-  </main>
+  <div class="door experienced" tabindex="0" role="button" aria-expanded="false" aria-label="Experienced forecaster">
+   <div class="eyebrow">Experienced forecaster</div>
+   <h3>Build your own products.</h3>
+   <p class="pitch">Design custom layers, plan a full eight-day cycle with ghost layers, package your work, and grade it against real evidence.</p>
+   <div class="demo">
+    <div class="frag"><div class="t"><span>Custom layer</span><span>Heavy Rain Risk</span></div>
+     <div class="probrow"><span class="pill" style="background:#9fd0ff">Low</span><span class="pill" style="background:#3d8bf2;color:#fff">Moderate</span><span class="pill on" style="background:#123f9c;color:#fff">High</span><span class="pill" style="background:#f1f5f9">+ Add</span></div></div>
+    <div class="more">
+     <div class="two">
+      <div class="frag"><div class="t"><span>Forecast days</span></div><div class="probrow"><span class="pill" style="background:#1683f8;color:#fff;min-width:30px">1</span><span class="pill" style="background:#f1f5f9;min-width:30px">2</span><span class="pill" style="background:#f1f5f9;min-width:30px">3</span><span class="pill" style="background:#f1f5f9;min-width:30px">…8</span></div><p style="margin:8px 0 0;font-size:.8rem;color:#475569">Ghost layers show other products while you draw.</p></div>
+      <div class="frag"><div class="t"><span>Tools</span></div><div class="kbd"><kbd>Package</kbd><span>Bundle your forecast</span><kbd>Export</kbd><span>Take it with you</span><kbd>T W H C</kbd><span>Outlook type keys</span></div></div>
+     </div>
+     <div class="frag"><div class="t"><span>Forecast Grade</span><span style="color:#92400e">Sample data</span></div><div class="vstats"><div><b>78</b><small>Overall / 100</small></div><div><b>SPC</b><small>Storm reports</small></div><div><b>DAT</b><small>NOAA surveys</small></div></div></div>
+    </div>
+   </div>
+   <div class="actions"><a class="btn btn-ghost" href="https://app.gfcweather.com/signup">Create an account</a><span class="hint">Tap to open</span></div>
+  </div>
+ </div>
 </section>
 
-<!-- GALLERY -->
-<section class="gallery" id="gallery">
-  <div class="gallery-head reveal">
-    <div>
-      <div class="eyebrow">Inside the app</div>
-      <h2>Tools you can see.</h2>
-    </div>
-    <p>Real screens from GFC. Swipe, or scroll sideways.</p>
-  </div>
-  <div class="track">
-    <article class="tile">
-      <img src="assets/live/live-drawn-outlook-desktop.png" alt="The GFC outlook map with a drawn probability outlook and drawing tools">
-      <div class="meta">
-        <h3>Outlook map</h3>
-        <p>Pan and zoom over a real map, pick a probability level from the scale, and draw the area you expect.</p>
-      </div>
-    </article>
-    <article class="tile tile-verification">
-      <img src="assets/live/live-verification-desktop.png" alt="The verification workspace grading a forecast">
-      <div class="meta">
-        <h3>Verification</h3>
-        <p>Grade a forecast against SPC storm reports and NOAA damage surveys, then see where it held up.</p>
-      </div>
-    </article>
-    <article class="tile tile-monitor">
-      <img src="assets/live/live-monitor-desktop.png" alt="The monitor with radar and satellite layers">
-      <div class="meta">
-        <h3>Monitor</h3>
-        <p>Radar, satellite, SPC reports, and NWS alerts, with playback and refresh.</p>
-      </div>
-    </article>
-  </div>
+<section class="bento-sec wrap" aria-labelledby="bento-h">
+ <div class="reveal"><div class="eyebrow">Inside the builder</div><h2 class="big" id="bento-h">Everything a forecast needs.</h2></div>
+ <div class="bento reveal">
+  <div class="tile t-a"><h3>Custom layers</h3><p>Create a layer, name it, and give each category its own color and opacity. Heavy rain, fire weather, winter precip: your call.</p>
+   <div class="viz"><svg viewBox="0 0 400 220" style="width:100%" aria-hidden="true" id="bentoMap"></svg></div></div>
+  <div class="tile t-b"><h3>Multi-day cycles</h3><p>One cycle, eight forecast days. Jump between them from the Days tab.</p><div class="viz mini-days"><span class="on">1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
+  <div class="tile"><h3>Guided discussion</h3><p>Answer the questions; the live preview formats it.</p><div class="viz" style="font:11px/1.6 'IBM Plex Mono',monospace;background:#fff;color:#111;border-radius:10px;padding:10px">Day 1 Outlook Discussion<br>** UNOFFICIAL OUTLOOK **</div></div>
+  <div class="tile"><h3>Monitor</h3><p>Radar, satellite, warnings, and reports in one read-only view.</p><div class="viz" style="height:64px;border-radius:12px;background:radial-gradient(30% 50% at 30% 50%,#ff3b00,#ffd400 40%,#20b020 70%,transparent 72%),radial-gradient(20% 40% at 70% 40%,#ffd400,#20b020 60%,transparent 62%),#1c2433"></div></div>
+  <div class="tile t-b"><h3>The severe outlook, built in</h3><p>Tornado, wind, and hail probabilities with hatching, plus an automatic categorical map.</p><div class="viz mini-days"><span class="on">Tor</span><span>Wind</span><span>Hail</span><span>Cat</span></div></div>
+  <div class="tile t-b"><h3>Forecast Grade &amp; packages</h3><p>Save, package, and export your forecast, then grade it against SPC reports and NOAA DAT surveys.</p><div class="viz exp"><span>Save</span><span>Package</span><span>Export</span><span>78 / 100</span></div></div>
+ </div>
 </section>
 
-<!-- WHAT GFC IS -->
-<section class="what" id="what">
-  <div class="reveal">
-    <div class="eyebrow">What GFC is</div>
-    <h2>A place to make your own forecasts, then check them.</h2>
-    <p class="lede">GFC gives you a map, the tools to draw a forecast on it, and a way to watch and score that forecast later. It is built for people who want to practice the craft: students, enthusiasts, and anyone who likes to know how a call turned out.</p>
+<section class="day" aria-labelledby="day-h">
+ <div class="wrap">
+  <div class="reveal"><div class="eyebrow">A forecast day</div><h2 class="big" id="day-h">How a forecast day goes.</h2></div>
+  <div class="tl reveal">
+   <div class="stop" style="--c:#60a5fa"><time>7:00 AM</time><h3>Plan &amp; build</h3><p>Pick your products and draw the first version.</p></div>
+   <div class="stop" style="--c:#f59e0b"><time>11:30 AM</time><h3>Update</h3><p>Tighten the lines, update your discussion.</p></div>
+   <div class="stop" style="--c:#ef4444"><time>3:00 PM</time><h3>Monitor</h3><p>Radar and warnings as storms develop.</p></div>
+   <div class="stop" style="--c:#a78bfa"><time>9:00 PM</time><h3>Package</h3><p>Save and package the day's forecast.</p></div>
+   <div class="stop" style="--c:#22c55e"><time>Next morning</time><h3>Verify</h3><p>Grade it against the reports.</p></div>
   </div>
-
-  <div class="modes">
-    <article class="mode">
-      <div class="thumb"><img src="assets/live/live-drawn-outlook-desktop.png" alt=""></div>
-      <div class="body">
-        <span class="n">01</span>
-        <h3>Forecast</h3>
-        <p>Draw risk areas on a map. Choose categories, set your confidence, and build the forecast from the ground up.</p>
-      </div>
-    </article>
-    <article class="mode">
-      <div class="thumb"><img src="assets/live/live-discussion-desktop.png" alt="" style="object-position:0% 0%"></div>
-      <div class="body">
-        <span class="n">02</span>
-        <h3>Discussion</h3>
-        <p>Write the reasoning behind each forecast. Share it, read others, and compare how different people read the same setup.</p>
-      </div>
-    </article>
-    <article class="mode">
-      <div class="thumb"><img src="assets/live/live-monitor-desktop.png" alt=""></div>
-      <div class="body">
-        <span class="n">03</span>
-        <h3>Monitor</h3>
-        <p>Keep radar, satellite, reports, and alerts beside your forecast while the event happens, so you can see the call and the reality together.</p>
-      </div>
-    </article>
-    <article class="mode">
-      <div class="thumb"><img src="assets/live/live-verification-desktop.png" alt=""></div>
-      <div class="body">
-        <span class="n">04</span>
-        <h3>Verification</h3>
-        <p>Look back at how a forecast held up. Review hits and misses, track trends in your own calls, and see what to adjust next time.</p>
-      </div>
-    </article>
-  </div>
-
-  <div class="scale-demo reveal">
-    <div class="scale-head">
-      <div>
-        <div class="eyebrow">Try the scale</div>
-        <h3>Pick a level. Read what it means.</h3>
-      </div>
-      <p class="scale-note" id="scaleNote" aria-live="polite">Select a level from the same probability scale the forecast editor uses.</p>
-    </div>
-    <div class="chips" role="group" aria-label="Probability scale">
-      <button class="chip" style="--c:#7cc576;--t:#10261a" aria-pressed="false" data-note="The lowest level. Broad areas with a small chance of a tornado.">2%</button>
-      <button class="chip" style="--c:#b99a86;--t:#241913" aria-pressed="false" data-note="A small step up from the lowest level.">5%</button>
-      <button class="chip" style="--c:#ffe066;--t:#2a2306" aria-pressed="false" data-note="Enough chance to watch closely. Often used on the outer edge of a setup.">10%</button>
-      <button class="chip" style="--c:#ff7f7f;--t:#2a0c0c" aria-pressed="false" data-note="An elevated chance for a tornado within the area.">15%</button>
-      <button class="chip" style="--c:#ff5ce6;--t:#2a0a26" aria-pressed="false" data-note="High enough that a tornado is a real concern in the area.">30%</button>
-      <button class="chip" style="--c:#c59bf0;--t:#1d1030" aria-pressed="false" data-note="A very high chance, usually in a smaller area.">45%</button>
-      <button class="chip" style="--c:#0f4c86;--t:#eaf4ff" aria-pressed="false" data-note="The highest levels are rare and reserved for the strongest setups.">60%</button>
-      <button class="chip hatch" style="--c:#c9ced2;--t:#1c2327" aria-pressed="false" data-note="Hatching marks conditional intensity: the potential for stronger tornadoes if they form.">CIG1</button>
-      <button class="chip hatch" style="--c:#b5bcc1;--t:#1c2327" aria-pressed="false" data-note="A higher intensity group, layered over a probability level.">CIG2</button>
-      <button class="chip hatch" style="--c:#9aa2a8;--t:#1c2327" aria-pressed="false" data-note="The highest intensity group on the scale.">CIG3</button>
-    </div>
-    <p class="scale-foot">Levels follow the SPC-style scale in the app. It is a tool for your own forecast, not an official product.</p>
-  </div>
-
-  <div class="split">
-    <div class="panel light reveal">
-      <div class="eyebrow" style="color:#55656e">Where it came from</div>
-      <h3>Started as an outlook builder.</h3>
-      <p>GFC began as a tool for drawing SPC-style convective outlooks, using the same categorical risk levels people see on official outlook maps.</p>
-      <p>It is growing to cover more kinds of weather: severe, winter, and tropical forecasting.</p>
-    </div>
-    <div class="panel dark reveal">
-      <div class="eyebrow">What it is not</div>
-      <h3>An official source.</h3>
-      <p>GFC is a tool for enthusiasts to build and check their own forecasts. Forecasts made in GFC are not official products and are not warnings.</p>
-      <p>For official forecasts and warnings, check your national weather service.</p>
-    </div>
-  </div>
-
-  <div class="split">
-    <div class="panel dark reveal">
-      <div class="eyebrow">How to start</div>
-      <h3>Start small. Build up.</h3>
-      <div class="timeline">
-        <div><b>Step 1</b><span>Draw one forecast on a day you feel confident about.</span></div>
-        <div><b>Step 2</b><span>Write a short reason for each risk area you drew.</span></div>
-        <div><b>Step 3</b><span>Watch what happened, then review where your call held up.</span></div>
-        <div><b>Step 4</b><span>Take on a harder setup when you are ready. Severe, winter, and tropical are all on the way.</span></div>
-      </div>
-    </div>
-    <div class="panel light reveal">
-      <div class="eyebrow" style="color:#55656e">Pricing</div>
-      <h3>Forecasting stays free.</h3>
-      <p>The core tools for drawing, discussing, monitoring, and verifying forecasts are free. Premium is optional and adds extras. It never gates the core tools.</p>
-      <p>Accounts unlock features, but you can start without one.</p>
-    </div>
-  </div>
+ </div>
 </section>
 
-<!-- ACCOUNT -->
+<section class="what wrap" id="what" aria-labelledby="what-h">
+ <div class="reveal">
+  <div class="eyebrow">In plain language</div>
+  <h2 class="big" id="what-h">A place to make your own forecasts, then check them.</h2>
+  <p class="lede">GFC is a forecast builder for weather enthusiasts, students, and forecasters who want practice. You make the call. The reports grade it.</p>
+ </div>
+ <div class="isnt reveal">
+  <div class="y"><h3>What it is</h3><ul><li>A builder for your own forecast products</li><li>A way to explain and share your reasoning</li><li>A practice loop: plan, build, monitor, verify</li></ul></div>
+  <div class="n"><h3>What it isn't</h3><ul><li>An official forecast or warning source</li><li>Something to make safety decisions with</li><li>Affiliated with the NWS or SPC</li></ul></div>
+ </div>
+</section>
+
+<section class="faq wrap" id="faq" aria-labelledby="faq-h">
+ <div class="reveal"><div class="eyebrow">Questions</div><h2 class="big" id="faq-h">Good questions.</h2></div>
+ <div class="faqlist">
+  <div class="qa"><button aria-expanded="false" aria-controls="a1" id="q1">Is it free?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a1" role="region" aria-labelledby="q1"><div><p>You can start building for free, without an account. Some features need an account; see Pricing for details.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a2" id="q2">Do I need an account?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a2" role="region" aria-labelledby="q2"><div><p>No. Continue without an account to try it. Create one when you want to save to the cloud and unlock more features.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a3" id="q3">Is this official?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a3" role="region" aria-labelledby="q3"><div><p>No. Forecasts made in GFC are unofficial and not for safety decisions. For official outlooks and warnings, follow the National Weather Service and the Storm Prediction Center.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a4" id="q4">Is it only for severe weather?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a4" role="region" aria-labelledby="q4"><div><p>No. The severe outlook is built in, but custom layers let you build any product you want, with your own categories and colors.</p></div></div></div>
+ </div>
+</section>
+
 <section class="account" id="account">
-  <div class="reveal">
-    <div class="eyebrow">Ready when you are</div>
-    <h2>Make your first forecast today.</h2>
-    <p>Create an account to save your work and unlock features. Or jump straight in and start drawing.</p>
-    <div class="ctas">
-      <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
-      <a class="btn btn-ghost" href="https://app.gfcweather.com">Continue Without Account</a>
-    </div>
-  </div>
+ <div class="reveal">
+  <div class="eyebrow">Ready when you are</div>
+  <h2>Make your first forecast today.</h2>
+  <p>Create an account to save your work and unlock features. Or jump straight in and start building.</p>
+  <div class="ctas"><a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a><a class="btn btn-ghost" href="https://app.gfcweather.com">Continue Without Account</a></div>
+ </div>
 </section>
-
 <footer id="help">
-  <p class="trust"><span>Unofficial forecasts · Not for safety decisions</span></p>
-  <div class="links">
-    <a href="#">Privacy Policy</a>
-    <a href="#">Terms of Service</a>
-    <a href="#">Pricing</a>
-    <a href="#">About</a>
-    <a href="#">Help / Contact</a>
-    <a href="#changelog" id="changelog">Changelog</a>
-  </div>
+ <p class="trust"><span>Unofficial forecasts · Not for safety decisions</span></p>
+ <div class="links"><a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Pricing</a><a href="#">About</a><a href="#">Help / Contact</a><a href="#changelog" id="changelog">Changelog</a></div>
 </footer>
-
 <script>
-(() => {
-  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-  const top = document.getElementById('top');
-  const heroBg = document.getElementById('heroBg');
-  const heroWindow = document.getElementById('heroWindow');
-  const hero = document.getElementById('hero');
-  const storyEl = document.getElementById('story');
-  const beats = [...storyEl.querySelectorAll('.beat')];
-  const rail = [...storyEl.querySelectorAll('.rail span')];
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+(()=>{
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const P=(lon,lat)=>[(lon+107)*52,(43-lat)*48];
+const pts=a=>a.map(([lo,la])=>P(lo,la).map(v=>v.toFixed(1)).join(',')).join(' ');
+const LINES=[[[-104.05,45],[-104.05,41],[-102.05,41],[-102.05,37]],[[-102.05,40],[-95.31,40]],[[-109,37],[-94.62,37]],[[-103,37],[-103,32],[-106.6,32]],[[-103,36.5],[-100,36.5],[-100,34.56]],[[-100,34.56],[-99.2,34.33],[-98.1,34.13],[-97,33.85],[-96,33.85],[-95.2,33.9],[-94.48,33.64],[-94.04,33.55]],[[-94.04,33.55],[-94.04,31],[-93.7,30.2]],[[-94.04,33.02],[-91.17,33.0]],[[-94.48,33.64],[-94.43,35.4],[-94.62,36.5]],[[-94.62,36.5],[-90.15,36.5],[-90.37,36.0],[-89.7,36.0]],[[-94.62,37],[-94.6,39.1],[-94.9,39.6],[-95.31,40],[-95.77,40.58],[-91.73,40.6]],[[-95.31,40],[-95.9,41.4],[-96.4,42.5],[-96.6,43.5]],[[-104.05,43],[-98.5,43],[-96.6,42.5]],[[-91.4,40.4],[-90.6,41.5],[-91.1,42.6],[-91.2,43.5]],[[-91.4,40.4],[-90.2,38.8],[-89.5,37.0],[-89.6,36.5],[-90.1,35.0],[-91.1,33.0],[-91.6,31],[-91.6,30]],[[-88.1,37.5],[-89.2,37.1],[-89.5,37.0]],[[-109,41],[-104.05,41]],[[-96.45,43.5],[-91.2,43.5]],[[-88.1,37.5],[-87.5,39],[-87.5,42.5]],[[-88.2,30.3],[-88.4,35],[-88.1,35]],[[-91.6,31],[-89.7,31],[-89.6,30.2]],[[-90.3,35],[-88.2,35]]];
+const RIVERS=[[[-104,41.3],[-100.5,41.1],[-98.4,40.8],[-96.1,41.0]],[[-104.5,38.3],[-101,37.9],[-99,38.2],[-97.4,37.7],[-96.8,36.9],[-95.4,35.6],[-94.4,35.4],[-92.3,34.75],[-91.2,33.9]],[[-102.4,34.4],[-100,34.56],[-97.5,33.9],[-94.6,33.6],[-93.8,32.6],[-92.4,31.3]],[[-96.6,43],[-95.9,41.4],[-95.31,40],[-94.9,39.6],[-94.4,39.2],[-93,39.3],[-91.6,38.7],[-90.2,38.8]],[[-91.2,43.5],[-91.1,42.6],[-90.6,41.5],[-91.4,40.4],[-90.2,38.8],[-89.5,37.0],[-89.6,36.5],[-90.1,35.0],[-91.1,33.0],[-91.6,31]]];
+const ROADS=[[[-101.83,35.22],[-97.5,35.47],[-95.99,36.15],[-93.29,37.21],[-90.2,38.63]],[[-96.8,32.78],[-97.5,35.47],[-97.33,37.69],[-95.68,39.05],[-94.58,39.1]],[[-104.99,39.74],[-97.3,38.9],[-94.58,39.1],[-90.2,38.63]],[[-97.5,35.47],[-94.4,35.4],[-92.29,34.75],[-90.05,35.15]]];
+const STATES=[['NEBRASKA',-99.8,41.6],['KANSAS',-98.3,38.6],['OKLAHOMA',-97.4,35.3],['TEXAS',-100.5,32.4],['MISSOURI',-92.5,38.5],['ARKANSAS',-92.4,34.9],['IOWA',-93.4,42.1],['COLORADO',-105.3,39],['NEW MEXICO',-105.5,34.3],['ILLINOIS',-89.2,40.2],['LOUISIANA',-92.5,31.6],['MISSISSIPPI',-89.7,32.6]];
+const CITIES=[['Oklahoma City',-97.5,35.47],['Wichita',-97.33,37.69],['Tulsa',-95.99,36.15],['Kansas City',-94.58,39.1],['Dallas',-96.8,32.78],['Omaha',-95.94,41.26],['Amarillo',-101.83,35.22],['Springfield',-93.29,37.21],['Little Rock',-92.29,34.75],['St. Louis',-90.2,38.63],['Memphis',-90.05,35.15],['Lubbock',-101.85,33.58],['Denver',-104.99,39.74],['Albuquerque',-106.6,35.1],['Shreveport',-93.75,32.5],['Des Moines',-93.6,41.6]];
+function smooth(p){let d=`M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;const n=p.length;for(let i=0;i<n;i++){const p0=p[(i-1+n)%n],p1=p[i],p2=p[(i+1)%n],p3=p[(i+2)%n];d+=`C${(p1[0]+(p2[0]-p0[0])/6).toFixed(1)},${(p1[1]+(p2[1]-p0[1])/6).toFixed(1)} ${(p2[0]-(p3[0]-p1[0])/6).toFixed(1)},${(p2[1]-(p3[1]-p1[1])/6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`}return d+'Z'}
+function rings(lon,lat,angDeg,lv,seed){const C=P(lon,lat),A=angDeg*Math.PI/180,N=44;let prev=null;return lv.map((l,i)=>{const r=[];for(let j=0;j<N;j++){const t=j/N*2*Math.PI;const a=Math.cos(t)>0?l[0]:l[1];let rr=1/Math.sqrt((Math.cos(t)/a)**2+(Math.sin(t)/l[2])**2);rr*=1+.08*Math.sin(3*t+seed+i*1.7)+.05*Math.sin(5*t+2*seed+i)+.03*Math.sin(7*t+i);if(prev)rr=Math.min(rr,prev[j]*.78);r.push(rr)}prev=r;
+ const s=i*7;return smooth(r.map((rr,j)=>{const t=j/N*2*Math.PI,x=rr*Math.cos(t)+s,y=rr*Math.sin(t);return[C[0]+x*Math.cos(A)-y*Math.sin(A),C[1]+x*Math.sin(A)+y*Math.cos(A)]}))})}
+const PROD={
+ rain:{name:'Heavy Rain Risk',cats:[['Low','#9fd0ff'],['Moderate','#3d8bf2'],['High','#123f9c']],paths:rings(-93.8,35.9,-32,[[300,230,110],[200,150,70],[105,80,36]],1.3)},
+ fire:{name:'Fire Weather',cats:[['Elevated','#ffcf8a'],['Critical','#f2802e'],['Extreme','#b3261e']],paths:rings(-102.4,34.6,-38,[[250,190,120],[165,120,74],[80,60,36]],2.1)},
+ tor:{name:'Tornado',cats:[['2%','#79BA7A'],['5%','#BD998A'],['10%','#FFE481'],['15%','#FF8080']],paths:rings(-96.5,36.8,-30,[[330,240,120],[245,175,86],[170,115,58],[95,62,32]],.4)}
+};
 
-  // Scroll state: nav background, hero parallax, and which story beat is showing.
-  function onScroll() {
-    const y = window.scrollY;
-    top.classList.toggle('scrolled', y > 40);
-    if (!reduceMotion && y < window.innerHeight * 1.2) {
-      heroBg.style.transform = `translate3d(0, ${y * .18}px, 0)`;
-    }
-    const total = storyEl.offsetHeight - window.innerHeight;
-    const p = total > 0 ? clamp(-storyEl.getBoundingClientRect().top / total) : 0;
-    const idx = Math.min(beats.length - 1, Math.floor(clamp(p, 0, .9999) * beats.length));
-    beats.forEach((b, i) => b.classList.toggle('active', i === idx));
-    rail.forEach((r, i) => r.classList.toggle('active', i === idx));
-  }
-  let ticking = false;
-  window.addEventListener('scroll', () => {
-    if (!ticking) { requestAnimationFrame(() => { onScroll(); ticking = false; }); ticking = true; }
-  }, { passive: true });
-  window.addEventListener('resize', onScroll);
-  onScroll();
-
-  // Hero window tilts flat once the page loads.
-  requestAnimationFrame(() => setTimeout(() => hero.classList.add('in'), 120));
-
-  // Doors: hover, focus, and tap expand.
-  const doorsRow = document.getElementById('doorsRow');
-  const doors = doorsRow.querySelectorAll('.door');
-  function setOpen(target) {
-    doors.forEach(d => d.classList.toggle('open', d === target));
-    doorsRow.classList.toggle('has-open', !!target);
-  }
-  doors.forEach(d => {
-    d.addEventListener('pointerenter', () => setOpen(d));
-    d.addEventListener('focusin', () => setOpen(d));
-    d.addEventListener('click', e => { if (!d.classList.contains('open')) { e.preventDefault(); setOpen(d); } });
-  });
-  doorsRow.addEventListener('pointerleave', () => setOpen(null));
-
-  // Probability scale demo.
-  const scaleNote = document.getElementById('scaleNote');
-  document.querySelectorAll('.chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === chip)));
-      scaleNote.textContent = chip.dataset.note;
-    });
-  });
-
-  // Reveal on scroll.
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } });
-  }, { threshold: .18 });
-  document.querySelectorAll('.reveal, .mode').forEach((n, i) => {
-    if (n.classList.contains('mode')) n.style.transitionDelay = ((i % 4) * .08) + 's';
-    io.observe(n);
-  });
+const DBZ=[[5,'#04e9e7'],[10,'#019ff4'],[15,'#0300f4'],[20,'#02fd02'],[25,'#01c501'],[30,'#008e00'],[35,'#fdf802'],[40,'#e5bc00'],[45,'#fd9500'],[50,'#fd0000'],[55,'#d40000'],[60,'#bc0000'],[65,'#f800fd'],[70,'#9854c6']];
+const WARN=[['#ff0000',[[-95.62,35.02],[-95.18,35.38],[-94.98,35.22],[-95.05,34.93],[-95.40,34.86]]],
+ ['#ff0000',[[-94.42,36.55],[-94.02,36.86],[-93.83,36.70],[-93.95,36.42],[-94.25,36.38]]],
+ ['#ffff00',[[-95.10,35.75],[-94.45,36.32],[-94.12,36.05],[-94.30,35.62],[-94.80,35.45],[-95.02,35.50]]],
+ ['#ffff00',[[-96.35,34.18],[-95.78,34.70],[-95.42,34.52],[-95.55,34.10],[-96.05,33.92]]],
+ ['#ffff00',[[-93.75,37.25],[-93.10,37.78],[-92.82,37.52],[-93.02,37.12],[-93.48,37.02],[-93.70,37.08]]],
+ ['#ffff00',[[-96.95,33.55],[-96.48,33.98],[-96.15,33.80],[-96.30,33.40]]]];
+const SREP=[['#ff0000',-95.55,34.98],['#ff0000',-94.45,36.42],['#0000ff',-95.9,34.5],['#0000ff',-94.9,35.6],['#0000ff',-93.6,37.2],['#00c000',-96.3,34.0],['#00c000',-94.6,35.9],['#0000ff',-95.2,35.2]];
+let _rad=null;function radarURL(){if(_rad)return _rad;const W=1000,H=526,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);
+ const hs=(x,y)=>{let n=Math.imul(x,374761393)+Math.imul(y,668265263)|0;n=Math.imul(n^n>>>13,1274126177);return((n^n>>>16)>>>0)/4294967296};
+ const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);const a=hs(xi,yi),b=hs(xi+1,yi),c=hs(xi,yi+1),d=hs(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
+ const fbm=(x,y)=>{let t=0,a=.5,f=1;for(let i=0;i<5;i++){t+=a*vn(x*f,y*f);f*=2.1;a*=.5}return t};
+ // squall line axis as polyline (lon,lat) -> pixel
+ const L=[[-97.3,33.3],[-96.3,34.2],[-95.4,35.1],[-94.6,36.0],[-93.9,36.9],[-93.1,37.7],[-92.4,38.5]].map(q=>P(...q).map(v=>v));
+ const cores=[[-95.45,35.05,1.25],[-94.2,36.55,1.2],[-94.75,35.8,.8],[-95.9,34.35,.8],[-93.3,37.35,.85],[-96.6,33.72,.6],[-92.7,38.2,.5]].map(([lo,la,k])=>{const[x,y]=P(lo,la);return[x,y,k]});
+ const iso=[[-97.6,35.4,7],[-98.1,34.7,5],[-92.2,36.6,6],[-91.8,37.4,4],[-96.9,36.3,5]].map(([lo,la,r])=>{const[x,y]=P(lo,la);return[x,y,r]});
+ const segd=(x,y)=>{let best=1e9,side=0;for(let i=0;i<L.length-1;i++){const[ax,ay]=L[i],[bx,by]=L[i+1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy))),px=ax+t*dx-x,py=ay+t*dy-y,d=Math.hypot(px,py);if(d<best){best=d;side=(dx*(y-ay)-dy*(x-ax))}}return[best,side]};
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){const X=x/2,Y=y/2,n=fbm(X/14,Y/14),n2=fbm(X/5+40,Y/5+9);
+  const wx=X*2+(n-.5)*36,wy=Y*2+(fbm(X/14+7,Y/14+3)-.5)*36;const[d,side]=segd(wx,wy);
+  // leading convective edge narrow, trailing stratiform wide on NW side (side>0)
+  let z=0;const conv=Math.exp(-(d*d)/(2*9*9))*(0.55+0.6*n2);z=Math.max(z,conv*58);
+  if(side<0){const st=Math.exp(-d/50)*(n*1.25);z=Math.max(z,st*36)}else{z=Math.max(z,Math.exp(-d/14)*n*30)}
+  for(const[cx,cy,k]of cores){const r=Math.hypot(wx-cx,(wy-cy)*1.25);z=Math.max(z,Math.exp(-(r*r)/(2*11*11))*(52+20*k)*(0.8+0.35*n2))}
+  for(const[cx,cy,r]of iso){const rr=Math.hypot(wx-cx,wy-cy);z=Math.max(z,Math.exp(-(rr*rr)/(2*4*r*r))*(30+25*n2))}
+  z+= (n2-.5)*9;const o=(y*W+x)*4;if(z<13){im.data[o+3]=0;continue}
+  const k=Math.min(DBZ.length-1,Math.max(0,Math.floor((z-5)/5)));const c=DBZ[k][1];im.data[o]=parseInt(c.slice(1,3),16);im.data[o+1]=parseInt(c.slice(3,5),16);im.data[o+2]=parseInt(c.slice(5,7),16);im.data[o+3]=z<20?120:215}
+ g.putImageData(im,0,0);return _rad=cv.toDataURL()}
+function mapSVG(id,prod,o={}){
+ let h=`<svg class="map" viewBox="0 0 1000 526" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sample ${prod?PROD[prod].name:''} forecast map"><defs><radialGradient id="dbz${id}"><stop offset="0" stop-color="#c00000"/><stop offset=".22" stop-color="#ff3b00"/><stop offset=".45" stop-color="#ffd400"/><stop offset=".7" stop-color="#18b018" stop-opacity=".85"/><stop offset="1" stop-color="#18b018" stop-opacity="0"/></radialGradient><linearGradient id="tint${id}" x1="0" x2="1"><stop offset="0" stop-color="#e6ecdc" stop-opacity="0"/><stop offset=".5" stop-color="#e3eadb"/></linearGradient><filter id="bl${id}"><feGaussianBlur stdDeviation="3"/></filter></defs>
+ <rect class="m-water" width="1000" height="526"/><path class="m-land" d="M0,0H1000V470C960,480 930,500 900,526H0Z"/><path class="m-tint" d="M560,0H1000V470C960,480 930,500 900,526H560C600,400 540,200 600,0Z" fill="url(#tint${id})"/>`;
+ h+=RIVERS.map(l=>`<polyline class="m-riv" points="${pts(l)}"/>`).join('')+ROADS.map(l=>`<polyline class="m-road" points="${pts(l)}"/>`).join('');
+ h+=LINES.map(l=>`<polyline class="m-st" points="${pts(l)}"/>`).join('');
+ h+=STATES.map(([n,lo,la])=>{const[x,y]=P(lo,la);return`<text class="m-slbl" x="${x}" y="${y}" text-anchor="middle">${n}</text>`}).join('');
+ if(prod){const p=PROD[prod];h+=`<g class="polys ${o.draw?'draw':''}" ${o.op?`opacity="${o.op}"`:''}>`+p.paths.map((d,i)=>`<path class="poly" d="${d}" fill="${p.cats[i][1]}" style="--d:${(i*1.1).toFixed(1)}s"/>`).join('')+`</g>`}
+ h+=CITIES.map(([n,lo,la])=>{const[x,y]=P(lo,la);return`<circle cx="${x}" cy="${y}" r="2.3" fill="#374151"/><text class="m-city" x="${x+5}" y="${y-4}">${n}</text>`}).join('');
+ if(o.radar){h+=`<image class="radar" href="${radarURL()}" x="0" y="0" width="1000" height="526" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+  const poly=a=>a.map(q=>P(...q).map(v=>v.toFixed(1)).join(',')).join(' ');
+  h+=`<g class="warn" fill="none" stroke-width="1.6" stroke-linejoin="miter">`+WARN.map(([c,pp])=>`<polygon points="${poly(pp)}" stroke="${c}"/>`).join('')+`</g>`;
+  h+=SREP.map(([c,lo,la])=>{const[x,y]=P(lo,la);return`<circle class="warn" cx="${x}" cy="${y}" r="2.6" fill="${c}" stroke="#000" stroke-width=".6"/>`}).join('')}
+ if(o.reports){let s=11;const r=()=>(s=s*16807%2147483647)/2147483647;const C=P(-96.2,36.9);let out='';for(let i=0;i<30;i++){const u=(r()*2-1)*260,v=(r()*2-1)*80,A=-30*Math.PI/180;const x=C[0]+u*Math.cos(A)-v*Math.sin(A),y=C[1]+u*Math.sin(A)+v*Math.cos(A);const t=r();const c=t<.25?'#FF0000':t<.65?'#0000FF':'#00FF00';out+=`<circle class="rpt" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${c}" stroke="#000" stroke-opacity=".4" style="transition-delay:${(i*.05).toFixed(2)}s"/>`}h+=out}
+ h+=`<circle class="pen2" r="6" fill="#fff" stroke="#1683f8" stroke-width="3" opacity="0"/></svg>`;return h}
+const I={home:'<path d="M3 11l9-7 9 7v9H3z"/>',map:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',msg:'<rect x="3" y="4" width="18" height="14" rx="2"/>',chk:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',ant:'<path d="M12 12v9M8 8a5 5 0 018 0M5 5a9 9 0 0114 0"/>',pen:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',lay:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',wr:'<path d="M14 6a4 4 0 105 5l-8 8-4-1-1-4z"/>',book:'<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/>'};
+const ic=k=>`<svg viewBox="0 0 24 24">${I[k]}</svg>`;
+function topbar(active){return `<div class="ab"><div class="lg"><i><img src="assets/cloud.png" alt=""></i>Graphical Forecast Creator</div><nav>${[['Home','home'],['Forecast','map'],['Discussion','msg'],['Verification','chk'],['Monitor','ant']].map(([n,k])=>`<span data-nav="${n}" class="${n==active?'on':''}">${ic(k)}${n}</span>`).join('')}</nav><div class="rt"><span class="ver">v1.7.8</span><span>◎ Account</span><span class="moon">☾</span><span>⋯</span></div></div>`}
+function legend(prod,mode){if(mode==='severe')return `<h4>Tornado Probabilities</h4>`+PROD.tor.cats.concat([['30%','#FF80FF'],['45%','#C896F7'],['60%','#104E8B']]).map(([k,c])=>`<div class="it"><span class="sw" style="background:${c}"></span>${k}</div>`).join('');
+ if(!prod)return `<h4>Custom Layers</h4><div class="muted">No custom layer selected</div>`;const p=PROD[prod];return `<h4>Custom Layers</h4><div class="lt">${p.name}</div>`+p.cats.map(([k,c])=>`<div class="it"><span class="sw" style="background:${c}"></span>${k}</div>`).join('')}
+function forecastView(id,prod){const p=PROD[prod];return `<div class="view vf on" data-v="forecast">${mapSVG(id,prod,{draw:true})}
+ <div class="zoom"><b>+</b><b>−</b></div><div class="lgd">${legend(prod)}</div>
+ <div class="unof">UNOFFICIAL FORECAST — NOT FOR SAFETY DECISIONS</div>
+ <div class="dtools"><span class="tp on">Pan</span><span class="td">Draw</span><span>Delete</span><span class="sep"></span><span class="on" style="background:#111;color:#fff">Key</span><span class="ur">↶↷</span></div>
+ <div class="dhelp">Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.</div>
+ <div class="attr">OpenFreeMap © OpenMapTiles Data from OpenStreetMap</div>
+ <div class="cated"><div class="h"><span>Custom categories</span><span>Heavy Rain Risk</span></div>${p.cats.map(([k,c],i)=>`<div class="r"><i style="background:${c}"></i><span>${k}</span><code>${c.toUpperCase()}</code><span>${[55,70,80][i]}%</span></div>`).join('')}<div class="add">+ Add category</div></div>
+ <div class="tbar"><div class="tabs"><span data-tab="draw">${ic('pen')}Draw</span><span data-tab="days">${ic('cal')}Days</span><span data-tab="layers">${ic('lay')}Layers</span><span data-tab="tools">${ic('wr')}Tools</span><span class="ctx">CONTEXT <b class="ctxd">Day 1</b> · <b>Jan 1 Cycle</b></span></div>
+ <div class="rows">
+  <div class="row" data-row="days"><div class="lb">Cycle date</div><span class="tb"><b>Jan 1</b>&nbsp;Cycle 2026-01-01</span><span class="tb">Edit</span><div class="lb">Forecast days<small>1-8</small></div><span class="ib dim">‹</span>${[1,2,3,4,5,6,7,8].map(n=>`<span class="dn${n==1?' on':''}" data-d="${n}">${n}</span>`).join('')}<span class="ib">›</span><div class="lb">Day status</div><div class="stat"><div class="lb">Current</div><span class="dcur">Day 1</span></div><div class="stat"><div class="lb">Data</div>0/8</div><div class="stat"><div class="lb">Jump</div>1-8</div></div>
+  <div class="row" data-row="severe"><div class="lb">Draw mode</div><div class="seg"><span class="on">Severe</span><span>Custom</span></div><div class="lb">Outlook type<small>T / W / H / C</small></div><span class="tb on">Tor</span><span class="tb">Wind</span><span class="tb">Hail</span><span class="tb">Cat</span><div class="lb">Probability scale<small>Arrow keys</small></div>${[['2%','#79BA7A'],['5%','#BD998A'],['10%','#FFE481'],['15%','#FF8080'],['30%','#FF80FF'],['45%','#C896F7'],['60%','#104E8B']].map(([k,c],i)=>`<span class="pp${i==0?' on':''}" style="background:${c}">${k}</span>`).join('')}<div class="cur"><div class="lb">Current<br>selection</div><span class="chip">Tornado 2%</span></div></div>
+  <div class="row" data-row="custom"><div class="lb">Draw mode</div><div class="seg"><span>Severe</span><span class="on">Custom</span></div><div class="lb">Library</div><span class="tb" style="color:#1d4ed8">${ic('book')}Saved products</span><div class="grpbox"><span class="sel"><input class="ltitle" aria-label="Layer title" value="${p.name}" tabindex="-1" readonly> ▾</span><span class="ib plus">+</span><span class="ib">↑</span><span class="ib">↓</span><span class="ib">🗑</span></div><div class="cats">${p.cats.map(([k,c],i)=>`<span class="cat${i==0?' on':''}"><i style="background:${c}"></i>${k}</span>`).join('')}</div></div>
+ </div></div></div>`}
+function discussionView(){return `<div class="view vd" data-v="discussion"><div class="hd">▤ Forecast Discussion <span class="badge">Day 1</span><div class="btns"><span class="tb">⤓ Export</span><span class="tb save">▣ Save</span></div></div>
+ <div class="lc"><div class="fields"><div>◷ Valid From<div>05/06/2026, 07:00 AM</div><small>May 6, 2026, 07:00 AM CDT</small></div><div>◷ Valid To<div>05/07/2026, 07:00 AM</div><small>May 7, 2026, 07:00 AM CDT</small></div><div>⚇ Forecaster<div class="fname" style="color:#6b7280">Your name or username</div></div></div>
+ <div class="ban">⚠ <b>UNOFFICIAL OUTLOOK</b> - For educational purposes only.</div>
+ <div class="gtabs"><span>✎ DIY Editor</span><span class="on">✦ Guided</span></div>
+ <div class="info">Answer each question below. When you save, your responses will be formatted into a professional forecast discussion with section headers.</div>
+ <div class="qcard"><div class="qh"><b>1</b>SUMMARY</div><em>What is the overall severe weather threat for this outlook period? Describe the areas at risk and primary hazards expected.</em><div class="ta" id="q1t"></div></div>
+ <div class="qcard"><div class="qh"><b>2</b>METEOROLOGICAL SETUP</div><em>What synoptic and mesoscale features are driving this event?</em><div class="ta ph" id="q2t">Describe the atmospheric setup. Include: upper-level patterns, surface features, moisture characteristics, and lift mechanisms.</div></div></div>
+ <div class="rc"><div class="ph2">◉ Live Preview</div><div class="mono" id="prev"></div></div></div>`}
+function monitorView(id){const pn=(t,b)=>`<div class="pn"><div class="t"><span>${t}</span><span>⌃</span></div><div class="b">${b}</div></div>`;
+ return `<div class="view vm" data-v="monitor"><div class="side"><h3>Monitor</h3><p>Live radar, satellite, SPC reports, and NWS alerts refresh with Playback or Refresh.</p>
+ ${pn('◎ Radar','Source<div class="selx"><span class="rsrc">Off</span>▾</div>Product<div class="selx"><span>Base Reflectivity</span>▾</div>Opacity<div class="sl"><i style="width:70%"></i></div><small class="mt">5:55 PM CDT</small>')}${pn('⌁ Satellite','Product<div class="selx"><span>Off</span>▾</div><small class="mt">Latest time unavailable</small>')}
+ ${pn('⚠ Watches &amp; warnings','<span class="ck"><i></i>Show official NWS polygons</span><span class="ck"><i></i>Watches</span><span class="ck"><i></i>Warnings</span><span class="ck off"><i></i>Advisories</span>')}
+ ${pn('⌖ SPC storm reports','<span class="ck"><i></i>Show today\'s SPC reports</span>')}${pn('▦ Outlooks','<span class="ck off"><i></i>Show SPC Day 1 outlook</span>')}${pn('▷ Playback','<div class="sl"><i style="width:100%"></i></div><small class="mt">12 frames · 5:00–5:55 PM</small>')}</div>
+ <div class="mapm">${mapSVG(id,null,{radar:true})}<div class="rlg"><span>dBZ</span>${DBZ.filter((c,i)=>i%2==1).map(([v,c])=>`<i style="background:${c}" title="${v}"></i>`).join('')}<span>5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;40&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;75</span></div><div class="rts">MRMS Reflectivity at Lowest Altitude · 5:55 PM CDT</div><div class="ro">Read-only monitor</div></div></div>`}
+function verifyView(id){return `<div class="view vv" data-v="verification"><div class="k">VERIFICATION WORKSPACE</div><h2>Forecast Grade</h2><div class="sub">Compare the outlook against SPC evidence · formula gfc-ver-4 · <a>Methodology</a></div>
+ <div class="vgrid"><div class="vl"><span class="k">1 · PACKAGE AND EVIDENCE</span><h5>Choose a forecast package</h5><div class="pk">PACKAGE <span>day1-severe.json</span><br>ENGINE <span>GFC-VER-1</span> DATE <span>MAY 6</span></div><span class="tb">⤒ Upload forecast file</span><div class="hr"></div><span class="k">2 · OBSERVATION DATE</span><h5>SPC reports + NOAA DAT surveys</h5><span class="ck"><i></i>Use today instead</span><div class="gbtn">Grade forecast</div></div>
+ <div class="vc"><div class="vt"><span>Cat</span><span class="on">Tornado</span><span>Wind</span><span>Hail</span><span>◉ Evidence</span><span>DAT survey</span><span>⚇ Legend</span></div><div class="vmap">${mapSVG(id,'tor',{reports:true})}</div></div>
+ <div class="vr"><h5>Overall Grade</h5><div class="g"><span class="gnum">0</span> <small>/ 100</small></div><span class="smp">SAMPLE DATA</span>
+ ${[['Tornado',74],['Wind',81],['Hail',79]].map(([k,v])=>`<div class="hz"><span>${k}</span><span class="bb"><i data-w="${v}"></i></span><b>${v}</b></div>`).join('')}<div class="ev">Evidence: 30 SPC storm reports · 2 NOAA DAT surveys (sample)</div></div></div></div>`}
+function build(box,o){box.innerHTML=`<div class="appc">${topbar('Forecast')}${forecastView(o.id,o.prod)}${o.story?discussionView()+monitorView(o.id+'m')+verifyView(o.id+'v'):''}</div>`;const a=box.querySelector('.appc');fit(box);return a}
+function fit(box){const a=box.querySelector('.appc');const w=box.clientWidth;let s=w/1000,fx=0;const min=box.dataset.min?+box.dataset.min:0;if(s<min){fx=+(a.dataset.fx||0);s=min;fx=Math.max(0,Math.min(fx,1000-w/s))}a.style.transform=`translate(${-fx*s}px,0) scale(${s})`;box.style.height=(640*s)+'px'}
+const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));const clear=()=>{T.forEach(clearTimeout);T.length=0};
+function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',p.getTotalLength().toFixed(0)))}
+function drawPolys(a,force){const g=a.querySelector('.vf .polys');setL(g);g.classList.remove('done');g.getBoundingClientRect();if(RM||force){g.classList.add('done');return}g.classList.add('done');
+ const pen=a.querySelector('.vf .pen2'),ps=[...g.querySelectorAll('.poly')],cats=[...a.querySelectorAll('.cat')];const t0=performance.now();pen.setAttribute('opacity',1);
+ (function f(n){const t=Math.max(0,(n-t0)/1000),i=Math.floor(t/1.1);if(i>=ps.length||!a.isConnected){pen.setAttribute('opacity',0);return}const p=ps[i],q=p.getPointAtLength(Math.min(1,(t-i*1.1)/1)*p.getTotalLength()*.999);pen.setAttribute('cx',q.x);pen.setAttribute('cy',q.y);cats.forEach((c,k)=>c.classList.toggle('on',k===i));requestAnimationFrame(f)})(t0)}
+function hidePolys(a){const g=a.querySelector('.vf .polys');setL(g);g.querySelectorAll('.poly').forEach(p=>p.style.transition='none');g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
+function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
+function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n))}
+function typeInto(el,text,speed,done){if(RM){el.textContent=text;done&&done();return}let i=0;const iv=setInterval(()=>{i+=2;el.textContent=text.slice(0,i);if(i>=text.length){clearInterval(iv);done&&done()}},speed);T.push(iv)}
+// hero
+const hb=document.getElementById('heroBox');hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');ha.querySelector('.dhelp').style.display='none';ha.querySelector('.tp').classList.remove('on');ha.querySelector('.td').classList.add('on');ha.querySelector('.td').style.cssText='background:#111;color:#fff';
+setTimeout(()=>drawPolys(ha),400);
+// story
+const sb=document.getElementById('storyBox');sb.dataset.min='.7';const sa=build(sb,{id:'s',prod:'rain',story:true});
+const SUM='A slow-moving front will stall from eastern Oklahoma into southern Missouri. Repeated rounds of storms with precipitable water near 1.8 inches will bring 2-4 inches of rain, locally higher in the Ozarks. Flash flooding is the main concern overnight.';
+const steps=[
+ a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'forecast');hidePolys(a);tab(a,'days','days');a.querySelector('.lgd').innerHTML=legend(null,'severe');a.querySelector('.cated').classList.remove('on');a.querySelector('.dhelp').style.display='';
+   const ds=[...a.querySelectorAll('.dn')];ds.forEach(d=>d.classList.toggle('on',d.dataset.d==1));
+   later(900,()=>{ds.forEach(d=>d.classList.toggle('on',d.dataset.d==2));a.querySelector('.ctxd').textContent='Day 2';a.querySelector('.dcur').textContent='Day 2'});
+   later(2000,()=>{tab(a,'draw','severe');a.dataset.fx='0';fit(sb)});
+   later(3300,()=>{tab(a,'draw','custom');a.dataset.fx='250';fit(sb);a.querySelector('.lgd').innerHTML=legend(null);const pl=a.querySelector('.plus');pl.classList.add('hot');const t=a.querySelector('.ltitle');t.value='';a.querySelector('.cats').style.visibility='hidden';
+     later(500,()=>{pl.classList.remove('hot');let i=0;const nm='Heavy Rain Risk';const iv=setInterval(()=>{t.value=nm.slice(0,++i);if(i>=nm.length){clearInterval(iv);a.querySelector('.cated').classList.add('on');a.querySelector('.cats').style.visibility='';a.querySelector('.lgd').innerHTML=legend('rain')}},RM?0:60);T.push(iv)})})},
+ a=>{a.dataset.fx='400';a.classList.remove('dark');view(a,'forecast');tab(a,'draw','custom');a.querySelector('.ltitle').value='Heavy Rain Risk';a.querySelector('.cated').classList.remove('on');a.querySelector('.lgd').innerHTML=legend('rain');a.querySelector('.dhelp').style.display='none';
+   a.querySelector('.tp').classList.remove('on');const td=a.querySelector('.td');td.classList.add('on');td.style.cssText='background:#111;color:#fff';drawPolys(a)},
+ a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'discussion');const q=a.querySelector('#q1t'),pv=a.querySelector('#prev');q.textContent='';a.querySelector('.fname').textContent='Your name or username';
+   const head='Graphical Forecast Creator\nDay 1 Outlook Discussion\n\nIssued: Wednesday, May 6, 2026 at 07:00 AM CDT\nValid: Wed, May 6, 07:00 AM CDT to Thu, May 7, 07:00 AM CDT\n\n** UNOFFICIAL OUTLOOK - FOR EDUCATIONAL/DEMONSTRATION PURPOSES ONLY **\n\n---\n\nSUMMARY\n';pv.textContent=head;
+   later(400,()=>typeInto(q,SUM,28,()=>{}));later(400,()=>{let i=0;const iv=setInterval(()=>{i+=2;pv.textContent=head+SUM.slice(0,i);if(i>=SUM.length)clearInterval(iv)},RM?0:28);T.push(iv)})},
+ a=>{a.dataset.fx='330';view(a,'monitor');const vm=a.querySelector('.vm');vm.classList.remove('live');a.querySelector('.rsrc').textContent='Off';const m=a.querySelector('.moon');
+   later(500,()=>m.classList.add('pulse'));later(1100,()=>{a.classList.add('dark');m.textContent='☀';m.classList.remove('pulse')});later(1500,()=>{a.querySelector('.rsrc').textContent='MRMS CONUS';vm.classList.add('live')})},
+ a=>{a.dataset.fx='480';a.classList.remove('dark');a.querySelector('.moon').textContent='☾';view(a,'verification');const vv=a.querySelector('.vv');vv.classList.remove('go');a.querySelector('.gnum').textContent='0';a.querySelectorAll('.hz i').forEach(i=>i.style.width='0');
+   later(500,()=>{vv.classList.add('go');a.querySelectorAll('.hz i').forEach(i=>i.style.width=i.dataset.w+'%');const e=a.querySelector('.gnum'),t0=performance.now();(function f(n){const p=Math.min(1,(n-t0)/1400);e.textContent=Math.round(78*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)})}
+];
+const sec=document.getElementById('story'),stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
+function onScroll(){document.getElementById('top').classList.toggle('scrolled',scrollY>20);const r=sec.getBoundingClientRect(),tot=sec.offsetHeight-innerHeight,p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
+ if(s!==cur&&r.top<innerHeight*.5){cur=s;clear();stepEls.forEach((e,i)=>e.classList.toggle('active',i===s));bars.forEach((e,i)=>e.classList.toggle('on',i<=s));steps[s](sa);fit(sb)}}
+addEventListener('scroll',onScroll,{passive:true});addEventListener('resize',()=>{fit(hb);fit(sb)});onScroll();
+// doors
+const doors=document.getElementById('doorsEl'),ds=[...doors.querySelectorAll('.door')];doors.classList.add('has-open');
+function openDoor(d){ds.forEach(x=>{const o=x===d;x.classList.toggle('open',o);x.setAttribute('aria-expanded',o)})}
+ds.forEach(d=>{d.addEventListener('mouseenter',()=>matchMedia('(hover:hover)').matches&&openDoor(d));d.addEventListener('click',e=>{if(!e.target.closest('a'))openDoor(d)});d.addEventListener('focus',()=>openDoor(d));d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDoor(d)}})});
+// bento map: custom layer mini
+const bm=document.getElementById('bentoMap');const p=PROD.rain;
+bm.innerHTML=`<rect width="400" height="220" rx="12" fill="#f3f1ea"/><g transform="translate(-200,-95) scale(.62)">${p.paths.map((d,i)=>`<path d="${d}" fill="${p.cats[i][1]}" fill-opacity=".85" stroke="#000" stroke-width="2.5"/>`).join('')}</g>
+<g font-family="-apple-system,Segoe UI,sans-serif"><rect x="12" y="12" width="132" height="86" rx="10" fill="rgba(248,250,255,.95)" stroke="#cbd5e1"/><text x="22" y="30" font-size="11" fill="#333">Custom Layers</text>${p.cats.map(([k,c],i)=>`<rect x="22" y="${40+i*18}" width="12" height="12" fill="${c}" stroke="#555"/><text x="40" y="${50+i*18}" font-size="10" fill="#333">${k}</text>`).join('')}</g>`;
+document.querySelectorAll('.qa button').forEach(b=>b.addEventListener('click',()=>{const o=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',o);b.closest('.qa').classList.toggle('open',o)}));
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+document.querySelectorAll('.reveal').forEach(e=>RM?e.classList.add('in'):io.observe(e));
 })();
-</script>
-</body>
-</html>
+</script></body></html>
