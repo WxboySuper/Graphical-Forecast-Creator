@@ -18,13 +18,14 @@ const steps = workflow.jobs.review.steps;
 const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
-  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
+  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'ready_for_review']);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.ok(workflow.on.workflow_run === undefined);
+  assert.ok(workflow.on.workflow_dispatch === undefined, 'first-look reviews start from PR events or the manual comment trigger');
   assert.ok(workflow.concurrency === undefined, 'CI waiting must not hold the shared OpenCode queue');
   assert.ok(waitJob.concurrency === undefined, 'the CI waiter must run outside the model queue');
   assert.equal(workflow.jobs.review.needs, 'wait-for-ci');
-  assert.deepEqual(workflow.jobs.review.concurrency, { group: 'gfc-opencode-maintenance-queue', queue: 'max' });
+  assert.deepEqual(workflow.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': true });
   assert.equal(waitJob.permissions['pull-requests'], 'read');
   assert.equal(waitJob.permissions.actions, 'read');
   assert.ok(workflow.jobs.review.permissions.actions === undefined);
@@ -64,7 +65,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
-  assert.match(context.with.script, /model context and OpenCode compaction are available/);
+  assert.match(context.with.script, /Keep the diff context capped at 30,000 characters/);
   assert.match(context.with.script, /revisionTruncationReasons/);
   assert.match(context.with.script, /diffTruncationReasons/);
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);

@@ -27,7 +27,7 @@ const visitLocalImports = (file, visited = new Set()) => {
 
 test('trusted PR changelog automation runs only in pull_request_target with read-only job permissions', () => {
   const workflow = readWorkflow('opencode-changelog-pr.yml');
-  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited']);
+  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'reopened', 'ready_for_review']);
   assert.equal(workflow.concurrency.group, 'gfc-opencode-maintenance-queue');
   assert.equal(workflow.permissions.contents, 'read');
   assert.equal(workflow.permissions['pull-requests'], 'read');
