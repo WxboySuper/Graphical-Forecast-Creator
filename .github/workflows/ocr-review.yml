@@ -8,6 +8,22 @@ name: Review | OCR
 # - Own manual trigger (/ocr), distinct from /review-opencode.
 # Low, style, and nit findings are suppressed and never fail the merge gate.
 #
+# The required `ocr-review` check has to land on every PR head SHA, otherwise
+# branch protection blocks the PR the moment someone pushes or rebases:
+# - pull_request_target fires on opened, ready_for_review, synchronize,
+#   reopened, and edited, so a new head SHA gets its own run and a title
+#   change re-runs the review on the same head.
+# - The job always runs for a pull_request_target event. A draft PR, a
+#   HOLD/WIP title, or a fork head skips the review inside the job (a
+#   step-level skip), so the check still reports on that head instead of
+#   staying pending.
+# - cancel-in-progress is false. A newer head must not cancel the run that
+#   still owes a result for the head it started on. The automatic and the
+#   manual path use separate per-PR groups, so a queued /ocr review is not
+#   dropped when a newer run enters the automatic group.
+# - A manual /ocr comment run has no check run of its own on the PR head, so
+#   it reports a commit status with the `ocr-review` context on the head.
+#
 # Model: MiniMax M3.1 Flash Free via OpenCode Go (free), reusing
 # OPENCODE_API_KEY. It uses the OpenAI chat/completions protocol, so
 # llm_protocol is openai and the URL ends in /chat/completions.
@@ -16,34 +32,42 @@ name: Review | OCR
 
 on:
   pull_request_target:
-    types: [opened, ready_for_review]
+    types: [opened, ready_for_review, synchronize, reopened, edited]
   issue_comment:
     types: [created]
 permissions:
   contents: read
   pull-requests: write
+  statuses: write
 
 concurrency:
+  # Two per-PR groups. The automatic group holds one run per PR, so a new
+  # head replaces the queued one and never cancels the running one. The
+  # manual group is separate, because GitHub drops a queued run when a newer
+  # run enters the same group, and a requested /ocr review must not vanish
+  # because somebody pushed in the meantime.
   group: >-
     ${{
       (github.event_name == 'pull_request_target'
+        && format('gfc-ocr-pr-{0}', github.event.pull_request.number))
         || (github.event_name == 'issue_comment'
           && github.event.issue.pull_request
           && github.event.comment.user.type != 'Bot'
           && startsWith(github.event.comment.body, '/ocr')
-          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)))
-        && format('gfc-ocr-{0}', github.event.pull_request.number || github.event.issue.number)
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+          && format('gfc-ocr-manual-{0}', github.event.issue.number))
         || format('gfc-ocr-noop-{0}', github.run_id)
     }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   ocr-review:
+    # Only the manual comment path is filtered here. A pull_request_target
+    # event always runs the job: the job's own check run is what branch
+    # protection waits for, so it must report on every head SHA. Draft,
+    # HOLD/WIP, and fork PRs are handled by a step-level skip further down.
     if: |
-      (github.event_name == 'pull_request_target' &&
-       github.event.pull_request.draft == false &&
-       !contains(github.event.pull_request.title, 'HOLD') &&
-       !contains(github.event.pull_request.title, 'WIP'))
+      github.event_name == 'pull_request_target'
       || (
         github.event_name == 'issue_comment'
         && github.event.issue.pull_request
@@ -76,8 +100,80 @@ jobs:
             core.setOutput('base_ref', pull.base.ref);
             core.setOutput('head_sha', pull.head.sha);
 
+      - name: Mark the manual review as pending on the PR head
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          HEAD_SHA: ${{ steps.pr-refs.outputs.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // A comment-triggered run reports no check run on the PR head, so
+            // the head would sit without an `ocr-review` status for the whole
+            // review. Publish a pending status first, then the final one
+            // after the gate. Never fatal: the status API is an extra
+            // convenience, not a reason to fail a review that already ran.
+            const sha = String(process.env.HEAD_SHA || '').trim();
+            if (!/^[a-f0-9]{40}$/i.test(sha)) {
+              core.warning('OCR status: no PR head SHA; skipping pending status.');
+              return;
+            }
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                state: 'pending',
+                context: 'ocr-review',
+                description: 'OCR review is running',
+                target_url: process.env.RUN_URL || '',
+              });
+              core.info(`OCR pending status posted on ${sha.slice(0, 7)}.`);
+            } catch (error) {
+              core.warning(`OCR pending status failed: ${error.message}`);
+            }
+
+      - name: Decide whether this head needs a review
+        id: skip
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          # GitHub's contains() ignores case, so this keeps the old job-level
+          # behavior: "wip: feature" and "Hold: investigation" skip the
+          # review just like "WIP: feature" and "HOLD" did.
+          PR_TITLE_HOLDS: ${{ contains(github.event.pull_request.title, 'HOLD') || contains(github.event.pull_request.title, 'WIP') }}
+          # A fork head is attacker-controlled. This run holds a write-scoped
+          # token and the OPENCODE_API_KEY secret, and a synchronize event
+          # lets a fork author re-arm it on every push, so the automatic
+          # review only runs for heads that live in this repository. The
+          # manual /ocr path is unaffected: a trusted author asked for it.
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          # A draft PR, a HOLD/WIP title, or a fork head is not ready for
+          # review. The job still runs so the required check reports on this
+          # head SHA; only the review itself is skipped.
+          skip=false
+          reason=""
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            if [ "$PR_DRAFT" = "true" ]; then
+              skip=true
+              reason="draft pull request"
+            elif [ "$PR_TITLE_HOLDS" = "true" ]; then
+              skip=true
+              reason="HOLD/WIP title"
+            elif [ "$PR_HEAD_REPO" != "$REPOSITORY" ]; then
+              skip=true
+              reason="head from a fork"
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "OCR review skip=$skip ($reason)"
+
       - name: Run OCR review with MiniMax M3.1 Flash Free
         id: ocr
+        if: steps.skip.outputs.skip != 'true'
         uses: alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4 # main as of 2026-10-10
         with:
           llm_url: ${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/chat/completions' }}
@@ -109,7 +205,7 @@ jobs:
 
       - name: Post OCR digest summary
         id: ocr-digest
-        if: always() && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
+        if: always() && steps.skip.outputs.skip != 'true' && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
@@ -279,8 +375,17 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           OCR_OUTCOME: ${{ steps.ocr.outcome }}
+          OCR_SKIPPED: ${{ steps.skip.outputs.skip }}
         with:
           script: |
+            // A skipped review (draft PR, HOLD/WIP title, fork head) passes
+            // on purpose: the check has to report on this head SHA, and there
+            // is nothing to gate. A review that ran and failed is still a
+            // failure.
+            if (process.env.OCR_SKIPPED === 'true') {
+              core.info('OCR gate passed: this revision was skipped (draft PR, HOLD/WIP title, or fork head).');
+              return;
+            }
             const outcome = process.env.OCR_OUTCOME || 'unknown';
             if (outcome !== 'success') {
               core.setFailed(`OCR review did not complete (outcome=${outcome}).`);
@@ -307,12 +412,50 @@ jobs:
             }
             core.info(`OCR gate passed: ${comments.length} finding(s), none medium or higher.`);
 
+      - name: Report the ocr-review status on the PR head
+        if: always() && github.event_name == 'issue_comment'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          HEAD_SHA: ${{ steps.pr-refs.outputs.head_sha }}
+          GATE_OUTCOME: ${{ steps.ocr-gate.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // The final status for a manual run. It lands on the PR head, so
+            // the required `ocr-review` check sees it. Never fatal: the
+            // review already ran and posted its findings, and a status API
+            // hiccup must not turn a passing review into a red one.
+            const sha = String(process.env.HEAD_SHA || '').trim();
+            if (!/^[a-f0-9]{40}$/i.test(sha)) {
+              core.warning('OCR status: no PR head SHA; skipping final status.');
+              return;
+            }
+            const state = process.env.GATE_OUTCOME === 'success' ? 'success' : 'failure';
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                state,
+                context: 'ocr-review',
+                description: state === 'success'
+                  ? 'OCR review passed'
+                  : 'OCR review failed',
+                target_url: process.env.RUN_URL || '',
+              });
+              core.info(`OCR status posted on ${sha.slice(0, 7)}: ${state}.`);
+            } catch (error) {
+              core.warning(`OCR status failed: ${error.message}`);
+            }
+
       - name: Run summary
         if: always()
         run: |
           {
             echo "OCR outcome=${{ steps.ocr.outcome }}.";
-            if [ "${{ steps.ocr.outcome }}" = "success" ]; then
+            if [ "${{ steps.skip.outputs.skip }}" = "true" ]; then
+              echo "OCR review skipped (${{ steps.skip.outputs.reason }}).";
+            elif [ "${{ steps.ocr.outcome }}" = "success" ]; then
               echo "OCR review posted.";
             else
               echo "OCR review did NOT post (outcome=${{ steps.ocr.outcome }}).";
