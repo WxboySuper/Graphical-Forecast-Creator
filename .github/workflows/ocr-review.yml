@@ -378,11 +378,12 @@ jobs:
           OCR_SKIPPED: ${{ steps.skip.outputs.skip }}
         with:
           script: |
-            // A skipped review (draft PR, HOLD/WIP title) passes on purpose:
-            // the check has to report on this head SHA, and there is nothing
-            // to gate. A review that ran and failed is still a failure.
+            // A skipped review (draft PR, HOLD/WIP title, fork head) passes
+            // on purpose: the check has to report on this head SHA, and there
+            // is nothing to gate. A review that ran and failed is still a
+            // failure.
             if (process.env.OCR_SKIPPED === 'true') {
-              core.info('OCR gate passed: this revision was skipped (draft PR or HOLD/WIP title).');
+              core.info('OCR gate passed: this revision was skipped (draft PR, HOLD/WIP title, or fork head).');
               return;
             }
             const outcome = process.env.OCR_OUTCOME || 'unknown';
