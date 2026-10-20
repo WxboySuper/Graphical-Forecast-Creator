@@ -423,6 +423,10 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
           }
           setReportsState(loadedReports);
           dispatch(setReports(loadedReports));
+          // Restoring a snapshot reopens a past package with its verification evidence, so the
+          // evidence must be shown even if the user hid it earlier in the session. This mirrors
+          // the fresh-run path, which forces visibility on right after the reports load.
+          dispatch(setVisibility(true));
           dispatch(setDate(snapshot.reportDate ?? 'today'));
         })
         .catch(() => {
