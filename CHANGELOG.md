@@ -26,6 +26,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Verification clear:** Loading a different forecast in classic verification now also clears loaded storm reports from the map.
 - **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
 - **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
 - **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
