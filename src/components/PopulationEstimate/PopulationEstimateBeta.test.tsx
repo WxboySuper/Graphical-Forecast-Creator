@@ -76,4 +76,26 @@ describe('PopulationEstimateBeta', () => {
     expect(capturedSignal?.aborted).toBe(true);
     expect(screen.getByRole('button', { name: /Estimate affected population/i })).toBeEnabled();
   });
+
+  test('closes with Escape while loading and aborts the request', async () => {
+    const user = userEvent.setup();
+    const store = createStore();
+    store.dispatch(addFeature({ feature: tornadoFeature }));
+    let capturedSignal: AbortSignal | undefined;
+    estimatePopulationMock.mockImplementation((_geometry, options) => {
+      capturedSignal = options?.signal;
+      return new Promise(() => undefined);
+    });
+
+    renderEstimate(store);
+    const estimateButton = screen.getByRole('button', { name: /Estimate affected population/i });
+    await user.click(estimateButton);
+    expect(await screen.findByText('WorldPop is calculating the population inside your outlook...')).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(estimateButton).toBeEnabled();
+  });
 });
