@@ -488,6 +488,7 @@ export const applySettingsToState = (
 
   if (settings.darkMode !== currentDarkModeRef.current) {
     dispatch(setDarkMode(settings.darkMode));
+    currentDarkModeRef.current = settings.darkMode;
   }
 
   if (
@@ -506,6 +507,13 @@ export const applySettingsToState = (
         ghostOutlooks: settings.ghostOutlooks,
       }),
     );
+    currentOverlaysRef.current = {
+      ...currentOverlaysRef.current,
+      baseMapStyle: settings.baseMapStyle,
+      stateBorders: settings.stateBorders,
+      counties: settings.counties,
+      ghostOutlooks: settings.ghostOutlooks,
+    };
   }
 
   writeStoredForecastUiVariant(settings.forecastUiVariant);
