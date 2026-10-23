@@ -333,15 +333,16 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
   useEffect(() => () => {
     reportRequestIdRef.current += 1;
-  }, []);
+    dispatch(setLoading(false));
+  }, [dispatch]);
   
   // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
     const requestId = ++reportRequestIdRef.current;
 
     try {
-      dispatch(setLoading(true));
       dispatch(setError(null));
+      dispatch(setLoading(true));
       
       // Parse YYYY-MM-DD string directly to avoid timezone issues
       const [year, month, day] = selectedDate.split('-').map(Number);
