@@ -595,14 +595,26 @@ export const seedOrApplySettings = async (opts: {
     lastSyncedSettingsRef,
     setSyncedSettings,
   } = opts;
-  const remoteSettings = readRemoteSettings(settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined);
+  const remoteData = settingsSnapshot.data() as Partial<UserSettingsDocument> | undefined;
+  const completeRemoteSettings = readRemoteSettings(remoteData, localSettings);
+  const remoteSettings = readRemoteSettings(remoteData);
 
   if (!isActive()) {
     return;
   }
 
-  if (remoteSettings) {
-    applyRemoteSettings(remoteSettings);
+  if (completeRemoteSettings && settingsSnapshot.exists()) {
+    if (!remoteSettings) {
+      await setDoc(
+        settingsRef,
+        getRemoteSeedPayload(completeRemoteSettings),
+        { merge: true },
+      );
+      if (!isActive()) {
+        return;
+      }
+    }
+    applyRemoteSettings(completeRemoteSettings);
     return;
   }
 
@@ -655,7 +667,7 @@ export const startSettingsSubscription = (opts: {
     (snapshotError) => {
       if (opts.isActive()) {
         opts.setSettingsSyncStatus('error');
-        opts.setError(snapshotError.message);
+        opts.setError(getSettingsSyncError(snapshotError));
       }
     },
   );
