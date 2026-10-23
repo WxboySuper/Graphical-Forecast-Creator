@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
 import Overlay from 'ol/Overlay';
@@ -261,7 +261,7 @@ export const useMonitorMapBootstrap = ({
   const dispatch = useDispatch<AppDispatch>();
   const darkModeRef = useRef(darkMode);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     darkModeRef.current = darkMode;
   }, [darkMode]);
 
