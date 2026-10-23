@@ -1,6 +1,6 @@
 {
   "name": "graphical-forecast-creator",
-  "version": "1.8.0-beta.5",
+  "version": "1.8.0-beta.6",
   "private": true,
   "packageManager": "pnpm@10.30.3",
   "pnpm": {
@@ -68,6 +68,7 @@
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs",
     "test": "jest",
+    "test:toolbar:timezone": "cross-env TZ=America/New_York jest src/components/IntegratedToolbar/IntegratedToolbar.test.tsx",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:coverage": "jest --coverage",
     "perf": "cross-env GFC_PERF=1 jest --runInBand src/performance",
