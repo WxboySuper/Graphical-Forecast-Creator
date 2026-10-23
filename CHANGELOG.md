@@ -61,6 +61,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
+- **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
 - **Firebase SDK:** Updated Firebase from 12.19.0 to 13.0.0 to keep hosted Google sign-in, session persistence, and Firestore cloud sync on a supported release with no change to existing behavior.
 - **Sentry Node server SDK:** Update the hosted server error monitoring dependency from 11.6.0 to 11.8.0 to keep crash reporting on a supported release.
 - **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
