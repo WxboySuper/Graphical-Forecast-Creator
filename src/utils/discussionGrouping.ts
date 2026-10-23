@@ -15,13 +15,19 @@ const STANDARD_GROUPING_IDS = new Set(STANDARD_DISCUSSION_GROUPINGS.map(({ id })
 const isDayType = (value: unknown): value is DayType =>
   typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 8;
 
+const trimDiscussionText = (value: unknown): string =>
+  typeof value === 'string' ? value.trim() : '';
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /** Returns true when a discussion has user-authored content. */
 export const hasDiscussionContent = (discussion: DiscussionData | undefined): boolean => {
   if (!discussion) return false;
-  if (discussion.mode === 'diy') return Boolean(discussion.diyContent?.trim());
-  return Boolean(
-    discussion.guidedContent
-      && Object.values(discussion.guidedContent).some((value) => value.trim().length > 0),
+  if (discussion.mode === 'diy') return trimDiscussionText(discussion.diyContent).length > 0;
+  if (discussion.mode !== 'guided' || !isRecord(discussion.guidedContent)) return false;
+  return Object.values(discussion.guidedContent).some(
+    (value) => trimDiscussionText(value).length > 0,
   );
 };
 
@@ -45,7 +51,7 @@ const orderDiscussionDrafts = (drafts: DiscussionData[], preferredDraft?: Discus
 const mergeDiyDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => ({
   ...primary,
   mode: 'diy',
-  diyContent: drafts.map((draft) => draft.diyContent?.trim()).filter(Boolean).join('\n\n'),
+  diyContent: drafts.map((draft) => trimDiscussionText(draft.diyContent)).filter(Boolean).join('\n\n'),
   guidedContent: undefined,
   lastModified: new Date().toISOString(),
 });
@@ -53,20 +59,27 @@ const mergeDiyDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionDat
 /** Combines guided drafts by filling the first empty field for each section. */
 const mergeGuidedDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => {
   const guidedContent = { ...EMPTY_GUIDED_CONTENT };
-  drafts.forEach((draft) => {
-    if (!draft.guidedContent) return;
+  const mergeGuidedContent = (source: unknown): void => {
+    if (!isRecord(source)) return;
     (Object.keys(guidedContent) as Array<keyof GuidedDiscussionData>).forEach((key) => {
-      const value = draft.guidedContent?.[key]?.trim();
-      if (value && !guidedContent[key].trim()) guidedContent[key] = value;
+      const value = trimDiscussionText(source[key]);
+      if (value && !trimDiscussionText(guidedContent[key])) guidedContent[key] = value;
     });
+  };
+  mergeGuidedContent(primary.guidedContent);
+  drafts.forEach((draft) => {
+    if (draft !== primary) mergeGuidedContent(draft.guidedContent);
   });
   return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified: new Date().toISOString() };
 };
 
 /** Serializes guided sections into plain text for mixed-mode merges. */
 const serializeGuidedDraft = (draft: DiscussionData): string | undefined => {
-  if (draft.mode !== 'guided' || !draft.guidedContent) return undefined;
-  const text = Object.values(draft.guidedContent).map((value) => value.trim()).filter(Boolean).join('\n\n');
+  if (draft.mode !== 'guided' || !isRecord(draft.guidedContent)) return undefined;
+  const text = Object.values(draft.guidedContent)
+    .map((value) => trimDiscussionText(value))
+    .filter(Boolean)
+    .join('\n\n');
   return text || undefined;
 };
 
@@ -74,7 +87,7 @@ const serializeGuidedDraft = (draft: DiscussionData): string | undefined => {
 const mergeMixedDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => {
   const textParts = drafts.flatMap((draft) => {
     if (draft.mode === 'diy') {
-      const diyContent = draft.diyContent?.trim();
+      const diyContent = trimDiscussionText(draft.diyContent);
       return diyContent ? [diyContent] : [];
     }
     const guidedText = serializeGuidedDraft(draft);

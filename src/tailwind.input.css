@@ -1,2 +1,3 @@
 @import "tailwindcss";
 @config "../tailwind.compat.config.js";
+@source not "../design";

@@ -212,12 +212,13 @@ export function formatOutlookVerificationSummary(
 ): string {
   const { hits, misses, hitRate, byRiskLevel } = verification;
   const total = hits + misses;
-  
+  const missRate = total > 0 ? 100 - hitRate : 0;
+
   let summary = `
 ${outlookType.toUpperCase()} Verification:
 - Total Relevant Reports: ${total}
 - Hits: ${hits} (${hitRate.toFixed(1)}%)
-- Misses: ${misses} (${(100 - hitRate).toFixed(1)}%)
+- Misses: ${misses} (${missRate.toFixed(1)}%)
 `;
 
   if (Object.keys(byRiskLevel).length > 0) {

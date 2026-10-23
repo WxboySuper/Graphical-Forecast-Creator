@@ -23,6 +23,7 @@ export interface StormReportsState {
   reports: StormReport[];
   date: string | null;
   loading: boolean;
+  clearGeneration: number; // Invalidates pending report requests when the reports are cleared.
   error: string | null;
   visible: boolean;
   filterByType: {

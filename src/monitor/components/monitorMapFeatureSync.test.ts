@@ -8,6 +8,21 @@ import {
 } from './monitorMapFeatureSync';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
 
+const alertCollection = (
+  topId: string | undefined,
+  properties: Record<string, unknown>,
+): NwsAlertFeatureCollection => ({
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      ...(topId === undefined ? {} : { id: topId }),
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties,
+    } as NwsAlertFeatureCollection['features'][number],
+  ],
+});
+
 const makeCollection = (label: string): MonitorMesoscaleDiscussionCollection => ({
   type: 'FeatureCollection',
   features: [{
@@ -15,6 +30,47 @@ const makeCollection = (label: string): MonitorMesoscaleDiscussionCollection => 
     geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
     properties: { label, productNumber: '0001' },
   }],
+});
+
+describe('syncAlertFeatures', () => {
+  test('skips null entries and features without geometry', () => {
+    const source = new VectorSource();
+
+    expect(() =>
+      syncAlertFeatures(
+        source,
+        {
+          type: 'FeatureCollection',
+          features: [null, { geometry: null, properties: {} }],
+        } as unknown as NwsAlertFeatureCollection,
+      ),
+    ).not.toThrow();
+    expect(source.getFeatures()).toHaveLength(0);
+  });
+
+  test('preserves a top-level string id into feature properties for identity', () => {
+    const source = new VectorSource();
+    const url = 'https://api.weather.gov/alerts/top-level';
+
+    syncAlertFeatures(source, alertCollection(url, { event: 'Tornado Warning' }));
+
+    expect(source.getFeatures()).toHaveLength(1);
+    expect(source.getFeatures()[0].get('id')).toBe(url);
+    expect(source.getFeatures()[0].get('nwsAlert')).toBe(true);
+  });
+
+  test('keeps an explicit property id over the top-level id', () => {
+    const source = new VectorSource();
+
+    syncAlertFeatures(
+      source,
+      alertCollection('https://api.weather.gov/alerts/top-level', {
+        id: 'https://api.weather.gov/alerts/property',
+      }),
+    );
+
+    expect(source.getFeatures()[0].get('id')).toBe('https://api.weather.gov/alerts/property');
+  });
 });
 
 describe('syncMesoscaleDiscussionFeatures', () => {
