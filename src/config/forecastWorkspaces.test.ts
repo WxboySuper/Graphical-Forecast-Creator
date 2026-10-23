@@ -23,6 +23,11 @@ describe('forecast workspace product contract', () => {
 
   test.each(BUILD_TARGETS)('exposes Severe and Custom according to the %s target', (target: BuildTarget) => {
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, target)).toBe(true);
+    expect(getForecastWorkspace('tropical')?.exposureKey).toBeNull();
+    for (const workspaceId of ['mesoscale', 'tropical', 'winter'] as const) {
+      expect(isForecastWorkspaceExposed(getForecastWorkspace(workspaceId)!, target)).toBe(false);
+    }
   });
 
   test('keeps unknown IDs and malformed paths out of the contract', () => {
@@ -41,7 +46,12 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('mesoscale')).toMatchObject({
       path: '/forecast/mesoscale',
       productType: 'mesoscale',
-      exposureKey: 'mesoscaleWorkspace',
+      status: 'future',
+      exposureKey: null,
+    });
+    expect(getForecastWorkspace('winter')).toMatchObject({
+      status: 'future',
+      exposureKey: null,
     });
     expect(getForecastWorkspaceByPath('/forecast/custom')).toMatchObject({
       id: 'custom',
@@ -49,11 +59,19 @@ describe('forecast workspace product contract', () => {
     });
   });
 
+  test('does not expose a gated workspace without an explicit feature key', () => {
+    const customWorkspace = getForecastWorkspace('custom')!;
+
+    expect(customWorkspace.status).toBe('gated');
+    expect(isForecastWorkspaceExposed({ ...customWorkspace, exposureKey: null }, 'production')).toBe(false);
+  });
+
   test('keeps product identity separate from workspace exposure', () => {
     expect(getForecastWorkspace('severe')?.productType).toBe('severe');
     expect(getForecastWorkspace('custom')?.productType).toBe('custom');
     expect(isForecastWorkspaceExposed(getForecastWorkspace('severe')!, 'production')).toBe(true);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('winter')!, 'production')).toBe(false);
   });
 
   test('uses Severe for legacy Forecast entry points', () => {
