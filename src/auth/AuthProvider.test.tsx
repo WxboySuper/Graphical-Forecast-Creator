@@ -201,6 +201,8 @@ describe('AuthProvider Utils', () => {
       readRemoteSettings({ ...validSettings, defaultForecasterName: 'a'.repeat(101) } as Record<string, unknown>)
     ).toBeNull();
     expect(readRemoteSettings({ darkMode: 'not boolean' } as Record<string, unknown>)).toBeNull();
+    expect(readRemoteSettings({ ...validSettings, baseMapStyle: 'unexpected' } as Record<string, unknown>)).toBeNull();
+    expect(readRemoteSettings({ ...validSettings, ghostOutlooks: 1 } as Record<string, unknown>)).toBeNull();
     expect(readRemoteSettings(undefined)).toBeNull();
   });
 
@@ -257,9 +259,9 @@ describe('AuthProvider Utils', () => {
     expect(canSyncHostedUserDocuments(null)).toBe(false);
     expect(readProfileBetaAccess({ betaAccess: true })).toBe(true);
     expect(readProfileBetaAccess(undefined)).toBe(false);
-    expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Update failed');
+    expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Unable to update synced settings right now.');
     expect(getSettingsUpdateError('bad')).toBe('Unable to update synced settings right now.');
-    expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Sync failed');
+    expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Unable to sync account settings right now.');
     expect(getSettingsSyncError('bad')).toBe('Unable to sync account settings right now.');
 
     const profilePayload = createProfilePayload({
@@ -557,6 +559,48 @@ describe('AuthProvider hosted settings integration', () => {
       expect(setDoc).not.toHaveBeenCalled();
     });
 
+    test('seedOrApplySettings fills partial remote settings without replacing valid values', async () => {
+      const settings = {
+        darkMode: false,
+        baseMapStyle: 'esri-satellite' as const,
+        stateBorders: true,
+        counties: false,
+        ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
+        defaultForecasterName: 'Remote',
+        forecastUiVariant: 'workspace_dock' as const,
+        monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      };
+      const { darkMode: _darkMode, ...partialSettings } = settings;
+      const localSettings = { ...settings, darkMode: true, defaultForecasterName: 'Local' };
+      const setDocSpy = jest.mocked(setDoc).mockResolvedValue(undefined as never);
+      const applyRemoteSettings = jest.fn();
+
+      await seedOrApplySettings({
+        settingsRef: { path: 'settings' } as never,
+        settingsSnapshot: { data: () => partialSettings, exists: () => true } as never,
+        localSettings,
+        applyRemoteSettings,
+        isActive: () => true,
+        lastSyncedSettingsRef: { current: null },
+        setSyncedSettings: jest.fn(),
+      });
+
+      expect(setDocSpy).toHaveBeenCalledWith(
+        { path: 'settings' },
+        expect.objectContaining({
+          darkMode: true,
+          baseMapStyle: 'esri-satellite',
+          defaultForecasterName: 'Remote',
+        }),
+        { merge: true },
+      );
+      expect(applyRemoteSettings).toHaveBeenCalledWith(expect.objectContaining({
+        darkMode: true,
+        baseMapStyle: 'esri-satellite',
+        defaultForecasterName: 'Remote',
+      }));
+    });
+
     test('seedOrApplySettings seeds Firestore when the settings are missing', async () => {
       const settings = {
         darkMode: false,
@@ -636,7 +680,7 @@ describe('AuthProvider hosted settings integration', () => {
         throw new Error('Expected error handler to be registered');
       }
       errorHandler(new Error('listener failed'));
-      expect(setError).toHaveBeenCalledWith('listener failed');
+      expect(setError).toHaveBeenCalledWith('Unable to sync account settings right now.');
       subscription();
       expect(unsubscribe).toHaveBeenCalled();
     });
