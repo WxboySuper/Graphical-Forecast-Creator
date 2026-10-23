@@ -68,6 +68,8 @@ describe('hosted settings sync', () => {
 
   const createSnapshotHarness = (localOverlays: OverlaysState, lastSyncedSettingsRef: { current: ReturnType<typeof buildHostedSettingsFixture> | null }) => {
     const dispatch = jest.fn();
+    const currentDarkModeRef = { current: false };
+    const currentOverlaysRef = { current: localOverlays };
     return {
       dispatch,
       applySnapshot: (
@@ -91,8 +93,8 @@ describe('hosted settings sync', () => {
             },
             applyRemoteSettings: (settings, options) => {
               applySettingsToState(settings, {
-                currentDarkModeRef: { current: false },
-                currentOverlaysRef: { current: localOverlays },
+                currentDarkModeRef,
+                currentOverlaysRef,
                 dispatch,
                 setSyncedSettings: jest.fn(),
                 lastSyncedSettingsRef,
@@ -136,14 +138,14 @@ describe('hosted settings sync', () => {
         clearSupersededBaselineOneShot: () => {
           supersededBaselineRef.current = null;
         },
-        applyRemoteSettings: (settings) => {
+        applyRemoteSettings: (settings, options) => {
           applySettingsToState(settings, {
             currentDarkModeRef: { current: false },
             currentOverlaysRef: { current: localOverlays },
             dispatch,
             setSyncedSettings: jest.fn(),
             lastSyncedSettingsRef,
-          });
+          }, options);
         },
         setSettingsSyncStatus: jest.fn(),
       },
@@ -265,14 +267,14 @@ describe('hosted settings sync', () => {
         clearSupersededBaselineOneShot: () => {
           oneShotRef.current = null;
         },
-        applyRemoteSettings: (settings) => {
+        applyRemoteSettings: (settings, options) => {
           applySettingsToState(settings, {
             currentDarkModeRef: { current: false },
             currentOverlaysRef: { current: localOverlays },
             dispatch,
             setSyncedSettings: jest.fn(),
             lastSyncedSettingsRef,
-          });
+          }, options);
         },
         setSettingsSyncStatus: jest.fn(),
       },
@@ -289,14 +291,14 @@ describe('hosted settings sync', () => {
         clearSupersededBaselineOneShot: () => {
           oneShotRef.current = null;
         },
-        applyRemoteSettings: (settings) => {
+        applyRemoteSettings: (settings, options) => {
           applySettingsToState(settings, {
             currentDarkModeRef: { current: false },
             currentOverlaysRef: { current: localOverlays },
             dispatch,
             setSyncedSettings: jest.fn(),
             lastSyncedSettingsRef,
-          });
+          }, options);
         },
         setSettingsSyncStatus: jest.fn(),
       },
@@ -365,32 +367,38 @@ describe('hosted settings sync', () => {
   test('handleHostedSettingsFirestoreSnapshot applies another device change when nothing is pending', () => {
     const baseline = buildHostedSettingsFixture('osm');
     const remoteUpdate = { ...baseline, counties: true };
-    const dispatch = jest.fn();
     const lastSyncedSettingsRef = { current: baseline };
+    const { dispatch, applySnapshot } = createSnapshotHarness(TEST_OVERLAY_STATE, lastSyncedSettingsRef);
 
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => remoteUpdate, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: TEST_OVERLAY_STATE },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
+    applySnapshot(remoteUpdate);
 
     expect(dispatch).toHaveBeenCalledWith(
       applyOverlaySettings(expect.objectContaining({ counties: true })),
+    );
+  });
+
+  test('applies successive snapshots against the latest local state refs', () => {
+    const baseline = buildHostedSettingsFixture('osm');
+    const remoteUpdate = { ...baseline, darkMode: true, baseMapStyle: 'blank' as const };
+    const dispatch = jest.fn();
+    const context = {
+      currentDarkModeRef: { current: false },
+      currentOverlaysRef: { current: TEST_OVERLAY_STATE },
+      dispatch,
+      setSyncedSettings: jest.fn(),
+      lastSyncedSettingsRef: { current: baseline },
+    };
+
+    applySettingsToState(remoteUpdate, context);
+    applySettingsToState(baseline, context);
+
+    expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
+    expect(dispatch).toHaveBeenCalledWith(setDarkMode(false));
+    expect(dispatch).toHaveBeenCalledWith(
+      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
+    );
+    expect(dispatch).toHaveBeenCalledWith(
+      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
     );
   });
 
@@ -511,26 +519,16 @@ describe('hosted settings sync', () => {
       expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('blank');
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
 
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => targetB, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => true,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => null,
-          clearSupersededBaselineOneShot: jest.fn(),
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlaysC },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
+      applyHostedSettingsSnapshot({
+        remote: targetB,
+        localOverlays: localOverlaysC,
+        dispatch,
+        lastSyncedSettingsRef,
+        active: true,
+        pendingIntentRef,
+        inFlightRef,
+        supersededBaselineRef: { current: null },
+      });
 
       expect(dispatch).not.toHaveBeenCalledWith(
         applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
@@ -586,26 +584,16 @@ describe('hosted settings sync', () => {
       resolveB?.();
       await Promise.resolve();
 
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => targetB, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => true,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => null,
-          clearSupersededBaselineOneShot: jest.fn(),
-          applyRemoteSettings: (settings, options) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlaysA },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            }, options);
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
+      applyHostedSettingsSnapshot({
+        remote: targetB,
+        localOverlays: localOverlaysA,
+        dispatch,
+        lastSyncedSettingsRef,
+        active: true,
+        pendingIntentRef,
+        inFlightRef,
+        supersededBaselineRef: { current: null },
+      });
 
       expect(dispatch).not.toHaveBeenCalledWith(
         applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
@@ -844,29 +832,10 @@ describe('hosted settings sync', () => {
   test('after pending intent is cleared, remote dark mode changes do not coalesce basemap', () => {
     const baseline = buildHostedSettingsFixture('osm');
     const remoteDarkMode = { ...baseline, darkMode: true };
-    const dispatch = jest.fn();
     const lastSyncedSettingsRef = { current: baseline };
+    const { dispatch, applySnapshot } = createSnapshotHarness(TEST_OVERLAY_STATE, lastSyncedSettingsRef);
 
-    handleHostedSettingsFirestoreSnapshot(
-      { data: () => remoteDarkMode, metadata: { hasPendingWrites: false } },
-      {
-        isActive: () => true,
-        getPendingLocalWrite: () => null,
-        getInFlightHostedSettingsWrite: () => null,
-        getSupersededBaselineOneShot: () => null,
-        clearSupersededBaselineOneShot: jest.fn(),
-        applyRemoteSettings: (settings) => {
-          applySettingsToState(settings, {
-            currentDarkModeRef: { current: false },
-            currentOverlaysRef: { current: TEST_OVERLAY_STATE },
-            dispatch,
-            setSyncedSettings: jest.fn(),
-            lastSyncedSettingsRef,
-          });
-        },
-        setSettingsSyncStatus: jest.fn(),
-      },
-    );
+    applySnapshot(remoteDarkMode);
 
     expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
     expect(dispatch).not.toHaveBeenCalledWith(
