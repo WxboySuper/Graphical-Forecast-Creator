@@ -27,6 +27,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Imported discussions:** Ignore malformed non-string content when checking and combining discussion drafts, avoiding crashes when opening older or damaged forecasts.
+- **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
+- **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
 - **Restored grade evidence:** Restoring a saved grade snapshot now makes storm report evidence visible again even if it was hidden.
 - **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
 - **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
@@ -60,6 +62,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Firebase SDK:** Updated Firebase from 12.19.0 to 13.0.0 to keep hosted Google sign-in, session persistence, and Firestore cloud sync on a supported release with no change to existing behavior.
 - **Sentry Node server SDK:** Update the hosted server error monitoring dependency from 11.6.0 to 11.8.0 to keep crash reporting on a supported release.
 - **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
 - **Stripe server SDK:** Update the server Stripe library from 22.6.2 to 23.0.0 to keep premium checkout, customer portal, and subscription webhooks on a supported release with no change to billing behavior.
