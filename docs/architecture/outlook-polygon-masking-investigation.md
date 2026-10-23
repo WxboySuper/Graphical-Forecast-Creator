@@ -159,14 +159,13 @@ All modes default **off**. Controls live in **Layers → Trim to land** (popover
 
 
 Code under `src/utils/outlookPolygonMasking/` implements **three land-mask
-strategies** and two application styles:
+strategies** through the canonical clipping helper:
 
 | ID | Strategy | Application | Purpose |
 |----|----------|-------------|---------|
 | **A** | `us-country-minus-great-lakes` | `clipOutlookToLandMask` (mutate) | **Recommended MVP** |
 | **B** | `us-states-union` | same clip helper | Compare admin union vs coastline |
 | **C** | `us-country` | same clip helper | Coastline only, lakes still filled |
-| **Preview** | any mask | `previewClipOutlookToLandMask` | Render-only experiments (no Redux) |
 
 Run benchmarks/tests:
 
