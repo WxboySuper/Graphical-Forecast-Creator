@@ -5,6 +5,7 @@ const initialState: StormReportsState = {
   reports: [],
   date: null,
   loading: false,
+  clearGeneration: 0,
   error: null,
   visible: true,
   filterByType: {
@@ -45,6 +46,7 @@ const stormReportsSlice = createSlice({
       state.reports = [];
       state.date = null;
       state.loading = false;
+      state.clearGeneration += 1;
       state.error = null;
     }
   }

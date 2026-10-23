@@ -14,6 +14,7 @@ const defaultStormReportsState: StormReportsState = {
   reports: [],
   date: null,
   loading: false,
+  clearGeneration: 0,
   error: null,
   visible: false,
   filterByType: { tornado: true, wind: true, hail: true },

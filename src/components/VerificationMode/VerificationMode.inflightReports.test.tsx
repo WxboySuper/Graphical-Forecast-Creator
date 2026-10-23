@@ -146,4 +146,49 @@ describe('VerificationMode with in-flight storm reports', () => {
     expect(store.getState().stormReports.date).toBeNull();
     expect(store.getState().stormReports.loading).toBe(false);
   });
+
+  test('keeps an in-flight report load when switching between sidebar tabs', async () => {
+    const user = userEvent.setup();
+    let resolveReports!: (reports: StormReport[]) => void;
+    const pendingReports = new Promise<StormReport[]>((resolve) => {
+      resolveReports = resolve;
+    });
+    mockFetchStormReports.mockReturnValue(pendingReports);
+    mockFetchTodayStormReports.mockReturnValue(pendingReports);
+    mockFetchYesterdayStormReports.mockReturnValue(pendingReports);
+
+    const { store } = renderWithStore();
+    const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
+    await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
+    expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Load Reports/i }));
+    await waitFor(() => expect(
+      mockFetchStormReports.mock.calls.length +
+      mockFetchTodayStormReports.mock.calls.length +
+      mockFetchYesterdayStormReports.mock.calls.length
+    ).toBe(1));
+
+    await user.click(screen.getByRole('button', { name: /Analysis/i }));
+    expect(store.getState().stormReports.loading).toBe(true);
+    await user.click(screen.getByRole('button', { name: /Load Data/i }));
+
+    await act(async () => {
+      resolveReports([{
+        id: 'tab-switch-report',
+        type: 'tornado',
+        latitude: 35,
+        longitude: -97,
+        time: '2026-04-20T00:00:00Z',
+        location: 'Norman',
+        county: 'Cleveland',
+        state: 'OK',
+      }]);
+      await pendingReports;
+    });
+
+    expect(store.getState().stormReports.reports.map(({ id }) => id)).toEqual(['tab-switch-report']);
+    expect(store.getState().stormReports.date).not.toBeNull();
+    expect(store.getState().stormReports.loading).toBe(false);
+  });
 });

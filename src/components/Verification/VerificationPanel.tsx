@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useMemo, useRef, useState } from 'react';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { RootState } from '../../store';
 import {
   setReports,
@@ -312,6 +312,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
   activePanel = 'setup',
 }) => {
   const dispatch = useDispatch();
+  const store = useStore<RootState>();
   const reportRequestIdRef = useRef(0);
   // Select storm report data and UI state from the Redux store.
   const { date, loading, error, visible, filterByType, reports } = useSelector(
@@ -331,14 +332,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
     return getCurrentSpcReportDate();
   });
 
-  useEffect(() => () => {
-    reportRequestIdRef.current += 1;
-    dispatch(setLoading(false));
-  }, [dispatch]);
-  
   // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
     const requestId = ++reportRequestIdRef.current;
+    const clearGeneration = store.getState().stormReports.clearGeneration;
 
     try {
       dispatch(setError(null));
@@ -352,7 +349,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       const source = reportSourceForDate(reportDate, new Date());
       const fetchedReports = await fetchReportsForSource(source, reportDate);
 
-      if (requestId !== reportRequestIdRef.current) {
+      if (
+        requestId !== reportRequestIdRef.current ||
+        clearGeneration !== store.getState().stormReports.clearGeneration
+      ) {
         return;
       }
 
@@ -363,7 +363,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         dispatch(setError('info:No storm reports found for this date.'));
       }
     } catch (err) {
-      if (requestId !== reportRequestIdRef.current) {
+      if (
+        requestId !== reportRequestIdRef.current ||
+        clearGeneration !== store.getState().stormReports.clearGeneration
+      ) {
         return;
       }
 
@@ -371,7 +374,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         err instanceof Error ? err.message : 'Failed to load storm reports. The date may not have available data.'
       ));
     } finally {
-      if (requestId === reportRequestIdRef.current) {
+      if (
+        requestId === reportRequestIdRef.current &&
+        clearGeneration === store.getState().stormReports.clearGeneration
+      ) {
         dispatch(setLoading(false));
       }
     }
