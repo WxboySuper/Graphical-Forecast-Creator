@@ -68,6 +68,7 @@
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs",
     "test": "jest",
+    "test:toolbar:timezone": "cross-env TZ=America/New_York jest src/components/IntegratedToolbar/IntegratedToolbar.test.tsx",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
     "test:coverage": "jest --coverage",
     "perf": "cross-env GFC_PERF=1 jest --runInBand src/performance",

@@ -317,6 +317,9 @@ jobs:
         env:
           CI: true
 
+      - name: Verify toolbar dates in a US timezone
+        run: pnpm run test:toolbar:timezone -- --runInBand
+
       - name: Run analytics server tests
         working-directory: server
         run: |
