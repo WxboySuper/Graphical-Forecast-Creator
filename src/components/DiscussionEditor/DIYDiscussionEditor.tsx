@@ -35,27 +35,46 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
     }, 0);
   };
 
+  // Insert a heading prefix at the beginning of the line containing the cursor. This converts the current line into a heading instead of splitting the line at the cursor position.
+  const insertHeading = (prefix: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const lineStart = start === 0 ? 0 : content.lastIndexOf('\n', start - 1) + 1;
+    const newText =
+      content.substring(0, lineStart) +
+      prefix +
+      content.substring(lineStart);
+
+    onChange(newText);
+
+    // Restore cursor position shifted by the inserted prefix
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(
+        start + prefix.length,
+        end + prefix.length
+      );
+    }, 0);
+  };
+
   // Handler for inserting bold markdown syntax, which adds "**" before and after the selected text. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleBold = () => insertFormatting('**', '**');
   // Handler for inserting italic markdown syntax, which adds "*" before and after the selected text. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
   const handleItalic = () => insertFormatting('*', '*');
-  // Handler for inserting a level 1 heading markdown syntax, which adds "# " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
+  // Handler for inserting a level 1 heading markdown syntax, which adds "# " at the beginning of the current line. It inserts the prefix at the line start so a mid-line cursor converts the line instead of splitting it.
   const handleH1 = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    insertFormatting('\n# ', '');
+    insertHeading('# ');
   };
-  // Handler for inserting a level 2 heading markdown syntax, which adds "## " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
+  // Handler for inserting a level 2 heading markdown syntax, which adds "## " at the beginning of the current line. It inserts the prefix at the line start so a mid-line cursor converts the line instead of splitting it.
   const handleH2 = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    insertFormatting('\n## ', '');
+    insertHeading('## ');
   };
-  // Handler for inserting a level 3 heading markdown syntax, which adds "### " at the beginning of the line. It uses the insertFormatting function to apply the formatting and manages the cursor position accordingly.
+  // Handler for inserting a level 3 heading markdown syntax, which adds "### " at the beginning of the current line. It inserts the prefix at the line start so a mid-line cursor converts the line instead of splitting it.
   const handleH3 = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    insertFormatting('\n### ', '');
+    insertHeading('### ');
   };
 
   // Handle text changes in the textarea

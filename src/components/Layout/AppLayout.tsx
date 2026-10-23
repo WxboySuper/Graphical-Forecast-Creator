@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
 import Documentation from '../Documentation/Documentation';
-import { ToastManager } from '../Toast/Toast';
+import { isEmptyToastMessage, normalizeToastType, ToastManager, type ToastData } from '../Toast/Toast';
 import ToSModal from '../ToS/ToSModal';
 import PrivacyPolicyModal from '../PrivacyPolicy/PrivacyPolicyModal';
 import { AlertBanner } from '../AlertBanner';
@@ -17,13 +17,10 @@ import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
 
-export interface ToastItem {
-  id: string;
-  message: string;
-  type?: 'info' | 'success' | 'warning' | 'error';
-}
+/** @deprecated Import ToastData from the Toast component instead. */
+export type ToastItem = ToastData;
 
-export type AddToastFn = (message: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
+export type AddToastFn = (message: ToastData['message'], type?: ToastData['type']) => void;
 
 interface AppLayoutContextValue {
   addToast: AddToastFn;
@@ -46,14 +43,15 @@ export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
   const [showTermsViewer, setShowTermsViewer] = useState(false);
   const [showPrivacyViewer, setShowPrivacyViewer] = useState(false);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
 
   // Toast management
   const addToast = useCallback<AddToastFn>((message, type = 'info') => {
+    if (isEmptyToastMessage(message)) return;
     const id = uuidv4();
-    setToasts(prev => [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type }]);
+    setToasts(prev => [...prev.slice(-(MAX_TOASTS - 1)), { id, message, type: normalizeToastType(type) }]);
   }, []);
 
   // Handler to remove a toast by ID, which is passed to the ToastManager component to allow it to dismiss individual toast notifications when they expire or when the user manually dismisses them.

@@ -67,6 +67,117 @@ describe('discussionGrouping', () => {
     ])).toEqual([]);
   });
 
+  test('treats non-string imported guided values as empty instead of throwing', () => {
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    };
+
+    expect(() => hasDiscussionContent(malformedGuided as never)).not.toThrow();
+    expect(hasDiscussionContent(malformedGuided as never)).toBe(false);
+    expect(hasDiscussionContent({
+      ...malformedGuided,
+      guidedContent: { ...(malformedGuided.guidedContent as object), synopsis: '  Valid  ' },
+    } as never)).toBe(true);
+  });
+
+  test('rejects malformed guided content containers', () => {
+    const malformedString = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: 'Imported guided text',
+    };
+    const malformedArray = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: ['Imported guided text'],
+    };
+
+    expect(hasDiscussionContent(malformedString as never)).toBe(false);
+    expect(hasDiscussionContent(malformedArray as never)).toBe(false);
+  });
+
+  test('treats non-string imported DIY content as empty instead of throwing', () => {
+    const malformedDiy = { ...discussion, diyContent: 123 };
+
+    expect(() => hasDiscussionContent(malformedDiy as never)).not.toThrow();
+    expect(hasDiscussionContent(malformedDiy as never)).toBe(false);
+  });
+
+  test('ignores non-string imported values while merging discussion drafts', () => {
+    const malformedDiy = { ...discussion, diyContent: 123 } as never;
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '  Valid guided text  ',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    } as never;
+
+    expect(() => mergeDiscussionDrafts([malformedDiy])).not.toThrow();
+    expect(mergeDiscussionDrafts([malformedDiy])?.diyContent).toBe('');
+    expect(() => mergeDiscussionDrafts([malformedGuided])).not.toThrow();
+    expect(mergeDiscussionDrafts([malformedGuided])?.guidedContent?.timing).toBe('Valid guided text');
+    expect(mergeDiscussionDrafts([discussion, malformedGuided])?.diyContent).toBe(
+      'One canonical discussion\n\nValid guided text',
+    );
+  });
+
+  test('normalizes primary guided values before merging later drafts', () => {
+    const primary = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '  Primary timing  ',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    } as never;
+    const fallback = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: '  Fallback synopsis  ',
+        meteorologicalSetup: '  Fallback setup  ',
+        severeWeatherExpectations: '  Fallback expectations  ',
+        timing: 'Fallback timing',
+        regionalBreakdown: '  Fallback region  ',
+        additionalConsiderations: '  Fallback consideration  ',
+      },
+    } as never;
+
+    expect(mergeDiscussionDrafts([primary, fallback])?.guidedContent).toEqual({
+      synopsis: 'Fallback synopsis',
+      meteorologicalSetup: 'Fallback setup',
+      severeWeatherExpectations: 'Fallback expectations',
+      timing: 'Primary timing',
+      regionalBreakdown: 'Fallback region',
+      additionalConsiderations: 'Fallback consideration',
+    });
+  });
+
   test('merges mixed DIY and guided drafts into one DIY draft', () => {
     const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
     const guidedDraft = {
@@ -87,5 +198,17 @@ describe('discussionGrouping', () => {
 
     expect(merged?.mode).toBe('diy');
     expect(merged?.diyContent).toBe('DIY scope text\n\nGuided synopsis');
+  });
+
+  test('ignores malformed guided containers in mixed-mode merges', () => {
+    const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: ['Not guided discussion text'],
+    } as never;
+
+    expect(mergeDiscussionDrafts([diyDraft, malformedGuided], diyDraft)?.diyContent).toBe('DIY scope text');
   });
 });
