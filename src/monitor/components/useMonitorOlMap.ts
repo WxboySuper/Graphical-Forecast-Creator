@@ -12,6 +12,7 @@ import type { SerializedMonitorOutlookFeature } from './monitorMapFeatureSync';
 import { useMonitorMapBootstrap } from './useMonitorMapBootstrap';
 import { useMonitorMapLayerSync } from './useMonitorMapLayerSync';
 import { useMonitorMapRefs } from './monitorMapRefs';
+import { normalizeAlertDetailUrl } from '../nwsAlertDetails';
 import {
   clearMonitorAlertPopup,
   renderMonitorAlertPopup,
@@ -43,6 +44,12 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     }
     setSelectedAlert(null);
   }, [refs.overlayRef]);
+
+  // Canonical detail URL, '' sentinel for URL-less selections (exempt from
+  // expiry, dismissed manually), null for no selection.
+  const selectedAlertDetailUrl: string | null = selectedAlert
+    ? (normalizeAlertDetailUrl(selectedAlert.detailUrl) ?? '')
+    : null;
 
   useMonitorMapBootstrap({
     mapView: args.mapView,
@@ -82,6 +89,7 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     alertsOpacity: args.alertsOpacity,
     mesoscaleDiscussions: args.mesoscaleDiscussions,
     refs,
+    selectedAlertDetailUrl,
     onClearSelectedAlert: clearSelectedAlert,
   });
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { appendAlertSnapshotFrame, fetchActiveNwsAlerts, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { MAX_ANIMATION_FRAMES } from './wms';
@@ -8,6 +8,7 @@ interface UseMonitorNwsAlertsLoadOptions {
   enabled: boolean;
   refreshToken: number;
   addToast: AddToastFn;
+  hasExistingFrames: RefObject<boolean>;
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFrameIndex: Dispatch<SetStateAction<number>>;
   setLoading: Dispatch<SetStateAction<boolean>>;
@@ -20,6 +21,7 @@ export const useMonitorNwsAlertsLoad = ({
   enabled,
   refreshToken,
   addToast,
+  hasExistingFrames,
   setRawFrames,
   setFrameIndex,
   setLoading,
@@ -36,6 +38,8 @@ export const useMonitorNwsAlertsLoad = ({
     }
 
     let active = true;
+    // This stable ref is sampled once for this request; changing its value does not restart the load.
+    const hadExistingFramesAtStart = hasExistingFrames.current;
     setLoading(true);
     setError(null);
 
@@ -56,9 +60,15 @@ export const useMonitorNwsAlertsLoad = ({
           return undefined;
         }
 
-        setRawFrames([]);
-        setError('Official alerts are unavailable right now.');
-        addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+        // Keep prior frames; current filters still determine which alerts appear.
+        if (hadExistingFramesAtStart) {
+          const message = 'NWS alert refresh failed. Previous alert data is retained, may be outdated, and still follows current filters.';
+          setError(message);
+          addToast(message, 'warning');
+        } else {
+          setError('Official alerts are unavailable right now.');
+          addToast('NWS watch/warning polygons could not be loaded.', 'warning');
+        }
         return undefined;
       })
       .finally(() => {
@@ -70,5 +80,5 @@ export const useMonitorNwsAlertsLoad = ({
     return () => {
       active = false;
     };
-  }, [addToast, enabled, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
+  }, [addToast, enabled, hasExistingFrames, refreshToken, setError, setFetchedAt, setFrameIndex, setLoading, setRawFrames]);
 };
