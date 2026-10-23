@@ -112,7 +112,7 @@ export const applyWmsLayer = (
 };
 
 /** Loads and styles US state outlines into the monitor reference source. */
-export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean) => {
+export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolean | (() => boolean)) => {
   if (source.getFeatures().length > 0) {
     return;
   }
@@ -130,7 +130,8 @@ export const loadUsStateOutlines = async (source: VectorSource, darkMode: boolea
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857',
   });
-  const style = createStateOutlineStyle(darkMode);
+  // Read the theme after the GeoJSON request resolves so a mid-fetch toggle is reflected.
+  const style = createStateOutlineStyle(typeof darkMode === 'function' ? darkMode() : darkMode);
   features.forEach((feature) => {
     if ('setStyle' in feature && typeof feature.setStyle === 'function') {
       feature.setStyle(style);
