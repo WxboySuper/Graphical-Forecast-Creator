@@ -4,12 +4,15 @@ import type {
   ValidationIssue,
   CycleValidationResult,
 } from '../types/workflow';
-import type { ForecastCycle, DayType, OutlookType, OutlookDay, DiscussionData } from '../types/outlooks';
+import type { ForecastCycle, DayType, OutlookType, OutlookDay } from '../types/outlooks';
 import {
   getDiscussionGroupingForDay,
   getDiscussionForGrouping,
+  hasDiscussionContent,
   getValidationDiscussionGroupings,
 } from './discussionGrouping';
+
+export { hasDiscussionContent };
 
 // ---------------------------------------------------------------------------
 // Expected outlook types per day grouping
@@ -27,15 +30,6 @@ const GROUPING_DAY_NUMBERS: Record<StandardGrouping, DayType[]> = {
   day3: [3],
   'day4-8': [4, 5, 6, 7, 8],
 };
-
-const GUIDED_DISCUSSION_FIELDS = [
-  'synopsis',
-  'meteorologicalSetup',
-  'severeWeatherExpectations',
-  'timing',
-  'regionalBreakdown',
-  'additionalConsiderations',
-] as const;
 
 interface DayValidationContext {
   day: DayType;
@@ -74,24 +68,6 @@ const hasNonTstmPolygonData = (map: Map<string, unknown[]> | undefined): boolean
     if (key !== 'TSTM' && features.length > 0) return true;
   }
   return false;
-};
-
-/** Returns true when guided discussion fields contain non-empty text. */
-const hasGuidedDiscussionContent = (
-  guided: NonNullable<DiscussionData['guidedContent']>,
-): boolean => GUIDED_DISCUSSION_FIELDS.some(
-  (field) => (guided[field]?.trim().length ?? 0) > 0,
-);
-
-/** Returns true when a discussion exists and has non-empty content. */
-export const hasDiscussionContent = (discussion: DiscussionData | undefined): boolean => {
-  if (!discussion) return false;
-  if (discussion.mode === 'diy') {
-    return (discussion.diyContent?.trim().length ?? 0) > 0;
-  }
-
-  const guided = discussion.guidedContent;
-  return Boolean(guided && hasGuidedDiscussionContent(guided));
 };
 
 /** Collects the forecast days that should be validated for the requested groupings. */
