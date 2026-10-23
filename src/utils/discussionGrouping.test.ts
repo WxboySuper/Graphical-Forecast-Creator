@@ -90,6 +90,24 @@ describe('discussionGrouping', () => {
     } as never)).toBe(true);
   });
 
+  test('rejects malformed guided content containers', () => {
+    const malformedString = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: 'Imported guided text',
+    };
+    const malformedArray = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: ['Imported guided text'],
+    };
+
+    expect(hasDiscussionContent(malformedString as never)).toBe(false);
+    expect(hasDiscussionContent(malformedArray as never)).toBe(false);
+  });
+
   test('treats non-string imported DIY content as empty instead of throwing', () => {
     const malformedDiy = { ...discussion, diyContent: 123 };
 
@@ -120,6 +138,44 @@ describe('discussionGrouping', () => {
     expect(mergeDiscussionDrafts([discussion, malformedGuided])?.diyContent).toBe(
       'One canonical discussion\n\nValid guided text',
     );
+  });
+
+  test('normalizes primary guided values before merging later drafts', () => {
+    const primary = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '  Primary timing  ',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    } as never;
+    const fallback = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: '  Fallback synopsis  ',
+        meteorologicalSetup: '  Fallback setup  ',
+        severeWeatherExpectations: '  Fallback expectations  ',
+        timing: 'Fallback timing',
+        regionalBreakdown: '  Fallback region  ',
+        additionalConsiderations: '  Fallback consideration  ',
+      },
+    } as never;
+
+    expect(mergeDiscussionDrafts([primary, fallback])?.guidedContent).toEqual({
+      synopsis: 'Fallback synopsis',
+      meteorologicalSetup: 'Fallback setup',
+      severeWeatherExpectations: 'Fallback expectations',
+      timing: 'Primary timing',
+      regionalBreakdown: 'Fallback region',
+      additionalConsiderations: 'Fallback consideration',
+    });
   });
 
   test('merges mixed DIY and guided drafts into one DIY draft', () => {

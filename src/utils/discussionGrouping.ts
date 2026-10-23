@@ -18,15 +18,16 @@ const isDayType = (value: unknown): value is DayType =>
 const trimDiscussionText = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : '';
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /** Returns true when a discussion has user-authored content. */
 export const hasDiscussionContent = (discussion: DiscussionData | undefined): boolean => {
   if (!discussion) return false;
   if (discussion.mode === 'diy') return trimDiscussionText(discussion.diyContent).length > 0;
-  return Boolean(
-    discussion.guidedContent
-      && Object.values(discussion.guidedContent).some(
-        (value) => trimDiscussionText(value).length > 0,
-      ),
+  if (discussion.mode !== 'guided' || !isRecord(discussion.guidedContent)) return false;
+  return Object.values(discussion.guidedContent).some(
+    (value) => trimDiscussionText(value).length > 0,
   );
 };
 
@@ -58,12 +59,16 @@ const mergeDiyDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionDat
 /** Combines guided drafts by filling the first empty field for each section. */
 const mergeGuidedDiscussionDrafts = (primary: DiscussionData, drafts: DiscussionData[]): DiscussionData => {
   const guidedContent = { ...EMPTY_GUIDED_CONTENT };
-  drafts.forEach((draft) => {
-    if (!draft.guidedContent) return;
+  const mergeGuidedContent = (source: unknown): void => {
+    if (!isRecord(source)) return;
     (Object.keys(guidedContent) as Array<keyof GuidedDiscussionData>).forEach((key) => {
-      const value = trimDiscussionText(draft.guidedContent?.[key]);
+      const value = trimDiscussionText(source[key]);
       if (value && !trimDiscussionText(guidedContent[key])) guidedContent[key] = value;
     });
+  };
+  mergeGuidedContent(primary.guidedContent);
+  drafts.forEach((draft) => {
+    if (draft !== primary) mergeGuidedContent(draft.guidedContent);
   });
   return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified: new Date().toISOString() };
 };
