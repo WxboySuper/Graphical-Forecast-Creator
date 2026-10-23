@@ -15,14 +15,26 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.
+- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
 
 - **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
+- **Cloud Library workspaces:** Organize saved forecasts with workspace tabs and shareable workspace links.
 
 #### Fixed
 
+- **Categorical outlooks:** Keep significant-threat probabilities supported during categorical conversion.
+- **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
+- **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
+- **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
+- **Restored grade evidence:** Restoring a saved grade snapshot now makes storm report evidence visible again even if it was hidden.
+- **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
+- **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
+- **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
+- **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
 - **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
 - **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
 - **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.
@@ -31,6 +43,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
 - **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
 - **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
+- **Verification summaries:** Show zero misses when no reports are available instead of reporting a 100% miss rate.
 - **Forecast file handling:** Validate copied forecast files before import and keep generated downloads available long enough for browsers to save them.
 - **Reference layers and dialogs:** Restore saved reference-layer settings and keep keyboard focus inside open dialogs.
 - **Beta account access:** Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
@@ -50,9 +63,18 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
+- **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
+- **Firebase SDK:** Updated Firebase from 12.19.0 to 13.0.0 to keep hosted Google sign-in, session persistence, and Firestore cloud sync on a supported release with no change to existing behavior.
+- **Sentry Node server SDK:** Update the hosted server error monitoring dependency from 11.6.0 to 11.8.0 to keep crash reporting on a supported release.
+- **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
+- **Stripe server SDK:** Update the server Stripe library from 22.6.2 to 23.0.0 to keep premium checkout, customer portal, and subscription webhooks on a supported release with no change to billing behavior.
+- **Server:** Update hosted API dependencies to Sentry Node 11.8.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
+- **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
 - **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
+- **firebase-admin:** 14.4.0 → 14.5.0 (`server`)
 
 #### Dependency summary
 <!-- dependabot-automation -->
