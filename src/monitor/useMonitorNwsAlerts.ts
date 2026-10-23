@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { filterNwsAlertCollection, type NwsAlertFeatureCollection } from './nwsAlerts';
 import { useMonitorNwsAlertsLoad } from './useMonitorNwsAlertsLoad';
@@ -35,6 +35,11 @@ export const useMonitorNwsAlerts = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const hasExistingFrames = useRef(false);
+
+  useEffect(() => {
+    hasExistingFrames.current = rawFrames.length > 0;
+  }, [rawFrames]);
 
   const filterOptions = useMemo(
     () => ({ showWatches, showWarnings, showAdvisories }),
@@ -50,6 +55,7 @@ export const useMonitorNwsAlerts = ({
     enabled,
     refreshToken,
     addToast,
+    hasExistingFrames,
     setRawFrames,
     setFrameIndex,
     setLoading,

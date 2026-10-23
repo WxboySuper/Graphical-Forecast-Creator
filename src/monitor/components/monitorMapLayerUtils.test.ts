@@ -6,6 +6,7 @@ import {
   STATE_OUTLINE_LAYER_Z_INDEX,
   STORM_REPORTS_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
+  createBaseSource,
   createMesoscaleDiscussionStyle,
 } from './monitorMapLayerUtils';
 
@@ -28,5 +29,9 @@ describe('monitor reference layer order', () => {
 
   test('uses the same stable z-index for mesoscale discussion polygons', () => {
     expect(createMesoscaleDiscussionStyle().getZIndex()).toBe(SPC_REFERENCE_LAYER_Z_INDEX);
+  });
+
+  test('uses OpenStreetMap tiles for the monitor basemap', () => {
+    expect(createBaseSource().getUrls()?.[0]).toContain('tile.openstreetmap.org');
   });
 });

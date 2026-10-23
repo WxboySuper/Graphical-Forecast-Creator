@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import VerificationMode from './VerificationMode';
 import verificationReducer from '../../store/verificationSlice';
+import stormReportsReducer, { setDate, setReports } from '../../store/stormReportsSlice';
 
 const mockAddToast = jest.fn();
 const mockQueueProductMetric = jest.fn();
@@ -54,16 +55,18 @@ const mockReadForecastImportFile = jest.requireMock('../../utils/fileUtils').rea
 
 const renderWithStore = () => {
   const store = configureStore({
-    reducer: { verification: verificationReducer },
+    reducer: { verification: verificationReducer, stormReports: stormReportsReducer },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
   });
 
-  return render(
+  const view = render(
     <Provider store={store}>
       <VerificationMode />
     </Provider>
   );
+
+  return { ...view, store };
 };
 
 describe('VerificationMode', () => {
@@ -139,6 +142,36 @@ describe('VerificationMode', () => {
 
     expect(await screen.findByText(/Choose Forecast File/i)).toBeInTheDocument();
     expect(screen.queryByText(/Forecast Loaded/i)).not.toBeInTheDocument();
+  });
+
+  test('clearing the loaded forecast also clears the storm reports', async () => {
+    const user = userEvent.setup();
+    const { store } = renderWithStore();
+
+    const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
+    await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
+    expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
+
+    store.dispatch(setReports([{
+      id: 'r1',
+      type: 'tornado',
+      latitude: 35,
+      longitude: -97,
+      time: '2026-04-20T00:00:00Z',
+      location: 'Norman',
+      county: 'Cleveland',
+      state: 'OK',
+    }]));
+    store.dispatch(setDate('2026-04-20'));
+    expect(store.getState().stormReports.reports).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: /Load Different Forecast/i }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Clear/i }));
+
+    expect(await screen.findByText(/Choose Forecast File/i)).toBeInTheDocument();
+    expect(store.getState().stormReports.reports).toEqual([]);
+    expect(store.getState().stormReports.date).toBeNull();
   });
 
   test('surfaces file validation errors', async () => {
