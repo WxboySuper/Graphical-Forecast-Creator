@@ -124,7 +124,7 @@ const categorizeProbability = ({ probability, cig, rules }: CategoricalConversio
   if (!isCategoricalProbability(probability)) return 'TSTM';
   if (!isCigLevel(cig)) return 'TSTM';
 
-  const normalizedProbability = probability.replace(/[#]/g, '');
+  const normalizedProbability = probability.replace(/%?#$/, '%');
   // Higher CIG regions must keep at least the risk from a lower mapped region.
   return findCategoricalRisk({ probability: normalizedProbability, targetCigRank: CIG_RANK[cig], rules })
     ?? 'TSTM';

@@ -14,6 +14,11 @@ describe('outlookUtils', () => {
     expect(hailToCategorical({ probability: '15%#', cig: 'CIG0' })).toBe('SLGT');
   });
 
+  test('legacy significant probabilities preserve their mapped categorical risk', () => {
+    expect(tornadoToCategorical({ probability: '10#', cig: 'CIG0' })).toBe('SLGT');
+    expect(tornadoToCategorical({ probability: '10%#', cig: 'CIG0' })).toBe('SLGT');
+  });
+
   test('isSignificantThreat detects #', () => {
     expect(isSignificantThreat({ probability: '5%#' })).toBe(true);
     expect(isSignificantThreat({ probability: '5%' })).toBe(false);
