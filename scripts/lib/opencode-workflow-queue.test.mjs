@@ -22,7 +22,7 @@ const migratedWorkflows = [
 const queueGroup = 'gfc-opencode-maintenance-queue';
 const ghActionsExpr = (expression) => ['$', '{{ ', expression, ' }}'].join('');
 
-test('every OpenCode workflow shares the single bounded concurrency queue', () => {
+test('OpenCode workflows use the shared queue except first-look, which is per PR', () => {
   for (const workflowFile of workflowFiles.filter((candidate) => !candidate.endsWith('opencode-first-look.yml'))) {
     const source = readFileSync(new URL(workflowFile, import.meta.url), 'utf8');
     assert.match(
@@ -36,7 +36,7 @@ test('every OpenCode workflow shares the single bounded concurrency queue', () =
   const firstLook = parse(readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8'));
   assert.ok(firstLook.concurrency === undefined, 'CI waiting must stay outside the OpenCode queue');
   assert.ok(firstLook.jobs['wait-for-ci'].concurrency === undefined);
-  assert.deepEqual(firstLook.jobs.review.concurrency, { group: queueGroup, queue: 'max' });
+  assert.deepEqual(firstLook.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': false });
 });
 
 test('changelog audit keeps runner context references at step scope', () => {

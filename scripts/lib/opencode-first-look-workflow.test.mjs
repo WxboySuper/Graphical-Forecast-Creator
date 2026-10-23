@@ -18,13 +18,14 @@ const steps = workflow.jobs.review.steps;
 const runner = steps.find((step) => step.name === 'Run read-only review');
 
 test('first-look review keeps read-only repository access and one bot-owned summary comment', () => {
-  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'synchronize', 'reopened', 'ready_for_review']);
+  assert.deepEqual(workflow.on.pull_request_target.types, ['opened', 'ready_for_review']);
   assert.deepEqual(workflow.on.issue_comment.types, ['created']);
   assert.ok(workflow.on.workflow_run === undefined);
+  assert.ok(workflow.on.workflow_dispatch === undefined, 'first-look reviews start from PR events or the manual comment trigger');
   assert.ok(workflow.concurrency === undefined, 'CI waiting must not hold the shared OpenCode queue');
   assert.ok(waitJob.concurrency === undefined, 'the CI waiter must run outside the model queue');
   assert.equal(workflow.jobs.review.needs, 'wait-for-ci');
-  assert.deepEqual(workflow.jobs.review.concurrency, { group: 'gfc-opencode-maintenance-queue', queue: 'max' });
+  assert.deepEqual(workflow.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': false });
   assert.equal(waitJob.permissions['pull-requests'], 'read');
   assert.equal(waitJob.permissions.actions, 'read');
   assert.ok(workflow.jobs.review.permissions.actions === undefined);
@@ -64,10 +65,16 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(context.with.script, /priorFindingAssessments/);
   assert.match(context.with.script, /latestChanges/);
   assert.match(context.with.script, /review-opencode/);
-  assert.match(context.with.script, /model context and OpenCode compaction are available/);
+  assert.match(context.with.script, /Keep the diff context capped at 30,000 characters/);
   assert.match(context.with.script, /revisionTruncationReasons/);
   assert.match(context.with.script, /diffTruncationReasons/);
+  assert.match(context.with.script, /MAX_DIFF_CHARS/);
+  assert.match(context.with.script, /lastIndexOf\('\\n', diffCharsRemaining - 1\)/);
   assert.doesNotMatch(context.with.script, /file\.patch\?\.slice/);
+  assert.doesNotMatch(context.with.script, /fullPatch\.slice\(0, diffCharsRemaining\)/);
+  assert.match(context.with.script, /fullPatch\.slice\(0, lastNewline \+ 1\)/);
+  assert.match(context.with.script, /changedLineNumbers = Object\.fromEntries\(files\.map/);
+  assert.match(context.with.script, /revisionDiff\.files = revisionDiff\.files\.map/);
   assert.doesNotMatch(context.with.script, /comparison\.commits \?\? \[\]\)\.slice/);
   assert.match(context.with.script, /GitHub could not return the complete review-thread history/);
   assert.doesNotMatch(context.with.script, /Deferring first-look/);
@@ -76,7 +83,7 @@ test('first-look review keeps read-only repository access and one bot-owned summ
   assert.match(waitStep.with.script, /CI_TIMEOUT_MS/);
   assert.match(waitStep.with.script, /Skipping this stale review/);
   assert.match(waitStep.with.script, /pull\.head\.ref/);
-  assert.match(waitStep.with.script, /The review will now enter the shared OpenCode queue/);
+  assert.match(waitStep.with.script, /The review will now start in its per-PR queue/);
   assert.match(waitJob.outputs.run, /steps\.wait\.outputs\.run/);
 
   const publish = steps.find((step) => step.name === 'Publish first-look result');

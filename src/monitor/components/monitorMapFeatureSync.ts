@@ -6,6 +6,7 @@ import VectorSource from 'ol/source/Vector';
 import { fromLonLat } from 'ol/proj';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
+import { resolveNwsAlertDetailUrl } from '../nwsAlertDetails';
 import { buildStormReportStyle } from '../stormReportMapStyle';
 import { toOlStyle } from '../../components/Map/openLayersMapStyles';
 import { MONITOR_OUTLOOK_TRANSPARENCY_SCALE } from './monitorMapLayerUtils';
@@ -60,6 +61,25 @@ export const syncOutlookFeatures = (
   });
 };
 
+/** Builds OL alert properties with top-level id fallback for identity. */
+const buildAlertProperties = (
+  feature: NwsAlertFeatureCollection['features'][number],
+): Record<string, unknown> => {
+  const properties = feature.properties ?? {};
+  return {
+    ...properties,
+    // Only fall back to the top-level id when properties carry no URL
+    // identity, so click-time resolveNwsAlertDetailUrl sees the same URL as
+    // expiry matching (issue #1595). String-only: expiry only matches
+    // http(s) URLs, numeric GeoJSON ids are intentionally ignored.
+    ...(!resolveNwsAlertDetailUrl(properties) && typeof feature.id === 'string'
+      ? { id: feature.id }
+      : {}),
+    event: properties.event ?? 'Alert',
+    nwsAlert: true,
+  };
+};
+
 /** Replaces the monitor alert vector source with NWS alert polygons. */
 export const syncAlertFeatures = (
   source: VectorSource,
@@ -71,7 +91,7 @@ export const syncAlertFeatures = (
   const format = new GeoJSON();
 
   alertsCollection.features.forEach((feature) => {
-    if (!feature.geometry) {
+    if (!feature || !feature.geometry) {
       return;
     }
 
@@ -82,11 +102,7 @@ export const syncAlertFeatures = (
 
     olFeatures.forEach((olFeature) => {
       if ('setProperties' in olFeature && typeof olFeature.setProperties === 'function') {
-        olFeature.setProperties({
-          ...(feature.properties ?? {}),
-          event: feature.properties?.event ?? 'Alert',
-          nwsAlert: true,
-        });
+        olFeature.setProperties(buildAlertProperties(feature));
       }
       source.addFeature(olFeature as never);
     });

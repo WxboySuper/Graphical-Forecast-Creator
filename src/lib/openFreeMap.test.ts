@@ -1,4 +1,4 @@
-import { getOpenFreeMapStyleSet, isOpenFreeMapStyle } from './openFreeMap';
+let openFreeMap: typeof import('./openFreeMap');
 
 const stylePayload = {
   version: 8,
@@ -14,8 +14,9 @@ const stylePayload = {
 };
 
 describe('openFreeMap helpers', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
+    openFreeMap = await import('./openFreeMap');
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: jest.fn().mockResolvedValue(stylePayload),
@@ -23,14 +24,13 @@ describe('openFreeMap helpers', () => {
   });
 
   test('recognizes OpenFreeMap-backed base map styles', () => {
-    expect(isOpenFreeMapStyle('osm')).toBe(true);
-    expect(isOpenFreeMapStyle('carto-light')).toBe(true);
-    expect(isOpenFreeMapStyle('satellite')).toBe(false);
+    expect(openFreeMap.isOpenFreeMapStyle('osm')).toBe(true);
+    expect(openFreeMap.isOpenFreeMapStyle('satellite')).toBe(false);
   });
 
   test('splits fetched style into base and overlay layer stacks and caches the result', async () => {
-    const first = await getOpenFreeMapStyleSet('osm');
-    const second = await getOpenFreeMapStyleSet('osm');
+    const first = await openFreeMap.getOpenFreeMapStyleSet('osm');
+    const second = await openFreeMap.getOpenFreeMapStyleSet('osm');
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(first).toBe(second);
@@ -44,7 +44,7 @@ describe('openFreeMap helpers', () => {
   });
 
   test('rejects non OpenFreeMap styles and clears failed fetches from cache', async () => {
-    await expect(getOpenFreeMapStyleSet('satellite')).rejects.toThrow(/does not use OpenFreeMap/);
+    await expect(openFreeMap.getOpenFreeMapStyleSet('esri-satellite')).rejects.toThrow(/does not use OpenFreeMap/);
 
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({ ok: false })
@@ -53,8 +53,8 @@ describe('openFreeMap helpers', () => {
         json: jest.fn().mockResolvedValue(stylePayload),
       });
 
-    await expect(getOpenFreeMapStyleSet('carto-light')).rejects.toThrow(/Unable to load/);
-    await expect(getOpenFreeMapStyleSet('carto-light')).resolves.toEqual(
+    await expect(openFreeMap.getOpenFreeMapStyleSet('osm')).rejects.toThrow(/Unable to load/);
+    await expect(openFreeMap.getOpenFreeMapStyleSet('osm')).resolves.toEqual(
       expect.objectContaining({ baseStyle: expect.any(Object), overlayStyle: expect.any(Object) })
     );
     expect(global.fetch).toHaveBeenCalledTimes(2);

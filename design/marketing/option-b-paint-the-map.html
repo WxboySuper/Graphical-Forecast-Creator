@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC - Option B: Paint the Map</title>
+<style>
+  :root {
+    --bg: #fbf8f1;
+    --ink: #1f2a2e;
+    --muted: #64727a;
+    --card: #ffffff;
+    --line: #e7e1d3;
+    --tstm: #bcd9b8;
+    --mrgl: #7cc576;
+    --slgt: #f5d33b;
+    --enh: #ff8c1a;
+    --mdt: #e8413c;
+    --high: #b52ad4;
+    --accent: #2f6fdb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Nunito", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 18px clamp(16px, 4vw, 48px); }
+  .wordmark { font-weight: 900; font-size: 1.15rem; }
+  nav a { margin-left: 18px; color: var(--muted); text-decoration: none; font-weight: 700; }
+
+  .hero {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: clamp(20px, 4vw, 56px);
+    align-items: center;
+    padding: 12px clamp(16px, 4vw, 48px) 40px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .hero h1 { font-size: clamp(2.5rem, 5.5vw, 4.4rem); line-height: 1; margin: 0 0 16px; letter-spacing: -.02em; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero .sub { font-size: 1.15rem; color: var(--muted); line-height: 1.55; max-width: 520px; }
+
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0 10px; }
+  .btn { padding: 14px 24px; border-radius: 16px; font-weight: 800; text-decoration: none; font-size: 1rem; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 0 #1f4fa6; }
+  .btn-primary:active { transform: translateY(3px); box-shadow: 0 3px 0 #1f4fa6; }
+  .btn-secondary { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 2px var(--line); }
+  .note { color: var(--muted); font-size: .92rem; margin: 6px 0 0; }
+
+  .canvas-card {
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: 0 20px 50px rgba(31, 42, 46, .12);
+    padding: 16px;
+  }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  .toolbar .label { font-weight: 800; color: var(--muted); font-size: .85rem; margin-right: 4px; }
+  .swatch {
+    border: 0; border-radius: 10px; padding: 8px 12px; font-weight: 800; font-size: .85rem; cursor: pointer;
+    color: var(--ink); box-shadow: inset 0 0 0 2px rgba(0,0,0,.08);
+  }
+  .swatch[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 2px;
+    aspect-ratio: 12 / 8;
+    background: #d9e6f2;
+    border-radius: 14px;
+    overflow: hidden;
+    touch-action: none;
+    user-select: none;
+  }
+  .cell { background: #cfe3f4; transition: background .25s ease; }
+  .cell.land { background: #e9efe0; }
+  .caption { display: flex; justify-content: space-between; margin-top: 10px; font-size: .85rem; color: var(--muted); font-weight: 700; }
+  .caption button { background: none; border: 0; color: var(--accent); font-weight: 800; cursor: pointer; padding: 0; }
+
+  .doors-title { text-align: center; padding: 10px 20px 14px; }
+  .doors-title h2 { margin: 0 0 6px; font-size: 1.8rem; letter-spacing: -.01em; }
+  .doors-title p { margin: 0; color: var(--muted); }
+
+  .doors {
+    max-width: 1200px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px) 40px;
+    display: flex; gap: 16px; height: 440px;
+  }
+  .door {
+    flex: 1 1 0; border-radius: 28px; padding: 30px; display: flex; flex-direction: column; justify-content: flex-end;
+    transition: flex .65s cubic-bezier(.2, .9, .25, 1); overflow: hidden; position: relative; outline: none;
+  }
+  .door:focus-visible { outline: 4px solid var(--accent); outline-offset: 4px; }
+  .door-beginner { background: #b9e4a8; }
+  .door-experienced { background: #1f3b52; color: #f1f5f8; }
+  .door .tag { font-weight: 900; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
+  .door h3 { font-size: clamp(1.6rem, 2.6vw, 2.2rem); margin: 6px 0 8px; letter-spacing: -.01em; }
+  .door p { margin: 0 0 18px; line-height: 1.5; max-width: 380px; }
+  .door .btns { display: flex; gap: 10px; flex-wrap: wrap; opacity: 0; transform: translateY(8px); transition: opacity .4s ease .1s, transform .4s ease .1s; }
+  .door.open .btns { opacity: 1; transform: none; }
+  .door .btns a { padding: 12px 18px; border-radius: 14px; font-weight: 800; text-decoration: none; }
+  .door-beginner .btns a:first-child { background: #fff; color: var(--ink); }
+  .door-beginner .btns a:last-child { background: var(--ink); color: #fff; }
+  .door-experienced .btns a:first-child { background: rgba(255,255,255,.14); color: #fff; }
+  .door-experienced .btns a:last-child { background: #ffd23f; color: var(--ink); }
+
+  .doors.has-open .door:not(.open) { flex: .6; }
+  .doors.has-open .door.open { flex: 2.4; }
+
+  .account { text-align: center; padding: 0 20px 48px; }
+  .account p { color: var(--muted); margin: 10px 0 0; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: center; padding: 22px; color: var(--muted); font-weight: 700; font-size: .9rem; border-top: 2px dashed var(--line); }
+  footer a { color: inherit; text-decoration: none; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; }
+    nav { display: none; }
+    .doors { flex-direction: column; height: auto; }
+    .door { min-height: 130px; }
+    .doors.has-open .door:not(.open) { flex: .5; }
+    .doors.has-open .door.open { flex: 2.4; min-height: 300px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .door, .btns { transition: none; } }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wordmark">GFC</div>
+    <nav><a href="#">Changelog</a><a href="#">Help</a><a href="#">Pricing</a></nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Create forecasts. <em>Your way.</em></h1>
+      <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+        <a class="btn btn-secondary" href="https://app.gfcweather.com">Continue Without Account</a>
+      </div>
+      <p class="note">Accounts unlock features, but you can start without one.</p>
+    </div>
+
+    <div class="canvas-card" aria-label="Try painting a risk area">
+      <div class="toolbar">
+        <span class="label">Paint:</span>
+        <button class="swatch" data-color="var(--tstm)" aria-pressed="false" style="background:#bcd9b8">TSTM</button>
+        <button class="swatch" data-color="var(--mrgl)" aria-pressed="true" style="background:#7cc576">MRGL</button>
+        <button class="swatch" data-color="var(--slgt)" aria-pressed="false" style="background:#f5d33b">SLGT</button>
+        <button class="swatch" data-color="var(--enh)" aria-pressed="false" style="background:#ff8c1a">ENH</button>
+        <button class="swatch" data-color="var(--mdt)" aria-pressed="false" style="background:#e8413c; color:#fff">MDT</button>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="caption">
+        <span>Try it. Nothing is saved here.</span>
+        <button id="reset">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="doors-title">
+    <h2>Where do you want to start?</h2>
+    <p>Hover or tap a door.</p>
+  </div>
+
+  <main class="doors" id="doors">
+    <section class="door door-beginner" tabindex="0" data-door="beginner">
+      <span class="tag">Beginner</span>
+      <h3>New to forecasting?</h3>
+      <p>Start here — no experience needed. Draw your first forecast in minutes.</p>
+      <div class="btns">
+        <a href="/beginners">Learn More</a>
+        <a href="https://app.gfcweather.com">Open the App</a>
+      </div>
+    </section>
+    <section class="door door-experienced" tabindex="0" data-door="experienced">
+      <span class="tag">Experienced</span>
+      <h3>Experienced?</h3>
+      <p>Jump in — you already know what you're doing. Draw, verify, discuss.</p>
+      <div class="btns">
+        <a href="/experienced">Learn More</a>
+        <a href="https://app.gfcweather.com">Open the App</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Pricing</a><a href="#">About</a><a href="#">Help / Contact</a><a href="#">Changelog</a>
+  </footer>
+
+<script>
+  // Painting grid: visitors can try a risk area. Nothing is sent anywhere.
+  const grid = document.getElementById('grid');
+  const COLS = 12, ROWS = 8;
+  let color = getComputedStyle(document.documentElement).getPropertyValue('--mrgl').trim();
+  let painting = false;
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.dataset.i = i;
+    grid.appendChild(c);
+  }
+  function paint(el) {
+    if (el && el.classList.contains('cell')) el.style.background = color;
+  }
+  grid.addEventListener('pointerdown', e => { painting = true; paint(e.target); });
+  grid.addEventListener('pointerover', e => { if (painting) paint(e.target); });
+  window.addEventListener('pointerup', () => painting = false);
+  grid.addEventListener('pointermove', e => {
+    if (!painting) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    paint(el);
+  });
+  document.querySelectorAll('.swatch').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', 'true');
+    color = b.dataset.color.startsWith('var') ? getComputedStyle(document.documentElement).getPropertyValue(b.dataset.color.slice(4, -1)).trim() : b.dataset.color;
+  }));
+  document.getElementById('reset').addEventListener('click', () => {
+    grid.querySelectorAll('.cell').forEach(c => c.style.background = '');
+  });
+
+  // Doors
+  const doors = document.getElementById('doors');
+  const items = doors.querySelectorAll('.door');
+  function setOpen(target) {
+    items.forEach(d => d.classList.toggle('open', d === target));
+    doors.classList.toggle('has-open', !!target);
+  }
+  items.forEach(d => {
+    d.addEventListener('pointerenter', () => setOpen(d));
+    d.addEventListener('focusin', () => setOpen(d));
+  });
+  doors.addEventListener('pointerleave', () => setOpen(null));
+</script>
+</body>
+</html>

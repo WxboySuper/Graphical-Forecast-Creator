@@ -44,7 +44,7 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
   };
 
   const statusLine = !stormReportsMeta.loading && !stormReportsMeta.error && settings.stormReportsEnabled
-    ? formatStormReportsStatusLine(stormReportsMeta.reports.length, stormReportsMeta.totalCount)
+    ? formatStormReportsStatusLine(stormReportsMeta.reports.length, stormReportsMeta.totalCount, 'SPC report day')
     : null;
 
   return (
@@ -55,7 +55,7 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
           checked={settings.stormReportsEnabled}
           onChange={(event) => onStormReportsEnabledChange(event.target.checked)}
         />
-        Show today&apos;s SPC reports
+        Show filtered reports from the current SPC report day (12Z–11:59Z)
       </label>
       {STORM_REPORT_FILTERS.map(({ label, settingKey }) => (
         <label key={settingKey} className="monitor-controls__checkbox">
@@ -77,11 +77,15 @@ const MonitorStormReportsSection: React.FC<MonitorStormReportsSectionProps> = ({
         />
         Match selected outlook type
       </label>
-      <div className="monitor-controls__meta">
-        {stormReportsMeta.loading && 'Loading SPC today.csv…'}
-        {!stormReportsMeta.loading && stormReportsMeta.error}
-        {statusLine}
+      <div className="monitor-controls__meta" role="status">
+        {stormReportsMeta.loading ? 'Loading reports from the current SPC report day…' : statusLine}
       </div>
+      {stormReportsMeta.error && !stormReportsMeta.loading && (
+        <div className="monitor-controls__meta monitor-controls__meta--error" role="alert">
+          <span aria-hidden="true">⚠ </span>
+          <span title={stormReportsMeta.error}>SPC storm reports are unavailable. Check your connection and try again.</span>
+        </div>
+      )}
     </MonitorControlsSection>
   );
 };
