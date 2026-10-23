@@ -36,5 +36,3 @@ export const upsertManagedChangelogDeclaration = (body, declaration) => {
 
   return `${withoutDeclarations ? `${withoutDeclarations}\n\n` : ''}${formatManagedChangelogDeclaration(declaration)}\n`;
 };
-
-export const changelogAutomationMarkers = { MANAGED_START, MANAGED_END };
