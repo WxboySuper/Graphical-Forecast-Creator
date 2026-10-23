@@ -105,6 +105,51 @@ describe('hosted settings sync', () => {
     };
   };
 
+  type HostedSnapshotTestContext = {
+    remote: ReturnType<typeof buildHostedSettingsFixture>;
+    localOverlays: OverlaysState;
+    dispatch: jest.Mock;
+    lastSyncedSettingsRef: { current: ReturnType<typeof buildHostedSettingsFixture> | null };
+    active: boolean;
+    pendingIntentRef: { current: PendingHostedSettingsWrite | null };
+    inFlightRef: { current: InFlightHostedSettingsWrite | null };
+    supersededBaselineRef: { current: PendingHostedSettingsWrite['baseline'] | null };
+  };
+
+  const applyHostedSettingsSnapshot = ({
+    remote,
+    localOverlays,
+    dispatch,
+    lastSyncedSettingsRef,
+    active,
+    pendingIntentRef,
+    inFlightRef,
+    supersededBaselineRef,
+  }: HostedSnapshotTestContext) => {
+    handleHostedSettingsFirestoreSnapshot(
+      { data: () => remote, metadata: { hasPendingWrites: false } },
+      {
+        isActive: () => active,
+        getPendingLocalWrite: () => pendingIntentRef.current,
+        getInFlightHostedSettingsWrite: () => inFlightRef.current,
+        getSupersededBaselineOneShot: () => supersededBaselineRef.current,
+        clearSupersededBaselineOneShot: () => {
+          supersededBaselineRef.current = null;
+        },
+        applyRemoteSettings: (settings) => {
+          applySettingsToState(settings, {
+            currentDarkModeRef: { current: false },
+            currentOverlaysRef: { current: localOverlays },
+            dispatch,
+            setSyncedSettings: jest.fn(),
+            lastSyncedSettingsRef,
+          });
+        },
+        setSettingsSyncStatus: jest.fn(),
+      },
+    );
+  };
+
   const createHostedWriteTestBed = (options?: {
     lastSynced?: ReturnType<typeof buildHostedSettingsFixture>;
     writeOwnerUid?: string;
@@ -397,28 +442,16 @@ describe('hosted settings sync', () => {
       expect(setDocSpy).toHaveBeenCalled();
       expect(pendingIntentRef.current).not.toBeNull();
 
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => baseline, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => active,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
-          clearSupersededBaselineOneShot: () => {
-            supersededBaselineRef.current = null;
-          },
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlays },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
+      applyHostedSettingsSnapshot({
+        remote: baseline,
+        localOverlays,
+        dispatch,
+        lastSyncedSettingsRef,
+        active,
+        pendingIntentRef,
+        inFlightRef,
+        supersededBaselineRef,
+      });
 
       expect(dispatch).not.toHaveBeenCalledWith(
         applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
@@ -430,28 +463,16 @@ describe('hosted settings sync', () => {
       expect(lastSyncedSettingsRef.current?.baseMapStyle).toBe('carto-light');
       expect(supersededBaselineRef.current?.baseMapStyle).toBe('osm');
 
-      handleHostedSettingsFirestoreSnapshot(
-        { data: () => baseline, metadata: { hasPendingWrites: false } },
-        {
-          isActive: () => active,
-          getPendingLocalWrite: () => pendingIntentRef.current,
-          getInFlightHostedSettingsWrite: () => inFlightRef.current,
-          getSupersededBaselineOneShot: () => supersededBaselineRef.current,
-          clearSupersededBaselineOneShot: () => {
-            supersededBaselineRef.current = null;
-          },
-          applyRemoteSettings: (settings) => {
-            applySettingsToState(settings, {
-              currentDarkModeRef: { current: false },
-              currentOverlaysRef: { current: localOverlays },
-              dispatch,
-              setSyncedSettings: jest.fn(),
-              lastSyncedSettingsRef,
-            });
-          },
-          setSettingsSyncStatus: jest.fn(),
-        },
-      );
+      applyHostedSettingsSnapshot({
+        remote: baseline,
+        localOverlays,
+        dispatch,
+        lastSyncedSettingsRef,
+        active,
+        pendingIntentRef,
+        inFlightRef,
+        supersededBaselineRef,
+      });
 
       expect(dispatch).not.toHaveBeenCalledWith(
         applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'osm' })),
