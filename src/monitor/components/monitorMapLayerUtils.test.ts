@@ -1,3 +1,5 @@
+import VectorSource from 'ol/source/Vector';
+import { Style } from 'ol/style';
 import {
   ALERTS_LAYER_Z_INDEX,
   MONITOR_LAYER_Z_ORDER,
@@ -8,6 +10,8 @@ import {
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
   createBaseSource,
   createMesoscaleDiscussionStyle,
+  createStateOutlineStyle,
+  loadUsStateOutlines,
 } from './monitorMapLayerUtils';
 
 describe('monitor reference layer order', () => {
@@ -33,5 +37,70 @@ describe('monitor reference layer order', () => {
 
   test('uses OpenStreetMap tiles for the monitor basemap', () => {
     expect(createBaseSource().getUrls()?.[0]).toContain('tile.openstreetmap.org');
+  });
+});
+
+const DARK_OUTLINE_STROKE = 'rgba(226, 232, 240, 0.72)';
+const LIGHT_OUTLINE_STROKE = 'rgba(51, 65, 85, 0.88)';
+
+const outlineGeoJSON = {
+  type: 'FeatureCollection',
+  features: [
+    {
+      type: 'Feature',
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[[-100, 40], [-99, 40], [-99, 41], [-100, 41], [-100, 40]]],
+      },
+    },
+  ],
+};
+
+const outlineStrokeColorOf = (source: VectorSource): unknown => {
+  const style = source.getFeatures()[0]?.getStyle() as Style | undefined;
+  return style?.getStroke()?.getColor();
+};
+
+describe('loadUsStateOutlines', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
+  });
+
+  test('styles features with the theme at fetch-resolve time, not call time', async () => {
+    let resolveFetch: ((value: unknown) => void) | undefined;
+    global.fetch = jest.fn().mockImplementation(
+      () => new Promise((resolve) => { resolveFetch = resolve; }),
+    ) as jest.Mock;
+
+    const source = new VectorSource();
+    let currentTheme = false;
+    const load = loadUsStateOutlines(source, () => currentTheme);
+
+    // Theme toggles while the GeoJSON fetch is still in flight.
+    currentTheme = true;
+    await Promise.resolve();
+    resolveFetch?.({ ok: true, json: async () => outlineGeoJSON });
+    await load;
+
+    expect(source.getFeatures()).toHaveLength(1);
+    expect(outlineStrokeColorOf(source)).toBe(DARK_OUTLINE_STROKE);
+  });
+
+  test('still accepts a plain boolean theme', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => outlineGeoJSON,
+    }) as jest.Mock;
+
+    const source = new VectorSource();
+    await loadUsStateOutlines(source, false);
+
+    expect(source.getFeatures()).toHaveLength(1);
+    expect(outlineStrokeColorOf(source)).toBe(LIGHT_OUTLINE_STROKE);
+    expect(createStateOutlineStyle(true).getStroke()?.getColor()).toBe(DARK_OUTLINE_STROKE);
   });
 });

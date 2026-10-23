@@ -1,7 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import { Fill, Stroke, Style } from 'ol/style';
 
-export const NWS_API_USER_AGENT = 'GraphicalForecastCreator/1.6 (monitor)';
 export const MAX_ACTIVE_ALERTS = 500;
 export const NWS_ACTIVE_ALERTS_URL =
   `https://api.weather.gov/alerts/active?status=actual&limit=${MAX_ACTIVE_ALERTS}`;
@@ -90,10 +89,13 @@ export const buildNwsAlertStyle = (event: string): Style => {
 
 /** Fetches and bounds the active NWS alert collection. */
 export const fetchActiveNwsAlerts = async (): Promise<NwsAlertFeatureCollection> => {
+  // Note: no User-Agent header here. This fetch runs in the browser, where
+  // User-Agent is a forbidden header name that browsers silently discard —
+  // sending it only pretended an api.weather.gov identity claim that never
+  // arrived. The browser supplies its own User-Agent.
   const response = await fetch(NWS_ACTIVE_ALERTS_URL, {
     headers: {
       Accept: 'application/geo+json',
-      'User-Agent': NWS_API_USER_AGENT,
     },
   });
 
