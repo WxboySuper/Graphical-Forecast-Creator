@@ -62,7 +62,7 @@ const mergeGuidedDiscussionDrafts = (primary: DiscussionData, drafts: Discussion
     if (!draft.guidedContent) return;
     (Object.keys(guidedContent) as Array<keyof GuidedDiscussionData>).forEach((key) => {
       const value = trimDiscussionText(draft.guidedContent?.[key]);
-      if (value && !guidedContent[key].trim()) guidedContent[key] = value;
+      if (value && !trimDiscussionText(guidedContent[key])) guidedContent[key] = value;
     });
   });
   return { ...primary, mode: 'guided', guidedContent, diyContent: undefined, lastModified: new Date().toISOString() };
