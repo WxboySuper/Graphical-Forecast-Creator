@@ -25,13 +25,13 @@ Every workstream must:
 
 Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved across local, beta, staging, and production for v1.7.
 
-Approved rows split into two lifecycles. Forecast Workflow v2, Verification relaunch, and Custom Products are permanent, so they carry `temporary: false` and no removal condition. Auto-TSTM is approved on every target but stays temporary, so it keeps a removal condition until #427 retires the gate.
+Approved rows use a permanent lifecycle. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products carry `temporary: false` and have no removal condition.
 
 ## Per-workstream detail
 
 ### Auto-TSTM (`autoTstm`, #427)
 
-- **Registry:** `temporary: true`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
+- **Registry:** `temporary: false`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
 - **Gates:** `FEATURE_SIDE_EFFECT_MODULES.autoTstm`, `ServerBackedFeatureBoundary`, `server/tstm.js` capability gate
 - **Tests:** `src/testing/featureExposure/exemplar.exposure.test.tsx`, `server/testing/autoTstm.exposure.test.js`
 - **Ops:** [auto-tstm-operations.md](./auto-tstm-operations.md)
