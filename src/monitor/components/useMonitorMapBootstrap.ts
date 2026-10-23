@@ -260,7 +260,10 @@ export const useMonitorMapBootstrap = ({
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
   const darkModeRef = useRef(darkMode);
-  darkModeRef.current = darkMode;
+
+  useEffect(() => {
+    darkModeRef.current = darkMode;
+  }, [darkMode]);
 
   useEffect(() => {
     if (!mapElementRef.current) {
