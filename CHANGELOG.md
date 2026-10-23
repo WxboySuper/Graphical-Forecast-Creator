@@ -26,7 +26,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
-- **Categorical outlooks:** Keep significant-threat probabilities supported during categorical conversion.
+- **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
+- **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
 - **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
 - **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.

@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
 import Overlay from 'ol/Overlay';
@@ -259,6 +259,11 @@ export const useMonitorMapBootstrap = ({
   onSelectAlert,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
+  const darkModeRef = useRef(darkMode);
+
+  useLayoutEffect(() => {
+    darkModeRef.current = darkMode;
+  }, [darkMode]);
 
   useEffect(() => {
     if (!mapElementRef.current) {
@@ -281,7 +286,7 @@ export const useMonitorMapBootstrap = ({
     syncReferenceLabels();
     attachMonitorMapPopup(map, refs);
     assignMonitorMapRefs(refs, map, layers);
-    loadUsStateOutlines(refs.stateOutlineSourceRef.current, darkMode).catch(() => undefined);
+    loadUsStateOutlines(refs.stateOutlineSourceRef.current, () => darkModeRef.current).catch(() => undefined);
     loadVectorReferenceStyle(refs);
 
     return () => {
