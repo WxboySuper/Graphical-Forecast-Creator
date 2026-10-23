@@ -25,12 +25,6 @@ export const SITE_RADAR_PRODUCTS: Array<{ value: MonitorRadarProduct; label: str
   { value: 'sr-bvel', label: 'Base Velocity' },
 ];
 
-/** @deprecated Use {@link getRadarProductsForMode} instead. */
-export const MRMS_PRODUCTS = [
-  ...MRMS_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'mrms-conus' as const })),
-  ...SITE_RADAR_PRODUCTS.map((product) => ({ ...product, mode: 'site' as const })),
-];
-
 export const getRadarProductsForMode = (mode: MonitorRadarMode) => {
   if (mode === 'site') {
     return SITE_RADAR_PRODUCTS;

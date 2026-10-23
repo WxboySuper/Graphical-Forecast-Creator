@@ -26,6 +26,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
 - **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
