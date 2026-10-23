@@ -190,7 +190,6 @@ const VerifMapStylePicker: React.FC<{
       [
         { value: "blank", label: "Blank (Weather)" },
         { value: "osm", label: "OpenStreetMap" },
-        { value: "carto-light", label: "Light" },
         { value: "esri-satellite", label: "Satellite" },
       ] as { value: BaseMapStyle; label: string }[]
     ).map(({ value, label }) => (

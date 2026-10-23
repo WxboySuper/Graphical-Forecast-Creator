@@ -1,0 +1,464 @@
+name: Review | OCR
+
+# OCR reports only actionable, medium-or-higher bugs, security, and correctness issues.
+# Non-interference design:
+# - Own concurrency group (ocr-<pr>), so neither reviewer cancels the other.
+# - Own sticky summary marker from the OCR action, distinct from
+#   gfc-opencode-first-look-summary. Neither overwrites the other.
+# - Own manual trigger (/ocr), distinct from /review-opencode.
+# Low, style, and nit findings are suppressed and never fail the merge gate.
+#
+# The required `ocr-review` check has to land on every PR head SHA, otherwise
+# branch protection blocks the PR the moment someone pushes or rebases:
+# - pull_request_target fires on opened, ready_for_review, synchronize,
+#   reopened, and edited, so a new head SHA gets its own run and a title
+#   change re-runs the review on the same head.
+# - The job always runs for a pull_request_target event. A draft PR, a
+#   HOLD/WIP title, or a fork head skips the review inside the job (a
+#   step-level skip), so the check still reports on that head instead of
+#   staying pending.
+# - cancel-in-progress is false. A newer head must not cancel the run that
+#   still owes a result for the head it started on. The automatic and the
+#   manual path use separate per-PR groups, so a queued /ocr review is not
+#   dropped when a newer run enters the automatic group.
+# - A manual /ocr comment run has no check run of its own on the PR head, so
+#   it reports a commit status with the `ocr-review` context on the head.
+#
+# Model: Beam Free via OpenCode Go (free), reusing
+# OPENCODE_API_KEY. It uses the OpenAI chat/completions protocol, so
+# llm_protocol is openai and the URL ends in /chat/completions.
+# Override without editing YAML via repo Variables:
+#   OCR_LLM_URL, OCR_LLM_MODEL, OCR_LLM_PROTOCOL.
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review, synchronize, reopened, edited]
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  # Two per-PR groups. The automatic group holds one run per PR, so a new
+  # head replaces the queued one and never cancels the running one. The
+  # manual group is separate, because GitHub drops a queued run when a newer
+  # run enters the same group, and a requested /ocr review must not vanish
+  # because somebody pushed in the meantime.
+  group: >-
+    ${{
+      (github.event_name == 'pull_request_target'
+        && format('gfc-ocr-pr-{0}', github.event.pull_request.number))
+        || (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && github.event.comment.user.type != 'Bot'
+          && startsWith(github.event.comment.body, '/ocr')
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+          && format('gfc-ocr-manual-{0}', github.event.issue.number))
+        || format('gfc-ocr-noop-{0}', github.run_id)
+    }}
+  cancel-in-progress: false
+
+jobs:
+  ocr-review:
+    # Only the manual comment path is filtered here. A pull_request_target
+    # event always runs the job: the job's own check run is what branch
+    # protection waits for, so it must report on every head SHA. Draft,
+    # HOLD/WIP, and fork PRs are handled by a step-level skip further down.
+    if: |
+      github.event_name == 'pull_request_target'
+      || (
+        github.event_name == 'issue_comment'
+        && github.event.issue.pull_request
+        && github.event.comment.user.type != 'Bot'
+        && startsWith(github.event.comment.body, '/ocr')
+        && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve PR refs for manual comments
+        id: pr-refs
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const prNumber = Number(
+              context.payload.issue?.number,
+            );
+            if (!Number.isInteger(prNumber) || prNumber < 1) {
+              core.setFailed('No valid PR number for the OCR review.');
+              return;
+            }
+            const { data: pull } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            core.setOutput('pr_number', String(prNumber));
+            core.setOutput('base_ref', pull.base.ref);
+            core.setOutput('head_sha', pull.head.sha);
+
+      - name: Mark the manual review as pending on the PR head
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          HEAD_SHA: ${{ steps.pr-refs.outputs.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // A comment-triggered run reports no check run on the PR head, so
+            // the head would sit without an `ocr-review` status for the whole
+            // review. Publish a pending status first, then the final one
+            // after the gate. Never fatal: the status API is an extra
+            // convenience, not a reason to fail a review that already ran.
+            const sha = String(process.env.HEAD_SHA || '').trim();
+            if (!/^[a-f0-9]{40}$/i.test(sha)) {
+              core.warning('OCR status: no PR head SHA; skipping pending status.');
+              return;
+            }
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                state: 'pending',
+                context: 'ocr-review',
+                description: 'OCR review is running',
+                target_url: process.env.RUN_URL || '',
+              });
+              core.info(`OCR pending status posted on ${sha.slice(0, 7)}.`);
+            } catch (error) {
+              core.warning(`OCR pending status failed: ${error.message}`);
+            }
+
+      - name: Decide whether this head needs a review
+        id: skip
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          # GitHub's contains() ignores case, so this keeps the old job-level
+          # behavior: "wip: feature" and "Hold: investigation" skip the
+          # review just like "WIP: feature" and "HOLD" did.
+          PR_TITLE_HOLDS: ${{ contains(github.event.pull_request.title, 'HOLD') || contains(github.event.pull_request.title, 'WIP') }}
+          # A fork head is attacker-controlled. This run holds a write-scoped
+          # token and the OPENCODE_API_KEY secret, and a synchronize event
+          # lets a fork author re-arm it on every push, so the automatic
+          # review only runs for heads that live in this repository. The
+          # manual /ocr path is unaffected: a trusted author asked for it.
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          # A draft PR, a HOLD/WIP title, or a fork head is not ready for
+          # review. The job still runs so the required check reports on this
+          # head SHA; only the review itself is skipped.
+          skip=false
+          reason=""
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            if [ "$PR_DRAFT" = "true" ]; then
+              skip=true
+              reason="draft pull request"
+            elif [ "$PR_TITLE_HOLDS" = "true" ]; then
+              skip=true
+              reason="HOLD/WIP title"
+            elif [ "$PR_HEAD_REPO" != "$REPOSITORY" ]; then
+              skip=true
+              reason="head from a fork"
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "OCR review skip=$skip ($reason)"
+
+      - name: Run OCR review with Beam Free
+        id: ocr
+        if: steps.skip.outputs.skip != 'true'
+        uses: alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4 # main as of 2026-10-10
+        with:
+          llm_url: ${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/chat/completions' }}
+          llm_auth_token: ${{ secrets.OPENCODE_API_KEY }}
+          # The Go gateway 400s every request without x-opencode-session
+          # (MissingSessionID). The run ID is stable for the conversation,
+          # since each workflow run performs exactly one review.
+          llm_extra_headers: 'x-opencode-session=ocr-${{ github.run_id }}'
+          llm_model: ${{ vars.OCR_LLM_MODEL || 'beam-free' }}
+          llm_use_anthropic: 'false'
+          llm_protocol: ${{ vars.OCR_LLM_PROTOCOL || 'openai' }}
+          # Keep the action's Anthropic-style default extra_body off this
+          # OpenAI chat/completions request. Probe runs showed the gateway accepts
+          # every body field OCR sends (tools, store, include, cache key)
+          # once the session header is present; '{}' simply stays neutral.
+          llm_extra_body: '{}'
+          language: English
+          effort: low
+          max_tokens_budget: '400000'
+          review_task_timeout: '20'
+          sticky_summary: 'true'
+          incremental: 'true'
+          resolve_outdated: 'false'
+          upload_artifacts: 'true'
+          rule: .opencodereview/rule.json
+          base_ref: ${{ steps.pr-refs.outputs.base_ref }}
+          head_sha: ${{ steps.pr-refs.outputs.head_sha }}
+          pr_number: ${{ steps.pr-refs.outputs.pr_number }}
+
+      - name: Post OCR digest summary
+        id: ocr-digest
+        if: always() && steps.skip.outputs.skip != 'true' && steps.ocr.outcome != 'cancelled' && steps.ocr.outcome != 'skipped'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          OCR_OUTCOME: ${{ steps.ocr.outcome }}
+          DIGEST_PR_NUMBER: ${{ env.PR_NUMBER }}
+          DIGEST_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DIGEST_HEAD_SHA: ${{ env.HEAD_SHA }}
+          DIGEST_PAYLOAD_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            // Advisory-only takeaway comment. Never fails the job: any
+            // problem logs a warning and skips, so a digest hiccup can never
+            // block a review or a merge. Uses its own marker, distinct from
+            // the OCR action's summary comment.
+            // PR-number/SHA wiring note (reviewers keep misreading this):
+            // pr-refs exports PR_NUMBER/HEAD_SHA via $GITHUB_ENV on
+            // dispatch/comment runs; on pull_request_target it is skipped
+            // and the payload fallbacks below cover those events.
+            const MARKER = '<!-- gfc-ocr-digest -->';
+            const findDigestComment = async (prNumber) => {
+              // Paginated: on busy PRs the marker can sit past page one.
+              // Retried: a flaked lookup must not masquerade a stale digest.
+              const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              const listPage = async (page) => {
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  try {
+                    return await github.rest.issues.listComments({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      issue_number: prNumber,
+                      per_page: 100,
+                      page,
+                    });
+                  } catch (error) {
+                    if (attempt === 2) throw error;
+                    core.warning('OCR digest comment lookup failed; retrying.');
+                    await wait(5000);
+                  }
+                }
+              };
+              for (let page = 1; page <= 20; page++) {
+                const { data: existing } = await listPage(page);
+                const match = existing.find((item) =>
+                  item.user?.login === 'github-actions[bot]' && (item.body || '').includes(MARKER),
+                );
+                if (match || existing.length < 100) return match || null;
+              }
+              return null;
+            };
+            const esc = (s) => String(s).replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/[\x60_*<>\[\]]/g, function (m) { return '\\' + m; }).replace(/@/g, '@\u200b');
+            try {
+              const outcome = process.env.OCR_OUTCOME || 'unknown';
+              const prNumber = Number(
+                process.env.DIGEST_PR_NUMBER
+                  || context.payload.pull_request?.number
+                  || context.payload.issue?.number,
+              );
+              if (!Number.isInteger(prNumber) || prNumber < 1) {
+                core.warning('OCR digest: no PR number; skipping.');
+                return;
+              }
+              if (outcome !== 'success') {
+                // Don't leave a previous run's digest masquerading as current:
+                // mark the existing comment stale instead of posting anew.
+                const stale = await findDigestComment(prNumber);
+                if (stale) {
+                    const prior = String(stale.body || '').split(MARKER).slice(1).join(MARKER).replace(/<details>[\s\S]*?<\/details>/g, '').trim();
+                  await github.rest.issues.updateComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    comment_id: stale.id,
+                    body: MARKER + '\n## OCR review digest \u2014 stale\n\n'
+                     + 'Latest run did not complete; prior findings preserved below.\n\nFull log: ' + esc(process.env.DIGEST_RUN_URL || '')
+                     + (prior ? '\n\n<details><summary>Previous digest</summary>\n\n' + prior + '\n\n</details>' : ''),
+                  });
+                  core.info('OCR digest marked stale.');
+                } else {
+                  core.warning(`OCR digest: review outcome was ${outcome}; skipping.`);
+                }
+                return;
+              }
+              const fs = require('fs');
+              let result;
+              try {
+                // Written by the OCR action's run step (see run logs:
+                // `ocr review ... > /tmp/ocr-result.json`); shape-checked below.
+                result = JSON.parse(fs.readFileSync('/tmp/ocr-result.json', 'utf8'));
+                core.info(`OCR digest: read result file (${result?.summary?.files_reviewed ?? '?'} files).`);
+              } catch (error) {
+                core.warning(`OCR digest: unreadable result file (${error.message}); skipping.`);
+                return;
+              }
+              const summary = result.summary || {};
+              const groups = Array.isArray(result.groups) ? result.groups : [];
+              const comments = Array.isArray(result.comments) ? result.comments : [];
+              const files = groups.flatMap((g) => Array.isArray(g.files) ? g.files : []);
+              // HEAD_SHA env only exists for dispatch/comment triggers
+              // (pr-refs step); on pull_request_target use the payload SHA.
+              const headSha = (
+                process.env.DIGEST_HEAD_SHA
+                || process.env.DIGEST_PAYLOAD_SHA
+                || ''
+              ).slice(0, 7);
+              const elapsed = summary.elapsed || '?';
+              const tokens = summary.total_tokens ?? '?';
+
+              const sevOf = (c) => String(
+                c.severity || c.priority || c.level || '',
+              ).toLowerCase();
+              const isHot = (c) => /\bcritical\b|\bhigh\b|^p0$|^p1$|\bblocker\b/.test(sevOf(c));
+              const hot = comments.filter(isHot).length;
+
+              const excerpt = (c) => {
+                const text = String(
+                  c.message || c.title || c.body || c.text || '',
+                ).replace(/\s+/g, ' ').trim();
+                return text.length > 300 ? `${text.slice(0, 297)}...` : text;
+              };
+              const locOf = (c) => {
+                const path = c.path || c.file || c.filename || 'unknown file';
+                return c.line ? `${path}:${c.line}` : path;
+              };
+
+              const lines = [
+                `## OCR review digest — ${headSha ? `\`${headSha}\`` : 'this revision'}`,
+                '',
+                comments.length === 0
+                  ? `✅ Clean: ${summary.files_reviewed ?? files.length} file(s) reviewed, no findings.`
+                  : `⚠️ ${comments.length} finding(s)${hot ? `, ${hot} critical/high` : ''} — resolve every inline thread to merge.`,
+                '',
+                `Scope: ${files.length ? files.slice(0, 20).map((f) => `\`${esc(f)}\``).join(', ') : 'n/a'}${files.length > 20 ? ` (+${files.length - 20} more)` : ''}`,
+              ];
+              for (const c of [...comments].sort((a, b) => Number(isHot(b)) - Number(isHot(a))).slice(0, 20)) {
+                const sev = sevOf(c) || 'n/a';
+                lines.push(`- **${esc(sev)}** ${esc(locOf(c))} — ${esc(excerpt(c)) || '(see inline thread)'}`);
+              }
+              if (comments.length > 20) lines.push(`- …and ${comments.length - 20} more (see inline threads)`);
+              lines.push(
+                '',
+                `Cost: ${esc(tokens)} tokens in ${esc(elapsed)}. Full log: ${esc(process.env.DIGEST_RUN_URL || '')}`,
+              );
+
+              const body = `${MARKER}\n${lines.join('\n')}`;
+              const match = await findDigestComment(prNumber);
+              if (match) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: match.id,
+                  body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  body,
+                });
+              }
+              core.info(`OCR digest posted (${comments.length} finding(s), ${files.length} file(s)).`);
+            } catch (error) {
+              core.warning(`OCR digest skipped: ${error.message}`);
+            }
+
+      - name: Enforce medium-or-higher OCR findings (merge gate)
+        id: ocr-gate
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          OCR_OUTCOME: ${{ steps.ocr.outcome }}
+          OCR_SKIPPED: ${{ steps.skip.outputs.skip }}
+        with:
+          script: |
+            // A skipped review (draft PR, HOLD/WIP title, fork head) passes
+            // on purpose: the check has to report on this head SHA, and there
+            // is nothing to gate. A review that ran and failed is still a
+            // failure.
+            if (process.env.OCR_SKIPPED === 'true') {
+              core.info('OCR gate passed: this revision was skipped (draft PR, HOLD/WIP title, or fork head).');
+              return;
+            }
+            const outcome = process.env.OCR_OUTCOME || 'unknown';
+            if (outcome !== 'success') {
+              core.setFailed(`OCR review did not complete (outcome=${outcome}).`);
+              return;
+            }
+            const fs = require('fs');
+            let result;
+            try {
+              result = JSON.parse(fs.readFileSync('/tmp/ocr-result.json', 'utf8'));
+            } catch (error) {
+              core.setFailed(`OCR gate could not read result file (${error.message}).`);
+              return;
+            }
+            const comments = Array.isArray(result.comments) ? result.comments : [];
+            const severityOf = (comment) => String(
+              comment.severity || comment.priority || comment.level || '',
+            ).toLowerCase();
+            const isBlocking = (comment) =>
+              /\bcritical\b|\bhigh\b|\bmedium\b|^p0$|^p1$|^p2$|\bblocker\b/.test(severityOf(comment));
+            const blocking = comments.filter(isBlocking);
+            if (blocking.length) {
+              core.setFailed(`OCR reported ${blocking.length} medium-or-higher finding(s).`);
+              return;
+            }
+            core.info(`OCR gate passed: ${comments.length} finding(s), none medium or higher.`);
+
+      - name: Report the ocr-review status on the PR head
+        if: always() && github.event_name == 'issue_comment'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        env:
+          HEAD_SHA: ${{ steps.pr-refs.outputs.head_sha }}
+          GATE_OUTCOME: ${{ steps.ocr-gate.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            // The final status for a manual run. It lands on the PR head, so
+            // the required `ocr-review` check sees it. Never fatal: the
+            // review already ran and posted its findings, and a status API
+            // hiccup must not turn a passing review into a red one.
+            const sha = String(process.env.HEAD_SHA || '').trim();
+            if (!/^[a-f0-9]{40}$/i.test(sha)) {
+              core.warning('OCR status: no PR head SHA; skipping final status.');
+              return;
+            }
+            const state = process.env.GATE_OUTCOME === 'success' ? 'success' : 'failure';
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha,
+                state,
+                context: 'ocr-review',
+                description: state === 'success'
+                  ? 'OCR review passed'
+                  : 'OCR review failed',
+                target_url: process.env.RUN_URL || '',
+              });
+              core.info(`OCR status posted on ${sha.slice(0, 7)}: ${state}.`);
+            } catch (error) {
+              core.warning(`OCR status failed: ${error.message}`);
+            }
+
+      - name: Run summary
+        if: always()
+        run: |
+          {
+            echo "OCR outcome=${{ steps.ocr.outcome }}.";
+            if [ "${{ steps.skip.outputs.skip }}" = "true" ]; then
+              echo "OCR review skipped (${{ steps.skip.outputs.reason }}).";
+            elif [ "${{ steps.ocr.outcome }}" = "success" ]; then
+              echo "OCR review posted.";
+            else
+              echo "OCR review did NOT post (outcome=${{ steps.ocr.outcome }}).";
+            fi
+            echo "inline=${{ steps.ocr.outputs.comments_inline }} total=${{ steps.ocr.outputs.comments_total }} failed=${{ steps.ocr.outputs.comments_failed }} summary=${{ steps.ocr.outputs.summary_comment_url }}";
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC - Option D: Radar Desk</title>
+<style>
+  :root {
+    --bg: #0b1417;
+    --panel: #111e23;
+    --ink: #e8f1f4;
+    --muted: #8ea3ab;
+    --line: #22363e;
+    --green: #6ee7a0;
+    --amber: #ffc857;
+    --orange: #ff8a3d;
+    --red: #ff5a5a;
+    --cyan: #5ad7ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+  header { display: flex; justify-content: space-between; align-items: center; padding: 16px clamp(16px, 4vw, 48px); border-bottom: 1px solid var(--line); }
+  .wordmark { font-weight: 700; letter-spacing: .04em; }
+  .status { color: var(--muted); font-size: .8rem; display: flex; gap: 8px; align-items: center; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  nav a { margin-left: 18px; color: var(--muted); text-decoration: none; font-size: .95rem; }
+
+  .hero {
+    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(24px, 4vw, 60px);
+    align-items: center; padding: clamp(32px, 6vh, 70px) clamp(16px, 4vw, 48px) 30px; max-width: 1240px; margin: 0 auto; width: 100%;
+  }
+  .hero h1 { font-size: clamp(2.6rem, 5.4vw, 4.6rem); line-height: 1; letter-spacing: -.03em; margin: 0 0 18px; }
+  .hero h1 span { color: var(--green); }
+  .hero .sub { color: var(--muted); font-size: 1.12rem; line-height: 1.6; max-width: 540px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+  .btn { padding: 14px 22px; border-radius: 10px; font-weight: 700; text-decoration: none; font-size: .98rem; }
+  .btn-primary { background: var(--green); color: #05211a; box-shadow: 0 0 0 1px var(--green), 0 0 30px rgba(110,231,160,.25); }
+  .btn-secondary { color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); background: transparent; }
+  .fine { color: var(--muted); font-size: .9rem; margin-top: 14px; }
+
+  .scope { position: relative; width: 100%; aspect-ratio: 1; max-width: 460px; justify-self: center; border-radius: 50%; border: 1px solid var(--line);
+    background: radial-gradient(circle at 50% 50%, #0e2a2c 0%, #0b1417 70%); overflow: hidden; }
+  .scope::before, .scope::after { content: ""; position: absolute; inset: 0; border-radius: 50%; }
+  .scope::before { background: repeating-radial-gradient(circle at 50% 50%, transparent 0 58px, rgba(90,215,255,.12) 58px 59px); }
+  .scope::after { background: conic-gradient(from 0deg, rgba(110,231,160,0) 0deg, rgba(110,231,160,.35) 40deg, rgba(110,231,160,0) 60deg); animation: sweep 5s linear infinite; }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  .blip { position: absolute; width: 12px; height: 12px; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 14px currentColor; }
+  .blip.g { background: var(--green); color: var(--green); top: 34%; left: 60%; }
+  .blip.a { background: var(--amber); color: var(--amber); top: 62%; left: 36%; }
+  .blip.r { background: var(--red); color: var(--red); top: 48%; left: 72%; }
+  .scope .label { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); color: var(--muted); font-size: .75rem; }
+
+  .doors-head { max-width: 1240px; margin: 0 auto; width: 100%; padding: 10px clamp(16px, 4vw, 48px) 14px; display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+  .doors-head h2 { font-size: 1.4rem; margin: 0; letter-spacing: -.01em; }
+  .doors-head .mono { color: var(--muted); font-size: .8rem; }
+
+  .doors { max-width: 1240px; margin: 0 auto; width: 100%; padding: 0 clamp(16px, 4vw, 48px) 40px; display: flex; gap: 14px; height: 420px; }
+  .door {
+    flex: 1 1 0; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 26px;
+    display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; outline: none;
+    transition: flex .6s cubic-bezier(.2,.8,.2,1), border-color .3s ease, box-shadow .3s ease;
+  }
+  .door::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent, rgba(110,231,160,.06)); opacity: 0; transition: opacity .4s; }
+  .door-experienced::before { background: linear-gradient(180deg, transparent, rgba(90,215,255,.08)); }
+  .door.open { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(90,215,255,.3), 0 20px 60px rgba(0,0,0,.4); }
+  .door.open::before { opacity: 1; }
+  .door:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .door .code { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: .75rem; color: var(--muted); letter-spacing: .08em; }
+  .door h3 { font-size: clamp(1.5rem, 2.4vw, 2rem); margin: 10px 0 10px; letter-spacing: -.01em; white-space: nowrap; }
+  .door p { color: var(--muted); line-height: 1.55; margin: 0; max-width: 360px; }
+  .door .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 18px; opacity: .6; transition: opacity .4s; }
+  .door.open .actions { opacity: 1; }
+  .door .actions a { padding: 11px 16px; border-radius: 9px; font-size: .92rem; font-weight: 700; text-decoration: none; }
+  .door-beginner .actions a:first-child { box-shadow: inset 0 0 0 1px var(--green); color: var(--green); }
+  .door-beginner .actions a:last-child { background: var(--green); color: #05211a; }
+  .door-experienced .actions a:first-child { box-shadow: inset 0 0 0 1px var(--cyan); color: var(--cyan); }
+  .door-experienced .actions a:last-child { background: var(--cyan); color: #04202a; }
+  .door .meter { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 16px; }
+  .door .meter span { display: block; height: 100%; width: 35%; transition: width .6s ease; }
+  .door-beginner .meter span { background: var(--green); }
+  .door-experienced .meter span { background: var(--cyan); width: 85%; }
+  .door.open .meter span { width: 100%; }
+
+  .doors.has-open .door:not(.open) { flex: .55; }
+  .doors.has-open .door.open { flex: 2.3; }
+
+  .account { text-align: center; padding: 0 20px 34px; }
+  .account p { color: var(--muted); font-size: .92rem; margin: 12px 0 0; }
+
+  footer { display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: center; padding: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: .88rem; }
+  footer a { color: inherit; text-decoration: none; }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; }
+    .scope { max-width: 300px; }
+    nav { display: none; }
+    .doors { flex-direction: column; height: auto; }
+    .door { min-height: 150px; }
+    .door h3 { white-space: normal; }
+    .doors.has-open .door:not(.open) { flex: .5; }
+    .doors.has-open .door.open { flex: 2.3; min-height: 300px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scope::after, .status i { animation: none; }
+    .door, .door .actions, .door .meter span { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wordmark">GFC</div>
+    <div class="status mono"><i></i> desk online</div>
+    <nav><a href="#">Changelog</a><a href="#">Help</a><a href="#">Pricing</a></nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Create forecasts. <span>Your way.</span></h1>
+      <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
+      <div class="ctas">
+        <a class="btn btn-primary" href="https://app.gfcweather.com/signup">Create Account</a>
+        <a class="btn btn-secondary" href="https://app.gfcweather.com">Continue Without Account</a>
+      </div>
+      <p class="fine">Accounts unlock features, but you can start without one.</p>
+    </div>
+    <div class="scope" aria-hidden="true">
+      <div class="blip g"></div><div class="blip a"></div><div class="blip r"></div>
+      <div class="label mono">scope // your forecast, your call</div>
+    </div>
+  </section>
+
+  <div class="doors-head">
+    <h2>Pick your station</h2>
+    <span class="mono">hover, focus, or tap a door</span>
+  </div>
+
+  <main class="doors" id="doors">
+    <section class="door door-beginner" tabindex="0" data-door="beginner">
+      <div>
+        <div class="code">// PATH 01 · BEGINNER</div>
+        <h3>New to forecasting?</h3>
+        <p>Start here — no experience needed. Draw your first forecast in minutes.</p>
+      </div>
+      <div>
+        <div class="actions">
+          <a href="/beginners">Learn More</a>
+          <a href="https://app.gfcweather.com">Open the App</a>
+        </div>
+        <div class="meter"><span></span></div>
+      </div>
+    </section>
+    <section class="door door-experienced" tabindex="0" data-door="experienced">
+      <div>
+        <div class="code">// PATH 02 · EXPERIENCED</div>
+        <h3>Experienced?</h3>
+        <p>Jump in — you already know what you're doing. Draw, verify, discuss.</p>
+      </div>
+      <div>
+        <div class="actions">
+          <a href="/experienced">Learn More</a>
+          <a href="https://app.gfcweather.com">Open the App</a>
+        </div>
+        <div class="meter"><span></span></div>
+      </div>
+    </section>
+  </main>
+
+  <section class="account">
+    <p>Accounts unlock features, but you can start without one.</p>
+  </section>
+
+  <footer>
+    <a href="#">Privacy Policy</a><a href="#">Terms of Service</a><a href="#">Pricing</a><a href="#">About</a><a href="#">Help / Contact</a><a href="#">Changelog</a>
+  </footer>
+
+<script>
+  const doors = document.getElementById('doors');
+  const items = doors.querySelectorAll('.door');
+  function setOpen(target) {
+    items.forEach(d => d.classList.toggle('open', d === target));
+    doors.classList.toggle('has-open', !!target);
+  }
+  items.forEach(d => {
+    d.addEventListener('pointerenter', () => setOpen(d));
+    d.addEventListener('focusin', () => setOpen(d));
+    d.addEventListener('click', e => { if (!d.classList.contains('open')) { e.preventDefault(); setOpen(d); } });
+  });
+  doors.addEventListener('pointerleave', () => setOpen(null));
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ import {
   readFirstLookModelOutput,
   wrapFirstLookPublicationError,
 } from './lib/opencode-first-look-publish.mjs';
-import { buildGhApiSlurpPaginateArgs, parseGhApiPaginatedResponse } from './lib/gh-api-paginate.mjs';
+import { buildGhApiArgs, buildGhApiSlurpPaginateArgs, parseGhApiPaginatedResponse } from './lib/gh-api-paginate.mjs';
 
 const required = ['GITHUB_REPOSITORY', 'PULL_NUMBER', 'REVIEW_SHA', 'REVIEW_KIND', 'REVIEW_REQUEST_ID', 'OUTPUT_PATH', 'CONTEXT_PATH', 'GH_TOKEN'];
 for (const key of required) if (!process.env[key]) throw new Error(`${key} is required.`);
@@ -27,16 +27,11 @@ if (!Number.isInteger(pullNumber) || pullNumber < 1 || !/^[a-f0-9]{40}$/i.test(e
 }
 
 const apiEnv = { ...process.env, GH_TOKEN: token };
-const ghApi = (method, route, fields = {}) => {
-  const args = ['api', method, route];
-  for (const [key, value] of Object.entries(fields)) {
-    args.push('-f', `${key}=${value}`);
-  }
-  return JSON.parse(execFileSync('gh', args, { encoding: 'utf8', env: apiEnv }));
-};
+const ghApi = (route, fields = {}, method = 'GET') =>
+  JSON.parse(execFileSync('gh', buildGhApiArgs(route, fields, method), { encoding: 'utf8', env: apiEnv }));
 
 const contextData = JSON.parse(readFileSync(contextPath, 'utf8'));
-const pull = ghApi('GET', `repos/${repository}/pulls/${pullNumber}`);
+const pull = ghApi(`repos/${repository}/pulls/${pullNumber}`);
 if (pull.head.sha !== expectedSha) {
   process.stdout.write(`Discarding stale result for ${expectedSha}; current head is ${pull.head.sha}.\n`);
   process.exit(0);
@@ -54,9 +49,9 @@ const summaryComment = findFirstLookSummaryComment(comments);
 const publishBody = (body) => {
   if (body.length > 60_000) throw new Error(`First-look comment exceeds the 60,000-character publishing limit (${body.length}).`);
   if (summaryComment) {
-    ghApi('PATCH', `repos/${repository}/issues/comments/${summaryComment.id}`, { body });
+    ghApi(`repos/${repository}/issues/comments/${summaryComment.id}`, { body }, 'PATCH');
   } else {
-    ghApi('POST', `repos/${repository}/issues/${pullNumber}/comments`, { body });
+    ghApi(`repos/${repository}/issues/${pullNumber}/comments`, { body }, 'POST');
   }
 };
 
