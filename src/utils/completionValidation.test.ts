@@ -139,6 +139,26 @@ describe('validateCycleCompletion', () => {
     expect(result.issues.some((i) => i.type === 'missing-discussion')).toBe(true);
   });
 
+  it('treats malformed imported discussion content as missing during completion validation', () => {
+    const day = createDayFixture(1, 'full');
+    day.discussion = {
+      mode: 'guided',
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '',
+        regionalBreakdown: '',
+        additionalConsiderations: '',
+      },
+    } as never;
+
+    const result = validateCycleCompletion(createForecastCycle({ 1: day }), ['day1']);
+
+    expect(result.issues.some((issue) => issue.type === 'missing-discussion')).toBe(true);
+  });
+
   it('is complete when day1 has all polygons and discussion', () => {
     const result = validateCycleCompletion(
       createForecastCycle({ 1: createDayFixture(1, 'withDiscussion') }),

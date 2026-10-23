@@ -12,4 +12,11 @@ describe('verificationUtils', () => {
     expect(summary).toContain('Total Relevant Reports');
     expect(summary).toContain('SLGT');
   });
+
+  test('formatOutlookVerificationSummary shows 0% misses when there are zero reports', () => {
+    const verification = { hits: 0, misses: 0, hitRate: 0, byRiskLevel: {}, reportDetails: [] };
+    const summary = formatOutlookVerificationSummary('tornado', verification);
+    expect(summary).toContain('Misses: 0 (0.0%)');
+    expect(summary).not.toContain('Misses: 0 (100.0%)');
+  });
 });

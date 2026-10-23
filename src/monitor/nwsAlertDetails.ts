@@ -32,6 +32,15 @@ export const resolveNwsAlertDetailUrl = (properties: Record<string, unknown>): s
   return null;
 };
 
+/** Normalizes a candidate alert detail URL to its canonical compared form. */
+export const normalizeAlertDetailUrl = (value: unknown): string | null => readString(value);
+
+/** Reads a canonical http(s) URL from a top-level GeoJSON feature id. */
+export const topLevelAlertUrl = (id: unknown): string | null => {
+  const normalized = readString(id);
+  return normalized !== null && /^https?:\/\//i.test(normalized) ? normalized : null;
+};
+
 export const formatNwsAlertTime = (value: string | null): string | null => {
   if (!value) {
     return null;

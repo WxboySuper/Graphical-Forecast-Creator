@@ -110,9 +110,8 @@ export const OverviewSection: React.FC = () => (
 
     <h4>Map Styles</h4>
     <ul>
-      <li><strong>Street</strong> — Standard OpenStreetMap tiles</li>
+      <li><strong>OpenStreetMap</strong> — Standard OpenStreetMap tiles</li>
       <li><strong>Satellite</strong> — Esri World Imagery</li>
-      <li><strong>Light</strong> — Carto light street map style</li>
       <li><strong>Blank (Weather)</strong> — Flat map: cream CONUS, gray neighbors, blue ocean</li>
     </ul>
   </div>
