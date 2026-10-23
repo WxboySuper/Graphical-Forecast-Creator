@@ -24,7 +24,7 @@ name: Review | OCR
 # - A manual /ocr comment run has no check run of its own on the PR head, so
 #   it reports a commit status with the `ocr-review` context on the head.
 #
-# Model: MiniMax M3.1 Flash Free via OpenCode Go (free), reusing
+# Model: Beam Free via OpenCode Go (free), reusing
 # OPENCODE_API_KEY. It uses the OpenAI chat/completions protocol, so
 # llm_protocol is openai and the URL ends in /chat/completions.
 # Override without editing YAML via repo Variables:
@@ -171,7 +171,7 @@ jobs:
           echo "reason=$reason" >> "$GITHUB_OUTPUT"
           echo "OCR review skip=$skip ($reason)"
 
-      - name: Run OCR review with MiniMax M3.1 Flash Free
+      - name: Run OCR review with Beam Free
         id: ocr
         if: steps.skip.outputs.skip != 'true'
         uses: alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4 # main as of 2026-10-10
@@ -182,7 +182,7 @@ jobs:
           # (MissingSessionID). The run ID is stable for the conversation,
           # since each workflow run performs exactly one review.
           llm_extra_headers: 'x-opencode-session=ocr-${{ github.run_id }}'
-          llm_model: ${{ vars.OCR_LLM_MODEL || 'minimax-m3.1-flash-free' }}
+          llm_model: ${{ vars.OCR_LLM_MODEL || 'beam-free' }}
           llm_use_anthropic: 'false'
           llm_protocol: ${{ vars.OCR_LLM_PROTOCOL || 'openai' }}
           # Keep the action's Anthropic-style default extra_body off this
