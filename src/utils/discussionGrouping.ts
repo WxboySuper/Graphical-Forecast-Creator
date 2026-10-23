@@ -75,7 +75,7 @@ const mergeGuidedDiscussionDrafts = (primary: DiscussionData, drafts: Discussion
 
 /** Serializes guided sections into plain text for mixed-mode merges. */
 const serializeGuidedDraft = (draft: DiscussionData): string | undefined => {
-  if (draft.mode !== 'guided' || !draft.guidedContent) return undefined;
+  if (draft.mode !== 'guided' || !isRecord(draft.guidedContent)) return undefined;
   const text = Object.values(draft.guidedContent)
     .map((value) => trimDiscussionText(value))
     .filter(Boolean)

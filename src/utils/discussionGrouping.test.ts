@@ -199,4 +199,16 @@ describe('discussionGrouping', () => {
     expect(merged?.mode).toBe('diy');
     expect(merged?.diyContent).toBe('DIY scope text\n\nGuided synopsis');
   });
+
+  test('ignores malformed guided containers in mixed-mode merges', () => {
+    const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: ['Not guided discussion text'],
+    } as never;
+
+    expect(mergeDiscussionDrafts([diyDraft, malformedGuided], diyDraft)?.diyContent).toBe('DIY scope text');
+  });
 });
