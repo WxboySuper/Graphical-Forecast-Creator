@@ -58,6 +58,35 @@ describe('useMonitorNwsAlertsLoad', () => {
     expect(setters.addToast).toHaveBeenCalledWith(toast, 'warning');
   });
 
+  test('clears a polling error when an in-flight manual load succeeds', async () => {
+    let resolveRequest: ((value: NwsAlertFeatureCollection) => void) | undefined;
+    jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts').mockImplementation(
+      () => new Promise((resolve) => { resolveRequest = resolve; }),
+    );
+    const setError = jest.fn();
+
+    renderHook(() => useMonitorNwsAlertsLoad({
+      enabled: true,
+      refreshToken: 1,
+      addToast: jest.fn(),
+      hasExistingFrames: { current: true } as RefObject<boolean>,
+      setRawFrames: jest.fn(),
+      setFrameIndex: jest.fn(),
+      setLoading: jest.fn(),
+      setError,
+      setFetchedAt: jest.fn(),
+    }));
+    await act(async () => undefined);
+
+    setError.mockClear();
+    setError('NWS alert refresh failed; showing last available data.');
+    await act(async () => {
+      resolveRequest?.({ type: 'FeatureCollection', features: [] });
+    });
+
+    expect(setError).toHaveBeenLastCalledWith(null);
+  });
+
   test('uses committed frames to classify a failed manual refresh', async () => {
     const fetch = jest.spyOn(nwsAlerts, 'fetchActiveNwsAlerts');
     fetch.mockResolvedValueOnce({ type: 'FeatureCollection', features: [] });
