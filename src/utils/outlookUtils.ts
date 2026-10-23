@@ -72,16 +72,62 @@ type CategoricalRule = {
 };
 
 type CategoricalConversion = {
+  probability: unknown;
+  cig: unknown;
+  rules: readonly CategoricalRule[];
+};
+type CategoricalRuleSearch = {
   probability: string;
-  cig: CIGLevel;
+  targetCigRank: number;
   rules: readonly CategoricalRule[];
 };
 
+const CIG_LEVELS: readonly CIGLevel[] = ['CIG0', 'CIG1', 'CIG2', 'CIG3'];
+const CIG_RANK: Record<CIGLevel, number> = { CIG0: 0, CIG1: 1, CIG2: 2, CIG3: 3 };
+
+/** Checks persisted CIG values before categorical conversion. */
+function isCigLevel(cig: unknown): cig is CIGLevel {
+  return typeof cig === 'string' && CIG_LEVELS.includes(cig as CIGLevel);
+}
+
+/** Checks that persisted probability values can be converted. */
+function isCategoricalProbability(probability: unknown): probability is string {
+  return typeof probability === 'string' && probability.length > 0;
+}
+
+/** Returns the highest mapped CIG rank no greater than the requested rank. */
+function highestApplicableCigRank(cigs: readonly CIGLevel[], targetCigRank: number): number {
+  let highestRank = -1;
+  for (const cig of cigs) {
+    const rank = CIG_RANK[cig];
+    if (rank <= targetCigRank && rank > highestRank) highestRank = rank;
+  }
+  return highestRank;
+}
+
+/** Finds the risk mapped at the requested CIG or the nearest lower CIG. */
+function findCategoricalRisk({ probability, targetCigRank, rules }: CategoricalRuleSearch): CategoricalRiskLevel | undefined {
+  let highestRank = -1;
+  let risk: CategoricalRiskLevel | undefined;
+  for (const rule of rules) {
+    if (!rule.probabilities.includes(probability)) continue;
+    const ruleRank = highestApplicableCigRank(rule.cigs, targetCigRank);
+    if (ruleRank > highestRank) {
+      highestRank = ruleRank;
+      risk = rule.risk;
+    }
+  }
+  return risk;
+}
+
 const categorizeProbability = ({ probability, cig, rules }: CategoricalConversion): CategoricalRiskLevel => {
+  if (!isCategoricalProbability(probability)) return 'TSTM';
+  if (!isCigLevel(cig)) return 'TSTM';
+
   const normalizedProbability = probability.replace(/[#]/g, '%');
-  return rules.find((rule) =>
-    rule.probabilities.includes(normalizedProbability) && rule.cigs.includes(cig)
-  )?.risk ?? 'TSTM';
+  // Higher CIG regions must keep at least the risk from a lower mapped region.
+  return findCategoricalRisk({ probability: normalizedProbability, targetCigRank: CIG_RANK[cig], rules })
+    ?? 'TSTM';
 };
 
 type CategoricalInput = {

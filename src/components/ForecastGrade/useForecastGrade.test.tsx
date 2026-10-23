@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import React from 'react';
 import verificationReducer from '../../store/verificationSlice';
-import stormReportsReducer from '../../store/stormReportsSlice';
+import stormReportsReducer, { setVisibility } from '../../store/stormReportsSlice';
 
 jest.mock('../../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -589,6 +589,27 @@ describe('useForecastGrade', () => {
 
       expect(result.current.phase).toBe('complete');
       expect(result.current.result).not.toBeNull();
+    });
+
+    test('applyGradeSnapshot shows the restored evidence even when visibility was toggled off', async () => {
+      const { result, store } = renderWithPackage();
+      store.dispatch(setVisibility(false));
+      expect(store.getState().stormReports.visible).toBe(false);
+
+      const snapshot = {
+        card: { id: 'card-snap', sourceLabel: 'Cloud snapshot' },
+        package: samplePackage,
+        forecast: { kind: 'serialized-snap' },
+        reportDate: '2026-07-28',
+      } as never;
+      act(() => {
+        result.current.applyGradeSnapshot(snapshot);
+      });
+
+      await waitFor(() =>
+        expect(store.getState().stormReports.reports).toEqual(sampleReports)
+      );
+      expect(store.getState().stormReports.visible).toBe(true);
     });
 
     test('run during an in-flight applyGradeSnapshot ignores the late report load', async () => {

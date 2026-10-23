@@ -1,7 +1,7 @@
 import { store } from '../store';
 
 type ExportMapLike = {
-  getTargetElement?: () => HTMLElement;
+  getTargetElement?: () => HTMLElement | null | undefined;
   once?: (event: 'rendercomplete', callback: () => void) => unknown;
   un?: (event: 'rendercomplete', callback: () => void) => void;
 };
@@ -9,7 +9,7 @@ type ExportMapLike = {
 /** Returns the OpenLayers target element when the map is mounted. */
 export const getExportContainer = (map: ExportMapLike): HTMLElement | null => {
   if (map.getTargetElement) {
-    return map.getTargetElement();
+    return map.getTargetElement() ?? null;
   }
 
   return null;

@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router';
 import { configureStore } from '@reduxjs/toolkit';
 import { IntegratedToolbar, TabbedIntegratedToolbar } from './IntegratedToolbar';
 import { useForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
-import forecastReducer, { addFeature, undoLastEdit } from '../../store/forecastSlice';
+import forecastReducer, { addFeature, startBlankCycle, undoLastEdit } from '../../store/forecastSlice';
 import overlaysReducer from '../../store/overlaysSlice';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 
@@ -134,6 +134,17 @@ describe('IntegratedToolbar undo/redo buttons', () => {
 
     await user.click(screen.getByLabelText('Redo'));
     expect(screen.getByLabelText('Undo')).toBeEnabled();
+  });
+});
+
+describe('IntegratedToolbar cycle date', () => {
+  test('renders the cycle date as a local calendar date', () => {
+    const store = createStore();
+    store.dispatch(startBlankCycle({ cycleDate: '2026-01-01' }));
+
+    renderToolbar('legacy', store);
+
+    expect(screen.getByRole('button', { name: 'Jan 1' })).toBeInTheDocument();
   });
 });
 

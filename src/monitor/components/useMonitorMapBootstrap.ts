@@ -216,7 +216,9 @@ const loadVectorReferenceStyle = (refs: MonitorMapRefs): void => {
       if (refs.vectorStyleRequestRef.current !== requestId || !refs.vectorReferenceGroupRef.current) return;
       replaceLayerGroupLayers(refs.vectorReferenceGroupRef.current, nextReferenceGroup);
       refs.vectorReferenceGroupRef.current.setZIndex(TOP_VECTOR_REFERENCE_LAYER_Z_INDEX);
-      refs.vectorReferenceGroupRef.current.setVisible(true);
+      refs.vectorReferenceGroupRef.current.setVisible(
+        Boolean(refs.satelliteLayerRef.current?.getVisible()),
+      );
     })
     .catch(() => undefined);
 };
@@ -257,9 +259,6 @@ export const useMonitorMapBootstrap = ({
   onSelectAlert,
 }: UseMonitorMapBootstrapArgs) => {
   const dispatch = useDispatch<AppDispatch>();
-  // Live theme for async outline loading: the mount-only effect below captures
-  // props once, but loadUsStateOutlines styles features when its fetch
-  // resolves, so it must read the theme at resolve time via this ref.
   const darkModeRef = useRef(darkMode);
   darkModeRef.current = darkMode;
 
@@ -273,10 +272,15 @@ export const useMonitorMapBootstrap = ({
     const handleMoveEnd = createMoveEndHandler({ map, refs, dispatch });
     const handleMapClick = createMapClickHandler({ map, layers, refs, onSelectAlert });
     const pointerMove = createPointerMoveHandler({ map, layers });
+    const syncReferenceLabels = () => {
+      layers.vectorReferenceGroup.setVisible(layers.satellite.getVisible());
+    };
 
     map.on('moveend', handleMoveEnd);
     map.on('click', handleMapClick);
     map.on('pointermove', pointerMove.handle);
+    layers.satellite.on('change:visible', syncReferenceLabels);
+    syncReferenceLabels();
     attachMonitorMapPopup(map, refs);
     assignMonitorMapRefs(refs, map, layers);
     loadUsStateOutlines(refs.stateOutlineSourceRef.current, () => darkModeRef.current).catch(() => undefined);
@@ -286,6 +290,7 @@ export const useMonitorMapBootstrap = ({
       map.un('moveend', handleMoveEnd);
       map.un('click', handleMapClick);
       map.un('pointermove', pointerMove.handle);
+      layers.satellite.un('change:visible', syncReferenceLabels);
       pointerMove.cancel();
       const target = map.getTargetElement();
       if (target instanceof HTMLElement) {

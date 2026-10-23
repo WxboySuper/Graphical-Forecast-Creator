@@ -1,6 +1,7 @@
 /** Guards against publishing first-look reviews when the model never read the PR diff/context. */
 
 import { FirstLookReviewUnavailableError } from './opencode-first-look-review-unavailable.mjs';
+import { changedPathSet, hasActionableFindings } from './opencode-first-look-output.mjs';
 import { assertContextReadFlag, parseFilesReviewed } from './opencode-first-look-files-reviewed.mjs';
 import { assertPhraseBackstop } from './opencode-first-look-phrase-backstop.mjs';
 
@@ -29,9 +30,6 @@ export function applyThreadCommitPlausibility(assessments, context) {
   const threads = new Map((context.openReviewThreads ?? []).map((thread) => [thread.id, thread]));
   return assessments.map((assessment) => downgradeSameCommitAssessment(assessment, threads, context.head));
 }
-
-const changedPathSet = (context) =>
-  new Set(context.changedFilePaths ?? context.files?.map((file) => file.path) ?? []);
 
 const isSameCommitDowngrade = (before, after) =>
   before?.status === 'addressed'
@@ -71,7 +69,7 @@ export function applyPublicationGuards(parsed, rawResult, context) {
   const downgradeFindings = buildSameCommitDowngradeFindings(beforeAssessments, reviewCommentAssessments, context);
   const badThings = [...parsed.badThings, ...downgradeFindings];
   const unresolved = reviewCommentAssessments.filter((assessment) => assessment.status !== 'addressed');
-  if (unresolved.length && badThings.length === 0) {
+  if (unresolved.length && !hasActionableFindings(badThings, parsed.droppedFindings ?? [])) {
     throw new FirstLookReviewUnavailableError(
       'First-look output must include concrete findings when a review thread remains open or unclear after investigation.',
     );

@@ -66,12 +66,143 @@ test('rejects missing required sections, invalid ratings, and hallucinated linke
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [{ priority: 'P4' }] }), context), /P0, P1, P2, or P3/);
   assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, linkedIssueAssessment: 'Issue 42' }), context), /omit linked-issue/);
   const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+  const badPath = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
     ...context, changedFilePaths: ['src/b.ts'], changedLineNumbers: { 'src/b.ts': [9] },
-  }), /path must be a changed PR file/);
-  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), {
+  });
+  assert.equal(badPath.badThings.length, 0);
+  assert.deepEqual(badPath.droppedFindings, [{ ...finding, reason: 'path' }]);
+  assert.equal(badPath.rating, 8);
+  const badLineContext = {
     ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
-  }), /line must be an added line/);
+  };
+  const badLine = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [finding] }), badLineContext);
+  assert.equal(badLine.badThings.length, 0);
+  assert.deepEqual(badLine.droppedFindings, [{ ...finding, reason: 'line' }]);
+  assert.equal(badLine.rating, 8);
+  const rendered = renderOpenCodeFirstLookComment(badLine, badLineContext);
+  assert.match(rendered, /Omitted finding \[P2\] "Issue" \(src\/a\\\.ts:9, line-drift\): reported location was not in the PR diff\./);
+});
+
+test('open threads with only drifted findings still publish with a capped rating', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
+  const driftedContext = {
+    ...withThread, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    badThings: [finding],
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'still-open', summary: 'The concern remains.' }],
+  }), driftedContext);
+  assert.equal(parsed.badThings.length, 0);
+  assert.equal(parsed.droppedFindings.length, 1);
+  assert.equal(parsed.rating, 8);
+  const rendered = renderOpenCodeFirstLookComment(parsed, driftedContext);
+  assert.match(rendered, /Omitted finding/);
+  assert.match(rendered, /Still open/);
+});
+
+test('merged follow-ups retain omitted findings and keep the score capped', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [], droppedFindings: [{ priority: 'P2', title: 'Old drift', path: 'src/a.ts', line: 9, evidence: 'E', impact: 'I', reason: 'line' }] },
+    { ...result, badThings: [], droppedFindings: [], rating: 10 },
+  );
+  assert.equal(merged.droppedFindings.length, 1);
+  assert.equal(merged.rating, 8);
+});
+
+test('omitted critical findings cap harder, omitted polish caps lighter', () => {
+  /** Builds a finding drifted off the diff for the given priority. */
+  const drift = (priority) => ({
+    priority, title: 'Drifted', path: 'src/a.ts', line: 99, evidence: 'Evidence', impact: 'Impact',
+  });
+  const driftedContext = {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [1] },
+  };
+  const critical = parseOpenCodeFirstLookOutput(
+    JSON.stringify({ ...result, rating: 10, badThings: [drift('P0')] }), driftedContext,
+  );
+  assert.equal(critical.badThings.length, 0);
+  assert.equal(critical.rating, 5);
+  const polish = parseOpenCodeFirstLookOutput(
+    JSON.stringify({ ...result, rating: 10, badThings: [drift('P3'), { ...drift('P3'), line: null }] }), driftedContext,
+  );
+  assert.equal(polish.badThings.length, 1);
+  assert.equal(polish.rating, 9);
+});
+
+test('dropped polish with no locatable findings cannot reach the merge threshold', () => {
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 10, badThings: [{
+    priority: 'P3', title: 'Nit', path: 'src/a.ts', line: 99, evidence: 'E', impact: 'I',
+  }] }), {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [1] },
+  });
+  assert.equal(parsed.badThings.length, 0);
+  assert.equal(parsed.rating, 8);
+});
+
+test('a critical drop past the display cap still sinks the merged score', () => {
+  const retained = Array.from({ length: 6 }, (_, index) => ({
+    priority: 'P2', title: `Old ${index}`, path: 'src/a.ts', line: index + 1, evidence: 'E', impact: 'I', reason: 'line',
+  }));
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [], droppedFindings: retained },
+    {
+      ...result,
+      badThings: [],
+      droppedFindings: [{
+        priority: 'P0', title: 'New critical', path: 'src/a.ts', line: 50, evidence: 'E', impact: 'I', reason: 'line',
+      }],
+      rating: 10,
+    },
+  );
+  assert.equal(merged.droppedFindings.length, 6);
+  assert.equal(merged.droppedOmittedCount, 1);
+  assert.equal(merged.rating, 5);
+  const rendered = renderOpenCodeFirstLookComment(merged, context);
+  assert.match(rendered, /New critical/);
+  assert.match(rendered, /1 more omitted finding/);
+});
+
+test('merged scores never rise above the supplied rating', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [] },
+    { ...result, badThings: [], droppedFindings: [], rating: 2 },
+  );
+  assert.equal(merged.rating, 2);
+});
+
+test('tampered carry-forward entries are re-validated, not trusted', () => {
+  const merged = mergeOpenCodeFirstLookResults(
+    { ...result, badThings: [{ priority: 'P9', title: 42, path: null, line: 'x' }] },
+    { ...result, badThings: [], droppedFindings: [], rating: 10 },
+  );
+  assert.deepEqual(merged.badThings, []);
+  assert.equal(merged.rating, 10);
+});
+
+test('coverage notes show priority, line, and drift reason', () => {
+  const drifted = {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [1] },
+  };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, badThings: [
+    { priority: 'P1', title: 'Bad line', path: 'src/a.ts', line: 9, evidence: 'E', impact: 'I' },
+    { priority: 'P3', title: 'Bad file', path: 'src/zzz.ts', line: null, evidence: 'E', impact: 'I' },
+  ] }), drifted);
+  const rendered = renderOpenCodeFirstLookComment(parsed, drifted);
+  assert.match(rendered, /\[P1\].*line-drift/);
+  assert.match(rendered, /\[P3\].*path-drift/);
+  assert.match(rendered, /\(src\/zzz\\\.ts, path-drift\)/);
+});
+
+test('omitted findings never raise a low supplied score', () => {
+  const finding = { priority: 'P2', title: 'Issue', path: 'src/a.ts', line: 9, evidence: 'Evidence', impact: 'Impact' };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, rating: 2, badThings: [finding] }), {
+    ...context, changedFilePaths: ['src/a.ts'], changedLineNumbers: { 'src/a.ts': [8] },
+  });
+  assert.equal(parsed.badThings.length, 0);
+  assert.equal(parsed.droppedFindings.length, 1);
+  assert.equal(parsed.rating, 2);
 });
 
 test('requires complete open-thread assessments before publishing', () => {
