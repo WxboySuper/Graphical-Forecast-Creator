@@ -25,7 +25,7 @@ name: Review | OCR
 #   it reports a commit status with the `ocr-review` context on the head.
 #
 # Model: DeepSeek V4.1 Flash Free via OpenCode Zen (free tier), reusing
-# the OPENCODE_ZEN_API_KEY secret (Zen key; the Go key is rejected). It uses the OpenAI chat/completions protocol, so
+# OPENCODE_API_KEY (works on Go and Zen). It uses the OpenAI chat/completions protocol, so
 # llm_protocol is openai and the URL ends in /chat/completions.
 # Override without editing YAML via repo Variables:
 #   OCR_LLM_URL, OCR_LLM_MODEL, OCR_LLM_PROTOCOL.
@@ -177,7 +177,7 @@ jobs:
         uses: alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4 # main as of 2026-10-10
         with:
           llm_url: ${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/v1/chat/completions' }}
-          llm_auth_token: ${{ secrets.OPENCODE_ZEN_API_KEY }}
+          llm_auth_token: ${{ secrets.OPENCODE_API_KEY }}
           # The Go gateway 400s every request without x-opencode-session
           # (MissingSessionID). The run ID is stable for the conversation,
           # since each workflow run performs exactly one review.

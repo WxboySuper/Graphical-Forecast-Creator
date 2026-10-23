@@ -145,7 +145,7 @@ test('the review model, budget, and merge gate stay unchanged', () => {
   assert.equal(ocr.with.effort, 'low');
   assert.equal(ocr.with.max_tokens_budget, '400000');
   assert.equal(ocr.with.incremental, 'true');
-  assert.equal(ocr.with.llm_auth_token, '${{ secrets.OPENCODE_ZEN_API_KEY }}');
+  assert.equal(ocr.with.llm_auth_token, '${{ secrets.OPENCODE_API_KEY }}');
 });
 
 test('the embedded github-script bodies parse', () => {
