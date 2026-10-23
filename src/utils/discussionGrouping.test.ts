@@ -90,6 +90,38 @@ describe('discussionGrouping', () => {
     } as never)).toBe(true);
   });
 
+  test('treats non-string imported DIY content as empty instead of throwing', () => {
+    const malformedDiy = { ...discussion, diyContent: 123 };
+
+    expect(() => hasDiscussionContent(malformedDiy as never)).not.toThrow();
+    expect(hasDiscussionContent(malformedDiy as never)).toBe(false);
+  });
+
+  test('ignores non-string imported values while merging discussion drafts', () => {
+    const malformedDiy = { ...discussion, diyContent: 123 } as never;
+    const malformedGuided = {
+      ...discussion,
+      mode: 'guided' as const,
+      diyContent: undefined,
+      guidedContent: {
+        synopsis: 123,
+        meteorologicalSetup: null,
+        severeWeatherExpectations: undefined,
+        timing: '  Valid guided text  ',
+        regionalBreakdown: '  ',
+        additionalConsiderations: 0,
+      },
+    } as never;
+
+    expect(() => mergeDiscussionDrafts([malformedDiy])).not.toThrow();
+    expect(mergeDiscussionDrafts([malformedDiy])?.diyContent).toBe('');
+    expect(() => mergeDiscussionDrafts([malformedGuided])).not.toThrow();
+    expect(mergeDiscussionDrafts([malformedGuided])?.guidedContent?.timing).toBe('Valid guided text');
+    expect(mergeDiscussionDrafts([discussion, malformedGuided])?.diyContent).toBe(
+      'One canonical discussion\n\nValid guided text',
+    );
+  });
+
   test('merges mixed DIY and guided drafts into one DIY draft', () => {
     const diyDraft = { ...discussion, diyContent: 'DIY scope text' };
     const guidedDraft = {
