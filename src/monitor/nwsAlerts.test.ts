@@ -134,12 +134,9 @@ describe('nwsAlerts', () => {
 
     try {
       await fetchActiveNwsAlerts();
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.not.objectContaining({ 'User-Agent': expect.anything() }),
-        }),
-      );
+      const requestInit = (global.fetch as jest.Mock).mock.calls[0]?.[1] as RequestInit | undefined;
+      expect(requestInit).toBeDefined();
+      expect(new Headers(requestInit?.headers).has('user-agent')).toBe(false);
     } finally {
       global.fetch = originalFetch;
     }
