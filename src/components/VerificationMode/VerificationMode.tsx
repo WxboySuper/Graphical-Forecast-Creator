@@ -4,6 +4,7 @@ import { Eye, FileUp, Layers3 } from 'lucide-react';
 import VerificationMap, { VerificationMapHandle } from '../Map/VerificationMap';
 import VerificationPanel from '../Verification/VerificationPanel';
 import { loadVerificationForecast, clearVerificationForecast } from '../../store/verificationSlice';
+import { clearReports } from '../../store/stormReportsSlice';
 import { deserializeForecast, readForecastImportFile, validateForecastDataReason } from '../../utils/fileUtils';
 import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
@@ -352,9 +353,10 @@ const VerificationMode: React.FC = () => {
     setSelectedDay(day);
   }, []);
 
-  // Handler for confirming forecast clear, which dispatches an action to clear the forecast data from the Redux store and resets local state related to the loaded forecast. This is called when the user confirms they want to clear the loaded forecast in the confirmation modal.
+  // Handler for confirming forecast clear, which dispatches actions to clear the forecast data and any storm reports from the Redux store and resets local state related to the loaded forecast. This is called when the user confirms they want to clear the loaded forecast in the confirmation modal, whose message promises that storm reports are cleared too.
   const handleConfirmClear = useCallback(() => {
     dispatch(clearVerificationForecast());
+    dispatch(clearReports());
     setForecastLoaded(false);
     setAvailableDays([]);
     setSelectedDay(1);

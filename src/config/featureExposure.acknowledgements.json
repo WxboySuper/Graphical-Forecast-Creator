@@ -7,6 +7,20 @@
     "stagingEnablementApproved": true,
     "productionEnablementApproved": true
   },
+  "outlookLandMasking": {
+    "reason": "Optional coastal land trimming is enabled through staging for validation under #619; production remains disabled and trimming stays off by default.",
+    "trackingIssue": 619,
+    "localDevelopmentApproved": true,
+    "betaEnablementApproved": true,
+    "stagingEnablementApproved": true
+  },
+  "kmzExport": {
+    "reason": "KML/KMZ export is enabled through staging for validation under #621; production remains disabled pending rollout review.",
+    "trackingIssue": 621,
+    "localDevelopmentApproved": true,
+    "betaEnablementApproved": true,
+    "stagingEnablementApproved": true
+  },
   "tropicalWorkspace": {
     "reason": "Route and navigation gating covered by src/testing/featureExposure/exemplar.exposure.test.tsx and src/routing/buildFeatureGatedRoutes.test.tsx",
     "trackingIssue": 529

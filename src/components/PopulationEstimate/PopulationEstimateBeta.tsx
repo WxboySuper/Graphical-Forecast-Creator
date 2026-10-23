@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
@@ -48,10 +49,11 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
 
   const cancelActiveRequest = React.useCallback((message?: string) => {
     const controller = requestController.current;
+    if (!controller) return;
     requestController.current = null;
-    controller?.abort();
+    controller.abort();
+    setIsLoading(false);
     if (message) {
-      setIsLoading(false);
       setError(message);
     }
   }, []);
@@ -72,7 +74,9 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
 
   const runEstimate = async (geometry: NonNullable<ReturnType<typeof unionForecastPolygons>>, controller: AbortController) => {
     try {
-      setEstimate(await estimatePopulation(geometry, { signal: controller.signal }));
+      const result = await estimatePopulation(geometry, { signal: controller.signal });
+      if (requestController.current !== controller) return;
+      setEstimate(result);
     } catch (caught) {
       if (requestController.current !== controller) return;
       setError(caught instanceof Error ? caught.message : 'WorldPop could not calculate this estimate.');
@@ -108,7 +112,18 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
     await runEstimate(geometry, controller);
   };
 
-  return { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate };
+  const handleOpenChange = React.useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      cancelActiveRequest();
+    }
+    setOpen(nextOpen);
+  }, [cancelActiveRequest]);
+
+  const handleCancel = React.useCallback(() => {
+    handleOpenChange(false);
+  }, [handleOpenChange]);
+
+  return { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate, handleOpenChange, handleCancel };
 };
 
 const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, 'isLoading' | 'estimate' | 'error'>> = ({
@@ -155,7 +170,7 @@ const PopulationEstimateBeta: React.FC = () => {
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
-  const { open, setOpen, isLoading, estimate, error, requestContext, handleEstimate } = usePopulationEstimate({
+  const { open, isLoading, estimate, error, requestContext, handleEstimate, handleOpenChange, handleCancel } = usePopulationEstimate({
     currentDay,
     activeOutlookType,
     currentDayData,
@@ -185,7 +200,7 @@ const PopulationEstimateBeta: React.FC = () => {
         </Button>
       </div>
 
-      <Dialog open={open} onOpenChange={(nextOpen) => { if (!isLoading) setOpen(nextOpen); }}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Affected population estimate</DialogTitle>
@@ -195,6 +210,13 @@ const PopulationEstimateBeta: React.FC = () => {
           </DialogHeader>
 
           <EstimateContent isLoading={isLoading} estimate={estimate} error={error} />
+          {isLoading ? (
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCancel}>
+                Cancel request
+              </Button>
+            </DialogFooter>
+          ) : null}
         </DialogContent>
       </Dialog>
     </>
