@@ -59,6 +59,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
 - **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
+- **body-parser security fix:** Update the hosted API's Express body-parser dependency to 2.4.0 to address CVE-2026-111181.
 
 #### Dependencies
 
