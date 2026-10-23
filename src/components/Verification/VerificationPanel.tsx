@@ -48,6 +48,13 @@ const fetchReportsForSource = (
   return fetchStormReports(reportDate);
 };
 
+const isCurrentReportRequest = (
+  requestId: number,
+  currentRequestId: number,
+  requestClearGeneration: number,
+  currentClearGeneration: number,
+): boolean => requestId === currentRequestId && requestClearGeneration === currentClearGeneration;
+
 interface VerificationPanelProps {
   activeOutlookType?: 'categorical' | 'tornado' | 'wind' | 'hail';
   selectedDay?: DayType;
@@ -349,10 +356,12 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       const source = reportSourceForDate(reportDate, new Date());
       const fetchedReports = await fetchReportsForSource(source, reportDate);
 
-      if (
-        requestId !== reportRequestIdRef.current ||
-        clearGeneration !== store.getState().stormReports.clearGeneration
-      ) {
+      if (!isCurrentReportRequest(
+        requestId,
+        reportRequestIdRef.current,
+        clearGeneration,
+        store.getState().stormReports.clearGeneration,
+      )) {
         return;
       }
 
@@ -363,10 +372,12 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         dispatch(setError('info:No storm reports found for this date.'));
       }
     } catch (err) {
-      if (
-        requestId !== reportRequestIdRef.current ||
-        clearGeneration !== store.getState().stormReports.clearGeneration
-      ) {
+      if (!isCurrentReportRequest(
+        requestId,
+        reportRequestIdRef.current,
+        clearGeneration,
+        store.getState().stormReports.clearGeneration,
+      )) {
         return;
       }
 
@@ -374,10 +385,12 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         err instanceof Error ? err.message : 'Failed to load storm reports. The date may not have available data.'
       ));
     } finally {
-      if (
-        requestId === reportRequestIdRef.current &&
-        clearGeneration === store.getState().stormReports.clearGeneration
-      ) {
+      if (isCurrentReportRequest(
+        requestId,
+        reportRequestIdRef.current,
+        clearGeneration,
+        store.getState().stormReports.clearGeneration,
+      )) {
         dispatch(setLoading(false));
       }
     }

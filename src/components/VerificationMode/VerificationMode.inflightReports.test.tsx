@@ -71,6 +71,53 @@ const renderWithStore = () => {
   return { ...view, store };
 };
 
+const createReport = (id: string): StormReport => ({
+  id,
+  type: 'tornado',
+  latitude: 35,
+  longitude: -97,
+  time: '2026-04-20T00:00:00Z',
+  location: 'Norman',
+  county: 'Cleveland',
+  state: 'OK',
+});
+
+const startPendingReportLoad = async () => {
+  const user = userEvent.setup();
+  let resolveReports!: (reports: StormReport[]) => void;
+  const pendingReports = new Promise<StormReport[]>((resolve) => {
+    resolveReports = resolve;
+  });
+  mockFetchStormReports.mockReturnValue(pendingReports);
+  mockFetchTodayStormReports.mockReturnValue(pendingReports);
+  mockFetchYesterdayStormReports.mockReturnValue(pendingReports);
+
+  const { store } = renderWithStore();
+  const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
+  await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
+  expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Load Reports/i }));
+  await waitFor(() => expect(
+    mockFetchStormReports.mock.calls.length +
+    mockFetchTodayStormReports.mock.calls.length +
+    mockFetchYesterdayStormReports.mock.calls.length
+  ).toBe(1));
+  expect(store.getState().stormReports.loading).toBe(true);
+
+  return { user, store, pendingReports, resolveReports };
+};
+
+const finishPendingReportLoad = async (
+  resolveReports: (reports: StormReport[]) => void,
+  pendingReports: Promise<StormReport[]>,
+  reportId: string,
+) => {
+  await act(async () => {
+    resolveReports([createReport(reportId)]);
+    await pendingReports;
+  });
+};
+
 describe('VerificationMode with in-flight storm reports', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -101,46 +148,14 @@ describe('VerificationMode with in-flight storm reports', () => {
   });
 
   test('does not restore reports when a pending request finishes after clearing the forecast', async () => {
-    const user = userEvent.setup();
-    let resolveReports!: (reports: StormReport[]) => void;
-    const pendingReports = new Promise<StormReport[]>((resolve) => {
-      resolveReports = resolve;
-    });
-    mockFetchStormReports.mockReturnValue(pendingReports);
-    mockFetchTodayStormReports.mockReturnValue(pendingReports);
-    mockFetchYesterdayStormReports.mockReturnValue(pendingReports);
-
-    const { store } = renderWithStore();
-    const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
-    await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
-    expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /Load Reports/i }));
-    await waitFor(() => expect(
-      mockFetchStormReports.mock.calls.length +
-      mockFetchTodayStormReports.mock.calls.length +
-      mockFetchYesterdayStormReports.mock.calls.length
-    ).toBe(1));
-    expect(store.getState().stormReports.loading).toBe(true);
+    const { user, store, pendingReports, resolveReports } = await startPendingReportLoad();
 
     await user.click(screen.getByRole('button', { name: /Load Different Forecast/i }));
     await user.click(screen.getByRole('button', { name: /Clear/i }));
     expect(await screen.findByText(/Choose Forecast File/i)).toBeInTheDocument();
     expect(store.getState().stormReports.loading).toBe(false);
 
-    await act(async () => {
-      resolveReports([{
-        id: 'late-report',
-        type: 'tornado',
-        latitude: 35,
-        longitude: -97,
-        time: '2026-04-20T00:00:00Z',
-        location: 'Norman',
-        county: 'Cleveland',
-        state: 'OK',
-      }]);
-      await pendingReports;
-    });
+    await finishPendingReportLoad(resolveReports, pendingReports, 'late-report');
 
     expect(store.getState().stormReports.reports).toEqual([]);
     expect(store.getState().stormReports.date).toBeNull();
@@ -148,44 +163,13 @@ describe('VerificationMode with in-flight storm reports', () => {
   });
 
   test('keeps an in-flight report load when switching between sidebar tabs', async () => {
-    const user = userEvent.setup();
-    let resolveReports!: (reports: StormReport[]) => void;
-    const pendingReports = new Promise<StormReport[]>((resolve) => {
-      resolveReports = resolve;
-    });
-    mockFetchStormReports.mockReturnValue(pendingReports);
-    mockFetchTodayStormReports.mockReturnValue(pendingReports);
-    mockFetchYesterdayStormReports.mockReturnValue(pendingReports);
-
-    const { store } = renderWithStore();
-    const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
-    await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
-    expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /Load Reports/i }));
-    await waitFor(() => expect(
-      mockFetchStormReports.mock.calls.length +
-      mockFetchTodayStormReports.mock.calls.length +
-      mockFetchYesterdayStormReports.mock.calls.length
-    ).toBe(1));
+    const { user, store, pendingReports, resolveReports } = await startPendingReportLoad();
 
     await user.click(screen.getByRole('button', { name: /Analysis/i }));
     expect(store.getState().stormReports.loading).toBe(true);
     await user.click(screen.getByRole('button', { name: /Load Data/i }));
 
-    await act(async () => {
-      resolveReports([{
-        id: 'tab-switch-report',
-        type: 'tornado',
-        latitude: 35,
-        longitude: -97,
-        time: '2026-04-20T00:00:00Z',
-        location: 'Norman',
-        county: 'Cleveland',
-        state: 'OK',
-      }]);
-      await pendingReports;
-    });
+    await finishPendingReportLoad(resolveReports, pendingReports, 'tab-switch-report');
 
     expect(store.getState().stormReports.reports.map(({ id }) => id)).toEqual(['tab-switch-report']);
     expect(store.getState().stormReports.date).not.toBeNull();
