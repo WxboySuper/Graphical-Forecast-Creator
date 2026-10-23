@@ -66,7 +66,6 @@ import {
   toTstmPreviewOlStyle,
   toGhostOlStyle,
   createLabelOverlaySource,
-  createTileSource,
   hideOverlay,
   TOP_OUTLINE_LAYER_Z_INDEX,
   TOP_VECTOR_REFERENCE_LAYER_Z_INDEX,
@@ -75,6 +74,7 @@ import {
 } from "./openLayersMapStyles";
 import type { EditableOutlookType } from "./openLayersMapStyles";
 import {
+  applyRasterBasemap,
   beginOpenFreeMapBasemapRequest,
   loadOpenFreeMapBasemap,
 } from "./openLayersBasemap";
@@ -1091,18 +1091,11 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         land.setVisible(false);
         landOutline.setVisible(true);
         el.style.backgroundColor = "";
-        tile.setSource(
-          createTileSource(baseMapStyle as Exclude<BaseMapStyle, "blank">),
-        );
-        const labelSource = createLabelOverlaySource(
-          baseMapStyle as Exclude<BaseMapStyle, "blank">,
-        );
-        if (labelSource) {
-          labels.setSource(labelSource);
-          labels.setVisible(true);
-        } else {
-          labels.setVisible(false);
-        }
+        applyRasterBasemap({
+          style: baseMapStyle as Exclude<BaseMapStyle, "blank">,
+          tile,
+          labels,
+        });
       }
     }, [baseMapStyle]);
 
