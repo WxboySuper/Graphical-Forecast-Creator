@@ -1124,9 +1124,9 @@ export const forecastSlice = createSlice({
 
     deleteSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
-      state.savedCycles = state.savedCycles.filter((cycle) => (
-        cycle.id !== cycleId || getSavedCycleWorkspaceId(cycle) !== state.workspaceId
-      ));
+      const savedCycle = state.savedCycles.find((cycle) => cycle.id === cycleId);
+      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== state.workspaceId) return;
+      state.savedCycles = state.savedCycles.filter((cycle) => cycle.id !== cycleId);
       // lifetimeCycleStats intentionally tracks historical saves, not the retained/deletable window.
     },
 

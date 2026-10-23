@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, useStore } from 'react-redux';
+import type { RootState } from '../../store';
 import {
   selectSavedCyclesForActiveWorkspace,
   selectForecastCycle,
@@ -24,6 +25,7 @@ export { deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 /** Modal for browsing, saving, loading, and deleting saved forecast cycles. */
 const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }) => {
   const dispatch = useDispatch();
+  const store = useStore<RootState>();
   const { addToast } = useAppLayout();
   const visibleSavedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const currentCycle = useSelector(selectForecastCycle);
@@ -65,6 +67,13 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
       title: 'Load Cycle',
       message: 'Load this cycle? Unsaved changes to your current cycle will be lost.',
       onConfirm: () => {
+        const cycleIsStillVisible = selectSavedCyclesForActiveWorkspace(store.getState())
+          .some((cycle) => cycle.id === cycleId);
+        if (!cycleIsStillVisible) {
+          addToast('This cycle is no longer available in the active workspace.', 'error');
+          setConfirmAction(null);
+          return;
+        }
         dispatch(loadSavedCycle(cycleId));
         addToast('Cycle loaded!', 'success');
         setConfirmAction(null);

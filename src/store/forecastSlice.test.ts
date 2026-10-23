@@ -1476,3 +1476,38 @@ describe('forecastSlice undo/redo', () => {
   });
 });
 
+
+describe('deleteSavedCycle workspace ownership', () => {
+  const initialState = reducer(undefined, { type: '@@INIT' });
+  const savedCycle = (id: string, workspaceId: 'severe' | 'custom') => ({
+    id,
+    workspaceId,
+    timestamp: '2026-10-23T12:00:00.000Z',
+    cycleDate: '2026-10-23',
+    forecastCycle: initialState.forecastCycle,
+    stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+  });
+
+  test('ignores a delete for a cycle owned by another workspace', () => {
+    const state = {
+      ...initialState,
+      workspaceId: 'custom' as const,
+      savedCycles: [savedCycle('severe-cycle', 'severe'), savedCycle('custom-cycle', 'custom')],
+    };
+    const nextState = reducer(state, deleteSavedCycle('severe-cycle'));
+
+    expect(nextState).toBe(state);
+    expect(nextState.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle', 'custom-cycle']);
+  });
+
+  test('deletes a cycle owned by the active workspace', () => {
+    const state = {
+      ...initialState,
+      workspaceId: 'custom' as const,
+      savedCycles: [savedCycle('severe-cycle', 'severe'), savedCycle('custom-cycle', 'custom')],
+    };
+    const nextState = reducer(state, deleteSavedCycle('custom-cycle'));
+
+    expect(nextState.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle']);
+  });
+});

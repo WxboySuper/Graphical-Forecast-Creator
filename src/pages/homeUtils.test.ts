@@ -78,6 +78,19 @@ describe('homeUtils', () => {
 
     expect(stats.totalCyclesMade).toBe(60);
     expect(stats.totalForecastsMade).toBe(101);
-    expect(stats.forecastStreak).toBe(75);
+    expect(stats.forecastStreak).toBe(0);
+  });
+
+  test('derives the forecast streak from the active workspace saved cycles', () => {
+    const stats = computeHomeStats(makeCycle(), [makeSavedCycle('2026-04-24', 2)], {
+      totalCyclesMade: 60,
+      totalForecastsMade: 100,
+      forecastStreak: 75,
+      lastSavedCycleDate: '2026-04-24',
+    });
+
+    expect(stats.totalCyclesMade).toBe(60);
+    expect(stats.totalForecastsMade).toBe(101);
+    expect(stats.forecastStreak).toBe(1);
   });
 });

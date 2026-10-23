@@ -84,7 +84,7 @@ export function computeHomeStats(
     savedCyclesCount: savedCycles.length,
     totalForecastsMade: getTotalForecastsMade(currentCycleMetrics.forecastDays, savedCycles, lifetimeStats),
     totalCyclesMade: lifetimeStats?.totalCyclesMade ?? savedCycles.length,
-    forecastStreak: lifetimeStats?.forecastStreak ?? computeSavedCycleStreak(savedCycles),
+    forecastStreak: computeSavedCycleStreak(savedCycles),
   };
 }
 
