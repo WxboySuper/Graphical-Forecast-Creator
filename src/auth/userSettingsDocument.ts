@@ -1,4 +1,6 @@
 import type { OverlaysState } from '../store/overlaysSlice';
+import { normalizeBaseMapStyle, type LegacyBaseMapStyle } from '../store/overlaysSlice';
+import type { OutlookType } from '../types/outlooks';
 import type { MonitorSettings } from '../monitor/types';
 import { areMonitorSettingsEqual } from '../monitor/types';
 import type { ForecastUiVariant } from '../utils/forecastUiVariant';
@@ -54,18 +56,41 @@ export const mergeUserSettingsDocument = (
   ...patch,
 });
 
+const BASE_MAP_STYLES = new Set(['osm', 'esri-satellite', 'blank', 'carto-light', 'carto-dark']);
+const OUTLOOK_TYPES: OutlookType[] = [
+  'tornado',
+  'wind',
+  'hail',
+  'categorical',
+  'totalSevere',
+  'day4-8',
+];
+
 const readBooleanField = (value: unknown): value is boolean => typeof value === 'boolean';
 
 const readDefaultForecasterName = (value: unknown): value is string =>
   typeof value === 'string' && value.length <= 100;
 
-const readBaseMapStyle = (
-  value: unknown,
-): value is UserSettingsDocument['baseMapStyle'] => Boolean(value);
+const readBaseMapStyle = (value: unknown): UserSettingsDocument['baseMapStyle'] | null => {
+  if (typeof value !== 'string' || !BASE_MAP_STYLES.has(value)) {
+    return null;
+  }
+  return normalizeBaseMapStyle(value as UserSettingsDocument['baseMapStyle'] | LegacyBaseMapStyle);
+};
 
-const readGhostOutlooks = (
-  value: unknown,
-): value is UserSettingsDocument['ghostOutlooks'] => Boolean(value);
+const readGhostOutlooks = (value: unknown): UserSettingsDocument['ghostOutlooks'] | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).some((key) => !OUTLOOK_TYPES.includes(key as OutlookType))
+    || OUTLOOK_TYPES.some((key) => typeof record[key] !== 'boolean')
+  ) {
+    return null;
+  }
+  return record as UserSettingsDocument['ghostOutlooks'];
+};
 
 const USER_SETTINGS_FIELD_READERS: {
   key: keyof UserSettingsDocument;
@@ -91,11 +116,11 @@ const USER_SETTINGS_FIELD_READERS: {
   },
   {
     key: 'baseMapStyle',
-    read: (partial) => (readBaseMapStyle(partial.baseMapStyle) ? partial.baseMapStyle : null),
+    read: (partial) => readBaseMapStyle(partial.baseMapStyle),
   },
   {
     key: 'ghostOutlooks',
-    read: (partial) => (readGhostOutlooks(partial.ghostOutlooks) ? partial.ghostOutlooks : null),
+    read: (partial) => readGhostOutlooks(partial.ghostOutlooks),
   },
   {
     key: 'forecastUiVariant',
@@ -111,6 +136,7 @@ const USER_SETTINGS_FIELD_READERS: {
 /** Validates a Firestore settings payload before the app applies it locally. */
 export const readRemoteSettings = (
   value: Partial<UserSettingsDocument> | undefined,
+  fallback?: UserSettingsDocument,
 ): UserSettingsDocument | null => {
   if (!value) {
     return null;
@@ -119,10 +145,10 @@ export const readRemoteSettings = (
   const document = {} as UserSettingsDocument;
   for (const { key, read } of USER_SETTINGS_FIELD_READERS) {
     const fieldValue = read(value);
-    if (fieldValue === null) {
+    if (fieldValue === null && !fallback) {
       return null;
     }
-    document[key] = fieldValue as never;
+    document[key] = (fieldValue ?? fallback?.[key]) as never;
   }
 
   return document;
