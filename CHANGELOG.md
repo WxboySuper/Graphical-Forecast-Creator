@@ -26,6 +26,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Restored grade evidence:** Restoring a saved grade snapshot now makes storm report evidence visible again even if it was hidden.
 - **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
 - **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
 - **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
@@ -60,9 +61,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
 - **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
+- **Sentry Node server SDK:** Update the hosted server error monitoring dependency from 11.6.0 to 11.8.0 to keep crash reporting on a supported release.
 - **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
 - **Stripe server SDK:** Update the server Stripe library from 22.6.2 to 23.0.0 to keep premium checkout, customer portal, and subscription webhooks on a supported release with no change to billing behavior.
-- **Server:** Update hosted API dependencies to Sentry Node 11.6.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
+- **Server:** Update hosted API dependencies to Sentry Node 11.8.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
 - **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
 - **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
 - **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.

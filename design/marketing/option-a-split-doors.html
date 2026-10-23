@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GFC - Option A: Split Doors</title>
+<style>
+  :root {
+    --paper: #f6f1e7;
+    --ink: #1d2a33;
+    --muted: #5b6b75;
+    --storm: #2d4a5c;
+    --marginal: #7cc576;
+    --slight: #f5d33b;
+    --enhanced: #ff8c1a;
+    --moderate: #e8413c;
+    --high: #b52ad4;
+    --radius: 22px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  a { color: inherit; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px clamp(18px, 4vw, 48px);
+  }
+  .wordmark { font-weight: 800; letter-spacing: .02em; font-size: 1.1rem; }
+  .wordmark span { color: var(--storm); }
+  nav a { margin-left: 22px; text-decoration: none; color: var(--muted); font-weight: 500; }
+  nav a:hover { color: var(--ink); }
+
+  .hero {
+    text-align: center;
+    padding: clamp(24px, 5vh, 56px) 20px 28px;
+  }
+  .hero h1 {
+    font-size: clamp(2.4rem, 6vw, 4.6rem);
+    line-height: 1.02;
+    margin: 0 0 14px;
+    letter-spacing: -.02em;
+  }
+  .hero p.sub {
+    max-width: 620px;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    line-height: 1.5;
+  }
+
+  .doors {
+    flex: 1;
+    display: flex;
+    gap: 14px;
+    padding: 0 clamp(14px, 3vw, 40px) 24px;
+    min-height: 420px;
+  }
+  .door {
+    position: relative;
+    flex: 1 1 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    padding: 28px;
+    text-decoration: none;
+    transition: flex .7s cubic-bezier(.2, .8, .2, 1);
+    outline: none;
+    isolation: isolate;
+  }
+  .door:focus-visible { box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink); }
+  .door-beginner { background: linear-gradient(160deg, #cfe9c4 0%, #7cc576 100%); }
+  .door-experienced { background: linear-gradient(160deg, #2d4a5c 0%, #142633 100%); color: #f3efe6; }
+  .door-experienced .muted { color: #b9c9d3; }
+
+  .door .body {
+    max-width: 420px;
+    opacity: .72;
+    transform: translateY(6px);
+    transition: opacity .5s ease, transform .6s ease;
+  }
+  .door.open .body { opacity: 1; transform: none; }
+  .door h2 { font-size: clamp(1.8rem, 3vw, 2.6rem); margin: 0 0 10px; letter-spacing: -.01em; }
+  .door .muted { color: #3c4f3a; margin: 0 0 18px; line-height: 1.5; }
+  .door .label {
+    display: inline-block; font-size: .78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; padding: 6px 10px; border-radius: 999px; margin-bottom: 14px;
+    background: rgba(255,255,255,.55);
+  }
+  .door-experienced .label { background: rgba(255,255,255,.12); }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; padding: 12px 18px; border-radius: 999px;
+    font-weight: 700; text-decoration: none; background: var(--ink); color: var(--paper);
+  }
+  .btn.ghost { background: transparent; color: inherit; box-shadow: inset 0 0 0 2px currentColor; }
+  .door-experienced .btn { background: var(--slight); color: var(--ink); }
+  .door-experienced .btn.ghost { background: transparent; color: #f3efe6; }
+
+  .shrunk .body { opacity: .5; }
+  .doors.has-open .door:not(.open) { flex: .55; }
+  .doors.has-open .door.open { flex: 2.2; }
+
+  .decor {
+    position: absolute; inset: auto -10% -30% auto; width: 60%; aspect-ratio: 1;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.5), transparent 65%);
+    z-index: -1; pointer-events: none;
+  }
+
+  .account {
+    text-align: center; padding: 0 20px 36px;
+  }
+  .account .row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+  .account .primary {
+    background: var(--ink); color: var(--paper); padding: 14px 26px; border-radius: 999px;
+    font-weight: 700; text-decoration: none;
+  }
+  .account .secondary {
+    padding: 14px 22px; border-radius: 999px; font-weight: 600; text-decoration: none;
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+  .account p { color: var(--muted); margin: 14px 0 0; font-size: .95rem; }
+
+  footer {
+    margin-top: auto; padding: 22px clamp(18px, 4vw, 48px); color: var(--muted); font-size: .9rem;
+    display: flex; flex-wrap: wrap; gap: 14px 22px; justify-content: center;
+  }
+  footer a { text-decoration: none; }
+
+  @media (max-width: 760px) {
+    nav { display: none; }
+    .doors { flex-direction: column; min-height: 0; }
+    .door { min-height: 150px; transition: flex .5s ease; }
+    .doors.has-open .door:not(.open) { flex: .5; }
+    .doors.has-open .door.open { flex: 2.4; }
+    .doors.has-open .door:not(.open) .body p,
+    .doors.has-open .door:not(.open) .actions { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .door, .door .body { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="wordmark">GFC <span>/ Graphical Forecast Creator</span></div>
+    <nav>
+      <a href="#">Changelog</a>
+      <a href="#">Help</a>
+      <a href="#">Pricing</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Create forecasts. Your way.</h1>
+    <p class="sub">Draw, share, and verify your own weather forecasts. No expertise required to start, no limits when you're ready.</p>
+  </section>
+
+  <main class="doors" id="doors">
+    <section class="door door-beginner" tabindex="0" data-door="beginner" aria-label="Beginner">
+      <div class="body">
+        <span class="label">Beginner</span>
+        <h2>New to forecasting?</h2>
+        <p class="muted">Start here — no experience needed. Draw your first forecast in minutes.</p>
+        <div class="actions">
+          <a class="btn ghost" href="/beginners">Learn More</a>
+          <a class="btn" href="https://app.gfcweather.com">Open the App</a>
+        </div>
+      </div>
+    </section>
+    <section class="door door-experienced" tabindex="0" data-door="experienced" aria-label="Experienced">
+      <div class="body">
+        <span class="label">Experienced</span>
+        <h2>Experienced?</h2>
+        <p class="muted">Jump in — you already know what you're doing. Draw, verify, discuss.</p>
+        <div class="actions">
+          <a class="btn ghost" href="/experienced">Learn More</a>
+          <a class="btn" href="https://app.gfcweather.com">Open the App</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <section class="account">
+    <div class="row">
+      <a class="primary" href="https://app.gfcweather.com/signup">Create Account</a>
+      <a class="secondary" href="https://app.gfcweather.com">Continue Without Account</a>
+    </div>
+    <p>Accounts unlock features, but you can start without one.</p>
+  </section>
+
+  <footer>
+    <a href="#">Privacy Policy</a>
+    <a href="#">Terms of Service</a>
+    <a href="#">Pricing</a>
+    <a href="#">About</a>
+    <a href="#">Help / Contact</a>
+    <a href="#">Changelog</a>
+  </footer>
+
+<script>
+  const doors = document.getElementById('doors');
+  const items = doors.querySelectorAll('.door');
+  function setOpen(target) {
+    items.forEach(d => d.classList.toggle('open', d === target));
+    doors.classList.toggle('has-open', !!target);
+  }
+  items.forEach(d => {
+    d.addEventListener('pointerenter', () => setOpen(d));
+    d.addEventListener('focusin', () => setOpen(d));
+    d.addEventListener('click', e => {
+      if (!d.classList.contains('open')) { e.preventDefault(); setOpen(d); }
+    });
+  });
+  doors.addEventListener('pointerleave', () => setOpen(null));
+</script>
+</body>
+</html>

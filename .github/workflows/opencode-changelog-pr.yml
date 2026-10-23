@@ -2,7 +2,7 @@ name: Changelog | PR generation
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    types: [opened, reopened, ready_for_review]
 
 concurrency:
   group: gfc-opencode-maintenance-queue
@@ -67,8 +67,7 @@ jobs:
       always() &&
       (needs.prepare-automated-changelog.result == 'success' || needs.prepare-automated-changelog.result == 'skipped') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.pull_request.user.login == 'dependabot[bot]' || (!github.event.pull_request.draft && !startsWith(github.head_ref, 'port/'))) &&
-      !(github.event.pull_request.user.login == 'dependabot[bot]' && github.event.action == 'edited')
+      (github.event.pull_request.user.login == 'dependabot[bot]' || (!github.event.pull_request.draft && !startsWith(github.head_ref, 'port/')))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
