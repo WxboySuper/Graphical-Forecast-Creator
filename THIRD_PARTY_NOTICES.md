@@ -10,7 +10,7 @@ to each.
 - **@babel/preset-react** ^8.0.1 (root (pnpm)) — MIT — allowed
 - **@babel/preset-typescript** ^8.0.7 (root (pnpm)) — MIT — allowed
 - **@eslint/js** ^9.39.5 (root (pnpm)) — MIT — allowed
-- **@firebase/rules-unit-testing** ^5.0.2 (root (pnpm)) — Apache-2.0 — allowed
+- **@firebase/rules-unit-testing** ^6.0.0 (root (pnpm)) — Apache-2.0 — allowed
 - **@playwright/test** ^1.64.0 (root (pnpm)) — Apache-2.0 — allowed
 - **@radix-ui/react-dialog** ^1.2.0 (root (pnpm)) — MIT — allowed
 - **@radix-ui/react-dropdown-menu** ^2.1.25 (root (pnpm)) — MIT — allowed
@@ -46,7 +46,7 @@ to each.
 - **eslint-plugin-react** ^7.37.5 (root (pnpm)) — MIT — allowed
 - **eslint-plugin-react-hooks** ^7.1.1 (root (pnpm)) — MIT — allowed
 - **eslint-plugin-testing-library** ^7.16.2 (root (pnpm)) — MIT — allowed
-- **firebase** ^12.19.0 (root (pnpm)) — Apache-2.0 — allowed
+- **firebase** ^13.0.0 (root (pnpm)) — Apache-2.0 — allowed
 - **firebase-tools** 15.33.0 (root (pnpm)) — MIT — allowed
 - **gh-pages** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **globals** ^17.13.0 (root (pnpm)) — MIT — allowed
