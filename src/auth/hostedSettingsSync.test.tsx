@@ -207,14 +207,14 @@ describe('hosted settings sync', () => {
     {
       name: 'keeps pending basemap when remote is stale',
       remoteStyle: 'osm' as const,
-      expectStyle: 'carto-light' as const,
+      expectStyle: 'blank' as const,
       remotePatch: {},
       extraExpect: null as ((coalesced: ReturnType<typeof buildHostedSettingsFixture>) => void) | null,
     },
     {
       name: 'still applies another device field while basemap write is pending',
       remoteStyle: 'osm' as const,
-      expectStyle: 'carto-light' as const,
+      expectStyle: 'blank' as const,
       remotePatch: { counties: true },
       extraExpect: (coalesced: ReturnType<typeof buildHostedSettingsFixture>) => {
         expect(coalesced.counties).toBe(true);
@@ -222,7 +222,7 @@ describe('hosted settings sync', () => {
     },
   ])('coalesceRemoteSettingsWithPendingLocal $name', ({ remoteStyle, expectStyle, remotePatch, extraExpect }) => {
     const baseline = buildHostedSettingsFixture('osm');
-    const target = buildHostedSettingsFixture('carto-light');
+    const target = buildHostedSettingsFixture('blank');
     const remote = { ...buildHostedSettingsFixture(remoteStyle), ...remotePatch };
     const coalesced = coalesceRemoteSettingsWithPendingLocal(remote, {
       baseline,
@@ -235,7 +235,7 @@ describe('hosted settings sync', () => {
 
   test('consumeSupersededBaselineOneShotIgnore ignores only the first matching stale echo', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
+    const acknowledged = buildHostedSettingsFixture('blank');
     let oneShot: PendingHostedSettingsWrite['baseline'] | null = baseline;
     const clearOneShot = () => {
       oneShot = null;
@@ -249,11 +249,11 @@ describe('hosted settings sync', () => {
 
   test('after one-shot stale echo is consumed, another device can revert basemap to the old value', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
+    const acknowledged = buildHostedSettingsFixture('blank');
     const oneShotRef = { current: baseline as PendingHostedSettingsWrite['baseline'] | null };
     const dispatch = jest.fn();
     const lastSyncedSettingsRef = { current: acknowledged };
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'blank' as const };
 
     handleHostedSettingsFirestoreSnapshot(
       { data: () => baseline, metadata: { hasPendingWrites: false } },
@@ -309,7 +309,7 @@ describe('hosted settings sync', () => {
 
   test('coalesceRemoteSettingsWithPendingLocal ignores superseded in-flight write targets', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const inFlightB = buildHostedSettingsFixture('carto-light');
+    const inFlightB = buildHostedSettingsFixture('blank');
     const targetC = buildHostedSettingsFixture('esri-satellite');
     const coalesced = coalesceRemoteSettingsWithPendingLocal(
       inFlightB,
@@ -325,8 +325,8 @@ describe('hosted settings sync', () => {
 
   test('regression: raw stale remote without coalesce reverts pending basemap', () => {
     const staleRemote = buildHostedSettingsFixture('osm');
-    const acknowledged = buildHostedSettingsFixture('carto-light');
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+    const acknowledged = buildHostedSettingsFixture('blank');
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'blank' as const };
     const dispatch = jest.fn();
 
     applySettingsToState(staleRemote, {
@@ -344,8 +344,8 @@ describe('hosted settings sync', () => {
 
   test('handleHostedSettingsFirestoreSnapshot keeps pending basemap when stale remote arrives', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const target = buildHostedSettingsFixture('carto-light');
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+    const target = buildHostedSettingsFixture('blank');
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'blank' as const };
     const lastSyncedSettingsRef = { current: baseline };
     const { dispatch, applySnapshot } = createSnapshotHarness(localOverlays, lastSyncedSettingsRef);
 
@@ -409,8 +409,8 @@ describe('hosted settings sync', () => {
         }) as never,
       );
       const baseline = buildHostedSettingsFixture('osm');
-      const target = buildHostedSettingsFixture('carto-light');
-      const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+      const target = buildHostedSettingsFixture('blank');
+      const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'blank' as const };
       const lastSyncedSettingsRef = { current: baseline };
       const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
       const inFlightRef = { current: null as InFlightHostedSettingsWrite | null };
@@ -460,7 +460,7 @@ describe('hosted settings sync', () => {
       resolveWrite?.();
       await Promise.resolve();
       expect(pendingIntentRef.current).toBeNull();
-      expect(lastSyncedSettingsRef.current?.baseMapStyle).toBe('carto-light');
+      expect(lastSyncedSettingsRef.current?.baseMapStyle).toBe('blank');
       expect(supersededBaselineRef.current?.baseMapStyle).toBe('osm');
 
       applyHostedSettingsSnapshot({
@@ -492,7 +492,7 @@ describe('hosted settings sync', () => {
         }) as never,
       );
       const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
+      const targetB = buildHostedSettingsFixture('blank');
       const targetC = buildHostedSettingsFixture('esri-satellite');
       const localOverlaysC = { ...TEST_OVERLAY_STATE, baseMapStyle: 'esri-satellite' as const };
       const dispatch = jest.fn();
@@ -505,10 +505,10 @@ describe('hosted settings sync', () => {
 
       scheduleWrite(targetB);
       jest.advanceTimersByTime(750);
-      expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
+      expect(inFlightRef.current?.target.baseMapStyle).toBe('blank');
 
       scheduleWrite(targetC);
-      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
+      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('blank');
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('esri-satellite');
 
       handleHostedSettingsFirestoreSnapshot(
@@ -533,7 +533,7 @@ describe('hosted settings sync', () => {
       );
 
       expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
+        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
       );
 
       resolveB?.();
@@ -561,7 +561,7 @@ describe('hosted settings sync', () => {
         }) as never,
       );
       const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
+      const targetB = buildHostedSettingsFixture('blank');
       const localOverlaysA = { ...TEST_OVERLAY_STATE, baseMapStyle: 'osm' as const };
       const dispatch = jest.fn();
       const {
@@ -573,7 +573,7 @@ describe('hosted settings sync', () => {
 
       scheduleWrite(targetB);
       jest.advanceTimersByTime(750);
-      expect(inFlightRef.current?.target.baseMapStyle).toBe('carto-light');
+      expect(inFlightRef.current?.target.baseMapStyle).toBe('blank');
 
       expect(
         shouldSkipHostedSettingsDocumentWrite(baseline, baseline, inFlightRef.current),
@@ -581,7 +581,7 @@ describe('hosted settings sync', () => {
 
       scheduleWrite(baseline);
       expect(pendingIntentRef.current?.target.baseMapStyle).toBe('osm');
-      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('carto-light');
+      expect(pendingIntentRef.current?.baseline.baseMapStyle).toBe('blank');
 
       resolveB?.();
       await Promise.resolve();
@@ -608,7 +608,7 @@ describe('hosted settings sync', () => {
       );
 
       expect(dispatch).not.toHaveBeenCalledWith(
-        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
+        applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
       );
 
       jest.advanceTimersByTime(750);
@@ -638,7 +638,7 @@ describe('hosted settings sync', () => {
         return Promise.resolve() as never;
       });
       const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
+      const targetB = buildHostedSettingsFixture('blank');
       const targetC = buildHostedSettingsFixture('esri-satellite');
       const onPersistError = jest.fn();
       const { pendingIntentRef, scheduleWrite } = createHostedWriteTestBed({ lastSynced: baseline, onPersistError });
@@ -686,7 +686,7 @@ describe('hosted settings sync', () => {
         return Promise.resolve() as never;
       });
       const baseline = buildHostedSettingsFixture('osm');
-      const targetB = buildHostedSettingsFixture('carto-light');
+      const targetB = buildHostedSettingsFixture('blank');
       const targetC = buildHostedSettingsFixture('esri-satellite');
       const lastSyncedSettingsRef = { current: baseline };
       const pendingIntentRef = { current: null as PendingHostedSettingsWrite | null };
@@ -756,7 +756,7 @@ describe('hosted settings sync', () => {
 
   test('finalizeHostedSettingsWriteFailure rebases newer pending intent after failed write', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
+    const targetB = buildHostedSettingsFixture('blank');
     const targetC = buildHostedSettingsFixture('esri-satellite');
     const lastSyncedSettingsRef = { current: baseline };
     const pendingRef = {
@@ -784,11 +784,11 @@ describe('hosted settings sync', () => {
 
   test('coalesced remote dark mode keeps lastSynced on raw remote during basemap debounce', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
+    const targetB = buildHostedSettingsFixture('blank');
     const remoteDarkMode = { ...baseline, darkMode: true };
     const dispatch = jest.fn();
     const lastSyncedSettingsRef = { current: baseline };
-    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'carto-light' as const };
+    const localOverlays = { ...TEST_OVERLAY_STATE, baseMapStyle: 'blank' as const };
     const pendingIntentRef = {
       current: {
         baseline,
@@ -826,7 +826,7 @@ describe('hosted settings sync', () => {
 
   test('debounce cancel when local matches synced clears pending intent (A to B to A)', () => {
     const baseline = buildHostedSettingsFixture('osm');
-    const targetB = buildHostedSettingsFixture('carto-light');
+    const targetB = buildHostedSettingsFixture('blank');
     const pendingRef = {
       current: {
         baseline,
@@ -870,7 +870,7 @@ describe('hosted settings sync', () => {
 
     expect(dispatch).toHaveBeenCalledWith(setDarkMode(true));
     expect(dispatch).not.toHaveBeenCalledWith(
-      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'carto-light' })),
+      applyOverlaySettings(expect.objectContaining({ baseMapStyle: 'blank' })),
     );
   });
 
@@ -883,7 +883,7 @@ describe('hosted settings sync', () => {
           rejectWrite = reject;
         }) as never,
       );
-      const target = buildHostedSettingsFixture('carto-light');
+      const target = buildHostedSettingsFixture('blank');
       const writeOwnerUid = 'user-a';
       const writeOwnerSessionGeneration = 1;
       let syncActive = true;
@@ -927,7 +927,7 @@ describe('hosted settings sync', () => {
           resolveWrite = resolve;
         }) as never,
       );
-      const target = buildHostedSettingsFixture('carto-light');
+      const target = buildHostedSettingsFixture('blank');
       const writeOwnerUid = 'user-a';
       const writeOwnerSessionGeneration = 1;
       let syncActive = true;
