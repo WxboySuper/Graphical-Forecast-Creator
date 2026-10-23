@@ -11,11 +11,13 @@ export interface BenchmarkResult {
   samplesMs: number[];
 }
 
+/** Return the middle measured value after sorting a sample set. */
 const median = (values: number[]): number => {
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.floor(sorted.length / 2)] ?? 0;
 };
 
+/** Run an operation repeatedly and return its sample timings and median. */
 export const measure = (
   operation: () => void,
   { iterations, samples = 5, warmup = 2 }: BenchmarkOptions,
@@ -37,6 +39,7 @@ export const measure = (
   return { medianMs: median(samplesMs), samplesMs };
 };
 
+/** Print a human-readable comparison between two benchmark results. */
 export const reportComparison = (
   label: string,
   baseline: BenchmarkResult,
