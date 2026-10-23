@@ -13,6 +13,33 @@ interface MonitorNwsAlertsRefreshOptions {
   onError?: (message: string | null) => void;
 }
 
+interface RefreshHandlers {
+  isActive: () => boolean;
+  setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
+  setFetchedAt: Dispatch<SetStateAction<string | null>>;
+  onError?: (message: string | null) => void;
+}
+
+const refreshAlertFrames = async ({
+  isActive,
+  setRawFrames,
+  setFetchedAt,
+  onError,
+}: RefreshHandlers) => {
+  try {
+    const collection = await fetchActiveNwsAlerts();
+    if (!isActive()) return;
+    setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
+    setFetchedAt(new Date().toISOString());
+    onError?.(null);
+  } catch {
+    if (!isActive()) return;
+    // Keep existing frames but make the failure explicit: without this,
+    // the animation silently presents stale alert frames indefinitely.
+    onError?.('NWS alert refresh failed; showing last available data.');
+  }
+};
+
 /** Polls animated NWS alerts without overlapping or stale requests. */
 export const useMonitorNwsAlertsRefresh = ({
   enabled,
@@ -32,22 +59,14 @@ export const useMonitorNwsAlertsRefresh = ({
     const intervalId = window.setInterval(() => {
       if (!active || requestInFlight) return;
       requestInFlight = true;
-      fetchActiveNwsAlerts()
-        .then((collection) => {
-          if (!active) return;
-          setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
-          setFetchedAt(new Date().toISOString());
-          onError?.(null);
-        })
-        .catch(() => {
-          if (!active) return;
-          // Keep existing frames but make the failure explicit: without this,
-          // the animation silently presents stale alert frames indefinitely.
-          onError?.('NWS alert refresh failed; showing last available data.');
-        })
-        .finally(() => {
-          requestInFlight = false;
-        });
+      void refreshAlertFrames({
+        isActive: () => active,
+        setRawFrames,
+        setFetchedAt,
+        onError,
+      }).finally(() => {
+        requestInFlight = false;
+      });
     }, Math.max(animationSpeedMs * 4, 15_000));
 
     return () => {
