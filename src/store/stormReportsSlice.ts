@@ -46,7 +46,7 @@ const stormReportsSlice = createSlice({
       state.reports = [];
       state.date = null;
       state.loading = false;
-      state.clearGeneration += 1;
+      state.clearGeneration = (state.clearGeneration ?? 0) + 1;
       state.error = null;
     }
   }
