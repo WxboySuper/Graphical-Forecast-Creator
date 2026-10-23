@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import {
@@ -312,6 +312,7 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
   activePanel = 'setup',
 }) => {
   const dispatch = useDispatch();
+  const reportRequestIdRef = useRef(0);
   // Select storm report data and UI state from the Redux store.
   const { date, loading, error, visible, filterByType, reports } = useSelector(
     (state: RootState) => state.stormReports
@@ -329,9 +330,15 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return getCurrentSpcReportDate();
   });
+
+  useEffect(() => () => {
+    reportRequestIdRef.current += 1;
+  }, []);
   
   // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
+    const requestId = ++reportRequestIdRef.current;
+
     try {
       dispatch(setLoading(true));
       dispatch(setError(null));
@@ -344,6 +351,10 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
       const source = reportSourceForDate(reportDate, new Date());
       const fetchedReports = await fetchReportsForSource(source, reportDate);
 
+      if (requestId !== reportRequestIdRef.current) {
+        return;
+      }
+
       dispatch(setReports(fetchedReports));
       dispatch(setDate(reportDate));
 
@@ -351,16 +362,23 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
         dispatch(setError('info:No storm reports found for this date.'));
       }
     } catch (err) {
+      if (requestId !== reportRequestIdRef.current) {
+        return;
+      }
+
       dispatch(setError(
         err instanceof Error ? err.message : 'Failed to load storm reports. The date may not have available data.'
       ));
     } finally {
-      dispatch(setLoading(false));
+      if (requestId === reportRequestIdRef.current) {
+        dispatch(setLoading(false));
+      }
     }
   };
   
   // Handler for clearing loaded storm reports from the Redux store, resetting the date and any errors.
   const handleClearReports = () => {
+    reportRequestIdRef.current += 1;
     dispatch(clearReports());
   };
   
