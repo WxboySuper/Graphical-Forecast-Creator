@@ -27,6 +27,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
+- **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
 - **Hosted map settings:** Keep the selected basemap after hosted settings sync completes.
 - **Monitor alert refresh:** Show background alert refresh failures while keeping the last available frames visible.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
