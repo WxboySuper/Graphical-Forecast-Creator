@@ -1488,26 +1488,18 @@ describe('deleteSavedCycle workspace ownership', () => {
     stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
   });
 
-  test('ignores a delete for a cycle owned by another workspace', () => {
+  test('only deletes a cycle owned by the active workspace', () => {
     const state = {
       ...initialState,
       workspaceId: 'custom' as const,
       savedCycles: [savedCycle('severe-cycle', 'severe'), savedCycle('custom-cycle', 'custom')],
     };
-    const nextState = reducer(state, deleteSavedCycle('severe-cycle'));
+    const afterForeignDelete = reducer(state, deleteSavedCycle('severe-cycle'));
 
-    expect(nextState).toBe(state);
-    expect(nextState.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle', 'custom-cycle']);
-  });
+    expect(afterForeignDelete).toBe(state);
+    expect(afterForeignDelete.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle', 'custom-cycle']);
 
-  test('deletes a cycle owned by the active workspace', () => {
-    const state = {
-      ...initialState,
-      workspaceId: 'custom' as const,
-      savedCycles: [savedCycle('severe-cycle', 'severe'), savedCycle('custom-cycle', 'custom')],
-    };
-    const nextState = reducer(state, deleteSavedCycle('custom-cycle'));
-
-    expect(nextState.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle']);
+    const afterOwnedDelete = reducer(afterForeignDelete, deleteSavedCycle('custom-cycle'));
+    expect(afterOwnedDelete.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle']);
   });
 });
