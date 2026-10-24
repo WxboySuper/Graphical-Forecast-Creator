@@ -48,7 +48,7 @@ jest.mock('./pages/ForecastPage', () => {
       // Models the page's session restore entry point: the restore effects read
       // the workspace-scoped autosave as soon as the page mounts.
       useEffect(() => {
-        const autosave = localStorage.getItem(getAutoSaveStorageKey(undefined, workspaceId));
+        const autosave = globalThis.localStorage.getItem(getAutoSaveStorageKey(undefined, workspaceId));
         globalThis.__gfcRestoreEvents ??= [];
         globalThis.__gfcRestoreEvents.push(`restore:${workspaceId}:${autosave ?? 'none'}`);
       }, [workspaceId]);
