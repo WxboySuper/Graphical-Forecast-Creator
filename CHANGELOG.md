@@ -27,6 +27,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
+- **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
+- **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.
 - **Monitor radar sites:** Preserve partial and cleared radar-site values when monitor settings are normalized.
 - **Monitor alert refresh:** Show background alert refresh failures while keeping the last available frames visible.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
