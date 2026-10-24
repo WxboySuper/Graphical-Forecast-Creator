@@ -374,6 +374,10 @@ const clearInFlightHostedSettingsWriteIfCurrent = (
 const executeDebouncedHostedSettingsWrite = (
   execution: DebouncedHostedSettingsWriteExecution,
 ): void => {
+  if (!execution.isWriteOwnerActive()) {
+    return;
+  }
+
   markInFlightHostedSettingsWrite(
     execution.inFlightHostedSettingsWriteRef,
     execution.capturedWriteSequence,

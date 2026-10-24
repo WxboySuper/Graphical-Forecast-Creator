@@ -829,6 +829,7 @@ const useHostedAuthState = (): AuthContextValue => {
       onPersisted: (settings) => {
         setSyncedSettings(settings);
         setSettingsSyncStatus('synced');
+        setError(null);
       },
       onPersistError: (syncError) => {
         setSettingsSyncStatus('error');

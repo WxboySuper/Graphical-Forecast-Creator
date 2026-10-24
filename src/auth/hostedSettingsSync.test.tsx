@@ -851,6 +851,26 @@ describe('hosted settings sync', () => {
     );
   });
 
+  test('debounced write does not start after its sync owner becomes inactive', () => {
+    jest.useFakeTimers();
+    try {
+      let ownerActive = true;
+      const target = buildHostedSettingsFixture('blank');
+      const { scheduleWrite, inFlightRef } = createHostedWriteTestBed({
+        isWriteOwnerActive: () => ownerActive,
+      });
+
+      scheduleWrite(target);
+      ownerActive = false;
+      jest.advanceTimersByTime(750);
+
+      expect(setDoc).not.toHaveBeenCalled();
+      expect(inFlightRef.current).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('failed in-flight write from a prior sync session does not surface settings error after re-login', async () => {
     jest.useFakeTimers();
     try {
