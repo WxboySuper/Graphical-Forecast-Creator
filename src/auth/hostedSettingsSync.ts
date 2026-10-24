@@ -189,12 +189,15 @@ export interface FinalizeHostedSettingsWriteFailureOptions {
 
 const rebasePendingSettingsIntentAfterFailure = (
   pending: PendingHostedSettingsWrite,
-  rebasedBaseline: UserSettingsDocument,
+  latestSyncedSettings: UserSettingsDocument,
 ): PendingHostedSettingsWrite => {
+  const rebasedBaseline: UserSettingsDocument = { ...latestSyncedSettings };
   const rebasedTarget: UserSettingsDocument = { ...pending.target };
   for (const key of USER_SETTINGS_DOCUMENT_KEYS) {
     if (isUserSettingsDocumentFieldEqual(key, pending.baseline[key], pending.target[key])) {
-      rebasedTarget[key] = rebasedBaseline[key] as never;
+      rebasedTarget[key] = latestSyncedSettings[key] as never;
+    } else {
+      rebasedBaseline[key] = pending.baseline[key] as never;
     }
   }
   return { ...pending, baseline: rebasedBaseline, target: rebasedTarget };

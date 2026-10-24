@@ -852,6 +852,7 @@ describe('hosted settings sync', () => {
   });
 
   test('debounced write does not start after its sync owner becomes inactive', () => {
+    const setDocCallsBefore = jest.mocked(setDoc).mock.calls.length;
     jest.useFakeTimers();
     try {
       let ownerActive = true;
@@ -864,7 +865,7 @@ describe('hosted settings sync', () => {
       ownerActive = false;
       jest.advanceTimersByTime(750);
 
-      expect(setDoc).not.toHaveBeenCalled();
+      expect(setDoc).toHaveBeenCalledTimes(setDocCallsBefore);
       expect(inFlightRef.current).toBeNull();
     } finally {
       jest.useRealTimers();
