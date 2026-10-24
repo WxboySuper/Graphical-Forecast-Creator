@@ -16,8 +16,13 @@ const OUTLOOK_LABELS: Record<OutlookType, string> = {
 
 const isCigKey = (probabilityKey: string): boolean => probabilityKey.startsWith('CIG');
 
-const normalizeProbabilityForColor = (probabilityKey: string): string =>
-  probabilityKey.replace(/#/g, '');
+const normalizeProbabilityForColor = (probabilityKey: string): string => {
+  const hadSignificantMarker = probabilityKey.includes('#');
+  const withoutMarker = probabilityKey.replace(/#/g, '');
+  return hadSignificantMarker && /^\d+$/.test(withoutMarker)
+    ? `${withoutMarker}%`
+    : withoutMarker;
+};
 
 const resolveFeatureColor = (outlookType: OutlookType, probabilityKey: string): string =>
   isCigKey(probabilityKey)
