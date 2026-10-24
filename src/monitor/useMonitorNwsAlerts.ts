@@ -72,6 +72,7 @@ export const useMonitorNwsAlerts = ({
     setRawFrames,
     setFrameIndex,
     setFetchedAt,
+    onRefreshError: setError,
   });
 
   const activeCollection = useMemo(() => {

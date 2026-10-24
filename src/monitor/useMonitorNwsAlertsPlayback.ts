@@ -13,6 +13,7 @@ interface UseMonitorNwsAlertsPlaybackArgs {
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFrameIndex: Dispatch<SetStateAction<number>>;
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
+  onRefreshError?: (message: string | null) => void;
 }
 
 export const useMonitorNwsAlertsPlayback = ({
@@ -24,6 +25,7 @@ export const useMonitorNwsAlertsPlayback = ({
   setRawFrames,
   setFrameIndex,
   setFetchedAt,
+  onRefreshError,
 }: UseMonitorNwsAlertsPlaybackArgs) => {
   useMonitorNwsAlertsFrameAdvance({
     enabled,
@@ -38,6 +40,7 @@ export const useMonitorNwsAlertsPlayback = ({
     animationSpeedMs,
     setRawFrames,
     setFetchedAt,
+    onError: onRefreshError,
   });
   useMonitorNwsAlertsFrameSync(enabled, animationEnabled, rawFrameCount, setFrameIndex);
 };
