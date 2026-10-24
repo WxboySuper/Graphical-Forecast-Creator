@@ -143,7 +143,7 @@ test('the review model, budget, and merge gate stay unchanged', () => {
   assert.equal(ocr.with.llm_model, "${{ vars.OCR_LLM_MODEL || 'beam-free' }}");
   assert.equal(ocr.with.llm_url, "${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/chat/completions' }}");
   assert.equal(ocr.with.effort, 'low');
-  assert.equal(ocr.with.max_tokens_budget, '400000');
+  assert.equal(ocr.with.max_tokens_budget, '500000');
   assert.equal(ocr.with.incremental, 'true');
   assert.equal(ocr.with.llm_auth_token, '${{ secrets.OPENCODE_API_KEY }}');
 });
