@@ -767,7 +767,7 @@ describe('hosted settings sync', () => {
     });
 
     expect(pendingRef.current?.target.baseMapStyle).toBe('esri-satellite');
-    expect(pendingRef.current?.baseline.baseMapStyle).toBe('blank');
+    expect(pendingRef.current?.baseline.baseMapStyle).toBe('osm');
     expect(pendingRef.current?.baseline.counties).toBe(true);
     expect(
       coalesceRemoteSettingsWithPendingLocal(
