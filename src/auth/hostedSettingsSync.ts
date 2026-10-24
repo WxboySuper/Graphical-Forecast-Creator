@@ -204,9 +204,15 @@ export const finalizeHostedSettingsWriteFailure = (
     pendingLocalSettingsIntentRef.current = null;
   } else if (pending && pending.writeSequence > capturedWriteSequence) {
     const rebasedBaseline = lastSyncedSettingsRef.current ?? pending.baseline;
+    const mergedBaseline: UserSettingsDocument = { ...rebasedBaseline };
+    for (const key of USER_SETTINGS_DOCUMENT_KEYS) {
+      if (!isUserSettingsDocumentFieldEqual(key, pending.baseline[key], pending.target[key])) {
+        mergedBaseline[key] = pending.baseline[key] as never;
+      }
+    }
     pendingLocalSettingsIntentRef.current = {
       ...pending,
-      baseline: rebasedBaseline,
+      baseline: mergedBaseline,
     };
   }
   if (isWriteOwnerActive()) {

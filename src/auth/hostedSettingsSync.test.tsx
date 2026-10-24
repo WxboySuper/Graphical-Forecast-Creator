@@ -742,11 +742,12 @@ describe('hosted settings sync', () => {
     }
   });
 
-  test('finalizeHostedSettingsWriteFailure rebases newer pending intent after failed write', () => {
+  test('finalizeHostedSettingsWriteFailure rebases newer pending intent without losing remote fields', () => {
     const baseline = buildHostedSettingsFixture('osm');
     const targetB = buildHostedSettingsFixture('blank');
     const targetC = buildHostedSettingsFixture('esri-satellite');
-    const lastSyncedSettingsRef = { current: baseline };
+    const remoteWithAnotherDeviceChange = { ...baseline, counties: true };
+    const lastSyncedSettingsRef = { current: remoteWithAnotherDeviceChange };
     const pendingRef = {
       current: {
         baseline: targetB,
@@ -766,7 +767,14 @@ describe('hosted settings sync', () => {
     });
 
     expect(pendingRef.current?.target.baseMapStyle).toBe('esri-satellite');
-    expect(pendingRef.current?.baseline.baseMapStyle).toBe('osm');
+    expect(pendingRef.current?.baseline.baseMapStyle).toBe('blank');
+    expect(pendingRef.current?.baseline.counties).toBe(true);
+    expect(
+      coalesceRemoteSettingsWithPendingLocal(
+        remoteWithAnotherDeviceChange,
+        pendingRef.current!,
+      ).counties,
+    ).toBe(true);
     expect(onPersistError).toHaveBeenCalledTimes(1);
   });
 
