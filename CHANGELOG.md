@@ -28,6 +28,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **Hosted map settings:** Keep the selected basemap after hosted settings sync completes.
+- **Monitor alert refresh:** Show background alert refresh failures while keeping the last available frames visible.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
 - **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
 - **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
@@ -61,6 +62,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
 - **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
+- **body-parser security fix:** Update the hosted API's Express body-parser dependency to 2.4.0 to address CVE-2026-111181.
 
 #### Dependencies
 

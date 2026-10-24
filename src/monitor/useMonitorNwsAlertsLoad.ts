@@ -53,6 +53,7 @@ export const useMonitorNwsAlertsLoad = ({
         setRawFrames(nextFrames);
         setFrameIndex(Math.max(0, nextFrames.length - 1));
         setFetchedAt(new Date().toISOString());
+        setError(null);
         return undefined;
       })
       .catch(() => {

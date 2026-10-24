@@ -9,7 +9,36 @@ interface MonitorNwsAlertsRefreshOptions {
   animationSpeedMs: number;
   setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
   setFetchedAt: Dispatch<SetStateAction<string | null>>;
+  /** Optional failure channel so background poll errors stay explicit instead of silent. */
+  onError?: (message: string | null) => void;
 }
+
+interface RefreshHandlers {
+  isActive: () => boolean;
+  setRawFrames: Dispatch<SetStateAction<NwsAlertFeatureCollection[]>>;
+  setFetchedAt: Dispatch<SetStateAction<string | null>>;
+  onError?: (message: string | null) => void;
+}
+
+const refreshAlertFrames = async ({
+  isActive,
+  setRawFrames,
+  setFetchedAt,
+  onError,
+}: RefreshHandlers) => {
+  try {
+    const collection = await fetchActiveNwsAlerts();
+    if (!isActive()) return;
+    setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
+    setFetchedAt(new Date().toISOString());
+    onError?.(null);
+  } catch {
+    if (!isActive()) return;
+    // Keep existing frames but make the failure explicit: without this,
+    // the animation silently presents stale alert frames indefinitely.
+    onError?.('NWS alert refresh failed; showing last available data.');
+  }
+};
 
 /** Polls animated NWS alerts without overlapping or stale requests. */
 export const useMonitorNwsAlertsRefresh = ({
@@ -18,6 +47,7 @@ export const useMonitorNwsAlertsRefresh = ({
   animationSpeedMs,
   setRawFrames,
   setFetchedAt,
+  onError,
 }: MonitorNwsAlertsRefreshOptions) => {
   useEffect(() => {
     if (!enabled || !animationEnabled) {
@@ -29,21 +59,19 @@ export const useMonitorNwsAlertsRefresh = ({
     const intervalId = window.setInterval(() => {
       if (!active || requestInFlight) return;
       requestInFlight = true;
-      fetchActiveNwsAlerts()
-        .then((collection) => {
-          if (!active) return;
-          setRawFrames((current) => appendAlertSnapshotFrame(current, collection, MAX_ANIMATION_FRAMES));
-          setFetchedAt(new Date().toISOString());
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          requestInFlight = false;
-        });
+      void refreshAlertFrames({
+        isActive: () => active,
+        setRawFrames,
+        setFetchedAt,
+        onError,
+      }).finally(() => {
+        requestInFlight = false;
+      });
     }, Math.max(animationSpeedMs * 4, 15_000));
 
     return () => {
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [animationEnabled, animationSpeedMs, enabled, setFetchedAt, setRawFrames]);
+  }, [animationEnabled, animationSpeedMs, enabled, onError, setFetchedAt, setRawFrames]);
 };
