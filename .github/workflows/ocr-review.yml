@@ -192,7 +192,7 @@ jobs:
           llm_extra_body: '{}'
           language: English
           effort: low
-          max_tokens_budget: '400000'
+          max_tokens_budget: '500000'
           review_task_timeout: '20'
           sticky_summary: 'true'
           incremental: 'true'
