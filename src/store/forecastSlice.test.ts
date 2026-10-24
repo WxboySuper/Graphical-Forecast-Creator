@@ -423,6 +423,23 @@ describe('forecastSlice undo/redo', () => {
     expect(afterDelete.savedCycles.some((cycle) => cycle.id === severeCycle.id)).toBe(true);
     expect(afterResume.forecastCycle).toBe(beforeLoad);
     expect(afterStart.forecastCycle).toBe(beforeLoad);
+
+    const malformedWorkspaceState = {
+      ...severeState,
+      workspaceId: 'not-a-workspace' as never,
+    };
+    expect(
+      reducer(malformedWorkspaceState, loadSavedCycle(severeCycle.id)).forecastCycle,
+    ).not.toBe(malformedWorkspaceState.forecastCycle);
+    expect(
+      reducer(malformedWorkspaceState, deleteSavedCycle(severeCycle.id)).savedCycles,
+    ).toHaveLength(1);
+    expect(
+      reducer(malformedWorkspaceState, resumeIncompleteCycle({ cycleId: severeCycle.id })).forecastCycle,
+    ).not.toBe(malformedWorkspaceState.forecastCycle);
+    expect(
+      reducer(malformedWorkspaceState, startFromPreviousCycle({ sourceCycleId: severeCycle.id })).forecastCycle,
+    ).not.toBe(malformedWorkspaceState.forecastCycle);
   });
 
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {

@@ -1094,7 +1094,7 @@ export const forecastSlice = createSlice({
     loadSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find(c => c.id === cycleId);
-      if (savedCycle && getSavedCycleWorkspaceId(savedCycle) === state.workspaceId) {
+      if (savedCycle && getSavedCycleWorkspaceId(savedCycle) === resolveForecastWorkspaceId(state.workspaceId)) {
         // The route owns workspace identity: loading a saved cycle never retags
         // the active workspace. Cross-workspace opens must navigate explicitly.
         state.forecastCycle = cloneForecastCycle(normalizeForecastCycle(savedCycle.forecastCycle));
@@ -1125,7 +1125,7 @@ export const forecastSlice = createSlice({
     deleteSavedCycle: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
       const savedCycle = state.savedCycles.find((cycle) => cycle.id === cycleId);
-      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== state.workspaceId) return;
+      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== resolveForecastWorkspaceId(state.workspaceId)) return;
       state.savedCycles = state.savedCycles.filter((cycle) => cycle.id !== cycleId);
       // lifetimeCycleStats intentionally tracks historical saves, not the retained/deletable window.
     },
@@ -1418,7 +1418,7 @@ export const forecastSlice = createSlice({
     resumeIncompleteCycle: (state, action: PayloadAction<{ cycleId: string }>) => {
       const { cycleId } = action.payload;
       const savedCycle = state.savedCycles.find((c) => c.id === cycleId);
-      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== state.workspaceId) return;
+      if (!savedCycle || getSavedCycleWorkspaceId(savedCycle) !== resolveForecastWorkspaceId(state.workspaceId)) return;
 
       clearHistory(state);
       state.discussionDraftsByScope = {};
@@ -1517,7 +1517,7 @@ export const forecastSlice = createSlice({
       const { sourceCycleId, newCycleDate, sourceDay, targetDay = 1, workflowTemplate } = action.payload;
 
       const sourceCycle = state.savedCycles.find(c => c.id === sourceCycleId);
-      if (!sourceCycle || getSavedCycleWorkspaceId(sourceCycle) !== state.workspaceId) return;
+      if (!sourceCycle || getSavedCycleWorkspaceId(sourceCycle) !== resolveForecastWorkspaceId(state.workspaceId)) return;
 
       const sourceForecastCycle = normalizeForecastCycle(sourceCycle.forecastCycle);
       const sourceDayNumber = sourceDay ?? sourceForecastCycle.currentDay;
