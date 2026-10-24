@@ -866,7 +866,8 @@ describe('hosted settings sync', () => {
       let syncActive = true;
       let currentSessionGeneration = 1;
       const onPersistError = jest.fn();
-      const { scheduleWrite } = createHostedWriteTestBed({
+      const targetC = buildHostedSettingsFixture('esri-satellite');
+      const { pendingIntentRef, scheduleWrite } = createHostedWriteTestBed({
         onPersistError,
         writeOwnerUid,
         isWriteOwnerActive: () =>
@@ -881,6 +882,8 @@ describe('hosted settings sync', () => {
 
       scheduleWrite(target);
       jest.advanceTimersByTime(750);
+      scheduleWrite(targetC);
+      const pendingFromNewSession = pendingIntentRef.current;
 
       currentSessionGeneration = 2;
       syncActive = true;
@@ -889,6 +892,7 @@ describe('hosted settings sync', () => {
       await Promise.resolve();
       await Promise.resolve();
 
+      expect(pendingIntentRef.current).toEqual(pendingFromNewSession);
       expect(onPersistError).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();

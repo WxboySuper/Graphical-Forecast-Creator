@@ -187,6 +187,19 @@ export interface FinalizeHostedSettingsWriteFailureOptions {
   error: unknown;
 }
 
+const rebasePendingSettingsIntentAfterFailure = (
+  pending: PendingHostedSettingsWrite,
+  rebasedBaseline: UserSettingsDocument,
+): PendingHostedSettingsWrite => {
+  const rebasedTarget: UserSettingsDocument = { ...pending.target };
+  for (const key of USER_SETTINGS_DOCUMENT_KEYS) {
+    if (isUserSettingsDocumentFieldEqual(key, pending.baseline[key], pending.target[key])) {
+      rebasedTarget[key] = rebasedBaseline[key] as never;
+    }
+  }
+  return { ...pending, baseline: rebasedBaseline, target: rebasedTarget };
+};
+
 /** Clears or rebases pending intent after a failed hosted settings write. */
 export const finalizeHostedSettingsWriteFailure = (
   options: FinalizeHostedSettingsWriteFailureOptions,
@@ -199,26 +212,21 @@ export const finalizeHostedSettingsWriteFailure = (
     onPersistError,
     error,
   } = options;
+  if (!isWriteOwnerActive()) {
+    return;
+  }
+
   const pending = pendingLocalSettingsIntentRef.current;
   if (pending?.writeSequence === capturedWriteSequence) {
     pendingLocalSettingsIntentRef.current = null;
   } else if (pending && pending.writeSequence > capturedWriteSequence) {
     const rebasedBaseline = lastSyncedSettingsRef.current ?? pending.baseline;
-    const rebasedTarget: UserSettingsDocument = { ...pending.target };
-    for (const key of USER_SETTINGS_DOCUMENT_KEYS) {
-      if (isUserSettingsDocumentFieldEqual(key, pending.baseline[key], pending.target[key])) {
-        rebasedTarget[key] = rebasedBaseline[key] as never;
-      }
-    }
-    pendingLocalSettingsIntentRef.current = {
-      ...pending,
-      baseline: rebasedBaseline,
-      target: rebasedTarget,
-    };
+    pendingLocalSettingsIntentRef.current = rebasePendingSettingsIntentAfterFailure(
+      pending,
+      rebasedBaseline,
+    );
   }
-  if (isWriteOwnerActive()) {
-    onPersistError(error);
-  }
+  onPersistError(error);
 };
 
 export interface UpdatePendingHostedSettingsWriteTargetOptions {

@@ -789,6 +789,23 @@ describe('AuthProvider local credential edge cases', () => {
     expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
   });
 
+  test('reports network failures for local sign-in and sign-up', async () => {
+    const signInDeps = makeCredentialDeps();
+    const signUpDeps = makeCredentialDeps();
+    fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(
+      localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps),
+    ).rejects.toThrow('Sign in failed');
+    expect(signInDeps.setError).toHaveBeenCalledWith('Sign in failed');
+
+    await expect(
+      localSignUpWithEmail({ email: 'user@example.com', password: 'secret' }, signUpDeps),
+    ).rejects.toThrow('Sign up failed');
+    expect(signUpDeps.setError).toHaveBeenCalledWith('Sign up failed');
+  });
+
   test('tolerates malformed JSON on successful sign-in and sign-up', async () => {
     const signInDeps = makeCredentialDeps();
     const signUpDeps = makeCredentialDeps();

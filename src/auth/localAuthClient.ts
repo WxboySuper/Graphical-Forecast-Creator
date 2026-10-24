@@ -187,12 +187,18 @@ async function localCredentialAction(
 ) {
   const failureMessage = action === 'signin' ? 'Sign in failed' : 'Sign up failed';
   deps.setError(null);
-  const resp = await fetch(`/api/local/${action}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(creds),
-    credentials: 'include',
-  });
+  let resp: Response;
+  try {
+    resp = await fetch(`/api/local/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(creds),
+      credentials: 'include',
+    });
+  } catch {
+    deps.setError(failureMessage);
+    throw new Error(failureMessage);
+  }
 
   if (!resp.ok) {
     const body = (await safeParseJson<{ message?: string }>(resp)) ?? { message: failureMessage };
