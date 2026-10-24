@@ -37,7 +37,11 @@ const readSite = (value: unknown, fallback: string): string => {
   }
 
   const normalized = value.trim().toUpperCase();
-  return /^K[A-Z0-9]{3}$/.test(normalized) ? normalized : fallback;
+  if (normalized === '') {
+    return '';
+  }
+
+  return /^K[A-Z0-9]{0,3}$/.test(normalized) ? normalized : fallback;
 };
 
 const isLatLonPair = (center: unknown): center is [number, number] =>
