@@ -32,7 +32,7 @@ import ForecastPage, {
   writeStoredDayValue,
 } from './ForecastPage';
 import forecastReducer, { saveCurrentCycle } from '../store/forecastSlice';
-import { addCustomLayer, addFeature, updateDiscussionDraft } from '../store/forecastSlice';
+import { addCustomLayer, addFeature, setForecastWorkspace, updateDiscussionDraft } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -41,10 +41,12 @@ import verificationReducer from '../store/verificationSlice';
 import monitorReducer from '../store/monitorSlice';
 import * as fileUtils from '../utils/fileUtils';
 import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getLocalCalendarDate } from '../utils/localDate';
 import type { Feature } from 'geojson';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../lib/customProductHandoff';
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../types/customProducts';
+import { DAY_ROLLOVER_LAST_ACTIVE_KEY, getRolloverStorageKey } from '../utils/dayRolloverStorage';
 
 const mockAddToast = jest.fn();
 const mockUseAuth = jest.fn();
@@ -126,6 +128,96 @@ const renderForecastPage = (store: ReturnType<typeof createStore>) =>
     </MemoryRouter>
   );
 
+/** Mounts the page as a non-default workspace, mirroring the App route -> Redux handoff. */
+const renderForecastPageInWorkspace = (store: ReturnType<typeof createStore>, workspaceId: 'severe' | 'custom') => {
+  store.dispatch(setForecastWorkspace(workspaceId));
+  return render(
+    <MemoryRouter>
+      <Provider store={store}>
+        <ForecastPage workspaceId={workspaceId} />
+      </Provider>
+    </MemoryRouter>
+  );
+};
+
+const LOCAL_AUTOSAVE_MARKER_ID = 'local-autosave-marker';
+
+const seedSevereAutosaveWithMarker = (featureId: string = LOCAL_AUTOSAVE_MARKER_ID): void => {
+  const sourceStore = createStore();
+  sourceStore.dispatch(addFeature({
+    feature: {
+      type: 'Feature',
+      id: featureId,
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+    } as never,
+  }));
+  localStorage.setItem('forecastData', JSON.stringify(serializeForecastWorkspace(
+    'severe',
+    sourceStore.getState().forecast.forecastCycle,
+    { center: [0, 0], zoom: 4 },
+  )));
+};
+
+const seedInvalidCloudHandoff = (payload: string): void => {
+  sessionStorage.setItem('cloudCyclePayload:severe:anonymous', payload);
+  sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'stale', label: 'Stale' }));
+};
+
+const seedSevereCloudHandoff = (payload: unknown): void => {
+  sessionStorage.setItem('cloudCyclePayload:severe:anonymous', JSON.stringify(payload));
+  sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+};
+
+const markerRestoredFromAutoSave = (store: ReturnType<typeof createStore>): boolean =>
+  store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('2%' as never)?.some((feature) => feature.id === LOCAL_AUTOSAVE_MARKER_ID) === true;
+
+const expectInvalidCloudHandoffClearedWithLocalRestore = async (
+  store: ReturnType<typeof createStore>,
+): Promise<void> => {
+  await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+    'The pending cloud forecast was invalid and was cleared without loading.',
+    'error',
+  ));
+  expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+  expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
+  expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+  // A broken handoff must never hide the local session it failed to replace.
+  expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+  expect(markerRestoredFromAutoSave(store)).toBe(true);
+};
+
+const buildCycleWithSingleOutlook = (
+  baseCycle: ReturnType<ReturnType<typeof createStore>['getState']>['forecast']['forecastCycle'],
+  featureId: string,
+) => {
+  const cycleWithOutlook = { ...baseCycle };
+  const features = new Map<string, Feature[]>();
+  features.set('10%', [{
+    type: 'Feature',
+    id: featureId,
+    geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+    properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
+  } as Feature]);
+  cycleWithOutlook.days = {
+    1: {
+      data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
+      metadata: { lowProbabilityOutlooks: [] },
+    },
+  } as typeof cycleWithOutlook.days;
+  return cycleWithOutlook;
+};
+
+const seedLocalAutosaveOutlook = (featureId: string): void => {
+  const cycleWithOutlook = buildCycleWithSingleOutlook(createStore().getState().forecast.forecastCycle, featureId);
+  const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+  localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+};
+
+const expectSingleOutlookRestored = (store: ReturnType<typeof createStore>, featureId: string): void => {
+  expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe(featureId);
+};
+
 
 describe('ForecastPage layout selection', () => {
   beforeEach(() => {
@@ -143,8 +235,9 @@ describe('ForecastPage layout selection', () => {
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
   });
 
-  test('publishes the route workspace to Redux so saves are workspace-tagged', () => {
+  test('tags new cycles with the active workspace after route ownership is synchronized', () => {
     const store = createStore();
+    store.dispatch(setForecastWorkspace('custom'));
     render(
       <MemoryRouter>
         <Provider store={store}>
@@ -158,6 +251,199 @@ describe('ForecastPage layout selection', () => {
       store.dispatch(saveCurrentCycle({ label: 'Route save' }));
     });
     expect(store.getState().forecast.savedCycles[0]?.workspaceId).toBe('custom');
+  });
+
+  test('waits for Redux workspace ownership before mounting workspace restore effects', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter>
+        <Provider store={store}>
+          <ForecastPage workspaceId="custom" />
+        </Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Preparing custom forecast workspace');
+    expect(screen.queryByText('ForecastTabbedToolbarLayout Mock')).not.toBeInTheDocument();
+
+    act(() => store.dispatch(setForecastWorkspace('custom')));
+
+    expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('keeps a handoff staged for another workspace and restores this one locally', async () => {
+    seedSevereAutosaveWithMarker();
+    const store = createStore();
+    const customPayload = serializeForecastWorkspace(
+      'custom',
+      store.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    );
+    sessionStorage.setItem('cloudCyclePayload:custom:anonymous', JSON.stringify(customPayload));
+    sessionStorage.setItem('cloudCycleMeta:custom:anonymous', JSON.stringify({ id: 'custom-1', label: 'Custom save' }));
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    // The staged Custom handoff stays staged so the Custom workspace can still open it.
+    expect(JSON.parse(sessionStorage.getItem('cloudCyclePayload:custom:anonymous') ?? 'null')).toEqual(customPayload);
+    expect(JSON.parse(sessionStorage.getItem('cloudCycleMeta:custom:anonymous') ?? 'null')).toEqual({ id: 'custom-1', label: 'Custom save' });
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+  });
+
+  test('preserves a misfiled cross-workspace handoff instead of deleting it', async () => {
+    seedSevereAutosaveWithMarker();
+    const store = createStore();
+    const customPayload = serializeForecastWorkspace(
+      'custom',
+      store.getState().forecast.forecastCycle,
+      { center: [0, 0], zoom: 4 },
+    );
+    const misfiled = JSON.stringify(customPayload);
+    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', misfiled);
+
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
+      'This cloud cycle belongs to a different forecast workspace and was not loaded.',
+      'error',
+    ));
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBe(misfiled);
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+  });
+
+  test('loads a handoff staged for this workspace and clears it', async () => {
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    seedSevereCloudHandoff(serializeForecastWorkspace('severe', sourceCycle, { center: [0, 0], zoom: 4 }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('loads a handoff staged for the signed-in account scope', async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const scopedKey = 'cloudCyclePayload:severe:user-user-1';
+    sessionStorage.setItem(scopedKey, JSON.stringify(
+      serializeForecastWorkspace('severe', sourceCycle, { center: [0, 0], zoom: 4 }),
+    ));
+    sessionStorage.setItem('cloudCycleMeta:severe:user-user-1', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem(scopedKey)).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('carries an account-tagged legacy handoff across the sign-in transition', async () => {
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    // Written by the pre-workspace build: scoped to the account, no workspace segment.
+    sessionStorage.setItem('cloudCyclePayload:user-user-1', JSON.stringify(payload));
+    sessionStorage.setItem('cloudCycleMeta:user-user-1', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:user-user-1')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
+    expectSingleOutlookRestored(store, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('keeps an unscoped legacy handoff out of the signed-in account and parks it anonymously', async () => {
+    seedSevereAutosaveWithMarker();
+    const sourceCycle = buildCycleWithSingleOutlook(
+      createStore().getState().forecast.forecastCycle,
+      LOCAL_AUTOSAVE_MARKER_ID,
+    );
+    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    sessionStorage.setItem('cloudCyclePayload', JSON.stringify(payload));
+    sessionStorage.setItem('cloudCycleMeta', JSON.stringify({ id: 'legacy-1', label: 'Legacy save' }));
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-2' }, syncedSettings: null });
+
+    const store = createStore();
+    const firstMount = renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-2')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    // The same browser tab can still open it once the account scope is gone.
+    expect(JSON.parse(sessionStorage.getItem('cloudCyclePayload:severe:anonymous') ?? 'null')).toEqual(payload);
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+
+    firstMount.unmount();
+    mockAddToast.mockClear();
+    mockUseAuth.mockReturnValue({ user: null, syncedSettings: null });
+    const anonymousStore = createStore();
+    renderForecastPage(anonymousStore);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expectSingleOutlookRestored(anonymousStore, LOCAL_AUTOSAVE_MARKER_ID);
+  });
+
+  test('drops an unreadable legacy handoff and still restores the local session', async () => {
+    seedSevereAutosaveWithMarker();
+    sessionStorage.setItem('cloudCyclePayload', 'not-json');
+    sessionStorage.setItem('cloudCycleMeta', 'not-json');
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' }, syncedSettings: null });
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    expect(mockAddToast).not.toHaveBeenCalledWith('Cloud forecast loaded successfully.', 'success');
+    expect(markerRestoredFromAutoSave(store)).toBe(true);
+  });
+
+  test('clears a malformed cloud handoff and still restores the local session', async () => {
+    seedSevereAutosaveWithMarker();
+    seedInvalidCloudHandoff('not-json');
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await expectInvalidCloudHandoffClearedWithLocalRestore(store);
+  });
+
+  test('clears an unknown-workspace cloud handoff and still restores the local session', async () => {
+    seedSevereAutosaveWithMarker();
+    seedInvalidCloudHandoff(JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'bogus',
+      forecast: { nope: true },
+    }));
+
+    const store = createStore();
+    renderForecastPage(store);
+
+    await expectInvalidCloudHandoffClearedWithLocalRestore(store);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
@@ -191,18 +477,52 @@ describe('ForecastPage layout selection', () => {
       createdAt: '2026-07-17T12:00:00.000Z',
       updatedAt: '2026-07-17T12:00:00.000Z',
     };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(layer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer }));
 
-    renderForecastPage(store);
+    renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
     expect(store.getState().forecast.customEditor.mode).toBe('custom');
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
+  test('leaves a custom-staged handoff untouched in the Severe workspace', async () => {
+    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
+    seedSevereAutosaveWithMarker();
+    const store = createStore();
+    const stagedLayer = {
+      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+      id: 'staged-for-custom' as never,
+      label: 'Custom only',
+      order: 0,
+      categories: [{
+        id: 'only' as never,
+        label: 'Only',
+        order: 0,
+        style: { fillColor: '#f97316', fillOpacity: 0.45, strokeColor: '#123456', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' as const },
+      }],
+      features: [],
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    };
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer: stagedLayer }));
+
+    renderForecastPage(store);
+
+    // The restore toast proves the handoff effect has run with ready=true.
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
+    expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
+    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
+      workspaceId: 'custom',
+      layer: stagedLayer,
+    });
+  });
+
   test('preserves a reusable-product handoff and reports the custom-layer limit', async () => {
     mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: 'stripe' });
     const store = createStore();
+    store.dispatch(setForecastWorkspace('custom'));
     for (let index = 0; index < CUSTOM_PRODUCT_LIMITS.layersPerCollection; index += 1) {
       store.dispatch(addCustomLayer({
         schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
@@ -235,22 +555,29 @@ describe('ForecastPage layout selection', () => {
       createdAt: '2026-07-17T12:00:00.000Z',
       updatedAt: '2026-07-17T12:00:00.000Z',
     };
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify(stagedLayer));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ workspaceId: 'custom', layer: stagedLayer }));
 
-    renderForecastPage(store);
+    renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith(
       `Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`,
       'error',
     ));
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers).toHaveLength(CUSTOM_PRODUCT_LIMITS.layersPerCollection);
-    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual(stagedLayer);
-    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
+      workspaceId: 'custom',
+      layer: stagedLayer,
+    });
+    // The failed handoff adds no layer, and the workspace keeps its own editor mode.
+    expect(store.getState().forecast.customEditor.mode).toBe('custom');
   });
 
   test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {
     const store = createStore();
-    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({ schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, id: 'stale' }));
+    sessionStorage.setItem(CUSTOM_PRODUCT_HANDOFF_KEY, JSON.stringify({
+      workspaceId: 'custom',
+      layer: { schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION, id: 'stale' },
+    }));
     renderForecastPage(store);
     await waitFor(() => expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull());
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
@@ -337,46 +664,16 @@ describe('ForecastPage layout selection', () => {
 
   test('restores the local autosave when the current cycle is empty', () => {
     const store = createStore();
-    const cycleWithOutlook = { ...store.getState().forecast.forecastCycle };
-    const features = new Map<string, Feature[]>();
-    features.set('10%', [{
-      type: 'Feature',
-      id: 'autosave-outlook',
-      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
-    } as Feature]);
-    cycleWithOutlook.days = {
-      1: {
-        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
-        metadata: { lowProbabilityOutlooks: [] },
-      },
-    } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
-    localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+    seedLocalAutosaveOutlook('autosave-outlook');
 
     renderForecastPage(store);
 
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('autosave-outlook');
+    expectSingleOutlookRestored(store, 'autosave-outlook');
   });
 
   test('restores the autosave only once under React StrictMode double effects', () => {
     const store = createStore();
-    const cycleWithOutlook = { ...store.getState().forecast.forecastCycle };
-    const features = new Map<string, Feature[]>();
-    features.set('10%', [{
-      type: 'Feature',
-      id: 'strictmode-outlook',
-      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
-      properties: { outlookType: 'tornado', probability: '10%', isSignificant: false },
-    } as Feature]);
-    cycleWithOutlook.days = {
-      1: {
-        data: { tornado: features, wind: new Map(), hail: new Map(), categorical: new Map(), totalSevere: new Map() } as never,
-        metadata: { lowProbabilityOutlooks: [] },
-      },
-    } as typeof cycleWithOutlook.days;
-    const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
-    localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
+    seedLocalAutosaveOutlook('strictmode-outlook');
 
     render(
       <React.StrictMode>
@@ -388,7 +685,7 @@ describe('ForecastPage layout selection', () => {
       </React.StrictMode>
     );
 
-    expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe('strictmode-outlook');
+    expectSingleOutlookRestored(store, 'strictmode-outlook');
   });
 
   test('keeps in-memory anonymous edits on sign-in without overwriting account autosave', async () => {
@@ -465,7 +762,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(createStore());
 
     expect(await screen.findByText('New day detected')).toBeInTheDocument();
-    expect(localStorage.getItem('gfc-last-active-local-day:anonymous')).toBe(today);
+    expect(localStorage.getItem(getRolloverStorageKey(DAY_ROLLOVER_LAST_ACTIVE_KEY, null, 'severe'))).toBe(today);
     expect(screen.getByRole('button', { name: 'Download a copy & start new day' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Replace without saving' })).toBeInTheDocument();
   });
@@ -504,11 +801,15 @@ describe('ForecastPage helpers', () => {
     expect(hasRestorableCloudSelection({ id: 'abc', label: 'Cycle' })).toBe(true);
     expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
 
-    sessionStorage.setItem('cloudCyclePayload', 'payload');
-    sessionStorage.setItem('cloudCycleMeta', 'meta');
-    clearStoredCloudSession();
+    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', 'payload');
+    sessionStorage.setItem('cloudCycleMeta:severe:anonymous', 'meta');
+    sessionStorage.setItem('cloudCyclePayload:custom:anonymous', 'custom-payload');
+    clearStoredCloudSession(null, 'severe');
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
     expect(sessionStorage.getItem('cloudCyclePayload')).toBeNull();
-    expect(sessionStorage.getItem('cloudCycleMeta')).toBeNull();
+    // Another workspace's staged handoff is not this workspace's to clear.
+    expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBe('custom-payload');
   });
 
   test('recovers a pending rollover prompt after session restore marks the cycle saved', () => {
@@ -542,15 +843,15 @@ describe('ForecastPage helpers', () => {
 
     const saveCycle = jest.fn().mockResolvedValue(true);
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(true);
-    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true });
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(true);
+    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true, workspaceId: 'severe' });
     expect(clearCurrent).toHaveBeenCalled();
     expect(dispatch).toHaveBeenCalledTimes(1);
 
     saveCycle.mockResolvedValueOnce(false);
     clearCurrent.mockClear();
     dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch })).toBe(false);
+    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(false);
     expect(clearCurrent).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
     exportSpy.mockRestore();

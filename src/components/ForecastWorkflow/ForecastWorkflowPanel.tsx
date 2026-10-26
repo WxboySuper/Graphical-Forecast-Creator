@@ -3,6 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
+import type { RootState } from '../../store';
 import { Button } from '../ui/button';
 import {
   selectForecastCycle,
@@ -165,6 +168,7 @@ interface WorkflowPanelActionsProps {
   onCreateUpdate: () => void;
   onStartFromPrevious: () => void;
   onNavigate: (path: string) => void;
+  forecastPath: string;
   discussionPath: string;
 }
 
@@ -235,6 +239,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   mapIsComplete,
   isPackageDownloading,
   discussionPath,
+  forecastPath,
   onExport,
   onOpenReview,
   onNavigate,
@@ -264,7 +269,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
             Update Discussion
           </Button>
         ) : (
-          <Button size="sm" onClick={() => onNavigate('/forecast')}>
+          <Button size="sm" onClick={() => onNavigate(forecastPath)}>
             <Map className="h-4 w-4 mr-2" />
             Update Map
           </Button>
@@ -278,7 +283,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   }
   if (context === 'discussion') {
     return (
-      <Button size="sm" onClick={() => onNavigate('/forecast')}>
+      <Button size="sm" onClick={() => onNavigate(forecastPath)}>
         <Map className="h-4 w-4 mr-2" />
         {mapIsComplete ? 'Finish Map' : 'Continue Map'}
       </Button>
@@ -456,6 +461,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId) ?? DEFAULT_FORECAST_WORKSPACE;
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
@@ -576,7 +582,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleReturnToMap(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   }
   /** Starts today's workflow from the suggested previous-cycle outlook. */
   function handleStartFromPrevious(): void {
@@ -631,6 +637,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           previousSuggestion={previousSuggestion}
           activeUpdateVersion={activeUpdateVersion}
           discussionPath={discussionPath}
+          forecastPath={getForecastWorkspacePath(workspaceId)}
           onExport={() => { handleWorkflowExport().catch(() => undefined); }}
           onOpenReview={handleOpenReview}
           onCreateUpdate={handleCreateUpdate}
@@ -653,7 +660,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           dispatch(setForecastDay(day));
           dispatch(setActiveOutlookType(outlookType));
           dispatch(dismissCompletionModal());
-          navigate('/forecast');
+          navigate(getForecastWorkspacePath(workspaceId));
         }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
       />

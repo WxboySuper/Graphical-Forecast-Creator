@@ -7,6 +7,41 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Next major / beta
 
+#### Dependencies
+
+- **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
+<!-- dependabot-automation -->
+
+- **@sentry/react:** ^10.72.0 → ^11.9.0
+- **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
+- **@testing-library/react:** ^16.2.0 → ^16.3.3
+- **@testing-library/user-event:** ^14.6.6 → ^14.6.7
+- **@types/node:** ^26.4.0 → ^26.5.1
+- **@types/react-dom:** 19.2.5 → 19.3.0
+- **firebase:** ^12.18.0 → ^13.0.0
+- **immer:** ^11.1.16 → ^11.2.9
+- **lucide-react:** ^1.35.0 → ^1.61.0
+- **ol-mapbox-style:** ^13.4.2 → ^13.8.0
+- **react-router:** ^8.3.0 → ~8.5.0
+- **rollup:** >=4.62.4 → >=4.63.1
+- **uuid:** ^14.0.1 → ^14.0.2
+- **web-vitals:** ^6.1.0 → ^6.2.1
+- **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
+- **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
+- **babel-jest:** ^30.5.0 → ^30.5.1
+- **esbuild:** ^0.28.1 → ^0.28.2
+- **eslint-plugin-jest:** ^29.16.0 → ^29.16.5
+- **firebase-tools:** 15.26.0 → 15.28.2
+- **globals:** ^17.11.0 → ^17.12.0
+- **jest:** ^30.5.0 → ^30.5.1
+- **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
+- **typescript-eslint:** ^8.68.0 → ^8.70.0
+- **vite:** ^8.2.1 → ^8.3.5
+- **@sentry/node:** ^10.69.0 → ^11.8.0 (`server`)
+- **firebase-admin:** ^14.2.0 → ^14.5.0 (`server`)
+- **express-rate-limit:** ^8.6.2 → ^8.7.1 (`server`)
+- **stripe:** ^22.4.0 → ^23.0.0 (`server`)
+
 #### Added
 
 - **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
@@ -21,7 +56,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
 
-- **Forecast workspaces:** Keep local autosaves separate by workspace and store workspace identity with cloud-cycle records.
+- **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves and loads to the active workspace, including a beta-gated Custom workspace at `/forecast/custom`.
 - **Cloud Library workspaces:** Organize saved forecasts with workspace tabs and shareable workspace links.
 
 #### Fixed

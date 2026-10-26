@@ -27,7 +27,7 @@ const CycleHistoryModal: React.FC<CycleHistoryModalProps> = ({ isOpen, onClose }
   const dispatch = useDispatch();
   const store = useStore<RootState>();
   const { addToast } = useAppLayout();
-  const visibleSavedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
+  const visibleSavedCycles = useSelector(selectSavedCyclesForActiveWorkspace) ?? [];
   const currentCycle = useSelector(selectForecastCycle);
 
   const [showSaveForm, setShowSaveForm] = useState(false);

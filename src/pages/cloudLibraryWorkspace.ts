@@ -1,6 +1,7 @@
 import {
   getExposedForecastWorkspaces,
   getForecastWorkspace,
+  isForecastWorkspaceExposed,
   resolveForecastWorkspaceId,
   type ForecastWorkspaceId,
 } from '../config/forecastWorkspaces';
@@ -47,15 +48,13 @@ export const getCloudLibraryTabLabel = (
 ): string | undefined =>
   tabId === 'all' ? undefined : tabs.find((tab) => tab.id === tabId)?.label;
 
-/** Resolves the editor route for one tab, keeping Custom on its legacy path. */
-export const getCloudLibraryWorkspacePath = (tabId: CloudLibraryTabId): string => {
+/** Resolves an exposed workspace editor route for one tab, falling back to Severe. */
+export const getCloudLibraryWorkspacePath = (tabId: CloudLibraryTabId, target?: BuildTarget): string => {
   if (tabId === 'all') return getDefaultForecastWorkspacePath();
   const workspace = getForecastWorkspace(tabId);
-  if (!workspace) return getDefaultForecastWorkspacePath();
-  if (workspace.id === 'custom') {
-    return workspace.legacyPaths[0] ?? getDefaultForecastWorkspacePath();
-  }
-  return workspace.status === 'available' ? workspace.path : getDefaultForecastWorkspacePath();
+  return workspace && isForecastWorkspaceExposed(workspace, target)
+    ? workspace.path
+    : getDefaultForecastWorkspacePath();
 };
 
 /** Resolves Home and End navigation, or undefined when the key is not an edge key. */

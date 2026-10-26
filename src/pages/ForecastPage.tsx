@@ -81,6 +81,8 @@ export {
   formatRolloverDayLabel,
   parseStoredForecastPayload,
   parseStoredCloudMeta,
+  getMismatchedCloudWorkspaceId,
+  INVALID_CLOUD_HANDOFF,
   clearStoredCloudSession,
   hasRestorableCloudSelection,
   buildRestoreKey,
@@ -488,6 +490,7 @@ const useCloudForecastActions = ({
   saveCycle,
   userId,
   workflowMetadata,
+  workspaceId,
 }: {
   addToast: AddToastFn;
   currentCloudId: string | null;
@@ -498,6 +501,7 @@ const useCloudForecastActions = ({
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -518,11 +522,8 @@ const useCloudForecastActions = ({
       const stats = countForecastMetrics(forecastCycle);
       let success: boolean;
       try {
-        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
       } catch (error) {
-        // Stale save completions throw the server error so explicit callers see
-        // the actual failure. The hook keeps global and selection state scoped,
-        // so propagate the message for the toolbar modal without extra handling.
         if (error instanceof Error) {
           throw error;
         }
@@ -536,7 +537,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
   );
 
   return {
@@ -621,6 +622,7 @@ const useForecastPageWorkspace = ({
     saveCycle,
     userId: user?.uid,
     workflowMetadata,
+    workspaceId,
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
@@ -688,7 +690,7 @@ const useForecastPageWorkspace = ({
     mapRef,
     currentDay: forecastCycle.currentDay,
   });
-  useCustomProductForecastHandoff(restoreComplete, addToast);
+  useCustomProductForecastHandoff(restoreComplete, addToast, workspaceId);
 
   const dayRolloverPrompt = useControllerDayRolloverPrompt({
     restoreComplete,
@@ -702,6 +704,7 @@ const useForecastPageWorkspace = ({
     canSaveToCloud: premiumActive,
     saveCycle,
     clearCurrent,
+    workspaceId,
   });
 
   return {
@@ -715,9 +718,7 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
-  workspaceId = DEFAULT_FORECAST_WORKSPACE,
-}) => {
+const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
   useEffect(() => {
@@ -778,6 +779,19 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
       />
     </div>
   );
+};
+
+/** Waits for AppHooks to reset Redux ownership before mounting restore effects. */
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+
+  if (activeWorkspaceId !== workspaceId) {
+    return <div role="status">Preparing {workspaceId} forecast workspace…</div>;
+  }
+
+  return <ForecastPageContent key={workspaceId} workspaceId={workspaceId} />;
 };
 
 export default ForecastPage;
