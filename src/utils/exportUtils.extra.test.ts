@@ -217,6 +217,18 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('232px');
   });
 
+  test('uses fallback clearance for a visible legend with zero layout height', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend zero-height');
+    jest.spyOn(container.querySelector<HTMLElement>('.map-legend')!, 'getBoundingClientRect').mockReturnValue({
+      x: 100, y: 380, width: 200, height: 0, top: 380, right: 300, bottom: 380, left: 100, toJSON: () => ({}),
+    } as DOMRect);
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
   test('does not reserve space for a hidden legend', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout', 'map-legend');
@@ -231,6 +243,16 @@ describe('exportUtils additional unit tests', () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
     container.style.width = '40px';
+
+    addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
+
+    expect(getAttributionBottom(container)).toBe('58px');
+  });
+
+  test('does not parse a percentage container width as pixels', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    container.style.width = '100%';
 
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
 

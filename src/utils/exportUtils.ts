@@ -124,6 +124,11 @@ const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
   );
 };
 
+const parsePixelWidth = (value: string | undefined) => {
+  const match = value?.trim().match(/^(\d+(?:\.\d+)?)px$/);
+  return match ? Number(match[1]) : Number.NaN;
+};
+
 const readContainerWidth = (container: HTMLElement) => {
   const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container)?.width;
   const widthCandidates = [
@@ -131,8 +136,8 @@ const readContainerWidth = (container: HTMLElement) => {
     container.getBoundingClientRect().width,
     container.offsetWidth,
     container.scrollWidth,
-    Number.parseFloat(container.style.width),
-    Number.parseFloat(computedWidth ?? ''),
+    parsePixelWidth(container.style.width),
+    parsePixelWidth(computedWidth),
   ];
   return widthCandidates.find((width) => width > 0) ?? 320;
 };
@@ -180,7 +185,9 @@ const getLegendClearance = (container: HTMLElement) => {
 
   const containerBounds = container.getBoundingClientRect();
   const legendBounds = legend.getBoundingClientRect();
-  if (containerBounds.height <= 0) return getFallbackLegendClearance(container, legend, legendBounds);
+  if (containerBounds.height <= 0 || legendBounds.height <= 0) {
+    return getFallbackLegendClearance(container, legend, legendBounds);
+  }
   return getMeasuredLegendClearance(containerBounds, legendBounds);
 };
 
