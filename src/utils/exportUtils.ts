@@ -115,6 +115,29 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   container.appendChild(footerDiv);
 };
 
+const getFooterBottom = (
+  container: HTMLElement,
+  unofficialOverlay: HTMLElement | null,
+  unofficialText: string | undefined,
+) => {
+  if (!unofficialOverlay) return 42;
+
+  const unofficialInner = unofficialOverlay?.firstElementChild as HTMLElement | null | undefined;
+  const measuredHeight = Math.max(
+    unofficialOverlay?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.scrollHeight ?? 0,
+  );
+  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
+  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
+  const textLength = unofficialText?.length ?? 0;
+  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
+  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
+  const estimatedHeight = Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
+  const unofficialHeight = Math.max(measuredHeight, estimatedHeight);
+  return 8 + Math.ceil(unofficialHeight) + 12;
+};
+
 /** Adds status, unofficial, title, and footer overlays to the export container. */
 export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}) => {
   const isDarkMode = store.getState().theme.darkMode;
@@ -128,20 +151,7 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
   const unofficialOverlay = options.unofficialText
     ? addUnofficialOverlay(container, options.unofficialText)
     : null;
-  const unofficialInner = unofficialOverlay?.firstElementChild as HTMLElement | null | undefined;
-  const measuredHeight = Math.max(
-    unofficialOverlay?.getBoundingClientRect().height ?? 0,
-    unofficialInner?.getBoundingClientRect().height ?? 0,
-    unofficialInner?.scrollHeight ?? 0,
-  );
-  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
-  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
-  const textLength = options.unofficialText?.length ?? 0;
-  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
-  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
-  const estimatedHeight = Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
-  const unofficialHeight = Math.max(measuredHeight, estimatedHeight);
-  const footerBottom = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 42;
+  const footerBottom = getFooterBottom(container, unofficialOverlay, options.unofficialText);
 
   addTitleAndFooter(container, options, isDarkMode, footerBottom);
 };
