@@ -153,8 +153,13 @@ const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string
 };
 
 const isLegendHidden = (legend: HTMLElement) => {
-  const computedDisplay = legend.ownerDocument.defaultView?.getComputedStyle(legend)?.display;
-  return legend.style.display === 'none' || computedDisplay === 'none';
+  const computedStyle = legend.ownerDocument.defaultView?.getComputedStyle(legend);
+  return legend.style.display === 'none' ||
+    computedStyle?.display === 'none' ||
+    legend.style.visibility === 'hidden' ||
+    computedStyle?.visibility === 'hidden' ||
+    legend.style.opacity === '0' ||
+    computedStyle?.opacity === '0';
 };
 
 const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMRect) => {

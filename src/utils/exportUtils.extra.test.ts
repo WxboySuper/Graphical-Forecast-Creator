@@ -239,6 +239,26 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
+  test('does not reserve space for a legend hidden by visibility', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.visibility = 'hidden';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('does not reserve space for a transparent legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.opacity = '0';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
   test('bounds warning clearance in a narrow container without layout', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
