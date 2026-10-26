@@ -124,42 +124,60 @@ const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
   );
 };
 
+const readContainerWidth = (container: HTMLElement) => {
+  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container).width;
+  const widthCandidates = [
+    container.clientWidth,
+    container.getBoundingClientRect().width,
+    container.offsetWidth,
+    container.scrollWidth,
+    Number.parseFloat(container.style.width),
+    Number.parseFloat(computedWidth ?? ''),
+  ];
+  return widthCandidates.find((width) => width > 0) ?? 320;
+};
+
 const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
-  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container).width;
-  const containerWidth =
-    container.clientWidth ||
-    container.getBoundingClientRect().width ||
-    container.offsetWidth ||
-    container.scrollWidth ||
-    Number.parseFloat(container.style.width) ||
-    Number.parseFloat(computedWidth ?? '') ||
-    320;
+  const containerWidth = readContainerWidth(container);
   const textLength = unofficialText?.length ?? 0;
   // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
   const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
   return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
 };
 
-const getLegendClearance = (container: HTMLElement) => {
-  const legend = container.querySelector<HTMLElement>('.map-legend');
-  if (!legend) return 0;
+const isLegendHidden = (legend: HTMLElement) => {
+  const computedDisplay = legend.ownerDocument.defaultView?.getComputedStyle(legend).display;
+  return legend.style.display === 'none' || computedDisplay === 'none';
+};
 
-  const containerBounds = container.getBoundingClientRect();
-  const legendBounds = legend.getBoundingClientRect();
-  if (containerBounds.height > 0 && legendBounds.height > 0) {
-    const footerLeft = containerBounds.left + 20;
-    const footerRight = containerBounds.right - 20;
-    const overlapsHorizontally = legendBounds.left < footerRight && legendBounds.right > footerLeft;
-    if (!overlapsHorizontally) return 0;
-    return Math.ceil(containerBounds.bottom - legendBounds.top + 12);
-  }
+const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMRect) => {
+  const footerLeft = containerBounds.left + 20;
+  const footerRight = containerBounds.right - 20;
+  return legendBounds.left < footerRight && legendBounds.right > footerLeft;
+};
 
+const getFallbackLegendClearance = (container: HTMLElement, legend: HTMLElement, legendBounds: DOMRect) => {
   // Cloned exports can lack layout metrics until the browser paints them.
   const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend).bottom;
   const legendBottom = Number.parseFloat(computedBottom ?? '');
   const legendHeight = legendBounds.height > 0 ? legendBounds.height : 108;
   return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendHeight + 12);
+};
+
+const getMeasuredLegendClearance = (containerBounds: DOMRect, legendBounds: DOMRect) => {
+  const overlaps = legendBounds.height > 0 && overlapsFooterHorizontally(containerBounds, legendBounds);
+  return overlaps ? Math.ceil(containerBounds.bottom - legendBounds.top + 12) : 0;
+};
+
+const getLegendClearance = (container: HTMLElement) => {
+  const legend = container.querySelector<HTMLElement>('.map-legend');
+  if (!legend || isLegendHidden(legend)) return 0;
+
+  const containerBounds = container.getBoundingClientRect();
+  const legendBounds = legend.getBoundingClientRect();
+  if (containerBounds.height <= 0) return getFallbackLegendClearance(container, legend, legendBounds);
+  return getMeasuredLegendClearance(containerBounds, legendBounds);
 };
 
 const getFooterBottom = (

@@ -184,5 +184,15 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(noLayoutContainer);
 
     expect(noLayoutContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
+
+    const hiddenContainer = document.createElement('div');
+    hiddenContainer.className = 'no-layout';
+    const hiddenLegend = document.createElement('div');
+    hiddenLegend.className = 'map-legend';
+    hiddenLegend.style.display = 'none';
+    hiddenContainer.appendChild(hiddenLegend);
+    addOverlays(hiddenContainer);
+
+    expect(hiddenContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
   });
 });
