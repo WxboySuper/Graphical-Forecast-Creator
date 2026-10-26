@@ -40,7 +40,8 @@ for (const width of [1280, 320]) {
     const exportBox = await viewport.boundingBox();
     if (!exportBox) throw new Error('Export viewport has no bounds');
     const overlayBounds = await page.evaluate(async ({ containerWidth }) => {
-      const { buildCloneCallback } = await import('/src/utils/exportUtils.ts');
+      const exportUtilsUrl = '/src/utils/exportUtils.ts';
+      const { buildCloneCallback } = await import(exportUtilsUrl);
       const source = document.querySelector<HTMLElement>('.map-container');
       if (!source) throw new Error('Forecast map export root was not found');
       const clonedRoot = source.cloneNode(true) as HTMLElement;
