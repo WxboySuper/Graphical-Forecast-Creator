@@ -7,7 +7,6 @@ const { parse } = createRequire(import.meta.url)('yaml');
 
 const workflowFiles = [
   '../../.github/workflows/opencode.yml',
-  '../../.github/workflows/opencode-first-look.yml',
   '../../.github/workflows/opencode-issue-triage.yml',
   '../../.github/workflows/opencode-changelog-audit.yml',
   '../../.github/workflows/opencode-changelog-pr.yml',
@@ -20,10 +19,9 @@ const migratedWorkflows = [
   '../../.github/workflows/opencode-research.yml',
 ];
 const queueGroup = 'gfc-opencode-maintenance-queue';
-const ghActionsExpr = (expression) => ['$', '{{ ', expression, ' }}'].join('');
 
-test('OpenCode workflows use the shared queue except first-look, which is per PR', () => {
-  for (const workflowFile of workflowFiles.filter((candidate) => !candidate.endsWith('opencode-first-look.yml'))) {
+test('OpenCode workflows use the shared queue', () => {
+  for (const workflowFile of workflowFiles) {
     const source = readFileSync(new URL(workflowFile, import.meta.url), 'utf8');
     assert.match(
       source,
@@ -33,38 +31,12 @@ test('OpenCode workflows use the shared queue except first-look, which is per PR
     assert.doesNotMatch(source, /^[ ]{2}cancel-in-progress: true$/m, `${workflowFile} must not cancel a running invocation`);
   }
 
-  const firstLook = parse(readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8'));
-  assert.ok(firstLook.concurrency === undefined, 'CI waiting must stay outside the OpenCode queue');
-  assert.ok(firstLook.jobs['wait-for-ci'].concurrency === undefined);
-  assert.deepEqual(firstLook.jobs.review.concurrency, { group: 'fl-' + ghActionsExpr('github.event.pull_request.number || github.event.issue.number'), 'cancel-in-progress': false });
 });
 
 test('changelog audit keeps runner context references at step scope', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/opencode-changelog-audit.yml', import.meta.url), 'utf8');
   const jobEnv = workflow.match(/^[ ]{4}env:\r?\n([\s\S]*?)^[ ]{4}steps:/m)?.[1] ?? '';
   assert.doesNotMatch(jobEnv, /runner\.temp/, 'runner context is unavailable in job-level env');
-});
-
-test('first-look reviews publish one bot comment with read-only issue and pull-request write access', () => {
-  const source = readFileSync(new URL('../../.github/workflows/opencode-first-look.yml', import.meta.url), 'utf8');
-  const workflow = parse(source);
-  const review = workflow.jobs.review;
-  const publisher = review.steps.find((step) => step.name === 'Publish first-look result');
-
-  assert.deepEqual(review.permissions, {
-    contents: 'read',
-    issues: 'read',
-    'pull-requests': 'write',
-    checks: 'read',
-  });
-  assert.deepEqual(workflow.jobs['wait-for-ci'].permissions, {
-    'pull-requests': 'read',
-    actions: 'read',
-  });
-  assert.equal(publisher.env.GH_TOKEN, ghActionsExpr('github.token'));
-  assert.doesNotMatch(publisher.env.GH_TOKEN, /GH_PAT/);
-  assert.match(publisher.run, /publish-opencode-first-look\.mjs/);
-  assert.doesNotMatch(source, /pulls\.createReview/);
 });
 
 test('migrated maintenance workflows stay deleted because T3 is the sole runner', () => {
