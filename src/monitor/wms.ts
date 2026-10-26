@@ -210,7 +210,3 @@ export const fetchWmsCapabilities = async (url: string): Promise<string> => {
 export const fetchLayerTimeValues = async (config: WmsLayerConfig): Promise<string[]> =>
   findLayerTimeValues(await fetchWmsCapabilities(config.url), config.layer);
 
-export const fetchLatestLayerTime = async (config: WmsLayerConfig): Promise<string | undefined> => {
-  const timeValues = await fetchLayerTimeValues(config);
-  return timeValues[timeValues.length - 1];
-};
