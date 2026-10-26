@@ -161,7 +161,7 @@ describe('exportUtils additional unit tests', () => {
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
 
-    const unofficialText = 'Unofficial Forecast â€” Not for Safety Decisions';
+    const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
     const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: false, statusText: 'StatusText', unofficialText });
     cb(clonedRoot);
 
