@@ -300,14 +300,15 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
-  test('uses a conservative warning height when layout is unavailable', async () => {
+  test('estimates warning height using a default export width when layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
 
     addOverlays(container, { unofficialText });
 
-    expect(getAttributionBottom(container)).toBe(`${8 + unofficialText.length * 16 + 6 + 12}px`);
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
   test('allows a source-measured warning height to override the conservative estimate', async () => {
@@ -340,7 +341,8 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'A'.repeat(29) });
 
-    expect(getAttributionBottom(container)).toBe(`${8 + 29 * 16 + 6 + 12}px`);
+    const estimatedLines = Math.ceil(29 / 21);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
   test('does not parse a percentage container width as pixels', async () => {
     const addOverlays = await loadOverlayAdder();
@@ -349,7 +351,9 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
 
-    expect(getAttributionBottom(container)).toBe(`${8 + 'Unofficial Forecast - Not for Safety Decisions'.length * 16 + 6 + 12}px`);
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
   test('handles a cloned document without a browsing context', async () => {
@@ -364,6 +368,8 @@ describe('exportUtils additional unit tests', () => {
     container.appendChild(legend);
 
     expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
-    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + 'Unofficial Forecast - Not for Safety Decisions'.length * 16 + 6 + 12}px`);
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 });
