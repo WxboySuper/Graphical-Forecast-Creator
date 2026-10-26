@@ -162,7 +162,14 @@ describe('exportUtils additional unit tests', () => {
     clonedRoot.appendChild(ctrl);
 
     const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
-    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: false, statusText: 'StatusText', unofficialText });
+    const cb = buildCloneCallback({
+      title: 'MyTitle',
+      includeLegendAndStatus: false,
+      statusText: 'StatusText',
+      unofficialText,
+      unofficialHeight: 22,
+      legendClearance: 0,
+    });
     cb(clonedRoot);
 
     // original control should be hidden
@@ -208,37 +215,31 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
-  test('uses fallback clearance for a legend when layout is unavailable', async () => {
+  test('does not invent legend dimensions when source layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout', 'map-legend');
 
     addOverlays(container);
 
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('uses source layout clearance when cloned legend geometry is zero', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+
+    addOverlays(container, { legendClearance: 232 });
+
     expect(getAttributionBottom(container)).toBe('232px');
   });
 
-  test('uses fallback clearance for a visible legend with zero layout height', async () => {
+  test('uses source layout clearance when clone container geometry is degenerate', async () => {
     const addOverlays = await loadOverlayAdder();
-    const container = createOverlayContainer('map-container', 'map-legend zero-height');
-    jest.spyOn(container.querySelector<HTMLElement>('.map-legend')!, 'getBoundingClientRect').mockReturnValue({
-      x: 100, y: 380, width: 200, height: 0, top: 380, right: 300, bottom: 380, left: 100, toJSON: () => ({}),
-    } as DOMRect);
+    const container = createOverlayContainer('no-layout', 'map-legend');
 
-    addOverlays(container);
+    addOverlays(container, { legendClearance: 232 });
 
     expect(getAttributionBottom(container)).toBe('232px');
-  });
-
-  test('uses fallback clearance for a visible legend when container width is unavailable', async () => {
-    const addOverlays = await loadOverlayAdder();
-    const container = createOverlayContainer('map-container', 'map-legend');
-    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({
-      x: 0, y: 0, width: 0, height: 600, top: 0, right: 0, bottom: 600, left: 0, toJSON: () => ({}),
-    } as DOMRect);
-
-    addOverlays(container);
-
-    expect(Number.parseFloat(getAttributionBottom(container) ?? '')).toBeGreaterThan(20);
   });
 
   test('does not reserve space for a hidden legend', async () => {
@@ -271,26 +272,26 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
-  test('bounds warning clearance in a narrow container without layout', async () => {
+  test('uses a conservative warning height when layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
-    container.style.width = '40px';
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
 
-    addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
+    addOverlays(container, { unofficialText });
 
-    expect(getAttributionBottom(container)).toBe('58px');
+    expect(getAttributionBottom(container)).toBe(`${8 + unofficialText.length * 16 + 6 + 12}px`);
   });
 
-  test('estimates long warning text conservatively when layout is unavailable', async () => {
+  test('allows a source-measured warning height to override the conservative estimate', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
 
-    addOverlays(container, { unofficialText: 'A'.repeat(29) });
+    addOverlays(container, { unofficialText: 'A'.repeat(200), unofficialHeight: 22 });
 
-    expect(getAttributionBottom(container)).toBe('58px');
+    expect(getAttributionBottom(container)).toBe('42px');
   });
 
-  test('ignores overflowing content width when estimating warning height', async () => {
+  test('does not rely on overflowing content width for warning clearance', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
     container.style.width = '200px';
@@ -298,7 +299,7 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'A'.repeat(29) });
 
-    expect(getAttributionBottom(container)).toBe('58px');
+    expect(getAttributionBottom(container)).toBe(`${8 + 29 * 16 + 6 + 12}px`);
   });
   test('does not parse a percentage container width as pixels', async () => {
     const addOverlays = await loadOverlayAdder();
@@ -307,7 +308,7 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
 
-    expect(getAttributionBottom(container)).toBe('58px');
+    expect(getAttributionBottom(container)).toBe(`${8 + 'Unofficial Forecast - Not for Safety Decisions'.length * 16 + 6 + 12}px`);
   });
 
   test('handles a cloned document without a browsing context', async () => {
@@ -322,6 +323,6 @@ describe('exportUtils additional unit tests', () => {
     container.appendChild(legend);
 
     expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
-    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
+    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + 'Unofficial Forecast - Not for Safety Decisions'.length * 16 + 6 + 12}px`);
   });
 });
