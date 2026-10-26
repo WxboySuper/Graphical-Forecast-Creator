@@ -161,7 +161,7 @@ describe('exportUtils additional unit tests', () => {
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
 
-    const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
+    const unofficialText = 'Unofficial Forecast â€” Not for Safety Decisions';
     const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: false, statusText: 'StatusText', unofficialText });
     cb(clonedRoot);
 
@@ -229,6 +229,18 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('232px');
   });
 
+  test('uses fallback clearance for a visible legend when container width is unavailable', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend');
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+      x: 0, y: 0, width: 0, height: 600, top: 0, right: 0, bottom: 600, left: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    addOverlays(container);
+
+    expect(Number.parseFloat(getAttributionBottom(container) ?? '')).toBeGreaterThan(20);
+  });
+
   test('does not reserve space for a hidden legend', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout', 'map-legend');
@@ -265,6 +277,15 @@ describe('exportUtils additional unit tests', () => {
     container.style.width = '40px';
 
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
+
+    expect(getAttributionBottom(container)).toBe('58px');
+  });
+
+  test('estimates long warning text conservatively when layout is unavailable', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'A'.repeat(29) });
 
     expect(getAttributionBottom(container)).toBe('58px');
   });

@@ -148,7 +148,7 @@ const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string
   const effectiveWidth = containerWidth < 64 ? 320 : containerWidth;
   const textLength = unofficialText?.length ?? 0;
   // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
-  const charactersPerLine = Math.max(8, Math.floor((effectiveWidth - 32) / 8.5));
+  const charactersPerLine = Math.max(8, Math.floor((effectiveWidth - 48) / 9.5));
   return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
 };
 
@@ -196,7 +196,7 @@ const getLegendClearance = (container: HTMLElement) => {
 
   const containerBounds = container.getBoundingClientRect();
   const legendBounds = legend.getBoundingClientRect();
-  if (containerBounds.height <= 0 || legendBounds.height <= 0) {
+  if (containerBounds.height <= 0 || containerBounds.width <= 0 || legendBounds.height <= 0) {
     return getFallbackLegendClearance(container, legend, legendBounds);
   }
   return getMeasuredLegendClearance(containerBounds, legendBounds);
@@ -507,7 +507,7 @@ export function maybeShowTileTimeoutWarning(exportRoot: HTMLElement, imgResult?:
       const warningBanner = document.createElement('div');
       warningBanner.setAttribute('data-gfc-export-warning', '1');
       warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
-      warningBanner.textContent = 'Warning: Map tiles timed out loading — check your internet connection. Export may be incomplete.';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading â€” check your internet connection. Export may be incomplete.';
       exportRoot.appendChild(warningBanner);
       setTimeout(() => { try { warningBanner.remove(); } catch {
         console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
