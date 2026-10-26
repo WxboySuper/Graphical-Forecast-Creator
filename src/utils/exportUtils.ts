@@ -164,7 +164,8 @@ const getStyleBasedLegendClearance = (container: HTMLElement, legend: HTMLElemen
   // A live source with degenerate geometry can still expose CSS lengths. Do not invent dimensions
   // when a detached document has neither layout metrics nor a browsing context.
   const computedStyle = container.ownerDocument.defaultView?.getComputedStyle(legend);
-  const bottom = parsePixelLength(legend.style.bottom || computedStyle?.bottom);
+  const inlineBottom = parsePixelLength(legend.style.bottom);
+  const bottom = Number.isFinite(inlineBottom) ? inlineBottom : parsePixelLength(computedStyle?.bottom);
   const heightCandidates = [
     legend.getBoundingClientRect().height,
     legend.offsetHeight,
