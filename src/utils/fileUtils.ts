@@ -46,17 +46,54 @@ const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
   bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
 ].includes(true);
 
-/** Expands one ZIP entry, rejecting archives that decompress past the import byte budget. */
+/** Expands one ZIP entry while enforcing the byte budget as output arrives. */
 const expandPackageEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
   const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
   const maxLabel = `${MAX_IMPORT_BYTES / 1024 / 1024} MB`;
+  const oversizedError = () => new Error(
+    `Expanded forecast package is too large. The maximum supported size is ${maxLabel}.`,
+  );
   if (declaredSize !== undefined && declaredSize > MAX_IMPORT_BYTES) {
-    throw new Error(`Expanded forecast package is too large. The maximum supported size is ${maxLabel}.`);
+    throw oversizedError();
   }
-  const expanded = await entry.async('uint8array');
-  if (expanded.byteLength > MAX_IMPORT_BYTES) {
-    throw new Error(`Expanded forecast package is too large. The maximum supported size is ${maxLabel}.`);
-  }
+
+  const expanded = await new Promise<Uint8Array>((resolve, reject) => {
+    const stream = entry.internalStream('uint8array');
+    const chunks: Uint8Array[] = [];
+    let byteLength = 0;
+    let settled = false;
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      stream.pause();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    stream.on('data', (chunk: Uint8Array) => {
+      if (settled) return;
+      byteLength += chunk.byteLength;
+      if (byteLength > MAX_IMPORT_BYTES) {
+        rejectOnce(oversizedError());
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on('error', rejectOnce);
+    stream.on('end', () => {
+      if (settled) return;
+      settled = true;
+      const result = new Uint8Array(byteLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      resolve(result);
+    });
+    stream.resume();
+  });
+
   return new TextDecoder().decode(expanded);
 };
 
