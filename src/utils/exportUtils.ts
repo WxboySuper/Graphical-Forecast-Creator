@@ -95,7 +95,7 @@ export const addUnofficialOverlay = (container: HTMLElement, unofficialText: str
 };
 
 /** Adds the title and footer overlays to the export container. */
-export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean, footerBottom = 42) => {
+export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean, footerBottom = 20) => {
   const doc = container.ownerDocument;
   if (options.title) {
     const titleDiv = doc.createElement('div');
@@ -126,7 +126,15 @@ const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
 
 const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
-  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
+  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container).width;
+  const containerWidth =
+    container.clientWidth ||
+    container.getBoundingClientRect().width ||
+    container.offsetWidth ||
+    container.scrollWidth ||
+    Number.parseFloat(container.style.width) ||
+    Number.parseFloat(computedWidth ?? '') ||
+    320;
   const textLength = unofficialText?.length ?? 0;
   // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
   const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
@@ -139,19 +147,19 @@ const getLegendClearance = (container: HTMLElement) => {
 
   const containerBounds = container.getBoundingClientRect();
   const legendBounds = legend.getBoundingClientRect();
-  const footerLeft = containerBounds.left + 20;
-  const footerRight = containerBounds.right - 20;
-  const overlapsHorizontally = legendBounds.left < footerRight && legendBounds.right > footerLeft;
-  if (!overlapsHorizontally) return 0;
-
   if (containerBounds.height > 0 && legendBounds.height > 0) {
+    const footerLeft = containerBounds.left + 20;
+    const footerRight = containerBounds.right - 20;
+    const overlapsHorizontally = legendBounds.left < footerRight && legendBounds.right > footerLeft;
+    if (!overlapsHorizontally) return 0;
     return Math.ceil(containerBounds.bottom - legendBounds.top + 12);
   }
 
   // Cloned exports can lack layout metrics until the browser paints them.
   const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend).bottom;
   const legendBottom = Number.parseFloat(computedBottom ?? '');
-  return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendBounds.height + 12);
+  const legendHeight = legendBounds.height > 0 ? legendBounds.height : 108;
+  return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendHeight + 12);
 };
 
 const getFooterBottom = (

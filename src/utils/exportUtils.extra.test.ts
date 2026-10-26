@@ -150,6 +150,9 @@ describe('exportUtils additional unit tests', () => {
     const { addOverlays } = await import('./exportUtils');
 
     jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('no-layout')) {
+        return { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
+      }
       if (this.classList.contains('map-container')) {
         return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
       }
@@ -172,5 +175,14 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(container);
 
     expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
+
+    const noLayoutContainer = document.createElement('div');
+    noLayoutContainer.className = 'no-layout';
+    const noLayoutLegend = document.createElement('div');
+    noLayoutLegend.className = 'map-legend';
+    noLayoutContainer.appendChild(noLayoutLegend);
+    addOverlays(noLayoutContainer);
+
+    expect(noLayoutContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
   });
 });
