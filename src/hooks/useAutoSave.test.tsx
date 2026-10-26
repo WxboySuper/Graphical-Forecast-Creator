@@ -1,7 +1,7 @@
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
-import forecastReducer, { setMapView, setCycleDate } from '../store/forecastSlice';
+import forecastReducer, { setMapView, setCycleDate, setForecastWorkspace } from '../store/forecastSlice';
 import { clearAutoSave, getAutoSaveStorageKey, migrateLegacyAutoSave, migrateWorkspaceAutoSaves, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
 import { serializeForecast } from '../utils/fileUtils';
 
@@ -335,16 +335,26 @@ describe('useAutoSave', () => {
     });
 
     await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
-    rerender(
-      <Provider store={store}>
-        <Harness workspaceId="custom" />
-      </Provider>
+    (serializeForecast as jest.Mock).mockImplementation(
+      (_cycle: unknown, mapView: { center: [number, number]; zoom: number }) => ({ zoom: mapView.zoom }),
     );
+
+    // setForecastWorkspace resets Redux state in the same commit as the scope
+    // change; the dirty Severe snapshot must still be flushed before that reset.
+    // eslint-disable-next-line testing-library/no-unnecessary-act -- batch the Redux reset with the route scope change
+    act(() => {
+      store.dispatch(setForecastWorkspace('custom'));
+      rerender(
+        <Provider store={store}>
+          <Harness workspaceId="custom" />
+        </Provider>
+      );
+    });
 
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({
       schemaVersion: 1,
       workspaceId: 'severe',
-      forecast: { serialized: true },
+      forecast: { zoom: 6 },
     }));
     expect(localStorage.getItem('forecastData:custom')).toBeNull();
   });

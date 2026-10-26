@@ -24,7 +24,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **ol-mapbox-style:** ^13.4.3 → ^13.8.0
 - **react-router:** ^8.3.1 → ~8.5.0
 - **rollup:** >=4.62.4 → >=4.63.1
-- **uuid:** ^14.0.1 → ^14.0.2
+- **uuid:** ^14.0.1 → ^14.0.3
 - **web-vitals:** ^6.1.0 → ^6.2.1
 - **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
 - **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
@@ -37,10 +37,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
 - **typescript-eslint:** ^8.68.0 → ^8.70.0
 - **vite:** ^8.3.0 → ^8.3.5
-- **@sentry/node:** ^10.69.0 → ^11.8.0 (`server`)
+- **@sentry/node:** ^10.69.0 → ^11.9.0 (`server`)
 - **firebase-admin:** ^14.3.0 → ^14.5.0 (`server`)
 - **express-rate-limit:** ^8.7.0 → ^8.7.1 (`server`)
-- **stripe:** ^22.6.1 → ^23.0.0 (`server`)
+- **stripe:** ^22.6.1 → ^23.0.1 (`server`)
 
 #### Added
 
