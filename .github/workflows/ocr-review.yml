@@ -192,7 +192,10 @@ jobs:
           llm_extra_body: '{}'
           language: English
           effort: low
-          max_tokens_budget: '500000'
+          # Older PRs may need more full-repository context than the default
+          # 500k budget allowed. #1184 used 582,597 tokens and failed before
+          # producing a review, so leave enough room for that valid review.
+          max_tokens_budget: '650000'
           review_task_timeout: '20'
           sticky_summary: 'true'
           incremental: 'true'
