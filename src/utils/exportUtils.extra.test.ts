@@ -300,14 +300,26 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
-  test('estimates warning height using a default export width when layout is unavailable', async () => {
+  test('uses a one-character-per-line estimate when warning layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
 
     addOverlays(container, { unofficialText });
 
-    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    const estimatedLines = unofficialText.length;
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+
+  test('estimates wrapped warning height from measured container width', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container');
+    const unofficialText = 'A'.repeat(73);
+
+    addOverlays(container, { unofficialText });
+
+    const measuredCharactersPerLine = Math.floor((320 - 32) / 8);
+    const estimatedLines = Math.ceil(unofficialText.length / measuredCharactersPerLine);
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
@@ -333,6 +345,16 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('80px');
   });
 
+  test('moves the warning above a bottom legend and keeps attribution above the warning', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend');
+
+    addOverlays(container, { unofficialText: 'Warning' });
+
+    expect(container.querySelector<HTMLElement>('.gfc-export-unofficial-overlay')?.style.bottom).toBe('232px');
+    expect(getAttributionBottom(container)).toBe('266px');
+  });
+
   test('does not rely on overflowing content width for warning clearance', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
@@ -341,7 +363,7 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'A'.repeat(29) });
 
-    const estimatedLines = Math.ceil(29 / 21);
+    const estimatedLines = 29;
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
   test('does not parse a percentage container width as pixels', async () => {
@@ -352,7 +374,7 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
 
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
-    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    const estimatedLines = unofficialText.length;
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
@@ -369,7 +391,7 @@ describe('exportUtils additional unit tests', () => {
 
     expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
-    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    const estimatedLines = unofficialText.length;
     expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 });
