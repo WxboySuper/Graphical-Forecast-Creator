@@ -43,6 +43,9 @@ export interface OverlayOptions {
   title?: string;
   statusText?: string;
   unofficialText?: string;
+  /** Layout measured from the live map before html2canvas clones it. */
+  legendClearance?: number;
+  unofficialHeight?: number;
 }
 
 // Helper: add title/footer/status and unofficial overlays
@@ -124,32 +127,15 @@ const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
   );
 };
 
-const parsePixelWidth = (value: string | undefined) => {
+const parsePixelLength = (value: string | undefined) => {
   const match = value?.trim().match(/^(\d+(?:\.\d+)?)px$/);
   return match ? Number(match[1]) : Number.NaN;
 };
 
-const readContainerWidth = (container: HTMLElement) => {
-  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container)?.width;
-  const widthCandidates = [
-    container.clientWidth,
-    container.getBoundingClientRect().width,
-    container.offsetWidth,
-
-    parsePixelWidth(container.style.width),
-    parsePixelWidth(computedWidth),
-  ];
-  return widthCandidates.find((width) => width > 0) ?? 320;
-};
-
-const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
-  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
-  const containerWidth = readContainerWidth(container);
-  const effectiveWidth = containerWidth < 64 ? 320 : containerWidth;
+const estimateUnofficialHeight = (unofficialText: string | undefined) => {
+  // The badge allows breaks between any characters, so one line per character is a safe upper bound.
   const textLength = unofficialText?.length ?? 0;
-  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
-  const charactersPerLine = Math.max(8, Math.floor((effectiveWidth - 48) / 9.5));
-  return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
+  return Math.max(22, textLength * 16 + 6);
 };
 
 const hasHiddenDisplay = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
@@ -174,12 +160,19 @@ const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMR
   return legendBounds.left < footerRight && legendBounds.right > footerLeft;
 };
 
-const getFallbackLegendClearance = (container: HTMLElement, legend: HTMLElement, legendBounds: DOMRect) => {
-  // Cloned exports can lack layout metrics until the browser paints them.
-  const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend)?.bottom;
-  const legendBottom = Number.parseFloat(computedBottom ?? '');
-  const legendHeight = legendBounds.height > 0 ? legendBounds.height : 108;
-  return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendHeight + 12);
+const getStyleBasedLegendClearance = (container: HTMLElement, legend: HTMLElement) => {
+  // A live source with degenerate geometry can still expose CSS lengths. Do not invent dimensions
+  // when a detached document has neither layout metrics nor a browsing context.
+  const computedStyle = container.ownerDocument.defaultView?.getComputedStyle(legend);
+  const bottom = parsePixelLength(legend.style.bottom || computedStyle?.bottom);
+  const height = Math.max(
+    legend.getBoundingClientRect().height,
+    legend.offsetHeight,
+    legend.scrollHeight,
+    parsePixelLength(legend.style.height),
+    parsePixelLength(computedStyle?.height),
+  );
+  return Number.isFinite(bottom) && height > 0 ? Math.ceil(bottom + height + 12) : 0;
 };
 
 const getMeasuredLegendClearance = (containerBounds: DOMRect, legendBounds: DOMRect) => {
@@ -200,7 +193,7 @@ const getLegendClearance = (container: HTMLElement) => {
   const containerBounds = container.getBoundingClientRect();
   const legendBounds = legend.getBoundingClientRect();
   if (hasDegenerateContainerBounds(containerBounds) || hasDegenerateLegendBounds(legendBounds)) {
-    return getFallbackLegendClearance(container, legend, legendBounds);
+    return getStyleBasedLegendClearance(container, legend);
   }
   return getMeasuredLegendClearance(containerBounds, legendBounds);
 };
@@ -209,14 +202,15 @@ const getFooterBottom = (
   container: HTMLElement,
   unofficialOverlay: HTMLElement | null,
   unofficialText: string | undefined,
+  measuredUnofficialHeight?: number,
+  measuredLegendClearance?: number,
 ) => {
-  const unofficialClearance = unofficialOverlay
-    ? 8 + Math.ceil(Math.max(
-      getMeasuredUnofficialHeight(unofficialOverlay),
-      estimateUnofficialHeight(container, unofficialText),
-    )) + 12
-    : 20;
-  return Math.max(unofficialClearance, getLegendClearance(container));
+  const unofficialHeight = measuredUnofficialHeight ?? Math.max(
+    unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0,
+    estimateUnofficialHeight(unofficialText),
+  );
+  const unofficialClearance = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 20;
+  return Math.max(unofficialClearance, measuredLegendClearance ?? getLegendClearance(container));
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
@@ -232,7 +226,13 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
   const unofficialOverlay = options.unofficialText
     ? addUnofficialOverlay(container, options.unofficialText)
     : null;
-  const footerBottom = getFooterBottom(container, unofficialOverlay, options.unofficialText);
+  const footerBottom = getFooterBottom(
+    container,
+    unofficialOverlay,
+    options.unofficialText,
+    options.unofficialHeight,
+    options.legendClearance,
+  );
 
   addTitleAndFooter(container, options, isDarkMode, footerBottom);
 };
@@ -247,6 +247,20 @@ const readStatusText = (root: HTMLElement): string =>
 const readUnofficialText = (root: HTMLElement): string =>
   root.querySelector('.unofficial-badge-inner')?.textContent?.trim() ??
   '';
+
+const getExistingUnofficialHeight = (root: HTMLElement) => {
+  const badge = root.querySelector<HTMLElement>('.unofficial-badge');
+  const inner = root.querySelector<HTMLElement>('.unofficial-badge-inner');
+  if (!badge) return undefined;
+  const height = Math.max(
+    badge.getBoundingClientRect().height,
+    badge.offsetHeight,
+    inner?.getBoundingClientRect().height ?? 0,
+    inner?.offsetHeight ?? 0,
+    inner?.scrollHeight ?? 0,
+  );
+  return height > 0 ? height : undefined;
+};
 
 // Helper: mark cloned images CORS-safe so html2canvas can load external tiles.
 /** Marks cloned images as CORS safe so html2canvas can load external tiles. */
@@ -456,9 +470,14 @@ export const exportMapAsImage = async (
 
   const { exportRoot, width, height } = getExportRootAndSize(map);
 
-  // Read overlays from live DOM before html2canvas clones/reflows styles
+  // Snapshot overlay layout before html2canvas clones/reflows styles. The clone may have no
+  // browsing context, so it cannot reliably recover stylesheet visibility or measured geometry.
   const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
   const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
+  const legendClearance = includeLegendAndStatus ? getLegendClearance(exportRoot) : 0;
+  const unofficialHeight = includeLegendAndStatus
+    ? getExistingUnofficialHeight(exportRoot)
+    : undefined;
 
   await waitForMapRender(map, 400);
   const imgResult = await waitForImagesLoaded(exportRoot, 1200);
@@ -469,7 +488,14 @@ export const exportMapAsImage = async (
     height,
     format,
     quality,
-    onClone: buildCloneCallback({ title, includeLegendAndStatus, statusText, unofficialText }),
+    onClone: buildCloneCallback({
+      title,
+      includeLegendAndStatus,
+      statusText,
+      unofficialText,
+      legendClearance,
+      unofficialHeight,
+    }),
   });
 };
 
