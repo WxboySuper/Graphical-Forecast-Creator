@@ -46,6 +46,20 @@ const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
   bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
 ].includes(true);
 
+/** Node-style stream surface JSZip emits through its internal stream helper. */
+interface PackageEntryStream {
+  on(event: 'data', handler: (chunk: Uint8Array) => void): PackageEntryStream;
+  on(event: 'error', handler: (error: unknown) => void): PackageEntryStream;
+  on(event: 'end', handler: () => void): PackageEntryStream;
+  pause(): void;
+  resume(): void;
+}
+
+/** JSZip keeps internalStream out of its public type surface, so widen the entry locally. */
+type StreamableZipEntry = JSZip.JSZipObject & {
+  internalStream: (type: 'uint8array') => PackageEntryStream;
+};
+
 /** Expands one ZIP entry while enforcing the byte budget as output arrives. */
 const expandPackageEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
   const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
@@ -58,7 +72,7 @@ const expandPackageEntry = async (entry: JSZip.JSZipObject): Promise<string> => 
   }
 
   const expanded = await new Promise<Uint8Array>((resolve, reject) => {
-    const stream = entry.internalStream('uint8array');
+    const stream = (entry as StreamableZipEntry).internalStream('uint8array');
     const chunks: Uint8Array[] = [];
     let byteLength = 0;
     let settled = false;
