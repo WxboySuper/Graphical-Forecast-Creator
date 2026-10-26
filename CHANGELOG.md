@@ -69,6 +69,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
 - **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
 - **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
 - **Firebase SDK:** Updated Firebase from 12.19.0 to 13.0.0 to keep hosted Google sign-in, session persistence, and Firestore cloud sync on a supported release with no change to existing behavior.
