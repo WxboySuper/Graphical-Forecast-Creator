@@ -124,12 +124,8 @@ describe('exportUtils additional unit tests', () => {
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
 
-    const legend = document.createElement('div');
-    legend.className = 'map-legend';
-    clonedRoot.appendChild(legend);
-
     const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
-    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: true, statusText: 'StatusText', unofficialText });
+    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: false, statusText: 'StatusText', unofficialText });
     cb(clonedRoot);
 
     // original control should be hidden
@@ -146,5 +142,35 @@ describe('exportUtils additional unit tests', () => {
     expect((unofficial!.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
     expect(footer!.style.bottom).toBe('58px');
     expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
+  });
+
+  test('keeps the original footer offset without a warning and clears a retained legend', async () => {
+    jest.resetModules();
+    jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
+    const { addOverlays } = await import('./exportUtils');
+
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('map-container')) {
+        return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
+      }
+      if (this.classList.contains('map-legend')) {
+        return { x: 100, y: 380, width: 200, height: 108, top: 380, right: 300, bottom: 488, left: 100, toJSON: () => ({}) } as DOMRect;
+      }
+      return { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
+    });
+
+    const plainContainer = document.createElement('div');
+    plainContainer.className = 'map-container';
+    addOverlays(plainContainer);
+    expect(plainContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
+
+    const container = document.createElement('div');
+    container.className = 'map-container';
+    const legend = document.createElement('div');
+    legend.className = 'map-legend';
+    container.appendChild(legend);
+    addOverlays(container);
+
+    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
   });
 });

@@ -133,15 +133,39 @@ const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string
   return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
 };
 
+const getLegendClearance = (container: HTMLElement) => {
+  const legend = container.querySelector<HTMLElement>('.map-legend');
+  if (!legend) return 0;
+
+  const containerBounds = container.getBoundingClientRect();
+  const legendBounds = legend.getBoundingClientRect();
+  const footerLeft = containerBounds.left + 20;
+  const footerRight = containerBounds.right - 20;
+  const overlapsHorizontally = legendBounds.left < footerRight && legendBounds.right > footerLeft;
+  if (!overlapsHorizontally) return 0;
+
+  if (containerBounds.height > 0 && legendBounds.height > 0) {
+    return Math.ceil(containerBounds.bottom - legendBounds.top + 12);
+  }
+
+  // Cloned exports can lack layout metrics until the browser paints them.
+  const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend).bottom;
+  const legendBottom = Number.parseFloat(computedBottom ?? '');
+  return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendBounds.height + 12);
+};
+
 const getFooterBottom = (
   container: HTMLElement,
   unofficialOverlay: HTMLElement | null,
   unofficialText: string | undefined,
 ) => {
-  if (!unofficialOverlay) return 42;
-  const measuredHeight = getMeasuredUnofficialHeight(unofficialOverlay);
-  const estimatedHeight = estimateUnofficialHeight(container, unofficialText);
-  return 8 + Math.ceil(Math.max(measuredHeight, estimatedHeight)) + 12;
+  const unofficialClearance = unofficialOverlay
+    ? 8 + Math.ceil(Math.max(
+      getMeasuredUnofficialHeight(unofficialOverlay),
+      estimateUnofficialHeight(container, unofficialText),
+    )) + 12
+    : 20;
+  return Math.max(unofficialClearance, getLegendClearance(container));
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
