@@ -333,6 +333,15 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
+  test('preserves a source-measured warning height when it exceeds the estimate', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'Short warning', unofficialHeight: 40 });
+
+    expect(getAttributionBottom(container)).toBe('60px');
+  });
+
   test('uses wrapped clone height when it exceeds the source badge measurement', async () => {
     const addOverlays = await loadOverlayAdder();
     jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
