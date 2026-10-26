@@ -135,7 +135,7 @@ const readContainerWidth = (container: HTMLElement) => {
     container.clientWidth,
     container.getBoundingClientRect().width,
     container.offsetWidth,
-    container.scrollWidth,
+
     parsePixelWidth(container.style.width),
     parsePixelWidth(computedWidth),
   ];
