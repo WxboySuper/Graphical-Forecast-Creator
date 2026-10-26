@@ -99,4 +99,4 @@ state.pullRequestUrl = pull.html_url;
 state.headSha = headSha;
 writeFileSync(statePath, JSON.stringify(state), 'utf8');
 
-process.stdout.write(`Opened ${pull.html_url}; the opened event will start first-look review.\n`);
+process.stdout.write(`Opened ${pull.html_url}.\n`);
