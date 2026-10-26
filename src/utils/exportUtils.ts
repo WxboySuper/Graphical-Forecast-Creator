@@ -135,10 +135,7 @@ const parsePixelLength = (value: string | undefined) => {
 const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   const textLength = unofficialText?.length ?? 0;
   const boundsWidth = container.getBoundingClientRect().width;
-  const clientWidth = container.clientWidth;
-  const inlineWidth = parsePixelLength(container.style.width);
-  const measuredWidth = [boundsWidth, clientWidth, inlineWidth].find((width) => Number.isFinite(width) && width > 0);
-  const containerWidth = measuredWidth ?? 320;
+  const containerWidth = Number.isFinite(boundsWidth) && boundsWidth > 0 ? boundsWidth : 0;
   const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8));
   const lines = Math.ceil(textLength / charactersPerLine);
   return Math.max(22, lines * 16 + 6);
@@ -206,7 +203,7 @@ const getLegendClearance = (container: HTMLElement) => {
   return getMeasuredLegendClearance(containerBounds, legendBounds);
 };
 
-const getFooterBottom = (
+const getFooterLayout = (
   container: HTMLElement,
   unofficialOverlay: HTMLElement | null,
   unofficialText: string | undefined,
@@ -217,8 +214,13 @@ const getFooterBottom = (
   const unofficialHeight = measuredUnofficialHeight > 0
     ? measuredUnofficialHeight
     : estimateUnofficialHeight(container, unofficialText);
-  const unofficialClearance = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 20;
-  return Math.max(unofficialClearance, layoutSnapshot.legendClearance ?? getLegendClearance(container));
+  const legendClearance = layoutSnapshot.legendClearance ?? getLegendClearance(container);
+  const unofficialBottom = unofficialOverlay ? Math.max(8, legendClearance) : 8;
+  const unofficialClearance = unofficialOverlay ? unofficialBottom + Math.ceil(unofficialHeight) + 12 : 20;
+  return {
+    footerBottom: Math.max(unofficialClearance, legendClearance),
+    unofficialBottom,
+  };
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
@@ -234,12 +236,13 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
   const unofficialOverlay = options.unofficialText
     ? addUnofficialOverlay(container, options.unofficialText)
     : null;
-  const footerBottom = getFooterBottom(
+  const { footerBottom, unofficialBottom } = getFooterLayout(
     container,
     unofficialOverlay,
     options.unofficialText,
     options,
   );
+  if (unofficialOverlay) unofficialOverlay.style.bottom = `${unofficialBottom}px`;
 
   addTitleAndFooter(container, options, isDarkMode, footerBottom);
 };
