@@ -27,7 +27,7 @@
   overflow: auto;
 }
 
-@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+@media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
   .map-legend,
   .forecast-floating-panels-layout .map-legend {
     display: none;
@@ -67,7 +67,7 @@
   }
 }
 
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 520px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
     top: 106px;
     left: 86px;
