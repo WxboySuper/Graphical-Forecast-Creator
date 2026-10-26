@@ -125,7 +125,7 @@ const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
 };
 
 const readContainerWidth = (container: HTMLElement) => {
-  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container).width;
+  const computedWidth = container.ownerDocument.defaultView?.getComputedStyle(container)?.width;
   const widthCandidates = [
     container.clientWidth,
     container.getBoundingClientRect().width,
@@ -148,7 +148,7 @@ const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string
 };
 
 const isLegendHidden = (legend: HTMLElement) => {
-  const computedDisplay = legend.ownerDocument.defaultView?.getComputedStyle(legend).display;
+  const computedDisplay = legend.ownerDocument.defaultView?.getComputedStyle(legend)?.display;
   return legend.style.display === 'none' || computedDisplay === 'none';
 };
 
@@ -160,7 +160,7 @@ const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMR
 
 const getFallbackLegendClearance = (container: HTMLElement, legend: HTMLElement, legendBounds: DOMRect) => {
   // Cloned exports can lack layout metrics until the browser paints them.
-  const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend).bottom;
+  const computedBottom = container.ownerDocument.defaultView?.getComputedStyle(legend)?.bottom;
   const legendBottom = Number.parseFloat(computedBottom ?? '');
   const legendHeight = legendBounds.height > 0 ? legendBounds.height : 108;
   return Math.ceil((Number.isFinite(legendBottom) ? legendBottom : 112) + legendHeight + 12);

@@ -27,6 +27,21 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis as typeof globalThis & { fetch?: unknown }, 'fetch');
 });
 
+const mockOverlayBounds = function (this: HTMLElement) {
+  const zeroBounds = { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
+  if (this.classList.contains('no-layout')) return zeroBounds;
+  if (this.classList.contains('map-container')) {
+    return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
+  }
+  if (this.classList.contains('map-legend') && this.classList.contains('near-top')) {
+    return { x: 100, y: 40, width: 200, height: 108, top: 40, right: 300, bottom: 148, left: 100, toJSON: () => ({}) } as DOMRect;
+  }
+  if (this.classList.contains('map-legend')) {
+    return { x: 100, y: 380, width: 200, height: 108, top: 380, right: 300, bottom: 488, left: 100, toJSON: () => ({}) } as DOMRect;
+  }
+  return zeroBounds;
+};
+
 describe('exportUtils additional unit tests', () => {
   type MapWithLifecycle = {
     getTargetElement?: () => HTMLElement;
@@ -149,21 +164,7 @@ describe('exportUtils additional unit tests', () => {
     jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
     const { addOverlays } = await import('./exportUtils');
 
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
-      if (this.classList.contains('no-layout')) {
-        return { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
-      }
-      if (this.classList.contains('map-container')) {
-        return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
-      }
-      if (this.classList.contains('map-legend')) {
-        if (this.classList.contains('near-top')) {
-          return { x: 100, y: 40, width: 200, height: 108, top: 40, right: 300, bottom: 148, left: 100, toJSON: () => ({}) } as DOMRect;
-        }
-        return { x: 100, y: 380, width: 200, height: 108, top: 380, right: 300, bottom: 488, left: 100, toJSON: () => ({}) } as DOMRect;
-      }
-      return { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
-    });
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
 
     const plainContainer = document.createElement('div');
     plainContainer.className = 'map-container';
@@ -213,5 +214,24 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(narrowContainer, { unofficialText: 'Unofficial Forecast — Not for Safety Decisions' });
 
     expect(narrowContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('58px');
+  });
+
+  test('handles a cloned document without a browsing context', async () => {
+    jest.resetModules();
+    jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
+    const { addOverlays } = await import('./exportUtils');
+
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
+    const detachedDocument = document.implementation.createHTMLDocument();
+    expect(detachedDocument.defaultView).toBeNull();
+
+    const container = detachedDocument.createElement('div');
+    container.className = 'no-layout';
+    const legend = detachedDocument.createElement('div');
+    legend.className = 'map-legend';
+    container.appendChild(legend);
+
+    expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
+    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
   });
 });
