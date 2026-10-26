@@ -73,11 +73,11 @@ to each.
 - **uuid** ^14.0.3 (root (pnpm)) — MIT — allowed
 - **vite** ^8.3.5 (root (pnpm)) — MIT — allowed
 - **yaml** 2.9.1 (root (pnpm)) — ISC — allowed
-- **@sentry/node** ^11.8.0 (server (npm)) — MIT — allowed
+- **@sentry/node** ^11.9.0 (server (npm)) — MIT — allowed
 - **express** ^5.3.0 (server (npm)) — MIT — allowed
 - **express-rate-limit** ^8.7.1 (server (npm)) — MIT — allowed
 - **firebase-admin** ^14.5.0 (server (npm)) — Apache-2.0 — allowed
-- **stripe** ^23.0.0 (server (npm)) — MIT — allowed
+- **stripe** ^23.0.1 (server (npm)) — MIT — allowed
 - **cfgrib** 0.9.15.1 (server (python)) — Apache-2.0 — allowed
 - **numpy** 2.4.1 (server (python)) — BSD-3-Clause — allowed
 - **scikit-image** 0.26.0 (server (python)) — BSD-3-Clause — allowed

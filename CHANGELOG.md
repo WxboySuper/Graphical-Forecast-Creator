@@ -69,6 +69,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Server billing and monitoring:** Update the hosted server Stripe library to 23.0.1 and Sentry Node SDK from 11.8.0 to 11.9.0 to keep premium checkout and error monitoring on supported releases with no change to billing behavior.
 - **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
 - **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
 - **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
