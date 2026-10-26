@@ -227,6 +227,31 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
+  test('uses computed legend lengths when inline lengths are automatic', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    const legend = container.querySelector<HTMLElement>('.map-legend')!;
+    legend.style.bottom = 'auto';
+    legend.style.height = 'auto';
+    const originalGetComputedStyle = window.getComputedStyle.bind(window);
+    jest.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element === legend) {
+        return {
+          display: 'block',
+          visibility: 'visible',
+          opacity: '1',
+          bottom: '112px',
+          height: '108px',
+        } as unknown as CSSStyleDeclaration;
+      }
+      return originalGetComputedStyle(element);
+    });
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
   test('uses source layout clearance when cloned legend geometry is zero', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout', 'map-legend');
