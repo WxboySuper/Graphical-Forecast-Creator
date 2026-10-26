@@ -294,6 +294,19 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('42px');
   });
 
+  test('uses wrapped clone height when it exceeds the source badge measurement', async () => {
+    const addOverlays = await loadOverlayAdder();
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains('gfc-export-unofficial-overlay') ? 60 : 0;
+      return { x: 0, y: 0, width: 320, height, top: 0, right: 320, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'A'.repeat(200), unofficialHeight: 22 });
+
+    expect(getAttributionBottom(container)).toBe('80px');
+  });
+
   test('does not rely on overflowing content width for warning clearance', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
