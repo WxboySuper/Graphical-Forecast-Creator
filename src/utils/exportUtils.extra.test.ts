@@ -184,7 +184,7 @@ describe('exportUtils additional unit tests', () => {
     expect(unofficial!.textContent).toContain(unofficialText);
     expect((unofficial!.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
     expect((unofficial!.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
-    expect(footer!.style.bottom).toBe('42px');
+    expect(footer!.style.bottom).toBe('58px');
     expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
   });
 
@@ -323,13 +323,14 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
-  test('allows a source-measured warning height to override the conservative estimate', async () => {
+  test('uses the wrapping estimate when the detached clone cannot be measured', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
 
     addOverlays(container, { unofficialText: 'A'.repeat(200), unofficialHeight: 22 });
 
-    expect(getAttributionBottom(container)).toBe('42px');
+    const estimatedLines = Math.ceil(200 / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
   test('uses wrapped clone height when it exceeds the source badge measurement', async () => {
