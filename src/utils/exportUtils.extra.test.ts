@@ -42,6 +42,28 @@ const mockOverlayBounds = function (this: HTMLElement) {
   return zeroBounds;
 };
 
+const loadOverlayAdder = async () => {
+  jest.resetModules();
+  jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
+  const { addOverlays } = await import('./exportUtils');
+  jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
+  return addOverlays;
+};
+
+const createOverlayContainer = (className: string, legendClassName?: string) => {
+  const container = document.createElement('div');
+  container.className = className;
+  if (legendClassName) {
+    const legend = document.createElement('div');
+    legend.className = legendClassName;
+    container.appendChild(legend);
+  }
+  return container;
+};
+
+const getAttributionBottom = (container: HTMLElement) =>
+  container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom;
+
 describe('exportUtils additional unit tests', () => {
   type MapWithLifecycle = {
     getTargetElement?: () => HTMLElement;
@@ -159,69 +181,64 @@ describe('exportUtils additional unit tests', () => {
     expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
   });
 
-  test('keeps the original footer offset without a warning and clears a retained legend', async () => {
-    jest.resetModules();
-    jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
-    const { addOverlays } = await import('./exportUtils');
+  test('keeps the original footer offset without a warning', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container');
 
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
-
-    const plainContainer = document.createElement('div');
-    plainContainer.className = 'map-container';
-    addOverlays(plainContainer);
-    expect(plainContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
-
-    const container = document.createElement('div');
-    container.className = 'map-container';
-    const legend = document.createElement('div');
-    legend.className = 'map-legend';
-    container.appendChild(legend);
     addOverlays(container);
 
-    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
 
-    const upperLegendContainer = document.createElement('div');
-    upperLegendContainer.className = 'map-container';
-    const upperLegend = document.createElement('div');
-    upperLegend.className = 'map-legend near-top';
-    upperLegendContainer.appendChild(upperLegend);
-    addOverlays(upperLegendContainer);
+  test('clears space above a retained lower legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend');
 
-    expect(upperLegendContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
+    addOverlays(container);
 
-    const noLayoutContainer = document.createElement('div');
-    noLayoutContainer.className = 'no-layout';
-    const noLayoutLegend = document.createElement('div');
-    noLayoutLegend.className = 'map-legend';
-    noLayoutContainer.appendChild(noLayoutLegend);
-    addOverlays(noLayoutContainer);
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
 
-    expect(noLayoutContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
+  test('does not move the footer for a retained upper legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend near-top');
 
-    const hiddenContainer = document.createElement('div');
-    hiddenContainer.className = 'no-layout';
-    const hiddenLegend = document.createElement('div');
-    hiddenLegend.className = 'map-legend';
-    hiddenLegend.style.display = 'none';
-    hiddenContainer.appendChild(hiddenLegend);
-    addOverlays(hiddenContainer);
+    addOverlays(container);
 
-    expect(hiddenContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
 
-    const narrowContainer = document.createElement('div');
-    narrowContainer.className = 'no-layout';
-    narrowContainer.style.width = '40px';
-    addOverlays(narrowContainer, { unofficialText: 'Unofficial Forecast — Not for Safety Decisions' });
+  test('uses fallback clearance for a legend when layout is unavailable', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
 
-    expect(narrowContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('58px');
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
+  test('does not reserve space for a hidden legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.display = 'none';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('bounds warning clearance in a narrow container without layout', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    container.style.width = '40px';
+
+    addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
+
+    expect(getAttributionBottom(container)).toBe('58px');
   });
 
   test('handles a cloned document without a browsing context', async () => {
-    jest.resetModules();
-    jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
-    const { addOverlays } = await import('./exportUtils');
-
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
+    const addOverlays = await loadOverlayAdder();
     const detachedDocument = document.implementation.createHTMLDocument();
     expect(detachedDocument.defaultView).toBeNull();
 
