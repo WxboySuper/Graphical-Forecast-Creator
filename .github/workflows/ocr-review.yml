@@ -182,7 +182,7 @@ jobs:
           # (MissingSessionID). The run ID is stable for the conversation,
           # since each workflow run performs exactly one review.
           llm_extra_headers: 'x-opencode-session=ocr-${{ github.run_id }}'
-          llm_model: ${{ vars.OCR_LLM_MODEL || 'opencode-go/muse-spark-1.3-contributor' }}
+          llm_model: ${{ vars.OCR_LLM_MODEL || 'muse-spark-1.3-contributor' }}
           llm_use_anthropic: 'false'
           llm_protocol: ${{ vars.OCR_LLM_PROTOCOL || 'openai-responses' }}
           # Keep the action's Anthropic-style default extra_body off this
