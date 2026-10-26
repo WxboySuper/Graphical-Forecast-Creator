@@ -510,7 +510,7 @@ export function maybeShowTileTimeoutWarning(exportRoot: HTMLElement, imgResult?:
       const warningBanner = document.createElement('div');
       warningBanner.setAttribute('data-gfc-export-warning', '1');
       warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
-      warningBanner.textContent = 'Warning: Map tiles timed out loading Ã¢â‚¬â€ check your internet connection. Export may be incomplete.';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading â€” check your internet connection. Export may be incomplete.';
       exportRoot.appendChild(warningBanner);
       setTimeout(() => { try { warningBanner.remove(); } catch {
         console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
