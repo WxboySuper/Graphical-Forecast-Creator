@@ -157,6 +157,9 @@ describe('exportUtils additional unit tests', () => {
         return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
       }
       if (this.classList.contains('map-legend')) {
+        if (this.classList.contains('near-top')) {
+          return { x: 100, y: 40, width: 200, height: 108, top: 40, right: 300, bottom: 148, left: 100, toJSON: () => ({}) } as DOMRect;
+        }
         return { x: 100, y: 380, width: 200, height: 108, top: 380, right: 300, bottom: 488, left: 100, toJSON: () => ({}) } as DOMRect;
       }
       return { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
@@ -176,6 +179,15 @@ describe('exportUtils additional unit tests', () => {
 
     expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('232px');
 
+    const upperLegendContainer = document.createElement('div');
+    upperLegendContainer.className = 'map-container';
+    const upperLegend = document.createElement('div');
+    upperLegend.className = 'map-legend near-top';
+    upperLegendContainer.appendChild(upperLegend);
+    addOverlays(upperLegendContainer);
+
+    expect(upperLegendContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
+
     const noLayoutContainer = document.createElement('div');
     noLayoutContainer.className = 'no-layout';
     const noLayoutLegend = document.createElement('div');
@@ -194,5 +206,12 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(hiddenContainer);
 
     expect(hiddenContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('20px');
+
+    const narrowContainer = document.createElement('div');
+    narrowContainer.className = 'no-layout';
+    narrowContainer.style.width = '40px';
+    addOverlays(narrowContainer, { unofficialText: 'Unofficial Forecast — Not for Safety Decisions' });
+
+    expect(narrowContainer.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe('58px');
   });
 });

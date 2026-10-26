@@ -140,9 +140,10 @@ const readContainerWidth = (container: HTMLElement) => {
 const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
   const containerWidth = readContainerWidth(container);
+  const effectiveWidth = containerWidth < 64 ? 320 : containerWidth;
   const textLength = unofficialText?.length ?? 0;
   // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
-  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
+  const charactersPerLine = Math.max(8, Math.floor((effectiveWidth - 32) / 8.5));
   return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
 };
 
@@ -166,7 +167,10 @@ const getFallbackLegendClearance = (container: HTMLElement, legend: HTMLElement,
 };
 
 const getMeasuredLegendClearance = (containerBounds: DOMRect, legendBounds: DOMRect) => {
-  const overlaps = legendBounds.height > 0 && overlapsFooterHorizontally(containerBounds, legendBounds);
+  const legendIsInFooterRegion = legendBounds.bottom > containerBounds.top + containerBounds.height / 2;
+  const overlaps = legendBounds.height > 0 &&
+    legendIsInFooterRegion &&
+    overlapsFooterHorizontally(containerBounds, legendBounds);
   return overlaps ? Math.ceil(containerBounds.bottom - legendBounds.top + 12) : 0;
 };
 
