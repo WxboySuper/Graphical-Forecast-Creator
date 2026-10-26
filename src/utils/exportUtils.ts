@@ -214,9 +214,13 @@ const getFooterLayout = (
   layoutSnapshot: Pick<OverlayOptions, 'unofficialHeight' | 'legendClearance'> = {},
 ) => {
   const measuredCloneHeight = unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0;
+  const fallbackHeight = Math.max(
+    layoutSnapshot.unofficialHeight ?? 0,
+    estimateUnofficialHeight(container, unofficialText),
+  );
   const unofficialHeight = measuredCloneHeight > 0
     ? Math.max(layoutSnapshot.unofficialHeight ?? 0, measuredCloneHeight)
-    : estimateUnofficialHeight(container, unofficialText);
+    : fallbackHeight;
   const legendClearance = layoutSnapshot.legendClearance ?? getLegendClearance(container);
   const unofficialBottom = unofficialOverlay ? Math.max(8, legendClearance) : 8;
   const unofficialClearance = unofficialOverlay ? unofficialBottom + Math.ceil(unofficialHeight) + 12 : 20;
