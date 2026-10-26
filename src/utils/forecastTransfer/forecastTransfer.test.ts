@@ -118,6 +118,22 @@ describe('forecastTransfer', () => {
     expect(placemarks[0]?.isSignificant).toBe(false);
   });
 
+  test('ignores non-integer gfc_day values and keeps the folder day', () => {
+    const kml = `<kml><Document><Folder><name>Day 2</name><Placemark>
+      <name>Tornado 15%</name>
+      <ExtendedData>
+        <Data name="gfc_day"><value>3.5</value></Data>
+        <Data name="gfc_outlook_type"><value>tornado</value></Data>
+        <Data name="gfc_probability_key"><value>15%</value></Data>
+      </ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-98,34 -96,34 -96,36 -98,36 -98,34</coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark></Folder></Document></kml>`;
+
+    const { placemarks } = parseKmlDocument(kml, 1);
+    expect(placemarks).toHaveLength(1);
+    expect(placemarks[0]?.day).toBe(2);
+  });
+
   test('exports KML blobs through exportForecastTransfer', async () => {
     const forecastCycle = buildForecast();
     const click = jest.fn();
