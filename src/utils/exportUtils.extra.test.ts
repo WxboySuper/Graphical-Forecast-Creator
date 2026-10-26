@@ -218,6 +218,9 @@ describe('exportUtils additional unit tests', () => {
   test('does not invent legend dimensions when source layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout', 'map-legend');
+    const legend = container.querySelector<HTMLElement>('.map-legend')!;
+    legend.style.bottom = 'auto';
+    legend.style.height = 'auto';
 
     addOverlays(container);
 
