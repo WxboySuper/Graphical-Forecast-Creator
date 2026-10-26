@@ -135,7 +135,11 @@ const parsePixelLength = (value: string | undefined) => {
 const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   const textLength = unofficialText?.length ?? 0;
   const boundsWidth = container.getBoundingClientRect().width;
-  const containerWidth = Number.isFinite(boundsWidth) && boundsWidth > 0 ? boundsWidth : 0;
+  let containerWidth = Number.isFinite(boundsWidth) && boundsWidth > 0 ? boundsWidth : 0;
+  if (containerWidth <= 0) {
+    const inlineWidth = parsePixelLength(container.style.width);
+    containerWidth = Number.isFinite(inlineWidth) && inlineWidth > 0 ? inlineWidth : 320;
+  }
   const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8));
   const lines = Math.ceil(textLength / charactersPerLine);
   return Math.max(22, lines * 16 + 6);
