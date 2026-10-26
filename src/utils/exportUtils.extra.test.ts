@@ -184,7 +184,7 @@ describe('exportUtils additional unit tests', () => {
     expect(unofficial!.textContent).toContain(unofficialText);
     expect((unofficial!.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
     expect((unofficial!.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
-    expect(footer!.style.bottom).toBe('58px');
+    expect(footer!.style.bottom).toBe('42px');
     expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
   });
 
