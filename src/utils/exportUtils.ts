@@ -152,14 +152,20 @@ const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string
   return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
 };
 
+const hasHiddenDisplay = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.display === 'none' || computedStyle?.display === 'none';
+
+const hasHiddenVisibility = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.visibility === 'hidden' || computedStyle?.visibility === 'hidden';
+
+const hasNoOpacity = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.opacity === '0' || computedStyle?.opacity === '0';
+
 const isLegendHidden = (legend: HTMLElement) => {
   const computedStyle = legend.ownerDocument.defaultView?.getComputedStyle(legend);
-  return legend.style.display === 'none' ||
-    computedStyle?.display === 'none' ||
-    legend.style.visibility === 'hidden' ||
-    computedStyle?.visibility === 'hidden' ||
-    legend.style.opacity === '0' ||
-    computedStyle?.opacity === '0';
+  return hasHiddenDisplay(legend.style, computedStyle) ||
+    hasHiddenVisibility(legend.style, computedStyle) ||
+    hasNoOpacity(legend.style, computedStyle);
 };
 
 const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMRect) => {
