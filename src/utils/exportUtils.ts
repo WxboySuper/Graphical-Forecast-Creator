@@ -165,13 +165,14 @@ const getStyleBasedLegendClearance = (container: HTMLElement, legend: HTMLElemen
   // when a detached document has neither layout metrics nor a browsing context.
   const computedStyle = container.ownerDocument.defaultView?.getComputedStyle(legend);
   const bottom = parsePixelLength(legend.style.bottom || computedStyle?.bottom);
-  const height = Math.max(
+  const heightCandidates = [
     legend.getBoundingClientRect().height,
     legend.offsetHeight,
     legend.scrollHeight,
     parsePixelLength(legend.style.height),
     parsePixelLength(computedStyle?.height),
-  );
+  ].filter(Number.isFinite);
+  const height = Math.max(...heightCandidates);
   return Number.isFinite(bottom) && height > 0 ? Math.ceil(bottom + height + 12) : 0;
 };
 
@@ -204,10 +205,9 @@ const getFooterBottom = (
   unofficialText: string | undefined,
   layoutSnapshot: Pick<OverlayOptions, 'unofficialHeight' | 'legendClearance'> = {},
 ) => {
-  const unofficialHeight = layoutSnapshot.unofficialHeight ?? Math.max(
-    unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0,
-    estimateUnofficialHeight(unofficialText),
-  );
+  const measuredCloneHeight = unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0;
+  const unofficialHeight = layoutSnapshot.unofficialHeight ??
+    (measuredCloneHeight > 0 ? measuredCloneHeight : estimateUnofficialHeight(unofficialText));
   const unofficialClearance = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 20;
   return Math.max(unofficialClearance, layoutSnapshot.legendClearance ?? getLegendClearance(container));
 };
@@ -472,14 +472,15 @@ export const exportMapAsImage = async (
   // browsing context, so it cannot reliably recover stylesheet visibility or measured geometry.
   const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
   const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
+  await waitForMapRender(map, 400);
+  const imgResult = await waitForImagesLoaded(exportRoot, 1200);
+  maybeShowTileTimeoutWarning(exportRoot, imgResult);
+
+  // Take the layout snapshot after rendering and image waits, immediately before the clone.
   const legendClearance = includeLegendAndStatus ? getLegendClearance(exportRoot) : 0;
   const unofficialHeight = includeLegendAndStatus
     ? getExistingUnofficialHeight(exportRoot)
     : undefined;
-
-  await waitForMapRender(map, 400);
-  const imgResult = await waitForImagesLoaded(exportRoot, 1200);
-  maybeShowTileTimeoutWarning(exportRoot, imgResult);
 
   return captureContainer(exportRoot, {
     width,
