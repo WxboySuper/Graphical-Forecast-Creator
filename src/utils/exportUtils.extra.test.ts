@@ -290,6 +290,16 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('58px');
   });
 
+  test('ignores overflowing content width when estimating warning height', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    container.style.width = '200px';
+    Object.defineProperty(container, 'scrollWidth', { configurable: true, value: 1200 });
+
+    addOverlays(container, { unofficialText: 'A'.repeat(29) });
+
+    expect(getAttributionBottom(container)).toBe('58px');
+  });
   test('does not parse a percentage container width as pixels', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
