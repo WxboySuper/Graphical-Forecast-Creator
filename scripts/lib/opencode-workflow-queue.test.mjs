@@ -1,9 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-
-const { parse } = createRequire(import.meta.url)('yaml');
 
 const workflowFiles = [
   '../../.github/workflows/opencode.yml',
