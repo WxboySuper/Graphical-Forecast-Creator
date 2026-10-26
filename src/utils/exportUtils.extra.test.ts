@@ -300,14 +300,14 @@ describe('exportUtils additional unit tests', () => {
     expect(getAttributionBottom(container)).toBe('20px');
   });
 
-  test('uses a one-character-per-line estimate when warning layout is unavailable', async () => {
+  test('uses the default export width when warning layout is unavailable', async () => {
     const addOverlays = await loadOverlayAdder();
     const container = createOverlayContainer('no-layout');
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
 
     addOverlays(container, { unofficialText });
 
-    const estimatedLines = unofficialText.length;
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
@@ -363,7 +363,7 @@ describe('exportUtils additional unit tests', () => {
 
     addOverlays(container, { unofficialText: 'A'.repeat(29) });
 
-    const estimatedLines = 29;
+    const estimatedLines = Math.ceil(29 / 21);
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
   test('does not parse a percentage container width as pixels', async () => {
@@ -374,7 +374,7 @@ describe('exportUtils additional unit tests', () => {
     addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
 
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
-    const estimatedLines = unofficialText.length;
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
     expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 
@@ -391,7 +391,7 @@ describe('exportUtils additional unit tests', () => {
 
     expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
     const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
-    const estimatedLines = unofficialText.length;
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
     expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 });
