@@ -132,10 +132,16 @@ const parsePixelLength = (value: string | undefined) => {
   return match ? Number(match[1]) : Number.NaN;
 };
 
-const estimateUnofficialHeight = (unofficialText: string | undefined) => {
-  // The badge allows breaks between any characters, so one line per character is a safe upper bound.
+const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
   const textLength = unofficialText?.length ?? 0;
-  return Math.max(22, textLength * 16 + 6);
+  const boundsWidth = container.getBoundingClientRect().width;
+  const clientWidth = container.clientWidth;
+  const inlineWidth = parsePixelLength(container.style.width);
+  const measuredWidth = [boundsWidth, clientWidth, inlineWidth].find((width) => Number.isFinite(width) && width > 0);
+  const containerWidth = measuredWidth ?? 320;
+  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8));
+  const lines = Math.ceil(textLength / charactersPerLine);
+  return Math.max(22, lines * 16 + 6);
 };
 
 const hasHiddenDisplay = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
@@ -210,7 +216,7 @@ const getFooterBottom = (
   const measuredUnofficialHeight = Math.max(layoutSnapshot.unofficialHeight ?? 0, measuredCloneHeight);
   const unofficialHeight = measuredUnofficialHeight > 0
     ? measuredUnofficialHeight
-    : estimateUnofficialHeight(unofficialText);
+    : estimateUnofficialHeight(container, unofficialText);
   const unofficialClearance = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 20;
   return Math.max(unofficialClearance, layoutSnapshot.legendClearance ?? getLegendClearance(container));
 };
