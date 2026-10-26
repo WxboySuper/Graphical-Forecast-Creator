@@ -27,6 +27,43 @@ afterEach(() => {
   Reflect.deleteProperty(globalThis as typeof globalThis & { fetch?: unknown }, 'fetch');
 });
 
+const mockOverlayBounds = function (this: HTMLElement) {
+  const zeroBounds = { x: 0, y: 0, width: 0, height: 0, top: 0, right: 0, bottom: 0, left: 0, toJSON: () => ({}) } as DOMRect;
+  if (this.classList.contains('no-layout')) return zeroBounds;
+  if (this.classList.contains('map-container')) {
+    return { x: 0, y: 0, width: 320, height: 600, top: 0, right: 320, bottom: 600, left: 0, toJSON: () => ({}) } as DOMRect;
+  }
+  if (this.classList.contains('map-legend') && this.classList.contains('near-top')) {
+    return { x: 100, y: 40, width: 200, height: 108, top: 40, right: 300, bottom: 148, left: 100, toJSON: () => ({}) } as DOMRect;
+  }
+  if (this.classList.contains('map-legend')) {
+    return { x: 100, y: 380, width: 200, height: 108, top: 380, right: 300, bottom: 488, left: 100, toJSON: () => ({}) } as DOMRect;
+  }
+  return zeroBounds;
+};
+
+const loadOverlayAdder = async () => {
+  jest.resetModules();
+  jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
+  const { addOverlays } = await import('./exportUtils');
+  jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(mockOverlayBounds);
+  return addOverlays;
+};
+
+const createOverlayContainer = (className: string, legendClassName?: string) => {
+  const container = document.createElement('div');
+  container.className = className;
+  if (legendClassName) {
+    const legend = document.createElement('div');
+    legend.className = legendClassName;
+    container.appendChild(legend);
+  }
+  return container;
+};
+
+const getAttributionBottom = (container: HTMLElement) =>
+  container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom;
+
 describe('exportUtils additional unit tests', () => {
   type MapWithLifecycle = {
     getTargetElement?: () => HTMLElement;
@@ -113,21 +150,258 @@ describe('exportUtils additional unit tests', () => {
     jest.doMock('../store', () => ({ store: { getState: () => ({ theme: { darkMode: false } }) } }));
     const { buildCloneCallback } = await import('./exportUtils');
 
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = 0;
+      return { x: 0, y: 0, width: 320, height, top: 0, right: 320, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+    });
+
     const clonedRoot = document.createElement('div');
+    clonedRoot.style.cssText = 'position:relative;height:180px;';
     const ctrl = document.createElement('div');
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
 
-    const legend = document.createElement('div');
-    legend.className = 'map-legend';
-    clonedRoot.appendChild(legend);
-
-    const cb = buildCloneCallback({ title: 'MyTitle', includeLegendAndStatus: true, statusText: 'StatusText', unofficialText: 'Unofficial' });
+    const unofficialText = 'Unofficial Forecast — Not for Safety Decisions';
+    const cb = buildCloneCallback({
+      title: 'MyTitle',
+      includeLegendAndStatus: false,
+      statusText: 'StatusText',
+      unofficialText,
+      unofficialHeight: 22,
+      legendClearance: 0,
+    });
     cb(clonedRoot);
 
     // original control should be hidden
     expect((ctrl as HTMLElement).style.display).toBe('none');
     // overlays/footer should have been added; look for known footer text
     expect(clonedRoot.textContent).toContain('Created with Graphical Forecast Creator');
+    const unofficial = clonedRoot.querySelector<HTMLElement>('.gfc-export-unofficial-overlay');
+    const footer = clonedRoot.querySelector<HTMLElement>('.gfc-export-attribution');
+    expect(unofficial).not.toBeNull();
+    expect(footer).not.toBeNull();
+    expect(unofficial!.style.bottom).toBe('8px');
+    expect(unofficial!.textContent).toContain(unofficialText);
+    expect((unofficial!.firstElementChild as HTMLElement).style.whiteSpace).toBe('normal');
+    expect((unofficial!.firstElementChild as HTMLElement).style.maxWidth).toBe('calc(100% - 16px)');
+    expect(footer!.style.bottom).toBe('58px');
+    expect(footer!.style.maxWidth).toBe('calc(100% - 40px)');
+  });
+
+  test('keeps the original footer offset without a warning', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container');
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('clears space above a retained lower legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend');
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
+  test('does not move the footer for a retained upper legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend near-top');
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('does not invent legend dimensions when source layout is unavailable', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    const legend = container.querySelector<HTMLElement>('.map-legend')!;
+    legend.style.bottom = 'auto';
+    legend.style.height = 'auto';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('uses computed legend lengths when inline lengths are automatic', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    const legend = container.querySelector<HTMLElement>('.map-legend')!;
+    legend.style.bottom = 'auto';
+    legend.style.height = 'auto';
+    const originalGetComputedStyle = window.getComputedStyle.bind(window);
+    jest.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+      if (element === legend) {
+        return {
+          display: 'block',
+          visibility: 'visible',
+          opacity: '1',
+          bottom: '112px',
+          height: '108px',
+        } as unknown as CSSStyleDeclaration;
+      }
+      return originalGetComputedStyle(element);
+    });
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
+  test('uses source layout clearance when cloned legend geometry is zero', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+
+    addOverlays(container, { legendClearance: 232 });
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
+  test('uses source layout clearance when clone container geometry is degenerate', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+
+    addOverlays(container, { legendClearance: 232 });
+
+    expect(getAttributionBottom(container)).toBe('232px');
+  });
+
+  test('does not reserve space for a hidden legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.display = 'none';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('does not reserve space for a legend hidden by visibility', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.visibility = 'hidden';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('does not reserve space for a transparent legend', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout', 'map-legend');
+    container.querySelector<HTMLElement>('.map-legend')!.style.opacity = '0';
+
+    addOverlays(container);
+
+    expect(getAttributionBottom(container)).toBe('20px');
+  });
+
+  test('uses the default export width when warning layout is unavailable', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
+
+    addOverlays(container, { unofficialText });
+
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+
+  test('estimates wrapped warning height from measured container width', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container');
+    const unofficialText = 'A'.repeat(73);
+
+    addOverlays(container, { unofficialText });
+
+    const measuredCharactersPerLine = Math.floor((320 - 32) / 8);
+    const estimatedLines = Math.ceil(unofficialText.length / measuredCharactersPerLine);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+
+  test('uses the wrapping estimate when the detached clone cannot be measured', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'A'.repeat(200), unofficialHeight: 22 });
+
+    const estimatedLines = Math.ceil(200 / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+
+  test('preserves a source-measured warning height when it exceeds the estimate', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'Short warning', unofficialHeight: 40 });
+
+    expect(getAttributionBottom(container)).toBe('60px');
+  });
+
+  test('uses wrapped clone height when it exceeds the source badge measurement', async () => {
+    const addOverlays = await loadOverlayAdder();
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains('gfc-export-unofficial-overlay') ? 60 : 0;
+      return { x: 0, y: 0, width: 320, height, top: 0, right: 320, bottom: height, left: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    const container = createOverlayContainer('no-layout');
+
+    addOverlays(container, { unofficialText: 'A'.repeat(200), unofficialHeight: 22 });
+
+    expect(getAttributionBottom(container)).toBe('80px');
+  });
+
+  test('moves the warning above a bottom legend and keeps attribution above the warning', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('map-container', 'map-legend');
+
+    addOverlays(container, { unofficialText: 'Warning' });
+
+    expect(container.querySelector<HTMLElement>('.gfc-export-unofficial-overlay')?.style.bottom).toBe('232px');
+    expect(getAttributionBottom(container)).toBe('266px');
+  });
+
+  test('does not rely on overflowing content width for warning clearance', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    container.style.width = '200px';
+    Object.defineProperty(container, 'scrollWidth', { configurable: true, value: 1200 });
+
+    addOverlays(container, { unofficialText: 'A'.repeat(29) });
+
+    const estimatedLines = Math.ceil(29 / 21);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+  test('does not parse a percentage container width as pixels', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const container = createOverlayContainer('no-layout');
+    container.style.width = '100%';
+
+    addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' });
+
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(getAttributionBottom(container)).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
+  });
+
+  test('handles a cloned document without a browsing context', async () => {
+    const addOverlays = await loadOverlayAdder();
+    const detachedDocument = document.implementation.createHTMLDocument();
+    expect(detachedDocument.defaultView).toBeNull();
+
+    const container = detachedDocument.createElement('div');
+    container.className = 'no-layout';
+    const legend = detachedDocument.createElement('div');
+    legend.className = 'map-legend';
+    container.appendChild(legend);
+
+    expect(() => addOverlays(container, { unofficialText: 'Unofficial Forecast - Not for Safety Decisions' })).not.toThrow();
+    const unofficialText = 'Unofficial Forecast - Not for Safety Decisions';
+    const estimatedLines = Math.ceil(unofficialText.length / 36);
+    expect(container.querySelector<HTMLElement>('.gfc-export-attribution')?.style.bottom).toBe(`${8 + estimatedLines * 16 + 6 + 12}px`);
   });
 });
