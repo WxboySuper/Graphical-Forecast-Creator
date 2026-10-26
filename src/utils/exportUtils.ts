@@ -115,27 +115,33 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   container.appendChild(footerDiv);
 };
 
+const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
+  const unofficialInner = unofficialOverlay.firstElementChild as HTMLElement | null;
+  return Math.max(
+    unofficialOverlay.getBoundingClientRect().height,
+    unofficialInner?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.scrollHeight ?? 0,
+  );
+};
+
+const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
+  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
+  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
+  const textLength = unofficialText?.length ?? 0;
+  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
+  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
+  return Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
+};
+
 const getFooterBottom = (
   container: HTMLElement,
   unofficialOverlay: HTMLElement | null,
   unofficialText: string | undefined,
 ) => {
   if (!unofficialOverlay) return 42;
-
-  const unofficialInner = unofficialOverlay?.firstElementChild as HTMLElement | null | undefined;
-  const measuredHeight = Math.max(
-    unofficialOverlay?.getBoundingClientRect().height ?? 0,
-    unofficialInner?.getBoundingClientRect().height ?? 0,
-    unofficialInner?.scrollHeight ?? 0,
-  );
-  // A clone without layout metrics still needs a bounded width for its wrapped-height estimate.
-  const containerWidth = container.clientWidth || Number.parseFloat(container.style.width) || 320;
-  const textLength = unofficialText?.length ?? 0;
-  // Keep a conservative wrapped-height estimate when a cloned element has not been laid out yet.
-  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8.5));
-  const estimatedHeight = Math.max(22, Math.ceil(textLength / charactersPerLine) * 16 + 6);
-  const unofficialHeight = Math.max(measuredHeight, estimatedHeight);
-  return 8 + Math.ceil(unofficialHeight) + 12;
+  const measuredHeight = getMeasuredUnofficialHeight(unofficialOverlay);
+  const estimatedHeight = estimateUnofficialHeight(container, unofficialText);
+  return 8 + Math.ceil(Math.max(measuredHeight, estimatedHeight)) + 12;
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
