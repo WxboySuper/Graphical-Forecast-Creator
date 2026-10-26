@@ -190,13 +190,16 @@ const getMeasuredLegendClearance = (containerBounds: DOMRect, legendBounds: DOMR
   return overlaps ? Math.ceil(containerBounds.bottom - legendBounds.top + 12) : 0;
 };
 
+const hasDegenerateContainerBounds = (bounds: DOMRect) => bounds.height <= 0 || bounds.width <= 0;
+const hasDegenerateLegendBounds = (bounds: DOMRect) => bounds.height <= 0;
+
 const getLegendClearance = (container: HTMLElement) => {
   const legend = container.querySelector<HTMLElement>('.map-legend');
   if (!legend || isLegendHidden(legend)) return 0;
 
   const containerBounds = container.getBoundingClientRect();
   const legendBounds = legend.getBoundingClientRect();
-  if (containerBounds.height <= 0 || containerBounds.width <= 0 || legendBounds.height <= 0) {
+  if (hasDegenerateContainerBounds(containerBounds) || hasDegenerateLegendBounds(legendBounds)) {
     return getFallbackLegendClearance(container, legend, legendBounds);
   }
   return getMeasuredLegendClearance(containerBounds, legendBounds);
@@ -507,7 +510,7 @@ export function maybeShowTileTimeoutWarning(exportRoot: HTMLElement, imgResult?:
       const warningBanner = document.createElement('div');
       warningBanner.setAttribute('data-gfc-export-warning', '1');
       warningBanner.style.cssText = 'position:absolute;top:12px;left:12px;z-index:1600;background:rgba(255,69,58,0.95);color:#fff;padding:8px 12px;border-radius:6px;font-weight:600;font-size:12px;pointer-events:none;';
-      warningBanner.textContent = 'Warning: Map tiles timed out loading â€” check your internet connection. Export may be incomplete.';
+      warningBanner.textContent = 'Warning: Map tiles timed out loading Ã¢â‚¬â€ check your internet connection. Export may be incomplete.';
       exportRoot.appendChild(warningBanner);
       setTimeout(() => { try { warningBanner.remove(); } catch {
         console.warn('GFC export: Failed to remove on-screen warning about tile load timeout.', warningBanner);
