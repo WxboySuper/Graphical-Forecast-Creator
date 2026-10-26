@@ -448,6 +448,7 @@ test('renders a drawn outlook in forecast and verification with shared map style
   for (const size of [
     { name: 'phone', width: 390, height: 844 },
     { name: 'short-landscape', width: 844, height: 390 },
+    { name: 'landscape-breakpoint', width: 844, height: 510 },
   ]) {
     await verifyLegendAtSize(page, testInfo, size);
   }
