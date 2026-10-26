@@ -202,15 +202,14 @@ const getFooterBottom = (
   container: HTMLElement,
   unofficialOverlay: HTMLElement | null,
   unofficialText: string | undefined,
-  measuredUnofficialHeight?: number,
-  measuredLegendClearance?: number,
+  layoutSnapshot: Pick<OverlayOptions, 'unofficialHeight' | 'legendClearance'> = {},
 ) => {
-  const unofficialHeight = measuredUnofficialHeight ?? Math.max(
+  const unofficialHeight = layoutSnapshot.unofficialHeight ?? Math.max(
     unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0,
     estimateUnofficialHeight(unofficialText),
   );
   const unofficialClearance = unofficialOverlay ? 8 + Math.ceil(unofficialHeight) + 12 : 20;
-  return Math.max(unofficialClearance, measuredLegendClearance ?? getLegendClearance(container));
+  return Math.max(unofficialClearance, layoutSnapshot.legendClearance ?? getLegendClearance(container));
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
@@ -230,8 +229,7 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
     container,
     unofficialOverlay,
     options.unofficialText,
-    options.unofficialHeight,
-    options.legendClearance,
+    options,
   );
 
   addTitleAndFooter(container, options, isDarkMode, footerBottom);
