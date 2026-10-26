@@ -61,15 +61,35 @@ describe('cloud session storage', () => {
     expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBe(meta);
   });
 
-  test('clearing Custom removes untagged legacy handoffs from anonymous and unscoped keys', () => {
+  test('clearing Custom leaves untagged legacy handoffs for the default Severe workspace', () => {
     const payload = JSON.stringify(validForecast());
-    const meta = JSON.stringify({ id: 'custom-1', label: 'Custom save' });
+    const meta = JSON.stringify({ id: 'legacy-1', label: 'Legacy save' });
     sessionStorage.setItem('cloudCyclePayload:anonymous', payload);
     sessionStorage.setItem('cloudCycleMeta:anonymous', meta);
     sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, payload);
     sessionStorage.setItem(CLOUD_CYCLE_META_KEY, meta);
 
     clearCloudSessionStorage({ workspaceId: 'custom' });
+
+    expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBe(payload);
+    expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBe(meta);
+    expect(sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY)).toBe(payload);
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBe(meta);
+  });
+
+  test('clearing Custom removes explicitly Custom-owned legacy handoffs from every scope', () => {
+    const payload = JSON.stringify({
+      schemaVersion: 1,
+      workspaceId: 'custom',
+      forecast: validForecast(),
+    });
+    const meta = JSON.stringify({ id: 'custom-1', label: 'Custom save' });
+    sessionStorage.setItem('cloudCyclePayload:anonymous', payload);
+    sessionStorage.setItem('cloudCycleMeta:anonymous', meta);
+    sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, payload);
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, meta);
+
+    clearCloudSessionStorage({ userId: 'user-1', workspaceId: 'custom' });
 
     expect(sessionStorage.getItem('cloudCyclePayload:anonymous')).toBeNull();
     expect(sessionStorage.getItem('cloudCycleMeta:anonymous')).toBeNull();
@@ -96,14 +116,20 @@ describe('cloud session storage', () => {
     expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBe(meta);
   });
 
-  test('clearing a signed-in workspace only touches that account scope', () => {
+  test('clears attributable anonymous and unscoped legacy handoffs for a signed-in workspace', () => {
     sessionStorage.setItem('cloudCyclePayload:severe:user-user-1', 'account-payload');
-    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', 'anonymous-payload');
+    sessionStorage.setItem('cloudCyclePayload:severe:anonymous', JSON.stringify(validForecast()));
+    sessionStorage.setItem('cloudCycleMeta:severe:anonymous', JSON.stringify({ id: 'legacy-1', label: 'Legacy Severe' }));
+    sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, JSON.stringify(validForecast()));
+    sessionStorage.setItem(CLOUD_CYCLE_META_KEY, JSON.stringify({ id: 'legacy-2', label: 'Legacy Severe' }));
 
     clearCloudSessionStorage({ userId: 'user-1', workspaceId: 'severe' });
 
     expect(sessionStorage.getItem('cloudCyclePayload:severe:user-user-1')).toBeNull();
-    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBe('anonymous-payload');
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem(CLOUD_CYCLE_PAYLOAD_KEY)).toBeNull();
+    expect(sessionStorage.getItem(CLOUD_CYCLE_META_KEY)).toBeNull();
   });
 
   test('carries an account-tagged legacy handoff into that account workspace slot', () => {
@@ -208,7 +234,7 @@ describe('cloud session storage', () => {
     expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
   });
 
-  test('migrates an untagged legacy handoff into the workspace requesting restore', () => {
+  test('migrates an untagged legacy handoff to Severe rather than guessing the route owner', () => {
     const payload = JSON.stringify(validForecast());
     const meta = JSON.stringify({ id: 'custom-legacy-1', label: 'Custom legacy save' });
     sessionStorage.setItem(CLOUD_CYCLE_PAYLOAD_KEY, payload);
@@ -216,9 +242,10 @@ describe('cloud session storage', () => {
 
     migrateLegacyCloudSessionStorage({ workspaceId: 'custom' });
 
-    expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBe(payload);
-    expect(sessionStorage.getItem('cloudCycleMeta:custom:anonymous')).toBe(meta);
-    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCycleMeta:custom:anonymous')).toBeNull();
+    expect(sessionStorage.getItem('cloudCyclePayload:severe:anonymous')).toBe(payload);
+    expect(sessionStorage.getItem('cloudCycleMeta:severe:anonymous')).toBe(meta);
   });
 
   test('does not overwrite a partial target handoff while migrating the legacy pair', () => {

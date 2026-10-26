@@ -111,11 +111,9 @@ describe('forecast workspace persistence contract', () => {
     })).toThrow(/unknown workspace/);
   });
 
-  test('accepts a valid custom payload and envelopes it for the custom workspace', () => {
-    // A legacy save carries no identity, so the workspace that opened it owns it.
-    expect(buildCloudSessionPayload('custom', validForecast())).toEqual(
-      createForecastWorkspaceSave('custom', validForecast()),
-    );
+  test('rejects an untagged legacy payload for Custom because it has no workspace identity', () => {
+    expect(() => buildCloudSessionPayload('custom', validForecast()))
+      .toThrow(/not supported by any workspace/);
 
     // A payload only the caller's Custom validator recognizes is Custom, never Severe.
     const customPayload = { customForecast: true };
@@ -130,31 +128,23 @@ describe('forecast workspace persistence contract', () => {
     expect(() => buildCloudSessionPayload('severe', customPayload, validators)).toThrow(/different forecast workspace/);
   });
 
-  test('classifies with the production cloud-load validators for the workspace that opened the cycle', () => {
+  test('uses the historical Severe default and requires envelopes for other workspaces', () => {
     const forecast = validForecast();
 
-    // Severe cannot claim a Custom record's save, and vice versa.
-    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('custom'))).toEqual({
-      ok: true,
-      workspaceId: 'custom',
-      payload: forecast,
-      legacy: true,
-    });
     expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('severe'))).toEqual({
       ok: true,
       workspaceId: 'severe',
       payload: forecast,
       legacy: true,
     });
-    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('tropical'))).toEqual({
-      ok: true,
-      workspaceId: 'tropical',
-      payload: forecast,
-      legacy: true,
-    });
-    expect(buildCloudSessionPayload('tropical', forecast, buildCloudLoadValidators('tropical'))).toEqual(
-      createForecastWorkspaceSave('tropical', forecast),
-    );
+    for (const workspaceId of ['custom', 'tropical'] as const) {
+      expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators(workspaceId)))
+        .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
+      expect(() => buildCloudSessionPayload(workspaceId, forecast, buildCloudLoadValidators(workspaceId)))
+        .toThrow(/not supported by any workspace/);
+    }
+    expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
+      .toEqual(createForecastWorkspaceSave('custom', forecast));
 
     // Malformed input fails the requested workspace's validator instead of being wrapped.
     expect(classifyForecastWorkspacePayload({ legacy: true }, buildCloudLoadValidators('custom')))

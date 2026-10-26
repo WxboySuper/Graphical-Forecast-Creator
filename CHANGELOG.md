@@ -12,17 +12,17 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
 <!-- dependabot-automation -->
 
-- **@sentry/react:** ^10.72.0 → ^11.9.0
+- **@sentry/react:** ^10.74.0 → ^11.9.0
 - **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
 - **@testing-library/react:** ^16.2.0 → ^16.3.3
 - **@testing-library/user-event:** ^14.6.6 → ^14.6.7
 - **@types/node:** ^26.4.0 → ^26.5.1
 - **@types/react-dom:** 19.2.5 → 19.3.0
-- **firebase:** ^12.18.0 → ^13.0.0
-- **immer:** ^11.1.16 → ^11.2.9
-- **lucide-react:** ^1.35.0 → ^1.61.0
-- **ol-mapbox-style:** ^13.4.2 → ^13.8.0
-- **react-router:** ^8.3.0 → ~8.5.0
+- **firebase:** ^12.19.0 → ^13.0.0
+- **immer:** ^11.1.18 → ^11.2.9
+- **lucide-react:** ^1.45.0 → ^1.61.0
+- **ol-mapbox-style:** ^13.4.3 → ^13.8.0
+- **react-router:** ^8.3.1 → ~8.5.0
 - **rollup:** >=4.62.4 → >=4.63.1
 - **uuid:** ^14.0.1 → ^14.0.2
 - **web-vitals:** ^6.1.0 → ^6.2.1
@@ -36,11 +36,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **jest:** ^30.5.0 → ^30.5.1
 - **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
 - **typescript-eslint:** ^8.68.0 → ^8.70.0
-- **vite:** ^8.2.1 → ^8.3.5
+- **vite:** ^8.3.0 → ^8.3.5
 - **@sentry/node:** ^10.69.0 → ^11.8.0 (`server`)
-- **firebase-admin:** ^14.2.0 → ^14.5.0 (`server`)
-- **express-rate-limit:** ^8.6.2 → ^8.7.1 (`server`)
-- **stripe:** ^22.4.0 → ^23.0.0 (`server`)
+- **firebase-admin:** ^14.3.0 → ^14.5.0 (`server`)
+- **express-rate-limit:** ^8.7.0 → ^8.7.1 (`server`)
+- **stripe:** ^22.6.1 → ^23.0.0 (`server`)
 
 #### Added
 

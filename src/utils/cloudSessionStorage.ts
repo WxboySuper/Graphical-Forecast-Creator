@@ -1,5 +1,5 @@
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { buildCloudLoadValidators, classifyForecastWorkspacePayload } from './forecastWorkspacePersistence';
+import { classifyForecastWorkspacePayload } from './forecastWorkspacePersistence';
 import { getScopedStorageKey, getStorageScope } from './storageScope';
 
 export const CLOUD_CYCLE_PAYLOAD_KEY = 'cloudCyclePayload';
@@ -82,14 +82,12 @@ const listLegacyCloudSessionPairs = (
 };
 
 /** Resolves the workspace that owns a legacy payload, or null when it is unreadable. */
-const resolveLegacyHandoffWorkspace = ({ payload, workspaceId }: {
+const resolveLegacyHandoffWorkspace = ({ payload }: {
   payload: string;
-  workspaceId?: ForecastWorkspaceId;
 }): ForecastWorkspaceId | null => {
   try {
     const value = JSON.parse(payload) as unknown;
-    const validators = workspaceId ? buildCloudLoadValidators(workspaceId) : undefined;
-    const classification = classifyForecastWorkspacePayload(value, validators);
+    const classification = classifyForecastWorkspacePayload(value);
     return classification.ok ? classification.workspaceId : null;
   } catch {
     return null;
@@ -108,7 +106,7 @@ const ownsLegacyCloudSessionPair = ({ payloadKey, workspaceId }: {
 }): boolean => {
   const payload = readCloudSessionValue({ key: payloadKey });
   if (payload === null) return false;
-  const owner = resolveLegacyHandoffWorkspace({ payload, workspaceId });
+  const owner = resolveLegacyHandoffWorkspace({ payload });
   return owner !== null && owner === workspaceId;
 };
 
@@ -123,17 +121,7 @@ export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionSc
   for (const baseKey of baseKeys) {
     removeCloudSessionStorageValue({ key: getCloudSessionStorageKey({ baseKey, scope: { userId, workspaceId } }) });
   }
-  if (userId) {
-    const scope = getStorageScope(userId);
-    const legacyPayloadKey = getScopedStorageKey(CLOUD_CYCLE_PAYLOAD_KEY, scope);
-    const legacyMetaKey = getScopedStorageKey(CLOUD_CYCLE_META_KEY, scope);
-    if (ownsLegacyCloudSessionPair({ payloadKey: legacyPayloadKey, workspaceId })) {
-      removeCloudSessionStorageValue({ key: legacyPayloadKey });
-      removeCloudSessionStorageValue({ key: legacyMetaKey });
-    }
-    return;
-  }
-  for (const { payloadKey, metaKey } of listLegacyCloudSessionPairs()) {
+  for (const { payloadKey, metaKey } of listLegacyCloudSessionPairs({ userId })) {
     if (!ownsLegacyCloudSessionPair({ payloadKey, workspaceId })) continue;
     removeCloudSessionStorageValue({ key: payloadKey });
     removeCloudSessionStorageValue({ key: metaKey });
@@ -254,13 +242,12 @@ const migrateLegacyCloudSessionPair = ({
   payloadKey,
   metaKey,
   ownerUserId,
-  workspaceId: requestedWorkspaceId,
-}: LegacyCloudSessionPair & { workspaceId?: ForecastWorkspaceId }): void => {
+}: LegacyCloudSessionPair): void => {
   const payload = readCloudSessionValue({ key: payloadKey });
   const meta = readCloudSessionValue({ key: metaKey });
   if (payload === null && meta === null) return;
 
-  const workspaceId = payload === null ? null : resolveLegacyHandoffWorkspace({ payload, workspaceId: requestedWorkspaceId });
+  const workspaceId = payload === null ? null : resolveLegacyHandoffWorkspace({ payload });
   const migrated = payload === null || workspaceId === null
     ? true
     : stageLegacyCloudSession({ payload, meta, workspaceId, ownerUserId });
@@ -272,7 +259,8 @@ const migrateLegacyCloudSessionPair = ({
 
 /**
  * Moves the pre-workspace `cloudCyclePayload` / `cloudCycleMeta` keys into the
- * workspace-scoped slots before a restore reads them.
+ * workspace-scoped slots before a restore reads them. Untagged historical
+ * payloads default to Severe; only a workspace envelope can route them elsewhere.
  *
  * Those keys carried no workspace, and the oldest of them carried no account
  * either. A key that already names the mounting account moves into that
@@ -285,6 +273,6 @@ export const migrateLegacyCloudSessionStorage = (
   scope: Pick<CloudSessionScope, 'userId'> & Partial<Pick<CloudSessionScope, 'workspaceId'>> = {},
 ): void => {
   for (const pair of listLegacyCloudSessionPairs(scope)) {
-    migrateLegacyCloudSessionPair({ ...pair, workspaceId: scope.workspaceId });
+    migrateLegacyCloudSessionPair(pair);
   }
 };
