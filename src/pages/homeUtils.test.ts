@@ -68,16 +68,25 @@ describe('homeUtils', () => {
     expect(formatCycleDate('2026-04-24')).toContain('April 24, 2026');
   });
 
-  test('adds current-cycle days to persisted lifetime forecast totals', () => {
-    const stats = computeHomeStats(makeCycle(), [], {
+  test('keeps lifetime totals account-wide and streaks workspace-scoped', () => {
+    const lifetimeStats = {
       totalCyclesMade: 60,
       totalForecastsMade: 100,
       forecastStreak: 75,
       lastSavedCycleDate: '2026-04-24',
-    });
+    };
+    const emptyWorkspace = computeHomeStats(makeCycle(), [], lifetimeStats);
+    const workspaceWithCycle = computeHomeStats(
+      makeCycle(),
+      [makeSavedCycle('2026-04-24', 2)],
+      lifetimeStats
+    );
 
-    expect(stats.totalCyclesMade).toBe(60);
-    expect(stats.totalForecastsMade).toBe(101);
-    expect(stats.forecastStreak).toBe(75);
+    expect(emptyWorkspace.totalCyclesMade).toBe(60);
+    expect(emptyWorkspace.totalForecastsMade).toBe(101);
+    expect(emptyWorkspace.forecastStreak).toBe(0);
+    expect(workspaceWithCycle.totalCyclesMade).toBe(60);
+    expect(workspaceWithCycle.totalForecastsMade).toBe(101);
+    expect(workspaceWithCycle.forecastStreak).toBe(1);
   });
 });

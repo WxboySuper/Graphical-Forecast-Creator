@@ -28,7 +28,7 @@ import { PRICING_COPY } from "../billing/pricingCopy";
 import { useUserMetrics } from "../metrics/useUserMetrics";
 import { useWorkflowAwareness } from "../hooks/useWorkflowAwarenessSync";
 import type { RootState } from "../store";
-import { selectForecastCycle, selectSavedCycles } from "../store/forecastSlice";
+import { selectForecastCycle, selectSavedCyclesForActiveWorkspace } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
 import { isFeatureExposed } from "../config/featureExposure";
 import "./AccountPage.css";
@@ -863,9 +863,7 @@ const MetricsCardContent: React.FC<{
 const MetricsCard: React.FC = () => {
   const { metrics, loading, error } = useUserMetrics();
   const forecastCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector((state: RootState) =>
-    selectSavedCycles(state),
-  );
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const lifetimeStats = useSelector((state: RootState) => state.forecast.lifetimeCycleStats);
   const localStats = useMemo(
     () => computeHomeStats(forecastCycle, savedCycles, lifetimeStats),
