@@ -140,7 +140,7 @@ test('a manual /ocr run reports a commit status on the pull request head', () =>
 test('the review model, budget, and merge gate stay configured', () => {
   const ocr = stepById('ocr');
   assert.equal(ocr.uses, 'alibaba/open-code-review@357c3f09a264563ab64d8f4fc3b25b186cd3c4a4');
-  assert.equal(ocr.with.llm_model, "${{ vars.OCR_LLM_MODEL || 'beam-free' }}");
+  assert.equal(ocr.with.llm_model, "${{ vars.OCR_LLM_MODEL || 'opencode-go/muse-spark-1.3-contributor' }}");
   assert.equal(ocr.with.llm_url, "${{ vars.OCR_LLM_URL || 'https://opencode.ai/zen/go/v1/chat/completions' }}");
   assert.equal(ocr.with.effort, 'low');
   assert.equal(ocr.with.max_tokens_budget, '650000');
