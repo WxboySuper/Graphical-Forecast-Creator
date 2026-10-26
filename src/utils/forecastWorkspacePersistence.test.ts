@@ -113,7 +113,7 @@ describe('forecast workspace persistence contract', () => {
 
   test('rejects an untagged legacy payload for Custom because it has no workspace identity', () => {
     expect(() => buildCloudSessionPayload('custom', validForecast()))
-      .toThrow(/not supported by any workspace/);
+      .toThrow(/different forecast workspace/);
 
     // A payload only the caller's Custom validator recognizes is Custom, never Severe.
     const customPayload = { customForecast: true };

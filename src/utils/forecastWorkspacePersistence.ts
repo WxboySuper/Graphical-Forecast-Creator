@@ -162,14 +162,8 @@ const assertCloudWorkspaceMatches = (
 const assertLegacyCloudWorkspaceMatches = (
   classification: Extract<ForecastWorkspaceClassification, { ok: true }>,
   workspaceId: ForecastWorkspaceId,
-  validators: ForecastWorkspaceLegacyValidators,
 ): void => {
-  if (validators.isSeverePayload) {
-    assertCloudWorkspaceMatches(classification.workspaceId, workspaceId);
-  }
-  if (validators.isCustomPayload) {
-    assertCloudWorkspaceMatches(classification.workspaceId, workspaceId);
-  }
+  assertCloudWorkspaceMatches(classification.workspaceId, workspaceId);
 };
 
 export const buildCloudSessionPayload = (
@@ -187,7 +181,7 @@ export const buildCloudSessionPayload = (
 
   // Explicit validators express the owner requested by this cloud load. Keep
   // the default legacy adoption path for callers without workspace validators.
-  assertLegacyCloudWorkspaceMatches(classification, workspaceId, validators);
+  assertLegacyCloudWorkspaceMatches(classification, workspaceId);
   return createForecastWorkspaceSave(workspaceId, classification.payload);
 };
 

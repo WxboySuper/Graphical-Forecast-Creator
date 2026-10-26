@@ -120,6 +120,9 @@ export const clearCloudSessionStorage = ({ userId, workspaceId }: CloudSessionSc
   const baseKeys: CloudSessionStorageSlot[] = [CLOUD_CYCLE_PAYLOAD_KEY, CLOUD_CYCLE_META_KEY];
   for (const baseKey of baseKeys) {
     removeCloudSessionStorageValue({ key: getCloudSessionStorageKey({ baseKey, scope: { userId, workspaceId } }) });
+    if (userId) {
+      removeCloudSessionStorageValue({ key: getCloudSessionStorageKey({ baseKey, scope: { workspaceId } }) });
+    }
   }
   for (const { payloadKey, metaKey } of listLegacyCloudSessionPairs({ userId })) {
     if (!ownsLegacyCloudSessionPair({ payloadKey, workspaceId })) continue;

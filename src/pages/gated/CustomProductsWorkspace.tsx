@@ -170,11 +170,9 @@ const CustomProductsWorkspace = ({ embedded = false, onProductUse }: CustomProdu
       // The editor already applied the layer inline, so the staged copy is a
       // duplicate that must be dropped rather than consumed by a later mount.
       const applied = onProductUse(layer);
-      const discarded = discardCustomProductForecastHandoff();
+      discardCustomProductForecastHandoff();
       if (!applied) {
         setApplicationError(`Remove a custom layer before loading this product (maximum ${CUSTOM_PRODUCT_LIMITS.layersPerCollection}).`);
-      } else if (!discarded) {
-        setApplicationError('The product was applied, but its staged copy could not be cleared from browser storage.');
       } else {
         setApplicationError(null);
       }
