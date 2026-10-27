@@ -1,6 +1,7 @@
 import type { DayType, OutlookType } from '../../types/outlooks';
 import { geometryFromKmlElement } from './kmlGeometry';
 import type { ParsedKmlPlacemark } from './types';
+import { validateFeature } from '../forecastGeometryValidation';
 import {
   findKmlElementsByLocalName,
   getExtendedDataValue,
@@ -23,6 +24,11 @@ export const parseKmlPlacemark = (
   if (!feature) {
     warnings.push('Skipped placemark without polygon geometry.');
     return null;
+  }
+
+  const featureResult = validateFeature(feature);
+  if (featureResult) {
+    throw new Error(featureResult.reason ?? 'KML geometry is invalid.');
   }
 
   const extendedDayValue = getExtendedDataValue(placemark, 'gfc_day');

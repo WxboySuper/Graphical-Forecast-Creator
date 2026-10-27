@@ -1,5 +1,16 @@
+import type { Feature } from 'geojson';
 import type { DayType, ForecastCycle, OutlookData, OutlookDay } from '../../types/outlooks';
 import type { ParsedKmlPlacemark } from './types';
+import { MAX_FEATURES_PER_MAP } from '../forecastOutlookValidation';
+
+const countFeatures = (map: Map<string, Feature[]> | undefined): number => {
+  if (!map) return 0;
+  let total = 0;
+  map.forEach((features) => {
+    total += features.length;
+  });
+  return total;
+};
 
 const createBaseOutlookData = (day: DayType): OutlookData => {
   if (day === 1 || day === 2) {
@@ -50,8 +61,20 @@ export const forecastCycleFromKmlPlacemarks = (
         days: {},
       };
 
+  const featureCounts = new Map<string, number>();
+
   placemarks.forEach((placemark) => {
     const existingDay = cycle.days[placemark.day] ?? createOutlookDay(placemark.day);
+    const countKey = `${placemark.day}:${placemark.outlookType}`;
+    const existingCount = featureCounts.get(countKey)
+      ?? countFeatures(existingDay.data[placemark.outlookType]);
+    if (existingCount >= MAX_FEATURES_PER_MAP) {
+      throw new Error(
+        `KML import contains more than ${MAX_FEATURES_PER_MAP} ${placemark.outlookType} features for day ${placemark.day}.`,
+      );
+    }
+    featureCounts.set(countKey, existingCount + 1);
+
     const outlookMap = new Map(existingDay.data[placemark.outlookType] ?? []);
     const bucket = [...(outlookMap.get(placemark.probabilityKey) ?? []), placemark.feature];
     outlookMap.set(placemark.probabilityKey, bucket);

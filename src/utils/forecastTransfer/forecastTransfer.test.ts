@@ -8,6 +8,7 @@ import { forecastCycleFromKmlPlacemarks, parseKmlDocument } from './parseKml';
 import { serializeForecast } from '../fileUtils';
 import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import { buildWorkflowExportPackage } from '../workflowPackage';
+import { MAX_FEATURES_PER_MAP } from '../forecastOutlookValidation';
 
 const square = (): Feature<Polygon> => ({
   type: 'Feature',
@@ -17,6 +18,9 @@ const square = (): Feature<Polygon> => ({
     coordinates: [[[-98, 34], [-96, 34], [-96, 36], [-98, 36], [-98, 34]]],
   },
 });
+
+const featureBucket = (length: number): Feature<Polygon>[] =>
+  Array.from({ length }, square);
 
 const buildForecast = (): ForecastCycle => ({
   cycleDate: '2026-08-18',
@@ -497,6 +501,84 @@ describe('forecastTransfer', () => {
 
     const { placemarks } = parseKmlDocument(kml, 1);
     expect(placemarks[0]?.isSignificant).toBe(false);
+  });
+
+  test('rejects KML imports that exceed the per-map feature bound', () => {
+    const placemarks = Array.from({ length: MAX_FEATURES_PER_MAP + 1 }, () => ({
+      day: 1 as const,
+      outlookType: 'tornado' as const,
+      probabilityKey: '15%',
+      feature: square(),
+      isSignificant: false,
+    }));
+
+    expect(() => forecastCycleFromKmlPlacemarks(placemarks)).toThrow('features for day 1');
+  });
+
+  test('counts existing features across probability buckets and allows the exact limit', () => {
+    const baseCycle = buildForecast();
+    const baseDay = baseCycle.days[1]!;
+    const firstBucketCount = Math.floor((MAX_FEATURES_PER_MAP - 1) / 2);
+    baseCycle.days[1] = {
+      ...baseDay,
+      data: {
+        ...baseDay.data,
+        tornado: new Map([
+          ['15%', featureBucket(firstBucketCount)],
+          ['30%', featureBucket(MAX_FEATURES_PER_MAP - 1 - firstBucketCount)],
+        ]),
+      },
+    };
+
+    const atLimit = forecastCycleFromKmlPlacemarks([{
+      day: 1,
+      outlookType: 'tornado',
+      probabilityKey: '30%',
+      feature: square(),
+      isSignificant: false,
+    }], baseCycle);
+
+    const tornadoMap = atLimit.days[1]?.data.tornado;
+    expect((tornadoMap?.get('15%')?.length ?? 0) + (tornadoMap?.get('30%')?.length ?? 0))
+      .toBe(MAX_FEATURES_PER_MAP);
+    expect(() => forecastCycleFromKmlPlacemarks([{
+      day: 1,
+      outlookType: 'tornado',
+      probabilityKey: '15%',
+      feature: square(),
+      isSignificant: false,
+    }], atLimit)).toThrow('features for day 1');
+  });
+
+  test('applies the feature limit independently to each day and outlook map', () => {
+    const baseCycle = buildForecast();
+    const baseDay = baseCycle.days[1]!;
+    baseCycle.days[1] = {
+      ...baseDay,
+      data: {
+        ...baseDay.data,
+        tornado: new Map([['15%', featureBucket(MAX_FEATURES_PER_MAP - 1)]]),
+        wind: new Map([['15%', featureBucket(MAX_FEATURES_PER_MAP - 1)]]),
+      },
+    };
+    baseCycle.days[2] = {
+      ...baseDay,
+      day: 2,
+      data: {
+        ...baseDay.data,
+        tornado: new Map([['15%', featureBucket(MAX_FEATURES_PER_MAP - 1)]]),
+      },
+    };
+
+    const atLimit = forecastCycleFromKmlPlacemarks([
+      { day: 1, outlookType: 'tornado', probabilityKey: '30%', feature: square(), isSignificant: false },
+      { day: 1, outlookType: 'wind', probabilityKey: '30%', feature: square(), isSignificant: false },
+      { day: 2, outlookType: 'tornado', probabilityKey: '30%', feature: square(), isSignificant: false },
+    ], baseCycle);
+
+    expect(atLimit.days[1]?.data.tornado?.get('30%')).toHaveLength(1);
+    expect(atLimit.days[1]?.data.wind?.get('30%')).toHaveLength(1);
+    expect(atLimit.days[2]?.data.tornado?.get('30%')).toHaveLength(1);
   });
 
   test('ignores non-integer gfc_day values and keeps the folder day', () => {
