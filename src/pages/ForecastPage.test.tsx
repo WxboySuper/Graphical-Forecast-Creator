@@ -1,8 +1,8 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useLocation } from 'react-router';
 import ForecastPage, {
   buildMapView,
   buildRestoreKey,
@@ -218,6 +218,11 @@ const expectSingleOutlookRestored = (store: ReturnType<typeof createStore>, feat
   expect(store.getState().forecast.forecastCycle.days[1]?.data.tornado?.get('10%')?.[0].id).toBe(featureId);
 };
 
+const RouterStateProbe = () => {
+  const location = useLocation();
+  return <output data-testid="router-state">{JSON.stringify(location.state)}</output>;
+};
+
 
 describe('ForecastPage layout selection', () => {
   beforeEach(() => {
@@ -233,6 +238,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('tags new cycles with the active workspace after route ownership is synchronized', () => {
@@ -444,6 +450,57 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     await expectInvalidCloudHandoffClearedWithLocalRestore(store);
+  });
+
+  test('shows a bookmark migration notice after the legacy Forecast entry redirects', () => {
+    const store = createStore();
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={store}>
+          <ForecastPage />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('forecast-page-workspace')).toContainElement(
+      screen.getByText('ForecastTabbedToolbarLayout Mock'),
+    );
+  });
+
+  test('clears the one-time redirect marker when the bookmark notice is dismissed', () => {
+    const store = createStore();
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={store}>
+          <ForecastPage />
+          <RouterStateProbe />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Forecast bookmark notice' }));
+
+    expect(screen.queryByRole('button', { name: 'Dismiss Forecast bookmark notice' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('router-state')).toHaveTextContent('null');
+    expect(screen.getByTestId('forecast-page-workspace')).toHaveFocus();
+  });
+
+  test('keeps the bookmark notice after a reload in the same tab until dismissed', async () => {
+    const firstRender = render(
+      <MemoryRouter initialEntries={[{ pathname: '/forecast/severe', state: { legacyForecastRedirect: true } }]}>
+        <Provider store={createStore()}><ForecastPage /></Provider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    await waitFor(() => expect(sessionStorage.getItem('gfc:legacy-forecast-notice')).toBe('true'));
+    firstRender.unmount();
+
+    renderForecastPage(createStore());
+
+    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
