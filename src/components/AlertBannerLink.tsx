@@ -12,16 +12,16 @@ const isInternalRoute = (linkUrl: string): boolean =>
 
 /** Renders an internal route or external link for the alert banner. */
 export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
+  if (!isSafeBannerLinkUrl(linkUrl)) {
+    return null;
+  }
+
   if (isInternalRoute(linkUrl)) {
     return (
       <Link className="alert-banner__link" to={linkUrl}>
         {linkLabel}
       </Link>
     );
-  }
-
-  if (linkUrl.startsWith('//') || !isSafeBannerLinkUrl(linkUrl)) {
-    return null;
   }
 
   return (

@@ -32,6 +32,15 @@ describe('AlertBannerLink', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('does not render mixed-slash URLs that browsers treat as protocol-relative', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AlertBannerLink linkUrl={'/\\evil.example/phish'} linkLabel="Off-site" />
+      </MemoryRouter>,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('does not render javascript URLs', () => {
     const { container } = render(
       <MemoryRouter>
