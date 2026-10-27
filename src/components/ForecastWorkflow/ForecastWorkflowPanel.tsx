@@ -430,11 +430,17 @@ const getCurrentWorkflowVersion = (versions: { version: number }[]): number => {
 };
 
 /** Determines whether the banner has enough state to render. */
-const shouldHideWorkflowPanel = (
-  isExposed: boolean,
-  hasActiveWorkflow: boolean,
-  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>,
-): boolean => !isExposed || !hasActiveWorkflow || !workflowMetadata;
+const shouldHideWorkflowPanel = ({
+  isExposed,
+  hasActiveWorkflow,
+  workflowMetadata,
+  workspaceMismatch,
+}: {
+  isExposed: boolean;
+  hasActiveWorkflow: boolean;
+  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>;
+  workspaceMismatch: boolean;
+}): boolean => workspaceMismatch || !isExposed || !hasActiveWorkflow || !workflowMetadata;
 
 /** Determines whether the current package can enter review. */
 const canReviewWorkflowPackage = (
@@ -501,9 +507,12 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     );
   }, [handoffEligibility.showHandoff, handoffIdentity]);
 
-  if (workspaceId !== activeWorkspaceId) return null;
-
-  if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
+  if (shouldHideWorkflowPanel({
+    isExposed: isFeatureExposed('forecastWorkflowV2'),
+    hasActiveWorkflow,
+    workflowMetadata,
+    workspaceMismatch: workspaceId !== activeWorkspaceId,
+  })) {
     return null;
   }
 

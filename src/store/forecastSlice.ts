@@ -1005,7 +1005,7 @@ export const forecastSlice = createSlice({
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
       const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
       const validCycles = cycles.filter((cycle): cycle is SavedCycle => cycle !== null && typeof cycle === 'object');
-      const normalizedCycles = cycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
+      const normalizedCycles = validCycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
       state.savedCycles = normalizedCycles.filter((cycle): cycle is SavedCycle => cycle !== null);
       state.lifetimeCycleStats = Array.isArray(action.payload)
         ? {

@@ -336,6 +336,22 @@ describe('forecastSlice undo/redo', () => {
     expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
   });
 
+  test('ignores malformed trailing entries before applying the history cap', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    const hydrated = reducer(state, loadCycleHistory([
+      ...state.savedCycles,
+      null as unknown as (typeof state.savedCycles)[number],
+    ]));
+
+    expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(hydrated.savedCycles[0]?.label).toBe('Cycle 1');
+    expect(hydrated.savedCycles.at(-1)?.label).toBe(`Cycle ${SAVED_CYCLES_LIMIT}`);
+  });
+
   test('continues streak tracking beyond the retained cycle window', () => {
     let state = reducer(undefined, { type: 'test/init' });
     for (let index = 0; index < SAVED_CYCLES_LIMIT + 10; index += 1) {

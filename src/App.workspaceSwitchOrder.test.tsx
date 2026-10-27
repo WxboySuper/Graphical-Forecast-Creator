@@ -39,6 +39,9 @@ jest.mock('./pages/BetaInvitePage', () => ({
   __esModule: true,
   default: () => <div>BetaInvitePage Mock</div>,
 }));
+jest.mock('./pages/DiscussionPage', () => ({
+  DiscussionPage: () => <div>DiscussionPage Mock</div>,
+}));
 jest.mock('./pages/ForecastPage', () => {
   const { useEffect } = jest.requireActual<typeof import('react')>('react');
   const { getAutoSaveStorageKey } = jest.requireActual<typeof import('./hooks/useAutoSave')>('./hooks/useAutoSave');
