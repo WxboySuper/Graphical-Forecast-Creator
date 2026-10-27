@@ -98,7 +98,7 @@
 
   .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
     /* 232px reserves the map-relative top offset and toolbar clearance. */
-    --legacy-notice-legend-space: max(0px, calc(100% - 232px));
+    --legacy-notice-legend-space: max(0px, calc(100% - 244px));
     box-sizing: border-box;
     padding: max(0px, min(6px, calc(var(--legacy-notice-legend-space) - 8px)));
     border-width: min(1px, max(0px, calc(var(--legacy-notice-legend-space) - 1px)));
