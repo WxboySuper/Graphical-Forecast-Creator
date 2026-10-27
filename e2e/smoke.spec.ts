@@ -6,21 +6,46 @@ import { test, expect } from '@playwright/test';
  */
 
 const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test').Page) => {
-  const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
-  const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-  const noticeBox = await page.getByTestId('legacy-forecast-notice').boundingBox();
-  const mapBox = await page.locator('.map-container').boundingBox();
-  const legendTopOffset = await page.getByRole('complementary', { name: /map legend/i }).evaluate((element) =>
-    Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-landscape-legend-top')),
-  );
-  const measuredNoticeHeight = await page.locator('.forecast-page-shell').evaluate((element) =>
-    Number.parseFloat(getComputedStyle(element).getPropertyValue('--legacy-forecast-notice-height')),
-  );
+  await expect.poll(() => page.evaluate(() => {
+    const shell = document.querySelector('.forecast-page-shell');
+    const notice = document.querySelector('[data-testid="legacy-forecast-notice"]');
+    if (!shell || !notice) return false;
 
-  if (!legendBox) throw new Error('Expected the map legend to have measurable bounds.');
-  if (!toolbarBox) throw new Error('Expected the toolbar to have measurable bounds.');
-  if (!noticeBox) throw new Error('Expected the migration notice to have measurable bounds.');
-  if (!mapBox) throw new Error('Expected the map to have measurable bounds.');
+    const measuredHeight = Number.parseFloat(
+      getComputedStyle(shell).getPropertyValue('--legacy-forecast-notice-height'),
+    );
+    return Number.isFinite(measuredHeight)
+      && Math.abs(measuredHeight - notice.getBoundingClientRect().height) <= 0.5;
+  })).toBe(true);
+
+  const geometry = await page.evaluate(() => {
+    const legend = document.querySelector<HTMLElement>('.map-legend.map-legend--mobile-open');
+    const toolbar = document.querySelector<HTMLElement>('.tabbed-integrated-toolbar');
+    const notice = document.querySelector<HTMLElement>('[data-testid="legacy-forecast-notice"]');
+    const map = document.querySelector<HTMLElement>('.map-container');
+    const shell = document.querySelector<HTMLElement>('.forecast-page-shell');
+    if (!legend || !toolbar || !notice || !map || !shell) return null;
+
+    const box = (element: HTMLElement) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return {
+      legendBox: box(legend),
+      toolbarBox: box(toolbar),
+      noticeBox: box(notice),
+      mapBox: box(map),
+      legendTopOffset: Number.parseFloat(
+        getComputedStyle(legend).getPropertyValue('--legacy-forecast-landscape-legend-top'),
+      ),
+      measuredNoticeHeight: Number.parseFloat(
+        getComputedStyle(shell).getPropertyValue('--legacy-forecast-notice-height'),
+      ),
+    };
+  });
+
+  if (!geometry) throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
+  const { legendBox, toolbarBox, noticeBox, mapBox, legendTopOffset, measuredNoticeHeight } = geometry;
   if (!Number.isFinite(legendTopOffset)) throw new Error('Expected the landscape legend offset to be defined.');
   if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
 
