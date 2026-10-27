@@ -73,7 +73,7 @@
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
-    max-height: calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 218px);
+    max-height: calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 234px);
   }
 }
 
