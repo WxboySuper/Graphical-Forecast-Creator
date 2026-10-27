@@ -638,13 +638,3 @@ export const subscribeToCloudCycles = (
   }
 };
 
-/**
- * Checks if a local cycle differs from the remote version
- */
-export const hasRemoteChanges = (
-  localPayload: GFCForecastSaveData,
-  remoteMetadata: CloudCycleMetadata
-): boolean => {
-  const localHash = computePayloadHash(localPayload);
-  return localHash !== remoteMetadata.payloadHash;
-};
