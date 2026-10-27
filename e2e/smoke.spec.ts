@@ -18,6 +18,12 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
       && Math.abs(measuredHeight - notice.getBoundingClientRect().height) <= 0.5;
   })).toBe(true);
 
+  // Verify the map-relative cap still works if the notice height was not measured.
+  await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('.forecast-page-shell');
+    shell?.style.setProperty('--legacy-forecast-notice-height', '0px');
+  });
+
   const geometry = await page.evaluate(() => {
     const legend = document.querySelector<HTMLElement>('.map-legend.map-legend--mobile-open');
     const toolbar = document.querySelector<HTMLElement>('.tabbed-integrated-toolbar');
@@ -35,17 +41,11 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
       toolbarBox: box(toolbar),
       noticeBox: box(notice),
       mapBox: box(map),
-      measuredNoticeHeight: Number.parseFloat(
-        getComputedStyle(shell).getPropertyValue('--legacy-forecast-notice-height'),
-      ),
     };
   });
 
   if (!geometry) throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
-  const { legendBox, toolbarBox, noticeBox, mapBox, measuredNoticeHeight } = geometry;
-  if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
-
-  expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
+  const { legendBox, toolbarBox, noticeBox, mapBox } = geometry;
   const expectedTop = mapBox.y + 106;
   expect(Math.abs(legendBox.y - expectedTop)).toBeLessThanOrEqual(2);
   expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);

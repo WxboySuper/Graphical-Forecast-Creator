@@ -97,17 +97,12 @@
   }
 
   .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
-    /* Remove decoration when the measured space is too small to fit it. */
+    /* 232px reserves the map-relative top offset and toolbar clearance. */
+    --legacy-notice-legend-space: max(0px, calc(100% - 232px));
     box-sizing: border-box;
-    padding: 0;
-    border-width: 0;
-    max-height: max(
-      0px,
-      calc(
-        100dvh - var(--app-header-height, 64px) -
-          var(--legacy-forecast-notice-height, 0px) - 232px
-      )
-    );
+    padding: max(0px, min(6px, calc(var(--legacy-notice-legend-space) - 8px)));
+    border-width: min(1px, max(0px, calc(var(--legacy-notice-legend-space) - 1px)));
+    max-height: var(--legacy-notice-legend-space);
   }
 }
 
