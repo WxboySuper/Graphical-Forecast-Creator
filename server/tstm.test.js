@@ -138,24 +138,47 @@ describe('Auto-TSTM server foundation', () => {
     await assert.rejects(result, /TSTM_GENERATOR_INVALID_JSON/);
   });
 
-  it('terminates a generator that exceeds its timeout', async () => {
+  /** Runs a timed-out generator whose fake child logs every signal it receives. */
+  const runWithSignalLog = async (exitsOn) => {
     const child = createFakeChild();
-    let killed = false;
-    child.kill = () => {
-      killed = true;
-      setImmediate(() => child.emit('close', null));
+    const signals = [];
+    child.kill = (signal) => {
+      signals.push(signal);
+      if (exitsOn(signal)) {
+        setImmediate(() => child.emit('close', null));
+      }
     };
     await assert.rejects(
       runTstmGenerator(
         { day: 1, cycleDate: '2026-06-13' },
         {
           env: { TSTM_GENERATION_TIMEOUT_MS: '1' },
+          killGraceMs: 20,
           spawnProcess: () => child,
         }
       ),
       /TSTM_GENERATION_TIMEOUT/
     );
-    assert.equal(killed, true);
+    return signals;
+  };
+
+  /** Waits past the SIGKILL grace window so any escalation would have landed. */
+  const signalSettle = () => new Promise((r) => setTimeout(r, 80));
+
+  it('terminates a generator that exceeds its timeout without escalating once it exits', async () => {
+    const signals = await runWithSignalLog(() => true);
+    assert.deepEqual(signals, ['SIGTERM']);
+
+    await signalSettle();
+    assert.deepEqual(signals, ['SIGTERM']);
+  });
+
+  it('escalates to SIGKILL when a generator ignores SIGTERM past the grace window', async () => {
+    const signals = await runWithSignalLog((signal) => signal === 'SIGKILL');
+    assert.deepEqual(signals, ['SIGTERM']);
+
+    await signalSettle();
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
   });
 
   it('passes --ingestion-mode flag when ingestionMode is set', async () => {

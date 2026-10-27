@@ -16,6 +16,7 @@ const {
 } = require('./tstm-ingestion');
 
 const DEFAULT_TIMEOUT_MS = 480000;
+const DEFAULT_KILL_GRACE_MS = 5000;
 const MAX_STDERR_LENGTH = 2000;
 const MAX_STDOUT_LENGTH = 4 * 1024 * 1024;
 const TSTM_CAPABILITY_KEY = 'TSTM_GENERATION_ENABLED';
@@ -58,6 +59,7 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   const env = options.env || process.env;
   const spawnProcess = options.spawnProcess || spawn;
   const timeoutMs = Number(env.TSTM_GENERATION_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const killGraceMs = Number(options.killGraceMs ?? DEFAULT_KILL_GRACE_MS);
   const script = path.join(__dirname, 'weather', 'generate_tstm.py');
   const args = [script];
   if (options.ingestionMode) {
@@ -74,7 +76,13 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
 
   let stdout = '';
   let stderr = '';
-  const state = { finished: false, timer: null };
+  const state = { finished: false, timer: null, killTimer: null };
+  /** Clears a pending SIGKILL escalation once the child has actually exited. */
+  function clearKillTimer() {
+    if (!state.killTimer) return;
+    clearTimeout(state.killTimer);
+    state.killTimer = null;
+  }
   /** Settles the worker exactly once and clears its timeout. */
   function finish(callback) {
     if (state.finished) return;
@@ -82,36 +90,55 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
     clearTimeout(state.timer);
     callback();
   }
-  state.timer = setTimeout(() => {
+  /**
+   * Asks the generator to stop and escalates to SIGKILL when it ignores
+   * SIGTERM past the grace window, so a wedged Herbie/GRIB child cannot be
+   * orphaned for the next ingestion cycle.
+   */
+  function terminate() {
     child.kill('SIGTERM');
+    if (state.killTimer) return;
+    state.killTimer = setTimeout(() => {
+      state.killTimer = null;
+      child.kill('SIGKILL');
+    }, Number.isFinite(killGraceMs) && killGraceMs >= 0 ? killGraceMs : DEFAULT_KILL_GRACE_MS);
+  }
+  state.timer = setTimeout(() => {
+    terminate();
     finish(() => reject(new Error('TSTM_GENERATION_TIMEOUT')));
   }, timeoutMs);
 
   child.stdout.on('data', (chunk) => {
     stdout += chunk.toString();
     if (stdout.length > MAX_STDOUT_LENGTH) {
-      child.kill('SIGTERM');
+      terminate();
       finish(() => reject(new Error('TSTM_GENERATOR_OUTPUT_TOO_LARGE')));
     }
   });
   child.stderr.on('data', (chunk) => {
     stderr = `${stderr}${chunk.toString()}`.slice(-MAX_STDERR_LENGTH);
   });
-  child.on('error', (error) => finish(() => reject(error)));
+  child.on('error', (error) => {
+    clearKillTimer();
+    finish(() => reject(error));
+  });
   child.stdin.on('error', () => {
     // Process failures are settled by the child error/close handlers.
   });
-  child.on('close', (code) => finish(() => {
-    if (code !== 0) {
-      reject(new Error(stderr || `TSTM_GENERATOR_EXIT_${code}`));
-      return;
-    }
-    try {
-      resolve(JSON.parse(stdout));
-    } catch {
-      reject(new Error('TSTM_GENERATOR_INVALID_JSON'));
-    }
-  }));
+  child.on('close', (code) => {
+    clearKillTimer();
+    finish(() => {
+      if (code !== 0) {
+        reject(new Error(stderr || `TSTM_GENERATOR_EXIT_${code}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error('TSTM_GENERATOR_INVALID_JSON'));
+      }
+    });
+  });
   child.stdin.end(JSON.stringify(payload));
 });
 
