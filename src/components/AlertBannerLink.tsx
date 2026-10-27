@@ -6,9 +6,13 @@ interface AlertBannerLinkProps {
   linkLabel: string;
 }
 
+/** In-app routes start with a single slash. '//host' is protocol-relative and resolves off-site. */
+const isInternalRoute = (linkUrl: string): boolean =>
+  linkUrl.startsWith('/') && !linkUrl.startsWith('//');
+
 /** Renders an internal route or external link for the alert banner. */
 export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
-  if (linkUrl.startsWith('/')) {
+  if (isInternalRoute(linkUrl)) {
     return (
       <Link className="alert-banner__link" to={linkUrl}>
         {linkLabel}
@@ -16,7 +20,7 @@ export function AlertBannerLink({ linkUrl, linkLabel }: AlertBannerLinkProps) {
     );
   }
 
-  if (!isSafeBannerLinkUrl(linkUrl)) {
+  if (linkUrl.startsWith('//') || !isSafeBannerLinkUrl(linkUrl)) {
     return null;
   }
 
