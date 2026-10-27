@@ -46,7 +46,7 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
 
   if (!geometry) throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
   const { legendBox, toolbarBox, noticeBox, mapBox } = geometry;
-  const expectedTop = mapBox.y + 106;
+  const expectedTop = mapBox.y + Math.min(106, Math.max(8, mapBox.height - 96));
   expect(Math.abs(legendBox.y - expectedTop)).toBeLessThanOrEqual(2);
   expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
   expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);

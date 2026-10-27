@@ -97,12 +97,13 @@
   }
 
   .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
-    /* 232px reserves the map-relative top offset and toolbar clearance. */
-    --legacy-notice-legend-space: max(0px, calc(100% - 244px));
+    /* Keep 106px clearance when possible; shorter maps reserve 96px for the legend. */
+    --legacy-notice-legend-top: min(106px, max(8px, calc(100% - 96px)));
     box-sizing: border-box;
-    padding: max(0px, min(6px, calc(var(--legacy-notice-legend-space) - 8px)));
-    border-width: min(1px, max(0px, calc(var(--legacy-notice-legend-space) - 1px)));
-    max-height: var(--legacy-notice-legend-space);
+    top: var(--legacy-notice-legend-top);
+    padding: 6px;
+    border-width: 1px;
+    max-height: max(0px, calc(100% - var(--legacy-notice-legend-top) - 12px));
   }
 }
 
