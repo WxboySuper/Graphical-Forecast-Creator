@@ -9,6 +9,7 @@ import { serializeForecast } from '../fileUtils';
 import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import { buildWorkflowExportPackage } from '../workflowPackage';
 import { MAX_FEATURES_PER_MAP } from '../forecastOutlookValidation';
+import { MAX_KML_IMPORT_BYTES } from '../forecastImportValidation';
 
 const square = (): Feature<Polygon> => ({
   type: 'Feature',
@@ -82,6 +83,25 @@ const readBlobBytes = (blob: Blob): Promise<ArrayBuffer> =>
     reader.onerror = () => reject(reader.error ?? new Error('Could not read the exported package.'));
     reader.readAsArrayBuffer(blob);
   });
+
+/** Rewrites an archive's central-directory uncompressed size to simulate forged ZIP metadata. */
+const forgeCentralDirectoryUncompressedSize = (bytes: Uint8Array, declaredSize: number): Uint8Array => {
+  const patched = Uint8Array.from(bytes);
+  const view = new DataView(patched.buffer);
+  let endOfCentralDirectory = -1;
+  for (let index = patched.length - 22; index >= 0; index -= 1) {
+    if (view.getUint32(index, true) === 0x06054b50) {
+      endOfCentralDirectory = index;
+      break;
+    }
+  }
+  if (endOfCentralDirectory < 0) {
+    throw new Error('ZIP end-of-central-directory record not found.');
+  }
+  const centralDirectoryOffset = view.getUint32(endOfCentralDirectory + 16, true);
+  view.setUint32(centralDirectoryOffset + 24, declaredSize, true);
+  return patched;
+};
 
 describe('forecastTransfer', () => {
   test('detects supported transfer formats from file metadata', () => {
@@ -484,6 +504,75 @@ describe('forecastTransfer', () => {
     file.arrayBuffer = async () => buffer;
 
     await expect(importForecastTransfer(file)).rejects.toThrow('Expanded KML is too large');
+  });
+
+  test('rejects oversized KMZ entries even when the declared uncompressed size is forged small', async () => {
+    const zip = new JSZip();
+    zip.file('doc.kml', `<kml>${'x'.repeat(10 * 1024 * 1024 + 1)}</kml>`, { compression: 'DEFLATE' });
+    const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+    const forged = forgeCentralDirectoryUncompressedSize(bytes, 1024);
+    const buffer = Uint8Array.from(forged).buffer;
+    const file = new File([buffer], 'forged.kmz', { type: 'application/vnd.google-earth.kmz' });
+    file.arrayBuffer = async () => buffer;
+
+    await expect(importForecastTransfer(file)).rejects.toThrow('Expanded KML is too large');
+  });
+
+  test('pauses KMZ decompression when streamed content exceeds the limit', async () => {
+    const listeners = new Map<string, (value?: unknown) => void>();
+    const end = jest.fn();
+    let paused = false;
+    const stream = {
+      on: jest.fn((event: string, listener: (value?: unknown) => void) => {
+        listeners.set(event, event === 'end'
+          ? () => {
+            end();
+            listener();
+          }
+          : listener);
+        return stream;
+      }),
+      pause: jest.fn(() => {
+        paused = true;
+      }),
+      resume: jest.fn(() => {
+        listeners.get('data')?.(new Uint8Array(MAX_KML_IMPORT_BYTES + 1));
+        if (!paused) listeners.get('end')?.();
+        return stream;
+      }),
+    } as unknown as JSZip.JSZipStreamHelper<Uint8Array>;
+    const entry = {
+      _data: { uncompressedSize: 1 },
+      internalStream: jest.fn(() => stream),
+    } as unknown as JSZip.JSZipObject;
+    const zip = { file: jest.fn(() => entry), files: {} } as unknown as JSZip;
+    const loadAsync = jest.spyOn(JSZip, 'loadAsync').mockResolvedValue(zip);
+    const file = new File(['zip'], 'controlled.kmz', { type: 'application/vnd.google-earth.kmz' });
+
+    try {
+      await expect(importForecastTransfer(file)).rejects.toThrow('Expanded KML is too large');
+      expect(stream.pause).toHaveBeenCalledTimes(1);
+      expect(end).not.toHaveBeenCalled();
+    } finally {
+      loadAsync.mockRestore();
+    }
+  });
+
+  test('imports a small KMZ through the streaming reader', async () => {
+    const forecastCycle = buildForecast();
+    const kml = buildStructuredKmlDocument({
+      forecastCycle,
+      options: { scope: 'current-day', day: 1, strategy: 'structured-kml' },
+    });
+    const zip = new JSZip();
+    zip.file('doc.kml', kml);
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const buffer = Uint8Array.from(bytes).buffer;
+    const file = new File([buffer], 'small.kmz', { type: 'application/vnd.google-earth.kmz' });
+    file.arrayBuffer = async () => buffer;
+
+    const result = await importForecastTransfer(file, { defaultDay: 1 });
+    expect(result.forecastCycle.days[1]?.data.tornado?.get('15%')).toHaveLength(1);
   });
 
   test('does not treat CIG metadata as significant threat metadata', () => {
