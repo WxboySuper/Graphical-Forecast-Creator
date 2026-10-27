@@ -97,13 +97,13 @@
   }
 
   .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
-    /* Keep 106px clearance when possible; shorter maps reserve 96px for the legend. */
+    /* Keep 106px clearance when possible; shorter maps reserve room above the toolbar. */
     --legacy-notice-legend-top: min(106px, max(8px, calc(100% - 96px)));
     box-sizing: border-box;
     top: var(--legacy-notice-legend-top);
     padding: 6px;
     border-width: 1px;
-    max-height: max(0px, calc(100% - var(--legacy-notice-legend-top) - 12px));
+    max-height: max(0px, calc(100% - var(--legacy-notice-legend-top) - 40px));
   }
 }
 
