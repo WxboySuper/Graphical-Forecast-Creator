@@ -8,6 +8,7 @@ import { forecastCycleFromKmlPlacemarks, parseKmlDocument } from './parseKml';
 import { serializeForecast } from '../fileUtils';
 import { serializeForecastWorkspace } from '../forecastWorkspacePersistenceAdapter';
 import { buildWorkflowExportPackage } from '../workflowPackage';
+import { MAX_FEATURES_PER_MAP } from '../forecastOutlookValidation';
 
 const square = (): Feature<Polygon> => ({
   type: 'Feature',
@@ -497,6 +498,18 @@ describe('forecastTransfer', () => {
 
     const { placemarks } = parseKmlDocument(kml, 1);
     expect(placemarks[0]?.isSignificant).toBe(false);
+  });
+
+  test('rejects KML imports that exceed the per-map feature bound', () => {
+    const placemarks = Array.from({ length: MAX_FEATURES_PER_MAP + 1 }, () => ({
+      day: 1 as const,
+      outlookType: 'tornado' as const,
+      probabilityKey: '15%',
+      feature: square(),
+      isSignificant: false,
+    }));
+
+    expect(() => forecastCycleFromKmlPlacemarks(placemarks)).toThrow('features for day 1');
   });
 
   test('ignores non-integer gfc_day values and keeps the folder day', () => {
