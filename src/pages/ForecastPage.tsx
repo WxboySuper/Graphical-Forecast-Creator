@@ -744,7 +744,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
-  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef);
+  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(() => {
     const shell = forecastShellRef.current;

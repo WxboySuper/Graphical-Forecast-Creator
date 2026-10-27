@@ -69,12 +69,18 @@
 
 @media (max-height: 520px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
-    top: 106px;
+    top: max(8px, calc(106px - var(--legacy-forecast-notice-height, 0px)));
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
     box-sizing: border-box;
-    max-height: calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 234px);
+    max-height: max(
+      0px,
+      min(
+        calc(100dvh - var(--app-header-height, 64px) - 224px),
+        calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 126px)
+      )
+    );
   }
 }
 

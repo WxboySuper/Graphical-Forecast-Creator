@@ -46,7 +46,8 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
   if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
 
   expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
-  expect(Math.abs(legendBox.y - (mapBox.y + 106))).toBeLessThanOrEqual(2);
+  const expectedTop = mapBox.y + Math.max(8, 106 - noticeBox.height);
+  expect(Math.abs(legendBox.y - expectedTop)).toBeLessThanOrEqual(2);
   expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
   expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 };

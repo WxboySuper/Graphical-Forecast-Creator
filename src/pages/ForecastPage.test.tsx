@@ -469,6 +469,15 @@ describe('ForecastPage layout selection', () => {
     );
   });
 
+  test('does not show the Severe bookmark notice in another workspace when it is persisted', () => {
+    sessionStorage.setItem('gfc:legacy-forecast-notice', 'true');
+    const store = createStore();
+
+    renderForecastPageInWorkspace(store, 'custom');
+
+    expect(screen.queryByTestId('legacy-forecast-notice')).not.toBeInTheDocument();
+  });
+
   test('clears the one-time redirect marker when the bookmark notice is dismissed', () => {
     const store = createStore();
     render(

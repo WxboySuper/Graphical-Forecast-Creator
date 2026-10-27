@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const SESSION_KEY = 'gfc:legacy-forecast-notice';
 
@@ -52,13 +53,15 @@ const getLocationState = (state: unknown): Record<string, unknown> => (
 
 export const useLegacyForecastNotice = (
   workspaceRef: RefObject<HTMLDivElement | null>,
+  workspaceId: ForecastWorkspaceId,
 ): [boolean, () => void] => {
   const location = useLocation();
   const navigate = useNavigate();
   const locationState = useMemo(() => getLocationState(location.state), [location.state]);
   const hasRedirectMarker = Boolean(locationState.legacyForecastRedirect);
-  const [isPersisted, clearNotice] = usePersistedNotice(hasRedirectMarker);
-  const shouldShowNotice = hasRedirectMarker || isPersisted;
+  const isDefaultWorkspace = workspaceId === DEFAULT_FORECAST_WORKSPACE;
+  const [isPersisted, clearNotice] = usePersistedNotice(isDefaultWorkspace && hasRedirectMarker);
+  const shouldShowNotice = isDefaultWorkspace && (hasRedirectMarker || isPersisted);
   const shouldFocusWorkspace = useRef(false);
 
   useEffect(() => {
