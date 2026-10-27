@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react';
-import App from './App';
-import { Outlet as MockOutlet } from 'react-router';
+import App, { ForecastLegacyRedirect } from './App';
+import { MemoryRouter, Outlet as MockOutlet, Route, Routes, useLocation } from 'react-router';
 
 // Mock lightweight routes directly so the application test does not execute page logic.
 jest.mock('./pages/HomePage', () => ({
@@ -62,5 +62,38 @@ describe('App Simple', () => {
       render(<App />);
     });
     expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
+  });
+
+  test('legacy Forecast redirect preserves search, hash, and existing router state', async () => {
+    const DestinationProbe = () => {
+      const location = useLocation();
+      return <output data-testid="redirect-location">{JSON.stringify({
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+        state: location.state,
+      })}</output>;
+    };
+
+    render(
+      <MemoryRouter initialEntries={[{
+        pathname: '/forecast',
+        search: '?source=bookmark',
+        hash: '#day-2',
+        state: { openedFrom: 'saved-link' },
+      }]}>
+        <Routes>
+          <Route path="/forecast" element={<ForecastLegacyRedirect />} />
+          <Route path="/forecast/severe" element={<DestinationProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('redirect-location')).toHaveTextContent(JSON.stringify({
+      pathname: '/forecast/severe',
+      search: '?source=bookmark',
+      hash: '#day-2',
+      state: { openedFrom: 'saved-link', legacyForecastRedirect: true },
+    }));
   });
 });

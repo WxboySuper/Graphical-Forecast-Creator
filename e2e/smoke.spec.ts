@@ -5,6 +5,74 @@ import { test, expect } from '@playwright/test';
  * without any white-screen crashes.
  */
 
+const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test').Page) => {
+  await expect.poll(() => page.evaluate(() => {
+    const shell = document.querySelector('.forecast-page-shell');
+    const notice = document.querySelector('[data-testid="legacy-forecast-notice"]');
+    if (!shell || !notice) return false;
+
+    const measuredHeight = Number.parseFloat(
+      getComputedStyle(shell).getPropertyValue('--legacy-forecast-notice-height'),
+    );
+    return Number.isFinite(measuredHeight)
+      && Math.abs(measuredHeight - notice.getBoundingClientRect().height) <= 0.5;
+  })).toBe(true);
+
+  // Verify the map-relative cap still works if the notice height was not measured.
+  await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>('.forecast-page-shell');
+    shell?.style.setProperty('--legacy-forecast-notice-height', '0px');
+  });
+
+  const geometry = await page.evaluate(() => {
+    const legend = document.querySelector<HTMLElement>('.map-legend.map-legend--mobile-open');
+    const toolbar = document.querySelector<HTMLElement>('.tabbed-integrated-toolbar');
+    const notice = document.querySelector<HTMLElement>('[data-testid="legacy-forecast-notice"]');
+    const map = document.querySelector<HTMLElement>('.map-container');
+    const shell = document.querySelector<HTMLElement>('.forecast-page-shell');
+    if (!legend || !toolbar || !notice || !map || !shell) return null;
+
+    const box = (element: HTMLElement) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return {
+      legendBox: box(legend),
+      toolbarBox: box(toolbar),
+      noticeBox: box(notice),
+      mapBox: box(map),
+    };
+  });
+
+  if (!geometry) throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
+  const { legendBox, toolbarBox, noticeBox, mapBox } = geometry;
+  const expectedTop = mapBox.y + Math.min(106, Math.max(8, mapBox.height - 96));
+  expect(Math.abs(legendBox.y - expectedTop)).toBeLessThanOrEqual(2);
+  expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
+  expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
+};
+
+const expectLegacyNoticePortraitLegendGeometry = async (page: import('@playwright/test').Page) => {
+  const geometry = await page.evaluate(() => {
+    const legend = document.querySelector<HTMLElement>('.map-legend.map-legend--mobile-open');
+    const toolbar = document.querySelector<HTMLElement>('.tabbed-integrated-toolbar');
+    const map = document.querySelector<HTMLElement>('.map-container');
+    if (!legend || !toolbar || !map) return null;
+
+    const box = (element: HTMLElement) => {
+      const { y, height } = element.getBoundingClientRect();
+      return { y, height };
+    };
+    return { legend: box(legend), toolbar: box(toolbar), map: box(map) };
+  });
+
+  if (!geometry) throw new Error('Expected the portrait legend, map, and toolbar to have measurable bounds.');
+  const { legend, toolbar, map } = geometry;
+  expect(legend.y).toBeGreaterThanOrEqual(map.y);
+  expect(legend.y + legend.height).toBeLessThanOrEqual(map.y + map.height + 1);
+  expect(legend.y + legend.height).toBeLessThanOrEqual(toolbar.y + 1);
+};
+
 test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
     await page.addInitScript(() => {
@@ -83,6 +151,16 @@ test.describe('App smoke tests', () => {
     await page.getByRole('button', { name: /show map key/i }).click();
     await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
 
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.minHeight = '140px';
+    });
+    await page.setViewportSize({ width: 390, height: 620 });
+    await expectLegacyNoticePortraitLegendGeometry(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.removeProperty('min-height');
+    });
+
     const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(documentOverflow).toBeLessThanOrEqual(1);
 
@@ -114,6 +192,7 @@ test.describe('App smoke tests', () => {
     await page.goto('/forecast?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
 
+    await expect(page.getByRole('status').filter({ hasText: '/forecast/severe' })).toBeVisible();
     await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
     await expect(page.locator('.tabbed-integrated-toolbar__status-bar')).not.toBeVisible();
     await expect(page.locator('.map-toolbar-help-surface')).not.toBeVisible();
@@ -123,12 +202,13 @@ test.describe('App smoke tests', () => {
     await page.getByRole('button', { name: /show map key/i }).click();
     await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
 
-    const legendBox = await page.getByRole('complementary', { name: /map legend/i }).boundingBox();
-    const toolbarBox = await page.locator('.tabbed-integrated-toolbar').boundingBox();
-    if (!legendBox || !toolbarBox) {
-      throw new Error('Expected the mobile key popout and toolbar to have measurable bounds.');
-    }
-    expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
+    await expectLegacyNoticeLegendGeometry(page);
+    await page.setViewportSize({ width: 667, height: 430 });
+    await expectLegacyNoticeLegendGeometry(page);
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.minHeight = '140px';
+    });
+    await expectLegacyNoticeLegendGeometry(page);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: /Undo/i }).first()).toBeVisible();
