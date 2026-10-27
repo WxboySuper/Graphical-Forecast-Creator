@@ -72,6 +72,18 @@ describe('dayRolloverStorage', () => {
     expect(readLegacyRolloverPrompt(null, 'custom')).toBeNull();
   });
 
+  test('clears legacy pending prompts when the default workspace dismisses them', () => {
+    localStorage.setItem(getLegacyRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, 'user-1'), JSON.stringify(PENDING_PROMPT));
+    localStorage.setItem(getLegacyRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, null), JSON.stringify(PENDING_PROMPT));
+    localStorage.setItem(DAY_ROLLOVER_PENDING_KEY, JSON.stringify(PENDING_PROMPT));
+
+    clearStoredRolloverPrompt('user-1', 'severe');
+    clearStoredRolloverPrompt(null, 'severe');
+
+    expect(readLegacyRolloverPrompt('user-1', 'severe')).toBeNull();
+    expect(readLegacyRolloverPrompt(null, 'severe')).toBeNull();
+  });
+
   test('ignores a malformed workspace-scoped pending prompt', () => {
     localStorage.setItem(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, null, 'custom'), '{bad json');
 

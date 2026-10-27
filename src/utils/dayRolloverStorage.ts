@@ -114,4 +114,8 @@ export function clearStoredRolloverPrompt(
   workspaceId: ForecastWorkspaceId,
 ): void {
   removeStoredDayValue(getRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId, workspaceId));
+  if (workspaceId === DEFAULT_FORECAST_WORKSPACE) {
+    removeStoredDayValue(getLegacyRolloverStorageKey(DAY_ROLLOVER_PENDING_KEY, userId));
+    if (!userId) removeStoredDayValue(DAY_ROLLOVER_PENDING_KEY);
+  }
 }

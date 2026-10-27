@@ -458,14 +458,18 @@ interface CloudLibraryActions {
 /** One cloud cycle row inside the library list. */
 const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, rowState, onRowStateChange, onLoad, onDelete, onRename }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const savedLabelRef = useRef<{ savedLabel: string; previousLabel: string } | null>(null);
   const [isSavingRename, setIsSavingRename] = useState(false);
   const { isRenaming, confirmingDelete, newLabel } = rowState;
   const updateRowState = (update: Partial<CloudCycleRowState>) => onRowStateChange(cycle.id, update);
 
   useEffect(() => {
+    const savedLabel = savedLabelRef.current;
     if (!isRenaming && newLabel !== cycle.label) {
+      if (savedLabel?.savedLabel === newLabel && savedLabel.previousLabel === cycle.label) return;
       onRowStateChange(cycle.id, { newLabel: cycle.label });
     }
+    if (savedLabel?.savedLabel === cycle.label) savedLabelRef.current = null;
   }, [cycle.id, cycle.label, isRenaming, newLabel, onRowStateChange]);
 
   /** Deletes the selected cloud cycle after the inline confirmation has been accepted. */
@@ -489,6 +493,7 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
     setIsSavingRename(true);
     try {
       await onRename(cycle.id, newLabel.trim());
+      savedLabelRef.current = { savedLabel: newLabel.trim(), previousLabel: cycle.label };
     } finally {
       setIsSavingRename(false);
       updateRowState({ isRenaming: false, newLabel: newLabel.trim() });
@@ -565,22 +570,25 @@ const SignedOutGate: React.FC = () => (
 const CloudLibraryFeedbackCard: React.FC<{
   error: string | null;
   message: string | null;
-}> = ({ error, message }) => {
-  if (!error && !message) return null;
-
-  return (
-    <Card className="cloud-library-surface-card">
-      <CardContent className="cloud-library-feedback" role="status">
-        {error ? (
-          <CloudOff className="h-5 w-5 shrink-0 text-destructive" />
-        ) : (
-          <Cloud className="h-5 w-5 shrink-0 text-primary" />
-        )}
-        <p>{error ?? message}</p>
-      </CardContent>
-    </Card>
-  );
-};
+}> = ({ error, message }) => (
+  <>
+    <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+      {error ?? message ?? ''}
+    </div>
+    {error || message ? (
+      <Card className="cloud-library-surface-card">
+        <CardContent className="cloud-library-feedback">
+          {error ? (
+            <CloudOff className="h-5 w-5 shrink-0 text-destructive" />
+          ) : (
+            <Cloud className="h-5 w-5 shrink-0 text-primary" />
+          )}
+          <p>{error ?? message}</p>
+        </CardContent>
+      </Card>
+    ) : null}
+  </>
+);
 
 /** Workspace tabs keep saved products separated while retaining an All view for discovery. */
 type CloudLibraryTabButtonProps = {
@@ -728,11 +736,11 @@ const CloudLibraryMainCard: React.FC<{
         [cycleId]: {
           isRenaming: update.isRenaming ?? existing?.isRenaming ?? false,
           confirmingDelete: update.confirmingDelete ?? existing?.confirmingDelete ?? false,
-          newLabel: update.newLabel ?? existing?.newLabel ?? '',
+          newLabel: update.newLabel ?? existing?.newLabel ?? cycles.find((cycle) => cycle.id === cycleId)?.label ?? '',
         },
       };
     });
-  }, []);
+  }, [cycles]);
   const workspacePath = getCloudLibraryWorkspacePath(activeTab, buildTarget);
 
   return (
@@ -912,7 +920,7 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    navigate(getForecastWorkspacePath(workspaceId));
+    navigate(getForecastWorkspacePath(workspaceId, buildTarget));
   }, [buildTarget, cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
@@ -1018,7 +1026,7 @@ const CloudLibraryPage: React.FC = () => {
         <CloudLibraryHero premiumActive={premiumActive} cycleCount={cycles.length} isExpiredPremium={isExpiredPremium} />
 
         {isExpiredPremium ? <ExpiredPremiumNotice /> : null}
-        {error || message ? <CloudLibraryFeedbackCard error={error} message={message} /> : null}
+        <CloudLibraryFeedbackCard error={error} message={message} />
 
         <CloudLibrarySignedInLayout
           premiumActive={premiumActive}

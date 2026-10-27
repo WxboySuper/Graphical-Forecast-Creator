@@ -83,6 +83,7 @@ describe("CloudLibraryPage", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     renderPage();
     expect(screen.getByText(/No cloud cycles saved yet/i)).toBeTruthy();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it("shows an expired-premium notice when entitlement lapsed from Stripe", () => {

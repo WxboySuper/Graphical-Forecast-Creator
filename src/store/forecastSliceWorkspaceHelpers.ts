@@ -222,10 +222,13 @@ export const advanceCycleGeneration = (state: ForecastState) => {
 };
 
 /** Normalizes hydrated cycle ownership so direct or legacy payloads cannot bypass Severe fallback. */
-export const normalizeCycleWorkspace = (cycle: SavedCycle): SavedCycle => ({
-  ...cycle,
-  workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
-});
+export const normalizeCycleWorkspace = (cycle: SavedCycle | null | undefined): SavedCycle | null => {
+  if (!cycle || typeof cycle !== 'object') return null;
+  return {
+    ...cycle,
+    workspaceId: resolveForecastWorkspaceId(cycle.workspaceId),
+  };
+};
 
 /**
  * Returns the tool and custom-editor defaults one workspace starts from.

@@ -1004,11 +1004,13 @@ export const forecastSlice = createSlice({
     // Load cycles from storage (for hydration)
     loadCycleHistory: (state, action: PayloadAction<SavedCycle[] | CycleHistoryLoad>) => {
       const cycles = Array.isArray(action.payload) ? action.payload : action.payload.cycles;
-      state.savedCycles = cycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
+      const validCycles = cycles.filter((cycle): cycle is SavedCycle => cycle !== null && typeof cycle === 'object');
+      const normalizedCycles = cycles.slice(-SAVED_CYCLES_LIMIT).map(normalizeCycleWorkspace);
+      state.savedCycles = normalizedCycles.filter((cycle): cycle is SavedCycle => cycle !== null);
       state.lifetimeCycleStats = Array.isArray(action.payload)
         ? {
-            totalCyclesMade: cycles.length,
-            totalForecastsMade: cycles.reduce((total, cycle) => total + (cycle.stats.forecastDays ?? 0), 0),
+            totalCyclesMade: validCycles.length,
+            totalForecastsMade: validCycles.reduce((total, cycle) => total + (cycle.stats?.forecastDays ?? 0), 0),
           }
         : action.payload.lifetimeCycleStats;
     },

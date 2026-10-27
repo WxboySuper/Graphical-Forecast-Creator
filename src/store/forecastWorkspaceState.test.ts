@@ -34,6 +34,15 @@ describe('forecast workspace state', () => {
       .toBe('cycle-2026-10-26-1');
   });
 
+  test('drops null entries when saved-cycle history hydrates', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    state = reducer(state, saveCurrentCycle({ label: 'Kept cycle' }));
+
+    const hydrated = reducer(undefined, loadCycleHistory([null, state.savedCycles[0]] as never));
+    expect(hydrated.savedCycles).toEqual([state.savedCycles[0]]);
+    expect(hydrated.lifetimeCycleStats?.totalCyclesMade).toBe(1);
+  });
+
   test('records the active workspace on saved cycles', () => {
     let state = reducer(undefined, setForecastWorkspace('custom'));
     state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
