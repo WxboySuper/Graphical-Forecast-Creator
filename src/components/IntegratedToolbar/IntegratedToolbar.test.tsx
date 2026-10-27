@@ -88,6 +88,7 @@ const ToolbarTestHarness: React.FC = () => {
     addToast: mockAddToast,
     onImportResult: jest.fn(),
     onExportComplete: jest.fn(),
+    workspaceId: 'severe',
   });
 
   return <TabbedIntegratedToolbar controller={controller} />;
@@ -165,7 +166,7 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
 describe('TabbedIntegratedToolbar layout scaffolding', () => {
   /* eslint-disable testing-library/no-node-access -- verifies scroll container DOM structure */
   test('tab row scrolls horizontally with a non-shrinking section track', () => {
-    renderToolbar('tabbed');
+    renderToolbar();
 
     const row = document.querySelector('.tabbed-integrated-toolbar__row');
     expect(row).toHaveClass('overflow-x-auto');
@@ -176,7 +177,7 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
   });
 
   test('toolbar sections contain labels and content without shared shrink classes', () => {
-    renderToolbar('tabbed');
+    renderToolbar();
 
     const sections = document.querySelectorAll('.tabbed-integrated-toolbar__section');
     expect(sections.length).toBeGreaterThan(0);
@@ -190,7 +191,7 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
 
   test('Days tab forecast strip reserves enough width for all day controls', async () => {
     const user = userEvent.setup();
-    renderToolbar('tabbed');
+    renderToolbar();
 
     await user.click(screen.getByRole('tab', { name: /Days/i }));
 
