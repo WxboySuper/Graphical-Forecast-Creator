@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { getForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../../routing/forecastWorkspaceRoutes';
+import type { RootState } from '../../store';
 import { Button } from '../ui/button';
 import {
   selectForecastCycle,
@@ -45,6 +48,24 @@ import {
   markCompletionHandoffHandled,
 } from './completionHandoffPolicy';
 import './ForecastWorkflowPanel.css';
+
+
+/** Resolves the workspace identity from the route before falling back to Redux state. */
+export const resolveWorkflowWorkspaceId = (
+  pathname: string,
+  search: string,
+  reduxWorkspaceId: string | null | undefined,
+): ForecastWorkspaceId =>
+  resolveRouteForecastWorkspaceContext(pathname, search)?.id
+  ?? resolveForecastWorkspaceId(reduxWorkspaceId);
+
+/** Keeps workspace identity on discussion links while retaining grouping parameters. */
+export const addWorkspaceToDiscussionPath = (path: string, workspaceId: ForecastWorkspaceId): string => {
+  const [pathname, search = ''] = path.split('?');
+  const params = new URLSearchParams(search);
+  params.set('workspace', workspaceId);
+  return `${pathname}?${params.toString()}`;
+};
 
 interface ForecastWorkflowPanelProps {
   controller?: ForecastWorkspaceController;
@@ -165,6 +186,7 @@ interface WorkflowPanelActionsProps {
   onCreateUpdate: () => void;
   onStartFromPrevious: () => void;
   onNavigate: (path: string) => void;
+  forecastPath: string;
   discussionPath: string;
 }
 
@@ -235,6 +257,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   mapIsComplete,
   isPackageDownloading,
   discussionPath,
+  forecastPath,
   onExport,
   onOpenReview,
   onNavigate,
@@ -264,7 +287,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
             Update Discussion
           </Button>
         ) : (
-          <Button size="sm" onClick={() => onNavigate('/forecast')}>
+          <Button size="sm" onClick={() => onNavigate(forecastPath)}>
             <Map className="h-4 w-4 mr-2" />
             Update Map
           </Button>
@@ -278,7 +301,7 @@ const WorkflowPanelPrimaryAction: React.FC<WorkflowPanelActionsProps> = ({
   }
   if (context === 'discussion') {
     return (
-      <Button size="sm" onClick={() => onNavigate('/forecast')}>
+      <Button size="sm" onClick={() => onNavigate(forecastPath)}>
         <Map className="h-4 w-4 mr-2" />
         {mapIsComplete ? 'Finish Map' : 'Continue Map'}
       </Button>
@@ -407,11 +430,17 @@ const getCurrentWorkflowVersion = (versions: { version: number }[]): number => {
 };
 
 /** Determines whether the banner has enough state to render. */
-const shouldHideWorkflowPanel = (
-  isExposed: boolean,
-  hasActiveWorkflow: boolean,
-  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>,
-): boolean => !isExposed || !hasActiveWorkflow || !workflowMetadata;
+const shouldHideWorkflowPanel = ({
+  isExposed,
+  hasActiveWorkflow,
+  workflowMetadata,
+  workspaceMismatch,
+}: {
+  isExposed: boolean;
+  hasActiveWorkflow: boolean;
+  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>;
+  workspaceMismatch: boolean;
+}): boolean => workspaceMismatch || !isExposed || !hasActiveWorkflow || !workflowMetadata;
 
 /** Determines whether the current package can enter review. */
 const canReviewWorkflowPackage = (
@@ -453,9 +482,13 @@ const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ has
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
+  const reduxWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const activeWorkspaceId = resolveForecastWorkspaceId(reduxWorkspaceId);
+  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, activeWorkspaceId);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
@@ -474,7 +507,12 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     );
   }, [handoffEligibility.showHandoff, handoffIdentity]);
 
-  if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
+  if (shouldHideWorkflowPanel({
+    isExposed: isFeatureExposed('forecastWorkflowV2'),
+    hasActiveWorkflow,
+    workflowMetadata,
+    workspaceMismatch: workspaceId !== activeWorkspaceId,
+  })) {
     return null;
   }
 
@@ -486,9 +524,10 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const hasDiscussion = hasGroupedDiscussionContent(
     currentDiscussionGrouping ? getDiscussionForGrouping(forecastCycle, currentDiscussionGrouping) : currentDay?.discussion,
   );
-  const discussionPath = currentDiscussionGrouping
-    ? discussionPathForGrouping(currentDiscussionGrouping)
-    : '/discussion';
+  const discussionPath = addWorkspaceToDiscussionPath(
+    currentDiscussionGrouping ? discussionPathForGrouping(currentDiscussionGrouping) : '/discussion',
+    workspaceId,
+  );
   const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
   const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
   const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');
@@ -576,7 +615,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleReturnToMap(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   }
   /** Starts today's workflow from the suggested previous-cycle outlook. */
   function handleStartFromPrevious(): void {
@@ -631,6 +670,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           previousSuggestion={previousSuggestion}
           activeUpdateVersion={activeUpdateVersion}
           discussionPath={discussionPath}
+          forecastPath={getForecastWorkspacePath(workspaceId)}
           onExport={() => { handleWorkflowExport().catch(() => undefined); }}
           onOpenReview={handleOpenReview}
           onCreateUpdate={handleCreateUpdate}
@@ -653,7 +693,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           dispatch(setForecastDay(day));
           dispatch(setActiveOutlookType(outlookType));
           dispatch(dismissCompletionModal());
-          navigate('/forecast');
+          navigate(getForecastWorkspacePath(workspaceId));
         }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
       />

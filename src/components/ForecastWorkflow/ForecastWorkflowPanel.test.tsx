@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router';
 import type { Feature, Polygon } from 'geojson';
-import ForecastWorkflowPanel, { getYesterdayLocalDate } from './ForecastWorkflowPanel';
+import ForecastWorkflowPanel, { addWorkspaceToDiscussionPath, getYesterdayLocalDate, resolveWorkflowWorkspaceId } from './ForecastWorkflowPanel';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import forecastReducer, {
   addFeature,
@@ -71,6 +71,25 @@ const renderPanel = (context: 'forecast' | 'discussion', controller?: ForecastWo
     </MemoryRouter>,
   );
 };
+
+describe('workspace-aware workflow routes', () => {
+  it('uses the forecast route workspace instead of a stale Redux selection', () => {
+    expect(resolveWorkflowWorkspaceId('/forecast/custom', '', 'severe')).toBe('custom');
+  });
+
+  it('resolves exposed discussion workspace hints and validates Redux fallback', () => {
+    expect(resolveWorkflowWorkspaceId('/discussion', '?group=day1&workspace=custom', 'severe')).toBe('custom');
+    expect(resolveWorkflowWorkspaceId('/discussion/', '?workspace=custom', 'severe')).toBe('custom');
+    expect(resolveWorkflowWorkspaceId('/discussion/thread/1', '?workspace=custom', 'severe')).toBe('custom');
+    expect(resolveWorkflowWorkspaceId('/discussion', '?workspace=unknown', 'custom')).toBe('custom');
+    expect(resolveWorkflowWorkspaceId('/discussion', '', 'invalid')).toBe('severe');
+  });
+
+  it('adds workspace identity without dropping discussion grouping', () => {
+    expect(addWorkspaceToDiscussionPath('/discussion?group=day1', 'custom'))
+      .toBe('/discussion?group=day1&workspace=custom');
+  });
+});
 
 describe('ForecastWorkflowPanel completion review', () => {
   beforeEach(() => {

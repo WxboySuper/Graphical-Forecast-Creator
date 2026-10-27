@@ -223,7 +223,7 @@ const normalizeStoredMetadata = ({
   return {
     id: readRequiredText(rawMetadata.id) ?? cycleId,
     userId: readRequiredText(rawMetadata.userId) ?? fallbackUserId,
-    workspaceId: resolveForecastWorkspaceId(rawMetadata.workspaceId as string | undefined),
+    workspaceId: resolveForecastWorkspaceId(typeof rawMetadata.workspaceId === 'string' ? rawMetadata.workspaceId : undefined),
     label,
     cycleDate,
     createdAt: readTimestampString(rawMetadata.createdAt),

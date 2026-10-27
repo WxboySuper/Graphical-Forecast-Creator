@@ -128,28 +128,34 @@ export const hasActionableFindings = (badThings = [], droppedFindings = []) => (
 const parseReviewAssessments = (assessments, openThreads) => {
   const expected = new Set(openThreads.map((thread) => thread.id));
   const accepted = new Map();
-  const seen = new Set();
   for (const assessment of Array.isArray(assessments) ? assessments : []) {
-    if (!isNewExpectedReviewAssessment(assessment, expected, seen)) continue;
-    seen.add(assessment.threadId);
-    accepted.set(assessment.threadId, parseReviewAssessment(assessment));
+    if (!isNewExpectedReviewAssessment(assessment, expected, accepted)) continue;
+    const parsed = parseReviewAssessment(assessment);
+    if (parsed) accepted.set(assessment.threadId, parsed);
   }
   const missing = openThreads.find((thread) => !accepted.has(thread.id));
   if (missing) throw new Error('First-look output must assess every supplied open review thread before publishing.');
   return openThreads.map((thread) => accepted.get(thread.id));
 };
 
-const isNewExpectedReviewAssessment = (assessment, expected, seen) => {
+const isNewExpectedReviewAssessment = (assessment, expected, accepted) => {
   if (!assessment) return false;
   if (!expected.has(assessment.threadId)) return false;
-  return !seen.has(assessment.threadId);
+  return !accepted.has(assessment.threadId);
 };
 
-const parseReviewAssessment = (assessment) => ({
-  threadId: assessment.threadId,
-  status: assertAssessmentStatus(assessment.status),
-  summary: boundedText(assessment.summary, 'review-comment summary'),
-});
+const parseReviewAssessment = (assessment) => {
+  const status = assertAssessmentStatus(assessment.status);
+  try {
+    return {
+      threadId: assessment.threadId,
+      status,
+      summary: boundedText(assessment.summary, 'review-comment summary'),
+    };
+  } catch {
+    return null;
+  }
+};
 
 const assertAssessmentStatus = (status) => {
   if (!ASSESSMENTS.has(status)) throw new Error('First-look review-thread status is invalid.');

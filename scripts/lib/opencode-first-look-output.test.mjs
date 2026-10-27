@@ -241,6 +241,42 @@ test('a thread assessed still-open or unclear cannot be published as a clean per
   }
 });
 
+test('requires complete open-thread assessments before publishing', () => {
+  const withThreads = {
+    ...context,
+    openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }, { id: 'thread-2', path: 'src/b.ts' }],
+  };
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    reviewCommentAssessments: [
+      { threadId: 'unknown-thread', status: 'addressed', summary: 'Untrusted extra thread.' },
+      { threadId: 'thread-1', status: 'addressed', summary: 'The fix addresses this comment.' },
+      { threadId: 'thread-1', status: 'still-open', summary: 'Duplicate assessment is ignored.' },
+      { threadId: 'thread-2', status: 'invalid-status', summary: 'Invalid assessment is unclear.' },
+    ],
+  }), withThreads), /review-thread status is invalid/);
+  assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({ ...result, reviewCommentAssessments: [] }), withThreads), /assess every supplied open review thread/);
+});
+
+test('an open GitHub thread may still support 10/10 when investigation confirms the code resolves it', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  const parsed = parseOpenCodeFirstLookOutput(JSON.stringify({
+    ...result,
+    reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary: 'The current guard resolves the concern; the GitHub thread still needs manual resolution.' }],
+  }), withThread);
+  assert.equal(parsed.rating, 10);
+});
+
+test('a thread assessed still-open or unclear cannot be published as a clean perfect review', () => {
+  const withThread = { ...context, openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }] };
+  for (const status of ['still-open', 'unclear']) {
+    assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
+      ...result,
+      reviewCommentAssessments: [{ threadId: 'thread-1', status, summary: 'The review concern remains unresolved.' }],
+    }), withThread), /concrete findings when a review thread remains open or unclear/);
+  }
+});
+
 test('same-revision CI follow-ups retain earlier concrete findings in the shared comment', () => {
   const previous = {
     ...result,
@@ -439,4 +475,19 @@ test('reports actual GitHub diff omissions as review coverage, not as a code fin
   assert.match(rendered, /## Review coverage\n- GitHub omitted a textual patch for one changed file\./);
   assert.match(rendered, /## Bad things\n- No actionable findings\./);
   assert.equal(parsed.badThings.length, 0);
+});
+
+
+test('ignores malformed review summaries while requiring every open thread to have a valid assessment', () => {
+  const withThread = {
+    ...context,
+    openReviewThreads: [{ id: 'thread-1', path: 'src/a.ts' }],
+  };
+
+  for (const summary of ['', 42, 'two\nlines']) {
+    assert.throws(() => parseOpenCodeFirstLookOutput(JSON.stringify({
+      ...result,
+      reviewCommentAssessments: [{ threadId: 'thread-1', status: 'addressed', summary }],
+    }), withThread), /assess every supplied open review thread/);
+  }
 });

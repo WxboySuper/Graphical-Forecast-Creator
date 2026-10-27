@@ -16,7 +16,7 @@ The planned Forecast routes are:
 | Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
 | Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
 | Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
-| Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customProducts` |
+| Custom | `/forecast/custom` | planned; current path is `/custom-products` | `customWorkspace` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
 contract preserves compatible query parameters and the hash when the routing
@@ -121,7 +121,9 @@ shared day groupings would make drafts collide or disappear.
 The exposure registry owns whether Mesoscale, Tropical, Winter, and Custom
 workspace pages may be registered. The registry currently leaves Mesoscale and
 Winter off on every target. Tropical remains governed by its existing disabled
-entry. Custom keeps its current product exposure and entitlement behavior.
+entry. Custom owns a separate `customWorkspace` key that stays off release
+targets until #915 registers the route; the `customProducts` key keeps gating
+the library, entitlement, and custom-layer behavior on its own.
 
 No future workspace page, provider client, map layer, or repository may be
 imported at module scope from the always-on application shell. Route loaders and

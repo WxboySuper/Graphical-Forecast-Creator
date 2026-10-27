@@ -1,4 +1,6 @@
 import {
+  buildCloudLoadValidators,
+  buildCloudSessionPayload,
   classifyForecastWorkspacePayload,
   createForecastWorkspaceSave,
   FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
@@ -85,5 +87,76 @@ describe('forecast workspace persistence contract', () => {
     const forecast = validForecast();
     expect(getForecastDataFromWorkspacePayload(forecast)).toBe(forecast);
     expect(getForecastDataFromWorkspacePayload(createForecastWorkspaceSave('severe', forecast))).toBe(forecast);
+  });
+
+  test('does not double-wrap an already-enveloped cloud handoff payload', () => {
+    const envelope = createForecastWorkspaceSave('severe', validForecast());
+    expect(buildCloudSessionPayload('severe', envelope)).toBe(envelope);
+    const customEnvelope = createForecastWorkspaceSave('custom', validForecast());
+    expect(() => buildCloudSessionPayload('severe', customEnvelope)).toThrow(/different forecast workspace/);
+  });
+
+  test('rejects an invalid cloud payload instead of wrapping it as forecast data', () => {
+    expect(() => buildCloudSessionPayload('severe', { legacy: true })).toThrow(/not supported by any workspace/);
+    expect(() => buildCloudSessionPayload('severe', { nope: true })).toThrow(/not supported by any workspace/);
+    expect(() => buildCloudSessionPayload('severe', {
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: {},
+    })).toThrow(/incomplete or invalid/);
+    expect(() => buildCloudSessionPayload('severe', {
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'bogus',
+      forecast: validForecast(),
+    })).toThrow(/unknown workspace/);
+  });
+
+  test('rejects an untagged legacy payload for Custom because it has no workspace identity', () => {
+    expect(() => buildCloudSessionPayload('custom', validForecast()))
+      .toThrow(/different forecast workspace/);
+
+    // A payload only the caller's Custom validator recognizes is Custom, never Severe.
+    const customPayload = { customForecast: true };
+    const validators = {
+      isCustomPayload: (value: unknown): value is GFCForecastSaveData => value === customPayload,
+    };
+    expect(buildCloudSessionPayload('custom', customPayload, validators)).toEqual({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'custom',
+      forecast: customPayload,
+    });
+    expect(() => buildCloudSessionPayload('severe', customPayload, validators)).toThrow(/different forecast workspace/);
+  });
+
+  test('uses the historical Severe default and requires envelopes for other workspaces', () => {
+    const forecast = validForecast();
+
+    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('severe'))).toEqual({
+      ok: true,
+      workspaceId: 'severe',
+      payload: forecast,
+      legacy: true,
+    });
+    for (const workspaceId of ['custom', 'tropical'] as const) {
+      expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators(workspaceId)))
+        .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
+      expect(() => buildCloudSessionPayload(workspaceId, forecast, buildCloudLoadValidators(workspaceId)))
+        .toThrow(/not supported by any workspace/);
+    }
+    expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
+      .toEqual(createForecastWorkspaceSave('custom', forecast));
+
+    // Malformed input fails the requested workspace's validator instead of being wrapped.
+    expect(classifyForecastWorkspacePayload({ legacy: true }, buildCloudLoadValidators('custom')))
+      .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
+    expect(() => buildCloudSessionPayload('custom', { legacy: true }, buildCloudLoadValidators('custom')))
+      .toThrow(/not supported by any workspace/);
+
+    // An explicit envelope still outranks the record it rode in on.
+    const severeEnvelope = createForecastWorkspaceSave('severe', forecast);
+    expect(() => buildCloudSessionPayload('custom', severeEnvelope, buildCloudLoadValidators('custom')))
+      .toThrow(/different forecast workspace/);
+    expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
+      .toEqual(createForecastWorkspaceSave('custom', forecast));
   });
 });
