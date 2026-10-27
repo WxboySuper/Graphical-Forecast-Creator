@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { Outlet as MockOutlet } from 'react-router';
 import App from './App';
 import { store } from './store';
 import {
@@ -41,15 +40,21 @@ jest.mock('./pages/ForecastPage', () => ({
   ForecastPage: () => <div>Forecast editor mock</div>,
   default: () => <div>Forecast editor mock</div>,
 }));
-jest.mock('./components/Layout', () => ({
-  AppLayout: () => (
-    <div>
-      <div>AppLayout Mock</div>
-      <MockOutlet />
-    </div>
-  ),
-}));
-jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
+jest.mock('./components/Layout', () => {
+  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
+  return {
+    AppLayout: () => (
+      <div>
+        <div>AppLayout Mock</div>
+        <Outlet />
+      </div>
+    ),
+  };
+});
+jest.mock('./components/Beta/BetaAccessGuard', () => {
+  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
+  return () => <Outlet />;
+});
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
   hasAcceptedToS: () => true,

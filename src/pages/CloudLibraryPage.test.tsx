@@ -97,7 +97,7 @@ describe("CloudLibraryPage", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ error: "Failed to load cloud cycles" }));
     renderPage();
-    expect(screen.getByText(/failed to load cloud cycles/i)).toBeTruthy();
+    expect(screen.getAllByText(/failed to load cloud cycles/i)).toHaveLength(2);
     expect(screen.getByRole("status")).toHaveTextContent(/failed to load cloud cycles/i);
   });
 
@@ -220,7 +220,7 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
     await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
-    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(sessionStorage.getItem("cloudCyclePayload:severe:user-user-1")).toBeNull();
   });
@@ -259,7 +259,7 @@ describe("CloudLibraryPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
-    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
     expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
@@ -274,7 +274,7 @@ describe("CloudLibraryPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
-    await screen.findByText(/Unable to hand this cloud cycle off to the editor/i);
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
     expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
     expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1")).toBeNull();
     expect(mockNavigate).not.toHaveBeenCalled();

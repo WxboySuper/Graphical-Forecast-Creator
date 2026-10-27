@@ -456,13 +456,15 @@ interface CloudLibraryActions {
 }
 
 /** One cloud cycle row inside the library list. */
-const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, rowState, onRowStateChange, onLoad, onDelete, onRename }) => {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const savedLabelRef = useRef<{ savedLabel: string; previousLabel: string } | null>(null);
-  const [isSavingRename, setIsSavingRename] = useState(false);
-  const { isRenaming, confirmingDelete, newLabel } = rowState;
-  const updateRowState = (update: Partial<CloudCycleRowState>) => onRowStateChange(cycle.id, update);
+type SavedCycleLabelRef = React.MutableRefObject<{ savedLabel: string; previousLabel: string } | null>;
 
+const useSyncSavedCycleLabel = (
+  cycle: CloudCycleMetadata,
+  isRenaming: boolean,
+  newLabel: string,
+  onRowStateChange: CycleItemProps['onRowStateChange'],
+  savedLabelRef: SavedCycleLabelRef,
+): void => {
   useEffect(() => {
     const savedLabel = savedLabelRef.current;
     if (!isRenaming && newLabel !== cycle.label) {
@@ -471,6 +473,16 @@ const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWor
     }
     if (savedLabel?.savedLabel === cycle.label) savedLabelRef.current = null;
   }, [cycle.id, cycle.label, isRenaming, newLabel, onRowStateChange]);
+};
+
+const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, rowState, onRowStateChange, onLoad, onDelete, onRename }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const savedLabelRef = useRef<{ savedLabel: string; previousLabel: string } | null>(null);
+  const [isSavingRename, setIsSavingRename] = useState(false);
+  const { isRenaming, confirmingDelete, newLabel } = rowState;
+  const updateRowState = (update: Partial<CloudCycleRowState>) => onRowStateChange(cycle.id, update);
+
+  useSyncSavedCycleLabel(cycle, isRenaming, newLabel, onRowStateChange, savedLabelRef);
 
   /** Deletes the selected cloud cycle after the inline confirmation has been accepted. */
   const handleDelete = async () => {
@@ -920,7 +932,7 @@ const useCloudLibraryActions = ({
       return;
     }
 
-    navigate(getForecastWorkspacePath(workspaceId, buildTarget));
+    navigate(getForecastWorkspacePath(workspaceId));
   }, [buildTarget, cycles, loadCycle, navigate, persistCloudCycleToSession]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
