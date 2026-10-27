@@ -744,9 +744,6 @@
   .max-w-lg {
     max-width: var(--container-lg);
   }
-  .max-w-md {
-    max-width: var(--container-md);
-  }
   .max-w-sm {
     max-width: var(--container-sm);
   }
@@ -1147,9 +1144,6 @@
       border-color: color-mix(in oklab, var(--button-bg) 20%, transparent);
     }
   }
-  .border-red-200 {
-    border-color: var(--color-red-200);
-  }
   .border-red-500\/50 {
     border-color: color-mix(in srgb, oklch(63.7% 0.237 25.331) 50%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1381,12 +1375,6 @@
   .bg-primary {
     background-color: var(--button-bg);
   }
-  .bg-primary\/5 {
-    background-color: var(--button-bg);
-    @supports (color: color-mix(in lab, red, red)) {
-      background-color: color-mix(in oklab, var(--button-bg) 5%, transparent);
-    }
-  }
   .bg-primary\/8 {
     background-color: var(--button-bg);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1398,9 +1386,6 @@
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--button-bg) 10%, transparent);
     }
-  }
-  .bg-red-50 {
-    background-color: var(--color-red-50);
   }
   .bg-red-500\/15 {
     background-color: color-mix(in srgb, oklch(63.7% 0.237 25.331) 15%, transparent);
@@ -1860,9 +1845,6 @@
   .text-red-700 {
     color: var(--color-red-700);
   }
-  .text-red-800 {
-    color: var(--color-red-800);
-  }
   .text-secondary-foreground {
     color: var(--text-primary);
   }
@@ -2075,14 +2057,6 @@
     @supports (color: color-mix(in lab, red, red)) {
       .hover\:border-primary\/30:hover {
         border-color: color-mix(in oklab, var(--button-bg) 30%, transparent);
-      }
-    }
-    .hover\:border-primary\/50:hover {
-      border-color: var(--button-bg);
-    }
-    @supports (color: color-mix(in lab, red, red)) {
-      .hover\:border-primary\/50:hover {
-        border-color: color-mix(in oklab, var(--button-bg) 50%, transparent);
       }
     }
     .hover\:bg-accent:hover {
