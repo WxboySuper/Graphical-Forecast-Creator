@@ -97,8 +97,10 @@
   }
 
   .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
-    /* E2E measured 14px of toolbar overlap with the shared 218px inset. */
+    /* Remove decoration when the measured space is too small to fit it. */
     box-sizing: border-box;
+    padding: 0;
+    border-width: 0;
     max-height: max(
       0px,
       calc(
