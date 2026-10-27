@@ -10,6 +10,7 @@ import type {
   ForecastImportResult,
 } from './types';
 import {
+  buildWorkspaceForecastFilename,
   buildTransferFilename,
   toKmzStrategy,
   toKmlScope,
@@ -19,16 +20,15 @@ import { importTransferFile } from './transferImportUtils';
 import { isFeatureExposed } from '../../config/featureExposure';
 import { GIS_ENTRY_WORKSPACE } from './importPolicy';
 
-/** Downloads a workspace-owned native JSON transfer so identity survives round-trips. */
+/** Downloads a native JSON transfer with a workspace-specific filename. Ownership comes from the payload, not the filename. */
 const downloadWorkspaceJsonTransfer = (
   request: Pick<ForecastExportRequest, 'forecastCycle' | 'mapView' | 'cycleMetadata' | 'workspaceId'>,
 ): void => {
   const { workspaceId } = request;
   const payload = serializeForecastWorkspace(workspaceId, request.forecastCycle, request.mapView, request.cycleMetadata);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   downloadBlob(
     new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-    `gfc-forecast-${timestamp}.json`,
+    buildWorkspaceForecastFilename(workspaceId),
   );
 };
 

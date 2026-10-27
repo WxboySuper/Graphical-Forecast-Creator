@@ -1,5 +1,6 @@
 import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { buildWorkspaceForecastFilename } from '../utils/forecastTransfer/transferExportUtils';
 import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
@@ -101,7 +102,7 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
     fileInputRef.current?.click();
   };
 
-  /** Serializes the active workspace cycle to a workspace-owned JSON file, then marks the store as saved. */
+  /** Serializes the active workspace cycle to native JSON with a workspace-specific filename, then marks the store as saved. */
   const handleSave = () => {
     try {
       const payload = serializeForecastWorkspace(
@@ -113,10 +114,9 @@ export function createFileHandlers({ addToast, dispatch, forecastCycle, cycleMet
         },
         cycleMetadata,
       );
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       downloadBlob(
         new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-        `gfc-forecast-${timestamp}.json`,
+        buildWorkspaceForecastFilename(workspaceId),
       );
       dispatch(markAsSaved());
       addToast('Forecast exported to JSON!', 'success');

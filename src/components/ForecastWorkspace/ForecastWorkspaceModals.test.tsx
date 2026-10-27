@@ -82,6 +82,7 @@ const createController = (): ForecastWorkspaceController =>
     getMapView: () => ({ center: [39.8283, -98.5795], zoom: 4 }),
     forecastCycle: { currentDay: 1, cycleDate: '2026-08-18', days: {} },
     isWorkflowActive: false,
+    workspaceId: 'severe',
     isTransferBusy: false,
     showHistoryModal: true,
     onCloseHistoryModal: jest.fn(),
