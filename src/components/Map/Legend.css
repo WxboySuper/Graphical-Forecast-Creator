@@ -82,7 +82,7 @@
       0px,
       calc(
         100dvh - var(--app-header-height, 64px) -
-          var(--legacy-forecast-notice-height, 0px) - 218px
+          var(--legacy-forecast-notice-height, 0px) - 232px
       )
     );
   }
