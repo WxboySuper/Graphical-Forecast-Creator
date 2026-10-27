@@ -194,6 +194,69 @@ describe('validateForecastImport', () => {
   });
 });
 
+describe('workspace envelope validation', () => {
+  it('validates the forecast carried by a well-formed envelope', () => {
+    expect(validateForecastImport({ schemaVersion: 1, workspaceId: 'severe', forecast: validSave() }))
+      .toEqual({ ok: true });
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'custom', forecast: validSave() })).toBe(true);
+  });
+
+  it('rejects an envelope whose owner is not a registered workspace', () => {
+    expect(validateForecastImport({ schemaVersion: 1, workspaceId: 'bogus', forecast: validSave() }))
+      .toEqual({ ok: false, reason: 'This forecast belongs to an unknown workspace.' });
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'bogus', forecast: validSave() })).toBe(false);
+  });
+
+  it('rejects an envelope whose forecast is not an object', () => {
+    expect(validateForecastImport({ schemaVersion: 1, workspaceId: 'severe', forecast: 'not-an-object' }))
+      .toEqual({ ok: false, reason: 'This workspace forecast is incomplete or invalid.' });
+  });
+
+  it('keeps workflow packages on the wrapper path despite their semver schemaVersion', () => {
+    const workflowPackage = {
+      packageType: 'cycle',
+      schemaVersion: '1.0.0',
+      exportedAt: '2026-07-20T00:00:00.000Z',
+      workspaceId: 'severe',
+      forecast: validSave(),
+    };
+
+    expect(validateForecastImport(workflowPackage)).toEqual({ ok: true });
+    expect(validateForecastData(workflowPackage)).toBe(true);
+  });
+
+  it('rejects a workflow package whose inner workspace disagrees with its outer label', () => {
+    const workflowPackage = {
+      packageType: 'cycle',
+      schemaVersion: '1.0.0',
+      exportedAt: '2026-07-20T00:00:00.000Z',
+      workspaceId: 'severe',
+      forecast: { schemaVersion: 1, workspaceId: 'custom', forecast: validSave() },
+    };
+
+    expect(validateForecastImport(workflowPackage)).toEqual({
+      ok: false,
+      reason: 'This workflow package declares a workspace that does not match its forecast.',
+    });
+  });
+
+  it('rejects a workflow package whose outer workspace is not registered', () => {
+    for (const workspaceId of ['bogus', 'Severe', 42]) {
+      const workflowPackage = {
+        packageType: 'cycle',
+        schemaVersion: '1.0.0',
+        exportedAt: '2026-07-20T00:00:00.000Z',
+        workspaceId,
+        forecast: validSave(),
+      };
+
+      expect(validateForecastImport(workflowPackage))
+        .toEqual({ ok: false, reason: 'This forecast belongs to an unknown workspace.' });
+      expect(validateForecastData(workflowPackage)).toBe(false);
+    }
+  });
+});
+
 describe('validateForecastData compatibility', () => {
   it('returns true for valid saves and workflow wrappers', () => {
     expect(validateForecastData(validSave())).toBe(true);

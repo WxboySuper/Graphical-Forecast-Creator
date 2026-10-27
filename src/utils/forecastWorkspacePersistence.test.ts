@@ -26,6 +26,12 @@ describe('forecast workspace persistence contract', () => {
     });
   });
 
+  test('refuses to build an envelope for a missing or unregistered workspace', () => {
+    for (const invalid of [undefined, '', 'Severe', 'mesoscale-v2', 42]) {
+      expect(() => createForecastWorkspaceSave(invalid as never, validForecast())).toThrow('valid workspace');
+    }
+  });
+
   test('uses the explicit workspace identity before legacy inference', () => {
     const payload = createForecastWorkspaceSave('custom', validForecast());
     expect(classifyForecastWorkspacePayload(payload)).toEqual({
@@ -52,7 +58,7 @@ describe('forecast workspace persistence contract', () => {
     })).toEqual({ ok: false, reason: 'unknown-workspace' });
   });
 
-  test('classifies a valid legacy forecast as Severe', () => {
+  test('keeps ambiguous untagged legacy forecasts Severe-owned because Custom requires an envelope', () => {
     const payload = validForecast();
     expect(classifyForecastWorkspacePayload(payload)).toEqual({
       ok: true,
@@ -111,42 +117,38 @@ describe('forecast workspace persistence contract', () => {
     })).toThrow(/unknown workspace/);
   });
 
-  test('rejects an untagged legacy payload for Custom because it has no workspace identity', () => {
-    expect(() => buildCloudSessionPayload('custom', validForecast()))
-      .toThrow(/different forecast workspace/);
+  test('refuses to assign workspace identity to untagged payloads', () => {
+    expect(() => buildCloudSessionPayload('custom', validForecast())).toThrow(/cannot be verified/);
 
-    // A payload only the caller's Custom validator recognizes is Custom, never Severe.
     const customPayload = { customForecast: true };
     const validators = {
       isCustomPayload: (value: unknown): value is GFCForecastSaveData => value === customPayload,
     };
-    expect(buildCloudSessionPayload('custom', customPayload, validators)).toEqual({
-      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
-      workspaceId: 'custom',
-      forecast: customPayload,
-    });
+    expect(() => buildCloudSessionPayload('custom', customPayload, validators)).toThrow(/cannot be verified/);
     expect(() => buildCloudSessionPayload('severe', customPayload, validators)).toThrow(/different forecast workspace/);
+
+    const customEnvelope = createForecastWorkspaceSave('custom', validForecast());
+    expect(buildCloudSessionPayload('custom', customEnvelope, validators)).toBe(customEnvelope);
   });
 
-  test('uses the historical Severe default and requires envelopes for other workspaces', () => {
+  test('classifies with the production cloud-load validators for the workspace that opened the cycle', () => {
     const forecast = validForecast();
 
+    // Severe cannot claim a Custom record's save, and vice versa.
+    expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('custom'))).toEqual({
+      ok: true,
+      workspaceId: 'custom',
+      payload: forecast,
+      legacy: true,
+    });
     expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators('severe'))).toEqual({
       ok: true,
       workspaceId: 'severe',
       payload: forecast,
       legacy: true,
     });
-    for (const workspaceId of ['custom', 'tropical'] as const) {
-      expect(classifyForecastWorkspacePayload(forecast, buildCloudLoadValidators(workspaceId)))
-        .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
-      expect(() => buildCloudSessionPayload(workspaceId, forecast, buildCloudLoadValidators(workspaceId)))
-        .toThrow(/not supported by any workspace/);
-    }
-    expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
-      .toEqual(createForecastWorkspaceSave('custom', forecast));
 
-    // Malformed input fails the requested workspace's validator instead of being wrapped.
+    // Malformed input fails both checks instead of being wrapped as forecast data.
     expect(classifyForecastWorkspacePayload({ legacy: true }, buildCloudLoadValidators('custom')))
       .toEqual({ ok: false, reason: 'unsupported-legacy-payload' });
     expect(() => buildCloudSessionPayload('custom', { legacy: true }, buildCloudLoadValidators('custom')))

@@ -15,6 +15,7 @@ import {
 } from '../lib/cloudCyclesService';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import type { CloudCycle } from '../types/cloudCycles';
+import { getForecastDataFromWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import type { GFCForecastSaveData } from '../types/outlooks';
 
 jest.mock('../auth/AuthProvider', () => ({
@@ -120,7 +121,7 @@ describe('buildLoadedCloudForecastPayload', () => {
       workflowMetadata,
     } as CloudCycle);
 
-    expect(payload.cycleMetadata).toEqual(workflowMetadata);
+    expect(getForecastDataFromWorkspacePayload(payload).cycleMetadata).toEqual(workflowMetadata);
   });
 
   test('clears stale embedded workflow metadata for plain cloud cycles', () => {
@@ -140,7 +141,7 @@ describe('buildLoadedCloudForecastPayload', () => {
       },
     } as CloudCycle);
 
-    expect(payload.cycleMetadata).toBeNull();
+    expect(getForecastDataFromWorkspacePayload(payload).cycleMetadata).toBeNull();
     expect(payload).not.toHaveProperty('cycleMetadata', expect.objectContaining({ id: 'stale-cycle' }));
   });
 
@@ -163,7 +164,7 @@ describe('buildLoadedCloudForecastPayload', () => {
     } as GFCForecastSaveData;
 
     const loaded = buildLoadedCloudForecastPayload({ payload: cloudPayload } as CloudCycle);
-    expect(loaded.forecastCycle?.days[1]?.customLayers).toEqual(customLayers);
+    expect(getForecastDataFromWorkspacePayload(loaded).forecastCycle?.days[1]?.customLayers).toEqual(customLayers);
   });
 });
 

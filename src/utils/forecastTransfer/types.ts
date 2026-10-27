@@ -1,5 +1,6 @@
 import type { DayType, ForecastCycle, OutlookType } from '../../types/outlooks';
 import type { CycleMetadata } from '../../types/workflow';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 /** Supported forecast data transfer formats. */
 export type ForecastTransferFormat = 'json' | 'package' | 'kml' | 'kmz';
@@ -23,10 +24,17 @@ export interface ForecastExportRequest {
   day?: DayType;
   kmlStrategy?: KmlArchiveStrategy;
   outlookTypes?: OutlookType[];
+  workspaceId: ForecastWorkspaceId;
 }
 
 export interface ForecastImportResult {
   forecastCycle: ForecastCycle;
+  /**
+   * Owning workspace for the transfer, or null when the file carries no
+   * workspace identity. A null owner is rejected for native formats, and for
+   * KML/KMZ it is accepted only in Severe, which is the GIS entry policy.
+   */
+  workspaceId: ForecastWorkspaceId | null;
   mapView?: ForecastTransferMapView;
   cycleMetadata?: CycleMetadata | null;
   warnings: string[];

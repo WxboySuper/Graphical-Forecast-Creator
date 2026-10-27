@@ -18,7 +18,9 @@ import {
   type ForecastTransferScope,
   type KmlArchiveStrategy,
 } from '../../utils/forecastTransfer';
+import { getForecastImportWorkspaceError } from '../../utils/forecastTransfer/importPolicy';
 import { isFeatureExposed } from '../../config/featureExposure';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 export type ForecastTransferDirection = 'import' | 'export';
 
@@ -37,6 +39,7 @@ export interface ForecastTransferModalProps {
   onExported: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
   onError?: (message: string) => void;
   onExportImage?: () => void;
+  workspaceId: ForecastWorkspaceId;
 }
 
 const FORMAT_OPTIONS: Array<{ value: ForecastTransferFormat; label: string; description: string }> = [
@@ -84,6 +87,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   onExported,
   onError,
   onExportImage,
+  workspaceId,
 }) => {
   const kmzEnabled = isFeatureExposed('kmzExport');
   const [format, setFormat] = useState<ForecastTransferFormat>('json');
@@ -92,35 +96,38 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   const [outlookType, setOutlookType] = useState<OutlookType | 'all'>('all');
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
 
+  const isSevereWorkspace = workspaceId === 'severe';
   const availableFormats = useMemo(
     () => FORMAT_OPTIONS.filter((option) => (
       option.value === 'json'
       || option.value === 'package'
-      || (kmzEnabled && (option.value === 'kml' || option.value === 'kmz'))
+      || (isSevereWorkspace && kmzEnabled && (option.value === 'kml' || option.value === 'kmz'))
     )),
-    [kmzEnabled],
+    [kmzEnabled, isSevereWorkspace],
   );
+  const effectiveFormat = availableFormats.some((option) => option.value === format)
+    ? format
+    : 'json';
 
   const availableScopes = useMemo(() => {
-    if (format === 'json') {
+    if (effectiveFormat === 'json') {
       return SCOPE_OPTIONS.filter((option) => option.value === 'cycle');
     }
-    if (format === 'package') {
+    if (effectiveFormat === 'package') {
       return SCOPE_OPTIONS.filter((option) => option.value === 'cycle' || (isWorkflowActive && option.value === 'workflow'));
     }
     return SCOPE_OPTIONS.filter((option) => option.value !== 'workflow');
-  }, [format, isWorkflowActive]);
+  }, [effectiveFormat, isWorkflowActive]);
 
   useEffect(() => {
-    if (!open) {
-      setImportWarnings([]);
-      return;
-    }
-
     if (!availableFormats.some((option) => option.value === format)) {
       setFormat(availableFormats[0]?.value ?? 'json');
     }
-  }, [open, availableFormats, format]);
+  }, [availableFormats, format]);
+
+  useEffect(() => {
+    if (!open) setImportWarnings([]);
+  }, [open]);
 
   useEffect(() => {
     if (!availableScopes.some((option) => option.value === scope)) {
@@ -132,7 +139,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     onBusyChange(true);
     try {
       await exportForecastTransfer({
-        format,
+        format: effectiveFormat,
         scope,
         forecastCycle,
         mapView,
@@ -140,8 +147,9 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         day: forecastCycle.currentDay,
         kmlStrategy,
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
+        workspaceId,
       });
-      onExported(format, scope);
+      onExported(effectiveFormat, scope);
       onClose();
     } catch (error) {
       onError?.(error instanceof Error ? error.message : 'Export failed.');
@@ -150,13 +158,14 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     }
   }, [
     onBusyChange,
-    format,
+    effectiveFormat,
     scope,
     forecastCycle,
     mapView,
     cycleMetadata,
     kmlStrategy,
     outlookType,
+    workspaceId,
     onExported,
     onError,
     onClose,
@@ -170,6 +179,12 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         baseCycle: forecastCycle,
         defaultDay: forecastCycle.currentDay as DayType,
       });
+      const workspaceError = getForecastImportWorkspaceError(result, workspaceId);
+      if (workspaceError) {
+        setImportWarnings([]);
+        onError?.(workspaceError);
+        return;
+      }
       setImportWarnings(result.warnings);
       onImported(result);
       onClose();
@@ -178,7 +193,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     } finally {
       onBusyChange(false);
     }
-  }, [onBusyChange, forecastCycle, onImported, onError, onClose]);
+  }, [onBusyChange, forecastCycle, onImported, onError, onClose, workspaceId]);
 
   const onFileInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -206,14 +221,20 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
 
           <TabsContent value="import" className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              Supported formats: JSON, workflow ZIP package, KML, and KMZ. KML/KMZ imports merge outlook polygons into your active forecast using GFC metadata when available.
+              {workspaceId === 'severe'
+                ? 'Supported formats: JSON, workflow ZIP package, KML, and KMZ. KML/KMZ imports merge outlook polygons into your active forecast using GFC metadata when available.'
+                : 'Supported formats: JSON and workflow ZIP package. KML/KMZ geometry imports belong to the Severe workspace.'}
             </p>
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border px-4 py-8 text-center hover:bg-muted/40">
               <span className="text-sm font-medium">Choose a forecast file</span>
-              <span className="mt-1 text-xs text-muted-foreground">.json, .zip, .kml, .kmz</span>
+              <span className="mt-1 text-xs text-muted-foreground">
+                {workspaceId === 'severe' ? '.json, .zip, .kml, .kmz' : '.json, .zip'}
+              </span>
               <input
                 type="file"
-                accept=".json,.zip,.kml,.kmz,application/json,application/zip,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz"
+                accept={workspaceId === 'severe'
+                  ? '.json,.zip,.kml,.kmz,application/json,application/zip,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz'
+                  : '.json,.zip,application/json,application/zip'}
                 className="sr-only"
                 onChange={onFileInputChange}
                 disabled={isBusy}
@@ -235,7 +256,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
               <select
                 id="transfer-format"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={format}
+                value={effectiveFormat}
                 onChange={(event) => setFormat(event.target.value as ForecastTransferFormat)}
                 disabled={isBusy}
               >

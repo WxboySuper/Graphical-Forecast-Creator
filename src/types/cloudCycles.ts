@@ -1,4 +1,4 @@
-import { GFCForecastSaveData } from './outlooks';
+import type { ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import type { CycleMetadata } from './workflow';
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
@@ -29,7 +29,7 @@ export interface CloudCycleMetadata {
  * Full cloud cycle including both metadata and serialized payload
  */
 export interface CloudCycle extends CloudCycleMetadata {
-  payload: GFCForecastSaveData;
+  payload: ForecastWorkspacePayload;
   /** v2 workflow metadata for the cycle (optional, present for workflow-imported cycles). */
   workflowMetadata?: CycleMetadata;
 }

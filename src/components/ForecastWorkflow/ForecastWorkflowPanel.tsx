@@ -49,24 +49,6 @@ import {
 } from './completionHandoffPolicy';
 import './ForecastWorkflowPanel.css';
 
-
-/** Resolves the workspace identity from the route before falling back to Redux state. */
-export const resolveWorkflowWorkspaceId = (
-  pathname: string,
-  search: string,
-  reduxWorkspaceId: string | null | undefined,
-): ForecastWorkspaceId =>
-  resolveRouteForecastWorkspaceContext(pathname, search)?.id
-  ?? resolveForecastWorkspaceId(reduxWorkspaceId);
-
-/** Keeps workspace identity on discussion links while retaining grouping parameters. */
-export const addWorkspaceToDiscussionPath = (path: string, workspaceId: ForecastWorkspaceId): string => {
-  const [pathname, search = ''] = path.split('?');
-  const params = new URLSearchParams(search);
-  params.set('workspace', workspaceId);
-  return `${pathname}?${params.toString()}`;
-};
-
 interface ForecastWorkflowPanelProps {
   controller?: ForecastWorkspaceController;
   context?: 'forecast' | 'discussion';
@@ -430,17 +412,12 @@ const getCurrentWorkflowVersion = (versions: { version: number }[]): number => {
 };
 
 /** Determines whether the banner has enough state to render. */
-const shouldHideWorkflowPanel = ({
-  isExposed,
-  hasActiveWorkflow,
-  workflowMetadata,
-  workspaceMismatch,
-}: {
-  isExposed: boolean;
-  hasActiveWorkflow: boolean;
-  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>;
-  workspaceMismatch: boolean;
-}): boolean => workspaceMismatch || !isExposed || !hasActiveWorkflow || !workflowMetadata;
+const shouldHideWorkflowPanel = (
+  isExposed: boolean,
+  hasActiveWorkflow: boolean,
+  workflowMetadata: ReturnType<typeof selectWorkflowMetadata>,
+  workspaceMismatch: boolean,
+): boolean => workspaceMismatch || !isExposed || !hasActiveWorkflow || !workflowMetadata;
 
 /** Determines whether the current package can enter review. */
 const canReviewWorkflowPackage = (
@@ -478,20 +455,167 @@ const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ has
   );
 };
 
+type WorkflowPanelCycle = ReturnType<typeof selectForecastCycle>;
+type WorkflowPanelTemplate = ReturnType<typeof selectWorkflowTemplate>;
+type WorkflowPanelSavedCycle = ReturnType<typeof selectSavedCyclesForActiveWorkspace>[number];
+
+/** Finds the newest saved cycle for a workflow, putting malformed revision dates last. */
+export const findLatestWorkflowSavedCycle = (
+  savedCycles: WorkflowPanelSavedCycle[],
+  workflowMetadataId: string,
+): WorkflowPanelSavedCycle | undefined => {
+  const revisionTime = (cycle: WorkflowPanelSavedCycle): number => {
+    const value = new Date(cycle.workflowMetadata?.updatedAt ?? cycle.timestamp).getTime();
+    return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+  };
+  return savedCycles
+    .filter((cycle) => cycle.workflowMetadata?.id === workflowMetadataId)
+    .sort((left, right) => {
+      const difference = revisionTime(right) - revisionTime(left);
+      return Number.isNaN(difference) || difference === 0 ? left.id.localeCompare(right.id) : difference;
+    })[0];
+};
+
+/** Adds a validated workspace hint while preserving any existing discussion query. */
+export const addWorkspaceToDiscussionPath = (path: string, workspaceId: string): string => {
+  const [pathAndQuery, hash] = path.split('#', 2);
+  const [pathname, search = ''] = pathAndQuery.split('?', 2);
+  const params = new URLSearchParams(search);
+  params.set('workspace', workspaceId);
+  return `${pathname}?${params.toString()}${hash ? `#${hash}` : ''}`;
+};
+
+/** Resolves workspace identity from an exposed route hint or the active editor. */
+export const resolveWorkflowWorkspaceId = (
+  pathname: string,
+  search: string,
+  activeWorkspaceId: ForecastWorkspaceId | null | undefined,
+): ForecastWorkspaceId => resolveRouteForecastWorkspaceContext(pathname, search)?.id
+  ?? resolveForecastWorkspaceId(activeWorkspaceId);
+
+/** Builds the Monitor handoff path for a workflow and its optional saved source. */
+export const buildMonitorHandoffPath = (
+  workspaceId: ForecastWorkspaceId,
+  workflowId: string,
+  savedCycle?: WorkflowPanelSavedCycle,
+): string => {
+  const params = new URLSearchParams({
+    workspace: workspaceId,
+    workflowId,
+    sourceKind: savedCycle ? 'local-cycle' : 'current',
+    sourceId: savedCycle?.id ?? 'current',
+  });
+  return `/monitor?${params.toString()}`;
+};
+
+interface WorkflowPanelViewModel {
+  currentDay: WorkflowPanelCycle['days'][DayType];
+  hasCustomContent: boolean;
+  hasMapStarted: boolean;
+  hasDiscussion: boolean;
+  discussionPath: string;
+  mapIsComplete: boolean;
+  discussionIsComplete: boolean;
+  activeUpdateVersion: number | undefined;
+  isUpdating: boolean;
+  canReviewPackage: boolean;
+  canExportPackage: boolean;
+  isReviewed: boolean;
+  hasSameDayWork: boolean;
+  currentVersion: number;
+  statusLabel: string;
+}
+
+/** Derives the banner state for the workflow panel without mixing in effects or navigation. */
+const getWorkflowPanelViewModel = (
+  forecastCycle: WorkflowPanelCycle,
+  workflowTemplate: WorkflowPanelTemplate,
+  workflowMetadata: NonNullable<ReturnType<typeof selectWorkflowMetadata>>,
+  workspaceId: ForecastWorkspaceId,
+  hasController: boolean,
+  context: 'forecast' | 'discussion',
+): WorkflowPanelViewModel => {
+  const currentDay = forecastCycle.days[forecastCycle.currentDay];
+  const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
+  const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
+  const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
+  const hasDiscussion = hasGroupedDiscussionContent(
+    currentDiscussionGrouping ? getDiscussionForGrouping(forecastCycle, currentDiscussionGrouping) : currentDay?.discussion,
+  );
+  const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
+  const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
+  const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');
+  const activeUpdateVersion = forecastCycle.updateInProgressVersion;
+  const isUpdating = typeof activeUpdateVersion === 'number';
+  return {
+    currentDay,
+    hasCustomContent: dayHasCustomContent(currentDay),
+    hasMapStarted,
+    hasDiscussion,
+    discussionPath: addWorkspaceToDiscussionPath(
+      currentDiscussionGrouping ? discussionPathForGrouping(currentDiscussionGrouping) : '/discussion',
+      workspaceId,
+    ),
+    mapIsComplete,
+    discussionIsComplete,
+    activeUpdateVersion,
+    isUpdating,
+    canReviewPackage: canReviewWorkflowPackage(mapIsComplete, discussionIsComplete, isUpdating, hasController, context),
+    canExportPackage: canExportWorkflowPackage(hasMapStarted, hasDiscussion, workflowMetadata.outlookVersions.length),
+    isReviewed: Boolean(forecastCycle.completionAcknowledgedAt),
+    hasSameDayWork: hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay),
+    currentVersion: getCurrentWorkflowVersion(workflowMetadata.outlookVersions),
+    statusLabel: getWorkflowStatusLabel({
+      hasMapStarted,
+      isUpdating,
+      activeUpdateVersion,
+      mapIsComplete,
+      discussionIsComplete,
+      isReviewed: Boolean(forecastCycle.completionAcknowledgedAt),
+    }),
+  };
+};
+
+/** Renders the compact package identity row with its optional update badge. */
+const WorkflowPanelMetaRow: React.FC<{
+  currentDay: DayType;
+  cycleDate: string;
+  currentVersion: number;
+  statusLabel: string;
+  isUpdating: boolean;
+}> = ({ currentDay, cycleDate, currentVersion, statusLabel, isUpdating }) => (
+  <div className="forecast-workflow-panel__meta-row">
+    <span>Day {currentDay} package</span>
+    <span>{formatCycleDate(cycleDate)}</span>
+    <span>v{currentVersion}</span>
+    <strong>{statusLabel}</strong>
+    {isUpdating ? (
+      <span className="forecast-workflow-panel__update-badge">
+        <RefreshCw className="h-3.5 w-3.5" />
+        Editing update
+      </span>
+    ) : null}
+  </div>
+);
+
 /** Persistent package workflow prompt for the forecast editor. */
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
   const reduxWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  const activeWorkspaceId = resolveForecastWorkspaceId(reduxWorkspaceId);
-  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, activeWorkspaceId);
+  const routeWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
+  const normalizedReduxWorkspaceId = resolveForecastWorkspaceId(reduxWorkspaceId);
+  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, reduxWorkspaceId);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
+  const activeWorkspaceId = reduxWorkspaceId;
+  const exportWorkspaceId = controller?.workspaceId ?? activeWorkspaceId;
   const workflowTemplate = useSelector(selectWorkflowTemplate);
   const validationResult = useSelector(selectCompletionValidationResult);
   const showCompletionModal = useSelector(selectShowCompletionModal);
@@ -507,45 +631,38 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
     );
   }, [handoffEligibility.showHandoff, handoffIdentity]);
 
-  if (shouldHideWorkflowPanel({
-    isExposed: isFeatureExposed('forecastWorkflowV2'),
+  if (shouldHideWorkflowPanel(
+    isFeatureExposed('forecastWorkflowV2'),
     hasActiveWorkflow,
     workflowMetadata,
-    workspaceMismatch: workspaceId !== activeWorkspaceId,
-  })) {
+    Boolean(routeWorkspace && routeWorkspace.id !== normalizedReduxWorkspaceId),
+  )) {
     return null;
   }
 
-  const currentDay = forecastCycle.days[forecastCycle.currentDay];
-  const hasCustomContent = dayHasCustomContent(currentDay);
-  const discussionGroupings = getDiscussionGroupings(forecastCycle, workflowTemplate, forecastCycle.currentDay);
-  const currentDiscussionGrouping = getDiscussionGroupingForDay(discussionGroupings, forecastCycle.currentDay);
-  const hasMapStarted = Boolean(currentDay && dayHasMapWork(currentDay));
-  const hasDiscussion = hasGroupedDiscussionContent(
-    currentDiscussionGrouping ? getDiscussionForGrouping(forecastCycle, currentDiscussionGrouping) : currentDay?.discussion,
-  );
-  const discussionPath = addWorkspaceToDiscussionPath(
-    currentDiscussionGrouping ? discussionPathForGrouping(currentDiscussionGrouping) : '/discussion',
+  const viewModel = getWorkflowPanelViewModel(
+    forecastCycle,
+    workflowTemplate,
+    activeWorkflowMetadata,
     workspaceId,
+    Boolean(controller),
+    context,
   );
-  const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
-  const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
-  const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');
-  const activeUpdateVersion = forecastCycle.updateInProgressVersion;
-  const isUpdating = typeof activeUpdateVersion === 'number';
-  const canReviewPackage = canReviewWorkflowPackage(mapIsComplete, discussionIsComplete, isUpdating, Boolean(controller), context);
-  const canExportPackage = canExportWorkflowPackage(hasMapStarted, hasDiscussion, activeWorkflowMetadata.outlookVersions.length);
-  const isReviewed = Boolean(forecastCycle.completionAcknowledgedAt);
-  const hasSameDayWork = hasSameDayWorkflowWork(forecastCycle.cycleDate, currentDay);
-  const currentVersion = getCurrentWorkflowVersion(activeWorkflowMetadata.outlookVersions);
-  const statusLabel = getWorkflowStatusLabel({
+  const {
+    hasCustomContent,
     hasMapStarted,
-    isUpdating,
-    activeUpdateVersion,
+    discussionPath,
     mapIsComplete,
     discussionIsComplete,
+    activeUpdateVersion,
+    isUpdating,
+    canReviewPackage,
+    canExportPackage,
     isReviewed,
-  });
+    hasSameDayWork,
+    currentVersion,
+    statusLabel,
+  } = viewModel;
 
   /** Starts a same-day workflow update from the current package. */
   function handleCreateUpdate(): void {
@@ -569,6 +686,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleOmitDay(day: DayType, reason: string): void { dispatch(omitDay({ day, reason })); }
   /** Exports the current workflow package and restores the button state afterward. */
   async function handleWorkflowExport(): Promise<void> {
+    setExportError(null);
     setIsPackageDownloading(true);
     try {
       await downloadGfcPackage(
@@ -576,20 +694,31 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         { center: [39.8283, -98.5795], zoom: 4 },
         workflowMetadata,
         'workflow',
+        exportWorkspaceId,
       );
+    } catch {
+      setExportError('Unable to export the workflow package. Please try again.');
     } finally {
       setIsPackageDownloading(false);
     }
   }
   /** Exports the complete cycle through the existing WF-09 package path. */
-  function handleCycleExport(): void {
+  async function handleCycleExport(): Promise<void> {
+    setExportError(null);
     setIsPackageDownloading(true);
-    downloadGfcPackage(
-      forecastCycle,
-      { center: [39.8283, -98.5795], zoom: 4 },
-      workflowMetadata,
-      'cycle',
-    ).finally(() => setIsPackageDownloading(false)).catch(() => undefined);
+    try {
+      await downloadGfcPackage(
+        forecastCycle,
+        { center: [39.8283, -98.5795], zoom: 4 },
+        workflowMetadata,
+        'cycle',
+        exportWorkspaceId,
+      );
+    } catch {
+      setExportError('Unable to export the forecast cycle. Please try again.');
+    } finally {
+      setIsPackageDownloading(false);
+    }
   }
   /** Dismisses guidance while leaving the completed workflow untouched. */
   function handleDismissHandoff(): void {
@@ -600,16 +729,8 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   function handleOpenMonitor(): void {
     markCompletionHandoffHandled(handoffIdentity);
     setShowCompletionHandoff(false);
-    const savedCycle = savedCycles
-      .filter((cycle) => cycle.workflowMetadata?.id === activeWorkflowMetadata.id)
-      .sort((left, right) => {
-        const leftRevision = new Date(left.workflowMetadata?.updatedAt ?? left.timestamp).getTime();
-        const rightRevision = new Date(right.workflowMetadata?.updatedAt ?? right.timestamp).getTime();
-        return rightRevision - leftRevision || right.id.localeCompare(left.id);
-      })[0];
-    const sourceKind = savedCycle ? 'local-cycle' : 'current';
-    const sourceId = savedCycle?.id ?? 'current';
-    navigate(`/monitor?workflowId=${encodeURIComponent(activeWorkflowMetadata.workflowId)}&sourceKind=${sourceKind}&sourceId=${encodeURIComponent(sourceId)}`);
+    const savedCycle = findLatestWorkflowSavedCycle(savedCycles, activeWorkflowMetadata.id);
+    navigate(buildMonitorHandoffPath(workspaceId, activeWorkflowMetadata.workflowId, savedCycle));
   }
   /** Closes guidance and returns the user to the forecast map. */
   function handleReturnToMap(): void {
@@ -634,18 +755,13 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       aria-label="Forecast package workflow"
     >
       <div className="forecast-workflow-panel__content">
-        <div className="forecast-workflow-panel__meta-row">
-          <span>Day {forecastCycle.currentDay} package</span>
-          <span>{formatCycleDate(forecastCycle.cycleDate)}</span>
-          <span>v{currentVersion}</span>
-          <strong>{statusLabel}</strong>
-          {isUpdating ? (
-            <span className="forecast-workflow-panel__update-badge">
-              <RefreshCw className="h-3.5 w-3.5" />
-              Editing update
-            </span>
-          ) : null}
-        </div>
+        <WorkflowPanelMetaRow
+          currentDay={forecastCycle.currentDay}
+          cycleDate={forecastCycle.cycleDate}
+          currentVersion={currentVersion}
+          statusLabel={statusLabel}
+          isUpdating={isUpdating}
+        />
 
         <WorkflowPanelSteps
           mapIsComplete={mapIsComplete}
@@ -671,7 +787,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
           activeUpdateVersion={activeUpdateVersion}
           discussionPath={discussionPath}
           forecastPath={getForecastWorkspacePath(workspaceId)}
-          onExport={() => { handleWorkflowExport().catch(() => undefined); }}
+          onExport={handleWorkflowExport}
           onOpenReview={handleOpenReview}
           onCreateUpdate={handleCreateUpdate}
           onStartFromPrevious={handleStartFromPrevious}
@@ -697,11 +813,12 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         }}
         onExport={() => { handleWorkflowExport().catch(() => undefined); }}
       />
+      {exportError ? <div className="forecast-workflow-panel__notice" role="alert">{exportError}</div> : null}
       <CompletionHandoff
         open={showCompletionHandoff}
         showMonitor={handoffEligibility.showMonitor}
         isDownloading={isPackageDownloading}
-        onWorkflowExport={() => { handleWorkflowExport().catch(() => undefined); }}
+        onWorkflowExport={handleWorkflowExport}
         onCycleExport={handleCycleExport}
         onMonitor={handleOpenMonitor}
         onReturnToMap={handleReturnToMap}

@@ -1,7 +1,7 @@
 import { useCallback, type MutableRefObject } from 'react';
 import type { useAppLayout } from '../Layout/AppLayout';
 import type { useCloudCycles } from '../../hooks/useCloudCycles';
-import { deserializeForecast } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import type { useForecastGrade } from './useForecastGrade';
 
 type AddToast = ReturnType<typeof useAppLayout>['addToast'];
@@ -39,7 +39,7 @@ export const useCloudLoadHandler = (
         return;
       }
       try {
-        grade.setForecastPackage(deserializeForecast(payload), 'cloud', `${label} (cloud)`);
+        grade.setForecastPackage(resolveNativeFileContent(payload).forecastCycle, 'cloud', `${label} (cloud)`);
         addToast('Cloud package loaded. Choose a report date and grade.', 'success');
       } catch {
         addToast('That cloud package could not be parsed.', 'error');

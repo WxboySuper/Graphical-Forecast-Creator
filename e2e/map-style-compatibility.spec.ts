@@ -163,7 +163,7 @@ const isPointInRing = ([x, y]: LonLat, ring: number[][]): boolean => {
 
 type ExportPackageJson = {
   forecastCycle?: unknown;
-  forecast?: { forecastCycle?: unknown };
+  forecast?: { forecastCycle?: unknown; forecast?: { forecastCycle?: unknown } };
 };
 
 type ForecastCycleJson = {
@@ -189,7 +189,7 @@ const parseForecastPackage = async (zip: JSZip): Promise<ExportPackageJson> => {
 
 /** Forecast cycle day map, found at either export layout; empty when the package omits it. */
 const forecastCycleDays = (packageJson: ExportPackageJson): Record<string, unknown> => {
-  const forecastCycle = packageJson.forecastCycle ?? packageJson.forecast?.forecastCycle;
+  const forecastCycle = packageJson.forecastCycle ?? packageJson.forecast?.forecastCycle ?? packageJson.forecast?.forecast?.forecastCycle;
   const days = (forecastCycle as ForecastCycleJson | undefined)?.days;
   return days ?? {};
 };

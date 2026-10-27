@@ -109,6 +109,9 @@ const useMonitorPageSources = ({
 }) => {
   const didApplyHandoffSource = useRef(false);
   const settings = useSelector((state: RootState) => state.monitor);
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const requestedWorkspaceId = searchParams.get('workspace');
+  const handoffWorkspaceReady = !requestedWorkspaceId || activeWorkspaceId === requestedWorkspaceId;
   const currentCycle = useSelector(selectForecastCycle);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const { cycles: cloudCycles, loading: cloudCyclesLoading } = useCloudCycles();
@@ -131,12 +134,12 @@ const useMonitorPageSources = ({
   );
 
   useEffect(() => {
-    if (didApplyHandoffSource.current) return;
+    if (didApplyHandoffSource.current || !handoffWorkspaceReady) return;
     const matchingSource = resolveHandoffSource(searchParams, outlookOptions);
     if (!matchingSource) return;
     dispatch(setMonitorOutlookSource({ kind: matchingSource.kind, id: matchingSource.id }));
     didApplyHandoffSource.current = true;
-  }, [dispatch, outlookOptions, searchParams]);
+  }, [dispatch, handoffWorkspaceReady, outlookOptions, searchParams]);
 
   const selectedOutlook = useMonitorCloudOutlook({ selectedOption, today, addToast });
   return {

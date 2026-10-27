@@ -7,10 +7,10 @@ import type {
 } from '../../types/forecastGrade';
 import { loadCloudCycle } from '../../lib/cloudCyclesService';
 import {
-  deserializeForecast,
   readForecastImportFile,
   validateForecastData,
 } from '../fileUtils';
+import { resolveNativeFileContent } from '../forecastTransfer/nativeImportUtils';
 import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../stormReportParser';
 import { isTodayReportDate, isYesterdayReportDate, toArchiveDate } from './archiveDate';
 import type { PackageGrade, ProductKind } from './gradeContract';
@@ -74,7 +74,7 @@ const toDatLoadError = (error: unknown, signal?: AbortSignal): SourceLoadError =
 /** Deserializes a saved forecast payload and surfaces a blocking error. */
 const deserializeCycle = (payload: unknown, parseErrorMessage: string): ForecastCycle => {
   try {
-    return deserializeForecast(payload);
+    return resolveNativeFileContent(payload).forecastCycle;
   } catch {
     throw new SourceLoadError(parseErrorMessage);
   }

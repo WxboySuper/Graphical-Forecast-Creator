@@ -66,7 +66,7 @@ export const resolveRouteForecastWorkspace = (
   resolveExposedForecastWorkspacePath(path, target)
   ?? resolveExposedLegacyForecastWorkspacePath(path, target);
 
-/** Resolves workspace identity from a forecast path or an exposed discussion URL hint. */
+/** Resolves workspace identity from a forecast path or an exposed discussion or Monitor URL hint. */
 export const resolveRouteForecastWorkspaceContext = (
   pathname: string,
   search = '',
@@ -75,7 +75,10 @@ export const resolveRouteForecastWorkspaceContext = (
   const routeWorkspace = resolveRouteForecastWorkspace(normalizedPath);
   if (routeWorkspace) return routeWorkspace;
 
-  if (normalizedPath !== '/discussion' && !normalizedPath.startsWith('/discussion/')) {
+  const acceptsWorkspaceHint = normalizedPath === '/monitor'
+    || normalizedPath === '/discussion'
+    || normalizedPath.startsWith('/discussion/');
+  if (!acceptsWorkspaceHint) {
     return undefined;
   }
 

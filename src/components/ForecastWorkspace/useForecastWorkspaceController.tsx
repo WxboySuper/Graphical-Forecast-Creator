@@ -107,6 +107,7 @@ export interface ForecastWorkspaceController {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
@@ -189,6 +190,7 @@ interface UseForecastWorkspaceControllerOptions {
   cloudTools?: React.ReactNode;
   onImportResult: (result: ForecastImportResult) => void;
   onExportComplete?: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -215,6 +217,7 @@ interface BuildForecastWorkspaceControllerArgs {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
+  workspaceId: import('../../config/forecastWorkspaces').ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   showHistoryModal: boolean;
   showCopyModal: boolean;
@@ -284,6 +287,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     forecastCycle,
     cycleMetadata,
     isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal,
     showCopyModal,
@@ -350,6 +354,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     forecastCycle,
     cycleMetadata,
     isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal,
     showCopyModal,
@@ -567,6 +572,7 @@ function useForecastWorkspaceControllerArgs({
   cloudTools = null,
   onImportResult,
   onExportComplete,
+  workspaceId,
 }: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
   const core = useForecastWorkspaceCoreState(mapRef, addToast);
   const modalState = useForecastWorkspaceModalState(core.cycleDate, core.dispatch);
@@ -609,6 +615,7 @@ function useForecastWorkspaceControllerArgs({
     forecastCycle: core.forecastCycle,
     cycleMetadata: core.cycleMetadata,
     isWorkflowActive: core.isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal: modalState.showHistoryModal,
     showCopyModal: modalState.showCopyModal,

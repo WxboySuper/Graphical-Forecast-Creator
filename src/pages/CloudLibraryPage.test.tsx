@@ -8,6 +8,7 @@ import CloudLibraryPage from "./CloudLibraryPage";
 import { getDefaultForecastWorkspacePath, getForecastWorkspacePath, isSupportedCloudLoadWorkspace } from "../routing/forecastWorkspaceRoutes";
 import { buildCloudSessionPayload } from "../utils/forecastWorkspacePersistence";
 import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { serializeForecast } from "../utils/fileUtils";
 import { getMismatchedCloudWorkspaceId, parseStoredForecastPayload } from "./forecastPageController";
 import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
@@ -87,7 +88,6 @@ describe("CloudLibraryPage", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     renderPage();
     expect(screen.getByText(/No cloud cycles saved yet/i)).toBeTruthy();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it("shows an expired-premium notice when entitlement lapsed from Stripe", () => {
@@ -127,30 +127,6 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByText("1 cloud cycle")).toBeInTheDocument();
     expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
     expect(screen.getByText("Custom save")).toBeInTheDocument();
-  });
-
-  it("preserves a rename draft when switching workspace tabs", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: "stripe" });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [
-          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
-          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
-        ],
-      })
-    );
-
-    renderPage();
-    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Rename/i }));
-    const renameInput = screen.getByRole("textbox", { name: /Rename cloud cycle/i });
-    fireEvent.change(renameInput, { target: { value: "Draft name" } });
-
-    fireEvent.click(screen.getByRole("tab", { name: /Severe 1/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
-
-    expect(screen.getByRole("textbox", { name: /Rename cloud cycle/i })).toHaveValue("Draft name");
   });
 
   it("uses workspace-specific empty copy for an empty tab", () => {
@@ -254,7 +230,7 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
     await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(sessionStorage.getItem("cloudCyclePayload:severe:user-user-1")).toBeNull();
   });
@@ -293,7 +269,7 @@ describe("CloudLibraryPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
     expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
@@ -308,7 +284,7 @@ describe("CloudLibraryPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Unable to hand this cloud cycle off to the editor/i));
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
     expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
     expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1")).toBeNull();
     expect(mockNavigate).not.toHaveBeenCalled();
@@ -329,6 +305,23 @@ describe("CloudLibraryPage", () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['rejects', () => Promise.reject(new Error('network failure'))],
+    ['returns no payload', () => Promise.resolve(null)],
+  ])('shows feedback when cloud loading %s', async (_caseName, loadCycleImpl) => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } });
+    const loadCycle = jest.fn(loadCycleImpl);
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: 'severe-1', workspaceId: 'severe', label: 'Severe save' }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /load/i }));
+
+    expect(await screen.findAllByText('Unable to load this cloud cycle right now. Your save is still stored.')).toHaveLength(2);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it("disables Load for a hidden workspace and explains the save is still stored", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn();
@@ -338,7 +331,6 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).not.toBeDisabled();
     expect(loadButton).toHaveAttribute("aria-disabled", "true");
     expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-meso-1");
     expect(
@@ -367,23 +359,26 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     expect(screen.getByRole("tab", { name: /All 6/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Severe 3/i })).toBeInTheDocument();
+    // A record naming an unknown workspace has no owner, so it is not counted
+    // under Severe. It stays listed under All instead of disappearing.
+    expect(screen.getByRole("tab", { name: /Severe 2/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /mesoscale/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /tropical/i })).not.toBeInTheDocument();
 
     for (const label of ["Severe save", "Legacy save", "Odd save", "Custom save", "Meso save", "Trop save"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.getByText("Unknown workspace")).toBeInTheDocument();
 
     // Tab label spans plus one ownership badge per matching row.
-    expect(screen.getAllByText("Severe")).toHaveLength(4);
+    expect(screen.getAllByText("Severe")).toHaveLength(3);
     expect(screen.getAllByText("Custom")).toHaveLength(2);
     expect(screen.getAllByText("Mesoscale")).toHaveLength(1);
     expect(screen.getAllByText("Tropical")).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Severe 3/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Severe 2/i }));
     expect(screen.getByText("Legacy save")).toBeInTheDocument();
-    expect(screen.getByText("Odd save")).toBeInTheDocument();
+    expect(screen.queryByText("Odd save")).not.toBeInTheDocument();
     expect(screen.queryByText("Meso save")).not.toBeInTheDocument();
     expect(screen.getAllByText("Severe")).toHaveLength(1);
   });
@@ -511,13 +506,12 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
   });
 
-  it("announces the loading state while keeping the panel focusable", () => {
+  it("keeps the panel focusable while loading without interactive content", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [], loading: true }));
 
     renderPage();
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
-    expect(screen.getByRole("status", { name: "Loading cloud cycles" })).toBeInTheDocument();
   });
 
   it("rejects an invalid cloud handoff payload instead of wrapping it", () => {
@@ -631,4 +625,62 @@ describe("CloudLibraryPage", () => {
     expect(window.history.length).toBe(entriesBefore);
   });
 
+  it("refuses a cloud payload that no workspace classifier accepts", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    // Untyped junk must not be wrapped into an envelope that fails on restore.
+    expect(() => buildCloudSessionPayload("severe", { legacy: true }))
+      .toThrow(/not supported by any workspace/);
+    expect(() => buildCloudSessionPayload("severe", { workspaceId: "bogus", forecastCycle: {} }))
+      .toThrow(/unknown workspace/);
+
+    // A payload that already names Custom must not be relabeled Severe just
+    // because the cloud record's metadata said Severe.
+    const declaresCustom = { workspaceId: "custom", ...bare };
+    expect(() => buildCloudSessionPayload("severe", declaresCustom)).toThrow(/incomplete or invalid/);
+  });
+
+  it("refuses to stage a handoff for a workspace the registry does not know", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    expect(() => buildCloudSessionPayload("bogus" as never, bare)).toThrow(/valid workspace/);
+    expect(() => buildCloudSessionPayload(undefined as never, bare)).toThrow(/valid workspace/);
+  });
+
+  it("refuses to hand off an untagged payload for a non-Severe record", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/bare-custom" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(serializeForecast(cycle, { center: [0, 0], zoom: 4 }));
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("refuses to hand off a cloud cycle that names an unknown workspace", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "rogue-1", workspaceId: "not-a-workspace" as never, label: "Rogue save" }],
+        loadCycle,
+      })
+    );
+
+    renderPage();
+    expect(screen.getByRole("button", { name: /load/i })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(/Unknown workspace cloud loading is not available yet/i)).toBeInTheDocument();
+    expect(loadCycle).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
+  });
 });

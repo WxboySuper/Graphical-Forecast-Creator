@@ -1,4 +1,5 @@
 import type { GFCForecastSaveData } from '../types/outlooks';
+import { createForecastWorkspaceSave, getForecastDataFromWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { getDoc, onSnapshot } from 'firebase/firestore';
 import {
   createCloudCyclePayloadStorage,
@@ -52,11 +53,14 @@ test('cloud payload encoding round-trips custom geometry and appearance', () => 
     },
   } as GFCForecastSaveData;
 
-  const encoded = createCloudCyclePayloadStorage(payload);
+  const workspacePayload = createForecastWorkspaceSave('custom', payload);
+  const encoded = createCloudCyclePayloadStorage(workspacePayload);
   const restored = parseCloudCyclePayload(encoded.payloadJson);
 
   expect(encoded.payloadBytes).toBeGreaterThan(0);
-  expect(restored?.forecastCycle?.days[1]?.customLayers).toEqual(payload.forecastCycle?.days[1]?.customLayers);
+  expect(restored).toEqual(workspacePayload);
+  expect(restored && getForecastDataFromWorkspacePayload(restored).forecastCycle?.days[1]?.customLayers).toEqual(payload.forecastCycle?.days[1]?.customLayers);
+  expect(parseCloudCyclePayload(JSON.stringify(payload))).toEqual(payload);
 });
 
 test('legacy reads return data without Firestore writes and remain visible with hosted records', async () => {
@@ -76,6 +80,25 @@ test('legacy reads return data without Firestore writes and remain visible with 
   expect(result.success).toBe(true);
   expect(result.data?.map((cycle) => cycle.id)).toEqual(['legacy', 'hosted']);
   expect(mockSetDoc).not.toHaveBeenCalled();
+});
+
+test('keeps missing workspace metadata as Severe but hides records with an unknown owner', async () => {
+  const { listCloudCycles } = await import('./cloudCyclesService');
+  mockGetDocs.mockResolvedValueOnce({
+    docs: [
+      { id: 'hosted', data: () => ({ id: 'hosted', userId: 'user-1', label: 'Hosted', cycleDate: '2026-07-18' }) },
+      { id: 'custom', data: () => ({ id: 'custom', userId: 'user-1', label: 'Custom', cycleDate: '2026-07-18', workspaceId: 'custom' }) },
+      { id: 'rogue', data: () => ({ id: 'rogue', userId: 'user-1', label: 'Rogue', cycleDate: '2026-07-18', workspaceId: 'not-a-workspace' }) },
+    ],
+  });
+  mockGetDoc.mockResolvedValue({ data: () => ({ cloudCycles: {} }) });
+
+  const result = await listCloudCycles({ userId: 'user-1' });
+
+  expect(result.success).toBe(true);
+  expect(result.data?.map((cycle) => cycle.id)).toEqual(['hosted', 'custom']);
+  expect(result.data?.find((cycle) => cycle.id === 'custom')?.workspaceId).toBe('custom');
+  expect(result.data?.find((cycle) => cycle.id === 'hosted')?.workspaceId).toBe('severe');
 });
 
 test('subscription checks the legacy store when the initial collection is empty', async () => {

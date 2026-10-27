@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
 import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
-import { deserializeForecast } from '../utils/fileUtils';
+import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
 
-const loadCloudOutlookOption = async (
+export const loadCloudOutlookOption = async (
   loadCycle: ReturnType<typeof useCloudCycles>['loadCycle'],
   selectedOption: MonitorOutlookSourceOption,
   today: string,
@@ -14,7 +14,7 @@ const loadCloudOutlookOption = async (
     return selectedOption;
   }
 
-  const cycle = deserializeForecast(payload);
+  const cycle = resolveNativeFileContent(payload).forecastCycle;
   const dayOne = cycle.cycleDate === today ? cycle.days[1]?.data : undefined;
   return {
     ...selectedOption,

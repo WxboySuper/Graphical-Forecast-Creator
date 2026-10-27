@@ -27,6 +27,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 - A pending debounced save flushes to its original workspace before a scope change. A deliberate fresh start clears both signed-in and anonymous copies.
 - Sign-in migrates anonymous autosaves per workspace. A non-Severe draft is never promoted into Severe.
 - Every new cloud record requires `workspaceId`. Library tabs filter on it. Legacy records without an id read as Severe.
+- Saved cycles are never hidden. A record whose workspace id this build does not recognize stays in history under the legacy Severe fallback instead of being dropped, so the user can still see it and delete it.
 
 ## Cloud handoff
 

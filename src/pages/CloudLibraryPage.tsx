@@ -360,6 +360,14 @@ const CloudCycleWriteActions: React.FC<{
   );
 };
 
+/** Checks whether this build can load a cloud cycle owned by the given workspace. */
+const isCloudCycleLoadSupported = (
+  workspaceId: ReturnType<typeof getCloudCycleWorkspaceId>,
+  buildTarget: ReturnType<typeof getBuildTarget>,
+): boolean =>
+  workspaceId !== null &&
+  isSupportedCloudLoadWorkspace(workspaceId, getForecastWorkspace(workspaceId), buildTarget);
+
 /** Action block for loading, renaming, and deleting one cloud cycle. */
 const CloudCycleActions: React.FC<{
   canWrite: boolean;
@@ -391,7 +399,7 @@ const CloudCycleActions: React.FC<{
   const buildTarget = getBuildTarget();
   const workspaceId = getCloudCycleWorkspaceId(cycle);
   const workspaceLabel = getCloudCycleWorkspaceLabel(cycle);
-  const loadSupported = isSupportedCloudLoadWorkspace(workspaceId, getForecastWorkspace(workspaceId), buildTarget);
+  const loadSupported = isCloudCycleLoadSupported(workspaceId, buildTarget);
   const loadHintId = `cloud-cycle-load-hint-${cycle.id}`;
   const handleLoadClick = () => {
     if (loadSupported) onLoad();
@@ -854,6 +862,56 @@ const CloudLibrarySignedInLayout: React.FC<{
   </div>
 );
 
+/** Stages the validated cloud payload and returns an error message when storage fails. */
+const persistCloudCycleToSession = ({
+  cycleId,
+  label,
+  workspaceId,
+  payload,
+  userId,
+}: {
+  cycleId: string;
+  label: string;
+  workspaceId: ForecastWorkspaceId;
+  payload: unknown;
+  userId?: string;
+}): string | null => {
+  try {
+    // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
+    // The validators come from production, keyed to the workspace that opened
+    // the cycle: Severe cannot claim a Custom record's save, a Custom record's
+    // save classifies as Custom, and malformed input throws here instead of
+    // being written to session storage.
+    const storable = buildCloudSessionPayload(workspaceId, payload, buildCloudLoadValidators(workspaceId));
+    // Each workspace stages into its own slot so loading a Severe cycle can
+    // never overwrite a handoff already waiting for the Custom editor.
+    sessionStorage.setItem(getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_PAYLOAD_KEY, scope: { userId, workspaceId } }), JSON.stringify(storable));
+    sessionStorage.setItem(
+      getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_META_KEY, scope: { userId, workspaceId } }),
+      JSON.stringify({ id: cycleId, label })
+    );
+    return null;
+  } catch {
+    return 'Unable to hand this cloud cycle off to the editor. Your save is still stored.';
+  }
+};
+/** Resolves and validates the workspace before a cloud cycle is loaded. */
+const resolveCloudCycleLoadWorkspace = ({
+  cycle,
+  buildTarget,
+}: {
+  cycle: CloudCycleMetadata;
+  buildTarget: ReturnType<typeof getBuildTarget>;
+}): { workspaceId: ForecastWorkspaceId } | { message: string } => {
+  const workspaceId = getCloudCycleWorkspaceId(cycle);
+  if (!workspaceId) return { message: 'That cloud cycle does not belong to a known forecast workspace.' };
+  const workspace = getForecastWorkspace(workspaceId);
+  if (!isSupportedCloudLoadWorkspace(workspaceId, workspace, buildTarget)) {
+    return { message: `${workspace?.label ?? 'This workspace'} cloud loading is not available yet. Your save is still stored.` };
+  }
+  return { workspaceId };
+};
+
 /** Creates the cloud library actions used by the page and keeps transient feedback local. */
 const useCloudLibraryActions = ({
   cycles,
@@ -875,65 +933,47 @@ const useCloudLibraryActions = ({
   const buildTarget = getBuildTarget();
   const [message, setMessage] = useState<string | null>(null);
 
-  const persistCloudCycleToSession = useCallback(
-    (cycleId: string, label: string, workspaceId: ForecastWorkspaceId, payload: unknown): boolean => {
-      try {
-        // Preserve an already-enveloped payload so cloud handoffs never double-wrap.
-        // The validators come from production, keyed to the workspace that opened
-        // the cycle: Severe cannot claim a Custom record's save, a Custom record's
-        // save classifies as Custom, and malformed input throws here instead of
-        // being written to session storage.
-        const storable = buildCloudSessionPayload(workspaceId, payload, buildCloudLoadValidators(workspaceId));
-        // Each workspace stages into its own slot so loading a Severe cycle can
-        // never overwrite a handoff already waiting for the Custom editor.
-        sessionStorage.setItem(getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_PAYLOAD_KEY, scope: { userId, workspaceId } }), JSON.stringify(storable));
-        sessionStorage.setItem(
-          getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_META_KEY, scope: { userId, workspaceId } }),
-          JSON.stringify({
-            id: cycleId,
-            label,
-          })
-        );
-        return true;
-      } catch {
-        setMessage('Unable to hand this cloud cycle off to the editor right now. Please try again.');
-        return false;
-      }
-    },
-    [userId]
-  );
-
   /** Loads one hosted cycle into the forecast editor and preserves its cloud metadata in session storage. */
   const handleLoadCycle = useCallback(async (cycleId: string) => {
     setMessage(null);
     const selectedCycle = cycles.find((cycle) => cycle.id === cycleId);
     if (!selectedCycle) {
+      setMessage('That cloud cycle is no longer in your library. Refresh and try again.');
       return;
     }
-    const workspaceId = getCloudCycleWorkspaceId(selectedCycle);
-    const workspace = getForecastWorkspace(workspaceId);
-    // Unexposed or unregistered workspaces reuse the existing failure path instead of
-    // navigating to a /forecast/{workspace} route with no editor.
-    if (!isSupportedCloudLoadWorkspace(workspaceId, workspace, buildTarget)) {
-      const workspaceLabel = workspace?.label ?? 'This workspace';
-      setMessage(
-        `${workspaceLabel} cloud loading is not available yet. Your save is still stored.`
-      );
+    const loadWorkspace = resolveCloudCycleLoadWorkspace({ cycle: selectedCycle, buildTarget });
+    if ('message' in loadWorkspace) {
+      setMessage(loadWorkspace.message);
       return;
     }
 
-    const payload = await loadCycle(cycleId);
+    const { workspaceId } = loadWorkspace;
+    let payload: Awaited<ReturnType<typeof loadCycle>>;
+    try {
+      payload = await loadCycle(cycleId);
+    } catch {
+      setMessage('Unable to load this cloud cycle right now. Your save is still stored.');
+      return;
+    }
     if (!payload) {
+      setMessage('Unable to load this cloud cycle right now. Your save is still stored.');
       return;
     }
 
-    if (!persistCloudCycleToSession(cycleId, selectedCycle.label, workspaceId, payload)) {
-      setMessage('Unable to hand this cloud cycle off to the editor. Your save is still stored.');
+    const storageError = persistCloudCycleToSession({
+      cycleId,
+      label: selectedCycle.label,
+      workspaceId,
+      payload,
+      userId,
+    });
+    if (storageError) {
+      setMessage(storageError);
       return;
     }
 
     navigate(getForecastWorkspacePath(workspaceId));
-  }, [buildTarget, cycles, loadCycle, navigate, persistCloudCycleToSession]);
+  }, [buildTarget, cycles, loadCycle, navigate, userId]);
 
   /** Deletes one hosted cloud cycle and surfaces a short success message on completion. */
   const handleDeleteCycle = useCallback(async (cycleId: string) => {

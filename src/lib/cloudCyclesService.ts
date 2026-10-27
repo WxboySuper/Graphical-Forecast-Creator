@@ -3,11 +3,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { auth, db } from './firebase';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
 import { GFCForecastSaveData } from '../types/outlooks';
+import type { ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
+import { isWorkspaceSaveEnvelope } from '../utils/forecastWorkspaceEnvelope';
 import type { CycleMetadata } from '../types/workflow';
 import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './workflowMetadataContract';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
-import { DEFAULT_FORECAST_WORKSPACE, resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, resolveStoredWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -38,7 +40,7 @@ interface NormalizeCloudCycleRecordParams {
   rawRecord: unknown;
   fallbackUserId: string;
   /** Parsed payload from the subcollection; falls back to a legacy inline value when omitted. */
-  payload?: GFCForecastSaveData;
+  payload?: ForecastWorkspacePayload;
 }
 
 interface NormalizeCloudCycleMetadataRecordParams {
@@ -76,7 +78,7 @@ interface SaveCloudCycleParams {
   label: string;
   cycleDate: string;
   stats: SavedCycleStats;
-  payload: GFCForecastSaveData;
+  payload: ForecastWorkspacePayload;
   workspaceId?: ForecastWorkspaceId;
   workflowMetadata?: CycleMetadata;
   isReadOnly?: boolean;
@@ -122,7 +124,7 @@ function noopUnsubscribe(): void {
  * Computes a simple hash of the cycle payload for change detection
  * Uses a simple string hash rather than cryptographic hashing
  */
-const computePayloadHash = (payload: GFCForecastSaveData): string => {
+const computePayloadHash = (payload: ForecastWorkspacePayload): string => {
   const jsonStr = JSON.stringify(payload);
   let hash = 0;
   for (let i = 0; i < jsonStr.length; i++) {
@@ -138,16 +140,18 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 /** Reads a stored cloud payload from either a JSON string or already-parsed object value. */
-export const parseCloudCyclePayload = (value: unknown): GFCForecastSaveData | null => {
+export const parseCloudCyclePayload = (value: unknown): ForecastWorkspacePayload | null => {
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value) as unknown;
+      if (isWorkspaceSaveEnvelope(parsed) && validateForecastData(parsed.forecast)) return parsed;
       return validateForecastData(parsed) ? (parsed as GFCForecastSaveData) : null;
     } catch {
       return null;
     }
   }
 
+  if (isWorkspaceSaveEnvelope(value) && validateForecastData(value.forecast)) return value;
   if (validateForecastData(value)) {
     return value as GFCForecastSaveData;
   }
@@ -195,7 +199,7 @@ const readRequiredText = (value: unknown): string | null =>
 const readStoredCount = (value: unknown): number => (typeof value === 'number' ? value : 0);
 
 /** Returns the serialized cloud payload plus its UTF-8 byte length for storage-safe writes. */
-export const createCloudCyclePayloadStorage = (payload: GFCForecastSaveData): CloudCyclePayloadDocument => {
+export const createCloudCyclePayloadStorage = (payload: ForecastWorkspacePayload): CloudCyclePayloadDocument => {
   const payloadJson = JSON.stringify(payload);
   return {
     payloadJson,
@@ -220,10 +224,17 @@ const normalizeStoredMetadata = ({
     return null;
   }
 
+  // Missing metadata predates workspace ownership and belongs to Severe. An
+  // explicit but unknown owner must stay hidden instead of being relabeled.
+  const workspaceId = rawMetadata.workspaceId === undefined || rawMetadata.workspaceId === null
+    ? DEFAULT_FORECAST_WORKSPACE
+    : resolveStoredWorkspaceId(rawMetadata.workspaceId);
+  if (!workspaceId) return null;
+
   return {
     id: readRequiredText(rawMetadata.id) ?? cycleId,
     userId: readRequiredText(rawMetadata.userId) ?? fallbackUserId,
-    workspaceId: resolveForecastWorkspaceId(typeof rawMetadata.workspaceId === 'string' ? rawMetadata.workspaceId : undefined),
+    workspaceId,
     label,
     cycleDate,
     createdAt: readTimestampString(rawMetadata.createdAt),
@@ -381,7 +392,7 @@ const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => 
 };
 
 /** Reads one cloud-cycle payload from the subcollection, or null when absent or invalid. */
-const readCloudCyclePayload = async (cycleId: string): Promise<GFCForecastSaveData | null> => {
+const readCloudCyclePayload = async (cycleId: string): Promise<ForecastWorkspacePayload | null> => {
   const payloadSnapshot = await getDoc(getCloudCyclePayloadDocRef(cycleId));
   if (!payloadSnapshot.exists()) {
     return null;

@@ -1,18 +1,21 @@
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { getForecastWorkspace } from '../config/forecastWorkspaces';
+import { getForecastWorkspace, requireForecastWorkspaceId } from '../config/forecastWorkspaces';
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { validateForecastData } from './fileUtils';
+import {
+  createForecastWorkspaceSave,
+  declaresWorkspaceEnvelope,
+  isRecord,
+  isWorkspaceSaveEnvelope,
+} from './forecastWorkspaceEnvelope';
+import type { ForecastWorkspaceSaveEnvelope } from './forecastWorkspaceEnvelope';
 
-/** Version of the workspace-aware save envelope, independent of forecast data version. */
-export const FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION = 1 as const;
-
-export interface ForecastWorkspaceSaveEnvelope {
-  schemaVersion: typeof FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION;
-  workspaceId: ForecastWorkspaceId;
-  forecast: GFCForecastSaveData;
-}
-
-export type ForecastWorkspacePayload = ForecastWorkspaceSaveEnvelope | GFCForecastSaveData;
+export {
+  FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+  createForecastWorkspaceSave,
+  getForecastDataFromWorkspacePayload,
+} from './forecastWorkspaceEnvelope';
+export type { ForecastWorkspacePayload, ForecastWorkspaceSaveEnvelope } from './forecastWorkspaceEnvelope';
 
 export type ForecastWorkspaceClassification =
   | { ok: true; workspaceId: ForecastWorkspaceId; payload: ForecastWorkspaceSaveEnvelope; legacy: false }
@@ -40,27 +43,8 @@ export const getForecastWorkspaceLoadError = (
   }
 };
 
-/** Creates the explicit envelope required for all new workspace-owned saves. */
-export const createForecastWorkspaceSave = (
-  workspaceId: ForecastWorkspaceId,
-  forecast: GFCForecastSaveData,
-): ForecastWorkspaceSaveEnvelope => ({
-  schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
-  workspaceId,
-  forecast,
-});
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const isWorkspaceId = (value: unknown): value is ForecastWorkspaceId =>
   typeof value === 'string' && getForecastWorkspace(value as ForecastWorkspaceId) !== undefined;
-
-const isEnvelope = (value: unknown): value is ForecastWorkspaceSaveEnvelope =>
-  isRecord(value) &&
-  value.schemaVersion === FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION &&
-  isWorkspaceId(value.workspaceId) &&
-  validateForecastData(value.forecast);
 
 const classifyLegacySeverePayload = (
   value: unknown,
@@ -111,19 +95,19 @@ const classifyExplicitWorkspacePayload = (value: unknown): Extract<ForecastWorks
 /**
  * Classifies a saved payload before it is opened in a workspace.
  *
- * Explicit workspace identity always wins. Legacy payloads are checked as
- * Severe first so a valid Severe save containing custom layers is never
- * reclassified as Custom merely because it contains those layers.
- *
- * This intentionally does not reuse resolveForecastWorkspaceId: an explicit but
- * unknown workspaceId must reject as 'unknown-workspace' instead of falling
- * back to Severe, so corrupt envelopes cannot silently open in the wrong workspace.
+ * Declared envelopes and explicit workspace IDs are validated before legacy
+ * payloads. Legacy payloads are classified with the validators for the requesting
+ * workspace, so invalid or unknown owners cannot fall back to Severe.
  */
 export const classifyForecastWorkspacePayload = (
   value: unknown,
   validators: ForecastWorkspaceLegacyValidators = {},
 ): ForecastWorkspaceClassification => {
-  if (isEnvelope(value)) {
+  if (declaresWorkspaceEnvelope(value)) {
+    if (!isWorkspaceSaveEnvelope(value)) {
+      return classifyExplicitWorkspacePayload(value) ?? { ok: false, reason: 'invalid' };
+    }
+    if (!validateForecastData(value.forecast)) return { ok: false, reason: 'invalid' };
     return { ok: true, workspaceId: value.workspaceId, payload: value, legacy: false };
   }
 
@@ -136,19 +120,12 @@ export const classifyForecastWorkspacePayload = (
   };
 };
 
-/** Extracts the forecast data from either a new envelope or a legacy payload. */
-export const getForecastDataFromWorkspacePayload = (
-  payload: ForecastWorkspacePayload,
-): GFCForecastSaveData => 'forecast' in payload ? payload.forecast : payload;
-
 /**
  * Builds the session payload for a cloud handoff.
  *
- * The payload is classified with real validators before anything is written:
- * an invalid or unknown envelope throws instead of being wrapped as forecast
- * data, an explicit envelope must name the workspace that opened it, and a
- * payload a Custom validator recognized stays Custom. Legacy saves carry no
- * identity of their own, so the workspace that opened the cycle owns them.
+ * Explicit envelopes must name the requested workspace. Untagged legacy
+ * payloads are only safe to adopt into Severe, where their historical owner is
+ * known. Other workspaces must save an explicit owner before cloud handoff.
  */
 const assertCloudWorkspaceMatches = (
   payloadWorkspaceId: ForecastWorkspaceId,
@@ -159,43 +136,58 @@ const assertCloudWorkspaceMatches = (
   }
 };
 
-const assertLegacyCloudWorkspaceMatches = (
-  classification: Extract<ForecastWorkspaceClassification, { ok: true }>,
-  workspaceId: ForecastWorkspaceId,
-): void => {
-  assertCloudWorkspaceMatches(classification.workspaceId, workspaceId);
-};
-
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
   validators: ForecastWorkspaceLegacyValidators = {},
 ): ForecastWorkspaceSaveEnvelope => {
+  const owner = requireForecastWorkspaceId(workspaceId);
   const classification = classifyForecastWorkspacePayload(payload, validators);
   if (!classification.ok) throw getForecastWorkspaceLoadError(classification);
 
-  if (!classification.legacy) {
-    assertCloudWorkspaceMatches(classification.workspaceId, workspaceId);
+  if (classification.legacy === false) {
+    assertCloudWorkspaceMatches(classification.workspaceId, owner);
     return classification.payload;
   }
 
-  // Explicit validators express the owner requested by this cloud load. Keep
-  // the default legacy adoption path for callers without workspace validators.
-  assertLegacyCloudWorkspaceMatches(classification, workspaceId);
-  return createForecastWorkspaceSave(workspaceId, classification.payload);
+  if (owner !== 'severe') {
+    throw new Error(
+      `This cloud cycle labels an untagged forecast as ${owner} workspace, which cannot be verified. Save it from that workspace to include its workspace identity.`,
+    );
+  }
+
+  if (classification.workspaceId !== owner) {
+    assertCloudWorkspaceMatches(classification.workspaceId, owner);
+  }
+  return createForecastWorkspaceSave(owner, classification.payload);
 };
 
 /**
  * Validators for one cloud load, built from the workspace that asked for it.
  *
- * Untagged saves predate workspace ownership and have no reliable identity.
- * Preserve the historical Severe default, and reject them for other workspaces
- * until a workspace-specific payload schema can identify them. New Custom saves
- * carry an explicit envelope, so they remain loadable without guessing.
+ * Every workspace serializes the same `GFCForecastSaveData` shape, so an
+ * untagged legacy payload carries no owner of its own and Severe's validator
+ * would otherwise claim every save in the library. The cloud record is the
+ * only Custom identity a legacy save has, so Severe claims an untagged payload
+ * only for a Severe load and the Custom validator claims it for a Custom load,
+ * which keeps a Custom record's payload from being classified as Severe before
+ * the envelope is written. Input that fails both checks is rejected instead of
+ * being staged.
+ *
+ * Severe still runs first inside the shared contract, so a Severe save with
+ * embedded custom layers is never reclassified as Custom. #915 owns the
+ * payload-level Custom schema that will replace the record-derived half of
+ * this check.
  */
 export const buildCloudLoadValidators = (
   workspaceId: ForecastWorkspaceId,
 ): ForecastWorkspaceLegacyValidators => ({
-  isSeverePayload: (value): value is GFCForecastSaveData =>
-    workspaceId === 'severe' && validateForecastData(value),
+  isSeverePayload: (value): value is GFCForecastSaveData => {
+    if (workspaceId === 'custom') return false;
+    return validateForecastData(value);
+  },
+  isCustomPayload: (value): value is GFCForecastSaveData => {
+    if (workspaceId !== 'custom') return false;
+    return validateForecastData(value);
+  },
 });
