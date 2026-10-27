@@ -181,6 +181,27 @@ describe('Auto-TSTM server foundation', () => {
     assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
   });
 
+  it('escalates after excessive stdout even if more output arrives during the grace window', async () => {
+    const child = createFakeChild();
+    const signals = [];
+    child.kill = (signal) => signals.push(signal);
+    const result = runTstmGenerator(
+      { day: 1, cycleDate: '2026-06-13' },
+      {
+        env: { TSTM_GENERATION_TIMEOUT_MS: '1000' },
+        killGraceMs: 20,
+        spawnProcess: () => child,
+      }
+    );
+
+    child.stdout.write('x'.repeat(4 * 1024 * 1024 + 1));
+    await assert.rejects(result, /TSTM_GENERATOR_OUTPUT_TOO_LARGE/);
+    child.stdout.write('more output during the grace window');
+
+    await signalSettle();
+    assert.deepEqual(signals, ['SIGTERM', 'SIGTERM', 'SIGKILL']);
+  });
+
   it('passes --ingestion-mode flag when ingestionMode is set', async () => {
     const child = createFakeChild();
     let spawnedArgs;
