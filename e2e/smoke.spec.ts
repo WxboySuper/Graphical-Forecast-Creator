@@ -35,9 +35,6 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
       toolbarBox: box(toolbar),
       noticeBox: box(notice),
       mapBox: box(map),
-      legendTopOffset: Number.parseFloat(
-        getComputedStyle(legend).getPropertyValue('--legacy-forecast-landscape-legend-top'),
-      ),
       measuredNoticeHeight: Number.parseFloat(
         getComputedStyle(shell).getPropertyValue('--legacy-forecast-notice-height'),
       ),
@@ -45,12 +42,11 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
   });
 
   if (!geometry) throw new Error('Expected the notice, map, legend, and toolbar to have measurable bounds.');
-  const { legendBox, toolbarBox, noticeBox, mapBox, legendTopOffset, measuredNoticeHeight } = geometry;
-  if (!Number.isFinite(legendTopOffset)) throw new Error('Expected the landscape legend offset to be defined.');
+  const { legendBox, toolbarBox, noticeBox, mapBox, measuredNoticeHeight } = geometry;
   if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
 
   expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
-  expect(Math.abs(legendBox.y - (mapBox.y + Math.max(8, legendTopOffset - noticeBox.height)))).toBeLessThanOrEqual(2);
+  expect(Math.abs(legendBox.y - (mapBox.y + 106))).toBeLessThanOrEqual(2);
   expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
   expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 };

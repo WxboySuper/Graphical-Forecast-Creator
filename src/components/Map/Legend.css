@@ -69,12 +69,11 @@
 
 @media (max-height: 520px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
-    --legacy-forecast-landscape-legend-top: 106px;
-    top: max(8px, calc(var(--legacy-forecast-landscape-legend-top, 106px) - var(--legacy-forecast-notice-height, 0px)));
+    top: 106px;
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
-    max-height: calc(100dvh - var(--app-header-height, 64px) - max(218px, calc(var(--legacy-forecast-notice-height, 0px) + 120px)));
+    max-height: calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 218px);
   }
 }
 
