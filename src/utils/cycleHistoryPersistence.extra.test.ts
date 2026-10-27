@@ -54,7 +54,7 @@ describe('cycleHistoryPersistence', () => {
     expect(fileUtils.deserializeForecast).toHaveBeenCalled();
   });
 
-  test('defaults malformed persisted workspace metadata to Severe', async () => {
+  test('keeps a persisted entry with an unregistered workspace visible instead of hiding it', async () => {
     jest.doMock('./fileUtils', () => ({
       serializeForecast: jest.fn(() => ({ serialized: true })),
       deserializeForecast: jest.fn(() => ({ restored: true })),
@@ -63,17 +63,71 @@ describe('cycleHistoryPersistence', () => {
       countForecastMetrics: jest.fn(() => ({ total: 1 })),
     }));
 
-    localStorage.setItem('gfc-cycle-history', JSON.stringify([{
-      id: 'malformed-workspace',
-      timestamp: 'ts',
-      cycleDate: '2026-04-22',
-      forecastData: { serialized: true },
-      workspaceId: 'not-a-workspace',
-      stats: { total: 1 },
-    }]));
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([
+      {
+        id: 'owned-custom',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { serialized: true },
+        workspaceId: 'custom',
+        stats: { total: 1 },
+      },
+      {
+        id: 'malformed-workspace',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { serialized: true },
+        workspaceId: 'not-a-workspace',
+        stats: { total: 1 },
+      },
+    ]));
 
     const mod = await import('./cycleHistoryPersistence');
-    expect(mod.loadCycleHistoryFromStorage()[0]?.workspaceId).toBe('severe');
+    const loaded = mod.loadCycleHistoryFromStorage();
+
+    // Nothing disappears from the user's history. The registered owner keeps its
+    // identity; the unattributable one stays readable under the legacy fallback
+    // instead of being silently dropped from storage.
+    expect(loaded.map((cycle) => cycle.id)).toEqual(['owned-custom', 'malformed-workspace']);
+    expect(loaded[0]?.workspaceId).toBe('custom');
+    expect(loaded[1]?.workspaceId).toBe('severe');
+  });
+
+  test('drops a persisted cycle whose forecast payload is a corrupt envelope', async () => {
+    // The real reader is required here: the failure is inside deserializeForecast,
+    // which the other cases in this file mock away.
+    jest.doMock('./fileUtils', () => jest.requireActual('./fileUtils'));
+
+    const forecastData = {
+      version: '1.0.0',
+      type: 'forecast-cycle',
+      timestamp: '2026-04-22T00:00:00.000Z',
+      forecastCycle: { days: {}, currentDay: 1, cycleDate: '2026-04-22' },
+    };
+    localStorage.setItem('gfc-cycle-history', JSON.stringify([
+      {
+        id: 'corrupt-envelope',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { schemaVersion: 1, workspaceId: 'bogus', forecast: forecastData },
+        stats: { total: 1 },
+      },
+      {
+        id: 'owned-envelope',
+        timestamp: 'ts',
+        cycleDate: '2026-04-22',
+        forecastData: { schemaVersion: 1, workspaceId: 'custom', forecast: forecastData },
+        stats: { total: 1 },
+      },
+    ]));
+
+    const mod = await import('./cycleHistoryPersistence');
+    const loaded = mod.loadCycleHistoryFromStorage();
+
+    // The corrupt envelope is dropped rather than kept as a blank entry, and the
+    // valid one still restores its real forecast data instead of an empty cycle.
+    expect(loaded.map((cycle) => cycle.id)).toEqual(['owned-envelope']);
+    expect((loaded[0]?.forecastCycle as { cycleDate?: string } | undefined)?.cycleDate).toBe('2026-04-22');
   });
 
   test('defaults legacy persisted records without workspace metadata to Severe', async () => {

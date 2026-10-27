@@ -8,6 +8,8 @@ import {
   getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
+  requireForecastWorkspaceId,
+  resolveStoredWorkspaceId,
 } from './forecastWorkspaces';
 
 describe('forecast workspace product contract', () => {
@@ -71,5 +73,30 @@ describe('forecast workspace product contract', () => {
     expect(getDefaultForecastWorkspace().legacyPaths).toContain('/forecast');
     expect(getForecastWorkspaceByLegacyPath('/forecast')?.id).toBe('severe');
     expect(getForecastWorkspaceByLegacyPath('/custom-products')).toBeUndefined();
+  });
+
+  test('returns a registered workspace from requireForecastWorkspaceId', () => {
+    expect(requireForecastWorkspaceId('severe')).toBe('severe');
+    expect(requireForecastWorkspaceId('custom')).toBe('custom');
+  });
+
+  test('fails closed when a writer cannot name a registered workspace', () => {
+    for (const invalid of [undefined, null, '', 'Severe', 'mesoscale-v2', 42, {}]) {
+      expect(() => requireForecastWorkspaceId(invalid)).toThrow('valid workspace');
+    }
+  });
+
+  test('resolves stored workspace ids without relabeling an unknown owner', () => {
+    // Absent means a record written before workspaces existed: stay on the default.
+    expect(resolveStoredWorkspaceId(undefined)).toBe('severe');
+    expect(resolveStoredWorkspaceId(null)).toBe('severe');
+    // Registered ids are returned as-is.
+    expect(resolveStoredWorkspaceId('custom')).toBe('custom');
+    expect(resolveStoredWorkspaceId('mesoscale')).toBe('mesoscale');
+    // Anything else has no usable owner and must stay distinguishable.
+    expect(resolveStoredWorkspaceId('bogus')).toBeNull();
+    expect(resolveStoredWorkspaceId('Severe')).toBeNull();
+    expect(resolveStoredWorkspaceId(42)).toBeNull();
+    expect(resolveStoredWorkspaceId({})).toBeNull();
   });
 });

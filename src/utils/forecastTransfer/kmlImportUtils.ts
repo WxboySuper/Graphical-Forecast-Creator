@@ -41,9 +41,14 @@ const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> =
   throw new Error('Unable to read KML file contents.');
 };
 
-/** Imports a KML/KMZ transfer into a forecast cycle. */
+/** Imports a KML/KMZ transfer into a forecast cycle. The file carries no owner, so the result is unowned. */
 export const importKmlTransfer = async (file: File, bytes: Uint8Array | undefined, format: 'kml' | 'kmz', options?: { baseCycle?: ForecastCycle; defaultDay?: DayType }): Promise<ForecastImportResult> => {
   const kml = await readKmlPayload(file, bytes);
   const { placemarks, warnings } = parseKmlDocument(kml, options?.defaultDay ?? options?.baseCycle?.currentDay ?? 1);
-  return { forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle), warnings, format };
+  return {
+    forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle),
+    workspaceId: null,
+    warnings,
+    format,
+  };
 };

@@ -16,7 +16,9 @@ const downloadForecast = async (page: import('@playwright/test').Page) => {
   const download = await downloadPromise;
   const savedPath = await download.path();
   if (!savedPath) throw new Error('Custom forecast download has no readable path');
-  const saved = JSON.parse(await readFile(savedPath, 'utf8'));
+  const payload = JSON.parse(await readFile(savedPath, 'utf8'));
+  expect(payload.workspaceId).toBe('severe');
+  const saved = payload.forecast ?? payload;
   await page.getByRole('tab', { name: 'Draw' }).click();
   return saved;
 };

@@ -7,6 +7,12 @@ import {
   type ImportValidationResult,
 } from './forecastValidationTypes';
 import { validateForecastCycle, validateLegacyOutlooks } from './forecastOutlookValidation';
+import { getForecastWorkspace } from '../config/forecastWorkspaces';
+import {
+  declaresWorkspaceEnvelope,
+  isRecord,
+  isWorkspaceSaveEnvelope,
+} from './forecastWorkspaceEnvelope';
 
 /**
  * Bounded, schema-aware validation for imported forecast files.
@@ -88,6 +94,48 @@ const validateObjectBounds = (value: unknown, depth: number): ImportValidationRe
 const isWorkflowWrapper = (candidate: { forecast?: unknown }): boolean =>
   candidate.forecast !== undefined && candidate.forecast !== null && typeof candidate.forecast === 'object';
 
+/** Returns true when a workflow package repeats its owner inside the forecast but changes it. */
+const hasConflictingWorkspaceOwner = (workspaceId: unknown, forecast: unknown): boolean => {
+  if (workspaceId === undefined) return false;
+  if (!isRecord(forecast)) return false;
+  if (!Object.prototype.hasOwnProperty.call(forecast, 'workspaceId')) return false;
+  return workspaceId !== forecast.workspaceId;
+};
+
+/** Rejects an explicit owner that this build cannot register. */
+const validateDeclaredWorkspaceOwner = (workspaceId: unknown): ImportValidationResult | null => {
+  if (workspaceId === undefined) return null;
+  return typeof workspaceId === 'string' && getForecastWorkspace(workspaceId)
+    ? null
+    : fail('This forecast belongs to an unknown workspace.');
+};
+
+/** Validates a workspace envelope before recursing into its forecast. */
+const validateWorkspaceEnvelope = (data: unknown): ImportValidationResult => {
+  if (!isWorkspaceSaveEnvelope(data)) return fail('This workspace forecast is incomplete or invalid.');
+  return validateForecastImport(data.forecast);
+};
+
+/** Validates a workflow wrapper and rejects conflicting outer and inner owners. */
+const validateWorkflowWrapper = (
+  candidate: { forecast?: unknown; workspaceId?: unknown },
+): ImportValidationResult => {
+  const inner = candidate.forecast;
+  const result = validateForecastImport(inner);
+  if (!result.ok) return result;
+  if (hasConflictingWorkspaceOwner(candidate.workspaceId, inner)) {
+    return fail('This workflow package declares a workspace that does not match its forecast.');
+  }
+  return result;
+};
+
+/** Validates a bare legacy forecast after recognized wrappers are unwrapped. */
+const validateLegacyForecast = (candidate: { outlooks?: unknown; forecastCycle?: unknown }): ImportValidationResult => {
+  if (candidate.outlooks !== undefined) return validateLegacyOutlooks(candidate.outlooks);
+  if (candidate.forecastCycle !== undefined) return validateForecastCycle(candidate.forecastCycle);
+  return fail('Forecast file is missing forecastCycle or outlooks data.');
+};
+
 /**
  * Validates a parsed forecast document before deserialization. This is the
  * single validator used by every forecast import entry point.
@@ -96,7 +144,7 @@ const isWorkflowWrapper = (candidate: { forecast?: unknown }): boolean =>
  */
 // @codescene(disable:"Complex Conditional")
 export const validateForecastImport = (data: unknown): ImportValidationResult => {
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+  if (!isRecord(data)) {
     return fail('Forecast file is not a valid object.');
   }
 
@@ -107,23 +155,29 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
     forecastCycle?: unknown;
     outlooks?: unknown;
     forecast?: unknown;
+    workspaceId?: unknown;
   };
+
+  // A declared owner must resolve before anything is unwrapped. Packages and
+  // envelopes both carry one, so checking here means an unknown workspace fails
+  // at the validation boundary instead of later in the ownership resolver.
+  const ownerError = validateDeclaredWorkspaceOwner(candidate.workspaceId);
+  if (ownerError) return ownerError;
+
+  // Workspace save envelope: version, registered owner, and payload shape are
+  // all part of the contract. A corrupt envelope is rejected here instead of
+  // being unwrapped into an empty cycle downstream. The branch narrows `data`
+  // rather than `candidate` so the legacy checks below keep their own types.
+  if (declaresWorkspaceEnvelope(data)) {
+    return validateWorkspaceEnvelope(data);
+  }
 
   // Workflow package wrapper: validate the embedded forecast payload.
   if (isWorkflowWrapper(candidate)) {
-    return validateForecastImport(candidate.forecast);
+    return validateWorkflowWrapper(candidate);
   }
 
-  // Legacy single-day format: outlooks maps live at the root.
-  if (candidate.outlooks !== undefined) {
-    return validateLegacyOutlooks(candidate.outlooks);
-  }
-
-  if (candidate.forecastCycle !== undefined) {
-    return validateForecastCycle(candidate.forecastCycle);
-  }
-
-  return fail('Forecast file is missing forecastCycle or outlooks data.');
+  return validateLegacyForecast(candidate);
 };
 
 export type { ImportValidationResult };

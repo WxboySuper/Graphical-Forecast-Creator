@@ -24,6 +24,7 @@ jest.mock('../../utils/productMetrics', () => ({
 
 jest.mock('../../utils/fileUtils', () => ({
   readForecastImportFile: jest.fn(),
+  validateForecastData: jest.fn(() => true),
   validateForecastDataReason: jest.fn(),
   deserializeForecast: jest.fn(),
 }));

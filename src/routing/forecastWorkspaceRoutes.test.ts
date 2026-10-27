@@ -28,8 +28,10 @@ describe('forecast workspace route contract', () => {
     expect(resolveForecastWorkspacePath('/forecast/unknown')).toBeUndefined();
   });
 
-  test('resolves exposed workspace hints across discussion path variants', () => {
+  test('resolves exposed workspace hints across discussion and Monitor handoff paths', () => {
     expect(resolveRouteForecastWorkspaceContext('/discussion', '?workspace=custom')?.id).toBe('custom');
+    expect(resolveRouteForecastWorkspaceContext('/monitor', '?workspace=custom')?.id).toBe('custom');
+    expect(resolveRouteForecastWorkspaceContext('/monitor', '?workspace=unknown')).toBeUndefined();
     expect(resolveRouteForecastWorkspaceContext('/discussion/', '?workspace=custom')?.id).toBe('custom');
     expect(resolveRouteForecastWorkspaceContext('/discussion/thread/1', '?workspace=custom')?.id).toBe('custom');
     expect(resolveRouteForecastWorkspaceContext('/discussion/thread/1', '?workspace=unknown')).toBeUndefined();

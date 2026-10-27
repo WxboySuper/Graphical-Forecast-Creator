@@ -1,0 +1,95 @@
+import type { GFCForecastSaveData } from '../types/outlooks';
+import {
+  FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+  createForecastWorkspaceSave,
+  declaresWorkspaceEnvelope,
+  getForecastDataFromWorkspacePayload,
+  hasWorkspaceEnvelopeWrapper,
+  isWorkspaceSaveEnvelope,
+} from './forecastWorkspaceEnvelope';
+
+const validForecast = (): GFCForecastSaveData => ({
+  version: '1.0.0',
+  type: 'forecast-cycle',
+  timestamp: '2026-09-24T00:00:00.000Z',
+  forecastCycle: { days: {}, currentDay: 1, cycleDate: '2026-09-24' },
+  mapView: { center: [0, 0], zoom: 0 },
+});
+
+describe('forecast workspace envelope checks', () => {
+  test('recognizes the wrapper shape without claiming an owner', () => {
+    expect(hasWorkspaceEnvelopeWrapper({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'bogus',
+      forecast: validForecast(),
+    })).toBe(true);
+    expect(hasWorkspaceEnvelopeWrapper(validForecast())).toBe(false);
+    expect(hasWorkspaceEnvelopeWrapper(null)).toBe(false);
+    expect(hasWorkspaceEnvelopeWrapper([])).toBe(false);
+  });
+
+  test('flags a claimed envelope even when its forecast is the wrong shape', () => {
+    expect(declaresWorkspaceEnvelope({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: 'not-an-object',
+    })).toBe(true);
+    expect(declaresWorkspaceEnvelope(validForecast())).toBe(false);
+    // Workflow packages carry a semver schemaVersion, so they are not envelopes.
+    expect(declaresWorkspaceEnvelope({ schemaVersion: '1.0.0', workspaceId: 'severe', forecast: validForecast() }))
+      .toBe(false);
+    expect(hasWorkspaceEnvelopeWrapper({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: 'not-an-object',
+    })).toBe(false);
+  });
+
+  test('accepts an envelope only when the version, shape, and owner all resolve', () => {
+    expect(isWorkspaceSaveEnvelope(createForecastWorkspaceSave('custom', validForecast()))).toBe(true);
+    expect(isWorkspaceSaveEnvelope(createForecastWorkspaceSave('severe', validForecast()))).toBe(true);
+  });
+
+  test('refuses to treat an envelope with an unknown owner as a valid envelope', () => {
+    expect(isWorkspaceSaveEnvelope({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'bogus',
+      forecast: validForecast(),
+    })).toBe(false);
+    expect(isWorkspaceSaveEnvelope({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 42,
+      forecast: validForecast(),
+    })).toBe(false);
+  });
+
+  test.each([
+    ['wrong version', 99, validForecast()],
+    ['non-object forecast', FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION, 'not-an-object'],
+    ['malformed forecast', FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION, {}],
+  ])('refuses an envelope with a %s', (_caseName, schemaVersion, forecast) => {
+    expect(isWorkspaceSaveEnvelope({ schemaVersion, workspaceId: 'severe', forecast })).toBe(false);
+  });
+
+  test('writes a registered owner into every new envelope', () => {
+    const envelope = createForecastWorkspaceSave('custom', validForecast());
+    expect(envelope.workspaceId).toBe('custom');
+    expect(isWorkspaceSaveEnvelope(envelope)).toBe(true);
+    expect(getForecastDataFromWorkspacePayload(envelope)).toBe(envelope.forecast);
+  });
+
+  test('does not unwrap a bare legacy payload or an invalid workspace claim', () => {
+    const legacy = { ...validForecast(), forecast: { legacyField: true } } as unknown as GFCForecastSaveData;
+    expect(getForecastDataFromWorkspacePayload(legacy)).toBe(legacy);
+    expect(() => getForecastDataFromWorkspacePayload({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'unknown',
+      forecast: validForecast(),
+    } as never)).toThrow('incomplete or invalid');
+    expect(() => getForecastDataFromWorkspacePayload({
+      schemaVersion: FORECAST_WORKSPACE_SAVE_SCHEMA_VERSION,
+      workspaceId: 'severe',
+      forecast: {},
+    } as never)).toThrow('incomplete or invalid');
+  });
+});

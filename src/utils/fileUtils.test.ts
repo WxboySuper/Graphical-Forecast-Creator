@@ -77,12 +77,42 @@ describe('fileUtils', () => {
     const serialized = serializeForecast({
       days: {}, currentDay: 1, cycleDate: '2026-04-21',
     }, { center: [0, 0], zoom: 0 });
-    const wrapper = buildWorkflowExportPackage({ scope: 'cycle', forecast: serialized });
+    const wrapper = buildWorkflowExportPackage({ scope: 'cycle', forecast: serialized, workspaceId: 'severe' });
     expect(validateForecastData(wrapper)).toBe(true);
     expect(deserializeForecast(wrapper).cycleDate).toBe('2026-04-21');
   });
 
+  test('rejects a corrupt workspace envelope instead of returning an empty cycle', () => {
+    const bare = serializeForecast({
+      days: {}, currentDay: 1, cycleDate: '2026-04-21',
+    }, { center: [0, 0], zoom: 0 });
+
+    expect(deserializeForecast({ schemaVersion: 1, workspaceId: 'severe', forecast: bare }).cycleDate)
+      .toBe('2026-04-21');
+
+    // Both shapes used to fall through to the legacy reader and hand back an
+    // empty day-one cycle with no sign that the real forecast was discarded.
+    expect(() => deserializeForecast({ schemaVersion: 1, workspaceId: 'bogus', forecast: bare }))
+      .toThrow('not a valid workspace save');
+    expect(() => deserializeForecast({ schemaVersion: 1, workspaceId: 'severe', forecast: 'not-an-object' }))
+      .toThrow('not a valid workspace save');
+
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'bogus', forecast: bare })).toBe(false);
+    expect(validateForecastData({ schemaVersion: 1, workspaceId: 'severe', forecast: bare })).toBe(true);
+  });
+
   test('reads the workflow manifest from an exported ZIP package', async () => {
+    const manifest = { packageType: 'workflow', schemaVersion: '1.0.0', exportedAt: '2026-07-17T00:00:00.000Z', forecast: { forecastCycle: {} } };
+    const zip = new JSZip();
+    zip.file('forecast_cycle.json', JSON.stringify({ forecastCycle: {} }));
+    zip.file('workflow_package.json', JSON.stringify(manifest));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
+
+    await expect(readForecastImportFile(file)).resolves.toEqual(manifest);
+  });
+
+  test('rejects a ZIP package whose manifest disagrees with its forecast entry', async () => {
     const manifest = { packageType: 'workflow', schemaVersion: '1.0.0', exportedAt: '2026-07-17T00:00:00.000Z', forecast: { forecastCycle: {} } };
     const zip = new JSZip();
     zip.file('forecast_cycle.json', JSON.stringify({ fallback: true }));
@@ -90,7 +120,16 @@ describe('fileUtils', () => {
     const bytes = await zip.generateAsync({ type: 'uint8array' });
     const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
 
-    await expect(readForecastImportFile(file)).resolves.toEqual(manifest);
+    await expect(readForecastImportFile(file)).rejects.toThrow('does not match');
+  });
+
+  test('rejects a ZIP package missing its workflow manifest instead of falling back', async () => {
+    const zip = new JSZip();
+    zip.file('forecast_cycle.json', JSON.stringify({ forecastCycle: {} }));
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const file = Object.assign(bytes, { name: 'workflow.zip', type: 'application/zip' }) as unknown as File;
+
+    await expect(readForecastImportFile(file)).rejects.toThrow('missing workflow_package.json');
   });
 
   test('serialize/deserialize preserves discussion scopes without changing day data', () => {

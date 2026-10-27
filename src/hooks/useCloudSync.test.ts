@@ -123,7 +123,11 @@ describe('useCloudSync', () => {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
-    }, payload, workflowMetadata, { workspaceId: 'severe' });
+    }, expect.objectContaining({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: payload,
+    }), workflowMetadata, { workspaceId: 'severe' });
     expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
   });
 
@@ -288,6 +292,23 @@ describe('useCloudSync', () => {
       await result.current.syncNow();
     });
     expect(saveCycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a workspace ownership change as a sync-relevant change', () => {
+    type SyncByWorkspaceProps = { workspaceId: 'severe' | 'custom' };
+    const { result, rerender } = renderHook<ReturnType<typeof useCloudSync>, SyncByWorkspaceProps>(
+      ({ workspaceId }) => useCloudSync(cloud(), workspaceId),
+      { initialProps: { workspaceId: 'severe' } },
+    );
+
+    act(() => {
+      result.current.markCurrentStateSynced('cloud-1');
+    });
+    expect(result.current.isSynced).toBe(true);
+
+    rerender({ workspaceId: 'custom' });
+
+    expect(result.current.isSynced).toBe(false);
   });
 
   it('keeps an out-of-order completion scoped to the cycle that started the save', async () => {

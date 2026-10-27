@@ -3,6 +3,7 @@ import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import forecastReducer, { setMapView, setCycleDate, setForecastWorkspace } from '../store/forecastSlice';
 import { clearAutoSave, getAutoSaveStorageKey, migrateLegacyAutoSave, migrateWorkspaceAutoSaves, pickNewestAutoSaveValue, selectPreferredAutoSaveValue, useAutoSave } from './useAutoSave';
+import * as forecastWorkspacePersistenceAdapter from '../utils/forecastWorkspacePersistenceAdapter';
 import { serializeForecast } from '../utils/fileUtils';
 
 jest.mock('../utils/fileUtils', () => ({
@@ -29,6 +30,7 @@ describe('useAutoSave', () => {
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     jest.useRealTimers();
   });
 
@@ -56,8 +58,10 @@ describe('useAutoSave', () => {
 
     expect(localStorage.getItem(anonymousKey)).toBeNull();
     expect(localStorage.getItem(scopedKey)).toBe(JSON.stringify({ custom: true }));
-    // The Severe scope is never touched by a non-Severe migration.
+    // The Severe scope is never touched by a non-Severe migration, anonymous
+    // or account-scoped. This is the rule the removed migration guard encoded.
     expect(localStorage.getItem('forecastData')).toBeNull();
+    expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
   });
 
   test('does not overwrite a non-Severe account autosave during migration', () => {
@@ -211,6 +215,44 @@ describe('useAutoSave', () => {
       jest.advanceTimersByTime(1);
     });
     expect(localStorage.getItem('forecastData')).toBe(JSON.stringify({ schemaVersion: 1, workspaceId: 'severe', forecast: { serialized: true } }));
+  });
+
+  test('discards a superseded debounce so only the newest edit persists', async () => {
+    const store = createStore();
+    const serializeWorkspaceSpy = jest.spyOn(forecastWorkspacePersistenceAdapter, 'serializeForecastWorkspace');
+    (serializeForecast as jest.Mock).mockImplementation((cycle: { cycleDate?: string }) => ({
+      serialized: true,
+      cycleDate: cycle?.cycleDate,
+    }));
+
+    render(
+      <Provider store={store}>
+        <Harness />
+      </Provider>
+    );
+
+    act(() => {
+      store.dispatch(setCycleDate('2026-04-25'));
+    });
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+
+    act(() => {
+      store.dispatch(setCycleDate('2026-04-26'));
+    });
+    await waitFor(() => expect(serializeForecast).not.toHaveBeenCalled());
+
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    // Exactly one write: the superseded generation never reaches storage, so a
+    // stale edit cannot overwrite the newer one.
+    expect(serializeWorkspaceSpy).toHaveBeenCalledTimes(1);
+    expect(serializeWorkspaceSpy.mock.calls[0][1].cycleDate).toBe('2026-04-26');
+    expect(JSON.parse(localStorage.getItem('forecastData') ?? '{}')).toMatchObject({
+      workspaceId: 'severe',
+      forecast: { serialized: true, cycleDate: '2026-04-26' },
+    });
   });
 
   test('clears pending saves and silently ignores serialization failures', async () => {

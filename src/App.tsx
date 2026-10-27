@@ -97,9 +97,7 @@ const AppHooks = () => {
   const { user } = useAuth();
   const userId = user?.uid;
   const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  // Only forecast routes own workspace identity. Generic pages (/, /cloud,
-  // Forecast routes own workspace identity. Discussion links may name an
-  // exposed workspace so the editor state, drafts, and return links stay aligned.
+  // Forecast routes and exposed discussion or Monitor handoff links own workspace identity.
   const routeWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
   const routeWorkspaceId = routeWorkspace?.id;
   const workspaceId = routeWorkspaceId ?? activeWorkspaceId;
