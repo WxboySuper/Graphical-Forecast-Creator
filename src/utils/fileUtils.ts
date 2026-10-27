@@ -15,7 +15,7 @@ import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 import { isFeatureExposed } from '../config/featureExposure';
-import { validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
+import { MAX_IMPORT_BYTES, validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
 export { MAX_IMPORT_BYTES } from './forecastImportValidation';
 
@@ -46,12 +46,77 @@ const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
   bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
 ].includes(true);
 
+/** Node-style stream surface JSZip emits through its internal stream helper. */
+interface PackageEntryStream {
+  on(event: 'data', handler: (chunk: Uint8Array) => void): PackageEntryStream;
+  on(event: 'error', handler: (error: unknown) => void): PackageEntryStream;
+  on(event: 'end', handler: () => void): PackageEntryStream;
+  pause(): void;
+  resume(): void;
+}
+
+/** JSZip keeps internalStream out of its public type surface, so widen the entry locally. */
+type StreamableZipEntry = JSZip.JSZipObject & {
+  internalStream: (type: 'uint8array') => PackageEntryStream;
+};
+
+/** Expands one ZIP entry while enforcing the byte budget as output arrives. */
+const expandPackageEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
+  const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+  const maxLabel = `${MAX_IMPORT_BYTES / 1024 / 1024} MB`;
+  const oversizedError = () => new Error(
+    `Expanded forecast package is too large. The maximum supported size is ${maxLabel}.`,
+  );
+  if (declaredSize !== undefined && declaredSize > MAX_IMPORT_BYTES) {
+    throw oversizedError();
+  }
+
+  const expanded = await new Promise<Uint8Array>((resolve, reject) => {
+    const stream = (entry as StreamableZipEntry).internalStream('uint8array');
+    const chunks: Uint8Array[] = [];
+    let byteLength = 0;
+    let settled = false;
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      stream.pause();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    stream.on('data', (chunk: Uint8Array) => {
+      if (settled) return;
+      byteLength += chunk.byteLength;
+      if (byteLength > MAX_IMPORT_BYTES) {
+        rejectOnce(oversizedError());
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on('error', rejectOnce);
+    stream.on('end', () => {
+      if (settled) return;
+      settled = true;
+      const result = new Uint8Array(byteLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      resolve(result);
+    });
+    stream.resume();
+  });
+
+  return new TextDecoder().decode(expanded);
+};
+
 /** Extracts the preferred forecast payload from a workflow ZIP package. */
 const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
   const zip = await JSZip.loadAsync(bytes ?? file);
   const entry = zip.file('workflow_package.json') ?? zip.file('forecast_cycle.json');
   if (!entry) throw new Error('Package is missing workflow_package.json and forecast_cycle.json.');
-  return JSON.parse(await entry.async('string')) as unknown;
+  return JSON.parse(await expandPackageEntry(entry)) as unknown;
 };
 
 /** Parses a plain JSON forecast from already-read bytes or the File text API. */
