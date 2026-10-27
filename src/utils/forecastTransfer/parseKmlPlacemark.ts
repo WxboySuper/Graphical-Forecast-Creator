@@ -25,8 +25,11 @@ export const parseKmlPlacemark = (
     return null;
   }
 
-  const extendedDay = Number(getExtendedDataValue(placemark, 'gfc_day') ?? context.day);
-  const day = (extendedDay >= 1 && extendedDay <= 8 ? extendedDay : context.day) as DayType;
+  const extendedDayValue = getExtendedDataValue(placemark, 'gfc_day');
+  const extendedDay = extendedDayValue === null ? context.day : Number(extendedDayValue);
+  const day = (Number.isInteger(extendedDay) && extendedDay >= 1 && extendedDay <= 8
+    ? extendedDay
+    : context.day) as DayType;
   const extendedOutlook = getExtendedDataValue(placemark, 'gfc_outlook_type') as OutlookType | null;
   const outlookFromName = parsePlacemarkName(placemark.getElementsByTagName('name')[0]?.textContent ?? '');
   const outlookType = extendedOutlook && OUTLOOK_TYPES.has(extendedOutlook)
