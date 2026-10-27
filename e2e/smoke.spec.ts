@@ -52,6 +52,27 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
   expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 };
 
+const expectLegacyNoticePortraitLegendGeometry = async (page: import('@playwright/test').Page) => {
+  const geometry = await page.evaluate(() => {
+    const legend = document.querySelector<HTMLElement>('.map-legend.map-legend--mobile-open');
+    const toolbar = document.querySelector<HTMLElement>('.tabbed-integrated-toolbar');
+    const map = document.querySelector<HTMLElement>('.map-container');
+    if (!legend || !toolbar || !map) return null;
+
+    const box = (element: HTMLElement) => {
+      const { y, height } = element.getBoundingClientRect();
+      return { y, height };
+    };
+    return { legend: box(legend), toolbar: box(toolbar), map: box(map) };
+  });
+
+  if (!geometry) throw new Error('Expected the portrait legend, map, and toolbar to have measurable bounds.');
+  const { legend, toolbar, map } = geometry;
+  expect(legend.y).toBeGreaterThanOrEqual(map.y);
+  expect(legend.y + legend.height).toBeLessThanOrEqual(map.y + map.height + 1);
+  expect(legend.y + legend.height).toBeLessThanOrEqual(toolbar.y + 1);
+};
+
 test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
     await page.addInitScript(() => {
@@ -129,6 +150,16 @@ test.describe('App smoke tests', () => {
     await expect(page.getByRole('complementary', { name: /map legend/i })).not.toBeVisible();
     await page.getByRole('button', { name: /show map key/i }).click();
     await expect(page.getByRole('complementary', { name: /map legend/i })).toBeVisible();
+
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.minHeight = '140px';
+    });
+    await page.setViewportSize({ width: 390, height: 620 });
+    await expectLegacyNoticePortraitLegendGeometry(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.removeProperty('min-height');
+    });
 
     const documentOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(documentOverflow).toBeLessThanOrEqual(1);
