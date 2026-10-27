@@ -803,7 +803,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   }
 
   return (
-    <div ref={forecastShellRef} className="forecast-page-shell">
+    <div ref={forecastShellRef} className={showLegacyNotice ? 'forecast-page-shell forecast-page-shell--legacy-notice' : 'forecast-page-shell'}>
       {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         <ForecastTabbedToolbarLayout

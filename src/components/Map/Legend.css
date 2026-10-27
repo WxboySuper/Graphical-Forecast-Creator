@@ -69,16 +69,20 @@
 
 @media (max-height: 520px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
-    top: max(8px, calc(106px - var(--legacy-forecast-notice-height, 0px)));
+    top: 106px;
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
+    max-height: calc(100dvh - var(--app-header-height, 64px) - 218px);
+  }
+
+  .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
     box-sizing: border-box;
     max-height: max(
       0px,
-      min(
-        calc(100dvh - var(--app-header-height, 64px) - 224px),
-        calc(100dvh - var(--app-header-height, 64px) - var(--legacy-forecast-notice-height, 0px) - 126px)
+      calc(
+        100dvh - var(--app-header-height, 64px) -
+          var(--legacy-forecast-notice-height, 0px) - 218px
       )
     );
   }
