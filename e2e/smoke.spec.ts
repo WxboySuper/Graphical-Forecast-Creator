@@ -25,7 +25,7 @@ const expectLegacyNoticeLegendGeometry = async (page: import('@playwright/test')
   if (!Number.isFinite(measuredNoticeHeight)) throw new Error('Expected the notice height to be measured.');
 
   expect(measuredNoticeHeight).toBeCloseTo(noticeBox.height, 0);
-  expect(Math.abs(legendBox.y - (mapBox.y + legendTopOffset - noticeBox.height))).toBeLessThanOrEqual(2);
+  expect(Math.abs(legendBox.y - (mapBox.y + Math.max(8, legendTopOffset - noticeBox.height)))).toBeLessThanOrEqual(2);
   expect(legendBox.y).toBeGreaterThanOrEqual(noticeBox.y + noticeBox.height);
   expect(legendBox.y + legendBox.height).toBeLessThanOrEqual(toolbarBox.y + 1);
 };
@@ -151,6 +151,10 @@ test.describe('App smoke tests', () => {
 
     await expectLegacyNoticeLegendGeometry(page);
     await page.setViewportSize({ width: 667, height: 430 });
+    await expectLegacyNoticeLegendGeometry(page);
+    await page.getByTestId('legacy-forecast-notice').evaluate((element) => {
+      (element as HTMLElement).style.minHeight = '140px';
+    });
     await expectLegacyNoticeLegendGeometry(page);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
