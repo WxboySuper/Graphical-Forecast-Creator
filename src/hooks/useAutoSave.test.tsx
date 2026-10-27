@@ -91,7 +91,7 @@ describe('useAutoSave', () => {
     expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ account: true, timestamp: '2026-07-13T12:00:00.000Z' }));
   });
 
-  test('migrates anonymous autosaves for every workspace on sign-in', () => {
+  test('migrates only the active anonymous workspace on sign-in', () => {
     localStorage.setItem('forecastData', JSON.stringify({ severe: true }));
     localStorage.setItem('forecastData:custom', JSON.stringify({ custom: true }));
     localStorage.setItem('forecastData:mesoscale', JSON.stringify({ mesoscale: true }));
@@ -99,24 +99,24 @@ describe('useAutoSave', () => {
     migrateWorkspaceAutoSaves('user-1', undefined, 'severe');
 
     expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify({ severe: true }));
-    expect(localStorage.getItem('forecastData:custom:user-user-1')).toBe(JSON.stringify({ custom: true }));
-    expect(localStorage.getItem('forecastData:mesoscale:user-user-1')).toBe(JSON.stringify({ mesoscale: true }));
+    expect(localStorage.getItem('forecastData:custom:user-user-1')).toBeNull();
+    expect(localStorage.getItem('forecastData:mesoscale:user-user-1')).toBeNull();
     expect(localStorage.getItem('forecastData')).toBeNull();
-    expect(localStorage.getItem('forecastData:custom')).toBeNull();
-    expect(localStorage.getItem('forecastData:mesoscale')).toBeNull();
+    expect(localStorage.getItem('forecastData:custom')).toBe(JSON.stringify({ custom: true }));
+    expect(localStorage.getItem('forecastData:mesoscale')).toBe(JSON.stringify({ mesoscale: true }));
   });
 
-  test('reconciles live editor state only for the mounted workspace during the sweep', () => {
+  test('reconciles only the mounted workspace and leaves other anonymous drafts untouched', () => {
     localStorage.setItem('forecastData:custom', JSON.stringify({ custom: true, timestamp: '2026-07-13T00:00:00.000Z' }));
     const liveSession = { live: true, timestamp: '2026-07-14T00:00:00.000Z' };
 
     migrateWorkspaceAutoSaves('user-1', liveSession, 'severe');
 
     expect(localStorage.getItem('forecastData:user-user-1')).toBe(JSON.stringify(liveSession));
-    expect(localStorage.getItem('forecastData:custom:user-user-1')).toBe(
+    expect(localStorage.getItem('forecastData:custom:user-user-1')).toBeNull();
+    expect(localStorage.getItem('forecastData:custom')).toBe(
       JSON.stringify({ custom: true, timestamp: '2026-07-13T00:00:00.000Z' }),
     );
-    expect(localStorage.getItem('forecastData:custom')).toBeNull();
   });
 
   test('sweep leaves existing account drafts and signed-out storage alone', () => {

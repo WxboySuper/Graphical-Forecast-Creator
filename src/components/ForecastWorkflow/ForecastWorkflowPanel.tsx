@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
 import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
-import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
+import { DEFAULT_FORECAST_WORKSPACE, FORECAST_WORKSPACES, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { getForecastWorkspacePath, resolveRouteForecastWorkspace } from '../../routing/forecastWorkspaceRoutes';
 import type { RootState } from '../../store';
 import { Button } from '../ui/button';
 import {
@@ -48,6 +48,35 @@ import {
   markCompletionHandoffHandled,
 } from './completionHandoffPolicy';
 import './ForecastWorkflowPanel.css';
+
+
+/** Resolves the workspace identity from the route before falling back to Redux state. */
+export const resolveWorkflowWorkspaceId = (
+  pathname: string,
+  search: string,
+  reduxWorkspaceId: ForecastWorkspaceId,
+): ForecastWorkspaceId => {
+  const routeWorkspace = resolveRouteForecastWorkspace(pathname);
+  if (routeWorkspace) return routeWorkspace.id;
+
+  if (pathname === '/discussion') {
+    const requestedId = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('workspace');
+    const requestedWorkspace = FORECAST_WORKSPACES.find(({ id }) => id === requestedId);
+    if (requestedWorkspace && resolveRouteForecastWorkspace(requestedWorkspace.path)) {
+      return requestedWorkspace.id;
+    }
+  }
+
+  return reduxWorkspaceId;
+};
+
+/** Keeps workspace identity on discussion links while retaining grouping parameters. */
+export const addWorkspaceToDiscussionPath = (path: string, workspaceId: ForecastWorkspaceId): string => {
+  const [pathname, search = ''] = path.split('?');
+  const params = new URLSearchParams(search);
+  params.set('workspace', workspaceId);
+  return `${pathname}?${params.toString()}`;
+};
 
 interface ForecastWorkflowPanelProps {
   controller?: ForecastWorkspaceController;
@@ -458,10 +487,12 @@ const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ has
 export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ controller, context = 'forecast' }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
-  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId) ?? DEFAULT_FORECAST_WORKSPACE;
+  const reduxWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId) ?? DEFAULT_FORECAST_WORKSPACE;
+  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, reduxWorkspaceId);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
@@ -492,9 +523,10 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const hasDiscussion = hasGroupedDiscussionContent(
     currentDiscussionGrouping ? getDiscussionForGrouping(forecastCycle, currentDiscussionGrouping) : currentDay?.discussion,
   );
-  const discussionPath = currentDiscussionGrouping
-    ? discussionPathForGrouping(currentDiscussionGrouping)
-    : '/discussion';
+  const discussionPath = addWorkspaceToDiscussionPath(
+    currentDiscussionGrouping ? discussionPathForGrouping(currentDiscussionGrouping) : '/discussion',
+    workspaceId,
+  );
   const currentValidation = validateCycleCompletion(forecastCycle, getWorkflowValidationGroupings(workflowTemplate));
   const mapIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-polygon');
   const discussionIsComplete = !currentValidation.issues.some((issue) => issue.type === 'missing-discussion');

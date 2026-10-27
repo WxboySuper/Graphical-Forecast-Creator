@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { selectForecastCycle } from '../store/forecastSlice';
 import { getScopedStorageKey, getStorageScope } from '../utils/storageScope';
-import { DEFAULT_FORECAST_WORKSPACE, FORECAST_WORKSPACES, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 
 const AUTOSAVE_DELAY = 5000; // 5 seconds debounce
