@@ -149,6 +149,25 @@ describe('forecastTransfer', () => {
     expect(result.forecastCycle.cycleDate).toBe(buildForecast().cycleDate);
   });
 
+  test('imports legacy gfc-forecast filenames from payload ownership, not the filename', async () => {
+    const payload = serializeForecastWorkspace('custom', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const json = JSON.stringify(payload);
+    const legacyFile = new File([json], 'gfc-forecast-2026-09-23T12-34-56.json', { type: 'application/json' });
+    legacyFile.arrayBuffer = async () => new TextEncoder().encode(json).buffer;
+
+    const legacyResult = await importForecastTransfer(legacyFile);
+    expect(legacyResult.format).toBe('json');
+    expect(legacyResult.workspaceId).toBe('custom');
+
+    const severePayload = serializeForecastWorkspace('severe', buildForecast(), { center: [39.8, -98.5], zoom: 4 });
+    const severeJson = JSON.stringify(severePayload);
+    const mislabeledFile = new File([severeJson], 'gfc-custom-forecast-2026-09-23T12-34-56.json', { type: 'application/json' });
+    mislabeledFile.arrayBuffer = async () => new TextEncoder().encode(severeJson).buffer;
+
+    const mislabeledResult = await importForecastTransfer(mislabeledFile);
+    expect(mislabeledResult.workspaceId).toBe('severe');
+  });
+
   test('preserves workflow package metadata through the workspace classifier', async () => {
     const forecast = serializeForecast(buildForecast(), { center: [39.8, -98.5], zoom: 4 });
     const cycleMetadata = {
@@ -192,6 +211,14 @@ describe('forecastTransfer', () => {
     const revokeObjectURL = jest.fn();
     global.URL.createObjectURL = createObjectURL;
     global.URL.revokeObjectURL = revokeObjectURL;
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') return link;
+      return originalCreateElement(...args);
+    }) as typeof document.createElement);
 
     let capturedJson = '';
     try {
@@ -205,15 +232,55 @@ describe('forecastTransfer', () => {
       capturedJson = seen.join('');
     } finally {
       global.Blob = OriginalBlob;
+      createElementSpy.mockRestore();
       jest.restoreAllMocks();
     }
 
     expect(capturedJson).toContain('"custom"');
+    expect(link.download).toMatch(/gfc-custom-forecast-.*\.json$/);
     const file = new File([capturedJson], 'custom-forecast.json', { type: 'application/json' });
     file.arrayBuffer = async () => new TextEncoder().encode(capturedJson).buffer;
     const result = await importForecastTransfer(file);
     expect(result.workspaceId).toBe('custom');
     expect(result.mapView).toEqual(mapView);
+  });
+
+  test('uses the Severe workspace filename for native JSON exports', async () => {
+    const forecastCycle = buildForecast();
+    const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
+    const clickSpy = jest.spyOn(link, 'click').mockImplementation(() => undefined);
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') return link;
+      return originalCreateElement(...args);
+    }) as typeof document.createElement);
+    const appendChildSpy = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
+    const removeChildSpy = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
+    const createObjectURL = jest.fn(() => 'blob:test');
+    const revokeObjectURL = jest.fn();
+    global.URL.createObjectURL = createObjectURL;
+    global.URL.revokeObjectURL = revokeObjectURL;
+
+    try {
+      await exportForecastTransfer({
+        format: 'json',
+        scope: 'cycle',
+        forecastCycle,
+        mapView,
+        workspaceId: 'severe',
+      });
+    } finally {
+      createElementSpy.mockRestore();
+      appendChildSpy.mockRestore();
+      removeChildSpy.mockRestore();
+      clickSpy.mockRestore();
+      jest.restoreAllMocks();
+    }
+
+    expect(link.download).toMatch(/^gfc-severe-forecast-.*\.json$/);
   });
 
   test('preserves explicit package workspace identity and rejects mismatched envelopes', async () => {
@@ -455,15 +522,18 @@ describe('forecastTransfer', () => {
     const revokeObjectURL = jest.fn();
     const appendChild = jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
     const removeChild = jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
-    const link = document.createElement('a');
+    const originalCreateElement = document.createElement.bind(document);
+    const link = originalCreateElement('a');
     link.click = click;
 
-    jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
-      if (tagName === 'a') {
+    jest.spyOn(document, 'createElement').mockImplementation(((
+      ...args: Parameters<typeof document.createElement>
+    ) => {
+      if (args[0] === 'a') {
         return link;
       }
-      return document.createElement(tagName);
-    });
+      return originalCreateElement(...args);
+    }) as typeof document.createElement);
     global.URL.createObjectURL = createObjectURL;
     global.URL.revokeObjectURL = revokeObjectURL;
 

@@ -17,6 +17,7 @@ import {
 import type { RootState } from '../store';
 import { downloadBlob, readForecastImportFile, validateForecastDataReason } from '../utils/fileUtils';
 import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
+import { buildWorkspaceForecastFilename } from '../utils/forecastTransfer/transferExportUtils';
 import type { ForecastCycle } from '../types/outlooks';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getForecastImportWorkspaceError } from '../utils/forecastTransfer/importPolicy';
@@ -172,7 +173,7 @@ export const applyForecastImportResult = (
   return applyImportMapViewState(dispatch, mapRef, result);
 };
 
-/** Downloads the active workspace cycle as a workspace-owned native JSON file. */
+/** Downloads the active workspace cycle as native JSON with a workspace-specific filename. */
 export const downloadWorkspaceForecastJson = (
   workspaceId: ForecastWorkspaceId,
   forecastCycle: ReturnType<typeof selectForecastCycle>,
@@ -180,10 +181,9 @@ export const downloadWorkspaceForecastJson = (
   workflowMetadata?: import('../types/workflow').CycleMetadata,
 ): void => {
   const payload = serializeForecastWorkspace(workspaceId, forecastCycle, mapView, workflowMetadata);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   downloadBlob(
     new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
-    `gfc-forecast-${timestamp}.json`,
+    buildWorkspaceForecastFilename(workspaceId),
   );
 };
 
