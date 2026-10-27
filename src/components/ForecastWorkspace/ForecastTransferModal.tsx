@@ -105,27 +105,29 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     )),
     [kmzEnabled, isSevereWorkspace],
   );
+  const effectiveFormat = availableFormats.some((option) => option.value === format)
+    ? format
+    : 'json';
 
   const availableScopes = useMemo(() => {
-    if (format === 'json') {
+    if (effectiveFormat === 'json') {
       return SCOPE_OPTIONS.filter((option) => option.value === 'cycle');
     }
-    if (format === 'package') {
+    if (effectiveFormat === 'package') {
       return SCOPE_OPTIONS.filter((option) => option.value === 'cycle' || (isWorkflowActive && option.value === 'workflow'));
     }
     return SCOPE_OPTIONS.filter((option) => option.value !== 'workflow');
-  }, [format, isWorkflowActive]);
+  }, [effectiveFormat, isWorkflowActive]);
 
   useEffect(() => {
-    if (!open) {
-      setImportWarnings([]);
-      return;
-    }
-
     if (!availableFormats.some((option) => option.value === format)) {
       setFormat(availableFormats[0]?.value ?? 'json');
     }
-  }, [open, availableFormats, format]);
+  }, [availableFormats, format]);
+
+  useEffect(() => {
+    if (!open) setImportWarnings([]);
+  }, [open]);
 
   useEffect(() => {
     if (!availableScopes.some((option) => option.value === scope)) {
@@ -137,7 +139,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     onBusyChange(true);
     try {
       await exportForecastTransfer({
-        format,
+        format: effectiveFormat,
         scope,
         forecastCycle,
         mapView,
@@ -147,7 +149,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
         workspaceId,
       });
-      onExported(format, scope);
+      onExported(effectiveFormat, scope);
       onClose();
     } catch (error) {
       onError?.(error instanceof Error ? error.message : 'Export failed.');
@@ -156,7 +158,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
     }
   }, [
     onBusyChange,
-    format,
+    effectiveFormat,
     scope,
     forecastCycle,
     mapView,
@@ -254,7 +256,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
               <select
                 id="transfer-format"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={format}
+                value={effectiveFormat}
                 onChange={(event) => setFormat(event.target.value as ForecastTransferFormat)}
                 disabled={isBusy}
               >

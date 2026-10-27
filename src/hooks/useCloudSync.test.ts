@@ -28,9 +28,16 @@ const mockSerializeForecast = serializeForecast as jest.MockedFunction<typeof se
 const mockCountForecastMetrics = countForecastMetrics as jest.MockedFunction<typeof countForecastMetrics>;
 
 describe('useCloudSync', () => {
-  const forecastCycle = { cycleDate: '2026-04-24', days: [] };
+  const forecastCycle = { cycleDate: '2026-04-24', currentDay: 1, days: {} };
   const mapView = { center: [1, 2], zoom: 5 };
-  const payload = { forecastCycle, mapView, savedAt: 'volatile' };
+  const payload = {
+    version: '1.0.0',
+    type: 'forecast-cycle',
+    timestamp: '2026-04-24T00:00:00.000Z',
+    forecastCycle,
+    mapView,
+    savedAt: 'volatile',
+  };
   const workflowMetadata = {
     id: 'WF-severe-day1-2026-04-24',
     workflowId: 'severe-day1',
