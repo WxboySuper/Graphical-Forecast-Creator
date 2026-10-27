@@ -38,7 +38,7 @@ import {
   getDefaultForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
   getUnavailableForecastWorkspaceRoutes,
-  resolveRouteForecastWorkspace,
+  resolveRouteForecastWorkspaceContext,
 } from './routing/forecastWorkspaceRoutes';
 import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWorkspacePage';
 
@@ -98,9 +98,9 @@ const AppHooks = () => {
   const userId = user?.uid;
   const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   // Only forecast routes own workspace identity. Generic pages (/, /cloud,
-  // /discussion, unregistered paths) leave the active forecast workspace alone
-  // so visiting them never thrashes autosave or Redux ownership back to Severe.
-  const routeWorkspace = resolveRouteForecastWorkspace(location.pathname);
+  // Forecast routes own workspace identity. Discussion links may name an
+  // exposed workspace so the editor state, drafts, and return links stay aligned.
+  const routeWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
   const routeWorkspaceId = routeWorkspace?.id;
   const workspaceId = routeWorkspaceId ?? activeWorkspaceId;
 

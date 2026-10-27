@@ -3,8 +3,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
 import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE, FORECAST_WORKSPACES, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
-import { getForecastWorkspacePath, resolveRouteForecastWorkspace } from '../../routing/forecastWorkspaceRoutes';
+import { resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { getForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../../routing/forecastWorkspaceRoutes';
 import type { RootState } from '../../store';
 import { Button } from '../ui/button';
 import {
@@ -54,27 +54,10 @@ import './ForecastWorkflowPanel.css';
 export const resolveWorkflowWorkspaceId = (
   pathname: string,
   search: string,
-  reduxWorkspaceId: ForecastWorkspaceId,
-): ForecastWorkspaceId => {
-  const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
-  const routeWorkspace = resolveRouteForecastWorkspace(normalizedPathname);
-  if (routeWorkspace) return routeWorkspace.id;
-
-  const isDiscussionPath = normalizedPathname === '/discussion'
-    || normalizedPathname.startsWith('/discussion/');
-  if (isDiscussionPath) {
-    const requestedId = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('workspace');
-    const requestedWorkspace = FORECAST_WORKSPACES.find(({ id }) => id === requestedId);
-    if (
-      requestedWorkspace?.id === reduxWorkspaceId
-      && resolveRouteForecastWorkspace(requestedWorkspace.path)
-    ) {
-      return requestedWorkspace.id;
-    }
-  }
-
-  return reduxWorkspaceId;
-};
+  reduxWorkspaceId: string | null | undefined,
+): ForecastWorkspaceId =>
+  resolveRouteForecastWorkspaceContext(pathname, search)?.id
+  ?? resolveForecastWorkspaceId(reduxWorkspaceId);
 
 /** Keeps workspace identity on discussion links while retaining grouping parameters. */
 export const addWorkspaceToDiscussionPath = (path: string, workspaceId: ForecastWorkspaceId): string => {
@@ -497,8 +480,9 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   const [isPackageDownloading, setIsPackageDownloading] = useState(false);
   const [showCompletionHandoff, setShowCompletionHandoff] = useState(false);
   const forecastCycle = useSelector(selectForecastCycle);
-  const reduxWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId) ?? DEFAULT_FORECAST_WORKSPACE;
-  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, reduxWorkspaceId);
+  const reduxWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const activeWorkspaceId = resolveForecastWorkspaceId(reduxWorkspaceId);
+  const workspaceId = resolveWorkflowWorkspaceId(location.pathname, location.search, activeWorkspaceId);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
@@ -516,6 +500,8 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
       Boolean(handoffIdentity) && handoffEligibility.showHandoff && !hasHandledCompletionHandoff(handoffIdentity),
     );
   }, [handoffEligibility.showHandoff, handoffIdentity]);
+
+  if (workspaceId !== activeWorkspaceId) return null;
 
   if (shouldHideWorkflowPanel(isFeatureExposed('forecastWorkflowV2'), hasActiveWorkflow, workflowMetadata)) {
     return null;

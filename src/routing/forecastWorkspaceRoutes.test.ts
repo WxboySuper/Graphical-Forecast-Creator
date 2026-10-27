@@ -11,6 +11,7 @@ import {
   resolveForecastWorkspacePath,
   resolveLegacyForecastWorkspacePath,
   resolveRouteForecastWorkspace,
+  resolveRouteForecastWorkspaceContext,
   resolveUnavailableForecastWorkspacePath,
 } from './forecastWorkspaceRoutes';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
@@ -25,6 +26,13 @@ describe('forecast workspace route contract', () => {
     expect(getForecastWorkspacePath('mesoscale')).toBe('/forecast/mesoscale');
     expect(resolveForecastWorkspacePath('/forecast/mesoscale')?.id).toBe('mesoscale');
     expect(resolveForecastWorkspacePath('/forecast/unknown')).toBeUndefined();
+  });
+
+  test('resolves exposed workspace hints across discussion path variants', () => {
+    expect(resolveRouteForecastWorkspaceContext('/discussion', '?workspace=custom')?.id).toBe('custom');
+    expect(resolveRouteForecastWorkspaceContext('/discussion/', '?workspace=custom')?.id).toBe('custom');
+    expect(resolveRouteForecastWorkspaceContext('/discussion/thread/1', '?workspace=custom')?.id).toBe('custom');
+    expect(resolveRouteForecastWorkspaceContext('/discussion/thread/1', '?workspace=unknown')).toBeUndefined();
   });
 
   test('maps legacy paths to their owning workspace', () => {

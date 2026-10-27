@@ -107,6 +107,14 @@ describe('App workspace switch ordering', () => {
     setItemSpy = null;
   });
 
+  test('syncs workspace identity from a discussion link', async () => {
+    window.history.pushState({}, '', '/discussion?workspace=custom');
+
+    render(<App />);
+
+    await waitFor(() => expect(store.getState().forecast.workspaceId).toBe('custom'));
+  });
+
   test('flushes the outgoing workspace autosave before the reset and the target restore', async () => {
     let previousWorkspaceId = store.getState().forecast.workspaceId;
     unsubscribe = store.subscribe(() => {

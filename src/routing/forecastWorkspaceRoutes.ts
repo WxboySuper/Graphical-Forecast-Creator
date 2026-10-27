@@ -66,6 +66,24 @@ export const resolveRouteForecastWorkspace = (
   resolveExposedForecastWorkspacePath(path, target)
   ?? resolveExposedLegacyForecastWorkspacePath(path, target);
 
+/** Resolves workspace identity from a forecast path or an exposed discussion URL hint. */
+export const resolveRouteForecastWorkspaceContext = (
+  pathname: string,
+  search = '',
+): ForecastWorkspaceDefinition | undefined => {
+  const normalizedPath = normalizeForecastWorkspacePath(pathname);
+  const routeWorkspace = resolveRouteForecastWorkspace(normalizedPath);
+  if (routeWorkspace) return routeWorkspace;
+
+  if (normalizedPath !== '/discussion' && !normalizedPath.startsWith('/discussion/')) {
+    return undefined;
+  }
+
+  const requestedId = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('workspace');
+  const requestedWorkspace = requestedId ? getForecastWorkspace(requestedId) : undefined;
+  return requestedWorkspace ? resolveRouteForecastWorkspace(requestedWorkspace.path) : undefined;
+};
+
 /** Returns canonical workspace routes that may be registered for a build target. */
 export const getExposedForecastWorkspacePaths = (target?: BuildTarget): string[] =>
   getExposedForecastWorkspaces(target).map((workspace) => workspace.path);
