@@ -77,8 +77,11 @@ describe('workspace-aware workflow routes', () => {
     expect(resolveWorkflowWorkspaceId('/forecast/custom', '', 'severe')).toBe('custom');
   });
 
-  it('restores the workspace from a discussion URL and validates its exposure', () => {
-    expect(resolveWorkflowWorkspaceId('/discussion', '?group=day1&workspace=custom', 'severe')).toBe('custom');
+  it('uses a discussion workspace hint only when Redux data belongs to that workspace', () => {
+    expect(resolveWorkflowWorkspaceId('/discussion', '?group=day1&workspace=custom', 'custom')).toBe('custom');
+    expect(resolveWorkflowWorkspaceId('/discussion', '?workspace=custom', 'severe')).toBe('severe');
+    expect(resolveWorkflowWorkspaceId('/discussion/', '?workspace=custom', 'severe')).toBe('severe');
+    expect(resolveWorkflowWorkspaceId('/discussion/thread/1', '?workspace=custom', 'custom')).toBe('custom');
     expect(resolveWorkflowWorkspaceId('/discussion', '?workspace=unknown', 'custom')).toBe('custom');
   });
 

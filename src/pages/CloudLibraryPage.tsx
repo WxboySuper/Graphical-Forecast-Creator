@@ -472,7 +472,7 @@ const useSyncSavedCycleLabel = (
       onRowStateChange(cycle.id, { newLabel: cycle.label });
     }
     if (savedLabel?.savedLabel === cycle.label) savedLabelRef.current = null;
-  }, [cycle.id, cycle.label, isRenaming, newLabel, onRowStateChange]);
+  }, [cycle.id, cycle.label, isRenaming, newLabel, onRowStateChange, savedLabelRef]);
 };
 
 const CycleItem: React.FC<CycleItemProps> = ({ cycle, canWrite, loading, showWorkspaceBadge = false, rowState, onRowStateChange, onLoad, onDelete, onRename }) => {

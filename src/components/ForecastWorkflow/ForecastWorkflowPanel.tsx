@@ -56,13 +56,19 @@ export const resolveWorkflowWorkspaceId = (
   search: string,
   reduxWorkspaceId: ForecastWorkspaceId,
 ): ForecastWorkspaceId => {
-  const routeWorkspace = resolveRouteForecastWorkspace(pathname);
+  const normalizedPathname = pathname.replace(/\/+$/, '') || '/';
+  const routeWorkspace = resolveRouteForecastWorkspace(normalizedPathname);
   if (routeWorkspace) return routeWorkspace.id;
 
-  if (pathname === '/discussion') {
+  const isDiscussionPath = normalizedPathname === '/discussion'
+    || normalizedPathname.startsWith('/discussion/');
+  if (isDiscussionPath) {
     const requestedId = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search).get('workspace');
     const requestedWorkspace = FORECAST_WORKSPACES.find(({ id }) => id === requestedId);
-    if (requestedWorkspace && resolveRouteForecastWorkspace(requestedWorkspace.path)) {
+    if (
+      requestedWorkspace?.id === reduxWorkspaceId
+      && resolveRouteForecastWorkspace(requestedWorkspace.path)
+    ) {
       return requestedWorkspace.id;
     }
   }
