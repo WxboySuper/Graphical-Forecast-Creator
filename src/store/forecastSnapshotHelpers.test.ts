@@ -63,12 +63,15 @@ describe('cloneEntries', () => {
     expect(cloned?.get('2%')?.[0].properties).toMatchObject({ probability: '2%' });
   });
 
-  test('reuses the cached clone for a repeated source identity', () => {
+  test('clones a source identity again for a separate snapshot', () => {
     const feature = createFeature('tornado-cache', 1);
     const first = cloneEntries(new Map([['2%', [feature]]]));
     const second = cloneEntries(new Map([['2%', [feature]]]));
 
-    expect(second?.get('2%')?.[0]).toBe(first?.get('2%')?.[0]);
+    expect(second?.get('2%')?.[0]).not.toBe(first?.get('2%')?.[0]);
+    expect(second?.get('2%')?.[0]).toEqual(first?.get('2%')?.[0]);
+    first!.get('2%')![0].properties = { probability: '5%' };
+    expect(second?.get('2%')?.[0].properties).toMatchObject({ probability: '2%' });
   });
 
   test('keeps distinct source objects isolated from each other', () => {
@@ -98,7 +101,7 @@ describe('cloneEntries', () => {
     expect(clones).toHaveLength(2);
     expect(clones[0]).toEqual(baseFeature);
     expect(clones[0]).not.toBe(baseFeature);
-    expect(clones[1]).toBe(clones[0]);
+    expect(clones[1]).not.toBe(clones[0]);
   });
 });
 
