@@ -110,15 +110,23 @@ export const getBetaApiToken = async (provider: BetaApiTokenProvider, signal?: A
 };
 
 /** Sends an authenticated request to the same-origin beta Worker API. */
-export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+const getRequestTokenProvider = async (signal?: AbortSignal): Promise<{ provider: BetaApiTokenProvider; generation: number }> => {
   // Child service effects can run before the Clerk provider's parent effect registers the token source.
   const initialGeneration = tokenProviderGeneration;
-  const provider = tokenProvider ?? await waitForTokenProvider(1_000, init.signal ?? undefined);
-  const requestGeneration = tokenProvider === provider ? tokenProviderGeneration : initialGeneration;
-  const token = await getBetaApiToken(provider, init.signal ?? undefined);
-  if (!tokenProvider) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  const provider = tokenProvider ?? await waitForTokenProvider(1_000, signal);
+  return { provider, generation: tokenProvider === provider ? tokenProviderGeneration : initialGeneration };
+};
+
+const assertRequestTokenProviderIsCurrent = (provider: BetaApiTokenProvider, generation: number): void => {
   if (tokenProvider !== provider) throw new Error(SESSION_SIGNED_OUT_ERROR);
-  if (tokenProviderGeneration !== requestGeneration) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  if (tokenProviderGeneration !== generation) throw new Error(SESSION_SIGNED_OUT_ERROR);
+};
+
+/** Sends an authenticated request to the same-origin beta Worker API. */
+export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const { provider, generation } = await getRequestTokenProvider(init.signal ?? undefined);
+  const token = await getBetaApiToken(provider, init.signal ?? undefined);
+  assertRequestTokenProviderIsCurrent(provider, generation);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');

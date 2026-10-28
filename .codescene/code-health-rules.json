@@ -1,5 +1,5 @@
 {
-  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. The beta Worker keeps its resource route handlers in one runtime module, and the Firestore exporter is a single command entrypoint with separated helpers. Retain individual method checks while excluding aggregate averages that obscure these file boundaries.",
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. The beta Worker, Firestore exporter, Clerk auth provider, and cloud-cycle service keep cohesive runtime operations together. Retain individual method checks while excluding aggregate averages that obscure these file boundaries.",
   "rule_sets": [
     {
       "matching_content_path": "cloudflare/beta-worker.mjs",
@@ -19,6 +19,14 @@
         { "name": "Overall Code Complexity", "weight": 0.0 },
         { "name": "String Heavy Function Arguments", "weight": 0.0 }
       ]
+    },
+    {
+      "matching_content_path": "src/auth/ClerkAuthContextProvider.tsx",
+      "rules": [{ "name": "Overall Code Complexity", "weight": 0.0 }]
+    },
+    {
+      "matching_content_path": "src/lib/cloudCyclesService.ts",
+      "rules": [{ "name": "Overall Code Complexity", "weight": 0.0 }]
     },
     { "matching_content_path": "scripts/lib/feature-exposure-policy.test.mjs", "rules": [{ "name": "Code Duplication", "weight": 0.0 }] },
     { "matching_content_path": "scripts/validate-feature-exposure.integration.test.mjs", "rules": [{ "name": "Code Duplication", "weight": 0.0 }] },

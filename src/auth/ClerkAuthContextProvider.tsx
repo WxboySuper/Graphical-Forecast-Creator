@@ -182,18 +182,30 @@ type ClerkRequestContext = {
   identityRef: React.MutableRefObject<{ isSignedIn: boolean; userId: string | undefined }>;
 };
 
+const requireClerkRequestUserId = (context: ClerkRequestContext): string => {
+  if (!context.isSignedIn) throw new Error('The beta session is signed out.');
+  if (!context.clerkUserId) throw new Error('The beta session is signed out.');
+  return context.clerkUserId;
+};
+
+const assertClerkRequestIsCurrent = (
+  context: ClerkRequestContext,
+  requestUserId: string,
+  signal?: AbortSignal,
+): void => {
+  if (signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
+  if (!context.identityRef.current.isSignedIn) throw new Error('The beta session is signed out.');
+  if (context.identityRef.current.userId !== requestUserId) throw new Error('The beta session is signed out.');
+};
+
 const requestClerkBetaApi = async (
   context: ClerkRequestContext,
   path: string,
   init: RequestInit = {},
 ): Promise<Response> => {
-  const requestUserId = context.clerkUserId;
-  if (!context.isSignedIn) throw new Error('The beta session is signed out.');
-  if (!requestUserId) throw new Error('The beta session is signed out.');
+  const requestUserId = requireClerkRequestUserId(context);
   const token = await getBetaApiToken(async () => (await context.getToken()) ?? null, init.signal ?? undefined);
-  if (init.signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
-  if (!context.identityRef.current.isSignedIn) throw new Error('The beta session is signed out.');
-  if (context.identityRef.current.userId !== requestUserId) throw new Error('The beta session is signed out.');
+  assertClerkRequestIsCurrent(context, requestUserId, init.signal ?? undefined);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
