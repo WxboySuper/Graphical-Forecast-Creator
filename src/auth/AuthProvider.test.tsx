@@ -33,23 +33,13 @@ import {
 } from './AuthProvider';
 import {
   attachHostedSettingsSubscription,
-  getRemoteSeedPayload,
   runInitialHostedSync,
   seedOrApplySettings,
   startSettingsSubscription,
   syncProfileDocument,
 } from './hostedSettingsSync';
 import { queueProductMetric } from '../utils/productMetrics';
-import {
-  areUserSettingsEqual,
-  createProfilePayload,
-  createSettingsSnapshot,
-  getRemoteSeedPayload,
-  getSettingsSyncError,
-  getSettingsUpdateError,
-  readProfileBetaAccess,
-  readRemoteSettings,
-} from './authSettings';
+import { createSettingsSnapshot } from './authSettings';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
