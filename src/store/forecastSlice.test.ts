@@ -47,6 +47,7 @@ import reducer, {
   selectCurrentOutlookOpacity,
   toggleSignificant,
 } from './forecastSlice';
+import { getFallbackOutlookData } from './forecastStateFactory';
 
 const createPolygon = (offset: number): Polygon => ({
   type: 'Polygon',
@@ -1392,6 +1393,12 @@ describe('forecastSlice undo/redo', () => {
       const fallback = selectCurrentOutlooks(withForecast(absentDayState));
       const day48Map = fallback['day4-8']!;
       expect(day48Map).toBeInstanceOf(Map);
+      expect(day48Map.size).toBe(0);
+      expect(day48Map.get('30%')).toBeUndefined();
+      expect([...day48Map.entries()]).toEqual([]);
+      expect(getFallbackOutlookData()['day4-8']!.size).toBe(0);
+      expect(getFallbackOutlookData()['day4-8']!.get('30%')).toBeUndefined();
+      expect(() => day48Map.forEach(() => {})).not.toThrow();
       expect(() => day48Map.set('30%', [])).toThrow(/read-only outlook map/);
       expect(() => day48Map.clear()).toThrow(/read-only outlook map/);
     });
