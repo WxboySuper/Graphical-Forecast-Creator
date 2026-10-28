@@ -4,7 +4,7 @@ const {
   createCheckoutEntitlementWrite,
   createSubscriptionEntitlementWrite,
   getSubscriptionUid,
-} = require('./billingEntitlementBuilders');
+} = require('./billing-entitlement-builders');
 
 /** Reads a subscription identifier or expanded object from an invoice payload. */
 const getInvoiceSubscription = (invoice) =>
