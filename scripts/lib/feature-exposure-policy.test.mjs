@@ -28,7 +28,7 @@ const validRegistry = {
 const emptySurfaces = { gatedRoutes: [], navigationItems: [] };
 
 const v17WorkstreamRegistry = {
-  autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
+  autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
   forecastWorkflowV2: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
   verificationRelaunch: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
   customProducts: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
@@ -289,7 +289,7 @@ describe('feature exposure policy', () => {
       hailOutlook: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       categoricalOutlook: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
       significantThreats: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-21', temporary: false, serverBacked: false, trackingIssue: 440 },
-      autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: true, removalCondition: 'Enable on beta.', serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
+      autoTstm: { exposure: { ...ALL_OFF }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: true, serverCapabilityKey: 'TSTM_GENERATION_ENABLED', trackingIssue: 427 },
       forecastWorkflowV2: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 429 },
       verificationRelaunch: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 430 },
       customProducts: { exposure: { ...ALL_ON }, owner: 'WxboySuper', addedDate: '2026-06-20', temporary: false, serverBacked: false, trackingIssue: 431 },
