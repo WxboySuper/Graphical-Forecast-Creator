@@ -11,11 +11,12 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports, formatReportDate } from '../../utils/stormReportParser';
+import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../../utils/stormReportParser';
 import {
   getCurrentSpcReportDate,
   isTodayReportDate,
   isYesterdayReportDate,
+  toArchiveDate,
 } from '../../utils/verificationV2/archiveDate';
 import { analyzeVerification, formatVerificationSummary, type OutlookTypeVerification, type VerificationResult } from '../../utils/verificationUtils';
 import type { StormReport } from '../../types/stormReports';
@@ -340,18 +341,21 @@ const VerificationPanel: React.FC<VerificationPanelProps> = ({
 
   // Handler for loading storm reports based on the selected date.
   const handleLoadReports = async () => {
+    // The date input can be cleared or manipulated, so reject values that do
+    // not resolve to a real calendar date before building an SPC request.
+    const reportDate = toArchiveDate(selectedDate);
+    if (!reportDate) {
+      dispatch(setError('Choose a valid report date.'));
+      return;
+    }
+
     const requestId = ++reportRequestIdRef.current;
     const clearGeneration = store.getState().stormReports.clearGeneration;
 
     try {
       dispatch(setError(null));
       dispatch(setLoading(true));
-      
-      // Parse YYYY-MM-DD string directly to avoid timezone issues
-      const [year, month, day] = selectedDate.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, day); // month is 0-indexed
 
-      const reportDate = formatReportDate(dateObj);
       const source = reportSourceForDate(reportDate, new Date());
       const fetchedReports = await fetchReportsForSource(source, reportDate);
 

@@ -71,6 +71,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
 - **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
 - **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
+- **Verification report dates:** Reject empty or malformed report dates before requesting SPC storm reports instead of fetching an invalid archive file.
 - **Restored grade evidence:** Restoring a saved grade snapshot now makes storm report evidence visible again even if it was hidden.
 - **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
 - **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
