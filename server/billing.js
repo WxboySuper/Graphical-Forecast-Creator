@@ -248,6 +248,29 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
   return result;
 };
 
+/** Extracts a verified Firebase user from the Authorization header. */
+const verifyRequestUser = async (req, res) => {
+  const token = getBearerToken(req);
+  const adminAuth = getAdminAuth();
+
+  if (!adminAuth || !hasFirebaseAdminConfig()) {
+    res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
+    return null;
+  }
+
+  if (!token) {
+    res.status(401).json({ error: 'Missing Firebase ID token.' });
+    return null;
+  }
+
+  try {
+    return await adminAuth.verifyIdToken(token);
+  } catch {
+    res.status(401).json({ error: 'Invalid Firebase ID token.' });
+    return null;
+  }
+};
+
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const handleCheckout = async (req, res) => {
   const billingConfig = getBillingRuntimeConfig();
