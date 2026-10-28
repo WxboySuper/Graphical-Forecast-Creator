@@ -69,6 +69,7 @@ export const useMonitorNwsAlerts = ({
     animationSpeedMs,
     filteredFrameCount: filteredFrames.length,
     rawFrameCount: rawFrames.length,
+    latestFrame: rawFrames[rawFrames.length - 1] ?? null,
     setRawFrames,
     setFrameIndex,
     setFetchedAt,
