@@ -3,6 +3,7 @@ import type { CycleMetadata, WorkflowMetadata } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { cloneEntries, cloneIntegratedCustomLayers } from './forecastSnapshotHelpers';
 import { clearHistory } from './forecastHistory';
+import { advanceCycleGeneration } from './forecastSliceWorkspaceHelpers';
 import type { ForecastState } from './forecastSlice';
 
 type DayBucket = 'day12' | 'day3' | 'day48';
@@ -139,6 +140,7 @@ export const applyRolloverFromPreviousCycle = (
   clearHistory(state);
   state.discussionDraftsByScope = {};
   state.forecastCycle = buildRolloverCycle({ ...args, now, createEmptyDay });
+  advanceCycleGeneration(state);
   state.isSaved = false;
   state.outlookVersionSnapshots = [];
   applyRolloverWorkflowState(state, args, now);
