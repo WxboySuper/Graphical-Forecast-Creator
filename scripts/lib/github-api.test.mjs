@@ -126,7 +126,7 @@ describe('upsertPromotionExposureComment', () => {
         `https://api.github.com/repos/owner/repo/issues/42/comments?per_page=${GITHUB_PAGE_SIZE}&page=1`
       );
       assert.equal(list.options.method, 'GET');
-      assert.equal(list.options.body, undefined);
+      assert.equal(typeof list.options.body, 'undefined');
 
       assert.equal(create.url, 'https://api.github.com/repos/owner/repo/issues/42/comments');
       assert.equal(create.options.method, 'POST');
