@@ -167,23 +167,31 @@ export const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
 };
 
 /** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
-const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> =>
-  new Proxy(map, {
+const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> => {
+  let proxy: Map<K, V>;
+  proxy = new Proxy(map, {
     set: () => {
       throw new Error('Attempted to mutate a shared read-only outlook map.');
     },
     deleteProperty: () => {
       throw new Error('Attempted to mutate a shared read-only outlook map.');
     },
-    get: (target, property, receiver) => {
+    get: (target, property) => {
       if (property === 'set' || property === 'delete' || property === 'clear') {
         return () => {
           throw new Error('Attempted to mutate a shared read-only outlook map.');
         };
       }
-      return Reflect.get(target, property, receiver);
+      const value = Reflect.get(target, property, target);
+      if (property === 'forEach') {
+        return (callback: (value: V, key: K, map: Map<K, V>) => void, thisArg?: unknown) =>
+          target.forEach((entryValue, key) => callback.call(thisArg, entryValue, key, proxy));
+      }
+      return typeof value === 'function' ? value.bind(target) : value;
     },
   });
+  return proxy;
+};
 
 /** Deeply guards a value so shared fallbacks cannot be mutated. */
 const deepFreezeOutlookData = (data: OutlookData): OutlookData => {
