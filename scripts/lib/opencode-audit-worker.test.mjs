@@ -33,6 +33,11 @@ test('only bot-authored audit findings with the workflow label and marker are el
   assert.equal(parseAuditIssue(auditIssue({ marker: '<!-- gfc-opencode-finding:0123456789abcdefabcd -->' })), null)
 })
 
+test('security and dependency review markers are never eligible for implementation', () => {
+  assert.equal(parseAuditIssue(auditIssue({ marker: machineMarker.replace('category=audit-weekly', 'category=security-daily') })), null)
+  assert.equal(parseAuditIssue(auditIssue({ marker: machineMarker.replace('category=audit-weekly', 'category=dependency-weekly') })), null)
+})
+
 test('implementation changes stay inside the issue scope and reject sensitive paths', () => {
   assert.equal(isWorkPathAllowed('src/monitor/MonitorMap.tsx', 'src/monitor'), true)
   assert.equal(isWorkPathAllowed('src/forecast/ForecastMap.tsx', 'src/monitor'), false)

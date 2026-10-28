@@ -40,18 +40,6 @@ const ALL_TARGETS_ON = {
   production: true,
 } as const satisfies FeatureExposureMatrix;
 
-// Exposure snapshots, not runtime-enforced caps. Fork a per-feature matrix if a feature diverges.
-const EXPOSURE_THROUGH_STAGING = {
-  ...ALL_TARGETS_ON,
-  production: false,
-} as const satisfies FeatureExposureMatrix;
-
-const EXPOSURE_THROUGH_BETA = {
-  ...ALL_TARGETS_ON,
-  staging: false,
-  production: false,
-} as const satisfies FeatureExposureMatrix;
-
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
 
@@ -147,7 +135,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 431,
   },
   outlookLandMasking: {
-    exposure: { ...EXPOSURE_THROUGH_STAGING },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: true,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
     temporary: true,
@@ -181,6 +174,25 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     serverBacked: false,
     trackingIssue: 915,
   },
+  mesoscaleWorkspace: {
+    exposure: { ...ALL_TARGETS_OFF },
+    owner: 'WxboySuper',
+    addedDate: '2026-08-28',
+    temporary: true,
+    removalCondition:
+      'Remove after the Mesoscale Forecast workspace and provider contract complete their staged rollout (#919).',
+    serverBacked: false,
+    trackingIssue: 919,
+  },
+  winterWorkspace: {
+    exposure: { ...ALL_TARGETS_OFF },
+    owner: 'WxboySuper',
+    addedDate: '2026-08-28',
+    temporary: true,
+    removalCondition: 'Keep disabled until a future Winter workspace release is approved.',
+    serverBacked: false,
+    trackingIssue: 913,
+  },
   collaborationRoom: {
     exposure: { ...ALL_TARGETS_OFF },
     owner: 'WxboySuper',
@@ -191,7 +203,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 433,
   },
   paintBucketTool: {
-    exposure: { ...EXPOSURE_THROUGH_BETA },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -201,7 +218,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 623,
   },
   kmzExport: {
-    exposure: { ...EXPOSURE_THROUGH_STAGING },
+    exposure: { local: true, beta: true, staging: true, production: false },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -210,7 +227,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 621,
   },
   populationEstimate: {
-    exposure: { ...EXPOSURE_THROUGH_BETA },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,
