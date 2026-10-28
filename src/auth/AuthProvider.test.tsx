@@ -661,15 +661,15 @@ describe('AuthProvider local credential edge cases', () => {
     fetchMock().mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
 
     await expect(localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps)).rejects.toThrow(
-      'offline',
+      'Sign in failed',
     );
-    expect(signInDeps.setError).toHaveBeenCalledWith('offline');
+    expect(signInDeps.setError).toHaveBeenCalledWith('Sign in failed');
     expect(signInDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
 
     await expect(localSignUpWithEmail({ email: 'new@example.com', password: 'secret' }, signUpDeps)).rejects.toThrow(
-      'offline',
+      'Sign up failed',
     );
-    expect(signUpDeps.setError).toHaveBeenCalledWith('offline');
+    expect(signUpDeps.setError).toHaveBeenCalledWith('Sign up failed');
     expect(signUpDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
     expect(fetchMock()).toHaveBeenCalledTimes(2);
     expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signin', expect.objectContaining({ method: 'POST' }));
@@ -875,13 +875,13 @@ describe('AuthProvider Local Auth', () => {
     expect(result.current.status).toBe('signed_out');
 
     await act(async () => {
-      await expect(result.current.signInWithEmail('user@example.com', 'secret')).rejects.toThrow('offline');
+      await expect(result.current.signInWithEmail('user@example.com', 'secret')).rejects.toThrow('Sign in failed');
     });
-    expect(result.current.error).toBe('offline');
+    expect(result.current.error).toBe('Sign in failed');
 
     await act(async () => {
-      await expect(result.current.signUpWithEmail('new@example.com', 'secret')).rejects.toThrow('offline');
+      await expect(result.current.signUpWithEmail('new@example.com', 'secret')).rejects.toThrow('Sign up failed');
     });
-    expect(result.current.error).toBe('offline');
+    expect(result.current.error).toBe('Sign up failed');
   });
 });
