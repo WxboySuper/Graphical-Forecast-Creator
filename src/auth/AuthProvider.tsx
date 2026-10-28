@@ -20,14 +20,11 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import type { RootState } from '../store';
-import { setDarkMode } from '../store/themeSlice';
-import { applyOverlaySettings, type OverlaysState } from '../store/overlaysSlice';
-import { applyMonitorSettings } from '../store/monitorSlice';
+import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
-import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
+import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   readStoredForecastUiVariant,
