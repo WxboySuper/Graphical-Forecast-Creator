@@ -22,8 +22,8 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
       security-events: read
-      vulnerability-alerts: read
     steps:
       - name: Check out the default branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
