@@ -126,11 +126,13 @@ describe("createForecastMapLayers", () => {
     expect(layers.tileLayer.getSource()).toBe(xyz);
   });
 
-  test("uses the OSM label overlay source when available", () => {
+  test("uses the label overlay source when available", () => {
+    const overlay = new XYZ({ url: "https://example.com/{z}/{x}/{y}.png" });
+    mockedCreateLabelOverlaySource.mockReturnValueOnce(overlay);
     const layers = createForecastMapLayers(createLayerSources());
 
     expect(mockedCreateLabelOverlaySource).toHaveBeenCalledWith("osm");
-    expect(layers.labelLayer.getSource()).toBeInstanceOf(XYZ);
+    expect(layers.labelLayer.getSource()).toBe(overlay);
   });
 
   test("keeps the label layer usable when no overlay source is available", () => {
