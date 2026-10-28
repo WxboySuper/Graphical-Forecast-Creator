@@ -19,6 +19,16 @@ const OUTLOOK_TYPES: readonly OutlookType[] = [
   'day4-8',
 ];
 
+const isSupportedBaseMapStyle = (value: unknown): value is UserSettingsDocument['baseMapStyle'] =>
+  value === 'osm' || value === 'esri-satellite' || value === 'blank';
+
+const hasValidGhostOutlooks = (value: unknown): value is UserSettingsDocument['ghostOutlooks'] => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+
+  const visibility = value as Record<string, unknown>;
+  return OUTLOOK_TYPES.every((outlookType) => typeof visibility[outlookType] === 'boolean');
+};
+
 /** The normalized settings document shared by hosted and local auth flows. */
 export interface UserSettingsDocument {
   darkMode: boolean;
@@ -58,13 +68,10 @@ const hasRequiredRemoteSettingsFields = (
   const { darkMode, baseMapStyle, stateBorders, counties, ghostOutlooks, defaultForecasterName } = value;
   return (
     typeof darkMode === 'boolean' &&
-    (baseMapStyle === 'osm' || baseMapStyle === 'esri-satellite' || baseMapStyle === 'blank') &&
+    isSupportedBaseMapStyle(baseMapStyle) &&
     typeof stateBorders === 'boolean' &&
     typeof counties === 'boolean' &&
-    typeof ghostOutlooks === 'object' &&
-    ghostOutlooks !== null &&
-    !Array.isArray(ghostOutlooks) &&
-    OUTLOOK_TYPES.every((outlookType) => typeof ghostOutlooks[outlookType] === 'boolean') &&
+    hasValidGhostOutlooks(ghostOutlooks) &&
     typeof defaultForecasterName === 'string' &&
     defaultForecasterName.length <= 100
   );
