@@ -1508,5 +1508,10 @@ export {
   selectCurrentVersionNumber,
   selectAutoCategoricalError,
 } from './forecastSliceSelectors';
+export {
+  selectCurrentDay,
+  selectDiscussionDraftForScope,
+  selectForecastCycle,
+} from './forecastSelectors';
 
 export default forecastSlice.reducer;
