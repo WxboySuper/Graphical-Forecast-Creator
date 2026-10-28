@@ -1,9 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import type { MonitorMesoscaleDiscussionCollection } from './referenceLayers';
 import * as referenceLayers from './referenceLayers';
 import { useMonitorReferenceLayers } from './useMonitorReferenceLayers';
 
-const collection: MonitorMesoscaleDiscussionCollection = {
+const collection: referenceLayers.MonitorMesoscaleDiscussionCollection = {
   type: 'FeatureCollection',
   features: [{
     type: 'Feature',
