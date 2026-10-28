@@ -8,6 +8,16 @@ import {
   type ForecastUiVariant,
 } from '../utils/forecastUiVariant';
 import type { OverlaysState } from '../store/overlaysSlice';
+import type { OutlookType } from '../types/outlooks';
+
+const OUTLOOK_TYPES: readonly OutlookType[] = [
+  'tornado',
+  'wind',
+  'hail',
+  'categorical',
+  'totalSevere',
+  'day4-8',
+];
 
 /** The normalized settings document shared by hosted and local auth flows. */
 export interface UserSettingsDocument {
@@ -47,10 +57,13 @@ const hasRequiredRemoteSettingsFields = (
   const { darkMode, baseMapStyle, stateBorders, counties, ghostOutlooks, defaultForecasterName } = value;
   return (
     typeof darkMode === 'boolean' &&
-    Boolean(baseMapStyle) &&
+    (baseMapStyle === 'osm' || baseMapStyle === 'esri-satellite' || baseMapStyle === 'blank') &&
     typeof stateBorders === 'boolean' &&
     typeof counties === 'boolean' &&
-    Boolean(ghostOutlooks) &&
+    typeof ghostOutlooks === 'object' &&
+    ghostOutlooks !== null &&
+    !Array.isArray(ghostOutlooks) &&
+    OUTLOOK_TYPES.every((outlookType) => typeof ghostOutlooks[outlookType] === 'boolean') &&
     typeof defaultForecasterName === 'string' &&
     defaultForecasterName.length <= 100
   );
@@ -103,13 +116,7 @@ export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boo
 export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
   Boolean(value?.betaAccess);
 
-/** Normalizes update-write failures into a user-facing sync error message. */
-export const getSettingsUpdateError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to update synced settings right now.';
-
-/** Normalizes initial/settings hydration failures into a user-facing sync error message. */
-export const getSettingsSyncError = (error: unknown): string =>
-  error instanceof Error ? error.message : 'Unable to sync account settings right now.';
+export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
 
 /** Builds the payload used when seeding or repairing a remote settings document. */
 export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({

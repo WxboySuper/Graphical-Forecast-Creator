@@ -36,6 +36,11 @@ import {
   areUserSettingsEqual,
   mergeUserSettingsDocument,
 } from './userSettingsDocument';
+import {
+  createProfilePayload,
+  readProfileBetaAccess,
+  type UserProfileDocument,
+} from './authSettings';
 import { getSettingsUpdateError } from './authSyncErrors';
 import {
   applySettingsToState,
@@ -98,10 +103,6 @@ import {
 
 type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
 type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
-
-interface UserProfileDocument {
-  betaAccess?: boolean;
-}
 
 interface AuthContextValue {
   status: AuthStatus;
@@ -215,20 +216,6 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
     monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
   };
 };
-
-/** Creates the user profile payload written to Firestore on hosted sign-in. */
-export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
-  email: user.email ?? '',
-  displayName: user.displayName ?? '',
-  photoURL: user.photoURL ?? '',
-  providers: (user.providerData ?? []).map((provider) => provider.providerId),
-  updatedAt: serverTimestamp(),
-  ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
-});
-
-/** Reads the current beta-access flag from one hosted profile document snapshot. */
-export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
-  Boolean(value?.betaAccess);
 
 export {
   asRecord,

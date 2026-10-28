@@ -51,6 +51,31 @@ describe('readRemoteSettings', () => {
     expect(readRemoteSettings({ darkMode: 'not boolean' } as unknown as Partial<UserSettingsDocument>)).toBeNull();
   });
 
+  test('rejects unsupported base map styles', () => {
+    const settings = { ...buildBaseSettings(), baseMapStyle: 'unexpected' };
+
+    expect(
+      readRemoteSettings(settings as unknown as Partial<UserSettingsDocument>),
+    ).toBeNull();
+  });
+
+  test('rejects malformed ghost outlook visibility maps', () => {
+    const settings = buildBaseSettings();
+
+    expect(
+      readRemoteSettings({ ...settings, ghostOutlooks: true } as unknown as Partial<UserSettingsDocument>),
+    ).toBeNull();
+    expect(
+      readRemoteSettings({ ...settings, ghostOutlooks: { tornado: true } } as unknown as Partial<UserSettingsDocument>),
+    ).toBeNull();
+    expect(
+      readRemoteSettings({
+        ...settings,
+        ghostOutlooks: { ...settings.ghostOutlooks, hail: 'visible' },
+      } as unknown as Partial<UserSettingsDocument>),
+    ).toBeNull();
+  });
+
   test('rejects an overlong forecaster name but keeps the 100 character limit', () => {
     const baseSettings = buildBaseSettings();
 
@@ -172,10 +197,10 @@ describe('readProfileBetaAccess', () => {
 });
 
 describe('settings errors', () => {
-  test('passes through error messages and falls back for unknown values', () => {
-    expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Update failed');
+  test('uses stable user-facing messages for failures', () => {
+    expect(getSettingsUpdateError(new Error('Update failed'))).toBe('Unable to update synced settings right now.');
     expect(getSettingsUpdateError('bad')).toBe('Unable to update synced settings right now.');
-    expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Sync failed');
+    expect(getSettingsSyncError(new Error('Sync failed'))).toBe('Unable to sync account settings right now.');
     expect(getSettingsSyncError('bad')).toBe('Unable to sync account settings right now.');
   });
 });
