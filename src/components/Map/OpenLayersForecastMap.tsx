@@ -59,6 +59,7 @@ import {
   toOlStyle,
   toCustomOlStyle,
   getCustomFeatureIdentity,
+  isPolygonOrMultiPolygon,
   toUpdatedCustomFeature,
   toDrawnCustomFeature,
   toGhostOlStyle,
@@ -938,8 +939,9 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
               dataProjection: "EPSG:4326",
               featureProjection: "EPSG:3857",
             });
+            if (!isPolygonOrMultiPolygon(geometry)) return;
             const customFeature = toDrawnCustomFeature(
-              geometry as unknown as Geometry,
+              geometry,
               activeCustomLayer,
               activeCustomCategory,
               customMode,
