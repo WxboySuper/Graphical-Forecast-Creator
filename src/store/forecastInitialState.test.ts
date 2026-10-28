@@ -1,8 +1,12 @@
 import { createInitialForecastState } from './forecastInitialState';
+import { DEFAULT_FORECAST_WORKSPACE } from '../config/forecastWorkspaces';
+import { createWorkspaceEditorDefaults } from './forecastSliceWorkspaceHelpers';
 
 describe('createInitialForecastState', () => {
   test('returns the complete initial state contract', () => {
     expect(createInitialForecastState()).toStrictEqual({
+      cycleGeneration: 1,
+      workspaceId: DEFAULT_FORECAST_WORKSPACE,
       forecastCycle: {
         days: {
           1: {
@@ -26,16 +30,7 @@ describe('createInitialForecastState', () => {
         currentDay: 1,
         cycleDate: '2026-01-01',
       },
-      drawingState: {
-        activeOutlookType: 'tornado',
-        activeProbability: '2%',
-        isSignificant: false,
-      },
-      customEditor: {
-        mode: 'severe',
-        activeLayerId: null,
-        activeCategoryId: null,
-      },
+      ...createWorkspaceEditorDefaults(DEFAULT_FORECAST_WORKSPACE),
       currentMapView: {
         center: [39.8283, -98.5795],
         zoom: 4,
@@ -49,6 +44,7 @@ describe('createInitialForecastState', () => {
       },
       historyByDay: {},
       discussionDraftsByScope: {},
+      discussionDraftsByWorkspace: {},
       completionValidation: {
         lastResult: null,
         showCompletionModal: false,
