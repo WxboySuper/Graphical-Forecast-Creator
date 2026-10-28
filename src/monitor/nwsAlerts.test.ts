@@ -1,4 +1,5 @@
 import {
+  appendAlertSnapshotFrame,
   classifyNwsAlert,
   filterNwsAlertCollection,
   fetchActiveNwsAlerts,
@@ -95,6 +96,26 @@ describe('nwsAlerts', () => {
       .toBe(true);
     expect(snapshotCollectionsEqual(makeCollection(['a', 'b']), makeCollection(['a', 'c'])))
       .toBe(false);
+  });
+
+  test('appends changed alert snapshots once and bounds the animation window', () => {
+    const makeCollection = (id: string): NwsAlertFeatureCollection => ({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        id,
+        properties: { updated: '2026-08-13T00:00:00Z' },
+        geometry: null,
+      }],
+    } as unknown as NwsAlertFeatureCollection);
+    const first = makeCollection('first');
+    const second = makeCollection('second');
+    const third = makeCollection('third');
+    const initialFrames = [first];
+
+    expect(appendAlertSnapshotFrame(initialFrames, makeCollection('first'), 2)).toBe(initialFrames);
+    expect(appendAlertSnapshotFrame(initialFrames, second, 2)).toEqual([first, second]);
+    expect(appendAlertSnapshotFrame([first, second], third, 2)).toEqual([second, third]);
   });
 
   test('bounds fetched alerts even when the API returns more than the limit', async () => {
