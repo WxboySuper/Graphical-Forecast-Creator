@@ -37,7 +37,6 @@ import {
   mergeUserSettingsDocument,
 } from './userSettingsDocument';
 import {
-  createProfilePayload,
   readProfileBetaAccess,
   type UserProfileDocument,
 } from './authSettings';
