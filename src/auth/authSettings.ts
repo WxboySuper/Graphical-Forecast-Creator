@@ -45,12 +45,13 @@ export interface BuildSettingsArgs {
   monitorSettings?: MonitorSettings;
 }
 
-/** Checks the required settings fields before a remote payload is normalized. */
+/** The required top-level fields before a remote payload can be normalized. */
 type RequiredRemoteSettingsFields = Pick<
   UserSettingsDocument,
   'darkMode' | 'baseMapStyle' | 'stateBorders' | 'counties' | 'ghostOutlooks' | 'defaultForecasterName'
 >;
 
+/** Validates required fields and supported values before accepting remote settings. */
 const hasRequiredRemoteSettingsFields = (
   value: Partial<UserSettingsDocument>,
 ): value is RequiredRemoteSettingsFields & Partial<UserSettingsDocument> => {
