@@ -24,8 +24,7 @@ import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
-import type { MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
   readStoredForecastUiVariant,
