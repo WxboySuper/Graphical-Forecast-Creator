@@ -1,7 +1,6 @@
 import type { DayType, GFCForecastSaveData } from '../types/outlooks';
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
-import type { CycleMetadata, SerializedOutlookVersionData, SerializedWorkflowPackage } from '../types/workflow';
-import { WORKFLOW_SCHEMA_VERSION } from '../types/workflow';
+import { WORKFLOW_SCHEMA_VERSION, type CycleMetadata, type SerializedOutlookVersionData, type SerializedWorkflowPackage } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { isFeatureExposed } from '../config/featureExposure';
 import { requireForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
