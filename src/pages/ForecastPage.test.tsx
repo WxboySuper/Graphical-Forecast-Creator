@@ -214,7 +214,7 @@ const buildCycleWithSingleOutlook = (
 
 const seedLocalAutosaveOutlook = (featureId: string): void => {
   const cycleWithOutlook = buildCycleWithSingleOutlook(createStore().getState().forecast.forecastCycle, featureId);
-  const autosavePayload = serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
+  const autosavePayload = fileUtils.serializeForecast(cycleWithOutlook, { center: [0, 0], zoom: 0 });
   localStorage.setItem('forecastData', JSON.stringify(autosavePayload));
 };
 
@@ -367,7 +367,7 @@ describe('ForecastPage layout selection', () => {
       createStore().getState().forecast.forecastCycle,
       LOCAL_AUTOSAVE_MARKER_ID,
     );
-    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    const payload = fileUtils.serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
     // Written by the pre-workspace build: scoped to the account, no workspace segment.
     sessionStorage.setItem('cloudCyclePayload:user-user-1', JSON.stringify(payload));
     sessionStorage.setItem('cloudCycleMeta:user-user-1', JSON.stringify({ id: 'severe-1', label: 'Severe save' }));
@@ -388,7 +388,7 @@ describe('ForecastPage layout selection', () => {
       createStore().getState().forecast.forecastCycle,
       LOCAL_AUTOSAVE_MARKER_ID,
     );
-    const payload = serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
+    const payload = fileUtils.serializeForecast(sourceCycle, { center: [0, 0], zoom: 4 });
     sessionStorage.setItem('cloudCyclePayload', JSON.stringify(payload));
     sessionStorage.setItem('cloudCycleMeta', JSON.stringify({ id: 'legacy-1', label: 'Legacy save' }));
     mockUseAuth.mockReturnValue({ user: { uid: 'user-2' }, syncedSettings: null });
@@ -685,7 +685,7 @@ describe('ForecastPage layout selection', () => {
 
   test('does not overwrite active in-memory outlooks with an older local autosave on remount', () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
     localStorage.setItem('forecastData', JSON.stringify(stalePayload));
 
     store.dispatch(addFeature({
@@ -711,7 +711,7 @@ describe('ForecastPage layout selection', () => {
 
   test('does not overwrite in-memory discussion drafts with an older local autosave on remount', () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [39.8283, -98.5795], zoom: 4 });
     localStorage.setItem('forecastData', JSON.stringify(stalePayload));
 
     store.dispatch(updateDiscussionDraft({
@@ -760,7 +760,7 @@ describe('ForecastPage layout selection', () => {
 
   test('keeps in-memory anonymous edits on sign-in without overwriting account autosave', async () => {
     const store = createStore();
-    const stalePayload = serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
+    const stalePayload = fileUtils.serializeForecast(store.getState().forecast.forecastCycle, { center: [0, 0], zoom: 0 });
     stalePayload.timestamp = '2026-07-13T12:00:00.000Z';
 
     const anonymousCycle = { ...store.getState().forecast.forecastCycle };
@@ -777,7 +777,7 @@ describe('ForecastPage layout selection', () => {
         metadata: { lowProbabilityOutlooks: [] },
       },
     } as unknown as typeof anonymousCycle.days;
-    const anonymousPayload = serializeForecast(anonymousCycle, { center: [0, 0], zoom: 0 });
+    const anonymousPayload = fileUtils.serializeForecast(anonymousCycle, { center: [0, 0], zoom: 0 });
     anonymousPayload.timestamp = '2026-07-14T12:00:00.000Z';
 
     localStorage.setItem('forecastData', JSON.stringify(anonymousPayload));
@@ -821,7 +821,7 @@ describe('ForecastPage layout selection', () => {
         properties: {},
       },
     }));
-    localStorage.setItem('forecastData', JSON.stringify(serializeForecast(
+    localStorage.setItem('forecastData', JSON.stringify(fileUtils.serializeForecast(
       sourceStore.getState().forecast.forecastCycle,
       sourceStore.getState().forecast.currentMapView,
     )));
