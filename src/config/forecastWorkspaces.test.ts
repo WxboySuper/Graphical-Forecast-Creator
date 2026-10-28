@@ -46,7 +46,8 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('mesoscale')).toMatchObject({
       path: '/forecast/mesoscale',
       productType: 'mesoscale',
-      exposureKey: 'mesoscaleWorkspace',
+      status: 'future',
+      exposureKey: null,
     });
     expect(getForecastWorkspaceByPath('/forecast/custom')).toMatchObject({
       id: 'custom',
@@ -54,11 +55,19 @@ describe('forecast workspace product contract', () => {
     });
   });
 
+  test('does not expose a gated workspace without an explicit feature key', () => {
+    const customWorkspace = getForecastWorkspace('custom')!;
+
+    expect(customWorkspace.status).toBe('gated');
+    expect(isForecastWorkspaceExposed({ ...customWorkspace, exposureKey: null }, 'production')).toBe(false);
+  });
+
   test('keeps product identity separate from workspace exposure', () => {
     expect(getForecastWorkspace('severe')?.productType).toBe('severe');
     expect(getForecastWorkspace('custom')?.productType).toBe('custom');
     expect(isForecastWorkspaceExposed(getForecastWorkspace('severe')!, 'production')).toBe(true);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('winter')!, 'production')).toBe(false);
     // #914 ships the route contract only: no future workspace opens on a release target.
     expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'production')).toBe(false);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'staging')).toBe(false);

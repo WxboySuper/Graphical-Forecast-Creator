@@ -15,12 +15,12 @@ intent and that record describes that branch's code.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Exposure owner |
+| Workspace | Canonical path | v1.8 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | gated until #919 enables it | `mesoscaleWorkspace` |
-| Tropical | `/forecast/tropical` | future, disabled | `tropicalWorkspace` |
-| Winter | `/forecast/winter` | future, disabled | `winterWorkspace` |
+| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
+| Tropical | `/forecast/tropical` | future; tracked in #432 | Workspace status |
+| Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |
 
 `/forecast` is a compatibility entry point for the Severe workspace. The route
@@ -124,7 +124,7 @@ the workspace definitions and route records.
 Future routes stay unregistered when their feature is off. A direct request
 falls through the normal application fallback instead of mounting a disabled
 page or running workspace code. When a workspace is enabled, its route must be
-registered only through the same feature exposure decision.
+registered only through the same feature exposure decision. The existing top-level `/tropical` route and navigation remain separately gated by `tropicalWorkspace`; that key does not expose the planned `/forecast/tropical` workspace.
 
 ## Compatibility paths
 
@@ -168,8 +168,7 @@ and lifecycle before its discussion UI is integrated:
   metadata. Any later discussion feature must define a Custom-specific scope ID
   and draft lifecycle. Existing custom layers embedded in legacy
   Severe days remain readable while #915 moves the UI.
-- Tropical and Winter have no production state contract yet. Their exposure
-  entries stay disabled.
+- Tropical, Mesoscale, and Winter have no production state contract yet. Their planned `/forecast/*` workspaces remain unregistered while status is future. The separate legacy `/tropical` route and navigation remain gated by `tropicalWorkspace`; Mesoscale and Winter have no legacy gated surface.
 
 The URL is the only persistent active-workspace selector. Temporary controls,
 map interaction state, and open panels stay local to the active workspace. They
@@ -233,15 +232,7 @@ state by default.
 
 ## Exposure and side effects
 
-The exposure registry owns whether Mesoscale, Tropical, Winter, and Custom
-workspace pages may be registered. Route `status` in
-`src/config/forecastWorkspaces.ts` is separate from the exposure flags in
-`src/config/featureExposure.ts`. Mesoscale (`mesoscaleWorkspace`), Tropical
-(`tropicalWorkspace`), and Winter (`winterWorkspace`) are off on every target
-(local, beta, staging, production), so their routes stay unregistered. Custom
-(`customProducts`) is enabled on every target, so `/forecast/custom` registers
-through the same exposure decision. Hosted Custom mutations still pass
-entitlement and Firestore capability gates apart from that exposure flag.
+Workspace status keeps future Mesoscale, Tropical, and Winter pages unregistered. When implementation is ready, a future workspace must be deliberately promoted and a gated workspace must receive an explicit exposure key before route registration. The exposure registry continues to govern Custom, which keeps its current product exposure and entitlement behavior.
 
 No future workspace page, provider client, map layer, or repository may be
 imported at module scope from the always-on application shell. Route loaders and
