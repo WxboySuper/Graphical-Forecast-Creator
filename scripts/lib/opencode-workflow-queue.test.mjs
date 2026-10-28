@@ -23,7 +23,7 @@ test('every OpenCode workflow shares the single bounded concurrency queue', () =
   }
   const scheduled = readFileSync(new URL('../../.github/workflows/opencode-scheduled-maintenance.yml', import.meta.url), 'utf8');
   assert.match(scheduled, /^[ ]{6}pull-requests: read$/m);
-  assert.doesNotMatch(scheduled, /vulnerability-alerts:/);
+  assert.match(scheduled, /^[ ]{6}vulnerability-alerts: read$/m);
   assert.match(scheduled, /fs\.fstatSync\(fileHandle\)/);
   assert.match(scheduled, /maintainer-led implementation/);
   assert.doesNotMatch(scheduled, /opencode-audit-eligible/);

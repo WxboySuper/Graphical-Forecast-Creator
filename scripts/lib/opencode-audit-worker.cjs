@@ -1,6 +1,6 @@
 const path = require('node:path')
 
-const auditMarkerPattern = /<!-- gfc-opencode-audit:v1 fingerprint=([a-f0-9]{20}) category=(bug-hunt|audit-weekly|audit-monthly) kind=(bug|security|dependency|documentation|test|maintainability|architecture) file=([A-Za-z0-9._/-]+) scope=([A-Za-z0-9._/-]+) -->/
+const auditMarkerPattern = /<!-- gfc-opencode-audit:v1 fingerprint=([a-f0-9]{20}) category=(bug-hunt|security-daily|dependency-weekly|audit-weekly|audit-monthly) kind=(bug|security|dependency|documentation|test|maintainability|architecture) file=([A-Za-z0-9._/-]+) scope=([A-Za-z0-9._/-]+) -->/
 const eligibleRoots = ['src/monitor/', 'src/forecast/', 'src/verification/', 'src/components/', 'src/utils/', 'docs/']
 const highRiskPath = /(^|\/)(billing|auth|authorization|security|entitlement|payment|stripe|deploy|deployment|secrets?)(\/|\.|$)/i
 const eligibleKinds = new Set(['bug', 'documentation', 'test', 'maintainability'])
@@ -14,6 +14,7 @@ function parseAuditIssue(issue) {
   const match = issue.body?.match(auditMarkerPattern)
   if (!match) return null
   const [, fingerprint, category, kind, file, scope] = match
+  if (category === 'security-daily' || category === 'dependency-weekly') return null
   const normalizedFile = file.replace(/\/+/g, '/')
   const normalizedScope = scope.replace(/\/+/g, '/')
   if (normalizedFile.startsWith('/') || normalizedFile.split('/').includes('..')) return null
