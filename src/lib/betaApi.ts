@@ -116,9 +116,9 @@ export const fetchBetaApi = async (path: string, init: RequestInit = {}): Promis
   const provider = tokenProvider ?? await waitForTokenProvider(1_000, init.signal ?? undefined);
   const requestGeneration = tokenProvider === provider ? tokenProviderGeneration : initialGeneration;
   const token = await getBetaApiToken(provider, init.signal ?? undefined);
-  if (!tokenProvider || tokenProvider !== provider || tokenProviderGeneration !== requestGeneration) {
-    throw new Error(SESSION_SIGNED_OUT_ERROR);
-  }
+  if (!tokenProvider) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  if (tokenProvider !== provider) throw new Error(SESSION_SIGNED_OUT_ERROR);
+  if (tokenProviderGeneration !== requestGeneration) throw new Error(SESSION_SIGNED_OUT_ERROR);
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');

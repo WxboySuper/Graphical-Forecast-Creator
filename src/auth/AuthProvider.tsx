@@ -23,7 +23,7 @@ import type { RootState } from '../store';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { isBetaClerkD1Mode } from '../lib/betaApi';
-import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
+import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
 import {

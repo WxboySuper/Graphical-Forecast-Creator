@@ -188,12 +188,12 @@ const requestClerkBetaApi = async (
   init: RequestInit = {},
 ): Promise<Response> => {
   const requestUserId = context.clerkUserId;
-  if (!context.isSignedIn || !requestUserId) throw new Error('The beta session is signed out.');
+  if (!context.isSignedIn) throw new Error('The beta session is signed out.');
+  if (!requestUserId) throw new Error('The beta session is signed out.');
   const token = await getBetaApiToken(async () => (await context.getToken()) ?? null, init.signal ?? undefined);
   if (init.signal?.aborted) throw new DOMException('The beta API request was cancelled.', 'AbortError');
-  if (!context.identityRef.current.isSignedIn || context.identityRef.current.userId !== requestUserId) {
-    throw new Error('The beta session is signed out.');
-  }
+  if (!context.identityRef.current.isSignedIn) throw new Error('The beta session is signed out.');
+  if (context.identityRef.current.userId !== requestUserId) throw new Error('The beta session is signed out.');
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${token}`);
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
