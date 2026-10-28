@@ -10,13 +10,13 @@ const MAX_PAYLOAD_BYTES = 750000;
 const verifyUser = (req) => verifyFirebaseToken(req);
 
 /** Validates that a cloud-cycle identity belongs to the verified user. */
-const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;
+const hasValidCycleIdentity = ({ userId, id, label }, uid) => userId === uid && typeof id === 'string' && id.length > 0 && id.length <= 128 && typeof label === 'string' && label.length > 0 && label.length <= 200;
 /** Returns the UTF-8 byte length of a serialized cloud-cycle payload. */
 const getPayloadBytes = (payloadJson) => Buffer.byteLength(payloadJson, 'utf8');
 /** Validates the bounded payload fields accepted by the cloud-cycle API. */
 const hasValidCyclePayload = ({ cycleDate, payloadJson }) => {
   const bytes = typeof payloadJson === 'string' ? getPayloadBytes(payloadJson) : -1;
-  return typeof cycleDate === 'string' && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
+  return typeof cycleDate === 'string' && cycleDate.length > 0 && cycleDate.length <= 32 && typeof payloadJson === 'string' && bytes <= MAX_PAYLOAD_BYTES;
 };
 /** Reads and normalizes a cloud-cycle request body for persistence. */
 const readCloudCycleRequest = (body, uid) => {
