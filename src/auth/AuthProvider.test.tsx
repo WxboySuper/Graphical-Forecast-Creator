@@ -5,12 +5,9 @@ import { getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import {
   applySettingsToState,
   areOverlaySettingsEqual,
-  areUserSettingsEqual,
   asRecord,
   canSyncHostedUserDocuments,
   clearDeletedAccountSession,
-  createProfilePayload,
-  createSettingsSnapshot,
   disabledAuthAction,
   extractLocalUserFromData,
   getDefaultContextValue,
