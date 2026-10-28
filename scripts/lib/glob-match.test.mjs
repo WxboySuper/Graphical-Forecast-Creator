@@ -14,4 +14,11 @@ describe('glob-match', () => {
   it('matches suffix globs', () => {
     assert.ok(pathMatches('docs/foo.md', '**/*.md'));
   });
+
+  it('anchors suffix globs to a path segment boundary', () => {
+    assert.ok(pathMatches('foo.ts', '**/foo.ts'));
+    assert.ok(pathMatches('src/foo.ts', '**/foo.ts'));
+    assert.equal(pathMatches('barfoo.ts', '**/foo.ts'), false);
+    assert.equal(pathMatches('src/notfoo.ts', '**/foo.ts'), false);
+  });
 });
