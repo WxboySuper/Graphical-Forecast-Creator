@@ -5,7 +5,9 @@ import { GITHUB_PAGE_SIZE } from './github-paginate.mjs';
 import { upsertPromotionExposureComment } from './pr-exposure-comment.mjs';
 import { githubRequest as staleBranchGithubRequest } from './stale-branch-github.mjs';
 
-/** Build the minimal response shape needed by the request helper tests. */
+/**
+ * Builds the minimal response shape needed by the request helper tests.
+ */
 const response = ({ ok, status, json = {}, text = '' }) => ({
   ok,
   status,
