@@ -1,6 +1,7 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate, useOutletContext } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { Dispatch, UnknownAction } from 'redux';
 import { ForecastMapHandle } from '../components/Map/ForecastMap';
 import { Button } from '../components/ui/button';
@@ -24,9 +25,10 @@ import {
   setForecastDay,
   redoLastEdit,
   undoLastEdit,
+  markAsSaved,
 } from '../store/forecastSlice';
 import { OutlookType, Probability, DayType } from '../types/outlooks';
-import { serializeForecast } from '../utils/fileUtils';
+import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import {
   getFirstExposedOutlookType,
   shouldActivateEmergencyMode,
@@ -52,6 +54,7 @@ import { CloudToolbarButton } from '../components/CloudCycleManager/CloudToolbar
 import { countForecastMetrics } from '../utils/forecastMetrics';
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils/keyboardShortcutKey';
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
+import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
@@ -59,18 +62,13 @@ import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/For
 import ForecastWorkspaceModals from '../components/ForecastWorkspace/ForecastWorkspaceModals';
 import { useForecastWorkspaceController } from '../components/ForecastWorkspace/useForecastWorkspaceController';
 import {
-  readStoredForecastUiVariant,
-  resolveForecastUiVariant,
-  type ForecastUiVariant,
-} from '../utils/forecastUiVariant';
-import {
   applyForecastImportResult,
   useForecastFileActions,
   useDayRolloverPrompt as useControllerDayRolloverPrompt,
   useSessionRestore as useControllerSessionRestore,
   useUnsavedChangesWarning as useControllerUnsavedChangesWarning,
+  formatRolloverDayLabel,
 } from './forecastPageController';
-import { markAsSaved } from '../store/forecastSlice';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../utils/forecastTransfer';
 import { queueProductMetric } from '../utils/productMetrics';
 export {
@@ -85,6 +83,8 @@ export {
   formatRolloverDayLabel,
   parseStoredForecastPayload,
   parseStoredCloudMeta,
+  getMismatchedCloudWorkspaceId,
+  INVALID_CLOUD_HANDOFF,
   clearStoredCloudSession,
   hasRestorableCloudSelection,
   buildRestoreKey,
@@ -94,23 +94,9 @@ export {
   runDayRolloverDownloadAction,
   runDayRolloverCloudSaveAction,
 } from './forecastPageController';
-import { formatRolloverDayLabel } from './forecastPageController';
 import './ForecastPage.css';
 
 interface PageContext { addToast: AddToastFn; }
-
-const renderForecastWorkspaceLayout = (
-  variant: ForecastUiVariant,
-  props: {
-    mapRef: React.RefObject<ForecastMapHandle | null>;
-    controller: ReturnType<typeof useForecastWorkspaceController>;
-    autoTstmTools?: React.ReactNode;
-    tstmPreviewFeatures?: ReturnType<typeof useAutoTstm>['previewFeatures'];
-  }
-) => {
-  // Only the Tabbed Toolbar variant is supported now.
-  return <ForecastTabbedToolbarLayout {...props} />;
-};
 
 // Helper to get probability list based on outlook type
 export const getProbabilityList = (activeOutlookType: string) => {
@@ -207,6 +193,15 @@ const DayRolloverDialog: React.FC<{
       </div>
     </DialogContent>
   </Dialog>
+);
+
+const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
+  <div ref={noticeRef} data-testid="legacy-forecast-notice" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+    <span role="status">
+      Forecast now opens in the Severe workspace at <code>{getDefaultForecastWorkspacePath()}</code>. Update any bookmarks that still use <code>/forecast</code>.
+    </span>
+    <Button type="button" variant="ghost" size="sm" className="ml-2 h-7" aria-label="Dismiss Forecast bookmark notice" onClick={onDismiss}>Dismiss</Button>
+  </div>
 );
 
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
@@ -506,6 +501,7 @@ const useCloudForecastActions = ({
   saveCycle,
   userId,
   workflowMetadata,
+  workspaceId,
 }: {
   addToast: AddToastFn;
   currentCloudId: string | null;
@@ -516,6 +512,7 @@ const useCloudForecastActions = ({
   saveCycle: UseCloudCyclesResult['saveCycle'];
   userId: string | undefined;
   workflowMetadata?: import('../types/workflow').CycleMetadata;
+  workspaceId: ForecastWorkspaceId;
 }) => {
   const handleCloudCycleLoaded = useCallback(
     (cloudCycle: { id: string; label: string }) => {
@@ -532,15 +529,12 @@ const useCloudForecastActions = ({
       }
 
       const requestCloudId = currentCloudId ?? undefined;
-      const payload = serializeForecast(forecastCycle, currentMapView, workflowMetadata);
+      const payload = serializeForecastWorkspace(workspaceId, forecastCycle, currentMapView, workflowMetadata);
       const stats = countForecastMetrics(forecastCycle);
       let success: boolean;
       try {
-        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata);
+        success = await saveCycle(label, forecastCycle.cycleDate, stats, payload, workflowMetadata, { workspaceId });
       } catch (error) {
-        // Stale save completions throw the server error so explicit callers see
-        // the actual failure. The hook keeps global and selection state scoped,
-        // so propagate the message for the toolbar modal without extra handling.
         if (error instanceof Error) {
           throw error;
         }
@@ -554,7 +548,7 @@ const useCloudForecastActions = ({
       markCurrentStateSynced(requestCloudId);
       addToast(`Saved "${label}" to the cloud.`, 'success');
     },
-    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata]
+    [addToast, currentCloudId, currentMapView, forecastCycle, markCurrentStateSynced, saveCycle, userId, workflowMetadata, workspaceId]
   );
 
   return {
@@ -639,15 +633,20 @@ const useForecastPageWorkspace = ({
     saveCycle,
     userId: user?.uid,
     workflowMetadata,
+    workspaceId,
   });
 
   const handleImportResult = useCallback((result: ForecastImportResult) => {
-    applyForecastImportResult(result, dispatch, mapRef);
+    const workspaceError = applyForecastImportResult(result, dispatch, mapRef, workspaceId);
+    if (workspaceError) {
+      addToast(workspaceError, 'error');
+      return;
+    }
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';
     addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  }, [addToast, dispatch, mapRef]);
+  }, [addToast, dispatch, mapRef, workspaceId]);
 
   const handleExportComplete = useCallback((format: ForecastTransferFormat, scope: ForecastTransferScope) => {
     if (format === 'json') {
@@ -684,6 +683,7 @@ const useForecastPageWorkspace = ({
     addToast,
     onImportResult: handleImportResult,
     onExportComplete: handleExportComplete,
+    workspaceId,
     cloudTools: renderCloudToolbar({
       premiumActive,
       isExpiredPremium,
@@ -706,7 +706,7 @@ const useForecastPageWorkspace = ({
     mapRef,
     currentDay: forecastCycle.currentDay,
   });
-  useCustomProductForecastHandoff(restoreComplete, addToast);
+  useCustomProductForecastHandoff(restoreComplete, addToast, workspaceId);
 
   const dayRolloverPrompt = useControllerDayRolloverPrompt({
     restoreComplete,
@@ -720,6 +720,7 @@ const useForecastPageWorkspace = ({
     canSaveToCloud: premiumActive,
     saveCycle,
     clearCurrent,
+    workspaceId,
   });
 
   return {
@@ -733,18 +734,42 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
-  workspaceId = DEFAULT_FORECAST_WORKSPACE,
-}) => {
+const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
   useEffect(() => {
     dispatch(setForecastWorkspace(workspaceId));
   }, [dispatch, workspaceId]);
   const navigate = useNavigate();
-  const location = useLocation();
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const forecastShellRef = useRef<HTMLDivElement>(null);
+  const legacyNoticeRef = useRef<HTMLDivElement>(null);
+  const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
+
+  useLayoutEffect(() => {
+    const shell = forecastShellRef.current;
+    const notice = legacyNoticeRef.current;
+    if (!shell) return;
+    if (!showLegacyNotice) {
+      shell.style.removeProperty('--legacy-forecast-notice-height');
+      return;
+    }
+    if (!notice) {
+      shell.style.removeProperty('--legacy-forecast-notice-height');
+      return;
+    }
+
+    const updateNoticeHeight = () => {
+      shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
+    };
+    updateNoticeHeight();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateNoticeHeight);
+    observer.observe(notice);
+    return () => observer.disconnect();
+  }, [showLegacyNotice]);
   const { addToast } = useOutletContext<PageContext>();
-  const { syncedSettings, user } = useAuth();
+  const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
@@ -755,6 +780,7 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
     mapRef,
     user,
     workflowMetadata,
+    workspaceId,
   );
   const {
     emergencyMode,
@@ -776,20 +802,17 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
     return <EmergencyModeMessage />;
   }
 
-  const forecastUiVariant = resolveForecastUiVariant({
-    search: location.search,
-    syncedSettingValue: syncedSettings?.forecastUiVariant,
-    storageValue: readStoredForecastUiVariant(),
-  });
-
   return (
-    <div className="forecast-page-shell">
-      {renderForecastWorkspaceLayout(forecastUiVariant, {
-        mapRef,
-        controller: workspaceController,
-        autoTstmTools,
-        tstmPreviewFeatures,
-      })}
+    <div ref={forecastShellRef} className={showLegacyNotice ? 'forecast-page-shell forecast-page-shell--legacy-notice' : 'forecast-page-shell'}>
+      {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
+      <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
+        <ForecastTabbedToolbarLayout
+          mapRef={mapRef}
+          controller={workspaceController}
+          autoTstmTools={autoTstmTools}
+          tstmPreviewFeatures={tstmPreviewFeatures}
+        />
+      </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog
         promptState={dayRolloverPrompt.promptState}
@@ -803,6 +826,19 @@ export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
       />
     </div>
   );
+};
+
+/** Waits for AppHooks to reset Redux ownership before mounting restore effects. */
+export const ForecastPage: React.FC<{ workspaceId?: ForecastWorkspaceId }> = ({
+  workspaceId = DEFAULT_FORECAST_WORKSPACE,
+}) => {
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+
+  if (activeWorkspaceId !== workspaceId) {
+    return <div role="status">Preparing {workspaceId} forecast workspace…</div>;
+  }
+
+  return <ForecastPageContent key={workspaceId} workspaceId={workspaceId} />;
 };
 
 export default ForecastPage;

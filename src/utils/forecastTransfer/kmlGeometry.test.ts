@@ -28,4 +28,18 @@ describe('kmlGeometry', () => {
     expect(placemarks).toHaveLength(1);
     expect(placemarks[0].probabilityKey).toBe('15%');
   });
+
+  test('rejects KML geometry above the native coordinate bound', () => {
+    const positions = Array.from(
+      { length: 250_000 },
+      (_, index) => `${-98 + (index % 10) * 0.01},34`,
+    ).join(' ');
+    const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><Placemark>
+  <name>Tornado 15%</name>
+  <Polygon><outerBoundaryIs><LinearRing><coordinates>${positions}</coordinates></LinearRing></outerBoundaryIs></Polygon>
+</Placemark></Document></kml>`;
+
+    expect(() => parseKmlDocument(kml, 1)).toThrow('too many coordinates');
+  });
 });

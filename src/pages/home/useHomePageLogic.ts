@@ -12,6 +12,7 @@ import {
   selectHasActiveWorkflow,
   startBlankCycle,
   createOutlookUpdate,
+  selectSavedCyclesForActiveWorkspace,
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 import type { WorkflowMetadata } from '../../types/workflow';
@@ -19,8 +20,10 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
+import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
 
 /**
  * Encapsulates the state and handlers used by the HomePage component so the page
@@ -34,9 +37,12 @@ const useHomePageLogic = () => {
   const { hostedAuthEnabled, status, user } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector(selectWorkflowMetadata);
+  const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
-  const savedCycles = useSelector((state: RootState) => state.forecast.savedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -47,8 +53,12 @@ const useHomePageLogic = () => {
     addToast,
     dispatch,
     forecastCycle,
+    cycleMetadata: workflowMetadata ?? undefined,
+    mapView: currentMapView,
+    workspaceId: activeWorkspaceId ?? DEFAULT_FORECAST_WORKSPACE,
   });
 
+  // Lifetime totals intentionally remain account-wide; retained history and recent-cycle lists are workspace-scoped.
   const lifetimeStats = useSelector((state: RootState) => state.forecast.lifetimeCycleStats);
   const stats = useMemo(() => computeHomeStats(forecastCycle, savedCycles, lifetimeStats), [forecastCycle, savedCycles, lifetimeStats]);
   const formattedDate = useMemo(() => formatCycleDate(forecastCycle.cycleDate), [forecastCycle.cycleDate]);
@@ -60,16 +70,16 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(resetForecasts());
     addToast('Started new forecast cycle', 'success');
   };
 
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(setForecastDay(day));
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Start a workflow package from the selected scope. */
@@ -80,13 +90,13 @@ const useHomePageLogic = () => {
       setConfirmNewCycle(true);
       return;
     }
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
     }));
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Start a same-day update for the active workflow. */
@@ -94,14 +104,14 @@ const useHomePageLogic = () => {
     if (!workflowEnabled) return;
     dispatch(createOutlookUpdate());
     addToast('Started same-day workflow update', 'success');
-    navigate('/forecast');
+    navigate(getForecastWorkspacePath(workspaceId));
   };
 
   /** Save the current forecast cycle to storage. */
   const handleSave = () => doSave();
 
   /** Navigate to the forecast page. */
-  const handleNavigateForecast = () => navigate('/forecast');
+  const handleNavigateForecast = () => navigate(getForecastWorkspacePath(workspaceId));
   /** Navigate to the discussion page. */
   const handleNavigateDiscussion = () => navigate('/discussion');
   /** Navigate to the account page. */
@@ -149,7 +159,7 @@ const useHomePageLogic = () => {
 
   /** Confirm starting a new cycle (discard changes). */
   const handleConfirmNewCycle = () => {
-    clearAutoSave(user?.uid);
+    clearAutoSave(user?.uid, workspaceId);
     if (pendingWorkflow) {
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
@@ -158,7 +168,7 @@ const useHomePageLogic = () => {
       setPendingWorkflow(null);
       setConfirmNewCycle(false);
       addToast(`Started ${pendingWorkflow.label} workflow`, 'success');
-      navigate('/forecast');
+      navigate(getForecastWorkspacePath(workspaceId));
       return;
     }
     dispatch(resetForecasts());

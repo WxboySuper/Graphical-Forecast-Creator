@@ -2,8 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { selectCanRedo, selectCanUndo, selectForecastCycle, selectOmittedDays, setActiveOutlookType, setForecastDay } from '../../store/forecastSlice';
-import { setBaseMapStyle, setGhostOutlookVisibility, setOutlookTrimStrategy, toggleOutlookTrimAutoOnDraw, toggleOutlookTrimPreviewOnly } from '../../store/overlaysSlice';
-import type { BaseMapStyle } from '../../store/overlaysSlice';
+import { setBaseMapStyle, setGhostOutlookVisibility, setOutlookTrimStrategy, toggleOutlookTrimAutoOnDraw, toggleOutlookTrimPreviewOnly, type BaseMapStyle } from '../../store/overlaysSlice';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import type { AddToastFn } from '../Layout';
 import useOutlookPanelLogic from '../OutlookPanel/useOutlookPanelLogic';
@@ -18,6 +17,7 @@ import { getOutlookColor } from '../../utils/outlookUtils';
 import { useForecastWorkspaceActionHandlers } from './forecastWorkspaceActions';
 import type { ForecastTransferDirection } from './ForecastTransferModal';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../../utils/forecastTransfer';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 const OUTLOOK_TYPE_ORDER: OutlookType[] = ['tornado', 'wind', 'hail', 'categorical', 'totalSevere', 'day4-8'];
 const EMPTY_LOW_PROBABILITY_OUTLOOKS: OutlookType[] = [];
@@ -107,6 +107,7 @@ export interface ForecastWorkspaceController {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
+  workspaceId: ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   onOpenHistoryModal: () => void;
   onOpenCopyModal: () => void;
@@ -189,6 +190,7 @@ interface UseForecastWorkspaceControllerOptions {
   cloudTools?: React.ReactNode;
   onImportResult: (result: ForecastImportResult) => void;
   onExportComplete?: (format: ForecastTransferFormat, scope: ForecastTransferScope) => void;
+  workspaceId: ForecastWorkspaceId;
 }
 
 /* Action handlers moved to forecastWorkspaceActions.tsx */
@@ -215,6 +217,7 @@ interface BuildForecastWorkspaceControllerArgs {
   forecastCycle: ReturnType<typeof selectForecastCycle>;
   cycleMetadata?: import('../../types/workflow').CycleMetadata;
   isWorkflowActive: boolean;
+  workspaceId: ForecastWorkspaceId;
   getMapView: () => { center: [number, number]; zoom: number };
   showHistoryModal: boolean;
   showCopyModal: boolean;
@@ -284,6 +287,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     forecastCycle,
     cycleMetadata,
     isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal,
     showCopyModal,
@@ -350,6 +354,7 @@ function buildForecastWorkspaceController(args: BuildForecastWorkspaceController
     forecastCycle,
     cycleMetadata,
     isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal,
     showCopyModal,
@@ -567,6 +572,7 @@ function useForecastWorkspaceControllerArgs({
   cloudTools = null,
   onImportResult,
   onExportComplete,
+  workspaceId,
 }: UseForecastWorkspaceControllerOptions): BuildForecastWorkspaceControllerArgs {
   const core = useForecastWorkspaceCoreState(mapRef, addToast);
   const modalState = useForecastWorkspaceModalState(core.cycleDate, core.dispatch);
@@ -609,6 +615,7 @@ function useForecastWorkspaceControllerArgs({
     forecastCycle: core.forecastCycle,
     cycleMetadata: core.cycleMetadata,
     isWorkflowActive: core.isWorkflowActive,
+    workspaceId,
     getMapView,
     showHistoryModal: modalState.showHistoryModal,
     showCopyModal: modalState.showCopyModal,

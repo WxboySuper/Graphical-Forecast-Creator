@@ -1,5 +1,6 @@
+// @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
-import type { DayType } from '../types/outlooks';
+import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
   addFeature,
@@ -33,8 +34,6 @@ import reducer, {
   createOutlookUpdate,
   startFromPreviousCycle,
   saveCurrentCycle,
-  setForecastWorkspace,
-  loadSavedCycle,
   deleteSavedCycle,
   loadCycleHistory,
   SAVED_CYCLES_LIMIT,
@@ -318,82 +317,7 @@ const getRedoStack = (state: ReturnType<typeof reducer>, day: DayType) =>
 
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 describe('forecastSlice undo/redo', () => {
-  test('records the active workspace on saved cycles', () => {
-    let state = reducer(undefined, setForecastWorkspace('custom'));
-    state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
-
-    expect(state.workspaceId).toBe('custom');
-    expect(state.savedCycles[0]?.workspaceId).toBe('custom');
-  });
-
-  test('ignores an invalid workspace action and keeps Severe active', () => {
-    const state = reducer(undefined, setForecastWorkspace('not-a-workspace' as never));
-
-    expect(state.workspaceId).toBe('severe');
-  });
-
-  test('normalizes missing workspace ownership on history hydration to Severe', () => {
-    let state = reducer(undefined, { type: 'test/init' });
-    state = reducer(state, saveCurrentCycle({ label: 'Legacy cycle' }));
-    const legacyCycle = { ...state.savedCycles[0] };
-    delete (legacyCycle as { workspaceId?: string }).workspaceId;
-
-    const hydrated = reducer(undefined, loadCycleHistory([legacyCycle]));
-    expect(hydrated.savedCycles[0]?.workspaceId).toBe('severe');
-  });
-
-  test('normalizes malformed workspace ownership on history hydration to Severe', () => {
-    let state = reducer(undefined, { type: 'test/init' });
-    state = reducer(state, saveCurrentCycle({ label: 'Direct cycle' }));
-    const malformedCycle = {
-      ...state.savedCycles[0],
-      workspaceId: 'not-a-workspace',
-    };
-
-    const hydratedArray = reducer(undefined, loadCycleHistory([malformedCycle as never]));
-    expect(hydratedArray.savedCycles[0]?.workspaceId).toBe('severe');
-
-    const hydratedSnapshot = reducer(undefined, loadCycleHistory({
-      cycles: [malformedCycle as never],
-      lifetimeCycleStats: { totalCyclesMade: 1, totalForecastsMade: 0 },
-    }));
-    expect(hydratedSnapshot.savedCycles[0]?.workspaceId).toBe('severe');
-  });
-
-  test('keeps the route-owned workspace when loading a cycle from another workspace', () => {
-    let state = reducer(undefined, setForecastWorkspace('custom'));
-    state = reducer(state, saveCurrentCycle({ label: 'Custom cycle' }));
-    const customId = state.savedCycles[0]?.id as string;
-
-    state = reducer(state, setForecastWorkspace('severe'));
-    expect(state.workspaceId).toBe('severe');
-
-    state = reducer(state, loadSavedCycle(customId));
-    expect(state.workspaceId).toBe('severe');
-    expect(state.savedCycles[0]?.workspaceId).toBe('custom');
-  });
-
-  test('loading a cycle with missing or malformed ownership leaves the active workspace unchanged', () => {
-    let state = reducer(undefined, setForecastWorkspace('custom'));
-    state = reducer(state, saveCurrentCycle({ label: 'Legacy load' }));
-    const legacyId = state.savedCycles[0]?.id as string;
-
-    const missingOwner = {
-      ...state.savedCycles[0],
-    };
-    delete (missingOwner as { workspaceId?: string }).workspaceId;
-    const withMissing = {
-      ...state,
-      savedCycles: [missingOwner],
-    };
-    expect(reducer(withMissing, loadSavedCycle(legacyId)).workspaceId).toBe('custom');
-
-    const withMalformed = {
-      ...state,
-      savedCycles: [{ ...state.savedCycles[0], workspaceId: 'not-a-workspace' } as never],
-    };
-    expect(reducer(withMalformed, loadSavedCycle(legacyId)).workspaceId).toBe('custom');
-  });
+  // Workspace state cases live in forecastWorkspaceState.test.ts.
 
   test('caps saved cycles on save and hydration while preserving lifetime totals', () => {
     let state = reducer(undefined, { type: 'test/init' });
@@ -411,6 +335,22 @@ describe('forecastSlice undo/redo', () => {
       state.savedCycles[state.savedCycles.length - 1],
     ]));
     expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+  });
+
+  test('ignores malformed trailing entries before applying the history cap', () => {
+    let state = reducer(undefined, { type: 'test/init' });
+    for (let index = 0; index < SAVED_CYCLES_LIMIT + 1; index += 1) {
+      state = reducer(state, saveCurrentCycle({ label: `Cycle ${index}` }));
+    }
+
+    const hydrated = reducer(state, loadCycleHistory([
+      ...state.savedCycles,
+      null as unknown as (typeof state.savedCycles)[number],
+    ]));
+
+    expect(hydrated.savedCycles).toHaveLength(SAVED_CYCLES_LIMIT);
+    expect(hydrated.savedCycles[0]?.label).toBe('Cycle 1');
+    expect(hydrated.savedCycles.at(-1)?.label).toBe(`Cycle ${SAVED_CYCLES_LIMIT}`);
   });
 
   test('continues streak tracking beyond the retained cycle window', () => {
@@ -1351,34 +1291,6 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 
-  describe('cycle session identity', () => {
-    it('tracks cycle generation across replacements, edits, and saved-cycle loads', () => {
-      const first = reducer(undefined, createOutlookUpdate());
-      const restored = reducer(first, restoreForecastCycle(first.forecastCycle));
-      const imported = reducer(restored, resetForecasts());
-      const started = reducer(imported, startBlankCycle({}));
-
-      expect(restored.cycleGeneration).toBe(2);
-      expect(imported.cycleGeneration).toBe(3);
-      expect(started.cycleGeneration).toBe(4);
-
-      let state = reducer(undefined, resetForecasts());
-      state = reducer(state, setForecastDay(1));
-      const generation = state.cycleGeneration;
-      state = reducer(state, setForecastDay(2));
-
-      expect(state.cycleGeneration).toBe(generation);
-
-      let savedCycleState = reducer(undefined, setForecastDay(1));
-      savedCycleState = reducer(savedCycleState, resetForecasts());
-      savedCycleState = reducer(savedCycleState, saveCurrentCycle({}));
-      const savedGeneration = savedCycleState.cycleGeneration;
-      savedCycleState = reducer(savedCycleState, resumeIncompleteCycle({ cycleId: savedCycleState.savedCycles[0].id }));
-
-      expect(savedCycleState.cycleGeneration).toBe(savedGeneration + 1);
-    });
-  });
-
   describe('selector referential stability', () => {
     const withForecast = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlooks>[0]);
 
@@ -1446,3 +1358,30 @@ describe('forecastSlice undo/redo', () => {
   });
 });
 
+
+describe('deleteSavedCycle workspace ownership', () => {
+  const initialState = reducer(undefined, { type: '@@INIT' });
+  const savedCycle = (id: string, workspaceId: 'severe' | 'custom') => ({
+    id,
+    workspaceId,
+    timestamp: '2026-10-23T12:00:00.000Z',
+    cycleDate: '2026-10-23',
+    forecastCycle: initialState.forecastCycle,
+    stats: { forecastDays: 0, totalOutlooks: 0, totalFeatures: 0 },
+  });
+
+  test('only deletes a cycle owned by the active workspace', () => {
+    const state = {
+      ...initialState,
+      workspaceId: 'custom' as const,
+      savedCycles: [savedCycle('severe-cycle', 'severe'), savedCycle('custom-cycle', 'custom')],
+    };
+    const afterForeignDelete = reducer(state, deleteSavedCycle('severe-cycle'));
+
+    expect(afterForeignDelete).toBe(state);
+    expect(afterForeignDelete.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle', 'custom-cycle']);
+
+    const afterOwnedDelete = reducer(afterForeignDelete, deleteSavedCycle('custom-cycle'));
+    expect(afterOwnedDelete.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle']);
+  });
+});

@@ -14,6 +14,7 @@ import { GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
+import { getForecastDataFromWorkspacePayload, isWorkspaceSaveEnvelope, type ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { trackProductEvent } from '../lib/productAnalytics';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
@@ -32,11 +33,11 @@ export interface UseCloudCyclesResult {
     label: string,
     cycleDate: string,
     stats: SavedCycleStats,
-    payload: GFCForecastSaveData,
+    payload: ForecastWorkspacePayload,
     workflowMetadata?: CycleMetadata,
     options?: { saveAsNew?: boolean; workspaceId?: ForecastWorkspaceId },
   ) => Promise<boolean>;
-  loadCycle: (cycleId: string) => Promise<GFCForecastSaveData | null>;
+  loadCycle: (cycleId: string) => Promise<ForecastWorkspacePayload | null>;
   deleteCycle: (cycleId: string) => Promise<boolean>;
   renameCycle: (cycleId: string, newLabel: string) => Promise<boolean>;
   markAsCurrent: (cycleId: string, label: string) => void;
@@ -419,7 +420,7 @@ interface CloudSaveRequest {
   label: string;
   cycleDate: string;
   stats: SavedCycleStats;
-  payload: GFCForecastSaveData;
+  payload: ForecastWorkspacePayload;
   workflowMetadata?: CycleMetadata;
   workspaceId: ForecastWorkspaceId;
   savedCycleId?: string;
@@ -582,7 +583,7 @@ function useCloudSaveCycle({
       label: string,
       cycleDate: string,
       stats: SavedCycleStats,
-      payload: GFCForecastSaveData,
+      payload: ForecastWorkspacePayload,
       workflowMetadata?: CycleMetadata,
       options?: { saveAsNew?: boolean; workspaceId?: ForecastWorkspaceId },
     ): Promise<boolean> => {
@@ -622,16 +623,26 @@ function useCloudSaveCycle({
   );
 }
 
-/** Builds the forecast payload handed to the editor after a cloud load. */
+/**
+ * Builds the forecast payload handed to the editor after a cloud load.
+ *
+ * Only the inner forecast is merged with the record's workflow metadata. An
+ * enveloped record keeps its envelope so the caller can still prove which
+ * workspace the forecast belongs to instead of receiving an untagged copy.
+ */
 export const buildLoadedCloudForecastPayload = (
   record: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>,
-): GFCForecastSaveData => {
+): ForecastWorkspacePayload => {
+  const stored = record.payload;
+  const inner = getForecastDataFromWorkspacePayload(stored);
+  let merged: GFCForecastSaveData;
   if (record.workflowMetadata) {
-    return { ...record.payload, cycleMetadata: record.workflowMetadata };
+    merged = { ...inner, cycleMetadata: record.workflowMetadata };
+  } else {
+    const { cycleMetadata: _staleEmbedded, ...plainPayload } = inner;
+    merged = { ...plainPayload, cycleMetadata: null };
   }
-
-  const { cycleMetadata: _staleEmbedded, ...plainPayload } = record.payload;
-  return { ...plainPayload, cycleMetadata: null };
+  return isWorkspaceSaveEnvelope(stored) ? { ...stored, forecast: merged } : merged;
 };
 
 /** Returns the sign-in error that blocks a cloud load, or null when the load may proceed. */
@@ -690,7 +701,7 @@ function applyCloudLoadSuccess({
   cycleId: string;
   user: ReturnType<typeof useAuth>['user'];
   data: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>;
-}): GFCForecastSaveData {
+}): ForecastWorkspacePayload {
   syncLoadedCloudSelection({ cycles, cycleId, setCurrentCloud });
   queueProductMetric({ event: 'cloud_cycle_loaded', user });
   updateSyncState('saved', undefined, cycleId);
@@ -721,7 +732,7 @@ function finishCloudLoadRequest({
   requestId: number;
   expectedUserId: string;
   user: ReturnType<typeof useAuth>['user'];
-}): GFCForecastSaveData | null {
+}): ForecastWorkspacePayload | null {
   const canApply = canApplyCloudLoadResult({
     requestedCycleId,
     startSelectionId,
@@ -757,7 +768,7 @@ function useCloudLoadCycle({
     user: ReturnType<typeof useAuth>['user'];
   }) {
   return useCallback(
-    async (cycleId: string): Promise<GFCForecastSaveData | null> => {
+    async (cycleId: string): Promise<ForecastWorkspacePayload | null> => {
       const blockedError = getCloudLoadBlockedError({ userId, localFixtureActive });
       if (blockedError) {
         setError(blockedError);

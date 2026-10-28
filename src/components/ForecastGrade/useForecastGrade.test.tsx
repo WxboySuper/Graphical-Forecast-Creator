@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import React from 'react';
 import verificationReducer from '../../store/verificationSlice';
-import stormReportsReducer from '../../store/stormReportsSlice';
+import stormReportsReducer, { setVisibility } from '../../store/stormReportsSlice';
 
 jest.mock('../../auth/AuthProvider', () => ({
   useAuth: jest.fn(),
@@ -16,6 +16,17 @@ jest.mock('../../billing/EntitlementProvider', () => ({
 jest.mock('../../utils/fileUtils', () => ({
   serializeForecast: jest.fn(() => ({ kind: 'serialized' })),
   deserializeForecast: jest.fn((payload: unknown) => payload),
+  validateForecastData: jest.fn(() => true),
+  validateForecastDataReason: jest.fn(() => null),
+}));
+
+jest.mock('../../utils/forecastTransfer/nativeImportUtils', () => ({
+  resolveNativeFileContent: jest.fn((payload: unknown) => ({
+    forecastCycle: payload,
+    workspaceId: 'severe',
+    mapView: undefined,
+    cycleMetadata: undefined,
+  })),
 }));
 
 jest.mock('../../utils/verificationV2/sources', () => ({
@@ -57,7 +68,8 @@ jest.mock('../../utils/verificationV2', () => ({
 
 import { useAuth } from '../../auth/AuthProvider';
 import { useEntitlement } from '../../billing/EntitlementProvider';
-import { deserializeForecast, serializeForecast } from '../../utils/fileUtils';
+import { serializeForecast } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import {
   buildGradeCard,
   loadForecastFromFile,
@@ -85,7 +97,7 @@ const mockRecordGradeResult = recordGradeResult as jest.MockedFunction<typeof re
 const mockBuildGradeCard = buildGradeCard as jest.MockedFunction<typeof buildGradeCard>;
 const mockTierHasSnapshots = tierHasSnapshots as jest.MockedFunction<typeof tierHasSnapshots>;
 const mockSerializeForecast = serializeForecast as jest.MockedFunction<typeof serializeForecast>;
-const mockDeserializeForecast = deserializeForecast as jest.MockedFunction<typeof deserializeForecast>;
+const mockResolveNativeFileContent = resolveNativeFileContent as jest.MockedFunction<typeof resolveNativeFileContent>;
 const mockLoadReportsForDate = loadReportsForDate as jest.MockedFunction<typeof loadReportsForDate>;
 const mockLoadDatEvidenceForDate = loadDatEvidenceForDate as jest.MockedFunction<typeof loadDatEvidenceForDate>;
 const mockLoadForecastFromFile = loadForecastFromFile as jest.MockedFunction<typeof loadForecastFromFile>;
@@ -591,6 +603,46 @@ describe('useForecastGrade', () => {
       expect(result.current.result).not.toBeNull();
     });
 
+    test('applyGradeSnapshot shows the restored evidence even when visibility was toggled off', async () => {
+      const { result, store } = renderWithPackage();
+      store.dispatch(setVisibility(false));
+      expect(store.getState().stormReports.visible).toBe(false);
+
+      const snapshot = {
+        card: { id: 'card-snap', sourceLabel: 'Cloud snapshot' },
+        package: samplePackage,
+        forecast: { kind: 'serialized-snap' },
+        reportDate: '2026-07-28',
+      } as never;
+      act(() => {
+        result.current.applyGradeSnapshot(snapshot);
+      });
+
+      await waitFor(() =>
+        expect(store.getState().stormReports.reports).toEqual(sampleReports)
+      );
+      expect(store.getState().stormReports.visible).toBe(true);
+    });
+
+    test('applyGradeSnapshot reports invalid stored forecast data without changing the current grade', () => {
+      const { result, addToast } = renderWithPackage();
+      const forecastBefore = result.current.forecast;
+      mockResolveNativeFileContent.mockImplementationOnce(() => {
+        throw new Error('unknown workspace');
+      });
+      const snapshot = {
+        card: { id: 'bad-card', sourceLabel: 'Broken snapshot' },
+        package: samplePackage,
+        forecast: { invalid: true },
+        reportDate: '2026-07-28',
+      } as never;
+
+      act(() => result.current.applyGradeSnapshot(snapshot));
+
+      expect(addToast).toHaveBeenCalledWith('That grade snapshot could not be parsed.', 'error');
+      expect(result.current.forecast).toBe(forecastBefore);
+    });
+
     test('run during an in-flight applyGradeSnapshot ignores the late report load', async () => {
       let resolveReports: ((value: typeof sampleReports) => void) | null = null;
       mockLoadReportsForDate.mockImplementationOnce(
@@ -599,7 +651,12 @@ describe('useForecastGrade', () => {
         })
       );
       // Make the snapshot deserialize to a real cycle so run() can read forecast.days.
-      mockDeserializeForecast.mockReturnValueOnce(sampleCycle);
+      mockResolveNativeFileContent.mockReturnValueOnce({
+        forecastCycle: sampleCycle,
+        workspaceId: 'severe',
+        mapView: undefined,
+        cycleMetadata: undefined,
+      } as never);
       const { result, store } = renderWithPackage();
 
       const snapshot = {

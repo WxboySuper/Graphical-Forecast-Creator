@@ -188,6 +188,21 @@ describe('VerificationPanel', () => {
     }
   });
 
+  test('rejects an invalid selected date without fetching reports', async () => {
+    const store = buildStore();
+    renderPanel(store, { activePanel: 'setup' });
+
+    fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
+
+    expect(await screen.findByText(/Choose a valid report date/i)).toBeInTheDocument();
+    expect(mockFetchStormReports).not.toHaveBeenCalled();
+    expect(mockFetchTodayStormReports).not.toHaveBeenCalled();
+    expect(mockFetchYesterdayStormReports).not.toHaveBeenCalled();
+    expect(store.getState().stormReports.date).toBeNull();
+    expect(store.getState().stormReports.loading).toBe(false);
+  });
+
   test('uses the current SPC report day before the 12Z boundary', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-04-20T11:00:00.000Z'));

@@ -35,8 +35,8 @@ export const FORECAST_WORKSPACES = [
     path: '/forecast/mesoscale',
     label: 'Mesoscale',
     productType: 'mesoscale',
-    status: 'gated',
-    exposureKey: 'mesoscaleWorkspace',
+    status: 'future',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
@@ -45,7 +45,7 @@ export const FORECAST_WORKSPACES = [
     label: 'Tropical',
     productType: 'tropical',
     status: 'future',
-    exposureKey: 'tropicalWorkspace',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
@@ -54,7 +54,7 @@ export const FORECAST_WORKSPACES = [
     label: 'Winter',
     productType: 'winter',
     status: 'future',
-    exposureKey: 'winterWorkspace',
+    exposureKey: null,
     legacyPaths: [],
   },
   {
@@ -63,8 +63,12 @@ export const FORECAST_WORKSPACES = [
     label: 'Custom',
     productType: 'custom',
     status: 'gated',
-    exposureKey: 'customProducts',
-    legacyPaths: ['/custom-products'],
+    // #914 ships the route contract only: the Custom workspace stays off release
+    // targets until #915 registers it. The library route keeps its own gate.
+    exposureKey: 'customWorkspace',
+    // /custom-products remains the separate Custom Products library route,
+    // not a legacy Forecast editor route.
+    legacyPaths: [],
   },
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 
@@ -88,9 +92,35 @@ const WORKSPACES_BY_LEGACY_PATH = new Map<string, ForecastWorkspaceDefinition>(
 export const getForecastWorkspace = (id: string): ForecastWorkspaceDefinition | undefined =>
   WORKSPACES_BY_ID.get(id as ForecastWorkspaceId);
 
+
 /** Returns the validated workspace id, falling back to Severe for missing or unknown values. */
 export const resolveForecastWorkspaceId = (workspaceId: string | undefined | null): ForecastWorkspaceId =>
   getForecastWorkspace(workspaceId ?? DEFAULT_FORECAST_WORKSPACE)?.id ?? DEFAULT_FORECAST_WORKSPACE;
+
+/**
+ * Returns a registered workspace ID or throws. Callers write payloads from
+ * values that reach them at runtime, where the ForecastWorkspaceId type checks
+ * nothing, so every save and export path resolves ownership here first.
+ */
+export const requireForecastWorkspaceId = (workspaceId: unknown): ForecastWorkspaceId => {
+  if (typeof workspaceId !== 'string' || !WORKSPACES_BY_ID.has(workspaceId as ForecastWorkspaceId)) {
+    throw new Error('Cannot save or export a forecast without a valid workspace.');
+  }
+  return workspaceId as ForecastWorkspaceId;
+};
+
+/**
+ * Resolves a workspace id read back from stored metadata.
+ *
+ * An absent id belongs to a record written before workspaces existed, so it stays
+ * on the default. An id this build does not register has no usable owner, so it
+ * returns null instead of being relabeled as the default; callers must treat null
+ * as "do not open, do not write back".
+ */
+export const resolveStoredWorkspaceId = (workspaceId: unknown): ForecastWorkspaceId | null => {
+  if (workspaceId === undefined || workspaceId === null) return DEFAULT_FORECAST_WORKSPACE;
+  return typeof workspaceId === 'string' ? WORKSPACES_BY_ID.get(workspaceId as ForecastWorkspaceId)?.id ?? null : null;
+};
 
 /** Returns the registered workspace for a canonical path, or undefined for malformed input. */
 export const getForecastWorkspaceByPath = (path: string): ForecastWorkspaceDefinition | undefined =>
@@ -105,7 +135,17 @@ export const getForecastWorkspaceByLegacyPath = (
 export const isForecastWorkspaceExposed = (
   workspace: ForecastWorkspaceDefinition,
   target: BuildTarget = getBuildTarget(),
-): boolean => workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target);
+): boolean => {
+  if (workspace.status === 'future') {
+    return false;
+  }
+
+  if (workspace.status === 'gated') {
+    return workspace.exposureKey !== null && isFeatureExposedOnTarget(workspace.exposureKey, target);
+  }
+
+  return workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target);
+};
 
 /** Returns only workspaces whose feature exposure permits route registration. */
 export const getExposedForecastWorkspaces = (

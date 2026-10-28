@@ -69,6 +69,7 @@ describe('featureExposure registry', () => {
       'customProducts',
       'outlookLandMasking',
       'tropicalWorkspace',
+      'customWorkspace',
       'mesoscaleWorkspace',
       'winterWorkspace',
       'collaborationRoom',

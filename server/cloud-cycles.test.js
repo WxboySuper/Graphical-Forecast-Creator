@@ -84,6 +84,20 @@ describe('cloud-cycle server contract', () => {
     assert.equal(readCloudCycleRequest({ ...base, metadata: { totalFeatures: -1 } }, 'user-1'), null);
   });
 
+  it('rejects empty cycle ids and dates before Firestore path construction', () => {
+    const base = {
+      id: 'cycle-1',
+      userId: 'user-1',
+      label: 'Cycle 1',
+      cycleDate: '2026-08-09',
+      payloadJson: '{}',
+      metadata: { id: 'cycle-1', userId: 'user-1' },
+    };
+
+    assert.equal(readCloudCycleRequest({ ...base, id: '' }, 'user-1'), null);
+    assert.equal(readCloudCycleRequest({ ...base, cycleDate: '' }, 'user-1'), null);
+  });
+
   it('bounds the new-cycle quota query and writes metadata and payload separately', async () => {
     const db = createDb({ existingCount: MAX_CLOUD_CYCLES - 1 });
     const payloadJson = '{"forecast":true}';

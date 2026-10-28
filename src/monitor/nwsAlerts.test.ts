@@ -124,4 +124,21 @@ describe('nwsAlerts', () => {
       global.fetch = originalFetch;
     }
   });
+
+  test('does not send a User-Agent header browsers would silently drop', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ type: 'FeatureCollection', features: [] }),
+    }) as jest.Mock;
+
+    try {
+      await fetchActiveNwsAlerts();
+      const requestInit = (global.fetch as jest.Mock).mock.calls[0]?.[1] as RequestInit | undefined;
+      expect(requestInit).toBeDefined();
+      expect(new Headers(requestInit?.headers).has('user-agent')).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

@@ -28,15 +28,6 @@ export const outlookLabels: Record<OutlookType, string> = {
   'day4-8': 'Day 4-8',
 };
 
-export const outlookShortcuts: Record<OutlookType, string> = {
-  tornado: 'T',
-  wind: 'W',
-  hail: 'H',
-  categorical: 'C',
-  totalSevere: 'S',
-  'day4-8': 'D',
-};
-
 export const FORECAST_DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export const FORECAST_BASE_MAP_OPTIONS: Array<{
@@ -46,7 +37,6 @@ export const FORECAST_BASE_MAP_OPTIONS: Array<{
 }> = [
   { value: 'blank', label: 'Weather Blank', shortLabel: 'Weather' },
   { value: 'osm', label: 'OpenStreetMap', shortLabel: 'Streets' },
-  { value: 'carto-light', label: 'Light', shortLabel: 'Light' },
   { value: 'esri-satellite', label: 'Satellite', shortLabel: 'Sat' },
 ];
 

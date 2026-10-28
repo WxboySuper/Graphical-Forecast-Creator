@@ -8,7 +8,8 @@ import type { ForecastCycle, DayType } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type { DatEvidence } from '../../utils/dat';
 import type { GradeAccountTier, GradeCard, GradeSnapshot, PackageSourceKind } from '../../types/forecastGrade';
-import { serializeForecast, deserializeForecast } from '../../utils/fileUtils';
+import { serializeForecast } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import {
   FORECAST_GRADE_FORMULA_VERSION,
   isReachedArchiveDate,
@@ -388,10 +389,16 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
 
   const applyGradeSnapshot = useCallback(
     (snapshot: GradeSnapshot) => {
+      let restoredForecast: ForecastCycle;
+      try {
+        restoredForecast = resolveNativeFileContent(snapshot.forecast).forecastCycle;
+      } catch {
+        addToast('That grade snapshot could not be parsed.', 'error');
+        return;
+      }
       const restoreSeq = ++restoreSeqRef.current;
       runGeneration.current += 1; // invalidate any in-flight run()
       abortDatLoad();
-      const restoredForecast = deserializeForecast(snapshot.forecast);
       const days = daysWithData(restoredForecast);
       setForecast(restoredForecast);
       setPackageSource('file');
@@ -423,6 +430,10 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
           }
           setReportsState(loadedReports);
           dispatch(setReports(loadedReports));
+          // Restoring a snapshot reopens a past package with its verification evidence, so the
+          // evidence must be shown even if the user hid it earlier in the session. This mirrors
+          // the fresh-run path, which forces visibility on right after the reports load.
+          dispatch(setVisibility(true));
           dispatch(setDate(snapshot.reportDate ?? 'today'));
         })
         .catch(() => {
@@ -448,7 +459,7 @@ export const useForecastGrade = (addToast: (message: string, type?: 'info' | 'su
         });
       return undefined;
     },
-    [abortDatLoad, dispatch, loadDatEvidenceWithTimeout]
+    [abortDatLoad, addToast, dispatch, loadDatEvidenceWithTimeout]
   );
 
   return useMemo<UseForecastGrade>(() => ({

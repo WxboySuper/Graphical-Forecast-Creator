@@ -29,7 +29,7 @@ export const pathMatches = (file, pattern) => {
 
   if (pattern.startsWith('**/')) {
     const suffix = pattern.slice(3);
-    return new RegExp(`${globToRegexBody(suffix)}$`).test(file);
+    return new RegExp(`(^|/)${globToRegexBody(suffix)}$`).test(file);
   }
 
   return new RegExp(`^${globToRegexBody(pattern)}$`).test(file);

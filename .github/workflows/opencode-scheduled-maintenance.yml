@@ -22,6 +22,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
       security-events: read
       vulnerability-alerts: read
     steps:
@@ -98,9 +99,28 @@ jobs:
             const stateComment = comments.find((comment) =>
               comment.user?.login === 'github-actions[bot]' && comment.body?.startsWith(stateMarker)
             )
-            const state = stateComment
-              ? JSON.parse(stateComment.body.slice(stateMarker.length).trim())
-              : { version: 2, jobs: {}, reported: {} }
+            let state
+            try {
+              state = stateComment
+                ? JSON.parse(stateComment.body.slice(stateMarker.length).trim())
+                : { version: 2, jobs: {}, reported: {} }
+            } catch (error) {
+              core.warning(`Maintenance state was unreadable and has been reset: ${error.message}`)
+              state = { version: 2, jobs: {}, reported: {} }
+              state.lastAttempt = {
+                category,
+                period,
+                at: now.toISOString(),
+                status: 'inconclusive',
+                error: 'Stored maintenance state was unreadable; retry after state reset.',
+              }
+              const body = `${stateMarker}\n${JSON.stringify(state)}`
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: stateComment.id, body,
+              })
+              core.setFailed('Stored maintenance state was unreadable; it was reset for a safe retry.')
+              return
+            }
             state.version = 2
             for (const job of Object.values(state.jobs ?? {})) {
               job.lastSuccessPeriod ??= job.lastSuccessKey
@@ -251,6 +271,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/lib"
           cp scripts/run-opencode-maintenance.mjs "$RUNNER_TEMP/run-opencode-maintenance.mjs"
+          cp scripts/lib/opencode-cli-output.mjs scripts/lib/opencode-env.cjs "$RUNNER_TEMP/lib/"
           cp scripts/lib/opencode-maintenance-state.cjs "$RUNNER_TEMP/opencode-maintenance-state.cjs"
           while IFS= read -r libFile; do
             cp "scripts/lib/${libFile}" "$RUNNER_TEMP/lib/"
@@ -298,40 +319,42 @@ jobs:
             const { applyScheduledResult, persistScheduledState } = require(process.env.STATE_HELPER_PATH)
             const stateMarker = '<!-- gfc-opencode-maintenance-state:v1 -->'
             const contextData = JSON.parse(fs.readFileSync(process.env.STATE_PATH, 'utf8'))
-            const raw = fs.readFileSync(process.env.OUTPUT_PATH, 'utf8').trim()
-            const result = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ''))
-            if (!['complete', 'inconclusive'].includes(result.status) || !Array.isArray(result.findings)) {
-              throw new Error('OpenCode returned an invalid scheduled-review result.')
+            let result
+            try {
+              const raw = fs.readFileSync(process.env.OUTPUT_PATH, 'utf8').trim()
+              result = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ''))
+            } catch (error) {
+              core.warning(`OpenCode returned unreadable scheduled-review output: ${error.message}`)
+              result = { status: 'inconclusive', findings: [] }
             }
-            if (result.findings.length > contextData.limits.maxFindings) {
-              throw new Error('OpenCode returned more findings than this job allows.')
+            if (!['complete', 'inconclusive'].includes(result?.status) || !Array.isArray(result?.findings) || result.findings.length > contextData.limits.maxFindings) {
+              core.warning('OpenCode returned an invalid scheduled-review result.')
+              result = { status: 'inconclusive', findings: [] }
             }
 
             const allIssues = await github.paginate(github.rest.issues.listForRepo, {
               owner: context.repo.owner, repo: context.repo.repo, state: 'all', per_page: 100,
             })
             const auditLabel = 'opencode-audit'
-            const eligibleLabel = 'opencode-audit-eligible'
             const labelByName = new Map((await github.paginate(github.rest.issues.listLabelsForRepo, {
               owner: context.repo.owner, repo: context.repo.repo, per_page: 100,
             })).map((label) => [label.name, label]))
-            for (const name of [auditLabel, eligibleLabel]) {
-              if (labelByName.has(name)) continue
+            if (!labelByName.has(auditLabel)) {
               try {
                 const created = await github.rest.issues.createLabel({
-                  owner: context.repo.owner, repo: context.repo.repo, name,
-                  color: name === eligibleLabel ? '1d76db' : '7057ff',
-                  description: name === eligibleLabel ? 'Verified low-risk issue eligible for bounded OpenCode implementation.' : 'Finding created by the OpenCode maintenance audit system.',
+                  owner: context.repo.owner, repo: context.repo.repo, name: auditLabel,
+                  color: '7057ff',
+                  description: 'Finding created by the OpenCode maintenance audit system.',
                 })
-                labelByName.set(name, created.data)
+                labelByName.set(auditLabel, created.data)
               } catch (error) {
                 if (error.status !== 422) throw error
               }
             }
-
-            const eligibleRoots = ['src/monitor/', 'src/forecast/', 'src/verification/', 'src/components/', 'src/utils/', 'docs/']
-            const highRiskPath = /(^|\/)(billing|auth|authorization|security|entitlement|payment|stripe|deploy|deployment|secrets?)(\/|\.|$)/i
             let createdCount = 0
+            let publicationFailed = false
+            const allowedKinds = new Set(['bug', 'security', 'dependency', 'documentation', 'test', 'maintainability', 'architecture'])
+            const allowedCategories = new Set(['bug-hunt', 'security-daily', 'dependency-weekly', 'audit-weekly', 'audit-monthly'])
             for (const finding of result.findings) {
               if (result.status !== 'complete') continue
               const title = String(finding.title ?? '').trim()
@@ -341,10 +364,24 @@ jobs:
               const file = String(finding.file ?? '').replace(/\\/g, '/')
               const line = Number(finding.line)
               const kind = String(finding.kind ?? '').toLowerCase()
-              if (!title || !summary || !evidence || title.length > 180 || summary.length > 3000 || evidence.length > 3000) continue
+              if (!title || !summary || !evidence || title.length > 180 || summary.length > 3000 || evidence.length > 3000 || !allowedKinds.has(kind) || !allowedCategories.has(contextData.category)) continue
 
-              if (!file || path.isAbsolute(file) || file.split('/').includes('..') || !fs.existsSync(file)) continue
-              if (!Number.isInteger(line) || line < 1 || line > fs.readFileSync(file, 'utf8').split(/\r?\n/).length) continue
+              if (!file || path.isAbsolute(file) || /^[A-Za-z]:/.test(file) || !/^[A-Za-z0-9._/-]+$/.test(file) || file.split('/').includes('..')) continue
+              let lineCount
+              let fileHandle
+              try {
+                fileHandle = fs.openSync(file, 'r')
+                const stats = fs.fstatSync(fileHandle)
+                if (!stats.isFile() || stats.size > 5 * 1024 * 1024) continue
+                lineCount = fs.readFileSync(fileHandle, 'utf8').split(/\r?\n/).length
+              } catch {
+                continue
+              } finally {
+                if (fileHandle !== undefined) {
+                  try { fs.closeSync(fileHandle) } catch {}
+                }
+              }
+              if (!Number.isInteger(line) || line < 1 || line > lineCount) continue
               const fingerprint = crypto.createHash('sha256')
                 .update(`${contextData.category}|${file}|${title.toLowerCase().replace(/\s+/g, ' ')}`)
                 .digest('hex').slice(0, 20)
@@ -352,32 +389,34 @@ jobs:
               const marker = `<!-- gfc-opencode-audit:v1 fingerprint=${fingerprint} category=${contextData.category} kind=${kind} file=${file} scope=${scope} -->`
               if (contextData.state.reported?.[fingerprint] || allIssues.some((issue) => !issue.pull_request && issue.body?.includes(marker))) continue
 
-              const lowRiskKind = ['bug', 'documentation', 'test', 'maintainability'].includes(kind)
-              const safeRoot = eligibleRoots.some((root) => file.startsWith(root))
-              const workerEligible = !['security-daily', 'dependency-weekly'].includes(contextData.category) &&
-                lowRiskKind && safeRoot && !highRiskPath.test(file)
-              const issueLabels = workerEligible ? [auditLabel, eligibleLabel] : [auditLabel]
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `[OpenCode ${contextData.category}] ${title}`,
-                labels: issueLabels,
-                body: `${summary}\n\nEvidence: ${evidence}\n\nLocation: \`${file}:${line}\`\n\nCategory: \`${kind}\`\nConfidence: ${confidence}\n\nThis is a model-reported maintenance finding for investigation. Confirm the evidence and impact before making changes. ${workerEligible ? 'It is eligible for a bounded implementation worker, which will open a PR for human review.' : 'This finding requires maintainer-led implementation.'}\n\n${marker}`,
-              })
+              try {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `[OpenCode ${contextData.category}] ${title}`,
+                  labels: [auditLabel],
+                  body: `${summary}\n\nEvidence: ${evidence}\n\nLocation: \`${file}:${line}\`\n\nCategory: \`${kind}\`\nConfidence: ${confidence}\n\nThis is a model-reported maintenance finding for investigation. Confirm the evidence and impact before making changes. This finding requires maintainer-led implementation.\n\n${marker}`,
+                })
+              } catch (error) {
+                publicationFailed = true
+                core.warning(`Could not publish finding "${title}": ${error.message}`)
+                continue
+              }
               contextData.state.reported ??= {}
-              contextData.state.reported[fingerprint] = { issueMarker: marker, workerEligible }
+              contextData.state.reported[fingerprint] = { issueMarker: marker, workerEligible: false }
               createdCount += 1
             }
 
             core.info('Published ' + createdCount + ' issues from ' + result.findings.length + ' reported findings. Confidence is informational.')
-            const state = applyScheduledResult(contextData, result, context.sha, new Date().toISOString(), createdCount)
-            if (result.status === 'complete') state.jobs[contextData.category].lastFocus = contextData.focus
+            const recordedResult = publicationFailed ? { ...result, status: 'inconclusive' } : result
+            const state = applyScheduledResult(contextData, recordedResult, context.sha, new Date().toISOString(), createdCount)
+            if (recordedResult.status === 'complete') state.jobs[contextData.category].lastFocus = contextData.focus
             const body = `${stateMarker}\n${JSON.stringify(state)}`
             await github.rest.issues.updateComment({
               owner: context.repo.owner, repo: context.repo.repo, comment_id: contextData.stateCommentId, body,
             })
             persistScheduledState(contextData, process.env.STATE_PATH)
-            if (result.status === 'inconclusive') core.setFailed('Investigation was inconclusive; the recorded state permits retrying it later.')
+            if (recordedResult.status === 'inconclusive') core.setFailed('Investigation or issue publication was inconclusive; the recorded state permits retrying it later.')
 
       - name: Record a failed investigation attempt
         if: failure() && steps.context.outputs.run == 'true'

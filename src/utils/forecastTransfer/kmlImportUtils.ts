@@ -13,15 +13,56 @@ const findKmlEntry = (zip: JSZip): JSZip.JSZipObject => {
   return preferred;
 };
 
+/** Reads one entry through JSZip's stream so the cap stops decompression instead of checking after it. */
+type StreamableKmlEntry = JSZip.JSZipObject & {
+  internalStream(type: 'uint8array'): JSZip.JSZipStreamHelper<Uint8Array>;
+};
+
+const expandedTooLargeError = (): Error =>
+  new Error(`Expanded KML is too large. The maximum supported size is ${MAX_KML_IMPORT_BYTES / 1024 / 1024} MB.`);
+
 /** Expands and validates one KML archive entry. */
+// @codescene(disable:"Complex Method")
 const expandKmlEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
   const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
   if (declaredSize !== undefined && declaredSize > MAX_KML_IMPORT_BYTES) {
-    throw new Error(`Expanded KML is too large. The maximum supported size is ${MAX_KML_IMPORT_BYTES / 1024 / 1024} MB.`);
+    throw expandedTooLargeError();
   }
-  const expandedKml = await entry.async('uint8array');
-  if (expandedKml.byteLength > MAX_KML_IMPORT_BYTES) {
-    throw new Error(`Expanded KML is too large. The maximum supported size is ${MAX_KML_IMPORT_BYTES / 1024 / 1024} MB.`);
+
+  const stream = (entry as StreamableKmlEntry).internalStream('uint8array');
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const settle = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      action();
+    };
+
+    stream
+      .on('data', (chunk) => {
+        if (settled) return;
+        total += chunk.length;
+        if (total > MAX_KML_IMPORT_BYTES) {
+          // Pause the worker chain so the forged-metadata case stops decompressing.
+          stream.pause();
+          settle(() => reject(expandedTooLargeError()));
+          return;
+        }
+        chunks.push(chunk);
+      })
+      .on('error', (error) => settle(() => reject(error)))
+      .on('end', () => settle(resolve))
+      .resume();
+  });
+
+  const expandedKml = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    expandedKml.set(chunk, offset);
+    offset += chunk.length;
   }
   return new TextDecoder().decode(expandedKml);
 };
@@ -41,9 +82,14 @@ const readKmlPayload = async (file: File, bytes?: Uint8Array): Promise<string> =
   throw new Error('Unable to read KML file contents.');
 };
 
-/** Imports a KML/KMZ transfer into a forecast cycle. */
+/** Imports a KML/KMZ transfer into a forecast cycle. The file carries no owner, so the result is unowned. */
 export const importKmlTransfer = async (file: File, bytes: Uint8Array | undefined, format: 'kml' | 'kmz', options?: { baseCycle?: ForecastCycle; defaultDay?: DayType }): Promise<ForecastImportResult> => {
   const kml = await readKmlPayload(file, bytes);
   const { placemarks, warnings } = parseKmlDocument(kml, options?.defaultDay ?? options?.baseCycle?.currentDay ?? 1);
-  return { forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle), warnings, format };
+  return {
+    forecastCycle: forecastCycleFromKmlPlacemarks(placemarks, options?.baseCycle),
+    workspaceId: null,
+    warnings,
+    format,
+  };
 };

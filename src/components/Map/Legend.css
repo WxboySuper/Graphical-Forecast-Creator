@@ -27,7 +27,7 @@
   overflow: auto;
 }
 
-@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+@media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
   .map-legend,
   .forecast-floating-panels-layout .map-legend {
     display: none;
@@ -67,13 +67,50 @@
   }
 }
 
-@media (max-height: 500px) and (orientation: landscape) {
+
+@media (max-width: 640px) and (orientation: portrait) {
+  .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
+    --legacy-notice-mobile-legend-top: min(
+      176px,
+      max(8px, calc(100% - 188px))
+    );
+    box-sizing: border-box;
+    top: var(--legacy-notice-mobile-legend-top);
+    max-height: min(
+      42dvh,
+      300px,
+      max(
+        0px,
+        calc(100% - var(--legacy-notice-mobile-legend-top) - 12px)
+      )
+    );
+  }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
   .map-legend.map-legend--mobile-open {
     top: 106px;
     left: 86px;
     bottom: auto;
     max-width: min(240px, calc(100vw - 110px));
     max-height: calc(100dvh - var(--app-header-height, 64px) - 218px);
+  }
+
+  .forecast-page-shell--legacy-notice .map-legend.map-legend--mobile-open {
+    /* Keep the legend clear of the landscape toolbar on short maps. */
+    --legacy-notice-legend-top: min(106px, max(8px, calc(100% - 96px)));
+    --legacy-notice-legend-toolbar-clearance: 40px;
+    box-sizing: border-box;
+    top: var(--legacy-notice-legend-top);
+    padding: 6px;
+    border-width: 1px;
+    max-height: max(
+      0px,
+      calc(
+        100% - var(--legacy-notice-legend-top) -
+          var(--legacy-notice-legend-toolbar-clearance)
+      )
+    );
   }
 }
 

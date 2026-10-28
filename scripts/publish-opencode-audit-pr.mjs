@@ -99,17 +99,4 @@ state.pullRequestUrl = pull.html_url;
 state.headSha = headSha;
 writeFileSync(statePath, JSON.stringify(state), 'utf8');
 
-const dispatch = await fetch(`${apiBase}/actions/workflows/opencode-first-look.yml/dispatches`, {
-  method: 'POST',
-  headers,
-  body: JSON.stringify({
-    ref: base,
-    inputs: { pull_number: String(pull.number), expected_sha: headSha },
-  }),
-});
-if (!dispatch.ok) {
-  process.stderr.write(`PR ${pull.html_url} opened, but first-look dispatch failed with ${dispatch.status}.\n`);
-  process.exitCode = 1;
-} else {
-  process.stdout.write(`Opened ${pull.html_url} and dispatched first-look review.\n`);
-}
+process.stdout.write(`Opened ${pull.html_url}.\n`);

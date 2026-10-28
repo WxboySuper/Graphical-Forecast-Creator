@@ -20,9 +20,7 @@ export type TemporaryFeatureExposureDefinition = FeatureExposureBase & {
 
 export type PermanentFeatureExposureDefinition = FeatureExposureBase & {
   temporary: false;
-  serverBacked: false;
-  serverCapabilityKey?: never;
-};
+} & ServerBackedMetadata;
 
 export type FeatureExposureDefinition =
   | TemporaryFeatureExposureDefinition
@@ -40,18 +38,6 @@ const ALL_TARGETS_ON = {
   beta: true,
   staging: true,
   production: true,
-} as const satisfies FeatureExposureMatrix;
-
-// Exposure snapshots, not runtime-enforced caps. Fork a per-feature matrix if a feature diverges.
-const EXPOSURE_THROUGH_STAGING = {
-  ...ALL_TARGETS_ON,
-  production: false,
-} as const satisfies FeatureExposureMatrix;
-
-const EXPOSURE_THROUGH_BETA = {
-  ...ALL_TARGETS_ON,
-  staging: false,
-  production: false,
 } as const satisfies FeatureExposureMatrix;
 
 const CORE_PRODUCT_OWNER = 'WxboySuper';
@@ -119,9 +105,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: true,
-    removalCondition:
-      'Remove after Auto-TSTM client and server gates ship and the stable production rollout completes (#427). The v1.7 release exposes the completed workflow on every release target.',
+    temporary: false,
     serverBacked: true,
     serverCapabilityKey: 'TSTM_GENERATION_ENABLED',
     trackingIssue: 427,
@@ -130,8 +114,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: true,
-    removalCondition: 'Remove after forecast workflow v2 replaces the current cycle workflow (#429).',
+    temporary: false,
     serverBacked: false,
     trackingIssue: 429,
   },
@@ -139,8 +122,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: true,
-    removalCondition: 'Remove after verification analytics relaunch reaches production (#430).',
+    temporary: false,
     serverBacked: false,
     trackingIssue: 430,
   },
@@ -148,13 +130,17 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     exposure: { ...ALL_TARGETS_ON },
     owner: 'WxboySuper',
     addedDate: '2026-06-20',
-    temporary: true,
-    removalCondition: 'Remove after custom layers and premium forecast products complete their production rollout (#431).',
+    temporary: false,
     serverBacked: false,
     trackingIssue: 431,
   },
   outlookLandMasking: {
-    exposure: { ...EXPOSURE_THROUGH_STAGING },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: true,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-27',
     temporary: true,
@@ -172,6 +158,21 @@ export const FEATURE_EXPOSURE_REGISTRY = {
       'Keep disabled on production until tropical workspace foundations are complete (#432).',
     serverBacked: false,
     trackingIssue: 432,
+  },
+  customWorkspace: {
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
+    owner: 'WxboySuper',
+    addedDate: '2026-09-24',
+    temporary: true,
+    removalCondition:
+      'Open the Custom workspace on release targets once #915 registers /forecast/custom and moves the Custom UI.',
+    serverBacked: false,
+    trackingIssue: 915,
   },
   mesoscaleWorkspace: {
     exposure: { ...ALL_TARGETS_OFF },
@@ -202,7 +203,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 433,
   },
   paintBucketTool: {
-    exposure: { ...EXPOSURE_THROUGH_BETA },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -212,7 +218,7 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 623,
   },
   kmzExport: {
-    exposure: { ...EXPOSURE_THROUGH_STAGING },
+    exposure: { local: true, beta: true, staging: true, production: false },
     owner: 'WxboySuper',
     addedDate: '2026-08-18',
     temporary: true,
@@ -221,7 +227,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 621,
   },
   populationEstimate: {
-    exposure: { ...EXPOSURE_THROUGH_BETA },
+    exposure: {
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,

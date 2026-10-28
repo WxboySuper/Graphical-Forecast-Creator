@@ -25,20 +25,18 @@ import {
   setSatelliteProduct,
   setReferenceLayerEnabled,
 } from '../store/monitorSlice';
-import { selectForecastCycle, selectSavedCycles } from '../store/forecastSlice';
+import { selectForecastCycle, selectSavedCyclesForActiveWorkspace } from '../store/forecastSlice';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import { useCloudCycles } from '../hooks/useCloudCycles';
 import type { AddToastFn } from '../components/Layout';
 import { MonitorControls, MonitorMap } from '../monitor/components';
-import { buildMonitorOutlookOptions, resolveSelectedOutlookOption } from '../monitor/outlookSources';
-import type { MonitorOutlookSourceOption } from '../monitor/outlookSources';
+import { buildMonitorOutlookOptions, resolveSelectedOutlookOption, type MonitorOutlookSourceOption } from '../monitor/outlookSources';
 import type { MonitorSettings } from '../monitor/types';
 import { useLocalMonitorSettings } from './useLocalMonitorSettings';
 import { useMonitorCloudOutlook } from './useMonitorCloudOutlook';
 import { usePremiumMonitorSettingsSync } from './usePremiumMonitorSettingsSync';
 import { buildRadarLayerConfig, buildSatelliteLayerConfig } from '../monitor/wms';
-import { formatMonitorReferenceTime } from '../monitor/referenceLayers';
-import type { MonitorReferenceLayerMeta } from '../monitor/referenceLayers';
+import { formatMonitorReferenceTime, type MonitorReferenceLayerMeta } from '../monitor/referenceLayers';
 import { useMonitorReferenceLayers, type MonitorReferenceLayersState } from '../monitor/useMonitorReferenceLayers';
 import { useLiveWmsLayers } from '../monitor/useLiveWmsLayers';
 import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
@@ -51,6 +49,7 @@ interface PageContext {
   addToast: AddToastFn;
 }
 
+/** Builds attribution text for the reference layers shown on the monitor page. */
 export const buildMonitorReferenceAttributions = ({
   enabled,
   meta,
@@ -98,6 +97,7 @@ const resolveHandoffSource = (
   return undefined;
 };
 
+/** Loads and selects the forecast sources used by the monitor page. */
 const useMonitorPageSources = ({
   dispatch,
   searchParams,
@@ -109,8 +109,11 @@ const useMonitorPageSources = ({
 }) => {
   const didApplyHandoffSource = useRef(false);
   const settings = useSelector((state: RootState) => state.monitor);
+  const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const requestedWorkspaceId = searchParams.get('workspace');
+  const handoffWorkspaceReady = !requestedWorkspaceId || activeWorkspaceId === requestedWorkspaceId;
   const currentCycle = useSelector(selectForecastCycle);
-  const savedCycles = useSelector(selectSavedCycles);
+  const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const { cycles: cloudCycles, loading: cloudCyclesLoading } = useCloudCycles();
   const { premiumActive } = useEntitlement();
   const { sites: radarSiteOptions, loading: radarSitesLoading, error: radarSitesError } = useRadarSiteOptions();
@@ -131,12 +134,12 @@ const useMonitorPageSources = ({
   );
 
   useEffect(() => {
-    if (didApplyHandoffSource.current) return;
+    if (didApplyHandoffSource.current || !handoffWorkspaceReady) return;
     const matchingSource = resolveHandoffSource(searchParams, outlookOptions);
     if (!matchingSource) return;
     dispatch(setMonitorOutlookSource({ kind: matchingSource.kind, id: matchingSource.id }));
     didApplyHandoffSource.current = true;
-  }, [dispatch, outlookOptions, searchParams]);
+  }, [dispatch, handoffWorkspaceReady, outlookOptions, searchParams]);
 
   const selectedOutlook = useMonitorCloudOutlook({ selectedOption, today, addToast });
   return {
@@ -151,6 +154,7 @@ const useMonitorPageSources = ({
   };
 };
 
+/** Connects monitor settings to live radar, satellite, and reference layers. */
 const useMonitorPageLayers = ({ settings, addToast }: {
   settings: MonitorSettings;
   addToast: AddToastFn;
@@ -228,6 +232,7 @@ interface MonitorPageWorkspaceProps {
   dispatch: AppDispatch;
 }
 
+/** Renders the monitor workspace after page-level data has been assembled. */
 const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
   settings,
   outlookOptions,

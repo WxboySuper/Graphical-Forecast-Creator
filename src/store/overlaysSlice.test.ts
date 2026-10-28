@@ -10,10 +10,12 @@ describe('overlaysSlice', () => {
     expect(state.outlookTrimStrategy).toBe('us-country-minus-great-lakes');
   });
 
-  test('redirects the retired dark basemap to light', () => {
-    expect(normalizeBaseMapStyle('carto-dark')).toBe('carto-light');
-    expect(reducer(undefined, setBaseMapStyle('carto-dark')).baseMapStyle).toBe('carto-light');
-    expect(reducer(undefined, applyOverlaySettings({ baseMapStyle: 'carto-dark' })).baseMapStyle).toBe('carto-light');
+  test('redirects saved Carto basemaps to OpenStreetMap', () => {
+    for (const legacyStyle of ['carto-light', 'carto-dark'] as const) {
+      expect(normalizeBaseMapStyle(legacyStyle)).toBe('osm');
+      expect(reducer(undefined, setBaseMapStyle(legacyStyle)).baseMapStyle).toBe('osm');
+      expect(reducer(undefined, applyOverlaySettings({ baseMapStyle: legacyStyle })).baseMapStyle).toBe('osm');
+    }
   });
 
   test('creates fresh defaults when resetting overlay state', () => {

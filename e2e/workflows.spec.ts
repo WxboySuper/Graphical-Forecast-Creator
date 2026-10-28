@@ -136,7 +136,9 @@ test.describe('Workflow continuity', () => {
     const manifestFile = zip.file('workflow_package.json');
     if (manifestFile === null) throw new Error('Workflow package manifest is missing');
     const manifest = JSON.parse(await manifestFile.async('string'));
-    const exportedLayer = manifest.forecast.forecastCycle.days['2'].customLayers.layers[0];
+    expect(manifest.forecast.workspaceId).toBe(manifest.workspaceId);
+    const innerForecast = manifest.forecast.forecast;
+    const exportedLayer = innerForecast.forecastCycle.days['2'].customLayers.layers[0];
     expect(exportedLayer.label).toBe('Package fire layer');
     expect(exportedLayer.categories[0].style.hatch).toBe('crosshatch');
     expect(exportedLayer.features[0].geometry.type).toBe('Polygon');

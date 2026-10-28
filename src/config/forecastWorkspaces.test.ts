@@ -8,6 +8,8 @@ import {
   getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
+  requireForecastWorkspaceId,
+  resolveStoredWorkspaceId,
 } from './forecastWorkspaces';
 
 describe('forecast workspace product contract', () => {
@@ -21,8 +23,11 @@ describe('forecast workspace product contract', () => {
     ]);
   });
 
-  test.each(BUILD_TARGETS)('exposes Severe and Custom according to the %s target', (target: BuildTarget) => {
-    expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(['severe', 'custom']);
+  test.each(BUILD_TARGETS)('exposes Severe and gates Custom on the %s target', (target: BuildTarget) => {
+    const expected = target === 'production' || target === 'staging'
+      ? ['severe']
+      : ['severe', 'custom'];
+    expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(expected);
   });
 
   test('keeps unknown IDs and malformed paths out of the contract', () => {
@@ -41,7 +46,8 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('mesoscale')).toMatchObject({
       path: '/forecast/mesoscale',
       productType: 'mesoscale',
-      exposureKey: 'mesoscaleWorkspace',
+      status: 'future',
+      exposureKey: null,
     });
     expect(getForecastWorkspaceByPath('/forecast/custom')).toMatchObject({
       id: 'custom',
@@ -49,18 +55,57 @@ describe('forecast workspace product contract', () => {
     });
   });
 
+  test('does not expose a gated workspace without an explicit feature key', () => {
+    const customWorkspace = getForecastWorkspace('custom')!;
+
+    expect(customWorkspace.status).toBe('gated');
+    expect(isForecastWorkspaceExposed({ ...customWorkspace, exposureKey: null }, 'production')).toBe(false);
+  });
+
   test('keeps product identity separate from workspace exposure', () => {
     expect(getForecastWorkspace('severe')?.productType).toBe('severe');
     expect(getForecastWorkspace('custom')?.productType).toBe('custom');
     expect(isForecastWorkspaceExposed(getForecastWorkspace('severe')!, 'production')).toBe(true);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('winter')!, 'production')).toBe(false);
+    // #914 ships the route contract only: no future workspace opens on a release target.
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'staging')).toBe(false);
+    expect(getForecastWorkspace('custom')?.exposureKey).toBe('customWorkspace');
+    // The library feature gate must not decide whether the editor route registers.
+    expect(getForecastWorkspace('custom')?.exposureKey).not.toBe('customProducts');
   });
 
-  test('uses Severe for legacy Forecast entry points', () => {
+  test('keeps the Custom Products library separate from legacy Forecast entry points', () => {
     expect(DEFAULT_FORECAST_WORKSPACE).toBe('severe');
     expect(getDefaultForecastWorkspace().path).toBe('/forecast/severe');
     expect(getDefaultForecastWorkspace().legacyPaths).toContain('/forecast');
     expect(getForecastWorkspaceByLegacyPath('/forecast')?.id).toBe('severe');
-    expect(getForecastWorkspaceByLegacyPath('/custom-products')?.id).toBe('custom');
+    expect(getForecastWorkspaceByLegacyPath('/custom-products')).toBeUndefined();
+  });
+
+  test('returns a registered workspace from requireForecastWorkspaceId', () => {
+    expect(requireForecastWorkspaceId('severe')).toBe('severe');
+    expect(requireForecastWorkspaceId('custom')).toBe('custom');
+  });
+
+  test('fails closed when a writer cannot name a registered workspace', () => {
+    for (const invalid of [undefined, null, '', 'Severe', 'mesoscale-v2', 42, {}]) {
+      expect(() => requireForecastWorkspaceId(invalid)).toThrow('valid workspace');
+    }
+  });
+
+  test('resolves stored workspace ids without relabeling an unknown owner', () => {
+    // Absent means a record written before workspaces existed: stay on the default.
+    expect(resolveStoredWorkspaceId(undefined)).toBe('severe');
+    expect(resolveStoredWorkspaceId(null)).toBe('severe');
+    // Registered ids are returned as-is.
+    expect(resolveStoredWorkspaceId('custom')).toBe('custom');
+    expect(resolveStoredWorkspaceId('mesoscale')).toBe('mesoscale');
+    // Anything else has no usable owner and must stay distinguishable.
+    expect(resolveStoredWorkspaceId('bogus')).toBeNull();
+    expect(resolveStoredWorkspaceId('Severe')).toBeNull();
+    expect(resolveStoredWorkspaceId(42)).toBeNull();
+    expect(resolveStoredWorkspaceId({})).toBeNull();
   });
 });

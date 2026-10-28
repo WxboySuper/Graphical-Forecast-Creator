@@ -1,6 +1,6 @@
 # v1.7 feature exposure workstreams
 
-Single adoption manifest for every unfinished v1.7 workstream registered in `src/config/featureExposure.ts`. Completing this adoption is tracked in FND-14 (#530).
+Single adoption manifest for every v1.7 workstream registered in `src/config/featureExposure.ts`. Some rows are permanent and never plan an exit, others are temporary until their gate retires, and the registry enforces both. Completing this adoption is tracked in FND-14 (#530).
 
 ## Adoption rule
 
@@ -10,6 +10,7 @@ Every workstream must:
 2. Gate routes, navigation, boundaries, side-effect modules, and server capabilities **before** the first exposed slice merges.
 3. Ship disabled-side-effect tests or a documented acknowledgement (see [feature-exposure-testing.md](./feature-exposure-testing.md)).
 4. Record the tracker issue and the PR that may first flip `exposure.beta` (TBD until an implementation slice is ready).
+5. Declare the lifecycle the registry enforces. Permanent rows use `temporary: false` with no `removalCondition`, temporary rows use `temporary: true` with a `removalCondition`.
 
 ## Summary
 
@@ -19,16 +20,18 @@ Every workstream must:
 | Forecast workflow v2 | `forecastWorkflowV2` | #429 | Home entry + forecast workspace workflow slice | Home interaction + adoption tests |
 | Verification relaunch | `verificationRelaunch` | #430 | Registry-backed Forecast Grade relaunch | Acknowledgement + adoption test |
 | Custom products | `customProducts` | #431 | Forecast editor, product library, entitlement, and storage gates | Acknowledgement + adoption and E2E tests |
-| Tropical workspace | `tropicalWorkspace` | #432 | Gated route `/tropical` + navbar | Exemplar + route/nav tests |
+| Tropical workspace | `tropicalWorkspace` (gates legacy `/tropical` only) | #432 (planned `/forecast/tropical`, TROP-01 to TROP-04) | Gated route `/tropical` + navbar | Exemplar + route/nav tests |
 | Collaboration room | `collaborationRoom` | #433 | Gated route `/collaborate` + navbar | Exemplar + route/nav tests |
 
 Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products are release-approved across local, beta, staging, and production for v1.7.
+
+Approved rows use a permanent lifecycle. Auto-TSTM, Forecast Workflow v2, Verification relaunch, and Custom Products carry `temporary: false` and have no removal condition.
 
 ## Per-workstream detail
 
 ### Auto-TSTM (`autoTstm`, #427)
 
-- **Registry:** `temporary: true`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
+- **Registry:** `temporary: false`, `serverBacked: true`, `serverCapabilityKey: TSTM_GENERATION_ENABLED`
 - **Gates:** `FEATURE_SIDE_EFFECT_MODULES.autoTstm`, `ServerBackedFeatureBoundary`, `server/tstm.js` capability gate
 - **Tests:** `src/testing/featureExposure/exemplar.exposure.test.tsx`, `server/testing/autoTstm.exposure.test.js`
 - **Ops:** [auto-tstm-operations.md](./auto-tstm-operations.md)
@@ -36,31 +39,39 @@ Unreleased rows remain disabled until their enablement criteria pass. Auto-TSTM,
 
 ### Forecast workflow v2 (`forecastWorkflowV2`, #429)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** home workflow actions and forecast workspace workflow panel
 - **Tests:** signed-in home interaction coverage in `src/pages/home/HomePage.test.tsx`, adoption contract in `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after workflow continuity and adoption coverage
 
 ### Verification relaunch (`verificationRelaunch`, #430)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** none yet — the existing `/verification` route is core product, not this relaunch key
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after dashboard, coexistence, and adoption coverage
 
 ### Custom products (`customProducts`, #431)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: false`, client-only
 - **Gates:** custom route, navigation, toolbar, repository, entitlement, and Firestore capability checks
 - **Tests:** acknowledgement in `featureExposure.acknowledgements.json`, `src/config/v17WorkstreamAdoption.exposure.test.ts`
 - **Release enablement:** approved for local, beta, staging, and production after implementation, UI review, and regression/E2E coverage
 
-### Tropical workspace (`tropicalWorkspace`, #432)
+### Tropical workspace (legacy `tropicalWorkspace`, planned workspace #432)
 
-- **Registry:** `temporary: true`, client-only
+- **Registry:** `temporary: true`, client-only, `trackingIssue: 432`
 - **Gates:** gated lazy route `/tropical`, navbar item `tropical-workspace`
 - **Tests:** exemplar + `buildFeatureGatedRoutes.test.tsx` + `featureNavigation.test.ts`
-- **Beta enablement:** tracker #432; first enable PR: TBD
+- **Scope:** the key gates only the legacy `/tropical` route and its navbar.
+  #432 tracks the planned `/forecast/tropical` workspace and its TROP children
+  (#478 to #481), so the `trackingIssue` value on this registry entry points at
+  that plan rather than the legacy surface.
+- **Planned workspace:** when implementation is ready, `/forecast/tropical`
+  defines its own exposure key and contract instead of reusing
+  `tropicalWorkspace`, and #432 records that key before the first implementation
+  PR.
+- **Beta enablement:** first enable PR: TBD
 
 ### Collaboration room (`collaborationRoom`, #433)
 

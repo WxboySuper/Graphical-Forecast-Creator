@@ -43,6 +43,9 @@ export interface OverlayOptions {
   title?: string;
   statusText?: string;
   unofficialText?: string;
+  /** Layout measured from the live map before html2canvas clones it. */
+  legendClearance?: number;
+  unofficialHeight?: number;
 }
 
 // Helper: add title/footer/status and unofficial overlays
@@ -67,15 +70,17 @@ export const addStatusOverlay = (container: HTMLElement, statusText: string, isD
 };
 
 /** Adds the unofficial forecast badge to the export container. */
-export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string) => {
+export const addUnofficialOverlay = (container: HTMLElement, unofficialText: string): HTMLElement => {
   const doc = container.ownerDocument;
   const unofficialWrapper = doc.createElement('div');
+  unofficialWrapper.className = 'gfc-export-unofficial-overlay';
+  // Keep the warning on its own bottom row; the attribution footer occupies the row above it.
   unofficialWrapper.style.cssText = 'position:absolute;bottom:8px;left:0;right:0;text-align:center;z-index:1300;pointer-events:none;';
 
   const innerBg = 'rgba(20,20,20,0.62)';
   const innerColor = '#f0f0f0';
   const innerDiv = doc.createElement('div');
-  innerDiv.style.cssText = `display:inline-block;background:${innerBg};color:${innerColor};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:0 10px;height:22px;line-height:16px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);white-space:nowrap;`;
+  innerDiv.style.cssText = `display:inline-block;box-sizing:border-box;max-width:calc(100% - 16px);background:${innerBg};color:${innerColor};font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:2px 10px;min-height:22px;line-height:16px;border-radius:999px;border:1px solid rgba(255,255,255,0.18);white-space:normal;overflow-wrap:anywhere;`;
 
   const dot = doc.createElement('span');
   dot.style.cssText = 'display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:middle;';
@@ -89,10 +94,11 @@ export const addUnofficialOverlay = (container: HTMLElement, unofficialText: str
   innerDiv.appendChild(text);
   unofficialWrapper.appendChild(innerDiv);
   container.appendChild(unofficialWrapper);
+  return unofficialWrapper;
 };
 
 /** Adds the title and footer overlays to the export container. */
-export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean) => {
+export const addTitleAndFooter = (container: HTMLElement, options: OverlayOptions, isDarkMode: boolean, footerBottom = 20) => {
   const doc = container.ownerDocument;
   if (options.title) {
     const titleDiv = doc.createElement('div');
@@ -104,11 +110,124 @@ export const addTitleAndFooter = (container: HTMLElement, options: OverlayOption
   }
 
   const footerDiv = doc.createElement('div');
+  footerDiv.className = 'gfc-export-attribution';
   const bg = isDarkMode ? 'rgba(30,30,30,0.9)' : 'rgba(255,255,255,0.9)';
   const text = isDarkMode ? '#e4e4e4' : '#212529';
-  footerDiv.style.cssText = `position:absolute;bottom:20px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
+  footerDiv.style.cssText = `position:absolute;box-sizing:border-box;max-width:calc(100% - 40px);bottom:${footerBottom}px;right:20px;z-index:1000;background-color:${bg};color:${text};padding:8px 12px;border-radius:4px;font-size:12px;white-space:normal;overflow-wrap:anywhere;text-align:right;box-shadow:0 2px 4px rgba(0,0,0,0.2);`;
   footerDiv.textContent = `Created with Graphical Forecast Creator | ${getFormattedDate()} | OpenStreetMap contributors`;
   container.appendChild(footerDiv);
+};
+
+const getMeasuredUnofficialHeight = (unofficialOverlay: HTMLElement) => {
+  const unofficialInner = unofficialOverlay.firstElementChild as HTMLElement | null;
+  return Math.max(
+    unofficialOverlay.getBoundingClientRect().height,
+    unofficialInner?.getBoundingClientRect().height ?? 0,
+    unofficialInner?.scrollHeight ?? 0,
+  );
+};
+
+const parsePixelLength = (value: string | undefined) => {
+  const match = value?.trim().match(/^(\d+(?:\.\d+)?)px$/);
+  return match ? Number(match[1]) : Number.NaN;
+};
+
+const estimateUnofficialHeight = (container: HTMLElement, unofficialText: string | undefined) => {
+  const textLength = unofficialText?.length ?? 0;
+  const boundsWidth = container.getBoundingClientRect().width;
+  let containerWidth = Number.isFinite(boundsWidth) && boundsWidth > 0 ? boundsWidth : 0;
+  if (containerWidth <= 0) {
+    const inlineWidth = parsePixelLength(container.style.width);
+    containerWidth = Number.isFinite(inlineWidth) && inlineWidth > 0 ? inlineWidth : 320;
+  }
+  const charactersPerLine = Math.max(1, Math.floor((containerWidth - 32) / 8));
+  const lines = Math.ceil(textLength / charactersPerLine);
+  return Math.max(22, lines * 16 + 6);
+};
+
+const hasHiddenDisplay = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.display === 'none' || computedStyle?.display === 'none';
+
+const hasHiddenVisibility = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.visibility === 'hidden' || computedStyle?.visibility === 'hidden';
+
+const hasNoOpacity = (inlineStyle: CSSStyleDeclaration, computedStyle?: CSSStyleDeclaration) =>
+  inlineStyle.opacity === '0' || computedStyle?.opacity === '0';
+
+const isLegendHidden = (legend: HTMLElement) => {
+  const computedStyle = legend.ownerDocument.defaultView?.getComputedStyle(legend);
+  return hasHiddenDisplay(legend.style, computedStyle) ||
+    hasHiddenVisibility(legend.style, computedStyle) ||
+    hasNoOpacity(legend.style, computedStyle);
+};
+
+const overlapsFooterHorizontally = (containerBounds: DOMRect, legendBounds: DOMRect) => {
+  const footerLeft = containerBounds.left + 20;
+  const footerRight = containerBounds.right - 20;
+  return legendBounds.left < footerRight && legendBounds.right > footerLeft;
+};
+
+const getStyleBasedLegendClearance = (container: HTMLElement, legend: HTMLElement) => {
+  // A live source with degenerate geometry can still expose CSS lengths. Do not invent dimensions
+  // when a detached document has neither layout metrics nor a browsing context.
+  const computedStyle = container.ownerDocument.defaultView?.getComputedStyle(legend);
+  const inlineBottom = parsePixelLength(legend.style.bottom);
+  const bottom = Number.isFinite(inlineBottom) ? inlineBottom : parsePixelLength(computedStyle?.bottom);
+  const heightCandidates = [
+    legend.getBoundingClientRect().height,
+    legend.offsetHeight,
+    legend.scrollHeight,
+    parsePixelLength(legend.style.height),
+    parsePixelLength(computedStyle?.height),
+  ].filter(Number.isFinite);
+  const height = Math.max(...heightCandidates);
+  return Number.isFinite(bottom) && height > 0 ? Math.ceil(bottom + height + 12) : 0;
+};
+
+const getMeasuredLegendClearance = (containerBounds: DOMRect, legendBounds: DOMRect) => {
+  const legendIsInFooterRegion = legendBounds.bottom > containerBounds.top + containerBounds.height / 2;
+  const overlaps = legendBounds.height > 0 &&
+    legendIsInFooterRegion &&
+    overlapsFooterHorizontally(containerBounds, legendBounds);
+  return overlaps ? Math.ceil(containerBounds.bottom - legendBounds.top + 12) : 0;
+};
+
+const hasDegenerateContainerBounds = (bounds: DOMRect) => bounds.height <= 0 || bounds.width <= 0;
+const hasDegenerateLegendBounds = (bounds: DOMRect) => bounds.height <= 0;
+
+const getLegendClearance = (container: HTMLElement) => {
+  const legend = container.querySelector<HTMLElement>('.map-legend');
+  if (!legend || isLegendHidden(legend)) return 0;
+
+  const containerBounds = container.getBoundingClientRect();
+  const legendBounds = legend.getBoundingClientRect();
+  if (hasDegenerateContainerBounds(containerBounds) || hasDegenerateLegendBounds(legendBounds)) {
+    return getStyleBasedLegendClearance(container, legend);
+  }
+  return getMeasuredLegendClearance(containerBounds, legendBounds);
+};
+
+const getFooterLayout = (
+  container: HTMLElement,
+  unofficialOverlay: HTMLElement | null,
+  unofficialText: string | undefined,
+  layoutSnapshot: Pick<OverlayOptions, 'unofficialHeight' | 'legendClearance'> = {},
+) => {
+  const measuredCloneHeight = unofficialOverlay ? getMeasuredUnofficialHeight(unofficialOverlay) : 0;
+  const fallbackHeight = Math.max(
+    layoutSnapshot.unofficialHeight ?? 0,
+    estimateUnofficialHeight(container, unofficialText),
+  );
+  const unofficialHeight = measuredCloneHeight > 0
+    ? Math.max(layoutSnapshot.unofficialHeight ?? 0, measuredCloneHeight)
+    : fallbackHeight;
+  const legendClearance = layoutSnapshot.legendClearance ?? getLegendClearance(container);
+  const unofficialBottom = unofficialOverlay ? Math.max(8, legendClearance) : 8;
+  const unofficialClearance = unofficialOverlay ? unofficialBottom + Math.ceil(unofficialHeight) + 12 : 20;
+  return {
+    footerBottom: Math.max(unofficialClearance, legendClearance),
+    unofficialBottom,
+  };
 };
 
 /** Adds status, unofficial, title, and footer overlays to the export container. */
@@ -121,11 +240,18 @@ export const addOverlays = (container: HTMLElement, options: OverlayOptions = {}
   }
 
   // Unofficial badge recreated from text to avoid html2canvas baseline drift.
-  if (options.unofficialText) {
-    addUnofficialOverlay(container, options.unofficialText);
-  }
+  const unofficialOverlay = options.unofficialText
+    ? addUnofficialOverlay(container, options.unofficialText)
+    : null;
+  const { footerBottom, unofficialBottom } = getFooterLayout(
+    container,
+    unofficialOverlay,
+    options.unofficialText,
+    options,
+  );
+  if (unofficialOverlay) unofficialOverlay.style.bottom = `${unofficialBottom}px`;
 
-  addTitleAndFooter(container, options, isDarkMode);
+  addTitleAndFooter(container, options, isDarkMode, footerBottom);
 };
 
 // Helper: build the clone callback to hide controls and add overlays (reduces branching in main function)
@@ -138,6 +264,20 @@ const readStatusText = (root: HTMLElement): string =>
 const readUnofficialText = (root: HTMLElement): string =>
   root.querySelector('.unofficial-badge-inner')?.textContent?.trim() ??
   '';
+
+const getExistingUnofficialHeight = (root: HTMLElement) => {
+  const badge = root.querySelector<HTMLElement>('.unofficial-badge');
+  const inner = root.querySelector<HTMLElement>('.unofficial-badge-inner');
+  if (!badge) return undefined;
+  const height = Math.max(
+    badge.getBoundingClientRect().height,
+    badge.offsetHeight,
+    inner?.getBoundingClientRect().height ?? 0,
+    inner?.offsetHeight ?? 0,
+    inner?.scrollHeight ?? 0,
+  );
+  return height > 0 ? height : undefined;
+};
 
 // Helper: mark cloned images CORS-safe so html2canvas can load external tiles.
 /** Marks cloned images as CORS safe so html2canvas can load external tiles. */
@@ -347,20 +487,33 @@ export const exportMapAsImage = async (
 
   const { exportRoot, width, height } = getExportRootAndSize(map);
 
-  // Read overlays from live DOM before html2canvas clones/reflows styles
+  // Snapshot overlay layout before html2canvas clones/reflows styles. The clone may have no
+  // browsing context, so it cannot reliably recover stylesheet visibility or measured geometry.
   const statusText = includeLegendAndStatus ? readStatusText(exportRoot) : '';
   const unofficialText = includeLegendAndStatus ? readUnofficialText(exportRoot) : '';
-
   await waitForMapRender(map, 400);
   const imgResult = await waitForImagesLoaded(exportRoot, 1200);
   maybeShowTileTimeoutWarning(exportRoot, imgResult);
+
+  // Take the layout snapshot after rendering and image waits, immediately before the clone.
+  const legendClearance = includeLegendAndStatus ? getLegendClearance(exportRoot) : 0;
+  const unofficialHeight = includeLegendAndStatus
+    ? getExistingUnofficialHeight(exportRoot)
+    : undefined;
 
   return captureContainer(exportRoot, {
     width,
     height,
     format,
     quality,
-    onClone: buildCloneCallback({ title, includeLegendAndStatus, statusText, unofficialText }),
+    onClone: buildCloneCallback({
+      title,
+      includeLegendAndStatus,
+      statusText,
+      unofficialText,
+      legendClearance,
+      unofficialHeight,
+    }),
   });
 };
 

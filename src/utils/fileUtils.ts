@@ -14,8 +14,9 @@ import { completionMetadataFromForecastCycle } from './forecastCompletionMetadat
 import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
+import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload, createForecastWorkspaceSave } from './forecastWorkspaceEnvelope';
 import { isFeatureExposed } from '../config/featureExposure';
-import { validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
+import { MAX_IMPORT_BYTES, validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
 export { MAX_IMPORT_BYTES } from './forecastImportValidation';
 
@@ -46,14 +47,108 @@ const isZipImport = (file: File, bytes?: Uint8Array): boolean => [
   bytes?.[0] === 0x50 && bytes?.[1] === 0x4b,
 ].includes(true);
 
-/** Extracts the preferred forecast payload from a workflow ZIP package. */
-const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
-  const zip = await JSZip.loadAsync(bytes ?? file);
-  const entry = zip.file('workflow_package.json') ?? zip.file('forecast_cycle.json');
-  if (!entry) throw new Error('Package is missing workflow_package.json and forecast_cycle.json.');
-  return JSON.parse(await entry.async('string')) as unknown;
+/** Node-style stream surface JSZip emits through its internal stream helper. */
+interface PackageEntryStream {
+  on(event: 'data', handler: (chunk: Uint8Array) => void): PackageEntryStream;
+  on(event: 'error', handler: (error: unknown) => void): PackageEntryStream;
+  on(event: 'end', handler: () => void): PackageEntryStream;
+  pause(): void;
+  resume(): void;
+}
+
+/** JSZip keeps internalStream out of its public type surface, so widen the entry locally. */
+type StreamableZipEntry = JSZip.JSZipObject & {
+  internalStream: (type: 'uint8array') => PackageEntryStream;
 };
 
+/** Expands one ZIP entry while enforcing the byte budget as output arrives. */
+const expandPackageEntry = async (entry: JSZip.JSZipObject): Promise<string> => {
+  const declaredSize = (entry as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
+  const maxLabel = `${MAX_IMPORT_BYTES / 1024 / 1024} MB`;
+  const oversizedError = () => new Error(
+    `Expanded forecast package is too large. The maximum supported size is ${maxLabel}.`,
+  );
+  if (declaredSize !== undefined && declaredSize > MAX_IMPORT_BYTES) {
+    throw oversizedError();
+  }
+
+  const expanded = await new Promise<Uint8Array>((resolve, reject) => {
+    const stream = (entry as StreamableZipEntry).internalStream('uint8array');
+    const chunks: Uint8Array[] = [];
+    let byteLength = 0;
+    let settled = false;
+
+    const rejectOnce = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      stream.pause();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    stream.on('data', (chunk: Uint8Array) => {
+      if (settled) return;
+      byteLength += chunk.byteLength;
+      if (byteLength > MAX_IMPORT_BYTES) {
+        rejectOnce(oversizedError());
+        return;
+      }
+      chunks.push(chunk);
+    });
+    stream.on('error', rejectOnce);
+    stream.on('end', () => {
+      if (settled) return;
+      settled = true;
+      const result = new Uint8Array(byteLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      resolve(result);
+    });
+    stream.resume();
+  });
+
+  return new TextDecoder().decode(expanded);
+};
+
+/** Returns a canonical JSON string with object keys sorted so key order cannot mask differences. */
+const toCanonicalJson = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map((item) => toCanonicalJson(item)).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${toCanonicalJson(entryValue)}`);
+    return `{${entries.join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+};
+
+/** Checks that the optional copy of the forecast agrees with the package manifest. */
+const assertPackageFallbackMatches = async (manifest: unknown, zip: JSZip): Promise<void> => {
+  const fallbackEntry = zip.file('forecast_cycle.json');
+  if (!fallbackEntry) return;
+
+  const fallback = JSON.parse(await expandPackageEntry(fallbackEntry)) as unknown;
+  const manifestForecast = (manifest as { forecast?: unknown } | null)?.forecast;
+  if (manifestForecast === undefined) return;
+  if (toCanonicalJson(manifestForecast) !== toCanonicalJson(fallback)) {
+    throw new Error('workflow_package.json does not match forecast_cycle.json.');
+  }
+};
+
+/** Extracts the required manifest while preserving the streaming size gate. */
+const readForecastPackage = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
+  const zip = await JSZip.loadAsync(bytes ?? file);
+  const manifestEntry = zip.file('workflow_package.json');
+  if (!manifestEntry) {
+    throw new Error('Package is missing workflow_package.json.');
+  }
+
+  const manifest = JSON.parse(await expandPackageEntry(manifestEntry)) as unknown;
+  await assertPackageFallbackMatches(manifest, zip);
+  return manifest;
+};
 /** Parses a plain JSON forecast from already-read bytes or the File text API. */
 const readForecastJson = async (file: File, bytes?: Uint8Array): Promise<unknown> => {
   const text = bytes ? new TextDecoder().decode(bytes) : await file.text();
@@ -221,10 +316,14 @@ const deserializeLegacyForecast = (data: GFCForecastSaveData): ForecastCycle => 
  * Deserializes the saved JSON data back into ForecastCycle.
  * Handles migration from single-day format and v1.0.0 cycleMetadata embedding.
  */
-export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
-  if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
-  if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
-  const forecastData = data as GFCForecastSaveData;
+const deserializeWorkspaceEnvelope = (data: unknown): ForecastCycle => {
+  if (!isWorkspaceSaveEnvelope(data)) {
+    throw new Error('This forecast envelope is not a valid workspace save.');
+  }
+  return deserializeForecast(data.forecast);
+};
+
+const deserializeForecastData = (forecastData: GFCForecastSaveData): ForecastCycle => {
   if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
   const cycle = forecastData.forecastCycle;
   return {
@@ -236,6 +335,16 @@ export const deserializeForecast = (data: GFCForecastSaveData | unknown): Foreca
       : {}),
     ...completionMetadataFromForecastCycle(cycle),
   };
+};
+
+export const deserializeForecast = (data: GFCForecastSaveData | unknown): ForecastCycle => {
+  if (isWorkflowExportPackage(data)) return deserializeForecast(data.forecast);
+  // A declared envelope must pass the strict validator before it is unwrapped.
+  // Falling through instead would hand the caller an empty day-one cycle with
+  // no indication that the real forecast was discarded.
+  if (declaresWorkspaceEnvelope(data)) return deserializeWorkspaceEnvelope(data);
+  if (!data || typeof data !== 'object') return deserializeLegacyForecast({} as GFCForecastSaveData);
+  return deserializeForecastData(data as GFCForecastSaveData);
 };
 
 /** Creates a deep forecast-cycle clone while preserving Map-backed outlook data. */
@@ -255,33 +364,38 @@ export const cloneForecastCycle = (forecastCycle: ForecastCycle): ForecastCycle 
  * excessive coordinates are rejected before any state mutation. The boolean
  * return preserves the existing call contract.
  */
-export const validateForecastData = (data: unknown): data is GFCForecastSaveData => {
-  if (isWorkflowExportPackage(data)) return validateForecastData(data.forecast);
-  return validateForecastImport(data).ok;
-};
+export const validateForecastData = (data: unknown): data is GFCForecastSaveData =>
+  validateForecastImport(data).ok;
 
 /**
  * Validates imported forecast data and returns an actionable failure reason
  * when it is rejected. Returns null for valid documents, and narrows the input
  * type so callers can deserialize safely after validation.
+ *
+ * The shared validator already unwraps workflow packages, so the outer owner is
+ * checked on the way through instead of being skipped.
  */
 export const validateForecastDataReason = (data: unknown): string | null => {
-  if (isWorkflowExportPackage(data)) return validateForecastDataReason(data.forecast);
   const result = validateForecastImport(data);
   return result.ok ? null : (result.reason ?? 'Invalid forecast data format.');
 };
 
 /**
- * Triggers a download of the serialized forecast data as a JSON file.
+ * Triggers a download of the workspace envelope for the serialized forecast data.
  * When `cycleMetadata` is provided, the export keeps the active workflow
  * metadata so a re-import can restore the workflow session.
+ *
+ * The owner is a required argument: this helper exists next to the bare legacy
+ * writer, and requiring an owner is what keeps it from producing a payload that
+ * carries no workspace identity.
  */
 export const exportForecastToJson = (
+  workspaceId: import('../config/forecastWorkspaces').ForecastWorkspaceId,
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
   cycleMetadata?: CycleMetadata
 ) => {
-  const data = serializeForecast(forecastCycle, mapView, cycleMetadata);
+  const data = createForecastWorkspaceSave(workspaceId, serializeForecast(forecastCycle, mapView, cycleMetadata));
   const jsonString = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   
@@ -354,17 +468,18 @@ const addPackageDiscussions = (
 export const downloadGfcPackage = async (
   forecastCycle: ForecastCycle,
   mapView: { center: [number, number]; zoom: number },
-  cycleMetadata?: CycleMetadata,
-  scope: WorkflowExportScope = 'cycle',
+  cycleMetadata: CycleMetadata | undefined,
+  scope: WorkflowExportScope,
+  workspaceId: import('../config/forecastWorkspaces').ForecastWorkspaceId,
 ): Promise<void> => {
   const zip = new JSZip();
 
-  // 1. Forecast JSON
-  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata });
-  const data = pkg.forecast;
-  zip.file('forecast_cycle.json', JSON.stringify(data, null, 2));
+  // 1. Forecast JSON. Both entries carry the same workspace envelope so the
+  // manifest, its fallback copy, and the package label all name one owner.
+  const pkg = buildWorkflowExportPackage({ scope, forecast: serializeForecast(forecastCycle, mapView, cycleMetadata), cycleMetadata, workspaceId });
+  zip.file('forecast_cycle.json', JSON.stringify(pkg.forecast, null, 2));
   zip.file('workflow_package.json', JSON.stringify(pkg, null, 2));
-  addPackageDiscussions(zip, data, cycleMetadata);
+  addPackageDiscussions(zip, getForecastDataFromWorkspacePayload(pkg.forecast), cycleMetadata);
 
   const blob = await zip.generateAsync({ type: 'blob' });
 

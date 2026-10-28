@@ -92,20 +92,36 @@ describe('fileUtils extra', () => {
     createdLink.click = clickMock as () => void;
     const spy = jest.spyOn(document, 'createElement').mockImplementation((tagName: string) => tagName === 'a' ? (createdLink as unknown as HTMLElement) : originalCreate(tagName));
 
+    let exportedBlob: Blob | null = null;
     const urlHelpers = Object.assign((globalThis.URL || URL) as URL, {
-      createObjectURL: jest.fn(() => 'blob:url'),
+      createObjectURL: jest.fn((blob: Blob) => {
+        exportedBlob = blob;
+        return 'blob:url';
+      }),
       revokeObjectURL: jest.fn()
     }) as BlobUrlHelpers;
     globalThis.URL = urlHelpers;
 
     const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() } } }, currentDay: 1, cycleDate: '2026-04-21' };
 
-    exportForecastToJson(forecast, { center: [0, 0], zoom: 0 });
+    exportForecastToJson('severe', forecast as never, { center: [0, 0], zoom: 0 });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();
     expect(urlHelpers.revokeObjectURL).toHaveBeenCalledWith('blob:url');
+
+    // The helper writes the workspace envelope, so it cannot hand out a payload
+    // that carries no workspace identity.
+    const exportedText = exportedBlob ? new TextDecoder().decode(new Uint8Array(await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsArrayBuffer(exportedBlob as Blob);
+    }))) : '';
+    expect(exportedText).toContain('"workspaceId": "severe"');
+    expect(exportedText).toContain('"schemaVersion": 1');
+    expect(() => exportForecastToJson('bogus' as never, forecast as never, { center: [0, 0], zoom: 0 })).toThrow('valid workspace');
     spy.mockRestore();
   });
 
@@ -146,7 +162,7 @@ describe('fileUtils extra', () => {
       discussionGroupings: [{ id: 'bad', label: ' ', days: [1, 2], discussionDay: 9 }],
     } as unknown as ForecastCycle;
 
-    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 }, undefined, 'cycle', 'severe');
 
     expect(Object.keys(generatedFiles).sort()).toEqual([
       'discussion_day1.txt',
@@ -189,7 +205,7 @@ describe('fileUtils extra', () => {
 
     const forecast: ForecastCycle = { days: { 1: { day: 1, metadata: {}, data: { categorical: new Map() }, discussion } }, currentDay: 1, cycleDate: '2026-04-21' };
 
-    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 });
+    await downloadGfcPackage(forecast, { center: [0, 0], zoom: 0 }, undefined, 'cycle', 'severe');
 
     expect(clickMock).toHaveBeenCalled();
     expect(urlHelpers.createObjectURL).toHaveBeenCalled();

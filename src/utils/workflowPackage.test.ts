@@ -1,4 +1,5 @@
 import { buildWorkflowExportPackage, isWorkflowExportPackage, toSerializedWorkflowPackage } from './workflowPackage';
+import { getForecastDataFromWorkspacePayload, isWorkspaceSaveEnvelope } from './forecastWorkspaceEnvelope';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -15,7 +16,7 @@ const metadata = {
 } as never;
 
 test.each(['workflow', 'cycle'] as const)('builds a discriminated %s package', (scope) => {
-  const pkg = buildWorkflowExportPackage({ scope, forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata, exportedAt: '2026-07-15T12:00:00.000Z' });
+  const pkg = buildWorkflowExportPackage({ scope, forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata, workspaceId: 'severe', exportedAt: '2026-07-15T12:00:00.000Z' });
   expect(pkg.packageType).toBe(scope);
   expect(isWorkflowExportPackage(pkg)).toBe(true);
   expect(pkg.exportedAt).toBe('2026-07-15T12:00:00.000Z');
@@ -23,7 +24,7 @@ test.each(['workflow', 'cycle'] as const)('builds a discriminated %s package', (
 });
 
 test('converts packages into the existing v2 serialized package contract', () => {
-  const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata });
+  const pkg = buildWorkflowExportPackage({ scope: 'cycle', forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle }, cycleMetadata: metadata, workspaceId: 'severe' });
   expect(toSerializedWorkflowPackage(pkg)?.cycles[0].id).toBe(metadata.id);
   expect(toSerializedWorkflowPackage(pkg)?.metadata.workflowId).toBe(metadata.workflowId);
 });
@@ -42,7 +43,7 @@ test('attaches custom geometry and appearance to its workflow grouping with comp
     version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z',
     forecastCycle: { ...cycle, days: { 1: { ...cycle.days[1], customLayers } } },
   } as never;
-  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata });
+  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata, workspaceId: 'severe' });
   const serialized = toSerializedWorkflowPackage(pkg)!;
 
   expect(pkg.customContent).toEqual({ included: true, severeAnalytics: 'excluded', autoCategorical: 'excluded' });
@@ -60,7 +61,7 @@ test('does not attach custom content to workflow groupings outside the local fea
       days: { 1: { ...cycle.days[1], customLayers: { schemaVersion: '1.0.0', layers: [{ id: 'hidden' }] } } },
     },
   } as never;
-  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata });
+  const pkg = buildWorkflowExportPackage({ scope: 'workflow', forecast, cycleMetadata: metadata, workspaceId: 'severe' });
   const serialized = toSerializedWorkflowPackage(pkg)!;
 
   expect(pkg.customContent).toBeUndefined();
@@ -77,6 +78,7 @@ test('fails closed when a workflow template is unknown', () => {
     scope: 'workflow',
     forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
     cycleMetadata: { ...metadata, workflowId: 'retired-workflow' },
+    workspaceId: 'severe',
 })).toThrow('Unknown workflow template');
 });
 
@@ -84,5 +86,60 @@ test('requires metadata for a workflow-scoped export', () => {
   expect(() => buildWorkflowExportPackage({
     scope: 'workflow',
     forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    workspaceId: 'severe',
   })).toThrow('Workflow export requires workflow metadata');
+});
+
+test('fails closed when the exporting workspace is missing or unregistered', () => {
+  for (const invalid of [undefined, '', 'Severe', 'mesoscale-v2', 42]) {
+    expect(() => buildWorkflowExportPackage({
+      scope: 'cycle',
+      forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+      workspaceId: invalid as never,
+    })).toThrow('valid workspace');
+  }
+});
+
+test('writes one workspace identity into both the package label and the inner forecast', () => {
+  const pkg = buildWorkflowExportPackage({
+    scope: 'cycle',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    cycleMetadata: metadata,
+    workspaceId: 'custom',
+    exportedAt: '2026-07-15T12:00:00.000Z',
+  });
+
+  expect(pkg.workspaceId).toBe('custom');
+  expect(isWorkspaceSaveEnvelope(pkg.forecast)).toBe(true);
+  expect(pkg.forecast).toMatchObject({ schemaVersion: 1, workspaceId: 'custom' });
+  expect(getForecastDataFromWorkspacePayload(pkg.forecast).forecastCycle).toBe(cycle);
+});
+
+test('rejects re-exporting an envelope under another workspace', () => {
+  const source = buildWorkflowExportPackage({
+    scope: 'cycle',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    workspaceId: 'severe',
+  });
+
+  expect(() => buildWorkflowExportPackage({
+    scope: 'cycle',
+    forecast: source.forecast,
+    workspaceId: 'custom',
+  })).toThrow('different workspace');
+});
+
+test('serializes a legacy bare forecast inside an older workflow package', () => {
+  const pkg = buildWorkflowExportPackage({
+    scope: 'cycle',
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+    cycleMetadata: metadata,
+    workspaceId: 'severe',
+  });
+  const legacyPackage = {
+    ...pkg,
+    forecast: { version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z', forecastCycle: cycle },
+  } as never;
+
+  expect(toSerializedWorkflowPackage(legacyPackage)?.cycles[0].groupings).toEqual([{ grouping: 'day1', day: 1 }]);
 });

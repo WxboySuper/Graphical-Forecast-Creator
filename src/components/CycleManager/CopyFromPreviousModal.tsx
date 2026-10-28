@@ -1,8 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import type { RootState } from '../../store';
 import { selectCurrentDay, copyFeaturesFromPrevious } from '../../store/forecastSlice';
 import { DayType, ForecastCycle } from '../../types/outlooks';
-import { deserializeForecast, validateForecastData } from '../../utils/fileUtils';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { readForecastImportFile, validateForecastData, validateForecastDataReason } from '../../utils/fileUtils';
+import { resolveNativeFileContent } from '../../utils/forecastTransfer/nativeImportUtils';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './CopyFromPreviousModal.css';
@@ -14,23 +17,77 @@ interface CopyFromPreviousModalProps {
 
 const DAYS: DayType[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
-// Read a file as text (Promise wrapper) and deserialize into ForecastCycle
-const readFileAsText = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target?.result as string);
-    reader.onerror = () => reject(new Error('Failed to read file.'));
-    reader.readAsText(file);
-  });
+/**
+ * True for failures that name an exact ownership or envelope problem. Those are
+ * shown verbatim so a user can tell an unknown workspace or a corrupt envelope
+ * apart from an ordinary unparseable file.
+ */
+const isSpecificOwnershipError = (message: string): boolean =>
+  message.startsWith('This forecast belongs to ')
+  || message.startsWith('This workflow package declares')
+  || message.startsWith('This forecast envelope')
+  || message.startsWith('This workspace forecast')
+  || message.startsWith('This package labels an untagged legacy forecast');
+
+/** Reads a forecast file with its owning workspace and import notes so dispatch can re-check. */
+export const parseForecastFileWithOwner = async (file: File, workspaceId: ForecastWorkspaceId): Promise<{ cycle: ForecastCycle; workspaceId: ForecastWorkspaceId; warnings: string[] }> => {
+  const parsed = await readForecastImportFile(file);
+  if (!validateForecastData(parsed)) {
+    // Surface the specific reason when validation has one: an unknown owner or a
+    // corrupt envelope is actionable, "invalid file" is not.
+    throw new Error(validateForecastDataReason(parsed) ?? 'Invalid GFC forecast file.');
+  }
+  const resolved = resolveNativeFileContent(parsed);
+  if (resolved.workspaceId !== workspaceId) {
+    throw new Error(`This forecast belongs to the ${resolved.workspaceId} workspace.`);
+  }
+  return { cycle: resolved.forecastCycle, workspaceId: resolved.workspaceId, warnings: resolved.warnings ?? [] };
+};
 
 /** Reads and parses a GFC JSON forecast file into a ForecastCycle object. */
-const parseForecastFile = async (file: File): Promise<ForecastCycle> => {
-  const content = await readFileAsText(file);
-  const parsed = JSON.parse(content);
-  if (!validateForecastData(parsed)) {
-    throw new Error('Invalid GFC forecast file.');
+export const parseForecastFile = async (file: File, workspaceId: ForecastWorkspaceId): Promise<ForecastCycle> => {
+  const parsed = await parseForecastFileWithOwner(file, workspaceId);
+  return parsed.cycle;
+};
+
+type SelectedForecastFileLoad = {
+  file: File;
+  workspaceId: ForecastWorkspaceId;
+  isCurrentLoad: () => boolean;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
+  setLoadedCycle: (cycle: ForecastCycle | null) => void;
+  setLoadedWorkspaceId: (workspaceId: ForecastWorkspaceId | null) => void;
+  setLoadedFileName: (fileName: string) => void;
+  addToast: ReturnType<typeof useAppLayout>['addToast'];
+};
+
+/** Loads one selected file and discards its result if a newer selection won. */
+const loadSelectedForecastFile = async ({
+  file,
+  workspaceId,
+  isCurrentLoad,
+  fileInputRef,
+  setLoadedCycle,
+  setLoadedWorkspaceId,
+  setLoadedFileName,
+  addToast,
+}: SelectedForecastFileLoad): Promise<void> => {
+  try {
+    const parsed = await parseForecastFileWithOwner(file, workspaceId);
+    if (!isCurrentLoad()) return;
+    setLoadedCycle(parsed.cycle);
+    setLoadedWorkspaceId(parsed.workspaceId);
+    setLoadedFileName(file.name);
+    parsed.warnings.forEach((warning) => addToast(warning, 'warning'));
+  } catch (error) {
+    if (!isCurrentLoad()) return;
+    const message = error instanceof Error && isSpecificOwnershipError(error.message)
+      ? error.message
+      : 'Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.';
+    addToast(message, 'error');
+  } finally {
+    if (isCurrentLoad() && fileInputRef.current) fileInputRef.current.value = '';
   }
-  return deserializeForecast(parsed);
 };
 
 type CopyModalHeaderProps = {
@@ -156,10 +213,13 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   const dispatch = useDispatch();
   const { addToast } = useAppLayout();
   const currentDay = useSelector(selectCurrentDay);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileLoadSequenceRef = useRef(0);
   const { setModalRef } = useModalFocusTrap({ active: isOpen, onClose });
 
   const [loadedCycle, setLoadedCycle] = useState<ForecastCycle | null>(null);
+  const [loadedWorkspaceId, setLoadedWorkspaceId] = useState<ForecastWorkspaceId | null>(null);
   const [loadedFileName, setLoadedFileName] = useState<string>('');
   const [sourceDay, setSourceDay] = useState<DayType>(1);
   const [targetDay, setTargetDay] = useState<DayType>(currentDay);
@@ -167,26 +227,35 @@ const CopyFromPreviousModal: React.FC<CopyFromPreviousModalProps> = ({ isOpen, o
   if (!isOpen) return null;
 
   // Handler for file selection when loading a forecast from JSON, which reads the selected file and parses it as a ForecastCycle object. It updates the local state with the loaded cycle and file name, and shows error toasts if the file cannot be read or parsed correctly. After handling the file, it resets the file input value to allow for loading the same file again if needed.
-  const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileLoad = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const loadSequence = ++fileLoadSequenceRef.current;
 
-    try {
-      const cycle = await parseForecastFile(file);
-      setLoadedCycle(cycle);
-      setLoadedFileName(file.name);
-    } catch {
-      addToast('Failed to load forecast file. Please ensure it\'s a valid GFC JSON file.', 'error');
-    } finally {
-      // Reset file input
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+    setLoadedCycle(null);
+    setLoadedWorkspaceId(null);
+    setLoadedFileName('');
+
+    void loadSelectedForecastFile({
+      file,
+      workspaceId,
+      isCurrentLoad: () => loadSequence === fileLoadSequenceRef.current,
+      fileInputRef,
+      setLoadedCycle,
+      setLoadedWorkspaceId,
+      setLoadedFileName,
+      addToast,
+    });
   };
 
   // Handler for copying features from the loaded cycle's source day to the current cycle's target day. It checks if a cycle is loaded, then dispatches the copyFeaturesFromPrevious action with the selected source and target days. After copying, it shows a success toast notification and closes the modal.
   const handleCopy = () => {
     if (!loadedCycle) {
       addToast('Please load a forecast file first.', 'warning');
+      return;
+    }
+    if (loadedWorkspaceId !== null && loadedWorkspaceId !== workspaceId) {
+      addToast(`This forecast belongs to the ${loadedWorkspaceId} workspace.`, 'error');
       return;
     }
 

@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import type { MonitorMapView, MonitorOutlookLayerType, MonitorOutlookSourceSelection, MonitorReferenceLayerSettings, MonitorSettings } from '../monitor/types';
-import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, type MonitorMapView, type MonitorOutlookLayerType, type MonitorOutlookSourceSelection, type MonitorReferenceLayerSettings, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import { resolveRadarProductForMode } from '../monitor/wms';
 
@@ -12,11 +11,22 @@ const monitorSlice = createSlice({
   name: 'monitor',
   initialState,
   reducers: {
-    applyMonitorSettings: (_state, action: PayloadAction<Partial<MonitorSettings> | MonitorSettings>) =>
-      normalizeMonitorSettings({
-        ...DEFAULT_MONITOR_SETTINGS,
-        ...action.payload,
-      }),
+    /**
+     * Merges the requested settings over the current slice state.
+     * A partial payload therefore only changes the fields it names, and
+     * `undefined` entries are ignored so an absent field keeps its live value
+     * instead of snapping back to `DEFAULT_MONITOR_SETTINGS`.
+     */
+    applyMonitorSettings: (state, action: PayloadAction<Partial<MonitorSettings> | MonitorSettings>) => {
+      const requested = Object.fromEntries(
+        Object.entries(action.payload ?? {}).filter(([, value]) => value !== undefined),
+      ) as Partial<MonitorSettings>;
+
+      return normalizeMonitorSettings({
+        ...state,
+        ...requested,
+      });
+    },
     setRadarMode: (state, action: PayloadAction<MonitorSettings['radarMode']>) => {
       state.radarMode = action.payload;
       state.radarProduct = resolveRadarProductForMode(action.payload, state.radarProduct);

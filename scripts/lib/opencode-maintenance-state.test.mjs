@@ -68,15 +68,9 @@ test('a complete result advances the category period and cannot be downgraded to
 })
 
 test('the scheduled caller persists the same period field used for result state and deduplication', () => {
-  const workflow = readFileSync(new URL('../../.github/workflows/opencode-scheduled-maintenance.yml', import.meta.url), 'utf8')
-  assert.match(workflow, /createScheduledContext\(\{[\s\S]*?\bcategory,\s*period,\s*scope/)
-  assert.match(workflow, /JSON\.stringify\(contextData\)/)
-  assert.match(workflow, /lastSuccessPeriod\s*===\s*period/)
-  assert.ok(
-    workflow.indexOf('let stateCommentId = stateComment?.id ?? null') <
-      workflow.indexOf('const contextData = createScheduledContext('),
-  )
-
+  // Caller-shape assertions lived against opencode-scheduled-maintenance.yml,
+  // which migrated to T3 (see the migration guard in opencode-workflow-queue.test.mjs).
+  // What remains is the state persistence round-trip every caller relies on.
   const directory = mkdtempSync(path.join(os.tmpdir(), 'gfc-opencode-period-'))
   const statePath = path.join(directory, 'state.json')
   try {

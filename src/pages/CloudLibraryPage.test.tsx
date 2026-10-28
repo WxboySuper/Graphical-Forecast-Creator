@@ -5,9 +5,12 @@ import { configureStore } from "@reduxjs/toolkit";
 import forecastReducer from "../store/forecastSlice";
 import themeReducer from "../store/themeSlice";
 import CloudLibraryPage from "./CloudLibraryPage";
-import { getDefaultForecastWorkspacePath } from "../routing/forecastWorkspaceRoutes";
-import { getForecastWorkspaceByLegacyPath } from "../config/forecastWorkspaces";
-import { getExposedGatedRoutePaths } from "../routing/buildFeatureGatedRoutes";
+import { getDefaultForecastWorkspacePath, getForecastWorkspacePath, isSupportedCloudLoadWorkspace } from "../routing/forecastWorkspaceRoutes";
+import { buildCloudSessionPayload } from "../utils/forecastWorkspacePersistence";
+import { serializeForecastWorkspace } from "../utils/forecastWorkspacePersistenceAdapter";
+import { serializeForecast } from "../utils/fileUtils";
+import { getMismatchedCloudWorkspaceId, parseStoredForecastPayload } from "./forecastPageController";
+import { getForecastWorkspace } from "../config/forecastWorkspaces";
 
 const mockNavigate = jest.fn();
 jest.mock("react-router", () => ({
@@ -36,8 +39,6 @@ jest.mock("./cloudLibraryWorkspace", () => {
 const mockUseAuth = jest.requireMock("../auth/AuthProvider").useAuth as jest.Mock;
 const mockUseEntitlement = jest.requireMock("../billing/EntitlementProvider").useEntitlement as jest.Mock;
 const mockUseCloudCycles = jest.requireMock("../hooks/useCloudCycles").useCloudCycles as jest.Mock;
-const actualGetCloudLibraryTabs = jest.requireActual("./cloudLibraryWorkspace").getCloudLibraryTabs;
-const mockGetCloudLibraryTabs = jest.requireMock("./cloudLibraryWorkspace").getCloudLibraryTabs as jest.Mock;
 
 const makeStore = () =>
   configureStore({
@@ -66,13 +67,15 @@ const renderPage = (store = makeStore()) =>
 
 describe("CloudLibraryPage", () => {
   beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
     window.history.replaceState({}, "", "/");
+    mockUseAuth.mockReset();
+    mockUseEntitlement.mockReset();
+    mockUseCloudCycles.mockReset();
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult());
     mockUseEntitlement.mockReturnValue({ premiumActive: false, effectiveSource: "local" });
-    mockGetCloudLibraryTabs.mockReset();
-    mockGetCloudLibraryTabs.mockImplementation(actualGetCloudLibraryTabs);
     mockNavigate.mockClear();
-    sessionStorage.clear();
   });
 
   it("shows the signed-out gate when no user is present", () => {
@@ -98,7 +101,7 @@ describe("CloudLibraryPage", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ error: "Failed to load cloud cycles" }));
     renderPage();
-    expect(screen.getByText(/failed to load cloud cycles/i)).toBeTruthy();
+    expect(screen.getAllByText(/failed to load cloud cycles/i)).toHaveLength(2);
     expect(screen.getByRole("status")).toHaveTextContent(/failed to load cloud cycles/i);
   });
 
@@ -128,78 +131,63 @@ describe("CloudLibraryPage", () => {
 
   it("uses workspace-specific empty copy for an empty tab", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [] }));
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }] })
+    );
 
     renderPage();
-    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
-      "href",
-      getDefaultForecastWorkspacePath(),
-    );
-    expect(getDefaultForecastWorkspacePath()).toBe("/forecast/severe");
-    fireEvent.click(screen.getByRole("tab", { name: /Severe 0/i }));
-    expect(screen.getByText("No Severe cloud cycles saved yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
-      "href",
-      "/forecast/severe",
-    );
     fireEvent.click(screen.getByRole("tab", { name: /Custom 0/i }));
     expect(screen.getByText("No Custom cloud cycles saved yet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Forecast Editor" })).toHaveAttribute(
-      "href",
-      "/custom-products",
-    );
-    expect(getExposedGatedRoutePaths()).toContain("/custom-products");
   });
 
-  it("keeps unsupported Load focusable with aria-disabled and a hint while blocking activation", () => {
+  it.each([
+    ["mesoscale", false, "local", "Mesoscale"],
+    ["tropical", true, "stripe", "Tropical"],
+    ["winter", false, "stripe", "Winter"],
+  ] as const)(
+    "does not fetch a cloud cycle owned by hidden workspace %s (premium: %s, source: %s)",
+    async (workspaceId, premiumActive, effectiveSource, workspaceLabel) => {
+      mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+      mockUseEntitlement.mockReturnValue({ premiumActive, effectiveSource });
+      const loadCycle = jest.fn();
+      mockUseCloudCycles.mockReturnValue(
+        cloudCyclesResult({
+          cycles: [{ id: `${workspaceId}-1`, workspaceId, label: `${workspaceId} save` }],
+          loadCycle,
+        })
+      );
+      window.history.replaceState({}, "", "/cloud");
+
+      renderPage();
+      expect(screen.getByRole("tab", { name: "All 1" })).toHaveAttribute("aria-selected", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Load" }));
+
+      expect(await screen.findByText(`${workspaceLabel} cloud loading is not available yet. Your save is still stored.`)).toBeInTheDocument();
+      expect(loadCycle).not.toHaveBeenCalled();
+      expect(sessionStorage.length).toBe(0);
+      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe("/cloud");
+    }
+  );
+
+  it("loads an exposed Custom cloud cycle into the matching forecast editor", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    const loadCycle = jest.fn();
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-load" }).forecastCycle;
+    const payload = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    const loadCycle = jest.fn().mockResolvedValue(payload);
     mockUseCloudCycles.mockReturnValue(
       cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
     );
 
     renderPage();
     const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).not.toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "true");
-    expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-custom-1");
-
-    loadButton.focus();
-    expect(loadButton).toHaveFocus();
-
-    const hint = screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.");
-    expect(hint).toBeInTheDocument();
-    expect(hint).toHaveAttribute("id", "cloud-cycle-load-hint-custom-1");
-    expect(
-      screen.getByText("Custom loading is not supported yet. Only Severe saves can be opened.", {
-        selector: ".cloud-cycle-main .cloud-cycle-load-hint",
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("Custom loading is not supported yet. Only Severe saves can be opened.", {
-        selector: ".cloud-cycle-actions .cloud-cycle-load-hint",
-      })
-    ).not.toBeInTheDocument();
-
+    expect(loadButton).not.toHaveAttribute("aria-disabled");
+    expect(loadButton).not.toHaveAttribute("aria-describedby");
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
     fireEvent.click(loadButton);
-    expect(loadCycle).not.toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-  });
-
-  it("uses native disabled for unsupported Load only while busy", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }],
-        loading: true,
-      })
-    );
-
-    renderPage();
-    const loadButton = screen.getByRole("button", { name: /load/i });
-    expect(loadButton).toBeDisabled();
-    expect(loadButton).toHaveAttribute("aria-disabled", "true");
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
+    expect(mockNavigate).toHaveBeenCalledWith(getForecastWorkspacePath("custom"));
+    expect(sessionStorage.length).toBeGreaterThan(0);
   });
 
   it("keeps Severe Load fully enabled without a support hint", () => {
@@ -213,13 +201,25 @@ describe("CloudLibraryPage", () => {
     expect(loadButton).not.toBeDisabled();
     expect(loadButton).not.toHaveAttribute("aria-disabled");
     expect(loadButton).not.toHaveAttribute("aria-describedby");
-    expect(screen.queryByText(/loading is not supported yet/i)).not.toBeInTheDocument();
-
-    loadButton.focus();
-    expect(loadButton).toHaveFocus();
+    expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
   });
 
   it("navigates to the canonical Severe route when loading a supported cycle", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/severe-load" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 }));
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
+    expect(mockNavigate).toHaveBeenCalledWith(getDefaultForecastWorkspacePath());
+  });
+
+  it("keeps the editor closed when the loaded payload cannot be staged", async () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
     mockUseCloudCycles.mockReturnValue(
@@ -230,7 +230,64 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /load/i }));
 
     await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("severe-1"));
-    expect(mockNavigate).toHaveBeenCalledWith(getDefaultForecastWorkspacePath());
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("cloudCyclePayload:severe:user-user-1")).toBeNull();
+  });
+
+  it("stages a Custom cloud load that only the Custom workspace can restore", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-roundtrip" }).forecastCycle;
+    const payload = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    const loadCycle = jest.fn().mockResolvedValue(payload);
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith(getForecastWorkspacePath("custom")));
+    const staged = sessionStorage.getItem("cloudCyclePayload:custom:user-user-1");
+    expect(staged).not.toBeNull();
+    expect(parseStoredForecastPayload(staged, "custom")).toEqual(JSON.parse(staged as string));
+    expect(getMismatchedCloudWorkspaceId(staged, "severe")).toBe("custom");
+    expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1"))
+      .toBe(JSON.stringify({ id: "custom-1", label: "Custom save" }));
+  });
+
+  it("refuses a Severe envelope served for a Custom record instead of staging it", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/custom-mismatch" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(
+      serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 }),
+    );
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
+    expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed input on a Custom record instead of wrapping it as forecast data", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn().mockResolvedValue({ version: 1 });
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
+    expect(sessionStorage.getItem("cloudCyclePayload:custom:user-user-1")).toBeNull();
+    expect(sessionStorage.getItem("cloudCycleMeta:custom:user-user-1")).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("returns early without calling loadCycle when the selected cycle no longer resolves", async () => {
@@ -245,6 +302,43 @@ describe("CloudLibraryPage", () => {
     fireEvent.click(loadButton);
 
     await waitFor(() => expect(loadCycle).not.toHaveBeenCalled());
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['rejects', () => Promise.reject(new Error('network failure'))],
+    ['returns no payload', () => Promise.resolve(null)],
+  ])('shows feedback when cloud loading %s', async (_caseName, loadCycleImpl) => {
+    mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } });
+    const loadCycle = jest.fn(loadCycleImpl);
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: 'severe-1', workspaceId: 'severe', label: 'Severe save' }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /load/i }));
+
+    expect(await screen.findAllByText('Unable to load this cloud cycle right now. Your save is still stored.')).toHaveLength(2);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("disables Load for a hidden workspace and explains the save is still stored", () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "meso-1", workspaceId: "mesoscale", label: "Meso save" }], loadCycle })
+    );
+
+    renderPage();
+    const loadButton = screen.getByRole("button", { name: /load/i });
+    expect(loadButton).toHaveAttribute("aria-disabled", "true");
+    expect(loadButton).toHaveAttribute("aria-describedby", "cloud-cycle-load-hint-meso-1");
+    expect(
+      screen.getByText("Mesoscale cloud loading is not available yet. Your save is still stored."),
+    ).toBeInTheDocument();
+
+    fireEvent.click(loadButton);
+    expect(loadCycle).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -265,23 +359,26 @@ describe("CloudLibraryPage", () => {
 
     renderPage();
     expect(screen.getByRole("tab", { name: /All 6/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Severe 3/i })).toBeInTheDocument();
+    // A record naming an unknown workspace has no owner, so it is not counted
+    // under Severe. It stays listed under All instead of disappearing.
+    expect(screen.getByRole("tab", { name: /Severe 2/i })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /mesoscale/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /tropical/i })).not.toBeInTheDocument();
 
     for (const label of ["Severe save", "Legacy save", "Odd save", "Custom save", "Meso save", "Trop save"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.getByText("Unknown workspace")).toBeInTheDocument();
 
     // Tab label spans plus one ownership badge per matching row.
-    expect(screen.getAllByText("Severe")).toHaveLength(4);
+    expect(screen.getAllByText("Severe")).toHaveLength(3);
     expect(screen.getAllByText("Custom")).toHaveLength(2);
     expect(screen.getAllByText("Mesoscale")).toHaveLength(1);
     expect(screen.getAllByText("Tropical")).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("tab", { name: /Severe 3/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /Severe 2/i }));
     expect(screen.getByText("Legacy save")).toBeInTheDocument();
-    expect(screen.getByText("Odd save")).toBeInTheDocument();
+    expect(screen.queryByText("Odd save")).not.toBeInTheDocument();
     expect(screen.queryByText("Meso save")).not.toBeInTheDocument();
     expect(screen.getAllByText("Severe")).toHaveLength(1);
   });
@@ -356,38 +453,6 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tab", { name: /Custom 1/i })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("moves focus to the valid tab when a keyboard target is removed", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [
-          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
-          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
-        ],
-      })
-    );
-
-    let useReducedTabs = false;
-    const fullTabs = [
-      { id: "all" as const, label: "All", cycleCount: 2 },
-      { id: "severe" as const, label: "Severe", cycleCount: 1 },
-      { id: "custom" as const, label: "Custom", cycleCount: 1 },
-    ];
-    const reducedTabs = fullTabs.filter((tab) => tab.id !== "severe");
-    mockGetCloudLibraryTabs.mockImplementation(() => (useReducedTabs ? reducedTabs : fullTabs));
-
-    renderPage();
-    const customTab = screen.getByRole("tab", { name: /Custom 1/i });
-    const allTab = screen.getByRole("tab", { name: /All 2/i });
-    customTab.focus();
-    useReducedTabs = true;
-    mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [] }));
-    fireEvent.keyDown(allTab, { key: "ArrowRight" });
-
-    expect(screen.getByRole("tab", { name: /All 2/i })).toHaveFocus();
-    expect(customTab).not.toHaveFocus();
-  });
-
   it("uses roving tabindex so only the active tab is in the tab order", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(
@@ -441,92 +506,31 @@ describe("CloudLibraryPage", () => {
     expect(screen.getByRole("tabpanel")).not.toHaveAttribute("tabindex");
   });
 
-  it("announces the loading state and keeps the panel focusable", () => {
+  it("keeps the panel focusable while loading without interactive content", () => {
     mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
     mockUseCloudCycles.mockReturnValue(cloudCyclesResult({ cycles: [], loading: true }));
 
     renderPage();
-    const loadingStatus = screen.getByRole("status", { name: "Loading cloud cycles" });
-    expect(loadingStatus).toHaveAttribute("aria-live", "polite");
-    expect(loadingStatus).toHaveAttribute("aria-busy", "true");
-    expect(loadingStatus).toHaveTextContent("Loading cloud cycles");
     expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
   });
 
-  it("ignores modified ArrowLeft/ArrowRight without preventDefault or tab changes", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [
-          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
-          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
-        ],
-      })
-    );
-
-    renderPage();
-    const allTab = screen.getByRole("tab", { name: /All 2/i });
-    allTab.focus();
-    for (const mods of [{ shiftKey: true }, { ctrlKey: true }, { altKey: true }, { metaKey: true }]) {
-      const notCancelled = fireEvent.keyDown(allTab, { key: "ArrowRight", ...mods });
-      expect(notCancelled).not.toBe(false);
-      const notCancelledLeft = fireEvent.keyDown(allTab, { key: "ArrowLeft", ...mods });
-      expect(notCancelledLeft).not.toBe(false);
-    }
-
-    expect(allTab).toHaveAttribute("aria-selected", "true");
-    expect(allTab).toHaveFocus();
-    expect(screen.getByRole("tab", { name: /Severe 1/i })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", "cloud-library-tab-all");
+  it("rejects an invalid cloud handoff payload instead of wrapping it", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const envelope = serializeForecastWorkspace("severe", cycle, { center: [0, 0], zoom: 4 });
+    expect(buildCloudSessionPayload("severe", envelope)).toBe(envelope);
+    const customEnvelope = serializeForecastWorkspace("custom", cycle, { center: [0, 0], zoom: 4 });
+    expect(() => buildCloudSessionPayload("severe", customEnvelope)).toThrow(/different forecast workspace/);
+    expect(() => buildCloudSessionPayload("severe", { legacy: true })).toThrow(/not supported by any workspace/);
   });
 
-  it("keeps the panel focusable while refreshing existing cycles", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [{ id: "severe-1", workspaceId: "severe", label: "Severe save" }],
-        loading: true,
-      })
-    );
-
-    renderPage();
-    expect(screen.getByText("Severe save")).toBeInTheDocument();
-    expect(screen.getByRole("tabpanel")).toHaveAttribute("tabindex", "0");
-  });
-
-  it("keeps rename draft when switching workspace filters away and back", () => {
-    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
-    mockUseEntitlement.mockReturnValue({ premiumActive: true, effectiveSource: "local" });
-    mockUseCloudCycles.mockReturnValue(
-      cloudCyclesResult({
-        cycles: [
-          { id: "severe-1", workspaceId: "severe", label: "Severe save" },
-          { id: "custom-1", workspaceId: "custom", label: "Custom save" },
-        ],
-      })
-    );
-
-    renderPage();
-    const renameButtons = screen.getAllByRole("button", { name: /rename/i });
-    fireEvent.click(renameButtons[0]);
-
-    const renameInput = screen.getByLabelText(/rename cloud cycle/i) as HTMLInputElement;
-    fireEvent.change(renameInput, { target: { value: "My draft rename" } });
-    expect(renameInput.value).toBe("My draft rename");
-
-    fireEvent.click(screen.getByRole("tab", { name: /Custom 1/i }));
-    expect(screen.queryByText("Severe save")).not.toBeInTheDocument();
-    expect(screen.getByText("Custom save")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: /All 2/i }));
-    expect(screen.getByText("Severe save")).toBeInTheDocument();
-    const restoredInput = screen.getByLabelText(/rename cloud cycle/i) as HTMLInputElement;
-    expect(restoredInput.value).toBe("My draft rename");
-  });
-
-  it("exposes the registered custom-products route for the Custom workspace", () => {
-    expect(getForecastWorkspaceByLegacyPath("/custom-products")?.id).toBe("custom");
-    expect(getExposedGatedRoutePaths()).toContain("/custom-products");
+  it("supports cloud loads only for workspaces with a registered exposed editor route", () => {
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("severe"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("custom", getForecastWorkspace("custom"))).toBe(true);
+    expect(isSupportedCloudLoadWorkspace("mesoscale", getForecastWorkspace("mesoscale"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("tropical", getForecastWorkspace("tropical"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("winter", getForecastWorkspace("winter"))).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", undefined)).toBe(false);
+    expect(isSupportedCloudLoadWorkspace("severe", getForecastWorkspace("custom"))).toBe(false);
   });
 
   it("restores a bookmarked workspace and preserves unrelated query parameters", () => {
@@ -619,5 +623,64 @@ describe("CloudLibraryPage", () => {
     fireEvent.keyDown(screen.getByRole("tab", { name: /Custom 1/i }), { key: "Home" });
     expect(window.location.search).toBe("");
     expect(window.history.length).toBe(entriesBefore);
+  });
+
+  it("refuses a cloud payload that no workspace classifier accepts", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    // Untyped junk must not be wrapped into an envelope that fails on restore.
+    expect(() => buildCloudSessionPayload("severe", { legacy: true }))
+      .toThrow(/not supported by any workspace/);
+    expect(() => buildCloudSessionPayload("severe", { workspaceId: "bogus", forecastCycle: {} }))
+      .toThrow(/unknown workspace/);
+
+    // A payload that already names Custom must not be relabeled Severe just
+    // because the cloud record's metadata said Severe.
+    const declaresCustom = { workspaceId: "custom", ...bare };
+    expect(() => buildCloudSessionPayload("severe", declaresCustom)).toThrow(/incomplete or invalid/);
+  });
+
+  it("refuses to stage a handoff for a workspace the registry does not know", () => {
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/test-init" }).forecastCycle;
+    const bare = serializeForecast(cycle, { center: [0, 0], zoom: 4 });
+
+    expect(() => buildCloudSessionPayload("bogus" as never, bare)).toThrow(/valid workspace/);
+    expect(() => buildCloudSessionPayload(undefined as never, bare)).toThrow(/valid workspace/);
+  });
+
+  it("refuses to hand off an untagged payload for a non-Severe record", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const cycle = forecastReducer(undefined, { type: "@@cloud-library/bare-custom" }).forecastCycle;
+    const loadCycle = jest.fn().mockResolvedValue(serializeForecast(cycle, { center: [0, 0], zoom: 4 }));
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({ cycles: [{ id: "custom-1", workspaceId: "custom", label: "Custom save" }], loadCycle })
+    );
+
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /load/i }));
+
+    await waitFor(() => expect(loadCycle).toHaveBeenCalledWith("custom-1"));
+    expect(await screen.findAllByText('Unable to hand this cloud cycle off to the editor. Your save is still stored.')).toHaveLength(2);
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("refuses to hand off a cloud cycle that names an unknown workspace", async () => {
+    mockUseAuth.mockReturnValue({ user: { uid: "user-1" } });
+    const loadCycle = jest.fn();
+    mockUseCloudCycles.mockReturnValue(
+      cloudCyclesResult({
+        cycles: [{ id: "rogue-1", workspaceId: "not-a-workspace" as never, label: "Rogue save" }],
+        loadCycle,
+      })
+    );
+
+    renderPage();
+    expect(screen.getByRole("button", { name: /load/i })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText(/Unknown workspace cloud loading is not available yet/i)).toBeInTheDocument();
+    expect(loadCycle).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+    expect(window.location.pathname).toBe("/");
   });
 });

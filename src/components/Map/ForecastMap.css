@@ -321,7 +321,7 @@
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-@media (max-width: 640px), (max-height: 500px) and (orientation: landscape) {
+@media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
   .map-toolbar-bottom-right {
     top: 12px;
     bottom: auto;
@@ -419,7 +419,7 @@
   }
 }
 
-@media (max-height: 500px) and (orientation: landscape) {
+@media (max-height: 520px) and (orientation: landscape) {
   .map-key-popout-button {
     top: 106px;
     left: 12px;

@@ -28,9 +28,16 @@ const mockSerializeForecast = serializeForecast as jest.MockedFunction<typeof se
 const mockCountForecastMetrics = countForecastMetrics as jest.MockedFunction<typeof countForecastMetrics>;
 
 describe('useCloudSync', () => {
-  const forecastCycle = { cycleDate: '2026-04-24', days: [] };
+  const forecastCycle = { cycleDate: '2026-04-24', currentDay: 1, days: {} };
   const mapView = { center: [1, 2], zoom: 5 };
-  const payload = { forecastCycle, mapView, savedAt: 'volatile' };
+  const payload = {
+    version: '1.0.0',
+    type: 'forecast-cycle',
+    timestamp: '2026-04-24T00:00:00.000Z',
+    forecastCycle,
+    mapView,
+    savedAt: 'volatile',
+  };
   const workflowMetadata = {
     id: 'WF-severe-day1-2026-04-24',
     workflowId: 'severe-day1',
@@ -123,7 +130,11 @@ describe('useCloudSync', () => {
       forecastDays: 1,
       totalOutlooks: 2,
       totalFeatures: 3,
-    }, payload, workflowMetadata, { workspaceId: 'severe' });
+    }, expect.objectContaining({
+      schemaVersion: 1,
+      workspaceId: 'severe',
+      forecast: payload,
+    }), workflowMetadata, { workspaceId: 'severe' });
     expect(updateSyncState).toHaveBeenCalledWith('saved', undefined, 'cloud-1');
   });
 
@@ -288,6 +299,23 @@ describe('useCloudSync', () => {
       await result.current.syncNow();
     });
     expect(saveCycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats a workspace ownership change as a sync-relevant change', () => {
+    type SyncByWorkspaceProps = { workspaceId: 'severe' | 'custom' };
+    const { result, rerender } = renderHook<ReturnType<typeof useCloudSync>, SyncByWorkspaceProps>(
+      ({ workspaceId }) => useCloudSync(cloud(), workspaceId),
+      { initialProps: { workspaceId: 'severe' } },
+    );
+
+    act(() => {
+      result.current.markCurrentStateSynced('cloud-1');
+    });
+    expect(result.current.isSynced).toBe(true);
+
+    rerender({ workspaceId: 'custom' });
+
+    expect(result.current.isSynced).toBe(false);
   });
 
   it('keeps an out-of-order completion scoped to the cycle that started the save', async () => {

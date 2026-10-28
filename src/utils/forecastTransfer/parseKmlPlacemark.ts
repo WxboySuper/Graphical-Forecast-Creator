@@ -1,6 +1,7 @@
 import type { DayType, OutlookType } from '../../types/outlooks';
 import { geometryFromKmlElement } from './kmlGeometry';
 import type { ParsedKmlPlacemark } from './types';
+import { validateFeature } from '../forecastGeometryValidation';
 import {
   findKmlElementsByLocalName,
   getExtendedDataValue,
@@ -25,8 +26,16 @@ export const parseKmlPlacemark = (
     return null;
   }
 
-  const extendedDay = Number(getExtendedDataValue(placemark, 'gfc_day') ?? context.day);
-  const day = (extendedDay >= 1 && extendedDay <= 8 ? extendedDay : context.day) as DayType;
+  const featureResult = validateFeature(feature);
+  if (featureResult) {
+    throw new Error(featureResult.reason ?? 'KML geometry is invalid.');
+  }
+
+  const extendedDayValue = getExtendedDataValue(placemark, 'gfc_day');
+  const extendedDay = extendedDayValue === null ? context.day : Number(extendedDayValue);
+  const day = (Number.isInteger(extendedDay) && extendedDay >= 1 && extendedDay <= 8
+    ? extendedDay
+    : context.day) as DayType;
   const extendedOutlook = getExtendedDataValue(placemark, 'gfc_outlook_type') as OutlookType | null;
   const outlookFromName = parsePlacemarkName(placemark.getElementsByTagName('name')[0]?.textContent ?? '');
   const outlookType = extendedOutlook && OUTLOOK_TYPES.has(extendedOutlook)

@@ -2,9 +2,8 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import forecastReducer from '../../store/forecastSlice';
+import forecastReducer, { type SavedCycle } from '../../store/forecastSlice';
 import useHomePageLogic from './useHomePageLogic';
-import type { SavedCycle } from '../../store/forecastSlice';
 
 const mockNavigate = jest.fn();
 const mockAddToast = jest.fn();
@@ -32,6 +31,7 @@ jest.mock('../../hooks/useFileLoader', () => ({
 }));
 
 const mockUseAuth = jest.requireMock('../../auth/AuthProvider').useAuth as jest.Mock;
+const mockCreateFileHandlers = jest.requireMock('../../hooks/useFileLoader').createFileHandlers as jest.Mock;
 
 const buildStore = (overrides?: Partial<ReturnType<typeof forecastReducer>>) => {
   const forecastState = { ...forecastReducer(undefined, { type: '@@INIT' }), ...(overrides ?? {}) };
@@ -118,7 +118,7 @@ describe('useHomePageLogic', () => {
       localStorage.setItem('forecastData:user-user-1', JSON.stringify({ stale: true }));
       result.current.handleQuickStartClick({ currentTarget: { dataset: { day: '5' } } } as React.MouseEvent<HTMLButtonElement>);
     });
-    expect(mockNavigate).toHaveBeenCalledWith('/forecast');
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/severe');
     expect(store.getState().forecast.forecastCycle.currentDay).toBe(5);
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
 
@@ -164,6 +164,42 @@ describe('useHomePageLogic', () => {
     expect(localStorage.getItem('forecastData:user-user-1')).toBeNull();
   });
 
+  test('exposes only active-workspace cycles to Home', () => {
+    const initialState = forecastReducer(undefined, { type: '@@INIT' });
+    const severeCycle: SavedCycle = {
+      id: 'severe-cycle',
+      timestamp: '2026-03-27T12:00:00Z',
+      cycleDate: '2026-03-27',
+      forecastCycle: initialState.forecastCycle,
+      stats: { forecastDays: 1, totalOutlooks: 1, totalFeatures: 1 },
+      workspaceId: 'severe',
+    };
+    const customCycle: SavedCycle = {
+      ...severeCycle,
+      id: 'custom-cycle',
+      label: 'Custom cycle',
+      workspaceId: 'custom',
+    };
+    const store = buildStore({ workspaceId: 'custom', savedCycles: [severeCycle, customCycle] });
+
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    expect(result.current.savedCycles.map((cycle) => cycle.id)).toEqual(['custom-cycle']);
+  });
+
+  test('quick-start navigates to the active workspace route', () => {
+    const store = buildStore({ workspaceId: 'custom' });
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+    const button = document.createElement('button');
+    button.dataset.day = '2';
+
+    act(() => {
+      result.current.handleQuickStartClick({ currentTarget: button } as unknown as React.MouseEvent<HTMLButtonElement>);
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
+  });
+
   test('ignores malformed quick-start and recent-cycle clicks', () => {
     const store = buildStore({
       savedCycles: [
@@ -188,5 +224,33 @@ describe('useHomePageLogic', () => {
 
     expect(mockNavigate).not.toHaveBeenCalled();
     expect(mockAddToast).not.toHaveBeenCalled();
+  });
+
+  test('threads the active map view, workflow metadata, and workspace into the save path', () => {
+    const initial = forecastReducer(undefined, { type: '@@INIT' });
+    const workflowMetadata = {
+      id: 'WF-severe-2026-03-27',
+      workflowId: 'severe-day1',
+      cycleDate: '2026-03-27',
+      status: 'in-progress',
+      outlookVersions: [{ version: 1, status: 'in-progress', createdAt: '2026-03-27T12:00:00Z' }],
+      createdAt: '2026-03-27T12:00:00Z',
+      updatedAt: '2026-03-27T12:00:00Z',
+    } as never;
+    const store = buildStore({
+      workspaceId: 'custom',
+      currentMapView: { center: [11, 22], zoom: 5 },
+      workflowMetadata,
+      isWorkflowActive: true,
+    });
+
+    renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    expect(mockCreateFileHandlers).toHaveBeenCalledWith(expect.objectContaining({
+      cycleMetadata: expect.objectContaining({ id: 'WF-severe-2026-03-27' }),
+      mapView: { center: [11, 22], zoom: 5 },
+      workspaceId: 'custom',
+      forecastCycle: expect.objectContaining({ cycleDate: initial.forecastCycle.cycleDate }),
+    }));
   });
 });
