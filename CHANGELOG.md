@@ -67,6 +67,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Monitor radar sites:** Preserve partial and cleared radar-site values when monitor settings are normalized.
 - **Hosted map settings:** Keep the selected basemap after hosted settings sync completes.
 - **Monitor alert refresh:** Show background alert refresh failures while keeping the last available frames visible.
+- **Monitor alert playback:** Keep the alert animation following new snapshots after the 12-frame window fills instead of replaying stale frames.
 - **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
 - **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
 - **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
