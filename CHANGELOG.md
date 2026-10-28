@@ -97,6 +97,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Tabbed forecast toolbar:** Stop section labels, day controls, layer chips, and custom draw panels from overlapping at desktop widths around 1024px by enforcing section minimum widths, clipping overflow, and horizontal scrolling in each tab row.
 - **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
 - **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
+- **Cloud cycle saves:** Reject empty cycle ids and dates with a 400 response instead of a generic 500.
 
 #### Security
 
