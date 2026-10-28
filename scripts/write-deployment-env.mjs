@@ -28,25 +28,13 @@ if (
 }
 
 /** Returns whether a resolved config path remains inside deploy/. */
-const isDeployPath = (candidatePath) => {
+function isDeployPath(candidatePath) {
   const relativePath = relative(DEPLOY_DIR, candidatePath);
   return !relativePath.startsWith('..') && !isAbsolute(relativePath) && relativePath !== '';
-};
-
-/** Reads one deployment config and recursively merges its optional shared parent. */
-const readDeploymentConfig = (candidatePath, seen = new Set()) => {
-  const resolvedPath = resolveDeploymentPath(candidatePath);
-  const nextSeen = addSeenPath(resolvedPath, seen);
-  const config = JSON.parse(readFileSync(resolvedPath, 'utf8'));
-  if (!Object.prototype.hasOwnProperty.call(config, 'extends')) {
-    return config;
-  }
-
-  return readInheritedDeploymentConfig(config, nextSeen);
-};
+}
 
 /** Resolves a config path and enforces the deploy directory boundary after symlinks. */
-const resolveDeploymentPath = (candidatePath) => {
+function resolveDeploymentPath(candidatePath) {
   if (!isDeployPath(candidatePath)) {
     throw new Error('Deployment config inheritance must stay under deploy/.');
   }
@@ -55,10 +43,10 @@ const resolveDeploymentPath = (candidatePath) => {
     throw new Error('Deployment config inheritance must stay under deploy/.');
   }
   return resolvedPath;
-};
+}
 
 /** Tracks resolved config paths and rejects inheritance cycles. */
-const addSeenPath = (resolvedPath, seen) => {
+function addSeenPath(resolvedPath, seen) {
   if (seen.has(resolvedPath)) {
     throw new Error(`Deployment config inheritance cycle at ${resolvedPath}.`);
   }
@@ -66,10 +54,22 @@ const addSeenPath = (resolvedPath, seen) => {
   const nextSeen = new Set(seen);
   nextSeen.add(resolvedPath);
   return nextSeen;
-};
+}
+
+/** Reads one deployment config and recursively merges its optional shared parent. */
+function readDeploymentConfig(candidatePath, seen = new Set()) {
+  const resolvedPath = resolveDeploymentPath(candidatePath);
+  const nextSeen = addSeenPath(resolvedPath, seen);
+  const config = JSON.parse(readFileSync(resolvedPath, 'utf8'));
+  if (!Object.prototype.hasOwnProperty.call(config, 'extends')) {
+    return config;
+  }
+
+  return readInheritedDeploymentConfig(config, nextSeen);
+}
 
 /** Reads and merges the parent named by an inherited deployment config. */
-const readInheritedDeploymentConfig = (config, seen) => {
+function readInheritedDeploymentConfig(config, seen) {
   if (typeof config.extends !== 'string' || config.extends.trim() === '') {
     throw new Error('Deployment config extends must be a non-empty string.');
   }
@@ -79,7 +79,7 @@ const readInheritedDeploymentConfig = (config, seen) => {
   const overrideConfig = { ...config };
   delete overrideConfig.extends;
   return mergeDeploymentConfigs(parentConfig, overrideConfig);
-};
+}
 
 let output = '';
 try {
