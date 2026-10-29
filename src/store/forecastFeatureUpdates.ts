@@ -1,4 +1,4 @@
-import type { Feature } from 'geojson';
+import type { Feature, Geometry } from 'geojson';
 import type { DayType, OutlookData, OutlookType } from '../types/outlooks';
 import type { ForecastState } from './forecastSlice';
 
@@ -6,8 +6,10 @@ export interface PendingFeatureUpdate {
   outlookType: OutlookType;
   probability: string;
   index: number;
-  feature: Feature;
+  feature: Feature<Geometry | null>;
 }
+
+type UpdatableFeature = Feature<Geometry | null>;
 
 type EmptyDayFactory = (
   day: DayType,
@@ -18,7 +20,7 @@ export interface ForecastFeatureUpdateHelpers {
   getCurrentOutlook: (state: ForecastState, dayNumber?: DayType) => OutlookData;
   collectPendingFeatureUpdates: (
     state: ForecastState,
-    incoming: Feature[],
+    incoming: UpdatableFeature[],
     day?: DayType,
   ) => PendingFeatureUpdate[];
   applyPendingFeatureUpdates: (
