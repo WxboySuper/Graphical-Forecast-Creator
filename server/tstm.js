@@ -49,6 +49,12 @@ const getDefaultCondaPython = () => {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 };
 
+/** Reads a positive numeric env override, falling back when it is unset or invalid. */
+const readPositiveNumberEnv = (value, fallback) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
 /** Resolves the Python executable used by the experimental worker. */
 const getPythonCommand = (env = process.env) => (
   env.PYTHON_BIN || env.PYTHON || getDefaultCondaPython() || 'python'
@@ -58,7 +64,7 @@ const getPythonCommand = (env = process.env) => (
 const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject) => {
   const env = options.env || process.env;
   const spawnProcess = options.spawnProcess || spawn;
-  const timeoutMs = Number(env.TSTM_GENERATION_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const timeoutMs = readPositiveNumberEnv(env.TSTM_GENERATION_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
   const killGraceMs = Number(options.killGraceMs ?? DEFAULT_KILL_GRACE_MS);
   const script = path.join(__dirname, 'weather', 'generate_tstm.py');
   const args = [script];
