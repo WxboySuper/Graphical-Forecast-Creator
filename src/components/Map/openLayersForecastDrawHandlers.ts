@@ -47,7 +47,7 @@ export const handleForecastDrawEnd = (
       });
       if (!isPolygonOrMultiPolygon(geometryObject)) return;
       const customFeature = toDrawnCustomFeature(
-        geometryObject as unknown as Geometry,
+        geometryObject,
         options.activeCustomLayer,
         options.activeCustomCategory,
         options.customMode,
