@@ -148,6 +148,17 @@ describe('setOutlookMap', () => {
     expect(state.isSaved).toBe(false);
   });
 
+  test('inserts a missing current day before updating its outlook map', () => {
+    const state = structuredClone(reducer(undefined, { type: 'test/init' }));
+    const day = state.forecastCycle.currentDay;
+    delete state.forecastCycle.days[day];
+    const map = new Map<string, Feature[]>();
+
+    const nextState = reducer(state, setOutlookMap({ outlookType: 'tornado', map }));
+
+    expect(nextState.forecastCycle.days[day]?.data.tornado).toBe(map);
+  });
+
   test('keeps day-specific supported outlook maps available', () => {
     let dayOneState = reducer(undefined, setForecastDay(1));
     const tornadoMap = new Map<string, Feature[]>();
@@ -452,6 +463,35 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     expect((getTornadoFeatures(state)[1].geometry as Polygon).coordinates[0][0]).toEqual([1, 1]);
+  });
+
+  test('re-finds later feature indexes after an earlier batched delete', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-a', 0) }));
+    state = reducer(state, addFeature({ feature: createFeature('feature-b', 1) }));
+
+    state = reducer(state, updateFeaturesBatch({
+      features: [
+        {
+          ...createFeature('feature-a', 0),
+          geometry: null,
+          properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+        },
+        {
+          ...createFeature('feature-b', 6),
+          properties: {
+            outlookType: 'tornado',
+            probability: '2%',
+            isSignificant: false,
+            batchUpdated: true,
+          },
+        },
+      ],
+    }));
+
+    expect(getTornadoFeatures(state)).toHaveLength(1);
+    expect(getTornadoFeatures(state)[0].id).toBe('feature-b');
+    expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([6, 6]);
+    expect(getTornadoFeatures(state)[0].properties?.batchUpdated).toBe(true);
   });
 
   test('deep-clones nested feature properties in history snapshots', () => {

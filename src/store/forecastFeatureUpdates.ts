@@ -39,8 +39,11 @@ export const createForecastFeatureUpdateHelpers = (
     dayNumber = state.forecastCycle.currentDay,
   ): OutlookData => {
     const day = state.forecastCycle.days[dayNumber];
-    if (!day) return createEmptyDay(dayNumber, initialTimestamp).data;
-    return day.data;
+    if (day) return day.data;
+
+    const emptyDay = createEmptyDay(dayNumber, initialTimestamp);
+    state.forecastCycle.days[dayNumber] = emptyDay;
+    return emptyDay.data;
   };
 
   /** Finds incoming features that already exist in the selected day's outlook maps. */
@@ -76,18 +79,22 @@ export const createForecastFeatureUpdateHelpers = (
     for (const update of pendingUpdates) {
       const features = outlookData[update.outlookType]?.get(update.probability);
       if (!features) continue;
+      const liveIndex = features.findIndex((entry) => entry.id === update.feature.id);
+      if (liveIndex === -1) continue;
 
       if (update.feature.geometry === null) {
-        features.splice(update.index, 1);
+        features.splice(liveIndex, 1);
         if (features.length === 0) outlookData[update.outlookType]?.delete(update.probability);
         continue;
       }
 
-      features[update.index] = {
-        ...features[update.index],
+      const currentFeature = features[liveIndex];
+      if (!currentFeature) continue;
+      features[liveIndex] = {
+        ...currentFeature,
         geometry: update.feature.geometry,
         properties: {
-          ...features[update.index].properties,
+          ...currentFeature.properties,
           ...update.feature.properties,
         },
       };
