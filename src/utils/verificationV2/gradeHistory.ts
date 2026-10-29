@@ -150,6 +150,51 @@ export interface LoadGradeSnapshotParams {
   cardId: string;
 }
 
+/** Returns whether a parsed value is a non-null, non-array object. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Returns whether a value is a string or null. */
+const isStringOrNull = (value: unknown): value is string | null =>
+  value === null || typeof value === 'string';
+
+/** Returns whether a value looks like the persisted grade card fields we read. */
+const isGradeCardShape = (value: unknown): boolean =>
+  isRecord(value) && typeof value.id === 'string' && typeof value.sourceLabel === 'string';
+
+/** Returns whether a value looks like one product entry in a package grade. */
+const isProductGradeShape = (value: unknown): boolean =>
+  isRecord(value)
+  && typeof value.product === 'string'
+  && typeof value.applicable === 'boolean';
+
+/** Returns whether a value looks like a package grade. */
+const isPackageGradeShape = (value: unknown): boolean => {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return (
+    typeof value.formulaVersion === 'string'
+    && (value.grade === null || typeof value.grade === 'number')
+    && isStringOrNull(value.letter)
+    && typeof value.dataQuality === 'string'
+    && Array.isArray(value.products)
+    && value.products.every(isProductGradeShape)
+  );
+};
+
+/**
+ * Validates the snapshot envelope before it reaches app state. Snapshots come
+ * from localStorage, so a tampered or corrupted entry must not be trusted as a
+ * `GradeSnapshot` cast.
+ */
+const isGradeSnapshot = (value: unknown): value is GradeSnapshot =>
+  isRecord(value)
+  && isGradeCardShape(value.card)
+  && isPackageGradeShape(value.package)
+  && isRecord(value.forecast)
+  && isStringOrNull(value.reportDate);
+
 /** Loads the immutable full snapshot for a card, if one was stored (premium). */
 export const loadGradeSnapshot = ({ scope, cardId }: LoadGradeSnapshotParams): GradeSnapshot | null => {
   if (!scope) {
@@ -161,7 +206,11 @@ export const loadGradeSnapshot = ({ scope, cardId }: LoadGradeSnapshotParams): G
   }
   try {
     const raw = storage.getItem(snapshotKey(scope, cardId));
-    return raw ? (JSON.parse(raw) as GradeSnapshot) : null;
+    if (!raw) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return isGradeSnapshot(parsed) ? parsed : null;
   } catch {
     return null;
   }
