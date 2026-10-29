@@ -20,6 +20,9 @@ const vendorChunkFor = (id: string): string | undefined =>
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const buildTarget = resolveBuildTarget(env.VITE_BUILD_TARGET);
+  if (buildTarget === 'beta' && env.VITE_BETA_AUTH_BACKEND === 'clerk-d1' && !env.VITE_CLERK_PUBLISHABLE_KEY?.trim()) {
+    throw new Error('VITE_CLERK_PUBLISHABLE_KEY is required for beta Clerk+D1 builds.');
+  }
   const base = env.PUBLIC_URL || '/';
   const pkgPath = path.resolve(__dirname, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
@@ -58,6 +61,8 @@ export default defineConfig(({ mode }) => {
       __GFC_FIREBASE_AUTH_DOMAIN__: JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN ?? ''),
       __GFC_FIREBASE_PROJECT_ID__: JSON.stringify(env.VITE_FIREBASE_PROJECT_ID ?? ''),
       __GFC_FIREBASE_APP_ID__: JSON.stringify(env.VITE_FIREBASE_APP_ID ?? ''),
+      __GFC_BETA_CLERK_D1__: JSON.stringify(buildTarget === 'beta' && env.VITE_BETA_AUTH_BACKEND === 'clerk-d1'),
+      __GFC_CLERK_PUBLISHABLE_KEY__: JSON.stringify(env.VITE_CLERK_PUBLISHABLE_KEY?.trim() ?? ''),
       __GFC_SENTRY_DSN__: JSON.stringify(env.VITE_SENTRY_DSN ?? ''),
       __GFC_SENTRY_ENVIRONMENT__: JSON.stringify(env.VITE_SENTRY_ENVIRONMENT ?? ''),
       __GFC_UMAMI_HOST__: JSON.stringify(env.VITE_UMAMI_HOST ?? ''),

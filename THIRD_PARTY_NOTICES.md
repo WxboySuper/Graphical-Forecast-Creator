@@ -9,6 +9,8 @@ to each.
 - **@babel/preset-env** ^8.0.7 (root (pnpm)) — MIT — allowed
 - **@babel/preset-react** ^8.0.1 (root (pnpm)) — MIT — allowed
 - **@babel/preset-typescript** ^8.0.7 (root (pnpm)) — MIT — allowed
+- **@clerk/backend** ^3.24.0 (root (pnpm)) — MIT — allowed
+- **@clerk/react** ^6.17.8 (root (pnpm)) — MIT — allowed
 - **@eslint/js** ^9.39.5 (root (pnpm)) — MIT — allowed
 - **@firebase/rules-unit-testing** ^6.0.0 (root (pnpm)) — Apache-2.0 — allowed
 - **@playwright/test** ^1.64.1 (root (pnpm)) — Apache-2.0 — allowed

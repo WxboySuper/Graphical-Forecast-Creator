@@ -197,6 +197,8 @@ jobs:
           # producing a review, so leave enough room for that valid review.
           max_tokens_budget: '650000'
           review_task_timeout: '20'
+          # Serialize reviews until the provider quota supports higher concurrency.
+          review_concurrency: '1'
           sticky_summary: 'true'
           incremental: 'true'
           resolve_outdated: 'false'

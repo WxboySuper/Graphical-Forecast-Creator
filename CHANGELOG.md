@@ -44,6 +44,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Beta Clerk and D1 migration:** Add a beta-only Clerk sign-in and Cloudflare D1 API path, with verified-email Firestore account migration and a retained R2 snapshot source. Firebase remains the beta release default until the migration is explicitly selected; production is unchanged.
 - **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
 - **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
 - **KMZ/KML export:** Add a beta export prototype for forecast products.
