@@ -1,6 +1,5 @@
 'use strict';
 
-const rateLimit = require('express-rate-limit');
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { verifyFirebaseToken } = require('./firebase-auth');
 const { registerMetricsRoutes: registerMetricsRoutesImpl } = require('./metricsRoutes');
