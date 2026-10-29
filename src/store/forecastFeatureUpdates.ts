@@ -69,38 +69,43 @@ export const createForecastFeatureUpdateHelpers = (
     });
   };
 
+  /** Applies one update to the current feature matching its stable ID. */
+  const applyPendingFeatureUpdate = (
+    outlookData: OutlookData,
+    update: PendingFeatureUpdate,
+  ): void => {
+    const features = outlookData[update.outlookType]?.get(update.probability);
+    if (!features) return;
+
+    const liveIndex = features.findIndex((entry) => entry.id === update.feature.id);
+    if (liveIndex === -1) return;
+
+    if (update.feature.geometry === null) {
+      features.splice(liveIndex, 1);
+      if (features.length === 0) outlookData[update.outlookType]?.delete(update.probability);
+      return;
+    }
+
+    const currentFeature = features[liveIndex];
+    if (!currentFeature) return;
+    features[liveIndex] = {
+      ...currentFeature,
+      geometry: update.feature.geometry,
+      properties: {
+        ...currentFeature.properties,
+        ...update.feature.properties,
+      },
+    };
+  };
+
   /** Applies pending geometry and property updates in place, removing null geometries. */
-  // @codescene(disable:"Bumpy Road Ahead")
   const applyPendingFeatureUpdates = (
     state: ForecastState,
     pendingUpdates: PendingFeatureUpdate[],
     day?: DayType,
   ): void => {
     const outlookData = getCurrentOutlook(state, day);
-
-    for (const update of pendingUpdates) {
-      const features = outlookData[update.outlookType]?.get(update.probability);
-      if (!features) continue;
-      const liveIndex = features.findIndex((entry) => entry.id === update.feature.id);
-      if (liveIndex === -1) continue;
-
-      if (update.feature.geometry === null) {
-        features.splice(liveIndex, 1);
-        if (features.length === 0) outlookData[update.outlookType]?.delete(update.probability);
-        continue;
-      }
-
-      const currentFeature = features[liveIndex];
-      if (!currentFeature) continue;
-      features[liveIndex] = {
-        ...currentFeature,
-        geometry: update.feature.geometry,
-        properties: {
-          ...currentFeature.properties,
-          ...update.feature.properties,
-        },
-      };
-    }
+    pendingUpdates.forEach((update) => applyPendingFeatureUpdate(outlookData, update));
   };
 
   return { getCurrentOutlook, collectPendingFeatureUpdates, applyPendingFeatureUpdates };
