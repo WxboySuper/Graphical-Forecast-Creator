@@ -1447,7 +1447,7 @@ describe('applyCreateOutlookUpdate seam', () => {
     groupings: ['day1'],
   };
 
-  it('transitions version and status, clones populated days, and invalidates completion', () => {
+  const createAcknowledgedForecast = () => {
     let state = reducer(undefined, startBlankCycle({
       workflowTemplate: seamWorkflowTemplate,
       cycleDate: '2026-07-04',
@@ -1458,10 +1458,17 @@ describe('applyCreateOutlookUpdate seam', () => {
       draft.forecastCycle.completionAcknowledgedAt = '2026-07-04T12:00:00.000Z';
     });
     const now = '2026-07-04T13:00:00.000Z';
+    return { acknowledged, now };
+  };
 
-    const next = produce(acknowledged, (draft) => {
+  const applyOutlookUpdate = (state: ReturnType<typeof reducer>, now: string) =>
+    produce(state, (draft) => {
       applyCreateOutlookUpdate(draft, now);
     });
+
+  it('transitions version and status and invalidates completion', () => {
+    const { acknowledged, now } = createAcknowledgedForecast();
+    const next = applyOutlookUpdate(acknowledged, now);
 
     const workflowMetadata = next.workflowMetadata!;
     expect(workflowMetadata.outlookVersions).toHaveLength(2);
@@ -1475,7 +1482,13 @@ describe('applyCreateOutlookUpdate seam', () => {
     expect(workflowMetadata.status).toBe('in-progress');
     expect(next.forecastCycle.updateInProgressVersion).toBe(2);
     expect(next.isSaved).toBe(false);
+    expect(next.forecastCycle.completionAcknowledgedAt).toBeUndefined();
+    expect(next.completionValidation.lastResult).toBeNull();
+  });
 
+  it('clones populated days into the previous version snapshot', () => {
+    const { acknowledged, now } = createAcknowledgedForecast();
+    const next = applyOutlookUpdate(acknowledged, now);
     const liveFeature = next.forecastCycle.days[1]!.data.tornado!.get('2%')![0]!;
     const snapshotFeature = next.outlookVersionSnapshots[0]!.days[1]!.data.tornado!.get('2%')![0]!;
     expect(next.outlookVersionSnapshots).toHaveLength(1);
@@ -1483,9 +1496,6 @@ describe('applyCreateOutlookUpdate seam', () => {
     expect(snapshotFeature.id).toBe('day-1-feature');
     expect(snapshotFeature).not.toBe(liveFeature);
     expect(snapshotFeature).toEqual(liveFeature);
-
-    expect(next.forecastCycle.completionAcknowledgedAt).toBeUndefined();
-    expect(next.completionValidation.lastResult).toBeNull();
   });
 
   it('advances without workflow metadata', () => {
