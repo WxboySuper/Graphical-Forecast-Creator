@@ -168,8 +168,7 @@ export const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
 
 /** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
 const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> => {
-  let proxy: Map<K, V>;
-  proxy = new Proxy(map, {
+  const proxy: Map<K, V> = new Proxy(map, {
     set: () => {
       throw new Error('Attempted to mutate a shared read-only outlook map.');
     },
