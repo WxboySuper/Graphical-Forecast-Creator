@@ -20,6 +20,13 @@ const {
   getCheckoutRefundTarget,
   getSubscriptionUid,
 } = require('./billing-entitlement-builders');
+const {
+  createCheckoutMetadata,
+  getCheckoutCustomerEmail,
+  getCheckoutPriceId,
+  isCheckoutAvailable,
+  isPortalAvailable,
+} = require('./billingRouteHelpers');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -81,10 +88,6 @@ const redactIdentifier = (value) => {
 
   return `...${value.slice(-4)}`;
 };
-
-/** Returns a Stripe-compatible customer email only when the decoded token actually includes one. */
-const getCheckoutCustomerEmail = (decodedToken) =>
-  typeof decodedToken.email === 'string' && decodedToken.email.trim() ? decodedToken.email : undefined;
 
 /** True when the user should retain premium access from Stripe state alone. */
 const isStripePremiumStatus = (billingStatus) => billingStatus === 'active' || billingStatus === 'trialing';
@@ -267,28 +270,6 @@ const verifyRequestUser = async (req, res) => {
     return null;
   }
 };
-
-/** Creates the plan-specific Stripe checkout session for the verified user. */
-const isCheckoutAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.checkoutEnabled);
-
-/** Checks whether the Stripe customer portal is configured for this site. */
-const isPortalAvailable = (stripe, billingConfig) => Boolean(stripe && billingConfig.hasBaseUrl);
-
-/** Resolves the Stripe price id for the selected billing plan. */
-const getCheckoutPriceId = (plan, billingConfig) => {
-  if (plan === 'monthly') {
-    return billingConfig.monthlyPriceId;
-  }
-
-  if (plan === 'annual') {
-    return billingConfig.annualPriceId;
-  }
-
-  return '';
-};
-
-/** Builds the checkout metadata shared between the session and subscription objects. */
-const createCheckoutMetadata = (uid, plan) => ({ uid, plan });
 
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const handleCheckout = async (req, res) => {
