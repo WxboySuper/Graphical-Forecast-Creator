@@ -1462,23 +1462,24 @@ describe('applyCreateOutlookUpdate seam', () => {
       applyCreateOutlookUpdate(draft, now);
     });
 
-    expect(next.workflowMetadata?.outlookVersions).toHaveLength(2);
-    expect(next.workflowMetadata?.outlookVersions[0].status).toBe('completed');
-    expect(next.workflowMetadata?.outlookVersions[1]).toMatchObject({
+    const workflowMetadata = next.workflowMetadata!;
+    expect(workflowMetadata.outlookVersions).toHaveLength(2);
+    expect(workflowMetadata.outlookVersions[0].status).toBe('completed');
+    expect(workflowMetadata.outlookVersions[1]).toMatchObject({
       version: 2,
       status: 'in-progress',
       derivedFrom: 1,
       createdAt: now,
     });
-    expect(next.workflowMetadata?.status).toBe('in-progress');
+    expect(workflowMetadata.status).toBe('in-progress');
     expect(next.forecastCycle.updateInProgressVersion).toBe(2);
     expect(next.isSaved).toBe(false);
 
-    const liveFeature = next.forecastCycle.days[1]?.data.tornado?.get('2%')?.[0];
-    const snapshotFeature = next.outlookVersionSnapshots[0]?.days[1]?.data.tornado?.get('2%')?.[0];
+    const liveFeature = next.forecastCycle.days[1]!.data.tornado!.get('2%')![0]!;
+    const snapshotFeature = next.outlookVersionSnapshots[0]!.days[1]!.data.tornado!.get('2%')![0]!;
     expect(next.outlookVersionSnapshots).toHaveLength(1);
     expect(next.outlookVersionSnapshots[0]).toMatchObject({ version: 1, createdAt: now });
-    expect(snapshotFeature?.id).toBe('day-1-feature');
+    expect(snapshotFeature.id).toBe('day-1-feature');
     expect(snapshotFeature).not.toBe(liveFeature);
     expect(snapshotFeature).toEqual(liveFeature);
 
