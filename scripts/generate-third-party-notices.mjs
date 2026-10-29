@@ -136,7 +136,7 @@ export const renderNotices = (entries) => {
   }
 
   lines.push('', 'License categories: allowed, review-required, prohibited, unknown.');
-  return lines.join('\n');
+  return `${lines.join('\n')}\n`;
 };
 
 /** Writes the notice document to the repository root. */
