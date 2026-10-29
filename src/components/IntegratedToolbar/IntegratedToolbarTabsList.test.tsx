@@ -50,12 +50,12 @@ const rectFor = (left: number, width: number) =>
   }) as DOMRect;
 
 const installGeometry = () => {
-  const tabsRect = rectFor(0, 400);
+  const tabsRect = rectFor(100, 400);
   const triggerRects: Record<TabbedToolbarTabKey, DOMRect> = {
-    draw: rectFor(0, 80),
-    days: rectFor(80, 90),
-    layers: rectFor(170, 100),
-    tools: rectFor(270, 110),
+    draw: rectFor(100, 80),
+    days: rectFor(180, 90),
+    layers: rectFor(270, 100),
+    tools: rectFor(370, 110),
   };
 
   jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -129,9 +129,9 @@ describe('TabbedIntegratedToolbarTabsList', () => {
     });
   });
 
-  test('keeps a single observer across tab changes and re-measures on resize', () => {
+  test('keeps one observer through tab changes and remeasures after geometry changes', () => {
     const { triggerRects } = installGeometry();
-    const { rerender } = renderTabsList('draw');
+    const { rerender, unmount } = renderTabsList('draw');
 
     expect(MockResizeObserver.instances).toHaveLength(1);
     const observer = MockResizeObserver.instances[0];
@@ -148,10 +148,13 @@ describe('TabbedIntegratedToolbarTabsList', () => {
     expect(observer.disconnected).toBe(false);
     expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '90px', transform: 'translateX(80px)' });
 
-    triggerRects.days = rectFor(120, 130);
+    triggerRects.days = rectFor(220, 130);
     act(() => {
       observer.fire();
     });
     expect(screen.getByTestId('toolbar-tab-indicator')).toHaveStyle({ width: '130px', transform: 'translateX(120px)' });
+
+    unmount();
+    expect(observer.disconnected).toBe(true);
   });
 });
