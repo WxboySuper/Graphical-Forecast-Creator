@@ -3,6 +3,7 @@ import type { Feature, Polygon } from 'geojson';
 import { produce } from 'immer';
 import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
+import { applyCreateOutlookUpdate } from './forecastVersioning';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
