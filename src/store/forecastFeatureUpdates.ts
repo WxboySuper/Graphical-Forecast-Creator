@@ -51,7 +51,7 @@ export const createForecastFeatureUpdateHelpers = (
   /** Finds incoming features that already exist in the selected day's outlook maps. */
   const collectPendingFeatureUpdates = (
     state: ForecastState,
-    incoming: Feature[],
+    incoming: UpdatableFeature[],
     day?: DayType,
   ): PendingFeatureUpdate[] => {
     const outlookData = getCurrentOutlook(state, day);
