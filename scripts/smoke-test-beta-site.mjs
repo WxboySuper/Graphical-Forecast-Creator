@@ -3,8 +3,21 @@
  */
 const BETA_ORIGIN = process.env.BETA_ORIGIN ?? 'https://beta.gfcweather.com';
 const EXPECTED_VERSION = process.env.EXPECTED_VERSION ?? '';
-const MAX_ATTEMPTS = Number(process.env.SMOKE_ATTEMPTS ?? 6);
-const RETRY_DELAY_MS = Number(process.env.SMOKE_RETRY_DELAY_MS ?? 10_000);
+const DEFAULT_MAX_ATTEMPTS = 6;
+const DEFAULT_RETRY_DELAY_MS = 10_000;
+
+/** Reads a positive-integer env override, falling back when unset or invalid. */
+function readPositiveIntegerEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const MAX_ATTEMPTS = readPositiveIntegerEnv('SMOKE_ATTEMPTS', DEFAULT_MAX_ATTEMPTS);
+const RETRY_DELAY_MS = readPositiveIntegerEnv('SMOKE_RETRY_DELAY_MS', DEFAULT_RETRY_DELAY_MS);
 
 /** Pause between smoke retries. */
 function sleep(ms) {
