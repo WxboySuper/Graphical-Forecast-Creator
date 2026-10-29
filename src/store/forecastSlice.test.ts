@@ -150,7 +150,14 @@ describe('setOutlookMap', () => {
   });
 
   test('inserts a missing current day before updating its outlook map', () => {
-    const state = structuredClone(reducer(undefined, { type: 'test/init' }));
+    const initialState = reducer(undefined, { type: 'test/init' });
+    const state = {
+      ...initialState,
+      forecastCycle: {
+        ...initialState.forecastCycle,
+        days: { ...initialState.forecastCycle.days },
+      },
+    };
     const day = state.forecastCycle.currentDay;
     delete state.forecastCycle.days[day];
     const map = new Map<string, Feature[]>();
