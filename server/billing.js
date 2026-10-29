@@ -4,8 +4,7 @@ const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
-const { getAdminAuth, getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
-const { getBearerToken } = require('./firebase-auth');
+const { getAdminAuth, getAdminDb } = require('./firebase-admin');
 const {
   getBillingReturnBaseUrl,
   getBillingRuntimeConfig,
@@ -15,10 +14,8 @@ const { recordBillingMetricEvent } = require('./metrics');
 const { deleteStripeCustomer, isAccountDeletionBlocked, isStripeCustomerDeletionBlocked } = require('./account-lifecycle');
 const { getStripeObjectId, refundDeletedAccountInvoice } = require('./billing-cleanup');
 const {
-  createCheckoutEntitlementWrite,
   createSubscriptionEntitlementWrite,
   getCheckoutRefundTarget,
-  getSubscriptionUid,
 } = require('./billing-entitlement-builders');
 const {
   createCheckoutMetadata,
@@ -27,6 +24,12 @@ const {
   isCheckoutAvailable,
   isPortalAvailable,
 } = require('./billingRouteHelpers');
+const { verifyRequestUser } = require('./billingRequestAuth');
+const {
+  buildCheckoutEntitlementWrite,
+  resolveAuthoritativeSubscription,
+  resolveInvoiceUid,
+} = require('./billingWebhookResolvers');
 
 let stripeClient = null;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -248,29 +251,6 @@ const writeEntitlement = async ({ uid, stripeCustomerId, stripeSubscriptionId, p
   return result;
 };
 
-/** Extracts a verified Firebase user from the Authorization header. */
-const verifyRequestUser = async (req, res) => {
-  const token = getBearerToken(req);
-  const adminAuth = getAdminAuth();
-
-  if (!adminAuth || !hasFirebaseAdminConfig()) {
-    res.status(503).json({ error: 'Firebase Admin is not configured on this deployment.' });
-    return null;
-  }
-
-  if (!token) {
-    res.status(401).json({ error: 'Missing Firebase ID token.' });
-    return null;
-  }
-
-  try {
-    return await adminAuth.verifyIdToken(token);
-  } catch {
-    res.status(401).json({ error: 'Invalid Firebase ID token.' });
-    return null;
-  }
-};
-
 /** Creates the plan-specific Stripe checkout session for the verified user. */
 const handleCheckout = async (req, res) => {
   const billingConfig = getBillingRuntimeConfig();
@@ -429,51 +409,6 @@ const recordBillingMetricEventSafely = async (eventType) => {
   }
 };
 
-/** Resolves a subscription id or expanded object from a supported webhook payload. */
-const getInvoiceSubscription = (invoice) =>
-  invoice.subscription || invoice.parent?.subscription_details?.subscription || null;
-
-/** Resolves a subscription id or expanded object from a supported webhook payload. */
-const getWebhookSubscription = (event) => {
-  const object = event.data.object;
-  if (event.type.startsWith('customer.subscription.')) {
-    return object;
-  }
-  if (event.type === 'checkout.session.completed') {
-    return object.subscription || null;
-  }
-  return getInvoiceSubscription(object);
-};
-
-/** Retrieves current Stripe lifecycle state for convenience events such as invoices. */
-const resolveAuthoritativeSubscription = (stripe, event) => {
-  const subscription = getWebhookSubscription(event);
-  if (!subscription) {
-    return null;
-  }
-  if (typeof subscription === 'object') {
-    return subscription;
-  }
-  return stripe.subscriptions.retrieve(subscription);
-};
-
-/** Preserves the checkout UID if Stripe has not copied metadata onto the subscription yet. */
-const withFallbackSubscriptionUid = (subscription, fallbackUid) => ({
-  ...subscription,
-  metadata: {
-    ...(subscription.metadata || {}),
-    ...(subscription.metadata?.uid || !fallbackUid ? {} : { uid: fallbackUid }),
-  },
-});
-
-/** Builds the entitlement write from the checkout session's subscription or session data. */
-const buildCheckoutEntitlementWrite = async (stripe, event, session) => {
-  const subscription = await resolveAuthoritativeSubscription(stripe, event);
-  return subscription
-    ? createSubscriptionEntitlementWrite(withFallbackSubscriptionUid(subscription, session.metadata?.uid))
-    : createCheckoutEntitlementWrite(session);
-};
-
 /** Applies checkout completion using current subscription state when available. */
 const handleCheckoutSessionCompleted = async (event, stripe) => {
   const session = event.data.object;
@@ -498,13 +433,6 @@ const handleSubscriptionEvent = async (event) => {
     await recordBillingMetricEventSafely('premium_cancellation');
   }
 };
-
-/** Returns the UID from the subscription or invoice metadata. */
-const resolveInvoiceUid = (subscription, invoice) =>
-  getSubscriptionUid(subscription) ||
-  invoice.parent?.subscription_details?.metadata?.uid ||
-  invoice.subscription_details?.metadata?.uid ||
-  '';
 
 /** Checks whether an invoice belongs to a deleted account. */
 const isInvoiceForDeletedAccount = (subscription, invoice, customerId) => {
