@@ -26,6 +26,7 @@ export const refreshHostedBetaAccess = async ({
 }: RefreshHostedBetaAccessArgs): Promise<void> => {
   const hostedProfileUnavailable = !isHostedAuthEnabled || !db || !user;
   if (hostedProfileUnavailable) {
+    requestIdRef.current += 1;
     setBetaAccess(false);
     setBetaAccessLoading(false);
     return;

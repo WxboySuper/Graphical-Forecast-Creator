@@ -87,6 +87,24 @@ describe('refreshHostedBetaAccess', () => {
     expect(mockGetDoc).not.toHaveBeenCalled();
   });
 
+  test('invalidates an in-flight request when the hosted profile becomes unavailable', async () => {
+    const staleSnapshot = createDeferred<ProfileSnapshot>();
+    const args = createRefreshArgs();
+    mockGetDoc.mockReturnValueOnce(staleSnapshot.promise as never);
+
+    const staleRequest = refreshHostedBetaAccess(args);
+    mockFirebaseState.isHostedAuthEnabled = false;
+    await refreshHostedBetaAccess(args);
+
+    staleSnapshot.resolve({ data: () => ({ betaAccess: true }) });
+    await staleRequest;
+
+    expect(args.requestIdRef.current).toBe(2);
+    expect(args.setBetaAccess).toHaveBeenCalledTimes(1);
+    expect(args.setBetaAccess).toHaveBeenCalledWith(false);
+    expect(args.setBetaAccessLoading).toHaveBeenLastCalledWith(false);
+  });
+
   test.each([true, false])('applies betaAccess %s from the hosted profile', async (betaAccess) => {
     const args = createRefreshArgs();
     mockGetDoc.mockResolvedValueOnce({ data: () => ({ betaAccess }) } as never);
