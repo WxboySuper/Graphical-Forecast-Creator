@@ -1,6 +1,6 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
 import type { Feature, Geometry } from 'geojson';
-import { original } from 'immer';
+import { isDraft, original } from 'immer';
 import type {
   DayType,
   OutlookData,
@@ -200,7 +200,11 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
     const { outlookType, map } = action.payload;
     const outlookData = deps.getCurrentOutlook(state);
     const currentMap = outlookData[outlookType];
-    if (!currentMap || currentMap === map || original(currentMap) === map) {
+    if (
+      !currentMap ||
+      currentMap === map ||
+      (isDraft(currentMap) && original(currentMap) === map)
+    ) {
       return;
     }
 
