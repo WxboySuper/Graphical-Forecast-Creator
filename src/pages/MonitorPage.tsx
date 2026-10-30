@@ -159,7 +159,17 @@ const useMonitorPageLayers = ({ settings, addToast }: {
   settings: MonitorSettings;
   addToast: AddToastFn;
 }) => {
-  const radarConfig = useMemo(() => buildRadarLayerConfig(settings), [settings]);
+  // Only the radar mode, product, and site feed the layer config. Depending on
+  // the whole settings object rebuilt the config on every map pan (mapView
+  // lives in the same slice) and made the WMS frame loader reset playback.
+  const radarConfig = useMemo(
+    () => buildRadarLayerConfig({
+      radarMode: settings.radarMode,
+      radarProduct: settings.radarProduct,
+      radarSite: settings.radarSite,
+    }),
+    [settings.radarMode, settings.radarProduct, settings.radarSite],
+  );
   const satelliteConfig = useMemo(() => buildSatelliteLayerConfig(settings.satelliteProduct), [settings.satelliteProduct]);
   const [refreshToken, setRefreshToken] = useState(0);
   const liveWmsLayers = useLiveWmsLayers({
