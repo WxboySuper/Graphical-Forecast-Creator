@@ -6,7 +6,8 @@
   "main": "analytics.js",
   "scripts": {
     "start": "node analytics.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:metrics": "node --test metrics.test.js metrics-storage.test.js metricsAdminReads.test.js metricsRoutes.test.js"
   },
   "dependencies": {
     "@sentry/node": "^11.9.0",
