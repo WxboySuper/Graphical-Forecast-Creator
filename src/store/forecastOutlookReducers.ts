@@ -1,5 +1,5 @@
 import type { PayloadAction } from '@reduxjs/toolkit';
-import type { Feature } from 'geojson';
+import type { Feature, Geometry } from 'geojson';
 import { original } from 'immer';
 import type {
   DayType,
@@ -14,8 +14,10 @@ interface PendingFeatureUpdate {
   outlookType: OutlookType;
   probability: string;
   index: number;
-  feature: Feature;
+  feature: Feature<Geometry | null>;
 }
+
+type UpdatableFeature = Feature<Geometry | null>;
 
 interface ForecastOutlookReducerDeps {
   getCurrentOutlook: (state: ForecastState, day?: DayType) => OutlookData;
@@ -29,7 +31,7 @@ interface ForecastOutlookReducerDeps {
   ) => Feature;
   collectPendingFeatureUpdates: (
     state: ForecastState,
-    incoming: Feature[],
+    incoming: UpdatableFeature[],
     day?: DayType,
   ) => PendingFeatureUpdate[];
   applyPendingFeatureUpdates: (
@@ -56,7 +58,7 @@ const DEFAULT_PROBABILITIES: Partial<Record<OutlookType, Probability>> = {
 const applyFeatureUpdates = (
   deps: ForecastOutlookReducerDeps,
   state: ForecastState,
-  incoming: Feature[],
+  incoming: UpdatableFeature[],
   day?: DayType,
 ) => {
   const pendingUpdates = deps.collectPendingFeatureUpdates(state, incoming, day);
@@ -138,11 +140,11 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
     state.isSaved = false;
   },
 
-  updateFeature: (state: ForecastState, action: PayloadAction<{ feature: Feature; day?: DayType }>) => {
+  updateFeature: (state: ForecastState, action: PayloadAction<{ feature: UpdatableFeature; day?: DayType }>) => {
     applyFeatureUpdates(deps, state, [action.payload.feature], action.payload.day);
   },
 
-  updateFeaturesBatch: (state: ForecastState, action: PayloadAction<{ features: Feature[] }>) => {
+  updateFeaturesBatch: (state: ForecastState, action: PayloadAction<{ features: UpdatableFeature[] }>) => {
     applyFeatureUpdates(deps, state, action.payload.features);
   },
 
