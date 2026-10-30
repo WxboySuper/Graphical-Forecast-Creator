@@ -181,7 +181,7 @@ test('billing reconciliation terminates a customer linkage that changes during d
   assert.deepEqual(deleted, ['cus_old', 'cus_new']);
 });
 
-test('orphaned data after identity deletion does not report failure', async () => {
+test('finalizes bookkeeping when the identity is deleted but marker cleanup fails', async () => {
   const uid = 'user-1';
   const db = new FakeDb({
     userProfiles: { [uid]: { displayName: 'Alex' } },
@@ -202,11 +202,21 @@ test('orphaned data after identity deletion does not report failure', async () =
   };
   const stripe = { customers: { del: async () => {} } };
 
-  // First call deletes identity, second call in catch confirms it's gone
+  const remove = db.remove.bind(db);
+  let cleanupFailures = 1;
+  db.remove = (collectionName, id) => {
+    if (collectionName === 'accountDeletionRequests' && authDeleted && cleanupFailures > 0) {
+      cleanupFailures -= 1;
+      throw new Error('transient Firestore failure');
+    }
+    remove(collectionName, id);
+  };
+
   await deleteAccount({ uid, db, adminAuth, stripe });
 
   assert.equal(authDeleted, true);
   assert.equal(db.read('accountDeletionRequests', uid), undefined);
+  assert.ok(db.read('accountDeletionTombstones', getDeletionTombstoneId(uid))?.completedAt);
 });
 
 test('raw in-progress markers and hashed tombstones both block account activity', async () => {
