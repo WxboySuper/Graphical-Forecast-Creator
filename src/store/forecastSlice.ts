@@ -20,7 +20,7 @@ import { areTstmFeaturesEqual } from '../utils/tstmGeneration';
 import { validateCycleCompletion } from '../utils/completionValidation';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 
-import { isValidDiscussionGroupings, mergeDiscussionDrafts, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
+import { isValidDiscussionGroupings, normalizeDiscussionGroupings } from '../utils/discussionGrouping';
 import { cloneJsonValue } from './cloneJsonValue';
 import type { TrimOutlookDataResult } from '../utils/outlookPolygonMasking/trimOutlookData';
 import {
@@ -59,6 +59,7 @@ import {
 } from '../config/forecastWorkspaces';
 import { getSavedCycleWorkspaceId } from './forecastSliceSelectors';
 import { applyCreateOutlookUpdate } from './forecastVersioning';
+import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 
 const HISTORY_LIMIT = 50;
 
@@ -725,29 +726,11 @@ export const forecastSlice = createSlice({
 
     /** Moves unpublished drafts when discussion scopes are combined or reset. */
     migrateDiscussionDrafts: (state, action: PayloadAction<{ migrations: Record<string, string>; preferScopeId?: string }>) => {
-      const { migrations, preferScopeId } = action.payload;
-      const preferredDraft = preferScopeId ? state.discussionDraftsByScope[preferScopeId] : undefined;
-      const nextDrafts = { ...state.discussionDraftsByScope };
-      const targetsToSources = new Map<string, string[]>();
-
-      Object.entries(migrations).forEach(([fromScopeId, toScopeId]) => {
-        const sources = targetsToSources.get(toScopeId) ?? [];
-        sources.push(fromScopeId);
-        targetsToSources.set(toScopeId, sources);
-      });
-
-      targetsToSources.forEach((fromScopeIds, toScopeId) => {
-        const sourceDrafts = fromScopeIds
-          .map((scopeId) => nextDrafts[scopeId])
-          .filter(Boolean) as DiscussionData[];
-        const mergedDraft = mergeDiscussionDrafts(sourceDrafts, preferredDraft);
-        if (mergedDraft) nextDrafts[toScopeId] = mergedDraft;
-      });
-
-      const removedScopeIds = new Set(Object.keys(migrations));
-      state.discussionDraftsByScope = Object.fromEntries(
-        Object.entries(nextDrafts).filter(([scopeId]) => !removedScopeIds.has(scopeId)),
-      ) as Record<string, DiscussionData>;
+      applyDiscussionDraftMigrations(
+        state,
+        action.payload.migrations,
+        action.payload.preferScopeId,
+      );
     },
 
     // Update discussion for a specific day
