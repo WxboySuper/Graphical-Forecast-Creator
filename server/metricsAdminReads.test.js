@@ -130,19 +130,24 @@ describe('metrics admin reads extraction', () => {
   });
 
   it('reads, filters, and sorts the requested admin window', async () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const todayKey = today.toISOString().slice(0, 10);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
     lastDb = createSnapshotDb({
       dailyDocs: {
-        '2026-09-20': { signups: 1 },
-        '2026-09-21': { signups: 2 },
+        [yesterdayKey]: { signups: 1 },
+        [todayKey]: { signups: 2 },
       },
     });
-    // Seed only two docs; the rest of the 7-day window is missing and filtered out.
+    // Seed only the two latest docs; the rest of the 7-day window is missing and filtered out.
     const window = await adminReads.readAdminMetricsWindow(7);
     const dates = window.map((entry) => entry.date);
     assert.deepEqual(dates, [...dates].sort());
-    assert.ok(dates.includes('2026-09-20'));
-    assert.ok(dates.includes('2026-09-21'));
-    assert.equal(window.find((entry) => entry.date === '2026-09-21').signups, 2);
+    assert.ok(dates.includes(yesterdayKey));
+    assert.ok(dates.includes(todayKey));
+    assert.equal(window.find((entry) => entry.date === todayKey).signups, 2);
   });
 
   it('builds one snapshot with live premium, storage, and account totals', async () => {
