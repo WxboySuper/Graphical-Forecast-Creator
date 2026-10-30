@@ -34,6 +34,22 @@ const sampleCard = (overrides: Partial<GradeCard> = {}): GradeCard => ({
   ...overrides,
 });
 
+const sampleSnapshot = (card: GradeCard): GradeSnapshot => ({
+  card,
+  package: {
+    formulaVersion: 'gfc-ver-4',
+    grade: 82.4,
+    letter: 'B',
+    products: [],
+    dataQuality: 'Good',
+    dataQualityReason: '',
+    hasReports: true,
+    generatedAt: '2026-05-01T00:00:00Z',
+  },
+  forecast: {} as GradeSnapshot['forecast'],
+  reportDate: '2026-05-01',
+});
+
 beforeEach(() => {
   window.localStorage.clear();
 });
@@ -92,7 +108,7 @@ describe('grade history persistence', () => {
 
   test('stores and restores premium snapshots and evicts them past the limit', () => {
     const card = sampleCard({ id: 'snap', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 82.4 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     recordGradeResult({ scope, card, snapshot });
     expect(loadGradeSnapshot({ scope, cardId: 'snap' })).not.toBeNull();
 
@@ -102,9 +118,37 @@ describe('grade history persistence', () => {
     expect(loadGradeSnapshot({ scope, cardId: 'snap' })).toBeNull();
   });
 
+  test('rejects snapshot entries that do not match the GradeSnapshot shape', () => {
+    const card = sampleCard({ id: 'valid', hasSnapshot: true });
+    window.localStorage.setItem(
+      `gfc-forecast-grade-snapshot-v1:${scope}:valid`,
+      JSON.stringify(sampleSnapshot(card)),
+    );
+    expect(loadGradeSnapshot({ scope, cardId: 'valid' })).not.toBeNull();
+
+    const valid = sampleSnapshot(card);
+    const tampered: Record<string, unknown>[] = [
+      { ...valid, card: { id: 'tampered' } },
+      { ...valid, package: { ...valid.package, products: 'not-an-array' } },
+      { ...valid, package: { ...valid.package, products: [null] } },
+      { ...valid, package: { ...valid.package, dataQuality: 7 } },
+      { ...valid, forecast: 'not-an-object' },
+      { ...valid, reportDate: 123 },
+    ];
+
+    tampered.forEach((snapshot, index) => {
+      const cardId = `tampered-${index}`;
+      window.localStorage.setItem(
+        `gfc-forecast-grade-snapshot-v1:${scope}:${cardId}`,
+        JSON.stringify(snapshot),
+      );
+      expect(loadGradeSnapshot({ scope, cardId })).toBeNull();
+    });
+  });
+
   test('flips hasSnapshot to false on the returned card when the snapshot write fails', () => {
     const card = sampleCard({ id: 'quota', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 82.4 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     const setItemSpy = jest
       .spyOn(Storage.prototype, 'setItem')
       .mockImplementation((key: string) => {
@@ -124,7 +168,7 @@ describe('grade history persistence', () => {
 
   test('does not evict snapshots when the card-list write fails', () => {
     const card = sampleCard({ id: 'a', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 1 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     recordGradeResult({ scope, card, snapshot });
     expect(loadGradeSnapshot({ scope, cardId: 'a' })).not.toBeNull();
 

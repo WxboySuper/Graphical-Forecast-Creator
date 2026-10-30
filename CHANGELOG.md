@@ -61,6 +61,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
 - **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.
