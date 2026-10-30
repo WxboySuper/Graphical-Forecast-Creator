@@ -180,6 +180,22 @@ describe('validateForecastImport', () => {
     expect(result.reason).toMatch(/invalid day/i);
   });
 
+  it('rejects an out-of-contract currentDay', () => {
+    for (const currentDay of [0, 9, 999, 2.5, '3', null]) {
+      const save = validSave();
+      (save.forecastCycle as { currentDay: unknown }).currentDay = currentDay;
+      const result = validateForecastImport(save);
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/currentDay/);
+    }
+  });
+
+  it('still accepts a save that omits currentDay', () => {
+    const save = validSave();
+    delete (save.forecastCycle as { currentDay?: unknown }).currentDay;
+    expect(validateForecastImport(save).ok).toBe(true);
+  });
+
   it('rejects malformed outlook map entries', () => {
     const save = withTornado([['30%', 'not-an-array']]);
     const result = validateForecastImport(save);

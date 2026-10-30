@@ -39,6 +39,33 @@ describe('fileUtils', () => {
     expect(des.days[1].data.categorical instanceof Map).toBe(true);
   });
 
+  /** Builds a serialized cycle whose saved current day can be forced to any value. */
+  const serializedWithCurrentDay = (currentDay: unknown, dayKey = 1) => {
+    const serialized = serializeForecast({
+      days: {
+        [dayKey]: {
+          day: dayKey,
+          metadata: { issueDate: 'x', validDate: 'y', issuanceTime: '0600', createdAt: '', lastModified: '', lowProbabilityOutlooks: [] },
+          data: { categorical: new Map([['TSTM', []]]) },
+        },
+      },
+      currentDay: dayKey,
+      cycleDate: '2026-04-21',
+    } as never, { center: [0, 0], zoom: 0 });
+    serialized.forecastCycle!.currentDay = currentDay as never;
+    return serialized;
+  };
+
+  test('deserializeForecast normalizes an out-of-contract currentDay', () => {
+    for (const currentDay of [999, 0, 2.5, '3', null]) {
+      expect(deserializeForecast(serializedWithCurrentDay(currentDay)).currentDay).toBe(1);
+    }
+  });
+
+  test('deserializeForecast falls back to the first saved day when currentDay is invalid', () => {
+    expect(deserializeForecast(serializedWithCurrentDay(0, 5)).currentDay).toBe(5);
+  });
+
   test('serialize/deserialize preserves copied geometry metadata', () => {
     const copiedFeature: Feature = {
       type: 'Feature',
