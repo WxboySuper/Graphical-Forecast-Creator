@@ -59,6 +59,14 @@ const validateTreeBounds = (
       : null;
   }
 
+  // JSON.parse turns out-of-range numeric literals such as 1e999 into
+  // Infinity, and the deserializer copies numbers like mapView.zoom and
+  // forecastCycle.currentDay straight into state. Reject every non-finite
+  // number here so no consumer has to re-check.
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return fail('Forecast file contains a non-finite number.');
+  }
+
   if (Array.isArray(value)) {
     return validateArrayBounds(value, depth);
   }
