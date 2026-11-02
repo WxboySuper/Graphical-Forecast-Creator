@@ -242,7 +242,8 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing severe forecast workspace')).not.toBeInTheDocument();
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toBeInTheDocument();
   });
 
   test('tags new cycles with the active workspace after route ownership is synchronized', () => {
@@ -279,7 +280,7 @@ describe('ForecastPage layout selection', () => {
     act(() => store.dispatch(setForecastWorkspace('custom')));
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing custom forecast workspace')).not.toBeInTheDocument();
   });
 
   test('keeps a handoff staged for another workspace and restores this one locally', async () => {
@@ -467,7 +468,7 @@ describe('ForecastPage layout selection', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
     expect(screen.getByTestId('forecast-page-workspace')).toContainElement(
       screen.getByText('ForecastTabbedToolbarLayout Mock'),
     );
@@ -507,13 +508,20 @@ describe('ForecastPage layout selection', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
     await waitFor(() => expect(sessionStorage.getItem('gfc:legacy-forecast-notice')).toBe('true'));
     firstRender.unmount();
 
     renderForecastPage(createStore());
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
+  });
+
+  test('shows the Auto-TSTM disabled banner while HREF is decommissioned', () => {
+    renderForecastPage(createStore());
+
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/temporarily disabled while the SPC HREF source/i);
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/SPC REF.*v1\.8/i);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {

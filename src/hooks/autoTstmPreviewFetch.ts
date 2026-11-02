@@ -3,6 +3,7 @@ import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';
 import { buildTstmRequest } from '../utils/buildTstmRequest';
 import { requestLatestTstmData } from '../utils/tstmGeneration';
+import { AUTO_TSTM_DISABLED, AUTO_TSTM_DISABLED_MESSAGE } from '../config/autoTstmDisable';
 import { resolveTstmFetchOutcome } from './autoTstmFetch';
 import type { AutoTstmStatus } from './useAutoTstmState';
 
@@ -64,6 +65,13 @@ export const runAutoTstmPreviewFetch = async ({
   setErrorMessage,
   setPreview,
 }: RunAutoTstmPreviewFetchArgs): Promise<void> => {
+  if (AUTO_TSTM_DISABLED) {
+    setPreview(null);
+    setStatus('error');
+    setErrorMessage(AUTO_TSTM_DISABLED_MESSAGE);
+    return;
+  }
+
   if (!isDaySupported) {
     return;
   }
