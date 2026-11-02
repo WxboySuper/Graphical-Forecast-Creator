@@ -255,6 +255,8 @@ const startIngestionLoop = (options = {}) => {
     running = true;
     try {
       await runIngestionCycle({ env, runGenerator, log });
+    } catch (error) {
+      log.error?.('[tstm-ingest] ingestion cycle failed; next tick will retry:', error);
     } finally {
       running = false;
     }
