@@ -17,7 +17,7 @@ const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) 
 };
 
 // Auto-TSTM is temporarily disabled client-side while the SPC HREF source is
-// decommissioned (SPC REF replacement planned for v1.8). The client must not
+// decommissioned (REFS / REFSCT replacement planned for v1.8). The client must not
 // hit /api/tstm/* in normal use and the entry point must stay visibly disabled.
 test.describe('Auto-TSTM disabled (HREF decommission)', () => {
   test.beforeEach(async ({ page }) => {
@@ -42,7 +42,7 @@ test.describe('Auto-TSTM disabled (HREF decommission)', () => {
     await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(
       /temporarily disabled while the SPC HREF source/i,
     );
-    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(/SPC REF.*v1\.8/i);
+    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(/REFSCT.*v1\.8/i);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeDisabled();
