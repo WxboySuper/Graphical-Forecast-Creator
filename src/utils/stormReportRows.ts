@@ -48,7 +48,23 @@ const ARCHIVE_HEADER_ALIASES: Readonly<Record<string, string>> = {
   remarks: 'Remarks',
 };
 
+/** SPC coordinates outside these limits cannot describe a real report. */
+const MAX_LATITUDE = 90;
+const MAX_LONGITUDE = 180;
+
+/**
+ * Rejects missing, non-finite, and out-of-range coordinates. `parseFloat`
+ * turns `1e999` into Infinity, which `Number.isNaN` never caught, and
+ * verification builds bounding boxes from these values.
+ */
+const hasUsableCoordinates = (latitude: number, longitude: number): boolean =>
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude) &&
+  Math.abs(latitude) <= MAX_LATITUDE &&
+  Math.abs(longitude) <= MAX_LONGITUDE;
+
 /** Parses one normalized storm-report CSV row using the supplied column mapping. */
+
 const parseStormReportRow = (
   line: string,
   type: ReportType,
@@ -59,7 +75,7 @@ const parseStormReportRow = (
   const lat = parseFloat(row[fields.latField]);
   const lon = parseFloat(row[fields.lonField]);
 
-  if (Number.isNaN(lat) || Number.isNaN(lon)) {
+  if (!hasUsableCoordinates(lat, lon)) {
     return null;
   }
 
