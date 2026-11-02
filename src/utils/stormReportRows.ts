@@ -93,6 +93,7 @@ const parseStormReportRow = (
   };
 };
 
+/** Parses one today.csv report row for the given report type. */
 export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | null => {
   const { rowHeaders } = TODAY_SECTION_DESCRIPTORS[type];
 
@@ -106,6 +107,7 @@ export const parseTodayCsvRow = (line: string, type: ReportType): StormReport | 
   });
 };
 
+/** Parses one archive CSV row using the archive header aliases. */
 export const parseArchiveCsvRow = (
   line: string,
   type: ReportType,
