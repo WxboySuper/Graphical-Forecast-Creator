@@ -38,6 +38,53 @@ export const useAppLayout = () => {
   return context;
 };
 
+interface DocumentationPanelProps {
+  show: boolean;
+  onClose: () => void;
+}
+
+interface ViewOnlyViewerProps {
+  show: boolean;
+  onClose: () => void;
+  onAccept: () => void;
+}
+
+// Small presentational subcomponent that encapsulates the documentation side-panel. It lives at module scope so React keeps the same component type across AppLayout renders; declaring it inside the layout would remount the drawer (and reset its open tab) on every toast or theme change.
+const DocumentationPanel: React.FC<DocumentationPanelProps> = ({ show, onClose }) => {
+  if (!show) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-[900] bg-black/25"
+        style={{ top: NAVBAR_HEIGHT }}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        className="fixed right-0 bottom-0 top-16 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
+        role="dialog"
+        aria-label="Documentation"
+        aria-modal="true"
+      >
+        <Documentation onClose={onClose} />
+      </div>
+    </>
+  );
+};
+
+/** Terms viewer wrapper to keep AppLayout lean. */
+const TermsViewer: React.FC<ViewOnlyViewerProps> = ({ show, onClose, onAccept }) => {
+  if (!show) return null;
+  return <ToSModal viewOnly onClose={onClose} onAccept={onAccept} />;
+};
+
+/** Keeps the view-only privacy policy modal wiring out of the main layout JSX. */
+const PrivacyViewer: React.FC<ViewOnlyViewerProps> = ({ show, onClose, onAccept }) => {
+  if (!show) return null;
+  return <PrivacyPolicyModal viewOnly onClose={onClose} onAccept={onAccept} />;
+};
+
 // Main layout component for the app, which includes the navbar, documentation panel, main content area (where different pages are rendered based on routing), and a toast manager for showing notifications. It also manages the state for showing/hiding the documentation panel and the ToS viewer modal, and it applies dark mode styling based on the Redux state. The component uses React Router's Outlet to render child routes and provides the addToast function through context for use in child components.
 export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
@@ -136,41 +183,7 @@ export const AppLayout: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigate, showDocumentation]);
 
-  // Small presentational subcomponent that encapsulates the documentation side-panel
-  const DocumentationPanel: React.FC<{ show: boolean; onClose: () => void }> = ({ show, onClose }) => {
-    if (!show) return null;
-
-    return (
-      <>
-        <div
-          className="fixed inset-0 z-[900] bg-black/25"
-          style={{ top: NAVBAR_HEIGHT }}
-          onClick={onClose}
-          aria-hidden="true"
-        />
-        <div
-          className="fixed right-0 bottom-0 top-16 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
-          role="dialog"
-          aria-label="Documentation"
-          aria-modal="true"
-        >
-          <Documentation onClose={onClose} />
-        </div>
-      </>
-    );
-  };
-
-  // Terms viewer wrapper to keep AppLayout lean
-  const TermsViewer: React.FC<{ show: boolean; onClose: () => void; onAccept: () => void }> = ({ show, onClose, onAccept }) => {
-    if (!show) return null;
-    return <ToSModal viewOnly onClose={onClose} onAccept={onAccept} />;
-  };
-
-  /** Keeps the view-only privacy policy modal wiring out of the main layout JSX. */
-  const PrivacyViewer: React.FC<{ show: boolean; onClose: () => void; onAccept: () => void }> = ({ show, onClose, onAccept }) => {
-    if (!show) return null;
-    return <PrivacyPolicyModal viewOnly onClose={onClose} onAccept={onAccept} />;
-  };
+  // Small presentational subcomponents live at module scope above so re-rendering AppLayout does not remount the docs drawer.
 
   return (
     <AppLayoutContext.Provider value={{ addToast }}>
