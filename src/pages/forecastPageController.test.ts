@@ -19,11 +19,15 @@ import {
   INVALID_CLOUD_HANDOFF,
   parseStoredCloudMeta,
   parseStoredForecastPayload,
+  parseRestorableCycleMetadata,
+  parseRestorableMapView,
   runDayRolloverCloudSaveAction,
   runDayRolloverDownloadAction,
   useDayRolloverPrompt,
+  useSessionRestore,
 } from './forecastPageController';
 import { serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
+import { getAutoSaveStorageKey } from '../hooks/useAutoSave';
 import type { ForecastImportResult } from '../utils/forecastTransfer';
 
 const createForecastCycle = () =>
@@ -372,6 +376,138 @@ describe('forecastPageController', () => {
       expect(dispatch).toHaveBeenCalledTimes(1);
     } finally {
       exportSpy.mockRestore();
+    }
+  });
+
+  test('accepts only finite, in-bounds map views from untrusted payloads', () => {
+    expect(parseRestorableMapView({ center: [39.8, -98.5], zoom: 4 })).toEqual({
+      center: [39.8, -98.5],
+      zoom: 4,
+    });
+    expect(parseRestorableMapView({ center: [0, 0], zoom: 0 })).toEqual({ center: [0, 0], zoom: 0 });
+    expect(parseRestorableMapView({ center: [-90, 180], zoom: 28 })).not.toBeNull();
+
+    expect(parseRestorableMapView(null)).toBeNull();
+    expect(parseRestorableMapView('map')).toBeNull();
+    expect(parseRestorableMapView({})).toBeNull();
+    expect(parseRestorableMapView({ center: [0], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [0, 0, 0], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: ['0', 0], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [Infinity, 0], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [0, Number.NaN], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [91, 0], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [0, 181], zoom: 4 })).toBeNull();
+    expect(parseRestorableMapView({ center: [0, 0], zoom: 1e308 })).toBeNull();
+    expect(parseRestorableMapView({ center: [0, 0], zoom: -1 })).toBeNull();
+  });
+
+  test('accepts only cycle metadata whose outlook versions are well formed', () => {
+    const metadata = {
+      id: 'cycle-1',
+      workflowId: 'workflow-1',
+      cycleDate: '2026-04-24',
+      status: 'draft',
+      outlookVersions: [],
+      createdAt: '2026-04-24T00:00:00.000Z',
+      updatedAt: '2026-04-24T00:00:00.000Z',
+    };
+    const version = { version: 1, status: 'in-progress', createdAt: '2026-04-24T00:00:00.000Z' };
+
+    expect(parseRestorableCycleMetadata(metadata)).toBe(metadata);
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: [version] })).not.toBeNull();
+
+    expect(parseRestorableCycleMetadata(null)).toBeNull();
+    expect(parseRestorableCycleMetadata('metadata')).toBeNull();
+    expect(parseRestorableCycleMetadata([])).toBeNull();
+    expect(parseRestorableCycleMetadata({ id: 'cycle-1' })).toBeNull();
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: 'nope' })).toBeNull();
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: [null] })).toBeNull();
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: [{ id: 'v1' }] })).toBeNull();
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: [{ ...version, version: '1' }] })).toBeNull();
+    expect(parseRestorableCycleMetadata({ ...metadata, outlookVersions: [version, undefined] })).toBeNull();
+  });
+
+  test('drops untrusted map view and metadata from an import result', () => {
+    const dispatch = jest.fn();
+    const result = {
+      workspaceId: 'severe',
+      format: 'json',
+      warnings: [],
+      forecastCycle: createForecastCycle(),
+      mapView: { center: [Infinity, 0], zoom: 1e308 },
+      cycleMetadata: { id: 'cycle-1' },
+    } as unknown as ForecastImportResult;
+
+    expect(applyForecastImportResult(result, dispatch, { current: null } as never, 'severe')).toBeNull();
+    const types = dispatch.mock.calls.map(([action]) => (action as { type: string }).type);
+    expect(types).toContain('forecast/importForecastCycle');
+    expect(types).not.toContain('forecast/setMapView');
+    expect(types).not.toContain('forecast/setWorkflowMetadata');
+  });
+
+  test('applies a valid map view and metadata from an import result', () => {
+    const dispatch = jest.fn();
+    const mapView = { center: [39.8, -98.5] as [number, number], zoom: 4 };
+    const cycleMetadata = {
+      id: 'cycle-1',
+      workflowId: 'workflow-1',
+      cycleDate: '2026-04-24',
+      status: 'draft',
+      outlookVersions: [],
+      createdAt: '2026-04-24T00:00:00.000Z',
+      updatedAt: '2026-04-24T00:00:00.000Z',
+    };
+    const result = {
+      workspaceId: 'severe',
+      format: 'json',
+      warnings: [],
+      forecastCycle: createForecastCycle(),
+      mapView,
+      cycleMetadata,
+    } as unknown as ForecastImportResult;
+
+    expect(applyForecastImportResult(result, dispatch, { current: null } as never, 'severe')).toBeNull();
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/setMapView', payload: mapView }));
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'forecast/setWorkflowMetadata', payload: cycleMetadata }));
+  });
+
+  test('ignores untrusted map view and metadata when restoring a session', () => {
+    const payload = serializeForecastWorkspace(
+      'severe',
+      createForecastCycle(),
+      { center: [39.8, -98.5], zoom: 4 },
+    ) as unknown as { forecast: Record<string, unknown> };
+    localStorage.setItem(getAutoSaveStorageKey(null, 'severe'), JSON.stringify({
+      ...payload,
+      forecast: {
+        ...payload.forecast,
+        mapView: { center: [1e308, 'west'], zoom: 1e308 },
+        cycleMetadata: { id: 'cycle-1' },
+      },
+    }));
+    const dispatch = jest.fn();
+
+    try {
+      const { unmount } = renderHook(() => useSessionRestore(
+        dispatch,
+        jest.fn(),
+        {
+          forecastCycle: createForecastCycle(),
+          discussionDraftsByScope: {},
+          currentMapView: { center: [0, 0] as [number, number], zoom: 4 },
+          workflowMetadata: undefined,
+        },
+        null,
+        'severe',
+      ));
+
+      const types = dispatch.mock.calls.map(([action]) => (action as { type: string }).type);
+      expect(types).toContain('forecast/restoreForecastCycle');
+      expect(types).not.toContain('forecast/setMapView');
+      expect(types).not.toContain('forecast/setWorkflowMetadata');
+      unmount();
+    } finally {
+      localStorage.clear();
     }
   });
 });
