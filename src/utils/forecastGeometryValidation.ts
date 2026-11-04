@@ -21,37 +21,48 @@ const isNonFinitePosition = (item: unknown): boolean =>
 /** Returns true when any item in a coordinate leaf is non-finite. */
 const leafHasNonFinite = (leaf: unknown[]): boolean => leaf.some(isNonFinitePosition);
 
-/** Recursively walks a nested coordinate tree, counting positions and non-finite values. */
-const walkCoordinates = (
-  value: unknown,
-  limit: number,
-  state: { count: number; hasNonFinite: boolean },
-): void => {
-  if (state.count >= limit) return;
+/**
+ * Coordinate budget shared by one geometry and every child of its collection.
+ * A GeometryCollection must not hand each child its own full allowance, or a
+ * crafted import can hide any number of positions behind one collection.
+ */
+interface CoordinateBudget {
+  remaining: number;
+  hasNonFinite: boolean;
+}
+
+/** Recursively walks a nested coordinate tree, charging positions against a shared budget. */
+const walkCoordinates = (value: unknown, budget: CoordinateBudget): void => {
+  if (budget.remaining <= 0) return;
   if (!Array.isArray(value)) return;
 
   if (value.length > 0 && Array.isArray(value[0])) {
-    value.forEach((child) => walkCoordinates(child, limit, state));
+    value.forEach((child) => walkCoordinates(child, budget));
     return;
   }
 
-  if (!state.hasNonFinite && leafHasNonFinite(value)) {
-    state.hasNonFinite = true;
+  if (!budget.hasNonFinite && leafHasNonFinite(value)) {
+    budget.hasNonFinite = true;
   }
-  state.count += value.length;
+  budget.remaining -= value.length;
 };
 
 /**
- * Counts coordinate positions inside a GeoJSON geometry, bounding work early
- * when the limit is exceeded, and reports whether any position is non-finite.
+ * Charges a geometry's coordinate positions against the shared budget.
+ * GeometryCollection children draw from the same budget as their parent.
  */
-const countCoordinatePositions = (geometry: Geometry, limit: number): { count: number; hasNonFinite: boolean } => {
+const chargeCoordinates = (geometry: Geometry, budget: CoordinateBudget): void => {
   if (geometry.type === 'GeometryCollection') {
-    return { count: 0, hasNonFinite: false };
+    const children = (geometry as unknown as { geometries?: unknown }).geometries;
+    if (!Array.isArray(children)) return;
+    for (const child of children) {
+      if (budget.remaining <= 0) return;
+      if (!child || typeof child !== 'object' || Array.isArray(child)) return;
+      chargeCoordinates(child as Geometry, budget);
+    }
+    return;
   }
-  const state = { count: 0, hasNonFinite: false };
-  walkCoordinates((geometry as { coordinates?: unknown }).coordinates, limit, state);
-  return state;
+  walkCoordinates((geometry as { coordinates?: unknown }).coordinates, budget);
 };
 
 /** Validates the child geometries of a GeometryCollection. */
@@ -60,30 +71,14 @@ function validateGeometryCollection(geometries: unknown): ImportValidationResult
     return fail('Forecast geometry collection is invalid or too large.');
   }
   for (const child of geometries) {
-    const childResult = validateGeometry(child);
+    const childResult = inspectGeometry(child);
     if (childResult) return childResult;
   }
   return null;
 }
 
-/** Validates a non-collection geometry's coordinates and size. */
-const validateGeometryCoordinates = (geometry: { type?: unknown; coordinates?: unknown }): ImportValidationResult | null => {
-  if (!Array.isArray(geometry.coordinates)) {
-    return fail(`Forecast geometry "${geometry.type}" is missing coordinates.`);
-  }
-  const { count, hasNonFinite } = countCoordinatePositions(geometry as Geometry, MAX_COORDINATE_POSITIONS);
-  if (count >= MAX_COORDINATE_POSITIONS) {
-    return fail('Forecast geometry contains too many coordinates.');
-  }
-  if (hasNonFinite) {
-    return fail('Forecast geometry contains a non-finite coordinate.');
-  }
-  return null;
-};
-
-/** Validates one GeoJSON geometry object against supported types and coordinate bounds. */
-// @codescene(disable:"Complex Conditional")
-export function validateGeometry(value: unknown): ImportValidationResult | null {
+/** Validates one geometry's shape, descending into collection children. */
+const inspectGeometry = (value: unknown): ImportValidationResult | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return fail('Forecast geometry is not a valid object.');
   }
@@ -97,7 +92,28 @@ export function validateGeometry(value: unknown): ImportValidationResult | null 
     return validateGeometryCollection(geometry.geometries);
   }
 
-  return validateGeometryCoordinates(geometry);
+  if (!Array.isArray(geometry.coordinates)) {
+    return fail(`Forecast geometry "${geometry.type}" is missing coordinates.`);
+  }
+
+  return null;
+};
+
+/** Validates one GeoJSON geometry object against supported types and coordinate bounds. */
+export function validateGeometry(value: unknown): ImportValidationResult | null {
+  const shapeResult = inspectGeometry(value);
+  if (shapeResult) return shapeResult;
+
+  const budget: CoordinateBudget = { remaining: MAX_COORDINATE_POSITIONS, hasNonFinite: false };
+  chargeCoordinates(value as Geometry, budget);
+
+  if (budget.remaining <= 0) {
+    return fail('Forecast geometry contains too many coordinates.');
+  }
+  if (budget.hasNonFinite) {
+    return fail('Forecast geometry contains a non-finite coordinate.');
+  }
+  return null;
 }
 
 /** Validates one serialized outlook feature and its geometry. */
