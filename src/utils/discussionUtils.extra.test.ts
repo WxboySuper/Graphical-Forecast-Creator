@@ -1,4 +1,5 @@
 import { compileDiscussionToText, exportDiscussionToFile } from './discussionUtils';
+import type { DiscussionData } from '../types/outlooks';
 
 type Discussion = {
   mode: 'guided' | 'diy';
@@ -55,11 +56,12 @@ describe('discussionUtils extra', () => {
   });
 
   test('compile guided discussion without guided content does not throw', () => {
-    const discussion: Discussion = {
+    const discussion: DiscussionData = {
       mode: 'guided',
       validStart: new Date().toISOString(),
       validEnd: new Date().toISOString(),
-      forecasterName: 'Zoe'
+      forecasterName: 'Zoe',
+      lastModified: new Date().toISOString()
     };
 
     const text = compileDiscussionToText(discussion, 1);
@@ -74,8 +76,9 @@ describe('discussionUtils extra', () => {
       guidedContent: 'not-a-record',
       validStart: new Date().toISOString(),
       validEnd: new Date().toISOString(),
-      forecasterName: 'Zoe'
-    } as unknown as Discussion;
+      forecasterName: 'Zoe',
+      lastModified: new Date().toISOString()
+    } as unknown as DiscussionData;
 
     expect(() => compileDiscussionToText(discussion, 2)).not.toThrow();
   });
