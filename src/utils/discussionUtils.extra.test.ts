@@ -54,6 +54,32 @@ describe('discussionUtils extra', () => {
     expect(text).toContain('Forecaster: Zoe');
   });
 
+  test('compile guided discussion without guided content does not throw', () => {
+    const discussion: Discussion = {
+      mode: 'guided',
+      validStart: new Date().toISOString(),
+      validEnd: new Date().toISOString(),
+      forecasterName: 'Zoe'
+    };
+
+    const text = compileDiscussionToText(discussion, 1);
+    expect(text).toContain('Day 1 Severe Weather Outlook Discussion');
+    expect(text).toContain('Forecaster: Zoe');
+    expect(text).not.toContain('Synopsis:');
+  });
+
+  test('compile guided discussion ignores malformed guided content', () => {
+    const discussion = {
+      mode: 'guided',
+      guidedContent: 'not-a-record',
+      validStart: new Date().toISOString(),
+      validEnd: new Date().toISOString(),
+      forecasterName: 'Zoe'
+    } as unknown as Discussion;
+
+    expect(() => compileDiscussionToText(discussion, 2)).not.toThrow();
+  });
+
   test('exportDiscussionToFile creates and clicks download link', async () => {
     const discussion: Discussion = {
       mode: 'diy',
