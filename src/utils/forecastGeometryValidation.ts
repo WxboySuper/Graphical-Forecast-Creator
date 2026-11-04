@@ -21,6 +21,10 @@ const isNonFinitePosition = (item: unknown): boolean =>
 /** Returns true when any item in a coordinate leaf is non-finite. */
 const leafHasNonFinite = (leaf: unknown[]): boolean => leaf.some(isNonFinitePosition);
 
+/** Returns true for a non-null, non-array object. */
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /**
  * Coordinate budget shared by one geometry and every child of its collection.
  * A GeometryCollection must not hand each child its own full allowance, or a
@@ -57,8 +61,8 @@ const chargeCoordinates = (geometry: Geometry, budget: CoordinateBudget): void =
     if (!Array.isArray(children)) return;
     for (const child of children) {
       if (budget.remaining <= 0) return;
-      if (!child || typeof child !== 'object' || Array.isArray(child)) return;
-      chargeCoordinates(child as Geometry, budget);
+      if (!isPlainObject(child)) return;
+      chargeCoordinates(child as unknown as Geometry, budget);
     }
     return;
   }
@@ -78,8 +82,8 @@ function validateGeometryCollection(geometries: unknown): ImportValidationResult
 }
 
 /** Validates one geometry's shape, descending into collection children. */
-const inspectGeometry = (value: unknown): ImportValidationResult | null => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+function inspectGeometry(value: unknown): ImportValidationResult | null {
+  if (!isPlainObject(value)) {
     return fail('Forecast geometry is not a valid object.');
   }
 
@@ -97,7 +101,7 @@ const inspectGeometry = (value: unknown): ImportValidationResult | null => {
   }
 
   return null;
-};
+}
 
 /** Validates one GeoJSON geometry object against supported types and coordinate bounds. */
 export function validateGeometry(value: unknown): ImportValidationResult | null {
