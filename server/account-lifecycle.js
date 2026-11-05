@@ -232,9 +232,12 @@ const finalizeDeletion = async ({ uid, adminAuth, requestRef, tombstoneRef }) =>
   await requestRef.delete();
 };
 
-/** Handles a deletion failure when the identity was already removed or the request marker is gone. */
-const handleDeletionFailure = async ({ adminAuth, uid, requestRef, error }) => {
-  if (await isIdentityGone(adminAuth, uid)) return;
+/** Retries final bookkeeping only after billing and data cleanup have succeeded. */
+const handleDeletionFailure = async ({ adminAuth, uid, requestRef, tombstoneRef, error, cleanupComplete }) => {
+  if (cleanupComplete && await isIdentityGone(adminAuth, uid)) {
+    await finalizeDeletion({ uid, adminAuth, requestRef, tombstoneRef });
+    return;
+  }
 
   await requestRef.set({ status: 'failed', updatedAt: new Date() }, { merge: true });
   throw error;
@@ -255,14 +258,16 @@ const initDeletionRefs = async (db, uid) => {
 /** Runs the idempotent destructive sequence while preserving the auth identity until cleanup succeeds. */
 const deleteAccount = async ({ uid, db, adminAuth, stripe }) => {
   const { requestRef, tombstoneRef, stripeCustomerId } = await initDeletionRefs(db, uid);
+  let cleanupComplete = false;
 
   try {
     await deleteLinkedStripeCustomers({ db, uid, stripe });
     await deleteAccountFirestoreData(db, uid);
     await reconcilePostSweepBilling({ db, uid, stripe, tombstoneRef, stripeCustomerId });
+    cleanupComplete = true;
     await finalizeDeletion({ uid, adminAuth, requestRef, tombstoneRef });
   } catch (error) {
-    await handleDeletionFailure({ adminAuth, uid, requestRef, error });
+    await handleDeletionFailure({ adminAuth, uid, requestRef, tombstoneRef, error, cleanupComplete });
   }
 };
 
