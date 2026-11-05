@@ -31,6 +31,14 @@ const readReport = (result) => {
     console.error(stderr);
   }
   process.exit(1);
+  return null;
+};
+
+/** Returns whether pnpm's report contains the expected advisory map. */
+const hasAdvisories = (report) => {
+  const advisories = report.advisories;
+  if (!advisories || typeof advisories !== 'object') return false;
+  return !Array.isArray(advisories);
 };
 
 /** Exits when pnpm reported an error body instead of advisories. */
@@ -40,7 +48,7 @@ const assertAuditCompleted = (report) => {
     console.error(`Dependency audit could not complete: ${summary}`);
     process.exit(1);
   }
-  if (!report.advisories || typeof report.advisories !== 'object' || Array.isArray(report.advisories)) {
+  if (!hasAdvisories(report)) {
     console.error('Dependency audit report has no valid advisories object.');
     process.exit(1);
   }
@@ -63,6 +71,7 @@ const failOnFixableAdvisories = (fixableHigh) => {
   process.exit(1);
 };
 
+/** Runs the dependency audit and exits when fixable high-severity advisories remain. */
 const main = () => {
   const result = spawnSync('pnpm', ['audit', '--audit-level=high', '--ignore-registry-errors', '--json'], {
     cwd: ROOT,

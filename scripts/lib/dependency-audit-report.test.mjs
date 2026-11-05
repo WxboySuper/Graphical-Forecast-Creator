@@ -24,7 +24,7 @@ test('returns null for empty, malformed, or non-object stdout', () => {
   assert.equal(parseAuditReport('   '), null);
   assert.equal(parseAuditReport('WARN something on stderr\n{"advisories":{}}'), null);
   assert.equal(parseAuditReport('[]'), null);
-  assert.equal(parseAuditReport(undefined), null);
+  assert.equal(parseAuditReport(), null);
 });
 
 test('selects only fixable high and critical advisories', () => {
@@ -36,5 +36,5 @@ test('selects only fixable high and critical advisories', () => {
 
 test('reports every advisory for logging', () => {
   assert.equal(auditAdvisories(report).length, 4);
-  assert.deepEqual(auditAdvisories(undefined), []);
+  assert.deepEqual(auditAdvisories(), []);
 });
