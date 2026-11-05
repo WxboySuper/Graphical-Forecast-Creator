@@ -15,6 +15,7 @@ repeatable workflows.
 - [Timed production rollout](./operations/timed-production-rollout.md) - scheduled promotion design.
 - [Alert banner](./operations/alert-banner.md) - runtime banner shape and timed-release banner behavior.
 - [Emergency feature disable](./operations/emergency-feature-disable.md) - server-side emergency shutoff for server-backed beta capabilities.
+- [Firestore retention and TTL](./operations/firestore-retention.md) - required TTL policies for the Stripe event ledger and metric dedupe collections.
 - [Feature exposure workstreams](./operations/feature-exposure-workstreams.md) - v1.7 rollout registry adoption manifest.
 - [v1.7 exposure matrix](./operations/v1.7-exposure-matrix.md) - cross-feature target exposure and release evidence contract.
 - [v1.7 acceptance matrix](./operations/v1.7-acceptance-matrix.md) - desktop, mobile, account-state, and disabled-feature acceptance evidence.
