@@ -1461,6 +1461,13 @@ export const {
   setWorkflowActive,
 } = forecastSlice.actions;
 
+export {
+  selectForecast,
+  selectForecastCycle,
+  selectCurrentDay,
+  selectDiscussionDraftForScope,
+} from './forecastSelectors';
+
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
