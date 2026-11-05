@@ -51,5 +51,11 @@ treat an existing document as the dedupe signal.
 The TTL policy reads the timestamp, not the constant. If
 `EVENT_LEDGER_RETENTION_MS` in `server/billing-webhook-state.js` or
 `DEDUPE_TTL_DAYS` in `server/metricsValues.js` changes, update the table above
-and re-check that the corresponding policy still exists. The policy does not
-need to change; the documents will simply expire at the new time.
+and re-check that the corresponding policy still exists. The policy itself does
+not need to change.
+
+Both writers store a fixed `expiresAt` when they create a document, so a new
+retention constant only affects future writes. Existing documents keep the
+`expiresAt` value they were written with. If a shorter window must also apply
+to documents already stored, update their `expiresAt` timestamps separately;
+changing the constant or the TTL policy will not rewrite them.
