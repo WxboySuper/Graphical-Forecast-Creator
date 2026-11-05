@@ -62,6 +62,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
+- **Documentation drawer:** Keep the selected tab and scroll position when the layout updates while the drawer is open.
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
 - **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.

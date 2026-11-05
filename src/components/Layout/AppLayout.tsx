@@ -85,6 +85,27 @@ const PrivacyViewer: React.FC<ViewOnlyViewerProps> = ({ show, onClose, onAccept 
   return <PrivacyPolicyModal viewOnly onClose={onClose} onAccept={onAccept} />;
 };
 
+/** Handles Escape and the configured navigation shortcuts. */
+const handleLayoutKeyDown = (
+  event: KeyboardEvent,
+  showDocumentation: boolean,
+  closeDocumentation: () => void,
+  navigate: ReturnType<typeof useNavigate>,
+) => {
+  if (event.key === 'Escape' && showDocumentation) {
+    closeDocumentation();
+    return;
+  }
+  if (!event.ctrlKey && !event.metaKey) return;
+  const key = keyboardShortcutKey(event);
+  if (!key) return;
+  const action = getNavigationKeyboardShortcuts(navigate)[key];
+  if (action) {
+    event.preventDefault();
+    action();
+  }
+};
+
 // Main layout component for the app, which includes the navbar, documentation panel, main content area (where different pages are rendered based on routing), and a toast manager for showing notifications. It also manages the state for showing/hiding the documentation panel and the ToS viewer modal, and it applies dark mode styling based on the Redux state. The component uses React Router's Outlet to render child routes and provides the addToast function through context for use in child components.
 export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
@@ -159,29 +180,13 @@ export const AppLayout: React.FC = () => {
 
   // Keyboard shortcuts for navigation
   useEffect(() => {
-    // Handler for keydown events: Escape closes docs; Ctrl/Cmd+key shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showDocumentation) {
-        setShowDocumentation(false);
-        return;
-      }
-
-      if (e.ctrlKey || e.metaKey) {
-        const key = keyboardShortcutKey(e);
-        if (!key) return;
-
-        const shortcuts = getNavigationKeyboardShortcuts(navigate);
-        const action = shortcuts[key];
-        if (action) {
-          e.preventDefault();
-          action();
-        }
-      }
-    };
+    /** Routes keyboard shortcuts and closes the documentation drawer on Escape. */
+    const handleKeyDown = (event: KeyboardEvent) =>
+      handleLayoutKeyDown(event, showDocumentation, handleCloseDocumentation, navigate);
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate, showDocumentation]);
+  }, [handleCloseDocumentation, navigate, showDocumentation]);
 
   // Small presentational subcomponents live at module scope above so re-rendering AppLayout does not remount the docs drawer.
 
