@@ -1,5 +1,6 @@
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
+import { produce } from 'immer';
 import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
@@ -149,14 +150,29 @@ describe('setOutlookMap', () => {
   });
 
   test('inserts a missing current day before updating its outlook map', () => {
-    const state = structuredClone(reducer(undefined, { type: 'test/init' }));
-    const day = state.forecastCycle.currentDay;
-    delete state.forecastCycle.days[day];
+    const initial = reducer(undefined, { type: 'test/init' });
+    const day = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[day]; });
     const map = new Map<string, Feature[]>();
 
     const nextState = reducer(state, setOutlookMap({ outlookType: 'tornado', map }));
 
     expect(nextState.forecastCycle.days[day]?.data.tornado).toBe(map);
+  });
+
+  test('no-op feature updates do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[2]; });
+    const afterSingle = reducer(state, updateFeature({ feature: createFeature('missing', 0), day: 2 }));
+    expect(afterSingle).toBe(state);
+    expect(afterSingle.forecastCycle.days[2]).toBeUndefined();
+
+    const missingCurrent = produce(initial, (draft) => {
+      delete draft.forecastCycle.days[draft.forecastCycle.currentDay];
+    });
+    const afterBatch = reducer(missingCurrent, updateFeaturesBatch({ features: [createFeature('missing', 0)] }));
+    expect(afterBatch).toBe(missingCurrent);
+    expect(afterBatch.forecastCycle.days[missingCurrent.forecastCycle.currentDay]).toBeUndefined();
   });
 
   test('keeps day-specific supported outlook maps available', () => {

@@ -54,7 +54,8 @@ export const createForecastFeatureUpdateHelpers = (
     incoming: UpdatableFeature[],
     day?: DayType,
   ): PendingFeatureUpdate[] => {
-    const outlookData = getCurrentOutlook(state, day);
+    const outlookData = state.forecastCycle.days[day ?? state.forecastCycle.currentDay]?.data;
+    if (!outlookData) return [];
 
     return incoming.flatMap((feature) => {
       const outlookType = (feature.properties?.outlookType as OutlookType)
