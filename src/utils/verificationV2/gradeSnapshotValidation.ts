@@ -1,4 +1,5 @@
 import type { GradeSnapshot } from '../../types/forecastGrade';
+import { isProductGradeShape } from './gradeProductValidation';
 
 /** Returns whether a value is a non-null, non-array object. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -11,32 +12,6 @@ const isStringOrNull = (value: unknown): value is string | null =>
 /** Returns whether a value looks like the persisted grade card fields we read. */
 const isGradeCardShape = (value: unknown): boolean =>
   isRecord(value) && typeof value.id === 'string' && typeof value.sourceLabel === 'string';
-
-/** Validates a score row before the dashboard renders it. */
-const isComponentShape = (value: unknown): boolean => {
-  if (!isRecord(value)) return false;
-  return typeof value.key === 'string'
-    && typeof value.label === 'string'
-    && typeof value.weight === 'number'
-    && typeof value.detail === 'string'
-    && typeof value.applicable === 'boolean'
-    && (value.applicable ? typeof value.score === 'number' : value.score === null);
-};
-
-/** Validates product fields used by the grade dashboard. */
-const isProductGradeShape = (value: unknown): boolean => {
-  if (!isRecord(value)) return false;
-  return typeof value.product === 'string'
-    && typeof value.label === 'string'
-    && typeof value.applicable === 'boolean'
-    && (value.grade === null || typeof value.grade === 'number')
-    && isStringOrNull(value.letter)
-    && typeof value.reportCount === 'number'
-    && Array.isArray(value.components)
-    && value.components.every(isComponentShape)
-    && (value.diagnostics === undefined
-      || (Array.isArray(value.diagnostics) && value.diagnostics.every(isComponentShape)));
-};
 
 /** Returns whether a value looks like a package grade. */
 const isPackageGradeShape = (value: unknown): boolean => {
