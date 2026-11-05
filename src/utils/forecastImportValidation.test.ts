@@ -118,6 +118,27 @@ describe('validateForecastImport', () => {
     expect(result.reason).toMatch(/excessively long string/i);
   });
 
+  it('rejects non-finite numbers produced by JSON.parse', () => {
+    const save = validSave();
+    (save.forecastCycle as { currentDay: number }).currentDay = JSON.parse('1e999');
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/non-finite number/i);
+  });
+
+  it('rejects non-finite map view numbers in legacy saves', () => {
+    const save = {
+      version: '0.5.0',
+      type: 'single-day',
+      timestamp: '2026-07-20T00:00:00.000Z',
+      outlooks: { tornado: [['30%', [validFeature()]]] },
+      mapView: { center: [0, 0], zoom: JSON.parse('-1e999') },
+    };
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/non-finite number/i);
+  });
+
   it('rejects unsupported geometry types', () => {
     const save = withTornado([['30%', [{ type: 'Feature', geometry: { type: 'Bogus', coordinates: [] }, properties: {} }]]]);
     const result = validateForecastImport(save);
