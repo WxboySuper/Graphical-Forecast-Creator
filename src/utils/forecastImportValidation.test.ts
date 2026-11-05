@@ -150,6 +150,67 @@ describe('validateForecastImport', () => {
     expect(result.reason).toMatch(/too many coordinates/i);
   });
 
+  it('rejects a geometry collection whose children share the coordinate budget', () => {
+    const ring: number[][] = [];
+    for (let i = 0; i < 90000; i++) {
+      ring.push([i, i]);
+    }
+    const child = { type: 'Polygon', coordinates: [ring, ring] };
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: { type: 'GeometryCollection', geometries: [child, child] },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/too many coordinates/i);
+  });
+
+  it('rejects nested collections that together exceed the coordinate budget', () => {
+    const ring: number[][] = [];
+    for (let i = 0; i < 90000; i++) {
+      ring.push([i, i]);
+    }
+    const child = { type: 'Polygon', coordinates: [ring, ring] };
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: {
+        type: 'GeometryCollection',
+        geometries: [{ type: 'GeometryCollection', geometries: [child, child] }],
+      },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/too many coordinates/i);
+  });
+
+  it('rejects a geometry collection without a geometries array', () => {
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: { type: 'GeometryCollection' },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/collection is invalid or too large/i);
+  });
+
+  it('accepts a geometry collection that stays inside the coordinate budget', () => {
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: {
+        type: 'GeometryCollection',
+        geometries: [
+          { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+          { type: 'Point', coordinates: [0, 0] },
+        ],
+      },
+      properties: {},
+    }]]]);
+    expect(validateForecastImport(save).ok).toBe(true);
+  });
+
   it('accepts legacy plain-object outlook maps', () => {
     const save = {
       version: '0.5.0',
