@@ -22,6 +22,13 @@ const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) 
 test.describe('Auto-TSTM disabled (HREF decommission)', () => {
   test.beforeEach(async ({ page }) => {
     await bypassLocalBeta(page);
+    await page.route('**/api/capabilities/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ capabilities: { TSTM_GENERATION_ENABLED: { available: true, reason: 'available' } } }),
+      });
+    });
   });
 
   test('shows the disabled banner and keeps the entry point disabled without fetching', async ({ page }) => {
@@ -48,5 +55,18 @@ test.describe('Auto-TSTM disabled (HREF decommission)', () => {
     await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeDisabled();
 
     expect(tstmRequestCount).toBe(0);
+  });
+
+  test('keeps the toolbar visible on a short phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 600 });
+    await page.goto('/forecast?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+    const toolbar = page.locator('.tabbed-integrated-toolbar');
+    await expect(toolbar).toBeVisible();
+    const bounds = await toolbar.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(601);
+    await page.getByRole('tab', { name: 'Tools' }).click();
+    await expect(page.getByRole('button', { name: /Auto-TSTM/ })).toBeDisabled();
   });
 });
