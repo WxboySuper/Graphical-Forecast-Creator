@@ -24,6 +24,7 @@ import reducer, {
   updateFeature,
   updateFeaturesBatch,
   removeFeature,
+  resetCategorical,
   completeCycle,
   completeWithOmissions,
   dismissCompletionModal,
@@ -173,6 +174,23 @@ describe('setOutlookMap', () => {
     const afterBatch = reducer(missingCurrent, updateFeaturesBatch({ features: [createFeature('missing', 0)] }));
     expect(afterBatch).toBe(missingCurrent);
     expect(afterBatch.forecastCycle.days[missingCurrent.forecastCycle.currentDay]).toBeUndefined();
+  });
+
+  test('read-only reducer fallbacks do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const currentDay = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[currentDay]; });
+
+    const afterRemove = reducer(state, removeFeature({
+      outlookType: 'tornado',
+      probability: '2%',
+      featureId: 'missing',
+    }));
+    const afterReset = reducer(afterRemove, resetCategorical());
+
+    expect(afterRemove).toBe(state);
+    expect(afterReset).toBe(state);
+    expect(afterReset.forecastCycle.days[currentDay]).toBeUndefined();
   });
 
   test('keeps day-specific supported outlook maps available', () => {

@@ -244,6 +244,7 @@ const buildFeatureWithProps = (
 
 const {
   getCurrentOutlook,
+  ensureCurrentOutlook,
   collectPendingFeatureUpdates,
   applyPendingFeatureUpdates,
 } = createForecastFeatureUpdateHelpers(createEmptyOutlook, INITIAL_TIMESTAMP);
@@ -544,6 +545,7 @@ export const forecastSlice = createSlice({
   reducers: {
     ...createForecastOutlookReducers({
       getCurrentOutlook,
+      ensureCurrentOutlook,
       computeOutlookType,
       computeProbability,
       buildFeatureWithProps,
@@ -587,10 +589,16 @@ export const forecastSlice = createSlice({
         return;
       }
 
+      const writableOutlookMap = ensureCurrentOutlook(
+        state,
+        undefined,
+        readActionTimestamp(action),
+      )[outlookType];
+      if (!writableOutlookMap) return;
       pushUndoSnapshot(state);
-      outlookMap.clear();
+      writableOutlookMap.clear();
       result.map.forEach((features, key) => {
-        outlookMap.set(key, features);
+        writableOutlookMap.set(key, features);
       });
       invalidateCompletionAcknowledgement(state);
       state.isSaved = false;
@@ -1444,10 +1452,4 @@ export {
   selectCurrentVersionNumber,
   selectAutoCategoricalError,
 } from './forecastSliceSelectors';
-export {
-  selectCurrentDay,
-  selectDiscussionDraftForScope,
-  selectForecastCycle,
-} from './forecastSelectors';
-
 export default forecastSlice.reducer;

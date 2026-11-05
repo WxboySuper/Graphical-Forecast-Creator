@@ -13,7 +13,6 @@ import type { ForecastState } from './forecastSlice';
 interface PendingFeatureUpdate {
   outlookType: OutlookType;
   probability: string;
-  index: number;
   feature: Feature<Geometry | null>;
 }
 
@@ -21,6 +20,7 @@ type UpdatableFeature = Feature<Geometry | null>;
 
 interface ForecastOutlookReducerDeps {
   getCurrentOutlook: (state: ForecastState, day?: DayType) => OutlookData;
+  ensureCurrentOutlook: (state: ForecastState, day?: DayType, timestamp?: string) => OutlookData;
   computeOutlookType: (feature: Feature, state: ForecastState) => OutlookType;
   computeProbability: (feature: Feature, state: ForecastState) => string;
   buildFeatureWithProps: (
@@ -204,8 +204,9 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
       return;
     }
 
+    const writableOutlookData = deps.ensureCurrentOutlook(state, undefined, deps.readActionTimestamp(action));
     deps.pushUndoSnapshot(state);
-    outlookData[outlookType] = map;
+    writableOutlookData[outlookType] = map;
     deps.invalidateCompletionAcknowledgement(state);
     state.isSaved = false;
   },
@@ -215,10 +216,11 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
     action: PayloadAction<{ map: Map<string, Feature[]> }>,
   ) => {
     const outlookData = deps.getCurrentOutlook(state);
-    if (!outlookData.categorical) {
+    const currentMap = outlookData.categorical;
+    if (!currentMap) {
       return;
     }
-    outlookData.categorical = action.payload.map;
+    deps.ensureCurrentOutlook(state, undefined, deps.readActionTimestamp(action)).categorical = action.payload.map;
     deps.invalidateCompletionAcknowledgement(state);
     state.isSaved = false;
   },
@@ -240,11 +242,17 @@ export const createForecastOutlookReducers = (deps: ForecastOutlookReducerDeps) 
       return;
     }
 
+    const writableCategorical = deps.ensureCurrentOutlook(
+      state,
+      undefined,
+      deps.readActionTimestamp(action),
+    ).categorical;
+    if (!writableCategorical) return;
     deps.pushUndoSnapshot(state);
     if (normalizedFeatures.length > 0) {
-      categorical.set('TSTM', normalizedFeatures);
+      writableCategorical.set('TSTM', normalizedFeatures);
     } else {
-      categorical.delete('TSTM');
+      writableCategorical.delete('TSTM');
     }
     deps.invalidateCompletionAcknowledgement(state);
     state.isSaved = false;
