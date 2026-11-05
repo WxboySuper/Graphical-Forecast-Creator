@@ -162,11 +162,31 @@ const isStringOrNull = (value: unknown): value is string | null =>
 const isGradeCardShape = (value: unknown): boolean =>
   isRecord(value) && typeof value.id === 'string' && typeof value.sourceLabel === 'string';
 
-/** Returns whether a value looks like one product entry in a package grade. */
-const isProductGradeShape = (value: unknown): boolean =>
-  isRecord(value)
-  && typeof value.product === 'string'
-  && typeof value.applicable === 'boolean';
+/** Validates a score row before the dashboard renders it. */
+const isComponentShape = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  return typeof value.key === 'string'
+    && typeof value.label === 'string'
+    && typeof value.weight === 'number'
+    && typeof value.detail === 'string'
+    && typeof value.applicable === 'boolean'
+    && (value.applicable ? typeof value.score === 'number' : value.score === null);
+};
+
+/** Validates the product fields used by the grade dashboard. */
+const isProductGradeShape = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  return typeof value.product === 'string'
+    && typeof value.label === 'string'
+    && typeof value.applicable === 'boolean'
+    && (value.grade === null || typeof value.grade === 'number')
+    && isStringOrNull(value.letter)
+    && typeof value.reportCount === 'number'
+    && Array.isArray(value.components)
+    && value.components.every(isComponentShape)
+    && (value.diagnostics === undefined
+      || (Array.isArray(value.diagnostics) && value.diagnostics.every(isComponentShape)));
+};
 
 /** Returns whether a value looks like a package grade. */
 const isPackageGradeShape = (value: unknown): boolean => {

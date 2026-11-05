@@ -146,6 +146,24 @@ describe('grade history persistence', () => {
     });
   });
 
+  test('validates the product rows used when reopening a snapshot', () => {
+    const card = sampleCard({ id: 'product', hasSnapshot: true });
+    const snapshot = sampleSnapshot(card);
+    const component = { key: 'eventCapture', label: 'Event capture', weight: 35, detail: '', applicable: true, score: 80 };
+    const product = { product: 'tornado', label: 'Tornado', grade: 80, letter: 'B', applicable: true, reportCount: 1, components: [component] };
+    const key = `gfc-forecast-grade-snapshot-v1:${scope}:product`;
+    const store = (entry: unknown) => window.localStorage.setItem(key, JSON.stringify({ ...snapshot, package: { ...snapshot.package, products: [entry] } }));
+
+    store(product);
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).not.toBeNull();
+    store({ product: 'tornado', applicable: true });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+    store({ ...product, components: [null] });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+    store({ ...product, diagnostics: 'invalid' });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+  });
+
   test('flips hasSnapshot to false on the returned card when the snapshot write fails', () => {
     const card = sampleCard({ id: 'quota', hasSnapshot: true });
     const snapshot = sampleSnapshot(card);
