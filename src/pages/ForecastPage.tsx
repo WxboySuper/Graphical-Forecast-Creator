@@ -45,7 +45,7 @@ import {
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
 import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
-import { AUTO_TSTM_DISABLED_MESSAGE } from '../config/autoTstmDisable';
+import { AUTO_TSTM_DISABLED, AUTO_TSTM_DISABLED_MESSAGE } from '../config/autoTstmDisable';
 import type { AddToastFn } from '../components/Layout';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -804,13 +804,15 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   }
 
   return (
-    <div ref={forecastShellRef} className={showLegacyNotice ? 'forecast-page-shell forecast-page-shell--legacy-notice' : 'forecast-page-shell'}>
+    <div ref={forecastShellRef} className={`forecast-page-shell${showLegacyNotice ? ' forecast-page-shell--legacy-notice' : ''}${AUTO_TSTM_DISABLED ? ' forecast-page-shell--auto-tstm-disabled' : ''}`}>
       {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
-      <div data-testid="auto-tstm-disabled-banner" role="status" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
-        <span>
-          <strong>Auto-TSTM disabled:</strong> {AUTO_TSTM_DISABLED_MESSAGE}
-        </span>
-      </div>
+      {AUTO_TSTM_DISABLED ? (
+        <div data-testid="auto-tstm-disabled-banner" role="status" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+          <span>
+            <strong>Auto-TSTM disabled:</strong> {AUTO_TSTM_DISABLED_MESSAGE}
+          </span>
+        </div>
+      ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         <ForecastTabbedToolbarLayout
           mapRef={mapRef}

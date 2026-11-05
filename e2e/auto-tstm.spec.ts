@@ -64,8 +64,10 @@ test.describe('Auto-TSTM disabled (HREF decommission)', () => {
     const toolbar = page.locator('.tabbed-integrated-toolbar');
     await expect(toolbar).toBeVisible();
     const bounds = await toolbar.boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(601);
+    if (!bounds) {
+      throw new Error('The forecast toolbar should have visible bounds on a short phone viewport.');
+    }
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(601);
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: /Auto-TSTM/ })).toBeDisabled();
   });
