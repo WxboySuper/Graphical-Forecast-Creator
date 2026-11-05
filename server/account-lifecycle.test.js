@@ -181,7 +181,8 @@ test('billing reconciliation terminates a customer linkage that changes during d
   assert.deepEqual(deleted, ['cus_old', 'cus_new']);
 });
 
-test('finalizes bookkeeping when the identity is deleted but marker cleanup fails', async () => {
+/** Creates a deletion whose request-marker removal fails the requested number of times. */
+const createMarkerCleanupScenario = (failures) => {
   const uid = 'user-1';
   const db = new FakeDb({
     userProfiles: { [uid]: { displayName: 'Alex' } },
@@ -203,20 +204,48 @@ test('finalizes bookkeeping when the identity is deleted but marker cleanup fail
   const stripe = { customers: { del: async () => {} } };
 
   const remove = db.remove.bind(db);
-  let cleanupFailures = 1;
   db.remove = (collectionName, id) => {
-    if (collectionName === 'accountDeletionRequests' && authDeleted && cleanupFailures > 0) {
-      cleanupFailures -= 1;
+    if (collectionName === 'accountDeletionRequests' && failures > 0) {
+      failures -= 1;
       throw new Error('transient Firestore failure');
     }
     remove(collectionName, id);
   };
 
+  return { uid, db, adminAuth, stripe, identityDeleted: () => authDeleted };
+};
+
+test('finalizes bookkeeping when the identity is deleted but marker cleanup fails', async () => {
+  const { uid, db, adminAuth, stripe, identityDeleted } = createMarkerCleanupScenario(1);
   await deleteAccount({ uid, db, adminAuth, stripe });
 
-  assert.equal(authDeleted, true);
+  assert.equal(identityDeleted(), true);
   assert.equal(db.read('accountDeletionRequests', uid), undefined);
   assert.ok(db.read('accountDeletionTombstones', getDeletionTombstoneId(uid))?.completedAt);
+});
+
+test('reports repeated marker cleanup failure instead of claiming success', async () => {
+  const { uid, db, adminAuth, stripe, identityDeleted } = createMarkerCleanupScenario(2);
+  await assert.rejects(deleteAccount({ uid, db, adminAuth, stripe }), /transient Firestore failure/);
+  assert.equal(identityDeleted(), true);
+  assert.equal(db.read('accountDeletionRequests', uid).status, 'in_progress');
+});
+
+test('does not finalize after billing fails even if the identity is already gone', async () => {
+  const uid = 'user-1';
+  const db = new FakeDb({
+    userProfiles: { [uid]: { displayName: 'Alex' } },
+    userEntitlements: { [uid]: { stripeCustomerId: 'cus_123' } },
+  });
+  const adminAuth = {
+    getUser: async () => { throw Object.assign(new Error('not found'), { code: 'auth/user-not-found' }); },
+    deleteUser: async () => assert.fail('must not finalize an incomplete deletion'),
+  };
+
+  await assert.rejects(deleteAccount({ uid, db, adminAuth, stripe: null }), { code: 'billing-unavailable' });
+  assert.ok(db.read('userProfiles', uid));
+  assert.equal(db.read('accountDeletionRequests', uid).status, 'failed');
+  assert.equal(db.read('accountDeletionTombstones', getDeletionTombstoneId(uid)), undefined);
 });
 
 test('raw in-progress markers and hashed tombstones both block account activity', async () => {
