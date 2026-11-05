@@ -60,6 +60,19 @@ interface UserCycleLookupParams {
   cycleId: string;
 }
 
+interface UserIdParams {
+  userId: string;
+}
+
+interface CycleIdParams {
+  cycleId: string;
+}
+
+interface CreateCycleIdParams {
+  userId: string;
+  cycleDate: string;
+}
+
 interface ListCloudCyclesParams {
   userId: string;
 }
@@ -178,17 +191,17 @@ const getCloudCyclesCollectionRef = () => {
 };
 
 /** Returns the Firestore document reference for a specific cloud cycle. */
-const getCloudCycleDocRef = (cycleId: string) => doc(getCloudCyclesCollectionRef(), cycleId);
+const getCloudCycleDocRef = ({ cycleId }: CycleIdParams) => doc(getCloudCyclesCollectionRef(), cycleId);
 
 /** Returns the Firestore document reference for a specific cloud cycle payload. */
-const getCloudCyclePayloadDocRef = (cycleId: string) =>
+const getCloudCyclePayloadDocRef = ({ cycleId }: CycleIdParams) =>
   doc(collection(getCloudCyclesCollectionRef(), cycleId, PAYLOAD_SUBCOLLECTION), PAYLOAD_DOC_ID);
 
 /** Reads the latest Firestore snapshot for one cloud cycle document. */
-const getCloudCycleDocSnapshot = (cycleId: string) => getDoc(getCloudCycleDocRef(cycleId));
+const getCloudCycleDocSnapshot = ({ cycleId }: CycleIdParams) => getDoc(getCloudCycleDocRef({ cycleId }));
 
 /** Returns the legacy user-settings document where pre-Phase 4 cloud cycles were stored. */
-const getLegacyUserSettingsRef = (userId: string) => {
+const getLegacyUserSettingsRef = ({ userId }: UserIdParams) => {
   if (!db) {
     throw new Error('Firestore is not initialized');
   }
@@ -334,7 +347,7 @@ const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadat
   [...cycles].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 
 /** Creates a collision-resistant id for new hosted cloud cycles. */
-const createCloudCycleId = (userId: string, cycleDate: string): string =>
+const createCloudCycleId = ({ userId, cycleDate }: CreateCycleIdParams): string =>
   `${userId}-${cycleDate}-${uuidv4()}`;
 
 /** Converts a Firestore query snapshot into normalized cloud-cycle records, including payload validation. */
@@ -352,9 +365,9 @@ const readCloudCycleMetadataFromQuery = ({ snapshot, fallbackUserId }: ReadCloud
     .filter((cycle): cycle is CloudCycleMetadata => Boolean(cycle));
 
 /** Reads older cloud-cycle data from the legacy user-settings document if present. */
-const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
+const readLegacyCloudCycles = async ({ userId }: UserIdParams): Promise<CloudCycle[]> => {
   try {
-    const snapshot = await getDoc(getLegacyUserSettingsRef(userId));
+    const snapshot = await getDoc(getLegacyUserSettingsRef({ userId }));
     const legacyData = snapshot.data() as LegacyUserSettingsDocument | undefined;
     const rawValue = legacyData?.cloudCycles;
 
@@ -389,7 +402,7 @@ const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
 };
 
 /** Reads all cloud cycles for a user, retaining legacy records without mutating them. */
-const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => {
+const readCloudCyclesForUser = async ({ userId }: UserIdParams): Promise<CloudCycle[]> => {
   const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
   const cycles = readCloudCyclesFromQuery({ snapshot, fallbackUserId: userId });
 
@@ -397,13 +410,13 @@ const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => 
     return cycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
   }
 
-  const legacyCycles = await readLegacyCloudCycles(userId);
+  const legacyCycles = await readLegacyCloudCycles({ userId });
   return legacyCycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 };
 
 /** Reads one cloud-cycle payload from the subcollection, or null when absent or invalid. */
-const readCloudCyclePayload = async (cycleId: string): Promise<ForecastWorkspacePayload | null> => {
-  const payloadSnapshot = await getDoc(getCloudCyclePayloadDocRef(cycleId));
+const readCloudCyclePayload = async ({ cycleId }: CycleIdParams): Promise<ForecastWorkspacePayload | null> => {
+  const payloadSnapshot = await getDoc(getCloudCyclePayloadDocRef({ cycleId }));
   if (!payloadSnapshot.exists()) {
     return null;
   }
@@ -413,9 +426,9 @@ const readCloudCyclePayload = async (cycleId: string): Promise<ForecastWorkspace
 
 /** Fetches one cloud cycle by id, including legacy fallback and migration support. */
 const fetchCloudCycleById = async ({ userId, cycleId }: UserCycleLookupParams): Promise<CloudCycle | null> => {
-  const docSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  const docSnapshot = await getCloudCycleDocSnapshot({ cycleId });
   if (docSnapshot.exists()) {
-    const payload = await readCloudCyclePayload(cycleId);
+    const payload = await readCloudCyclePayload({ cycleId });
     const cycle = normalizeCloudCycleRecord({
       cycleId: docSnapshot.id,
       rawRecord: docSnapshot.data(),
@@ -427,19 +440,19 @@ const fetchCloudCycleById = async ({ userId, cycleId }: UserCycleLookupParams): 
     }
   }
 
-  const legacyCycles = await readLegacyCloudCycles(userId);
+  const legacyCycles = await readLegacyCloudCycles({ userId });
   const legacyMatch = legacyCycles.find((cycle) => cycle.id === cycleId) ?? null;
   return legacyMatch;
 };
 
 /** Returns an existing cloud cycle only when it belongs to the current signed-in user. */
 const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): Promise<CloudCycle | null> => {
-  const existingSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  const existingSnapshot = await getCloudCycleDocSnapshot({ cycleId });
   if (!existingSnapshot.exists()) {
     return null;
   }
 
-  const payload = await readCloudCyclePayload(cycleId);
+  const payload = await readCloudCyclePayload({ cycleId });
   const existingCycle = normalizeCloudCycleRecord({
     cycleId,
     rawRecord: existingSnapshot.data(),
@@ -457,7 +470,7 @@ const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): P
  * Saves a new cloud cycle or updates an existing one
  */
 const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
-  const cycleId = params.existingId || createCloudCycleId(params.userId, params.cycleDate);
+  const cycleId = params.existingId || createCloudCycleId({ userId: params.userId, cycleDate: params.cycleDate });
   if (isBetaClerkD1Mode()) return buildBetaCloudCycleSaveContext(params, cycleId);
   return buildFirestoreCloudCycleSaveContext(params, cycleId);
 };
@@ -580,8 +593,8 @@ export const deleteCloudCycle = async (
       return { success: true };
     }
 
-    await deleteDoc(getCloudCyclePayloadDocRef(params.cycleId));
-    await deleteDoc(getCloudCycleDocRef(params.cycleId));
+    await deleteDoc(getCloudCyclePayloadDocRef({ cycleId: params.cycleId }));
+    await deleteDoc(getCloudCycleDocRef({ cycleId: params.cycleId }));
 
     return { success: true };
   } catch (error) {
@@ -628,7 +641,7 @@ export const renameCloudCycle = async (
       payloadHash: computePayloadHash(existing.payload),
     };
 
-    await setDoc(getCloudCycleDocRef(params.cycleId), serializeCloudCycleDocument(nextMetadata));
+    await setDoc(getCloudCycleDocRef({ cycleId: params.cycleId }), serializeCloudCycleDocument(nextMetadata));
 
     return { success: true };
   } catch (error) {
@@ -655,7 +668,7 @@ export async function listCloudCycles(
     }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
-    const legacyCycles = await readLegacyCloudCycles(userId);
+    const legacyCycles = await readLegacyCloudCycles({ userId });
     const visibleMetadata = [
       ...metadata,
       ...legacyCycles.map(toCloudCycleMetadata),
@@ -666,7 +679,7 @@ export async function listCloudCycles(
       return { success: true, data: sortCloudCycleMetadata(visibleMetadata) };
     }
 
-    const cycles = await readCloudCyclesForUser(userId);
+    const cycles = await readCloudCyclesForUser({ userId });
 
     return { success: true, data: sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)) };
   } catch (error) {
@@ -803,7 +816,7 @@ export const subscribeToCloudCycles = (
           return;
         }
 
-        readLegacyCloudCycles(userId)
+        readLegacyCloudCycles({ userId })
           .then((legacyCycles) => {
             if (!active) {
               return;

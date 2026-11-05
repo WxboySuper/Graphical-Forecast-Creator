@@ -108,7 +108,7 @@ test('serializes disable/delete behind an in-flight save', async () => {
 });
 
 test('deletes one cleared workflow awareness record', async () => {
-  await deleteOneWorkflowAwareness('user-a', metadata.cycleId);
+  await deleteOneWorkflowAwareness({ userId: 'user-a', cycleId: metadata.cycleId });
 
   expect(mockDeleteDoc).toHaveBeenCalledWith(expect.objectContaining({ parts: expect.arrayContaining([metadata.cycleId]) }));
 });
