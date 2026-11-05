@@ -2,6 +2,7 @@ import {
   validateForecastImport,
   validateImportFileBytes,
   MAX_IMPORT_BYTES,
+  MAX_OBJECT_KEYS,
 } from './forecastImportValidation';
 import { validateForecastData } from './fileUtils';
 
@@ -97,12 +98,45 @@ describe('validateForecastImport', () => {
     expect(result.reason).toMatch(/excessively large array|too many/i);
   });
 
+  it('rejects excessively wide objects', () => {
+    const save = validSave();
+    const wide: Record<string, number> = {};
+    for (let i = 0; i <= MAX_OBJECT_KEYS; i++) {
+      wide[`k${i}`] = i;
+    }
+    (save.forecastCycle as { days: Record<string, { data: Record<string, unknown> }> }).days[1].data = wide;
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/excessively large object/i);
+  });
+
   it('rejects excessively long strings', () => {
     const save = validSave();
     (save.forecastCycle as { days: Record<string, { metadata: Record<string, unknown> }> }).days[1].metadata.issueDate = 'x'.repeat(200000);
     const result = validateForecastImport(save);
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/excessively long string/i);
+  });
+
+  it('rejects non-finite numbers produced by JSON.parse', () => {
+    const save = validSave();
+    (save.forecastCycle as { currentDay: number }).currentDay = JSON.parse('1e999');
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/non-finite number/i);
+  });
+
+  it('rejects non-finite map view numbers in legacy saves', () => {
+    const save = {
+      version: '0.5.0',
+      type: 'single-day',
+      timestamp: '2026-07-20T00:00:00.000Z',
+      outlooks: { tornado: [['30%', [validFeature()]]] },
+      mapView: { center: [0, 0], zoom: JSON.parse('-1e999') },
+    };
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/non-finite number/i);
   });
 
   it('rejects unsupported geometry types', () => {
@@ -135,6 +169,67 @@ describe('validateForecastImport', () => {
     const result = validateForecastImport(save);
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/too many coordinates/i);
+  });
+
+  it('rejects a geometry collection whose children share the coordinate budget', () => {
+    const ring: number[][] = [];
+    for (let i = 0; i < 90000; i++) {
+      ring.push([i, i]);
+    }
+    const child = { type: 'Polygon', coordinates: [ring, ring] };
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: { type: 'GeometryCollection', geometries: [child, child] },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/too many coordinates/i);
+  });
+
+  it('rejects nested collections that together exceed the coordinate budget', () => {
+    const ring: number[][] = [];
+    for (let i = 0; i < 90000; i++) {
+      ring.push([i, i]);
+    }
+    const child = { type: 'Polygon', coordinates: [ring, ring] };
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: {
+        type: 'GeometryCollection',
+        geometries: [{ type: 'GeometryCollection', geometries: [child, child] }],
+      },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/too many coordinates/i);
+  });
+
+  it('rejects a geometry collection without a geometries array', () => {
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: { type: 'GeometryCollection' },
+      properties: {},
+    }]]]);
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/collection is invalid or too large/i);
+  });
+
+  it('accepts a geometry collection that stays inside the coordinate budget', () => {
+    const save = withTornado([['30%', [{
+      type: 'Feature',
+      geometry: {
+        type: 'GeometryCollection',
+        geometries: [
+          { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+          { type: 'Point', coordinates: [0, 0] },
+        ],
+      },
+      properties: {},
+    }]]]);
+    expect(validateForecastImport(save).ok).toBe(true);
   });
 
   it('accepts legacy plain-object outlook maps', () => {
@@ -178,6 +273,22 @@ describe('validateForecastImport', () => {
     const result = validateForecastImport(save);
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/invalid day/i);
+  });
+
+  it('rejects an out-of-contract currentDay', () => {
+    for (const currentDay of [0, 9, 999, 2.5, '3', null]) {
+      const save = validSave();
+      (save.forecastCycle as { currentDay: unknown }).currentDay = currentDay;
+      const result = validateForecastImport(save);
+      expect(result.ok).toBe(false);
+      expect(result.reason).toMatch(/currentDay/);
+    }
+  });
+
+  it('still accepts a save that omits currentDay', () => {
+    const save = validSave();
+    delete (save.forecastCycle as { currentDay?: unknown }).currentDay;
+    expect(validateForecastImport(save).ok).toBe(true);
   });
 
   it('rejects malformed outlook map entries', () => {

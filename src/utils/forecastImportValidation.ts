@@ -2,6 +2,7 @@ import {
   MAX_ARRAY_ITEMS,
   MAX_IMPORT_BYTES,
   MAX_NESTING_DEPTH,
+  MAX_OBJECT_KEYS,
   MAX_STRING_LENGTH,
   fail,
   type ImportValidationResult,
@@ -45,10 +46,10 @@ export const validateImportFileBytes = (bytes: Uint8Array | ArrayBuffer | undefi
  * Recursively enforces string-length and nesting bounds over the parsed tree.
  * The outlook maps are validated structurally on top of these generic bounds.
  */
-const validateTreeBounds = (
+function validateTreeBounds(
   value: unknown,
   depth: number,
-): ImportValidationResult | null => {
+): ImportValidationResult | null {
   if (depth > MAX_NESTING_DEPTH) {
     return fail('Forecast file nests too deeply.');
   }
@@ -59,15 +60,23 @@ const validateTreeBounds = (
       : null;
   }
 
+  // JSON.parse turns out-of-range numeric literals such as 1e999 into
+  // Infinity, and the deserializer copies numbers like mapView.zoom and
+  // forecastCycle.currentDay straight into state. Reject every non-finite
+  // number here so no consumer has to re-check.
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    return fail('Forecast file contains a non-finite number.');
+  }
+
   if (Array.isArray(value)) {
     return validateArrayBounds(value, depth);
   }
 
   return validateObjectBounds(value, depth);
-};
+}
 
 /** Bounds-checks one array and its children. */
-const validateArrayBounds = (value: unknown[], depth: number): ImportValidationResult | null => {
+function validateArrayBounds(value: unknown[], depth: number): ImportValidationResult | null {
   if (value.length > MAX_ARRAY_ITEMS) {
     return fail('Forecast file contains an excessively large array.');
   }
@@ -76,19 +85,23 @@ const validateArrayBounds = (value: unknown[], depth: number): ImportValidationR
     if (result) return result;
   }
   return null;
-};
+}
 
 /** Bounds-checks one plain object and its children. */
-const validateObjectBounds = (value: unknown, depth: number): ImportValidationResult | null => {
+function validateObjectBounds(value: unknown, depth: number): ImportValidationResult | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  for (const child of Object.values(value)) {
-    const result = validateTreeBounds(child, depth + 1);
+  const keys = Object.keys(value);
+  if (keys.length > MAX_OBJECT_KEYS) {
+    return fail('Forecast file contains an excessively large object.');
+  }
+  for (const key of keys) {
+    const result = validateTreeBounds((value as Record<string, unknown>)[key], depth + 1);
     if (result) return result;
   }
   return null;
-};
+}
 
 /** Returns true when the value is a workflow wrapper that embeds a forecast. */
 const isWorkflowWrapper = (candidate: { forecast?: unknown }): boolean =>
@@ -143,7 +156,7 @@ const validateLegacyForecast = (candidate: { outlooks?: unknown; forecastCycle?:
  * @returns {ImportValidationResult}
  */
 // @codescene(disable:"Complex Conditional")
-export const validateForecastImport = (data: unknown): ImportValidationResult => {
+export function validateForecastImport(data: unknown): ImportValidationResult {
   if (!isRecord(data)) {
     return fail('Forecast file is not a valid object.');
   }
@@ -178,10 +191,10 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
   }
 
   return validateLegacyForecast(candidate);
-};
+}
 
 export type { ImportValidationResult };
-export { MAX_IMPORT_BYTES };
+export { MAX_IMPORT_BYTES, MAX_OBJECT_KEYS };
 
 /** Maximum expanded KML payload accepted from a KMZ archive. */
 export const MAX_KML_IMPORT_BYTES = 10 * 1024 * 1024;

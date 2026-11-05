@@ -11,7 +11,7 @@ import {
 } from './discussionGrouping';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
-import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
+import { deserializeForecastCycleDays, normalizeForecastCurrentDay } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload, createForecastWorkspaceSave } from './forecastWorkspaceEnvelope';
@@ -326,9 +326,10 @@ const deserializeWorkspaceEnvelope = (data: unknown): ForecastCycle => {
 const deserializeForecastData = (forecastData: GFCForecastSaveData): ForecastCycle => {
   if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
   const cycle = forecastData.forecastCycle;
+  const days = deserializeForecastCycleDays(cycle);
   return {
-    days: deserializeForecastCycleDays(cycle),
-    currentDay: cycle.currentDay,
+    days,
+    currentDay: normalizeForecastCurrentDay(cycle.currentDay, days),
     cycleDate: cycle.cycleDate,
     ...(isValidDiscussionGroupings(cycle.discussionGroupings)
       ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }
