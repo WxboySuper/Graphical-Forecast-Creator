@@ -2,6 +2,7 @@ import {
   MAX_ARRAY_ITEMS,
   MAX_IMPORT_BYTES,
   MAX_NESTING_DEPTH,
+  MAX_OBJECT_KEYS,
   MAX_STRING_LENGTH,
   fail,
   type ImportValidationResult,
@@ -83,8 +84,12 @@ const validateObjectBounds = (value: unknown, depth: number): ImportValidationRe
   if (!value || typeof value !== 'object') {
     return null;
   }
-  for (const child of Object.values(value)) {
-    const result = validateTreeBounds(child, depth + 1);
+  const keys = Object.keys(value);
+  if (keys.length > MAX_OBJECT_KEYS) {
+    return fail('Forecast file contains an excessively large object.');
+  }
+  for (const key of keys) {
+    const result = validateTreeBounds((value as Record<string, unknown>)[key], depth + 1);
     if (result) return result;
   }
   return null;
@@ -181,7 +186,7 @@ export const validateForecastImport = (data: unknown): ImportValidationResult =>
 };
 
 export type { ImportValidationResult };
-export { MAX_IMPORT_BYTES };
+export { MAX_IMPORT_BYTES, MAX_OBJECT_KEYS };
 
 /** Maximum expanded KML payload accepted from a KMZ archive. */
 export const MAX_KML_IMPORT_BYTES = 10 * 1024 * 1024;

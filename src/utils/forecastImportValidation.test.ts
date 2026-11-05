@@ -2,6 +2,7 @@ import {
   validateForecastImport,
   validateImportFileBytes,
   MAX_IMPORT_BYTES,
+  MAX_OBJECT_KEYS,
 } from './forecastImportValidation';
 import { validateForecastData } from './fileUtils';
 
@@ -95,6 +96,18 @@ describe('validateForecastImport', () => {
     const result = validateForecastImport(save);
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/excessively large array|too many/i);
+  });
+
+  it('rejects excessively wide objects', () => {
+    const save = validSave();
+    const wide: Record<string, number> = {};
+    for (let i = 0; i <= MAX_OBJECT_KEYS; i++) {
+      wide[`k${i}`] = i;
+    }
+    (save.forecastCycle as { days: Record<string, { data: Record<string, unknown> }> }).days[1].data = wide;
+    const result = validateForecastImport(save);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toMatch(/excessively large object/i);
   });
 
   it('rejects excessively long strings', () => {
