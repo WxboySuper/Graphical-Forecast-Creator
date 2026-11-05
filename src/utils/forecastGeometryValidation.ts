@@ -56,14 +56,9 @@ const walkCoordinates = (value: unknown, budget: CoordinateBudget): void => {
  * GeometryCollection children draw from the same budget as their parent.
  */
 const chargeCoordinates = (geometry: Geometry, budget: CoordinateBudget): void => {
+  if (budget.remaining <= 0) return;
   if (geometry.type === 'GeometryCollection') {
-    const children = (geometry as unknown as { geometries?: unknown }).geometries;
-    if (!Array.isArray(children)) return;
-    for (const child of children) {
-      if (budget.remaining <= 0) return;
-      if (!isPlainObject(child)) return;
-      chargeCoordinates(child as unknown as Geometry, budget);
-    }
+    geometry.geometries.forEach((child) => chargeCoordinates(child, budget));
     return;
   }
   walkCoordinates((geometry as { coordinates?: unknown }).coordinates, budget);
