@@ -35,10 +35,15 @@ const readReport = (result) => {
 
 /** Exits when pnpm reported an error body instead of advisories. */
 const assertAuditCompleted = (report) => {
-  if (!report.error) return;
-  const summary = report.error.summary ?? report.error.code ?? 'unknown error';
-  console.error(`Dependency audit could not complete: ${summary}`);
-  process.exit(1);
+  if (report.error) {
+    const summary = report.error.summary ?? report.error.code ?? 'unknown error';
+    console.error(`Dependency audit could not complete: ${summary}`);
+    process.exit(1);
+  }
+  if (!report.advisories || typeof report.advisories !== 'object' || Array.isArray(report.advisories)) {
+    console.error('Dependency audit report has no valid advisories object.');
+    process.exit(1);
+  }
 };
 
 /** Logs every advisory with its fix status. */
