@@ -90,6 +90,7 @@ export {
   type InFlightHostedSettingsWrite,
   type PendingHostedSettingsWrite,
 } from './hostedSettingsSync';
+export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
 
 import { safeParseJson } from './authCommon';
 import {
@@ -219,12 +220,6 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
 };
 
 export {
-  asRecord,
-  extractLocalUserFromData,
-  postLocalJson,
-  safeParseJson,
-} from './authCommon';
-export {
   applyLocalAuthData,
   initLocalAuthState,
   localRefreshBetaAccess,
@@ -233,7 +228,6 @@ export {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
 } from './localAuthClient';
-
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
   settingsRef: ReturnType<typeof doc>,

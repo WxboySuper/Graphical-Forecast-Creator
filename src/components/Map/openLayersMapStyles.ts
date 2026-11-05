@@ -12,6 +12,7 @@ import type { OpenFreeMapStyleSet } from "../../lib/openFreeMap";
 import { getFeatureStyle, computeZIndex } from "../../utils/mapStyleUtils";
 import type {
   Feature as GeoJsonFeature,
+  MultiPolygon,
   Polygon,
 } from "geojson";
 import type { CustomCategoryStyle, CustomCategoryTemplate, CustomPolygonFeature, OneOffCustomLayer } from "../../types/customProducts";
@@ -238,6 +239,13 @@ export const getFeatureIdentity = (
   return { featureId, outlookType, probability };
 };
 
+/** Narrows serialized geometry to the polygon shapes the forecast store persists. */
+export const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | MultiPolygon => {
+  if (typeof value !== "object" || value === null) return false;
+  const type = (value as { type?: unknown }).type;
+  return type === "Polygon" || type === "MultiPolygon";
+};
+
 /** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted. */
 export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
@@ -250,15 +258,16 @@ export const toUpdatedGeoJsonFeature = (
   const geometry = feature.getGeometry();
   if (!geometry) return null;
 
-  const geoJsonGeometry = format.writeGeometryObject(geometry as Geometry, {
+  const geometryObject: unknown = format.writeGeometryObject(geometry as Geometry, {
     dataProjection: "EPSG:4326",
     featureProjection: "EPSG:3857",
   });
+  if (!isPolygonOrMultiPolygon(geometryObject)) return null;
 
   return {
     type: "Feature",
     id: identity.featureId,
-    geometry: geoJsonGeometry as Polygon,
+    geometry: geometryObject,
     properties: {
       outlookType: identity.outlookType,
       probability: identity.probability,
@@ -384,17 +393,19 @@ export const toUpdatedCustomFeature = (feature: FeatureLike, format: GeoJSON): C
   const identity = getCustomFeatureIdentity(feature);
   const geometry = feature.getGeometry();
   if (!identity || !geometry) return null;
+  const geometryObject: unknown = format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" });
+  if (!isPolygonOrMultiPolygon(geometryObject)) return null;
   return {
     type: "Feature",
     id: identity.featureId,
-    geometry: format.writeGeometryObject(geometry as Geometry, { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" }) as Polygon,
+    geometry: geometryObject,
     properties: { customLayerId: identity.customLayerId as CustomPolygonFeature['properties']['customLayerId'], categoryId: identity.categoryId as CustomPolygonFeature['properties']['categoryId'], title: identity.title },
   };
 };
 
 /** Converts a completed draw geometry when an active custom draw target exists. */
 export const toDrawnCustomFeature = (
-  geometry: Geometry,
+  geometry: Polygon | MultiPolygon,
   layer: OneOffCustomLayer | undefined,
   category: CustomCategoryTemplate | undefined,
   enabled: boolean,
@@ -405,7 +416,7 @@ export const toDrawnCustomFeature = (
   return {
     type: "Feature",
     id: uuidv4(),
-    geometry: geometry as unknown as Polygon,
+    geometry,
     properties: {
       customLayerId: layer.id,
       categoryId: category.id,

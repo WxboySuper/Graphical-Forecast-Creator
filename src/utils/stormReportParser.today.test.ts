@@ -46,6 +46,21 @@ describe('parseTodayStormReportCsv', () => {
     ]);
   });
 
+  test('drops rows with non-finite or out-of-range coordinates', () => {
+    const csv = [
+      'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
+      '1805,1,Ada,OK,OK,1e999,-96.67,Infinite latitude',
+      '1806,1,Ada,OK,OK,34.77,-1e999,Infinite longitude',
+      '1807,1,Ada,OK,OK,120,-96.67,Latitude out of range',
+      '1808,1,Ada,OK,OK,34.77,200,Longitude out of range',
+      '1809,1,Ada,OK,OK,34.77,-96.67,Usable row',
+    ].join('\n');
+
+    expect(parseTodayStormReportCsv(csv)).toMatchObject([
+      { latitude: 34.77, longitude: -96.67, comments: 'Usable row' },
+    ]);
+  });
+
   test('treats unknown Time-prefixed lines as section boundaries', () => {
     const csv = [
       'Time,F_Scale,Location,County,State,Lat,Lon,Comments',
