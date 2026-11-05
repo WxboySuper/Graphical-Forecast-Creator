@@ -49,10 +49,10 @@ const getDefaultCondaPython = () => {
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 };
 
-/** Reads a positive numeric env override, falling back when it is unset or invalid. */
+/** Reads a timeout supported by Node timers, falling back for invalid overrides. */
 const readPositiveNumberEnv = (value, fallback) => {
   const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= 2_147_483_647 ? parsed : fallback;
 };
 
 /** Resolves the Python executable used by the experimental worker. */
