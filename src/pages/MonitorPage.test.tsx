@@ -1,10 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router';
 import MonitorPage, { buildMonitorReferenceAttributions } from './MonitorPage';
 import type { MonitorReferenceLayerMeta } from '../monitor/referenceLayers';
-import monitorReducer from '../store/monitorSlice';
+import monitorReducer, { setMonitorMapView, setRadarSite } from '../store/monitorSlice';
 import forecastReducer from '../store/forecastSlice';
 import themeReducer from '../store/themeSlice';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
@@ -66,6 +66,14 @@ jest.mock('../monitor/useRadarSiteOptions', () => ({
 
 jest.mock('../monitor/components/MonitorMap', () => () => <div data-testid="monitor-map-stub" />);
 
+jest.mock('../monitor/wms', () => {
+  const actual = jest.requireActual('../monitor/wms');
+  return {
+    ...actual,
+    buildRadarLayerConfig: jest.fn(actual.buildRadarLayerConfig),
+  };
+});
+
 const renderMonitorPage = () => {
   const store = configureStore({
     reducer: {
@@ -85,7 +93,7 @@ const renderMonitorPage = () => {
     }),
   });
 
-  return render(
+  const view = render(
     <Provider store={store}>
       <MemoryRouter initialEntries={['/monitor']}>
         <Routes>
@@ -99,7 +107,13 @@ const renderMonitorPage = () => {
       </MemoryRouter>
     </Provider>
   );
+
+  return { store, view };
 };
+
+/** Reads the mocked radar config builder so tests can count rebuilds. */
+const radarConfigBuilder = (): jest.Mock =>
+  (jest.requireMock('../monitor/wms') as { buildRadarLayerConfig: jest.Mock }).buildRadarLayerConfig;
 
 describe('MonitorPage', () => {
   test('renders monitor workspace controls and map stub', () => {
@@ -109,6 +123,25 @@ describe('MonitorPage', () => {
     expect(screen.getByRole('complementary', { name: /Monitor controls/i })).toBeInTheDocument();
     expect(screen.getByTestId('monitor-map-stub')).toBeInTheDocument();
     expect(screen.getByText(/SPC reports, and NWS alerts/i)).toBeInTheDocument();
+  });
+
+  test('rebuilds the radar layer config only when radar inputs change', () => {
+    const buildRadar = radarConfigBuilder();
+    buildRadar.mockClear();
+    const { store } = renderMonitorPage();
+
+    const initialCalls = buildRadar.mock.calls.length;
+    expect(initialCalls).toBeGreaterThan(0);
+
+    act(() => {
+      store.dispatch(setMonitorMapView({ center: [35.2, -97.4], zoom: 7 }));
+    });
+    expect(buildRadar).toHaveBeenCalledTimes(initialCalls);
+
+    act(() => {
+      store.dispatch(setRadarSite('KOUN'));
+    });
+    expect(buildRadar).toHaveBeenCalledTimes(initialCalls + 1);
   });
 
   test('shows reference attribution only for a loaded MCD collection', () => {
