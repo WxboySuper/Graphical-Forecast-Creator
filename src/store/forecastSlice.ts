@@ -59,7 +59,6 @@ import {
 import { getSavedCycleWorkspaceId } from './forecastSliceSelectors';
 
 const HISTORY_LIMIT = 50;
-const EMPTY_OUTLOOK_DATA: OutlookData = Object.freeze({});
 
 export interface SavedCycleStats {
   forecastDays: number;
@@ -1472,7 +1471,7 @@ export {
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || EMPTY_OUTLOOK_DATA;
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay);
 };
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
@@ -1486,7 +1485,7 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || EMPTY_OUTLOOK_DATA;
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day);
 };
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export { WORKFLOW_ACTIVE_STORAGE_KEY } from './forecastSliceWorkspaceHelpers';
