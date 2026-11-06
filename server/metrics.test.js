@@ -16,6 +16,7 @@ let premiumCountCalls = 0;
 let premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
 let premiumFallbackGet = async () => ({ size: 0 });
 let clock = 0;
+let adminAuth = null;
 
 const createRef = (collection, id) => ({ collection, id, key: `${collection}/${id}` });
 const snapshot = (ref) => ({ exists: documents.has(ref.key), data: () => documents.get(ref.key) || {} });
@@ -53,11 +54,12 @@ require.cache[firebaseAdminPath] = {
   id: firebaseAdminPath,
   filename: firebaseAdminPath,
   loaded: true,
-  exports: { getAdminDb: () => db, getAdminAuth: () => null, hasFirebaseAdminConfig: () => true },
+  exports: { getAdminDb: () => db, getAdminAuth: () => adminAuth, hasFirebaseAdminConfig: () => true },
 };
 delete require.cache[metricsPath];
 const { countPremiumSubscriptions, countTotalAccounts, recordBillingMetricEvent } = require('./metrics');
 const { handleMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
+const { getDayKey } = require('./metricsValues');
 
 const createResponse = () => {
   const response = {
@@ -81,6 +83,11 @@ const createUnauthenticatedRequest = (event) => ({
   body: { event, installationId: 'test-installation' },
 });
 
+const createAuthenticatedRequest = (event) => ({
+  headers: { authorization: 'Bearer test-token' },
+  body: { event, installationId: 'test-installation' },
+});
+
 beforeEach(() => {
   documents.clear();
   aggregateGet = async () => ({ data: () => ({ count: 3 }) });
@@ -90,6 +97,7 @@ beforeEach(() => {
   premiumCountCalls = 0;
   premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
   premiumFallbackGet = async () => ({ size: 0 });
+  adminAuth = null;
   clock += 10 * 60 * 1000;
   Date.now = () => clock;
 });
@@ -229,5 +237,37 @@ describe('product metric authentication contract', () => {
 
   it('does not classify unsupported events as trusted metric writes', () => {
     assert.equal(requiresAuthenticatedMetricEvent('unknown'), false);
+  });
+});
+
+describe('product metric live summary', () => {
+  it('records the event when an optional live headline lookup fails', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+    premiumAggregateGet = async () => {
+      throw new Error('aggregation unavailable');
+    };
+    premiumFallbackGet = async () => {
+      throw new Error('fallback unavailable');
+    };
+
+    const dayKey = getDayKey();
+    documents.set(`adminDailyMetrics/${dayKey}`, {
+      cloudSaves: 2,
+      premiumSubscriptions: 7,
+    });
+
+    const response = createResponse();
+    await handleMetricEvent(createAuthenticatedRequest('cloud_cycle_saved'), response);
+
+    assert.equal(response.statusCode, 204);
+    const dailyMetrics = [...documents.entries()].find(([key]) =>
+      key.startsWith('adminDailyMetrics/')
+    )?.[1];
+    assert.equal(dailyMetrics.cloudSaves, 3);
+    // A failed lookup leaves the stored total untouched instead of resetting to zero or rejecting the event.
+    assert.equal(dailyMetrics.premiumSubscriptions, 7);
+    // The independent storage lookup still lands instead of being discarded.
+    assert.equal(typeof dailyMetrics.storageBytes, 'number');
+    assert.ok(dailyMetrics.storageBytes > 0);
   });
 });

@@ -287,6 +287,13 @@ const createMetricEventRefs = ({ db, dayKey, installationId, uid }) => {
 /** Returns whether this event should refresh live admin headline totals. */
 const shouldRefreshLiveAdminSummary = (eventType) => eventType === 'cloud_cycle_saved';
 
+/** Returns one settled live-summary value, logging why an optional lookup failed. */
+const readSettledLiveSummaryValue = (result, label) => {
+  if (result.status === 'fulfilled') return result.value;
+  console.warn(`[metrics] live-summary:${label}_unavailable`, result.reason);
+  return undefined;
+};
+
 /** Loads optional live admin summary values needed for metric writes. */
 const readLiveAdminSummary = async (eventType) => {
   if (!shouldRefreshLiveAdminSummary(eventType)) {
@@ -296,14 +303,16 @@ const readLiveAdminSummary = async (eventType) => {
     };
   }
 
-  const [premiumSubscriptions, storageBytes] = await Promise.all([
+  // These headline totals are optional extras on the event write, so a failed
+  // lookup must degrade to "unchanged" instead of rejecting the whole event.
+  const [premiumSubscriptions, storageBytes] = await Promise.allSettled([
     countPremiumSubscriptions(),
     getCurrentStorageBytes(),
   ]);
 
   return {
-    premiumSubscriptions,
-    storageBytes,
+    premiumSubscriptions: readSettledLiveSummaryValue(premiumSubscriptions, 'premium'),
+    storageBytes: readSettledLiveSummaryValue(storageBytes, 'storage'),
   };
 };
 
