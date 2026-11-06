@@ -6,6 +6,58 @@ should follow today. Documents under **Historical and exploratory material**
 preserve release context or investigation results; they are references, not
 current implementation contracts.
 
+## Code boundary guides
+
+The source tree has short guides for its broad code areas. Read the relevant
+guide before moving a module or adding a cross-cutting dependency:
+
+### Frontend guides
+
+- [Frontend overview](../src/README.md)
+- [Authentication](../src/auth/README.md)
+- [Billing](../src/billing/README.md)
+- [Components](../src/components/README.md)
+- [Configuration](../src/config/README.md) - build targets, exposure registry, navigation metadata, gated surfaces, server-capability status, and vendored boundary sources.
+- [Content](../src/content/README.md)
+- [Feature exposure](../src/features/README.md)
+- [Hooks](../src/hooks/README.md)
+- [Libraries](../src/lib/README.md)
+- [Maps](../src/maps/README.md)
+- [Metrics](../src/metrics/README.md) - read-only `userMetrics` hook that feeds progress numbers to the account page.
+- [Monitor](../src/monitor/README.md)
+- [Pages](../src/pages/README.md)
+- [Routing](../src/routing/README.md)
+- [Store](../src/store/README.md)
+- [Testing](../src/testing/README.md)
+- [Types](../src/types/README.md)
+- [Utilities](../src/utils/README.md)
+
+### Server guides
+
+- [Server overview](../server/README.md)
+- [Server library](../server/lib/README.md)
+- [Server release](../server/release/README.md)
+- [Server testing](../server/testing/README.md)
+- [Server weather](../server/weather/README.md)
+
+When a change crosses one of these boundaries, update the relevant architecture
+or operations document in the same pull request. Keep maintained investigations
+with the relevant product or architecture guidance. Local generated inventories
+and personal notes may go under the git-ignored `docs/personal` directory;
+archive completed exploratory material in the archive sections.
+
+## Choosing a document
+
+| If you are changing... | Start with... |
+| --- | --- |
+| general route composition, state ownership, or feature exposure | [Repository map](./architecture/codebase-inventory.md) |
+| Forecast-specific workspace route, state, persistence, or exposure decisions | [Forecast workspace follow-up](./architecture/forecast-workspace-boundaries.md) - v1.8 decision |
+| release or rollout behavior | [Release workflow](./operations/release-workflow.md) |
+| support response or privacy requests | [Support and privacy operations](./operations/v1.7-support-and-privacy.md) |
+| product rules | [Outlook information](./product/outlook-info.md), [specialty-style policy](./product/specialty-style-policy.md), and [custom layers and products](./custom-products.md) |
+| export formats | [Import and export formats](./product/kmz-export.md) |
+| tests or test cleanup | [Current testing guidance](#current-guidance-testing) and the module's colocated tests |
+
 ## Architecture
 
 - [Repository map and architecture overview](./architecture/codebase-inventory.md) - product surfaces, boundaries, entry points, and safe future move direction.
@@ -63,6 +115,7 @@ before using them to make a code or deployment decision.
 
 - [Outlook information](./product/outlook-info.md) - risk levels, probability values, and categorical conversion rules.
 - [Built-in specialty styles](./product/specialty-style-policy.md) - the approved relationship between visual presets and custom products.
+- [Custom layers and reusable products](./custom-products.md) - snapshot-first custom layer schema, exposure, and hosted authorization boundary.
 
 ## Current release reference
 

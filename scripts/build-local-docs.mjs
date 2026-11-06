@@ -10,8 +10,10 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const SCRIPT_DIR = path.dirname(SCRIPT_PATH);
 const ROOT = path.resolve(SCRIPT_DIR, '..');
 const OUTPUT = path.join(ROOT, 'docs', 'personal', 'site');
-const SKIP = new Set(['node_modules', '.git', 'build', 'coverage', 'site']);
+const SKIP = new Set(['node_modules', '.git', 'build', 'coverage', 'site', 'dist', 'playwright-report', 'test-results']);
 const ROOT_MARKDOWN = ['README.md', 'ROADMAP.md', 'CHANGELOG.md'];
+/** Generated pages live in docs/personal/site; this prefix reaches repository files from them. */
+const REPO_PREFIX = '../../../';
 
 /** Escape text before placing it in generated HTML. */
 function escapeHtml(value) { return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;'); }
@@ -27,16 +29,35 @@ function shouldPreserveDestination(destination, context, resolveMarkdownLink) {
   return !resolveMarkdownLink || !context?.sourcePath || !context.pageMap || destination.startsWith('#') || /^(?:https?:|mailto:)/i.test(destination) || destination.startsWith('/');
 }
 
+/** Split a destination into its path portion and its preserved fragment suffix. */
+function splitDestination(trimmed) {
+  const [target, fragment] = trimmed.split('#', 2);
+  return { target, suffix: fragment === undefined ? '' : `#${fragment}` };
+}
+
+/** Normalize a link target against the directory of the document that links to it. */
+function normalizeTarget(sourcePath, target) {
+  if (!target) return '';
+  return path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), target));
+}
+
+/** Map a normalized source-relative path onto its generated page or repository file. */
+function resolveLocalPath(normalized, suffix, context) {
+  if (!normalized || normalized.startsWith('..')) return null;
+  const page = context.pageMap.get(normalized);
+  if (page) return `${page}${suffix}`;
+  if (context.repoFiles?.has(normalized)) return `${REPO_PREFIX}${normalized}${suffix}`;
+  if (normalized.endsWith('/') && [...(context.repoFiles ?? [])].some((file) => file.startsWith(normalized))) return `${REPO_PREFIX}${normalized}${suffix}`;
+  return null;
+}
+
 /** Resolve a local Markdown link to its generated page, preserving fragments. */
 function resolveDestination(destination, context, resolveMarkdownLink) {
   const trimmed = destination.trim();
   if (!isSafeDestination(trimmed)) return '#';
   if (shouldPreserveDestination(trimmed, context, resolveMarkdownLink)) return trimmed;
-  const [target, fragment] = trimmed.split('#', 2);
-  if (!target.toLowerCase().endsWith('.md')) return trimmed;
-  const normalized = path.posix.normalize(path.posix.join(path.posix.dirname(context.sourcePath), target));
-  const page = context.pageMap.get(normalized);
-  return page ? `${page}${fragment === undefined ? '' : `#${fragment}`}` : trimmed;
+  const { target, suffix } = splitDestination(trimmed);
+  return resolveLocalPath(normalizeTarget(context.sourcePath, target), suffix, context) ?? trimmed;
 }
 
 /** Render inline Markdown emphasis, code, images, and links. */
@@ -44,7 +65,7 @@ function inlineMarkdown(value, context = {}) {
   const tokens = [];
   /** Protect rendered links while escaping the surrounding Markdown text. */
   const protect = (html) => { const token = `__GFC_LINK_${tokens.length}__`; tokens.push(html); return token; };
-  let source = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, destination) => protect(`<img alt="${escapeHtml(alt)}" src="${escapeHtml(resolveDestination(destination, context, false))}">`));
+  let source = value.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, destination) => protect(`<img alt="${escapeHtml(alt)}" src="${escapeHtml(resolveDestination(destination, context, true))}">`));
   source = source.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, destination) => protect(`<a href="${escapeHtml(resolveDestination(destination, context, true))}">${escapeHtml(label)}</a>`));
   const html = escapeHtml(source).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return html.replace(/__GFC_LINK_(\d+)__/gu, (_, index) => tokens[Number(index)]);
@@ -67,7 +88,7 @@ function renderTable(lines, context) {
 }
 
 /** Create mutable state for one Markdown document. */
-function createState(context) { return { html: [], paragraph: [], list: null, fence: null, fenceLines: [], context }; }
+function createState(context) { return { html: [], paragraph: [], list: null, fence: null, fenceLines: [], headingSlugs: new Map(), context }; }
 
 /** Flush the current paragraph into rendered output. */
 function flushParagraph(state) { if (state.paragraph.length) { state.html.push(`<p>${state.paragraph.map((line) => inlineMarkdown(line, state.context)).join(' ')}</p>`); state.paragraph = []; } }
@@ -95,11 +116,40 @@ function consumeTable(state, lines, index) {
   state.html.push(renderTable(tableLines, state.context)); return nextIndex;
 }
 
+/** Strip inline Markdown formatting so heading slugs match GitHub anchor behavior. */
+function stripHeadingMarkdown(text) {
+  const withoutMarkdown = text
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/(^|\W)_([^_]+)_(\W|$)/g, '$1$2$3');
+  // Repeat until stable so nested fragments cannot reassemble into a tag, then drop stray angle brackets.
+  let result = withoutMarkdown;
+  let previous;
+  do {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== previous);
+  return result.replace(/[<>]/g, '');
+}
+
+/** Derive a GitHub-style heading id, suffixing repeats within one document. */
+function headingId(text, state) {
+  const base = stripHeadingMarkdown(text).trim().toLowerCase().replace(/[^\p{L}\p{N}\s\-_]/gu, '').trim().replace(/\s+/g, '-');
+  const seen = state.headingSlugs.get(base) ?? 0;
+  state.headingSlugs.set(base, seen + 1);
+  return seen === 0 ? base : `${base}-${seen}`;
+}
+
 /** Consume a heading line. */
 function consumeHeading(state, line) {
   const match = line.match(/^(#{1,6})\s+(.+)$/);
   if (!match) return false;
-  flushParagraph(state); flushList(state); const level = match[1].length; state.html.push(`<h${level}>${inlineMarkdown(match[2], state.context)}</h${level}>`); return true;
+  flushParagraph(state); flushList(state); const level = match[1].length; const id = headingId(match[2], state); state.html.push(`<h${level} id="${escapeHtml(id)}">${inlineMarkdown(match[2], state.context)}</h${level}>`); return true;
 }
 
 /** Append a parsed list item to the current list state. */
@@ -144,13 +194,32 @@ async function walkMarkdown(directory, relative = '') {
   return files;
 }
 
-/** Collect root and docs Markdown, including ignored local planning files. */
-async function sourceFiles() {
+/** Collect root, docs, and src/server boundary-guide Markdown, including ignored local planning files. */
+export async function sourceFiles() {
   const files = [];
   for (const file of ROOT_MARKDOWN) { try { await fs.access(path.join(ROOT, file)); files.push({ absolute: path.join(ROOT, file), relative: file }); } catch { /* optional root document */ } }
   files.push(...await walkMarkdown(path.join(ROOT, 'docs'), 'docs'));
+  files.push(...await walkMarkdown(path.join(ROOT, 'src'), 'src'));
+  files.push(...await walkMarkdown(path.join(ROOT, 'server'), 'server'));
   const unique = new Map(files.map((file) => [file.relative, file]));
   return [...unique.values()];
+}
+
+/** Walk a directory and return every file as a POSIX path relative to the walk root. */
+async function walkRepoFiles(directory, relative = '') {
+  const entries = await fs.readdir(directory, { withFileTypes: true }); const files = [];
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (SKIP.has(entry.name)) continue;
+    const absolute = path.join(directory, entry.name); const next = relative ? `${relative}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) files.push(...await walkRepoFiles(absolute, next));
+    else if (entry.isFile()) files.push(next);
+  }
+  return files;
+}
+
+/** Collect repository file paths so non-Markdown local links can resolve from the generated site. */
+export async function collectRepoFiles() {
+  return new Set(await walkRepoFiles(ROOT));
 }
 
 /** Convert a source path into a stable output filename. */
@@ -161,8 +230,8 @@ export function pageHtml(title, relativePath, body) { const mermaid = body.inclu
 
 /** Build the ignored local documentation site. */
 async function main() {
-  const files = await sourceFiles(); const pageMap = new Map(files.map((file) => [file.relative, pageSlug(file.relative)])); await fs.rm(OUTPUT, { recursive: true, force: true }); await fs.mkdir(OUTPUT, { recursive: true }); const pages = [];
-  for (const file of files) { const title = file.relative.replace(/\.md$/i, '').split('/').pop(); const slug = pageSlug(file.relative); const context = { sourcePath: file.relative, pageMap }; await fs.writeFile(path.join(OUTPUT, slug), pageHtml(title, file.relative, renderMarkdown(await fs.readFile(file.absolute, 'utf8'), context))); pages.push({ title, path: file.relative, href: slug }); }
+  const files = await sourceFiles(); const repoFiles = await collectRepoFiles(); const pageMap = new Map(files.map((file) => [file.relative, pageSlug(file.relative)])); await fs.rm(OUTPUT, { recursive: true, force: true }); await fs.mkdir(OUTPUT, { recursive: true }); const pages = [];
+  for (const file of files) { const title = file.relative.replace(/\.md$/i, '').split('/').pop(); const slug = pageSlug(file.relative); const context = { sourcePath: file.relative, pageMap, repoFiles }; await fs.writeFile(path.join(OUTPUT, slug), pageHtml(title, file.relative, renderMarkdown(await fs.readFile(file.absolute, 'utf8'), context))); pages.push({ title, path: file.relative, href: slug }); }
   pages.sort((a, b) => a.path.localeCompare(b.path));
   const items = pages.map((page) => `<li><a href="${page.href}" data-search="${escapeHtml(`${page.title} ${page.path}`.toLowerCase())}">${escapeHtml(page.title)} <small>${escapeHtml(page.path)}</small></a></li>`).join('');
   const index = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GFC local docs</title><link rel="stylesheet" href="site.css"></head><body><header><strong>GFC local docs</strong><span>Generated from Markdown sources</span></header><main><section class="intro"><p>Local-only documentation, architecture notes, planning data, and generated inventory views.</p><label for="search">Search</label><input id="search" type="search" placeholder="Filter documentation"><p id="count"></p></section><ul class="nav" id="nav">${items}</ul></main><script>const input=document.querySelector('#search');const links=[...document.querySelectorAll('#nav a')];const count=document.querySelector('#count');function filter(){const query=input.value.toLowerCase();let visible=0;for(const link of links){const show=link.dataset.search.includes(query);link.parentElement.hidden=!show;if(show)visible+=1;}count.textContent=visible+' document'+(visible===1?'':'s');}input.addEventListener('input',filter);filter();</script></body></html>`;
