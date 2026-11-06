@@ -1,3 +1,9 @@
+/**
+ * Discussion route: this page coordinates the editable and guided discussion
+ * experiences for the active forecast scope, including grouping, persistence,
+ * preview, export, and workflow handoff. It composes editors and shared state
+ * helpers; discussion formatting and storage rules remain in utility modules.
+ */
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router';
