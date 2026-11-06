@@ -1,3 +1,9 @@
+/**
+ * Owns the browser export pipeline for forecast maps and images: clone preparation,
+ * overlay rendering, map/image readiness, format selection, and final download. Callers
+ * provide map and presentation options; this module keeps DOM cleanup and export timing
+ * details out of React components and Redux state ownership.
+ */
 import { store } from '../store';
 
 type ExportMapLike = {
