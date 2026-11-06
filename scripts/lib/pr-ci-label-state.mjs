@@ -1,3 +1,7 @@
+/**
+ * Derives pull-request CI label state from normalized GitHub check runs.
+ * This helper owns label-state comparison and transition decisions; GitHub fetching and mutation are handled by the calling script.
+ */
 import { LABEL_DEFS } from './pr-label-defs.mjs';
 
 /** @typedef {{ status: string; conclusion: string | null }} CheckRun */
