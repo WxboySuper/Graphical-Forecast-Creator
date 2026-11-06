@@ -1,3 +1,6 @@
+/**
+ * Storm report map style. Defines the visual rules for rendering storm reports on the monitor map.
+ */
 import { Circle, Fill, Stroke, Style } from 'ol/style';
 import type { ReportType } from '../types/stormReports';
 import { STORM_REPORT_COLORS, STORM_REPORT_FALLBACK_COLOR } from '../utils/stormReportColors';

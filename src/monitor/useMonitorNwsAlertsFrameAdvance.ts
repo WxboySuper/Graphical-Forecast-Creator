@@ -1,3 +1,6 @@
+/**
+ * NWS alert frame advance hook. Advances the monitor alert timeline when playback requests the next frame.
+ */
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 
 interface MonitorNwsAlertsFrameAdvanceOptions {
