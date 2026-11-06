@@ -1,3 +1,8 @@
+/**
+ * Forecast-transfer test boundary: this suite verifies format detection,
+ * structured and KML export/import, placemark parsing, and transfer validation
+ * across portable forecast packages.
+ */
 import JSZip from 'jszip';
 import type { Feature, Polygon } from 'geojson';
 import type { ForecastCycle } from '../../types/outlooks';
