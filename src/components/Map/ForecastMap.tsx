@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/ForecastMap.tsx
+ * Purpose: Renders the interactive forecast map and coordinates layers, controls, and map state.
+ */
+
 import type { ComponentProps } from 'react';
 import OLMap from 'ol/Map';
 import OpenLayersForecastMap from './OpenLayersForecastMap';

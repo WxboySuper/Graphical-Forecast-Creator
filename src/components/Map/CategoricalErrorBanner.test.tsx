@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/CategoricalErrorBanner.test.tsx
+ * Purpose: Tests categorical map error messaging, recovery actions, and visibility states.
+ */
+
 import { render, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import CategoricalErrorBanner from './CategoricalErrorBanner';
