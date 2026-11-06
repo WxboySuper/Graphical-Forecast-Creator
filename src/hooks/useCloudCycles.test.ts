@@ -1,3 +1,6 @@
+/**
+ * Cloud cycle hook tests. Verify cloud cycle loading, saving, update state, and failure paths exposed by the hook.
+ */
 import { act, renderHook } from '@testing-library/react';
 import {
   buildLoadedCloudForecastPayload,
