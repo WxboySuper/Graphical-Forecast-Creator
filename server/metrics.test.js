@@ -59,6 +59,7 @@ require.cache[firebaseAdminPath] = {
 delete require.cache[metricsPath];
 const { countPremiumSubscriptions, countTotalAccounts, recordBillingMetricEvent } = require('./metrics');
 const { handleMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
+const { getDayKey } = require('./metricsValues');
 
 const createResponse = () => {
   const response = {
@@ -249,6 +250,12 @@ describe('product metric live summary', () => {
       throw new Error('fallback unavailable');
     };
 
+    const dayKey = getDayKey();
+    documents.set(`adminDailyMetrics/${dayKey}`, {
+      cloudSaves: 2,
+      premiumSubscriptions: 7,
+    });
+
     const response = createResponse();
     await handleMetricEvent(createAuthenticatedRequest('cloud_cycle_saved'), response);
 
@@ -256,9 +263,9 @@ describe('product metric live summary', () => {
     const dailyMetrics = [...documents.entries()].find(([key]) =>
       key.startsWith('adminDailyMetrics/')
     )?.[1];
-    assert.equal(dailyMetrics.cloudSaves, 1);
-    // A failed lookup leaves the stored total untouched instead of rejecting the event.
-    assert.equal(dailyMetrics.premiumSubscriptions, 0);
+    assert.equal(dailyMetrics.cloudSaves, 3);
+    // A failed lookup leaves the stored total untouched instead of resetting to zero or rejecting the event.
+    assert.equal(dailyMetrics.premiumSubscriptions, 7);
     // The independent storage lookup still lands instead of being discarded.
     assert.equal(typeof dailyMetrics.storageBytes, 'number');
     assert.ok(dailyMetrics.storageBytes > 0);
