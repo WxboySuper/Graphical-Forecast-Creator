@@ -10,42 +10,26 @@ import {
 } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { useAuth } from '../auth/AuthProvider';
-
-/** True when password is the account's only supported reauthentication provider. */
-const accountUsesPasswordReauthentication = (
-  user: ReturnType<typeof useAuth>['user'],
-): boolean => {
-  const providerIds = new Set(user?.providerData.map((provider) => provider.providerId) ?? []);
-  if (!providerIds.has('password')) return false;
-  return !providerIds.has('google.com');
-};
-
-/** True when the destructive form has every provider-specific credential. */
-const canSubmitAccountDeletion = (
-  confirmation: string,
-  usesPassword: boolean,
-  password: string,
-): boolean => {
-  if (confirmation !== 'DELETE') return false;
-  if (!usesPassword) return true;
-  return password.length > 0;
-};
+import {
+  canSubmitAccountDeletion,
+  getAccountDeletionReauthentication,
+} from './accountDeletionUtils';
 
 /** Owns destructive account state while keeping the card markup declarative. */
-const useAccountDeletionAction = (usesPassword: boolean) => {
+const useAccountDeletionAction = (reauthentication: ReturnType<typeof getAccountDeletionReauthentication>) => {
   const { deleteAccount } = useAuth();
   const [confirmation, setConfirmation] = useState('');
   const [password, setPassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const canDelete = canSubmitAccountDeletion(confirmation, usesPassword, password);
+  const canDelete = canSubmitAccountDeletion(confirmation, reauthentication, password);
 
   /** Attempts account deletion after confirmation and any required reauthentication. */
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteAccount(usesPassword ? password : undefined);
+      await deleteAccount(reauthentication === 'password' ? password : undefined);
     } catch (error) {
       setDeleteError(error instanceof Error ? error.message : 'Unable to delete your account right now.');
       setDeleting(false);
@@ -98,8 +82,8 @@ const AccountDeletionButtonLabel: React.FC<{ deleting: boolean }> = ({ deleting 
 /** Renders the destructive account lifecycle control and provider reauthentication form. */
 export const AccountDeletionCard: React.FC = () => {
   const { user } = useAuth();
-  const usesPassword = accountUsesPasswordReauthentication(user);
-  const action = useAccountDeletionAction(usesPassword);
+  const reauthentication = getAccountDeletionReauthentication(user);
+  const action = useAccountDeletionAction(reauthentication);
 
   return (
     <Card className="account-danger-card">
@@ -115,7 +99,7 @@ export const AccountDeletionCard: React.FC = () => {
       </CardHeader>
       <CardContent className="account-section-content">
         <AccountDeletionPasswordField
-          visible={usesPassword}
+          visible={reauthentication === 'password'}
           password={action.password}
           deleting={action.deleting}
           onChange={action.setPassword}
@@ -133,7 +117,10 @@ export const AccountDeletionCard: React.FC = () => {
           />
         </div>
         <p className="account-support-copy">
-          You will be asked to authenticate again. Any active premium subscription linked to this account will end.
+          {reauthentication === 'unsupported'
+            ? 'This sign-in method cannot be reauthenticated here. Contact support for account deletion.'
+            : 'You will be asked to authenticate again.'}{' '}
+          Any active premium subscription linked to this account will end.
           This action cannot be undone.
         </p>
         {action.deleteError ? <p className="account-error-box" role="alert">{action.deleteError}</p> : null}
