@@ -1,3 +1,8 @@
+/**
+ * Monitor radar-site configuration helpers.
+ *
+ * This module turns radar-site metadata into the options consumed by monitor controls. Network loading and map-layer rendering remain outside this configuration boundary.
+ */
 import { readRadarSiteProperties } from './radarSiteProperties';
 
 export interface RadarSiteOption {
