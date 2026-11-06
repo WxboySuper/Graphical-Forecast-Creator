@@ -1,3 +1,7 @@
+/**
+ * Computes weighted verification scores from normalized forecast-grade component values.
+ * This utility owns deterministic score calculation and labels; data loading, UI state, and persistence remain outside its boundary.
+ */
 import {
   COMPONENT_LABELS,
   COMPONENT_WEIGHTS,
