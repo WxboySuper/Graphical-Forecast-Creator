@@ -1,3 +1,7 @@
+/**
+ * Server feature-exposure test harness. It starts an isolated HTTP app,
+ * exercises capability gates, and provides assertions for release metadata.
+ */
 'use strict';
 
 const express = require('express');
