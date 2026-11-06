@@ -1,3 +1,7 @@
+/**
+ * Renders workspace metadata controls and summaries for the active forecast cycle.
+ * This component owns metadata presentation and user callbacks; cycle state, validation, and persistence are supplied by the workspace controller.
+ */
 import React from 'react';
 import {
   Calendar,

@@ -1,3 +1,7 @@
+/**
+ * Composes the Forecast Grade source-selection panel from reusable chooser and date controls.
+ * This component owns panel layout and callback wiring; source loading, grading, and persistence remain with its callers.
+ */
 import React from 'react';
 import type { GradeAccountTier, PackageSourceKind } from '../../types/forecastGrade';
 import { GradeRunFooter, PackageChooser, ReportDatePicker } from './sourcePanelParts';
