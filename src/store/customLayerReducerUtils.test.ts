@@ -1,3 +1,6 @@
+/**
+ * Custom layer reducer utility tests. Verify reducer helpers update custom map layers without mutating prior state.
+ */
 import { cloneCustomValue } from './customLayerReducerUtils';
 
 describe('cloneCustomValue', () => {

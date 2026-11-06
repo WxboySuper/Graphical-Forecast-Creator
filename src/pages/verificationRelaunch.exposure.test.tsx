@@ -1,3 +1,6 @@
+/**
+ * Verification relaunch exposure tests. Verify the relaunch path appears only for supported feature targets.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { BUILD_TARGETS } from '../config/buildTarget';

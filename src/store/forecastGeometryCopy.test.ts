@@ -1,3 +1,6 @@
+/**
+ * Forecast geometry copy tests. Verify forecast shapes are duplicated with independent geometry state.
+ */
 import type { Feature, Polygon } from 'geojson';
 import reducer, {
   addFeature,
