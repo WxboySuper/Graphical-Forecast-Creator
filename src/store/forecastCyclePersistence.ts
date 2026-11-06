@@ -1,0 +1,48 @@
+import { cloneForecastCycle } from '../utils/fileUtils';
+import { countForecastMetrics } from '../utils/forecastMetrics';
+import { resolveForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { createSavedCycleId, SAVED_CYCLES_LIMIT } from './forecastSliceWorkspaceHelpers';
+import type { ForecastState, SavedCycle } from './forecastSlice';
+
+interface SaveForecastCycleOptions {
+  label?: string;
+  timestamp: string;
+}
+
+/** Saves a forecast snapshot and updates lifetime totals, streaks, and retention. */
+export const saveForecastCycle = (
+  state: ForecastState,
+  { label, timestamp }: SaveForecastCycleOptions,
+): void => {
+  const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
+  const savedCycle: SavedCycle = {
+    id: createSavedCycleId(state, timestamp),
+    timestamp,
+    cycleDate: state.forecastCycle.cycleDate,
+    label,
+    forecastCycle: forecastCycleSnapshot,
+    stats: countForecastMetrics(forecastCycleSnapshot),
+    workspaceId: resolveForecastWorkspaceId(state.workspaceId),
+    workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
+  };
+  state.savedCycles.push(savedCycle);
+  state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
+  state.lifetimeCycleStats.totalCyclesMade += 1;
+  state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
+  const lastSavedCycleDate = state.lifetimeCycleStats.lastSavedCycleDate;
+  if (!lastSavedCycleDate || savedCycle.cycleDate > lastSavedCycleDate) {
+    const previousDate = lastSavedCycleDate ? new Date(lastSavedCycleDate).getTime() : 0;
+    const currentDate = new Date(savedCycle.cycleDate).getTime();
+    const isConsecutiveDay = currentDate - previousDate === 86400000;
+    state.lifetimeCycleStats.forecastStreak = isConsecutiveDay
+      ? (state.lifetimeCycleStats.forecastStreak ?? 0) + 1
+      : 1;
+    state.lifetimeCycleStats.lastSavedCycleDate = savedCycle.cycleDate;
+  } else if (!state.lifetimeCycleStats.forecastStreak) {
+    state.lifetimeCycleStats.forecastStreak = 1;
+  }
+  if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
+    state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
+  }
+  state.isSaved = true;
+};

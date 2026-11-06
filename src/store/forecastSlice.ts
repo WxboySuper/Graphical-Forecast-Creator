@@ -8,8 +8,6 @@ import { normalizeForecastCycle } from '../utils/outlookMapCoercion';
 import type { Feature } from 'geojson';
 import type { RootState } from './index';
 import type { CustomLayerCollection } from '../types/customProducts';
-import { cloneForecastCycle } from '../utils/fileUtils';
-import { countForecastMetrics } from '../utils/forecastMetrics';
 import { createCustomLayerReducers } from './customLayerReducers';
 import { createCustomCategoryReducers } from './customCategoryReducers';
 import { createCustomFeatureReducers } from './customFeatureReducers';
@@ -28,7 +26,6 @@ import {
   INITIAL_CYCLE_DATE,
   INITIAL_TIMESTAMP,
   SAVED_CYCLES_LIMIT,
-  createSavedCycleId,
   COPY_FEATURE_RULES,
   getActionLocalCalendarDate,
   createEmptyOutlook,
@@ -64,6 +61,7 @@ import { restoreSavedCycle } from './forecastSavedCycle';
 import { hydrateForecastCycle } from './forecastCycleHydration';
 import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 import { startBlankForecastCycle } from './forecastBlankCycle';
+import { saveForecastCycle } from './forecastCyclePersistence';
 
 const HISTORY_LIMIT = 50;
 
@@ -784,38 +782,10 @@ export const forecastSlice = createSlice({
     },
 
     saveCurrentCycle: (state, action: PayloadAction<{ label?: string }>) => {
-      const forecastCycleSnapshot = cloneForecastCycle(state.forecastCycle);
-      const now = readActionTimestamp(action);
-      const savedCycle: SavedCycle = {
-        id: createSavedCycleId(state, now),
-        timestamp: now,
-        cycleDate: state.forecastCycle.cycleDate,
+      saveForecastCycle(state, {
         label: action.payload.label,
-        forecastCycle: forecastCycleSnapshot,
-        stats: countForecastMetrics(forecastCycleSnapshot),
-        workspaceId: resolveForecastWorkspaceId(state.workspaceId),
-        workflowMetadata: state.workflowMetadata ? { ...state.workflowMetadata } : undefined,
-      };
-      state.savedCycles.push(savedCycle);
-      state.lifetimeCycleStats ??= { totalCyclesMade: 0, totalForecastsMade: 0 };
-      state.lifetimeCycleStats.totalCyclesMade += 1;
-      state.lifetimeCycleStats.totalForecastsMade += savedCycle.stats.forecastDays;
-      const lastSavedCycleDate = state.lifetimeCycleStats.lastSavedCycleDate;
-      if (!lastSavedCycleDate || savedCycle.cycleDate > lastSavedCycleDate) {
-        const previousDate = lastSavedCycleDate ? new Date(lastSavedCycleDate).getTime() : 0;
-        const currentDate = new Date(savedCycle.cycleDate).getTime();
-        const isConsecutiveDay = currentDate - previousDate === 86400000;
-        state.lifetimeCycleStats.forecastStreak = isConsecutiveDay
-          ? (state.lifetimeCycleStats.forecastStreak ?? 0) + 1
-          : 1;
-        state.lifetimeCycleStats.lastSavedCycleDate = savedCycle.cycleDate;
-      } else if (!state.lifetimeCycleStats.forecastStreak) {
-        state.lifetimeCycleStats.forecastStreak = 1;
-      }
-      if (state.savedCycles.length > SAVED_CYCLES_LIMIT) {
-        state.savedCycles.splice(0, state.savedCycles.length - SAVED_CYCLES_LIMIT);
-      }
-      state.isSaved = true;
+        timestamp: readActionTimestamp(action),
+      });
     },
 
     loadSavedCycle: (state, action: PayloadAction<string>) => {
