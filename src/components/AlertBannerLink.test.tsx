@@ -1,3 +1,8 @@
+/**
+ * File: src/components/AlertBannerLink.test.tsx
+ * Purpose: Covers alert banner link rendering, routing targets, and accessible interaction behavior.
+ */
+
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AlertBannerLink } from './AlertBannerLink';

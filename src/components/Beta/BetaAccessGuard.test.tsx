@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Beta/BetaAccessGuard.test.tsx
+ * Purpose: Verifies beta access guard decisions for eligible, ineligible, and loading account states.
+ */
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Outlet, useOutletContext } from 'react-router';
