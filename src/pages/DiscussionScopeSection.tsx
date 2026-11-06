@@ -1,3 +1,7 @@
+/**
+ * Renders the discussion scope and grouping controls for a discussion page.
+ * This component owns local selection UI and change callbacks; grouping state persistence belongs to its page controller.
+ */
 import React, { useState } from 'react';
 import type { DiscussionGrouping } from '../types/outlooks';
 
