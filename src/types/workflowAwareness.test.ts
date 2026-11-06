@@ -1,3 +1,6 @@
+/**
+ * Workflow awareness type tests. Verify workflow metadata types preserve the shared awareness contract.
+ */
 import { MAX_OUTLOOK_VERSIONS } from '../lib/workflowMetadataContract';
 import type { CycleMetadata } from './workflow';
 import {

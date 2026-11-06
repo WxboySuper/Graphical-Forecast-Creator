@@ -1,3 +1,6 @@
+/**
+ * Feature exposure exemplar tests. Verify representative components obey the shared exposure contract.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import { BUILD_TARGETS } from '../../config/buildTarget';
 import { FEATURE_EXPOSURE_REGISTRY } from '../../config/featureExposure';
