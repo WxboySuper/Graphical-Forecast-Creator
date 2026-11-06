@@ -1,3 +1,8 @@
+/**
+ * File: src/components/DiscussionEditor/DIYDiscussionEditor.test.tsx
+ * Purpose: Covers discussion editor text editing, selection actions, and rendered controls.
+ */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import DIYDiscussionEditor from './DIYDiscussionEditor';
 

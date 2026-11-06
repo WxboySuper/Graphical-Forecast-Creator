@@ -1,3 +1,8 @@
+/**
+ * File: src/components/CycleManager/cycleHistoryModalUtils.test.ts
+ * Purpose: Verifies cycle history summaries, day-data detection, and deferred close behavior.
+ */
+
 import { getDaySummary, hasDayData, deferCloseAfterConfirm } from './cycleHistoryModalUtils';
 import type { SavedCycle } from '../../store/forecastSlice';
 
