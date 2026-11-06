@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade calculation entry point. It combines outlook, storm-report,
+ * and damage evidence into the typed component scores used by Verification.
+ */
 import type { OutlookData } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type { DatEvidence } from '../dat';
