@@ -1,3 +1,8 @@
+/**
+ * Feature-exposure diagnostics test boundary: this suite verifies diagnostic
+ * resolution, server-reason mapping, capability fallbacks, and aggregate
+ * exposure reporting for feature-policy tooling.
+ */
 import * as featureExposure from './featureExposure';
 import {
   isFeatureExposureDiagnosticsEnabled,

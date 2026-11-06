@@ -1,3 +1,8 @@
+/**
+ * Auto-save hook test boundary: this suite verifies snapshot selection, legacy
+ * migration, cycle-date/map-view persistence, debounced writes, and restore
+ * behavior at the editor auto-save boundary.
+ */
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
