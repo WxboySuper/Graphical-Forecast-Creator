@@ -1,5 +1,6 @@
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
 import type { Feature, Polygon } from 'geojson';
+import { produce } from 'immer';
 import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
 import reducer, {
@@ -23,6 +24,7 @@ import reducer, {
   updateFeature,
   updateFeaturesBatch,
   removeFeature,
+  resetCategorical,
   completeCycle,
   completeWithOmissions,
   dismissCompletionModal,
@@ -146,6 +148,49 @@ describe('setOutlookMap', () => {
 
     expect(state.forecastCycle.days[4]?.data['day4-8']).toBe(supportedMap);
     expect(state.isSaved).toBe(false);
+  });
+
+  test('inserts a missing current day before updating its outlook map', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const day = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[day]; });
+    const map = new Map<string, Feature[]>();
+
+    const nextState = reducer(state, setOutlookMap({ outlookType: 'tornado', map }));
+
+    expect(nextState.forecastCycle.days[day]?.data.tornado).toBe(map);
+  });
+
+  test('no-op feature updates do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[2]; });
+    const afterSingle = reducer(state, updateFeature({ feature: createFeature('missing', 0), day: 2 }));
+    expect(afterSingle).toBe(state);
+    expect(afterSingle.forecastCycle.days[2]).toBeUndefined();
+
+    const missingCurrent = produce(initial, (draft) => {
+      delete draft.forecastCycle.days[draft.forecastCycle.currentDay];
+    });
+    const afterBatch = reducer(missingCurrent, updateFeaturesBatch({ features: [createFeature('missing', 0)] }));
+    expect(afterBatch).toBe(missingCurrent);
+    expect(afterBatch.forecastCycle.days[missingCurrent.forecastCycle.currentDay]).toBeUndefined();
+  });
+
+  test('read-only reducer fallbacks do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const currentDay = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[currentDay]; });
+
+    const afterRemove = reducer(state, removeFeature({
+      outlookType: 'tornado',
+      probability: '2%',
+      featureId: 'missing',
+    }));
+    const afterReset = reducer(afterRemove, resetCategorical());
+
+    expect(afterRemove).toBe(state);
+    expect(afterReset).toBe(state);
+    expect(afterReset.forecastCycle.days[currentDay]).toBeUndefined();
   });
 
   test('keeps day-specific supported outlook maps available', () => {
@@ -452,6 +497,35 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     expect((getTornadoFeatures(state)[1].geometry as Polygon).coordinates[0][0]).toEqual([1, 1]);
+  });
+
+  test('re-finds later feature indexes after an earlier batched delete', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-a', 0) }));
+    state = reducer(state, addFeature({ feature: createFeature('feature-b', 1) }));
+
+    state = reducer(state, updateFeaturesBatch({
+      features: [
+        {
+          ...createFeature('feature-a', 0),
+          geometry: null,
+          properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+        },
+        {
+          ...createFeature('feature-b', 6),
+          properties: {
+            outlookType: 'tornado',
+            probability: '2%',
+            isSignificant: false,
+            batchUpdated: true,
+          },
+        },
+      ],
+    }));
+
+    expect(getTornadoFeatures(state)).toHaveLength(1);
+    expect(getTornadoFeatures(state)[0].id).toBe('feature-b');
+    expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([6, 6]);
+    expect(getTornadoFeatures(state)[0].properties?.batchUpdated).toBe(true);
   });
 
   test('deep-clones nested feature properties in history snapshots', () => {
