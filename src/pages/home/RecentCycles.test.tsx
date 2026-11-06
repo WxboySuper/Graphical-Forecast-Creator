@@ -1,3 +1,6 @@
+/**
+ * Recent cycles tests. Cover compact and section variants, empty states, and load/history callbacks.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import RecentCycles from './RecentCycles';
 import type { SavedCycle } from '../../store/forecastSlice';

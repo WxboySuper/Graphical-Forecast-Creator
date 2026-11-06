@@ -1,3 +1,6 @@
+/**
+ * Updates page tests. Cover the v1.7 release presentation, hero image, and home navigation.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import UpdatesPage from './UpdatesPage';

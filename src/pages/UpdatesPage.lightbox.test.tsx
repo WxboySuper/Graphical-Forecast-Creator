@@ -1,3 +1,6 @@
+/**
+ * Updates lightbox tests. Cover opening an enlarged release screenshot and closing the native dialog.
+ */
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import UpdatesPage from './UpdatesPage';

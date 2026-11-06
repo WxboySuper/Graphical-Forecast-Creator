@@ -1,3 +1,6 @@
+/**
+ * Monitor page tests. Cover the mocked workspace shell and SPC MCD reference-attribution rules.
+ */
 import { act, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
