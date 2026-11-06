@@ -1,7 +1,7 @@
 import React from 'react';
 import { CloudLightning } from 'lucide-react';
 import { ServerBackedFeatureBoundary } from '../../features/ServerBackedFeatureBoundary';
-import { AUTO_TSTM_DISABLED_MESSAGE } from '../../config/autoTstmDisable';
+import { AUTO_TSTM_DISABLED, AUTO_TSTM_DISABLED_MESSAGE } from '../../config/autoTstmDisable';
 import { Button } from '../ui/button';
 import type { UseAutoTstmResult } from '../../hooks/useAutoTstm';
 import AutoTstmPanel from './AutoTstmPanel';
@@ -17,9 +17,9 @@ export const AutoTstmWorkspaceTools: React.FC<{
       size="sm"
       className="h-8 gap-2"
       onClick={autoTstm.openPanel}
-      disabled
-      title={AUTO_TSTM_DISABLED_MESSAGE}
-      aria-label={`Auto-TSTM (disabled): ${AUTO_TSTM_DISABLED_MESSAGE}`}
+      disabled={AUTO_TSTM_DISABLED || !autoTstm.isDaySupported}
+      title={AUTO_TSTM_DISABLED ? AUTO_TSTM_DISABLED_MESSAGE : undefined}
+      aria-label={AUTO_TSTM_DISABLED ? `Auto-TSTM (disabled): ${AUTO_TSTM_DISABLED_MESSAGE}` : 'Auto-TSTM'}
     >
       <CloudLightning className="h-4 w-4" />
       Auto-TSTM

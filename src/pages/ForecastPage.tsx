@@ -769,9 +769,10 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(updateNoticeHeight);
     observer.observe(notice);
-    return () => {
+    function disconnectNoticeObserver(): void {
       observer.disconnect();
-    };
+    }
+    return disconnectNoticeObserver;
   }, [showLegacyNotice]);
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
