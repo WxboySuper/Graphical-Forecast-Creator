@@ -115,6 +115,9 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   }, timeoutMs);
 
   child.stdout.on('data', (chunk) => {
+    // Stop buffering once the worker settled; the generator may keep writing
+    // during the SIGKILL grace window and must not grow memory unbounded.
+    if (state.finished) return;
     stdout += chunk.toString();
     if (stdout.length > MAX_STDOUT_LENGTH) {
       terminate();
