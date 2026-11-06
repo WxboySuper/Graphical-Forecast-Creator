@@ -1,3 +1,8 @@
+/**
+ * Home-page test boundary: this suite verifies landing-page routing, recent
+ * forecast entry points, capability-aware actions, and loading or empty states
+ * through the page's user-facing contract.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import HomePage from '../HomePage';

@@ -1,3 +1,8 @@
+/**
+ * Account-page test boundary: this suite verifies account settings, billing
+ * entitlement presentation, hosted-account actions, and navigation states at
+ * the route surface using isolated authentication and service fixtures.
+ */
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
