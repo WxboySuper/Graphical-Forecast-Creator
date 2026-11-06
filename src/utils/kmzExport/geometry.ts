@@ -1,3 +1,8 @@
+/**
+ * KMZ geometry export helpers.
+ *
+ * This module converts forecast geometry into the coordinate structures required by KMZ export. File packaging and download handling remain in the export pipeline.
+ */
 import type { Feature, Geometry, MultiPolygon, Polygon, Position } from 'geojson';
 
 const closeRing = (ring: Position[]): Position[] => {

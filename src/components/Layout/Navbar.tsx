@@ -1,3 +1,8 @@
+/**
+ * GFC navigation bar component.
+ *
+ * This component renders the primary application navigation and account actions. Route authorization and data loading come from the supplied hooks and context.
+ */
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleDarkMode } from '../../store/themeSlice';
