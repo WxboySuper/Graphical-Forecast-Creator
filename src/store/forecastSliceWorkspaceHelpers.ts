@@ -9,6 +9,7 @@ import {
 } from '../config/forecastWorkspaces';
 import { getFirstExposedOutlookType } from '../config/productExposureSelectors';
 import type { ForecastState, SavedCycle } from './forecastSlice';
+import { freezeMap } from './forecastStateFactory';
 
 type DayBucket = 'day12' | 'day3' | 'day48';
 
@@ -165,25 +166,6 @@ export const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
     }
   };
 };
-
-/** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
-const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> =>
-  new Proxy(map, {
-    set: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    deleteProperty: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    get: (target, property, receiver) => {
-      if (property === 'set' || property === 'delete' || property === 'clear') {
-        return () => {
-          throw new Error('Attempted to mutate a shared read-only outlook map.');
-        };
-      }
-      return Reflect.get(target, property, receiver);
-    },
-  });
 
 /** Deeply guards a value so shared fallbacks cannot be mutated. */
 const deepFreezeOutlookData = (data: OutlookData): OutlookData => {
