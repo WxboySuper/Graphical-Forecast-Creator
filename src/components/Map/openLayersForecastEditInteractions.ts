@@ -1,3 +1,7 @@
+/**
+ * Coordinates OpenLayers modify and snap interactions for editing forecast geometry.
+ * This module owns edit-interaction wiring and callbacks; forecast state mutation and map lifecycle remain with their controllers.
+ */
 import type OLMap from "ol/Map";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
