@@ -81,11 +81,11 @@ const getReadOnlyMapProperty = <K, V>(
 
 /** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
 export const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> => {
-  let proxy: Map<K, V>;
-  proxy = new Proxy(map, {
+  const proxy = new Proxy(map, {
     set: rejectReadOnlyMapMutation,
     deleteProperty: rejectReadOnlyMapMutation,
-    get: (target, property) => getReadOnlyMapProperty(target, property, proxy),
+    get: (target, property, receiver) =>
+      getReadOnlyMapProperty(target, property, receiver as Map<K, V>),
   });
   return proxy;
 };
