@@ -748,32 +748,37 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
-  useLayoutEffect(() => {
-    const shell = forecastShellRef.current;
-    const notice = legacyNoticeRef.current;
-    if (!shell) return;
-    if (!showLegacyNotice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
-    if (!notice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
+  useLayoutEffect(
+    /** Measures the notice and tracks its height while it is visible. */
+    function updateLegacyForecastNotice() {
+      const shell = forecastShellRef.current;
+      const notice = legacyNoticeRef.current;
+      if (!shell) return;
+      if (!showLegacyNotice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return;
+      }
+      if (!notice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return;
+      }
 
-    /** Keeps the forecast shell offset in sync with the notice height. */
-    const updateNoticeHeight = (): void => {
-      shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
-    };
-    updateNoticeHeight();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(updateNoticeHeight);
-    observer.observe(notice);
-    function disconnectNoticeObserver(): void {
-      observer.disconnect();
-    }
-    return disconnectNoticeObserver;
-  }, [showLegacyNotice]);
+      /** Keeps the forecast shell offset in sync with the notice height. */
+      const updateNoticeHeight = (): void => {
+        shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
+      };
+      updateNoticeHeight();
+      if (typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(updateNoticeHeight);
+      observer.observe(notice);
+      /** Disconnects the observer when the layout effect cleans up. */
+      function disconnectNoticeObserver(): void {
+        observer.disconnect();
+      }
+      return disconnectNoticeObserver;
+    },
+    [showLegacyNotice],
+  );
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
