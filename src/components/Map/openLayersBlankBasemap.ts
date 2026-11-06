@@ -1,3 +1,7 @@
+/**
+ * Builds the blank OpenLayers basemap and its geographic boundary styling.
+ * This module owns static basemap layer construction; interactive map state and forecast overlays are managed by map controllers.
+ */
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { Fill, Stroke, Style } from "ol/style";

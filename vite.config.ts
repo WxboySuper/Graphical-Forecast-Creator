@@ -1,3 +1,7 @@
+/**
+ * Defines the Vite development and production build configuration for GFC.
+ * This file owns bundler plugins, aliases, environment loading, and build-time policy; application runtime behavior belongs to src/.
+ */
 import path from 'path';
 import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';

@@ -1,3 +1,7 @@
+/**
+ * Converts hosted and one-off custom products into the layer handoff shape used by forecast workflows.
+ * This module owns custom-product boundary normalization; product storage, UI selection, and map rendering remain outside it.
+ */
 import type { CustomProductId, HostedCustomProduct, OneOffCustomLayer } from '../types/customProducts';
 import {
   asCustomLayerId,
