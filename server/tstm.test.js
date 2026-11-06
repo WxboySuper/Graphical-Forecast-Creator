@@ -200,7 +200,7 @@ describe('Auto-TSTM server foundation', () => {
     assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
   });
 
-  it('escalates after excessive stdout even if more output arrives during the grace window', async () => {
+  it('escalates after excessive stdout while ignoring later output in the grace window', async () => {
     const child = createFakeChild();
     const signals = [];
     child.kill = (signal) => signals.push(signal);
@@ -215,10 +215,12 @@ describe('Auto-TSTM server foundation', () => {
 
     child.stdout.write('x'.repeat(4 * 1024 * 1024 + 1));
     await assert.rejects(result, /TSTM_GENERATOR_OUTPUT_TOO_LARGE/);
+    // Buffering must stop after settlement, so trailing chunks add no memory
+    // and no extra SIGTERM; the pending escalation still lands.
     child.stdout.write('more output during the grace window');
 
     await signalSettle();
-    assert.deepEqual(signals, ['SIGTERM', 'SIGTERM', 'SIGKILL']);
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
   });
 
   it('passes --ingestion-mode flag when ingestionMode is set', async () => {
