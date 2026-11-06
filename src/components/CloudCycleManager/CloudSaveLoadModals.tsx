@@ -1,3 +1,8 @@
+/**
+ * Modal dialogs for saving a forecast cycle to cloud storage and loading an
+ * existing cycle. This file owns the form and confirmation UI; cloud requests
+ * and persistence state come from the parent cloud-cycle controller.
+ */
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '../ui/button';
 import {

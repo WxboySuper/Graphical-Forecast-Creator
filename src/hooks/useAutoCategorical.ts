@@ -1,3 +1,8 @@
+/**
+ * React hook that derives categorical outlook values from forecast geometry.
+ * It watches forecast state, runs the derivation worker, and writes the result
+ * or an error back through the forecast slice.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { applyAutoCategoricalSync, selectCurrentOutlooks, selectCurrentDay, setAutoCategoricalError } from '../store/forecastSlice';
