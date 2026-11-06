@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastGrade/GradeTrendChart.test.tsx
+ * Purpose: Tests grade trend chart data, labels, rendering, and empty-state behavior.
+ */
+
 import { dedupeGradeCardsByDay } from './GradeTrendChart';
 import type { GradeCard } from '../../types/forecastGrade';
 
