@@ -1,3 +1,7 @@
+/**
+ * Defines the repository-facing model and normalization helpers for custom products.
+ * This module owns storage-shape compatibility and schema metadata; UI selection, transport, and map rendering remain outside it.
+ */
 import {
   CUSTOM_PRODUCTS_SCHEMA_VERSION,
   type CustomCategoryTemplate,

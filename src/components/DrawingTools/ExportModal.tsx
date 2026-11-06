@@ -1,3 +1,7 @@
+/**
+ * Renders the drawing-tools export modal and its focus-managed export controls.
+ * This component owns modal presentation and local form state; export serialization and file delivery are delegated to utilities and callers.
+ */
 import React, { useState, useEffect, useCallback } from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './ExportModal.css';
