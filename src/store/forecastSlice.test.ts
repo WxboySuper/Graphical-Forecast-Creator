@@ -1,4 +1,9 @@
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
+/**
+ * Forecast-slice test boundary: this suite exercises reducer transitions,
+ * imports, history operations, and forecast-cycle serialization contracts.
+ * It verifies state behavior through public actions rather than UI rendering.
+ */
 import type { Feature, Polygon } from 'geojson';
 import { produce } from 'immer';
 import type { DayType, DiscussionData } from '../types/outlooks';

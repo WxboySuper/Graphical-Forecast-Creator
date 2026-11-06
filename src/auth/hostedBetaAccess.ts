@@ -1,3 +1,8 @@
+/**
+ * Hosted beta-access resolution helpers.
+ *
+ * This module determines beta access from hosted authentication and entitlement data. UI guards consume the result; identity and billing services own the underlying records.
+ */
 import type { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { db, isHostedAuthEnabled, requireDb } from '../lib/firebase';

@@ -1,3 +1,8 @@
+/**
+ * Cloud-cycle domain types.
+ *
+ * This file defines the shared TypeScript shapes for saved cloud cycles, sync state, and related metadata. Runtime persistence and validation live in cloud-cycle services.
+ */
 import type { ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import type { CycleMetadata } from './workflow';
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
