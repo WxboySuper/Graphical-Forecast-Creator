@@ -1,3 +1,6 @@
+/**
+ * Additional outlook utility tests. Cover edge cases in outlook normalization and display helpers.
+ */
 import {
   getOutlookConstraints,
   tornadoToCategorical,
