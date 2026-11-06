@@ -1,3 +1,9 @@
+/**
+ * Exposure source parser: this module parses client and server source files to
+ * extract route, registry, and side-effect declarations used by exposure
+ * policy validation. It owns static syntax inspection and diagnostics, not
+ * runtime feature decisions or workflow process handling.
+ */
 import { parse } from '@babel/parser';
 
 /** Returns a stable Babel node description for policy error messages. */
