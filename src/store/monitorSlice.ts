@@ -1,3 +1,7 @@
+/**
+ * Redux slice for monitor settings and selected products. It stores normalized
+ * monitor preferences consumed by the monitor page and map controls.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { DEFAULT_MONITOR_SETTINGS, type MonitorMapView, type MonitorOutlookLayerType, type MonitorOutlookSourceSelection, type MonitorReferenceLayerSettings, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
