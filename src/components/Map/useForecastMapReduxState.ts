@@ -1,3 +1,7 @@
+/**
+ * Forecast-map Redux selector hook. It gathers active forecast, overlay, and
+ * custom-layer state into the map props consumed by the rendering components.
+ */
 import { useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { Feature as GeoJsonFeature } from "geojson";
