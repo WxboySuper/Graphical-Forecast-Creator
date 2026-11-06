@@ -1,3 +1,8 @@
+/**
+ * Drawing-tools confirmation modal.
+ *
+ * This component presents confirmation actions for destructive or state-changing drawing operations. The parent supplies callbacks and owns the underlying map mutation.
+ */
 import React from 'react';
 import './ConfirmationModal.css';
 import { Button } from '../ui/button';

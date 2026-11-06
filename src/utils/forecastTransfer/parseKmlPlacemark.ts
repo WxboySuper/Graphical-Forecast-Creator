@@ -1,3 +1,8 @@
+/**
+ * KML placemark parser.
+ *
+ * This module converts one KML placemark into the parsed forecast-transfer representation. File loading and cycle assembly are handled by the surrounding transfer pipeline.
+ */
 import type { DayType, OutlookType } from '../../types/outlooks';
 import { geometryFromKmlElement } from './kmlGeometry';
 import type { ParsedKmlPlacemark } from './types';
