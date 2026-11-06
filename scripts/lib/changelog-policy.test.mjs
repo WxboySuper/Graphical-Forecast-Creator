@@ -1,5 +1,5 @@
 /**
- * Requires exactly one impact declaration and a reason for none, the production changelog for hotfix impact, beta and hotfix entries in their own lanes with the stable lane derived from the branch name, and the declared lane to change rather than merely exist. Accepts an inherited forward-port impact, classifies waived and inherited impacts as skips, and fails a waived impact that still edits the changelog.
+ * Validates impact declarations, required reasons, and stable/beta changelog-lane policy.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';

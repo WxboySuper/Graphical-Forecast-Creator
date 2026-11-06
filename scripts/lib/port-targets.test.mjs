@@ -1,5 +1,5 @@
 /**
- * Verifies that only stable merges port to main, forward-port PRs are detected by title or source reference but not by incidental mentions or port/* branches, open-port PR JSON parses defensively, and porting skips on the manual label or an existing forward-port PR.
+ * Verifies stable/main port direction and detection of manually opened forward-port PRs.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

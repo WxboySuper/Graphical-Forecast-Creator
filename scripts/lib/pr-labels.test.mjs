@@ -1,5 +1,5 @@
 /**
- * Covers routing labels for stable promotion, descriptive labels by branch type and changed path, and computePrLabels merging them with changelog status and exposure labels.
+ * Covers stable-promotion routing labels and descriptive PR-label classification.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
