@@ -1,3 +1,6 @@
+/**
+ * Tooltip primitive. Provides the shared accessible hover and focus surface used to explain compact controls.
+ */
 import * as React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { cn } from '../../lib/utils';
