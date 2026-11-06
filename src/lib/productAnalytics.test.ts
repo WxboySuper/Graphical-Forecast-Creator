@@ -1,3 +1,8 @@
+/**
+ * Product-analytics test boundary: this suite verifies analytics enablement,
+ * zone selection, initialization, event tracking, and test reset behavior at
+ * the client product-metrics boundary.
+ */
 import {
   getProductAnalyticsZone,
   initProductAnalytics,
