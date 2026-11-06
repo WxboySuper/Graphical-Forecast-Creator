@@ -1,3 +1,6 @@
+/**
+ * Build target tests. Verify environment target classification used by deployment and runtime configuration.
+ */
 import fs from 'fs';
 import path from 'path';
 import { BUILD_TARGETS, getBuildTarget, resolveBuildTarget } from './buildTarget';
