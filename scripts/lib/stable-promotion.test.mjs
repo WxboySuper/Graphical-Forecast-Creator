@@ -1,3 +1,6 @@
+/**
+ * Checks deriveStableVersion turns 2.0.0-beta.4 into 2.0.0 and does not collapse 2.1.0-beta.1 onto the 2.0.0 line.
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { deriveStableVersion } from './package-version.mjs';

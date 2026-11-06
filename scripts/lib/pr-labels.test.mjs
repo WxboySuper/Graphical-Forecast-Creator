@@ -1,3 +1,6 @@
+/**
+ * Covers routing labels for stable promotion, descriptive labels by branch type and changed path, and computePrLabels merging them with changelog status and exposure labels.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { computePrLabels, descriptiveLabels, routingLabels } from './pr-labels.mjs';

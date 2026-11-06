@@ -1,3 +1,6 @@
+/**
+ * Covers release input validation, previous-tag selection, changelog lanes, and release-body assembly.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {

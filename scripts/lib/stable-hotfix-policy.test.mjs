@@ -1,3 +1,6 @@
+/**
+ * Checks that a stable hotfix keeps the major and minor version and advances only the patch, using 1.6.30 and 1.6.31 as the pair.
+ */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 

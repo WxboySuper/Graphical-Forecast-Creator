@@ -1,3 +1,6 @@
+/**
+ * Covers the shared authenticated GitHub request shape, JSON parsing, allowed empty responses, and errors.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { githubRequest } from './github-api.mjs';

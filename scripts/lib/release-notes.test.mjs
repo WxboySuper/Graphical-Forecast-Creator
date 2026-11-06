@@ -1,3 +1,6 @@
+/**
+ * Checks prior-release selection and release-note composition from explicit mode inputs.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { composeReleaseNotes, selectPreviousReleaseTag } from './release-notes.mjs';

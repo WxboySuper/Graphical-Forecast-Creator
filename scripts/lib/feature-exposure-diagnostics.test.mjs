@@ -1,3 +1,6 @@
+/**
+ * Verifies diagnostic reason codes for registry, server, and entitlement states, deterministic JSON feature ordering, and maintainer-metadata stripping in public mode.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {

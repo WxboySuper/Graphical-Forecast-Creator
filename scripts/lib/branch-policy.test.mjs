@@ -1,3 +1,6 @@
+/**
+ * Verifies allowed branch targets, including feature, hotfix, stable maintenance, and permissive main defaults.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { evaluateBranchPolicy } from './branch-policy.mjs';

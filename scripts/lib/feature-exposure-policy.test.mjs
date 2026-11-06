@@ -1,3 +1,6 @@
+/**
+ * Exercises valid and invalid feature registries across target coverage, lifecycle metadata, gated-route and navigation references, side-effect modules, client/server registry alignment and capability keys, per-feature exposure test coverage with acknowledgements, and v1.7 workstream beta and local approvals.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { evaluateFeatureExposurePolicy } from './feature-exposure-policy.mjs';
