@@ -57,28 +57,35 @@ export const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
   };
 };
 
+const READ_ONLY_MAP_MUTATION_METHODS = new Set<PropertyKey>(['set', 'delete', 'clear']);
+
+const rejectReadOnlyMapMutation = (): never => {
+  throw new Error('Attempted to mutate a shared read-only outlook map.');
+};
+
+const createReadOnlyMapForEach = <K, V>(target: Map<K, V>, proxy: Map<K, V>) =>
+  (callback: (value: V, key: K, map: Map<K, V>) => void, thisArg?: unknown) =>
+    target.forEach((entryValue, key) => callback.call(thisArg, entryValue, key, proxy));
+
+const getReadOnlyMapProperty = <K, V>(
+  target: Map<K, V>,
+  property: PropertyKey,
+  proxy: Map<K, V>,
+): unknown => {
+  if (READ_ONLY_MAP_MUTATION_METHODS.has(property)) return rejectReadOnlyMapMutation;
+  if (property === 'forEach') return createReadOnlyMapForEach(target, proxy);
+
+  const value = Reflect.get(target, property, target);
+  return typeof value === 'function' ? value.bind(target) : value;
+};
+
 /** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
-const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> => {
-  const proxy: Map<K, V> = new Proxy(map, {
-    set: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    deleteProperty: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    get: (target, property) => {
-      if (property === 'set' || property === 'delete' || property === 'clear') {
-        return () => {
-          throw new Error('Attempted to mutate a shared read-only outlook map.');
-        };
-      }
-      const value = Reflect.get(target, property, target);
-      if (property === 'forEach') {
-        return (callback: (value: V, key: K, map: Map<K, V>) => void, thisArg?: unknown) =>
-          target.forEach((entryValue, key) => callback.call(thisArg, entryValue, key, proxy));
-      }
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
+export const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> => {
+  let proxy: Map<K, V>;
+  proxy = new Proxy(map, {
+    set: rejectReadOnlyMapMutation,
+    deleteProperty: rejectReadOnlyMapMutation,
+    get: (target, property) => getReadOnlyMapProperty(target, property, proxy),
   });
   return proxy;
 };
