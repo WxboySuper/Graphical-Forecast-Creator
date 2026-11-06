@@ -1,3 +1,7 @@
+/**
+ * Provides derived metrics and geometry helpers for the home page forecast summaries.
+ * This module owns home-page presentation data shaping; persistence and page orchestration remain with the home controller.
+ */
 import type { ForecastCycle, OutlookDay, DayType } from '../types/outlooks';
 import type { LifetimeCycleStats, SavedCycle } from '../store/forecastSlice';
 import type { Feature } from 'geojson';
