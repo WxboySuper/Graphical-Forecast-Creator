@@ -196,6 +196,7 @@ const DayRolloverDialog: React.FC<{
   </Dialog>
 );
 
+/** Shows the notice displayed when the legacy /forecast route opens. */
 const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
   <div ref={noticeRef} data-testid="legacy-forecast-notice" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
     <span role="status">
@@ -760,14 +761,17 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
       return;
     }
 
-    const updateNoticeHeight = () => {
+    /** Keeps the forecast shell offset in sync with the notice height. */
+    const updateNoticeHeight = (): void => {
       shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
     };
     updateNoticeHeight();
     if (typeof ResizeObserver === 'undefined') return;
     const observer = new ResizeObserver(updateNoticeHeight);
     observer.observe(notice);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, [showLegacyNotice]);
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
