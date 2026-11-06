@@ -1,4 +1,5 @@
 import type { GradeAccountTier, GradeCard, GradeSnapshot } from '../../types/forecastGrade';
+import { isGradeSnapshot } from './gradeSnapshotValidation';
 
 /**
  * Local persistence for Forecast Grade history (PR 05 — sources-history).
@@ -161,7 +162,11 @@ export const loadGradeSnapshot = ({ scope, cardId }: LoadGradeSnapshotParams): G
   }
   try {
     const raw = storage.getItem(snapshotKey(scope, cardId));
-    return raw ? (JSON.parse(raw) as GradeSnapshot) : null;
+    if (!raw) {
+      return null;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    return isGradeSnapshot(parsed) ? parsed : null;
   } catch {
     return null;
   }
