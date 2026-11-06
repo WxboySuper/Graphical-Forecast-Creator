@@ -1,3 +1,7 @@
+/**
+ * Coordinates WMS layer time values and playback state for monitor-mode animation.
+ * This hook owns playback timing and user notifications; WMS transport and frame selection are delegated to monitor utilities.
+ */
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { fetchLayerTimeValues, selectAnimationFrameTimes, type WmsLayerConfig } from './wms';
