@@ -1,3 +1,7 @@
+/**
+ * Input primitive. Provides the shared ref-forwarding text input styles and native
+ * input attributes used across forms and dialogs.
+ */
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
