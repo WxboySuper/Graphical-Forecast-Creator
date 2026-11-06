@@ -9,6 +9,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **App libraries:** Update Sentry React to 11.10.0, Lucide icons to 1.65.0, React Redux to 9.3.1, and React Router to 8.5.1, along with development and build tools.
+- **Server libraries:** Update Sentry Node to 11.10.0, express-rate-limit to 8.7.2, and Stripe to 23.1.0.
 - **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
 <!-- dependabot-automation -->
 
@@ -62,6 +64,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
+- **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
+- **Account deletion:** Retry final cleanup when the account identity has already been removed, while reporting incomplete billing or data cleanup as a failure.
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
 - **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.

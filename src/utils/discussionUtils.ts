@@ -1,4 +1,24 @@
 import { DiscussionData, GuidedDiscussionData, DayType } from '../types/outlooks';
+import { isRecord } from './forecastWorkspaceEnvelope';
+
+/**
+ * Returns the guided sections of a discussion, or undefined when the field is
+ * absent or malformed. Guided-mode discussions can be saved with the field
+ * missing, so callers must not assume it exists.
+ */
+const getGuidedContent = (discussion: DiscussionData): GuidedDiscussionData | undefined => {
+  if (!isRecord(discussion.guidedContent)) return undefined;
+  return discussion.guidedContent as GuidedDiscussionData;
+};
+
+/** Appends one guided section when the discussion has text for it. */
+const pushGuidedSection = (lines: string[], label: string, value: unknown): void => {
+  if (typeof value !== 'string' || value.length === 0) return;
+  lines.push(label);
+  lines.push('');
+  lines.push(value);
+  lines.push('');
+};
 
 /**
  * Compiles a DiscussionData object into formatted text output
@@ -55,49 +75,16 @@ export const compileDiscussionToText = (
     // DIY mode - use the raw content
     lines.push(discussion.diyContent || '');
   } else {
-    // Guided mode - format the structured sections
-    const guided = discussion.guidedContent as GuidedDiscussionData;
-    
-    if (guided.synopsis) {
-      lines.push('Synopsis:');
-      lines.push('');
-      lines.push(guided.synopsis);
-      lines.push('');
-    }
-    
-    if (guided.meteorologicalSetup) {
-      lines.push('Meteorological Setup:');
-      lines.push('');
-      lines.push(guided.meteorologicalSetup);
-      lines.push('');
-    }
-    
-    if (guided.severeWeatherExpectations) {
-      lines.push('Severe Weather Expectations:');
-      lines.push('');
-      lines.push(guided.severeWeatherExpectations);
-      lines.push('');
-    }
-    
-    if (guided.timing) {
-      lines.push('Timing:');
-      lines.push('');
-      lines.push(guided.timing);
-      lines.push('');
-    }
-    
-    if (guided.regionalBreakdown) {
-      lines.push('Regional Breakdown:');
-      lines.push('');
-      lines.push(guided.regionalBreakdown);
-      lines.push('');
-    }
-    
-    if (guided.additionalConsiderations) {
-      lines.push('Additional Considerations:');
-      lines.push('');
-      lines.push(guided.additionalConsiderations);
-      lines.push('');
+    // Guided mode - format the structured sections. A guided discussion can be
+    // saved without guidedContent, in which case there is nothing to format.
+    const guided = getGuidedContent(discussion);
+    if (guided) {
+      pushGuidedSection(lines, 'Synopsis:', guided.synopsis);
+      pushGuidedSection(lines, 'Meteorological Setup:', guided.meteorologicalSetup);
+      pushGuidedSection(lines, 'Severe Weather Expectations:', guided.severeWeatherExpectations);
+      pushGuidedSection(lines, 'Timing:', guided.timing);
+      pushGuidedSection(lines, 'Regional Breakdown:', guided.regionalBreakdown);
+      pushGuidedSection(lines, 'Additional Considerations:', guided.additionalConsiderations);
     }
   }
   

@@ -89,6 +89,7 @@ export {
   type InFlightHostedSettingsWrite,
   type PendingHostedSettingsWrite,
 } from './hostedSettingsSync';
+export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
 
 import { safeParseJson } from './authCommon';
 import {
@@ -216,12 +217,29 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
   };
 };
 
-export {
-  asRecord,
-  extractLocalUserFromData,
-  postLocalJson,
-  safeParseJson,
-} from './authCommon';
+/**
+ * Builds the snapshot the debounced autosync effect uploads.
+ *
+ * Monitor settings come from the live Redux slice, not from the last synced
+ * document, so local monitor changes reach Firestore. The remaining fields have
+ * no local Redux source, so the synced document stays authoritative for them.
+ */
+export const createHostedAutosyncSnapshot = (args: {
+  darkMode: boolean;
+  overlays: OverlaysState;
+  displayName: string;
+  syncedForecasterName?: string;
+  syncedForecastUiVariant?: ForecastUiVariant;
+  monitorSettings: MonitorSettings;
+}): UserSettingsDocument =>
+  createSettingsSnapshot({
+    darkMode: args.darkMode,
+    overlays: args.overlays,
+    defaultForecasterName: args.syncedForecasterName ?? args.displayName,
+    forecastUiVariant: args.syncedForecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT,
+    monitorSettings: args.monitorSettings,
+  });
+
 export {
   applyLocalAuthData,
   initLocalAuthState,
@@ -231,7 +249,6 @@ export {
   localSignUpWithEmail,
   localUpdateSyncedSettings,
 } from './localAuthClient';
-
 /** Writes a merged settings document to Firestore with an updated server timestamp. */
 const writeHostedSettingsDocument = async (
   settingsRef: ReturnType<typeof doc>,
@@ -767,12 +784,13 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    const nextSettings = createSettingsSnapshot({
+    const nextSettings = createHostedAutosyncSnapshot({
       darkMode,
       overlays,
-      defaultForecasterName: syncedSettings?.defaultForecasterName ?? user.displayName ?? '',
-      forecastUiVariant: syncedSettings?.forecastUiVariant ?? DEFAULT_FORECAST_UI_VARIANT,
-      monitorSettings: syncedSettings?.monitorSettings ?? monitorSettings,
+      displayName: user.displayName ?? '',
+      syncedForecasterName: syncedSettings?.defaultForecasterName,
+      syncedForecastUiVariant: syncedSettings?.forecastUiVariant,
+      monitorSettings,
     });
 
     if (

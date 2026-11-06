@@ -10,6 +10,8 @@ export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
 export const MAX_NESTING_DEPTH = 32;
 /** Maximum number of items in any single array (protects against extreme collections). */
 export const MAX_ARRAY_ITEMS = 100_000;
+/** Maximum number of keys in any single object (protects against wide, expensive payloads). */
+export const MAX_OBJECT_KEYS = 100_000;
 /** Maximum string length anywhere in the document. */
 export const MAX_STRING_LENGTH = 100_000;
 

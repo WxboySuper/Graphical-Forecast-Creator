@@ -26,6 +26,10 @@
    - cloud-cycle owners retain read/delete access after downgrade;
    - document fields and payloads stay within the checked-in bounds.
 
+5. Confirm the Firestore TTL policies described in
+   [Firestore retention and TTL](./firestore-retention.md) are enabled for
+   `processedStripeWebhookEvents` and `adminMetricDedupes`.
+
 ## Deploy
 
 Use the explicit project identifier supplied by the release owner:

@@ -138,6 +138,25 @@ describe('Auto-TSTM server foundation', () => {
     await assert.rejects(result, /TSTM_GENERATOR_INVALID_JSON/);
   });
 
+  it('falls back to the default timeout for invalid or unsupported timer values', async () => {
+    for (const timeout of ['not-a-number', '0', '-1', '0.5', '2147483648']) {
+      const child = createFakeChild();
+      const result = runTstmGenerator(
+        { day: 1, cycleDate: '2026-06-13' },
+        {
+          env: { TSTM_GENERATION_TIMEOUT_MS: timeout },
+          killGraceMs: 20,
+          spawnProcess: () => child,
+        }
+      );
+      // Wait past the timer's minimum delay so an invalid value cannot win the race.
+      await new Promise((r) => setTimeout(r, 10));
+      child.stdout.end('{}');
+      child.emit('close', 0);
+      assert.deepEqual(await result, {});
+    }
+  });
+
   /** Runs a timed-out generator whose fake child logs every signal it receives. */
   const runWithSignalLog = async (exitsOn) => {
     const child = createFakeChild();
