@@ -1,3 +1,7 @@
+/**
+ * Shared dialog primitives built on Radix UI. These exports provide styled
+ * dialog structure and accessibility behavior without owning product state.
+ */
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';

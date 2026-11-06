@@ -1,3 +1,7 @@
+/**
+ * Recent-cycles home-page section. It renders saved-cycle summaries and sends
+ * the user's open, delete, and view actions to the home-page controller.
+ */
 import React from 'react';
 import { History } from 'lucide-react';
 import { Button } from '../../components/ui/button';
