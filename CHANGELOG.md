@@ -52,6 +52,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Auto-TSTM:** Temporarily disable automatic thunderstorm guidance while the SPC HREF source is retired. The forecast page explains the planned replacement.
 - **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.
 - **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.

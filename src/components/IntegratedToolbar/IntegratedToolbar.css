@@ -619,7 +619,7 @@
   }
 
   .forecast-workspace-layout__map {
-    min-height: 320px;
+    min-height: 0;
   }
 
   .tabbed-integrated-toolbar {

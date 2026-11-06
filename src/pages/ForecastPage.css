@@ -18,6 +18,18 @@
   overflow: hidden;
 }
 
+.forecast-page-shell--auto-tstm-disabled [data-testid='auto-tstm-disabled-banner'] {
+  flex: 0 0 auto;
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .forecast-page-shell--auto-tstm-disabled [data-testid='auto-tstm-disabled-banner'] {
+    padding-block: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.25;
+  }
+}
+
 @supports (height: 100dvh) {
   .forecast-page-shell {
     height: calc(100dvh - var(--app-header-height, 64px));

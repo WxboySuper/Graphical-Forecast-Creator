@@ -16,90 +16,61 @@ const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) 
   }
 };
 
-const mockAutoTstmCapabilities = async (page: import('@playwright/test').Page) => {
-  await page.route('**/api/capabilities/status', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        capabilities: {
-          TSTM_GENERATION_ENABLED: {
-            available: true,
-            reason: 'available',
-          },
-        },
-      }),
-    });
-  });
-};
-
-const mockCachedTstmLatest = async (page: import('@playwright/test').Page) => {
-  await page.route('**/api/tstm/latest**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        features: [{
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [[[-95, 35], [-94, 35], [-94, 36], [-95, 36], [-95, 35]]],
-          },
-          properties: { probability: 'TSTM' },
-        }],
-        run: '2026-06-13T12:00:00Z',
-        domain: 'conus',
-        forecastHours: [24],
-        effectiveStart: '2026-06-13T12:00:00Z',
-        effectiveEnd: '2026-06-14T12:00:00Z',
-        thresholds: {
-          calibratedThunderCoreProbability: 0.3,
-          calibratedThunderSupportProbability: 0.1,
-        },
-        warnings: [],
-        sources: {},
-        generatedAt: '2026-06-13T12:00:00Z',
-      }),
-    });
-  });
-};
-
-// Auto-TSTM is exposed on every v1.7 release build target (see src/config/featureExposure.ts).
-// The capability mock keeps this workflow testable without requiring live cached guidance.
-// Re-enablement tracked in https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/840
-test.describe('Auto-TSTM workspace tools', () => {
+// Auto-TSTM is temporarily disabled client-side while the SPC HREF source is
+// decommissioned (REFS / REFSCT replacement planned for v1.8). The client must not
+// hit /api/tstm/* in normal use and the entry point must stay visibly disabled.
+test.describe('Auto-TSTM disabled (HREF decommission)', () => {
   test.beforeEach(async ({ page }) => {
     await bypassLocalBeta(page);
-    await mockAutoTstmCapabilities(page);
-    await mockCachedTstmLatest(page);
+    await page.route('**/api/capabilities/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ capabilities: { TSTM_GENERATION_ENABLED: { available: true, reason: 'available' } } }),
+      });
+    });
   });
 
-  test('exposes preview controls on the Tools tab and can cancel without mutating the map', async ({ page }) => {
+  test('shows the disabled banner and keeps the entry point disabled without fetching', async ({ page }) => {
+    let tstmRequestCount = 0;
+    await page.route('**/api/tstm/**', async (route) => {
+      tstmRequestCount += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({}),
+      });
+    });
+
     await page.goto('/forecast?localBetaBypass=true');
     await acceptAgreementsIfPresent(page);
     await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('tab', { name: 'Tools' }).click();
-    await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeVisible({ timeout: 10000 });
-
-    await page.getByRole('button', { name: 'Auto-TSTM' }).click();
-    await expect(page.getByRole('heading', { name: 'Auto-TSTM Preview' })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Polygons/i)).toBeVisible({ timeout: 10000 });
-
-    await page.getByRole('dialog', { name: /Auto-TSTM Preview/i }).getByRole('button', { name: 'Cancel' }).click();
-    await expect(page.getByRole('heading', { name: 'Auto-TSTM Preview' })).not.toBeVisible({ timeout: 5000 });
-    await expect(page.locator('.map-container')).toBeVisible();
-  });
-
-  test('disables Auto-TSTM on unsupported forecast days', async ({ page }) => {
-    await page.goto('/forecast?localBetaBypass=true');
-    await acceptAgreementsIfPresent(page);
-    await expect(page.locator('.map-container')).toBeVisible({ timeout: 10000 });
-
-    await page.getByRole('tab', { name: 'Days' }).click();
-    await page.getByRole('button', { name: '3' }).click();
+    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(
+      /temporarily disabled while the SPC HREF source/i,
+    );
+    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(/REFSCT.*v1\.8/i);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeDisabled();
+    await page.getByRole('group', { name: /Auto-TSTM unavailable/ }).focus();
+    await expect(page.getByRole('tooltip')).toContainText(/temporarily disabled while the SPC HREF source/i);
+
+    expect(tstmRequestCount).toBe(0);
+  });
+
+  test('keeps the toolbar visible on a short phone viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 600 });
+    await page.goto('/forecast?localBetaBypass=true');
+    await acceptAgreementsIfPresent(page);
+    const toolbar = page.locator('.tabbed-integrated-toolbar');
+    await expect(toolbar).toBeVisible();
+    const bounds = await toolbar.boundingBox();
+    if (!bounds) {
+      throw new Error('The forecast toolbar should have visible bounds on a short phone viewport.');
+    }
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(601);
+    await page.getByRole('tab', { name: 'Tools' }).click();
+    await expect(page.getByRole('button', { name: /Auto-TSTM/ })).toBeDisabled();
   });
 });

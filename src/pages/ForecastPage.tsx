@@ -45,6 +45,7 @@ import {
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
 import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
+import { AUTO_TSTM_DISABLED, AUTO_TSTM_DISABLED_MESSAGE } from '../config/autoTstmDisable';
 import type { AddToastFn } from '../components/Layout';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -195,6 +196,7 @@ const DayRolloverDialog: React.FC<{
   </Dialog>
 );
 
+/** Shows the notice displayed when the legacy /forecast route opens. */
 const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
   <div ref={noticeRef} data-testid="legacy-forecast-notice" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
     <span role="status">
@@ -746,28 +748,40 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
-  useLayoutEffect(() => {
-    const shell = forecastShellRef.current;
-    const notice = legacyNoticeRef.current;
-    if (!shell) return;
-    if (!showLegacyNotice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
-    if (!notice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
+  useLayoutEffect(
+    /** Measures the notice and tracks its height while it is visible. */
+    function updateLegacyForecastNotice() {
+      const shell = forecastShellRef.current;
+      const notice = legacyNoticeRef.current;
+      let observer: ResizeObserver | undefined;
+      /** Disconnects the notice observer when one was created. */
+      function disconnectNoticeObserver(): void {
+        observer?.disconnect();
+      }
 
-    const updateNoticeHeight = () => {
-      shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
-    };
-    updateNoticeHeight();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(updateNoticeHeight);
-    observer.observe(notice);
-    return () => observer.disconnect();
-  }, [showLegacyNotice]);
+      if (!shell) return disconnectNoticeObserver;
+      if (!showLegacyNotice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return disconnectNoticeObserver;
+      }
+      if (!notice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return disconnectNoticeObserver;
+      }
+
+      /** Keeps the forecast shell offset in sync with the notice height. */
+      const updateNoticeHeight = (): void => {
+        shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
+      };
+      updateNoticeHeight();
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(updateNoticeHeight);
+        observer.observe(notice);
+      }
+      return disconnectNoticeObserver;
+    },
+    [showLegacyNotice],
+  );
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -803,8 +817,15 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   }
 
   return (
-    <div ref={forecastShellRef} className={showLegacyNotice ? 'forecast-page-shell forecast-page-shell--legacy-notice' : 'forecast-page-shell'}>
+    <div ref={forecastShellRef} className={`forecast-page-shell${showLegacyNotice ? ' forecast-page-shell--legacy-notice' : ''}${AUTO_TSTM_DISABLED ? ' forecast-page-shell--auto-tstm-disabled' : ''}`}>
       {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
+      {AUTO_TSTM_DISABLED ? (
+        <div data-testid="auto-tstm-disabled-banner" role="status" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+          <span>
+            <strong>Auto-TSTM disabled:</strong> {AUTO_TSTM_DISABLED_MESSAGE}
+          </span>
+        </div>
+      ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         <ForecastTabbedToolbarLayout
           mapRef={mapRef}
