@@ -1,12 +1,15 @@
 import mockReact from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { BrowserRouter } from 'react-router';
 import appModeReducer from '../../store/appModeSlice';
 import forecastReducer from '../../store/forecastSlice';
-import themeReducer from '../../store/themeSlice';
+import themeReducer, { toggleDarkMode } from '../../store/themeSlice';
 import AppLayout from './AppLayout';
+
+/** Counts how many times the documentation panel mounts, so the test can detect remounts. */
+const mockDocumentationMounts = { current: 0 };
 
 const createMockStore = () =>
   configureStore({
@@ -19,10 +22,10 @@ const createMockStore = () =>
       getDefaultMiddleware({ serializableCheck: false, immutableCheck: false }),
   });
 
-const renderWithRouter = (ui: mockReact.ReactElement) => {
+const renderWithRouter = (ui: mockReact.ReactElement, store = createMockStore()) => {
   return render(
     <BrowserRouter>
-      <Provider store={createMockStore()}>
+      <Provider store={store}>
         {ui}
       </Provider>
     </BrowserRouter>
@@ -59,11 +62,15 @@ jest.mock('./Navbar', () => ({
 
 jest.mock('../Documentation/Documentation', () => ({
   __esModule: true,
-  default: ({ onClose }: { onClose: () => void }) =>
-    mockReact.createElement('div', { 'data-testid': 'docs' }, [
+  default: ({ onClose }: { onClose: () => void }) => {
+    mockReact.useEffect(() => {
+      mockDocumentationMounts.current += 1;
+    }, []);
+    return mockReact.createElement('div', { 'data-testid': 'docs' }, [
       mockReact.createElement('span', { key: 'label' }, 'Docs panel'),
       mockReact.createElement('button', { key: 'close', onClick: onClose }, 'Close Docs'),
-    ]),
+    ]);
+  },
 }));
 
 jest.mock('../Toast/Toast', () => ({
@@ -86,6 +93,10 @@ jest.mock('../PrivacyPolicy/PrivacyPolicyModal', () => ({
 }));
 
 describe('AppLayout', () => {
+  beforeEach(() => {
+    mockDocumentationMounts.current = 0;
+  });
+
   it('renders routed content within the app layout', () => {
     renderWithRouter(<AppLayout />);
     
@@ -127,5 +138,21 @@ describe('AppLayout', () => {
     Object.defineProperty(event, 'key', { value: undefined });
 
     expect(() => window.dispatchEvent(event)).not.toThrow();
+  });
+
+  it('keeps an open documentation panel mounted when the layout re-renders for unrelated state', () => {
+    const store = createMockStore();
+    renderWithRouter(<AppLayout />, store);
+
+    fireEvent.click(screen.getByText('Docs'));
+    expect(screen.getByTestId('docs')).toBeInTheDocument();
+    expect(mockDocumentationMounts.current).toBe(1);
+
+    act(() => {
+      store.dispatch(toggleDarkMode());
+    });
+
+    expect(screen.getByTestId('docs')).toBeInTheDocument();
+    expect(mockDocumentationMounts.current).toBe(1);
   });
 });
