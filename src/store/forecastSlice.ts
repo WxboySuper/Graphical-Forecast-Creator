@@ -69,6 +69,7 @@ import { applyWorkflowPackageImport } from './forecastWorkflowImport';
 import { startBlankForecastCycle } from './forecastBlankCycle';
 import { saveForecastCycle } from './forecastCyclePersistence';
 import { applyCompletionValidation, applyCompleteCycle, applyCompleteWithOmissions } from './forecastCompletion';
+import { resetForecastState } from './forecastReset';
 import { applyCopyOutlookGeometryBetweenHazards } from './forecastGeometryCopy';
 
 const HISTORY_LIMIT = 50;
@@ -640,28 +641,11 @@ export const forecastSlice = createSlice({
     },
 
     resetForecasts: (state, action: UnknownAction) => {
-      clearHistory(state);
-        state.discussionDraftsByScope = {};
-
-      // Generate today's local date so rollover prompts and resets stay aligned.
-      const today = getActionLocalCalendarDate(action);
-
-      // Completely replace forecastCycle to force re-render
-      const newCycle: ForecastCycle = {
-        days: {
-          1: createEmptyOutlook(1, readActionTimestamp(action))
-        },
-        currentDay: 1,
-        cycleDate: today,
-      };
-
-      state.forecastCycle = newCycle;
+      resetForecastState(state, {
+        today: getActionLocalCalendarDate(action),
+        timestamp: readActionTimestamp(action),
+      });
       advanceCycleGeneration(state);
-      state.isSaved = false;
-      state.outlookVersionSnapshots = [];
-      state.workflowMetadata = undefined;
-      state.workflowTemplate = undefined;
-      state.isWorkflowActive = false;
     },
 
     markAsSaved: (state) => {
