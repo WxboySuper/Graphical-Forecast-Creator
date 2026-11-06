@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade headline component. It renders the overall grade, label, and
+ * score summary supplied by the verification result.
+ */
 import React from 'react';
 import type { PackageGrade, ProductGrade, ProductKind } from '../../utils/verificationV2';
 import { formatGrade, letterColorClass } from './gradeFormat';
