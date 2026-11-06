@@ -1,8 +1,7 @@
 /**
- * File: src/components/ForecastGrade/RunProgress.tsx
- * Purpose: Renders the accessible progress meter for forecast-grade execution state.
+ * Run-progress indicator. Renders the current verification stage and percentage
+ * through one accessible live status region.
  */
-
 import React from 'react';
 import type { GradeProgress } from '../../utils/verificationV2';
 
@@ -10,10 +9,6 @@ interface RunProgressProps {
   progress: GradeProgress | null;
 }
 
-/**
- * Staged foreground progress. Accuracy is prioritized over a fixed latency
- * budget; long runs surface their stage and complete automatically.
- */
 const RunProgress: React.FC<RunProgressProps> = ({ progress }) => {
   if (!progress) {
     return null;

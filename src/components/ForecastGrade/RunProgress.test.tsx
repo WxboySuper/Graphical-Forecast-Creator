@@ -1,8 +1,7 @@
 /**
- * File: src/components/ForecastGrade/RunProgress.test.tsx
- * Purpose: Tests readable progress meter rendering for active, stalled, and completed grade runs.
+ * Run-progress tests. Verify active staged progress renders one accessible status
+ * meter with the expected label and percentage.
  */
-
 import { render, screen } from '@testing-library/react';
 import RunProgress from './RunProgress';
 
