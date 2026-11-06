@@ -1,3 +1,7 @@
+/**
+ * Gated custom-product editor. It renders the product form, validates layer
+ * fields, and delegates create/update actions to the workspace controller.
+ */
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../components/ui/button';
