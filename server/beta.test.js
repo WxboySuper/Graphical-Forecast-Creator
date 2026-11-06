@@ -9,6 +9,7 @@ const betaPath = require.resolve('./beta');
 const originalFirebaseAdmin = require.cache[firebaseAdminPath];
 const originalModuleLoad = Module._load;
 const documents = new Map();
+const originalInviteToken = process.env.BETA_INVITE_TOKEN;
 
 const createRef = (collection, id) => ({
   key: `${collection}/${id}`,
@@ -59,13 +60,39 @@ const { __testing } = require('./beta');
 
 beforeEach(() => {
   documents.clear();
+  process.env.BETA_INVITE_TOKEN = 'test-invite-token';
 });
 
 after(() => {
   Module._load = originalModuleLoad;
+  if (originalInviteToken === undefined) delete process.env.BETA_INVITE_TOKEN;
+  else process.env.BETA_INVITE_TOKEN = originalInviteToken;
   if (originalFirebaseAdmin) require.cache[firebaseAdminPath] = originalFirebaseAdmin;
   else delete require.cache[firebaseAdminPath];
   delete require.cache[betaPath];
+});
+
+describe('beta invite token comparison', () => {
+  it('accepts the configured token', () => {
+    assert.equal(__testing.isValidInviteToken('test-invite-token'), true);
+  });
+
+  it('rejects the same-length token with a different byte', () => {
+    assert.equal(__testing.isValidInviteToken('test-invite-tokeX'), false);
+  });
+
+  it('rejects shorter and longer tokens without throwing', () => {
+    assert.equal(__testing.isValidInviteToken('test-invite'), false);
+    assert.equal(__testing.isValidInviteToken('test-invite-token-plus'), false);
+  });
+
+  it('rejects empty and non-string values', () => {
+    assert.equal(__testing.isValidInviteToken(''), false);
+    assert.equal(__testing.isValidInviteToken(undefined), false);
+    assert.equal(__testing.isValidInviteToken(null), false);
+    assert.equal(__testing.isValidInviteToken(42), false);
+    assert.equal(__testing.isValidInviteToken({ token: 'test-invite-token' }), false);
+  });
 });
 
 describe('beta entitlement grants', () => {
