@@ -62,6 +62,7 @@ import { applyDiscussionDraftMigrations } from './forecastDiscussionDrafts';
 import { applyLegacyForecastImport } from './forecastLegacyImport';
 import { applyCopyFeaturesFromPrevious } from './forecastCopy';
 import { restoreSavedCycle } from './forecastSavedCycle';
+import { hydrateForecastCycle } from './forecastCycleHydration';
 
 const HISTORY_LIMIT = 50;
 
@@ -663,17 +664,10 @@ export const forecastSlice = createSlice({
     // Restores the local auto-save snapshot. Same-session restores may retain unpublished drafts.
     restoreForecastCycle: {
       reducer: (state, action: PayloadAction<{ cycle: ForecastCycle; preserveDiscussionDrafts?: boolean }>) => {
-        state.forecastCycle = action.payload.cycle;
+        hydrateForecastCycle(state, action.payload.cycle, {
+          preserveDiscussionDrafts: action.payload.preserveDiscussionDrafts,
+        });
         advanceCycleGeneration(state);
-        if (!action.payload.preserveDiscussionDrafts) {
-          state.discussionDraftsByScope = {};
-        }
-        clearHistory(state);
-        state.isSaved = true;
-        state.outlookVersionSnapshots = [];
-        state.workflowMetadata = undefined;
-        state.workflowTemplate = undefined;
-        state.isWorkflowActive = false;
       },
       prepare: (cycle: ForecastCycle, preserveDiscussionDrafts = false) => ({
         payload: { cycle, preserveDiscussionDrafts },
@@ -682,16 +676,8 @@ export const forecastSlice = createSlice({
 
     // Import forecast data: Now handles Cycle
     importForecastCycle: (state, action: PayloadAction<ForecastCycle>) => {
-      state.forecastCycle = action.payload;
+      hydrateForecastCycle(state, action.payload);
       advanceCycleGeneration(state);
-      state.discussionDraftsByScope = {};
-      clearHistory(state);
-      state.isSaved = true;
-      state.outlookVersionSnapshots = [];
-      // Clear workflow state when importing a plain forecast cycle
-      state.workflowMetadata = undefined;
-      state.workflowTemplate = undefined;
-      state.isWorkflowActive = false;
     },
 
     // Legacy import support (Single day) -> Import into CURRENT day
