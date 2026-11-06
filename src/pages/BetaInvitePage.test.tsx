@@ -1,3 +1,6 @@
+/**
+ * Beta invite page tests. Verify invite acceptance, validation, and navigation behavior.
+ */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import BetaInvitePage from './BetaInvitePage';

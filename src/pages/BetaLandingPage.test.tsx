@@ -1,3 +1,6 @@
+/**
+ * Beta landing page tests. Verify beta entry messaging and gated navigation behavior.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import BetaLandingPage from './BetaLandingPage';
