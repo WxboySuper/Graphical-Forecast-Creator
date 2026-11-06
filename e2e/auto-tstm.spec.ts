@@ -1,3 +1,4 @@
+/** Opens the Auto-TSTM preview from the Tools tab, closes it on Cancel with the map still showing, and shows the button disabled on day 3. */
 import { test, expect } from '@playwright/test';
 
 const bypassLocalBeta = async (page: import('@playwright/test').Page) => {

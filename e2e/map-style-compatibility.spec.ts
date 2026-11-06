@@ -1,3 +1,4 @@
+/** Draws an outlook in forecast, reimports it in verification, asserts the verification canvas renders, and attaches screenshots at each stage. */
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';

@@ -1,3 +1,4 @@
+/** Verifies the new-day prompt shows download, disabled premium cloud save, keep, and replace buttons; keeping leaves forecastData in localStorage, download saves a forecast file, and replace shows the previous-session notice. */
 import { test, expect } from '@playwright/test';
 
 const localDay = (date: Date) => {
