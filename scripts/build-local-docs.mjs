@@ -47,6 +47,7 @@ function resolveLocalPath(normalized, suffix, context) {
   const page = context.pageMap.get(normalized);
   if (page) return `${page}${suffix}`;
   if (context.repoFiles?.has(normalized)) return `${REPO_PREFIX}${normalized}${suffix}`;
+  if (normalized.endsWith('/') && [...(context.repoFiles ?? [])].some((file) => file.startsWith(normalized))) return `${REPO_PREFIX}${normalized}${suffix}`;
   return null;
 }
 

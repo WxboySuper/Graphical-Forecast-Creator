@@ -48,6 +48,7 @@ async function buildCorpus() {
 function findRepoLinkFailures(source, href, repoFiles) {
   const target = href.slice(REPO_LINK_PREFIX.length).split('#')[0];
   if (repoFiles.has(target)) return [];
+  if (target.endsWith('/') && [...repoFiles].some((file) => file.startsWith(target))) return [];
   return [`${source.relative}: missing repository file ${target}`];
 }
 
