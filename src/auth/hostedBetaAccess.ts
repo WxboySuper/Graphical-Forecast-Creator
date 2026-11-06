@@ -1,7 +1,6 @@
 /**
- * Hosted beta-access resolution helpers.
- *
- * This module determines beta access from hosted authentication and entitlement data. UI guards consume the result; identity and billing services own the underlying records.
+ * Hosted beta-access loader. Reads the hosted profile entitlement and ignores
+ * responses from superseded requests before updating beta state.
  */
 import type { User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -22,7 +21,6 @@ interface RefreshHostedBetaAccessArgs {
   setBetaAccessLoading: (loading: boolean) => void;
 }
 
-/** Refreshes hosted beta access while ignoring responses from superseded requests. */
 export const refreshHostedBetaAccess = async ({
   user,
   requestIdRef,
