@@ -53,6 +53,8 @@ test.describe('Auto-TSTM disabled (HREF decommission)', () => {
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeDisabled();
+    await page.getByRole('group', { name: /Auto-TSTM unavailable/ }).focus();
+    await expect(page.getByRole('tooltip')).toContainText(/temporarily disabled while the SPC HREF source/i);
 
     expect(tstmRequestCount).toBe(0);
   });
