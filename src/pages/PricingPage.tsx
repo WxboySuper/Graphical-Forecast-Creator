@@ -1,3 +1,9 @@
+/**
+ * Presents the pricing route by combining product copy, entitlement status, and account
+ * navigation. This page owns the user-facing decision surface for free and premium
+ * capabilities; billing state and checkout transport remain owned by the entitlement and
+ * billing modules it consumes.
+ */
 import React, { useState } from 'react';
 import { Link } from 'react-router';
 import { Check, CircleUserRound, Cloud, Crown, LoaderCircle, ShieldCheck, X } from 'lucide-react';
