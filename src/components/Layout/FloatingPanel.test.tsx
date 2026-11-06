@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Layout/FloatingPanel.test.tsx
+ * Purpose: Covers floating panel positioning, visibility, controls, and interaction behavior.
+ */
+
 import { render, screen } from '@testing-library/react';
 import FloatingPanel from './FloatingPanel';
 
