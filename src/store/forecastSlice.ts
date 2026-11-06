@@ -1461,19 +1461,18 @@ export const {
   setWorkflowActive,
 } = forecastSlice.actions;
 
-/** Selects the full forecast slice. */
-export const selectForecast = (state: RootState) => state.forecast;
-/** Selects the active forecast cycle document. */
-export const selectForecastCycle = (state: RootState) => state.forecast.forecastCycle;
-/** Selects the currently active forecast day number. */
-export const selectCurrentDay = (state: RootState) => state.forecast.forecastCycle.currentDay;
-/** Selects one day's unsaved discussion draft, if the editor has changed it. */
-export const selectDiscussionDraftForScope = (state: RootState, scopeId: string) => state.forecast.discussionDraftsByScope[scopeId];
+export {
+  selectForecast,
+  selectForecastCycle,
+  selectCurrentDay,
+  selectDiscussionDraftForScope,
+} from './forecastSelectors';
+
 /** Selects the outlook maps for the active day, falling back to an empty day shape when needed. */
 export const selectCurrentOutlooks = (state: RootState) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay) || sharedEmptyOutlookData(4)!;
-  };
+  return cycle.days[cycle.currentDay]?.data || sharedEmptyOutlookData(cycle.currentDay);
+};
 const EMPTY_CUSTOM_LAYERS: CustomLayerCollection = {
   schemaVersion: '1.0.0',
   layers: [],
@@ -1486,8 +1485,8 @@ export const selectCurrentCustomLayers = (state: RootState): CustomLayerCollecti
 /** Selects the outlook maps for a specific day, falling back to a shared empty day shape when absent. */
 export const selectOutlooksForDay = (state: RootState, day: DayType) => {
   const cycle = state.forecast.forecastCycle;
-  return cycle.days[day]?.data || sharedEmptyOutlookData(day) || sharedEmptyOutlookData(4)!;
-  };
+  return cycle.days[day]?.data || sharedEmptyOutlookData(day);
+};
 /** Selects the saved forecast cycle snapshots shown in cycle history. */
 export { WORKFLOW_ACTIVE_STORAGE_KEY } from './forecastSliceWorkspaceHelpers';
 export { SAVED_CYCLES_LIMIT } from './forecastSliceWorkspaceHelpers';

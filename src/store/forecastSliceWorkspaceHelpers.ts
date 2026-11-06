@@ -208,12 +208,12 @@ const EMPTY_OUTLOOK_DATA_BY_DAY: Record<string, OutlookData> = {
   day48: deepFreezeOutlookData(createEmptyOutlook(4, INITIAL_TIMESTAMP).data),
 };
 
-/** Returns the shared empty outlook data for a day, or null when the day is unknown. */
-export const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
+/** Returns shared empty outlook data for a day, using the day 4-8 shape when the day is unknown. */
+export const sharedEmptyOutlookData = (day: DayType): OutlookData => {
   if (day === 1 || day === 2) return EMPTY_OUTLOOK_DATA_BY_DAY.day12;
   if (day === 3) return EMPTY_OUTLOOK_DATA_BY_DAY.day3;
   if (day >= 4 && day <= 8) return EMPTY_OUTLOOK_DATA_BY_DAY.day48;
-  return null;
+  return EMPTY_OUTLOOK_DATA_BY_DAY.day48;
 };
 
 /** Bumps the cycle generation when the active forecast document is fully replaced. */
