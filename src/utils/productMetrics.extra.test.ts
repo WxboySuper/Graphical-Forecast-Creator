@@ -1,6 +1,21 @@
 type FetchMock = jest.Mock<Promise<{ ok: boolean }>, [RequestInfo | URL, RequestInit?]>;
 
 describe('productMetrics extra', () => {
+  test('skips Firebase product metrics when hosted Firebase auth is disabled', async () => {
+    jest.resetModules();
+    jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: false }));
+
+    const fetchMock = jest.fn(() => Promise.resolve({ ok: true })) as unknown as FetchMock;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    window.localStorage.removeItem('gfcInstallationId');
+
+    const { recordProductMetric } = await import('./productMetrics');
+    await recordProductMetric({ event: 'cycle_saved' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem('gfcInstallationId')).toBeNull();
+  });
+
   test('recordProductMetric stores installation id and calls fetch', async () => {
     jest.resetModules();
     jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: true }));

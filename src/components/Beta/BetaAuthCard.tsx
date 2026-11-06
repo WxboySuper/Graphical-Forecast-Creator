@@ -1,9 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
+import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
 import { BetaInfoCard } from './BetaPageLayout';
+
+const CLERK_VERIFICATION_SEGMENTS = new Set([
+  'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
+  'email-code', 'phone-code', 'sso-callback',
+]);
+const CLERK_ROUTING_SEGMENTS = new Set(CLERK_VERIFICATION_SEGMENTS);
 
 type AuthMode = 'sign_in' | 'sign_up';
 
@@ -160,14 +167,42 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
   allowSignUp = false,
   googleLabel = 'Continue with Google',
 }) => {
-  const { error, signInWithEmail, signInWithGoogle, signUpWithEmail, status } = useAuth();
-  const [mode, setMode] = useState<AuthMode>('sign_in');
+  const { authProvider, error, signInWithEmail, signInWithGoogle, signUpWithEmail, status } = useAuth();
+  const [mode, setMode] = useState<AuthMode>(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [clerkVerificationInProgress, setClerkVerificationInProgress] = useState(false);
+  const [clerkRoutingInProgress, setClerkRoutingInProgress] = useState(false);
   const isBusy = submitting || status === 'loading';
+  const clerkRedirectUrl = typeof window === 'undefined' ? undefined : (() => {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('clerkSignUp');
+    return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
+  })();
+  const clerkSignUpUrl = (() => {
+    if (typeof window === 'undefined') return undefined;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('clerkSignUp', '1');
+    return `${nextUrl.origin}${nextUrl.pathname}${nextUrl.search}`;
+  })();
+  useEffect(() => {
+    if (authProvider !== 'clerk' || typeof window === 'undefined') return;
+    const syncVerificationState = () => {
+      const segments = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map((segment) => segment.toLowerCase());
+      setClerkRoutingInProgress(segments.some((segment) => CLERK_ROUTING_SEGMENTS.has(segment)));
+      setClerkVerificationInProgress(segments.some((segment) => CLERK_VERIFICATION_SEGMENTS.has(segment)));
+    };
+    syncVerificationState();
+    window.addEventListener('hashchange', syncVerificationState);
+    window.addEventListener('popstate', syncVerificationState);
+    return () => {
+      window.removeEventListener('hashchange', syncVerificationState);
+      window.removeEventListener('popstate', syncVerificationState);
+    };
+  }, [authProvider]);
 
   useEffect(() => {
     if (!allowSignUp) {
@@ -180,6 +215,37 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
       setConfirmPassword('');
     }
   }, [allowSignUp, mode]);
+
+  useEffect(() => {
+    if (authProvider !== 'clerk' || typeof window === 'undefined') return;
+    const syncMode = () => setMode(new URLSearchParams(window.location.search).has('clerkSignUp') ? 'sign_up' : 'sign_in');
+    syncMode();
+    window.addEventListener('popstate', syncMode);
+    return () => window.removeEventListener('popstate', syncMode);
+  }, [authProvider]);
+
+  const setClerkMode = (nextMode: AuthMode) => {
+    if (nextMode === mode) return;
+    if (typeof window === 'undefined') return;
+    if (clerkRoutingInProgress) return;
+    const nextUrl = new URL(window.location.href);
+    if (nextMode === 'sign_up') nextUrl.searchParams.set('clerkSignUp', '1');
+    else nextUrl.searchParams.delete('clerkSignUp');
+    nextUrl.hash = '';
+    window.history.pushState(null, '', nextUrl.href);
+    setMode(nextMode);
+  };
+
+  const restartClerkVerification = () => {
+    if (typeof window === 'undefined') return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.hash = '';
+    window.history.replaceState(null, '', nextUrl.href);
+    setClerkRoutingInProgress(false);
+    setClerkVerificationInProgress(false);
+    setMode(nextUrl.searchParams.has('clerkSignUp') ? 'sign_up' : 'sign_in');
+    try { window.dispatchEvent(new Event('hashchange')); } catch { /* Local state is already reset. */ }
+  };
 
   /** Submits the email/password form in either sign-in or sign-up mode. */
   const handleEmailSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -233,6 +299,35 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
 
   return (
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
+      {authProvider === 'clerk' ? (
+        <div className="beta-auth-content">
+          {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
+          {allowSignUp ? (
+            <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
+              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_in'}>
+                Sign in
+              </Button>
+              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_up'}>
+                Create account
+              </Button>
+            </div>
+          ) : null}
+          {clerkRoutingInProgress ? (
+            <div className="text-sm text-muted-foreground">
+              <p role="status">{clerkVerificationInProgress ? 'Finish verification before switching account actions.' : 'A sign-in route is still active.'}</p>
+              <Button type="button" variant="outline" onClick={restartClerkVerification}>Restart sign-in</Button>
+            </div>
+          ) : null}
+          {mode === 'sign_up' && allowSignUp ? (
+            <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl}
+              appearance={{ elements: { footerAction: { display: 'none' } } }} />
+          ) : (
+            <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl}
+              appearance={{ elements: { footerAction: { display: 'none' } } }} />
+          )}
+          {error || formError ? <div className="beta-auth-error">{error ?? formError}</div> : null}
+        </div>
+      ) : (
       <BetaAuthCardBody
         allowSignUp={allowSignUp}
         confirmPassword={confirmPassword}
@@ -250,6 +345,7 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
         onSelectMode={setMode}
         onSubmit={handleEmailSubmit}
       />
+      )}
     </BetaInfoCard>
   );
 };

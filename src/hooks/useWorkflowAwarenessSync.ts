@@ -127,7 +127,7 @@ const queueAwarenessDeletion = ({
   reportError: (error: unknown) => void;
 }): void => {
   removeRecord();
-  active.queue.enqueue(() => deleteOneWorkflowAwareness(userId, cycleId)).catch((nextError: unknown) => {
+  active.queue.enqueue(() => deleteOneWorkflowAwareness({ userId, cycleId })).catch((nextError: unknown) => {
     if (isActiveRequest(active, generation, userId)) reportError(nextError);
   });
 };
@@ -210,7 +210,7 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
 
     const active = activeRef.current;
     const generation = active.generation;
-    active.queue.enqueue(() => deleteWorkflowAwareness(userId)).catch((nextError: unknown) => {
+    active.queue.enqueue(() => deleteWorkflowAwareness({ userId })).catch((nextError: unknown) => {
       if (isActiveRequest(active, generation, userId)) {
         setError(nextError instanceof Error ? nextError.message : 'Unable to disable workflow awareness.');
       }
@@ -269,7 +269,7 @@ export const useWorkflowAwarenessSync = (): WorkflowAwarenessSyncResult => {
       disableRequestedRef.current = true;
       setRecords([]);
       try {
-        await active.queue.enqueue(() => deleteWorkflowAwareness(userId));
+        await active.queue.enqueue(() => deleteWorkflowAwareness({ userId }));
         return isActiveRequest(active, generation, userId);
       } catch (nextError) {
         if (isActiveRequest(active, generation, userId)) {

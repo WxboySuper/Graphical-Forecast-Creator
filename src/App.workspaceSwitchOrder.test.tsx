@@ -4,7 +4,6 @@ import { store } from './store';
 import { setMapView, setForecastWorkspace } from './store/forecastSlice';
 
 declare global {
-  // eslint-disable-next-line no-var
   var __gfcRestoreEvents: string[] | undefined;
 }
 

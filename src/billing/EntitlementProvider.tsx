@@ -1,12 +1,38 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { doc, onSnapshot, type Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from '../lib/betaApi';
 import { useAuth } from '../auth/AuthProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 
 export type EntitlementStatus = 'disabled' | 'loading' | 'free' | 'premium' | 'error';
 export type PlanInterval = 'monthly' | 'annual' | null;
 type EffectiveSource = 'stripe' | 'beta_override' | 'none';
+
+const readPeriodEndDate = (value: unknown): Date | null => {
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return null;
+};
+
+const readPeriodEndTimestamp = (value: unknown): Date | null => {
+  if (typeof value !== 'object' || value === null) return null;
+  if (!('seconds' in value)) return null;
+  if (typeof value.seconds !== 'number') return null;
+  const nanos = readPeriodEndNanoseconds(value);
+  return new Date(value.seconds * 1000 + Math.trunc(nanos / 1_000_000));
+};
+
+const readPeriodEndNanoseconds = (value: object): number => {
+  if (!('nanoseconds' in value)) return 0;
+  return typeof value.nanoseconds === 'number' ? value.nanoseconds : 0;
+};
+
+const normalizeBetaPeriodEnd = (value: unknown): Date | null => {
+  const date = readPeriodEndDate(value) ?? readPeriodEndTimestamp(value);
+  return date && !Number.isNaN(date.getTime()) ? date : null;
+};
+
+const hasInvalidBetaPeriodEnd = (value: unknown): boolean => value !== null && value !== undefined && normalizeBetaPeriodEnd(value) === null;
 
 interface BillingConfig {
   billingEnabled: boolean;
@@ -246,7 +272,7 @@ const subscribeToEntitlements = (
 };
 
 /** True when the provider should operate in hosted mode for the current render. */
-const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && db);
+const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && (db || isBetaClerkD1Mode()));
 
 /** Applies the loading state used while auth is still resolving. */
 const applyLoadingEntitlementState = (
@@ -259,17 +285,88 @@ const applyLoadingEntitlementState = (
 const isSignedOutEntitlementState = (status: ReturnType<typeof useAuth>['status'], user: ReturnType<typeof useAuth>['user']) =>
   status !== 'signed_in' || !user;
 
+type EntitlementEffectHandlers = {
+  setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
+  setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
+  setError: React.Dispatch<React.SetStateAction<string | null>>;
+};
+
 /** Starts the signed-in entitlement subscription and returns its cleanup callback. */
 const startSignedInEntitlementSubscription = (
   userId: string,
-  handlers: {
-    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
-    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
+  handlers: EntitlementEffectHandlers
 ) => {
   handlers.setEntitlementStatus('loading');
   return subscribeToEntitlements(userId, handlers);
+};
+
+const startBetaEntitlementSubscription = (
+  handlers: EntitlementEffectHandlers
+) => {
+  let active = true;
+  let attempts = 0;
+  let retryTimer: number | undefined;
+  handlers.setEntitlementStatus('loading');
+
+  const loadEntitlement = async (): Promise<void> => {
+    try {
+      const state = await fetchBetaEntitlementState();
+      if (!active) return;
+      applyBetaEntitlementState(state, handlers);
+    } catch (nextError) {
+      if (!active) return;
+      const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
+      if (scheduleEntitlementRetry(message, attempts, () => {
+        attempts += 1;
+        retryTimer = window.setTimeout(() => { void loadEntitlement(); }, 250);
+      })) return;
+      applyEntitlementFailure(message, handlers);
+    }
+  };
+
+  void loadEntitlement();
+  return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
+};
+
+const fetchBetaEntitlementState = async (): Promise<EntitlementListenerState> => {
+  const response = await fetchBetaApi('/api/user/entitlement');
+  const body = await readBetaEntitlementBody(response);
+  return normalizeBetaEntitlementState(body.entitlement);
+};
+
+const normalizeBetaEntitlementState = (raw: Record<string, unknown> | null): EntitlementListenerState => {
+  const rawEnd = raw?.currentPeriodEnd;
+  if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
+  const rawValues = { ...(raw ?? {}) };
+  delete rawValues.currentPeriodEnd;
+  const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
+  const endDate = normalizeBetaPeriodEnd(rawEnd);
+  if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
+  return createEntitlementListenerState(normalized);
+};
+
+const readBetaEntitlementBody = async (response: Response): Promise<{ entitlement: Record<string, unknown> | null }> => {
+  const body = await response.json().catch(() => null) as { error?: string; entitlement?: Record<string, unknown> | null } | null;
+  if (!response.ok) throw new Error(body?.error || 'Unable to load account billing status.');
+  return { entitlement: body?.entitlement ?? null };
+};
+
+const applyBetaEntitlementState = (state: EntitlementListenerState, handlers: EntitlementEffectHandlers): void => {
+  handlers.setEntitlement(state.entitlement);
+  handlers.setEntitlementStatus(state.status);
+  handlers.setError(null);
+};
+
+const scheduleEntitlementRetry = (message: string, attempts: number, schedule: () => void): boolean => {
+  if (!isBetaSessionInitializing(message) || attempts >= 4) return false;
+  schedule();
+  return true;
+};
+
+const applyEntitlementFailure = (message: string, handlers: EntitlementEffectHandlers): void => {
+  handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+  handlers.setEntitlementStatus('error');
+  handlers.setError(message);
 };
 
 /** Applies deterministic entitlement state for a local account fixture. */
@@ -301,11 +398,7 @@ const resolveEntitlementEffect = (
     status: ReturnType<typeof useAuth>['status'];
     user: ReturnType<typeof useAuth>['user'];
   },
-  handlers: {
-    setEntitlement: React.Dispatch<React.SetStateAction<UserEntitlementDocument>>;
-    setEntitlementStatus: React.Dispatch<React.SetStateAction<EntitlementStatus>>;
-    setError: React.Dispatch<React.SetStateAction<string | null>>;
-  }
+  handlers: EntitlementEffectHandlers
 ) => {
   const localTestAccount = readLocalTestAccount();
   if (localTestAccount) {
@@ -323,6 +416,13 @@ const resolveEntitlementEffect = (
     return null;
   }
 
+  if (args.status === 'error' && args.user) {
+    handlers.setEntitlement(DEFAULT_ENTITLEMENT);
+    handlers.setEntitlementStatus('error');
+    handlers.setError('Unable to verify your signed-in account. Try again.');
+    return null;
+  }
+
   if (isSignedOutEntitlementState(args.status, args.user)) {
     applySignedOutEntitlementState(handlers.setEntitlement, handlers.setEntitlementStatus, handlers.setError);
     return null;
@@ -332,6 +432,7 @@ const resolveEntitlementEffect = (
     return null;
   }
 
+  if (isBetaClerkD1Mode()) return startBetaEntitlementSubscription(handlers);
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 
@@ -370,6 +471,13 @@ const fetchBillingAction = async (
   endpoint: string,
   body?: Record<string, unknown>
 ) => {
+  if (isBetaClerkD1Mode()) {
+    const response = await fetchBetaApi(endpoint, {
+      method: 'POST',
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { response, data: await response.json().catch(() => ({})) };
+  }
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: await createAuthHeaders(() => currentUser.getIdToken()),

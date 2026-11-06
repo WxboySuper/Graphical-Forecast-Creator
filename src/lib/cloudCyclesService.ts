@@ -10,6 +10,7 @@ import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 import { DEFAULT_FORECAST_WORKSPACE, resolveStoredWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -59,6 +60,19 @@ interface UserCycleLookupParams {
   cycleId: string;
 }
 
+interface UserIdParams {
+  userId: string;
+}
+
+interface CycleIdParams {
+  cycleId: string;
+}
+
+interface CreateCycleIdParams {
+  userId: string;
+  cycleDate: string;
+}
+
 interface ListCloudCyclesParams {
   userId: string;
 }
@@ -87,7 +101,11 @@ interface SaveCloudCycleParams {
 
 /** Sends a normalized cloud cycle payload to the authenticated API. */
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
-  const response = await fetch('/api/cloud-cycles', {
+  const response = isBetaClerkD1Mode() ? await fetchBetaApi('/api/cloud-cycles', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }) : await fetch('/api/cloud-cycles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
@@ -106,10 +124,11 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
   metadata: { ...metadata, ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}), ...(workflowMetadata ? { workflowMetadata } : {}) },
 });
 
-/** Returns the current Firebase token when a user is signed in. */
-const getCloudSaveToken = (): Promise<string | null> => {
+/** Returns a Clerk session marker or the current Firebase token. */
+const getCloudSaveToken = async (): Promise<string | null> => {
+  if (isBetaClerkD1Mode()) return 'clerk-session';
   const currentUser = auth?.currentUser;
-  return Promise.resolve(currentUser ? currentUser.getIdToken() : null);
+  return currentUser ? currentUser.getIdToken() : null;
 };
 
 type LegacyCloudCyclesValue = string | Record<string, unknown> | undefined;
@@ -172,17 +191,17 @@ const getCloudCyclesCollectionRef = () => {
 };
 
 /** Returns the Firestore document reference for a specific cloud cycle. */
-const getCloudCycleDocRef = (cycleId: string) => doc(getCloudCyclesCollectionRef(), cycleId);
+const getCloudCycleDocRef = ({ cycleId }: CycleIdParams) => doc(getCloudCyclesCollectionRef(), cycleId);
 
 /** Returns the Firestore document reference for a specific cloud cycle payload. */
-const getCloudCyclePayloadDocRef = (cycleId: string) =>
+const getCloudCyclePayloadDocRef = ({ cycleId }: CycleIdParams) =>
   doc(collection(getCloudCyclesCollectionRef(), cycleId, PAYLOAD_SUBCOLLECTION), PAYLOAD_DOC_ID);
 
 /** Reads the latest Firestore snapshot for one cloud cycle document. */
-const getCloudCycleDocSnapshot = (cycleId: string) => getDoc(getCloudCycleDocRef(cycleId));
+const getCloudCycleDocSnapshot = ({ cycleId }: CycleIdParams) => getDoc(getCloudCycleDocRef({ cycleId }));
 
 /** Returns the legacy user-settings document where pre-Phase 4 cloud cycles were stored. */
-const getLegacyUserSettingsRef = (userId: string) => {
+const getLegacyUserSettingsRef = ({ userId }: UserIdParams) => {
   if (!db) {
     throw new Error('Firestore is not initialized');
   }
@@ -271,9 +290,10 @@ const normalizeCloudCycleRecord = ({
 
   // Keep the Firestore contract strict on the client too: invalid nested
   // metadata is ignored rather than trusted as workflow state.
-  const workflowMetadata = isValidWorkflowMetadata(rawRecord.workflowMetadata) &&
-    rawRecord.workflowMetadata.cycleDate === metadata.cycleDate
-    ? rawRecord.workflowMetadata
+  const rawWorkflowMetadata = rawRecord.workflowMetadata ?? metadataSource.workflowMetadata;
+  const workflowMetadata = isValidWorkflowMetadata(rawWorkflowMetadata) &&
+    rawWorkflowMetadata.cycleDate === metadata.cycleDate
+    ? rawWorkflowMetadata
     : undefined;
 
   return {
@@ -327,7 +347,7 @@ const sortCloudCycleMetadata = (cycles: CloudCycleMetadata[]): CloudCycleMetadat
   [...cycles].sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 
 /** Creates a collision-resistant id for new hosted cloud cycles. */
-const createCloudCycleId = (userId: string, cycleDate: string): string =>
+const createCloudCycleId = ({ userId, cycleDate }: CreateCycleIdParams): string =>
   `${userId}-${cycleDate}-${uuidv4()}`;
 
 /** Converts a Firestore query snapshot into normalized cloud-cycle records, including payload validation. */
@@ -345,9 +365,9 @@ const readCloudCycleMetadataFromQuery = ({ snapshot, fallbackUserId }: ReadCloud
     .filter((cycle): cycle is CloudCycleMetadata => Boolean(cycle));
 
 /** Reads older cloud-cycle data from the legacy user-settings document if present. */
-const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
+const readLegacyCloudCycles = async ({ userId }: UserIdParams): Promise<CloudCycle[]> => {
   try {
-    const snapshot = await getDoc(getLegacyUserSettingsRef(userId));
+    const snapshot = await getDoc(getLegacyUserSettingsRef({ userId }));
     const legacyData = snapshot.data() as LegacyUserSettingsDocument | undefined;
     const rawValue = legacyData?.cloudCycles;
 
@@ -382,7 +402,7 @@ const readLegacyCloudCycles = async (userId: string): Promise<CloudCycle[]> => {
 };
 
 /** Reads all cloud cycles for a user, retaining legacy records without mutating them. */
-const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => {
+const readCloudCyclesForUser = async ({ userId }: UserIdParams): Promise<CloudCycle[]> => {
   const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
   const cycles = readCloudCyclesFromQuery({ snapshot, fallbackUserId: userId });
 
@@ -390,13 +410,13 @@ const readCloudCyclesForUser = async (userId: string): Promise<CloudCycle[]> => 
     return cycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
   }
 
-  const legacyCycles = await readLegacyCloudCycles(userId);
+  const legacyCycles = await readLegacyCloudCycles({ userId });
   return legacyCycles.sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
 };
 
 /** Reads one cloud-cycle payload from the subcollection, or null when absent or invalid. */
-const readCloudCyclePayload = async (cycleId: string): Promise<ForecastWorkspacePayload | null> => {
-  const payloadSnapshot = await getDoc(getCloudCyclePayloadDocRef(cycleId));
+const readCloudCyclePayload = async ({ cycleId }: CycleIdParams): Promise<ForecastWorkspacePayload | null> => {
+  const payloadSnapshot = await getDoc(getCloudCyclePayloadDocRef({ cycleId }));
   if (!payloadSnapshot.exists()) {
     return null;
   }
@@ -406,9 +426,9 @@ const readCloudCyclePayload = async (cycleId: string): Promise<ForecastWorkspace
 
 /** Fetches one cloud cycle by id, including legacy fallback and migration support. */
 const fetchCloudCycleById = async ({ userId, cycleId }: UserCycleLookupParams): Promise<CloudCycle | null> => {
-  const docSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  const docSnapshot = await getCloudCycleDocSnapshot({ cycleId });
   if (docSnapshot.exists()) {
-    const payload = await readCloudCyclePayload(cycleId);
+    const payload = await readCloudCyclePayload({ cycleId });
     const cycle = normalizeCloudCycleRecord({
       cycleId: docSnapshot.id,
       rawRecord: docSnapshot.data(),
@@ -420,19 +440,19 @@ const fetchCloudCycleById = async ({ userId, cycleId }: UserCycleLookupParams): 
     }
   }
 
-  const legacyCycles = await readLegacyCloudCycles(userId);
+  const legacyCycles = await readLegacyCloudCycles({ userId });
   const legacyMatch = legacyCycles.find((cycle) => cycle.id === cycleId) ?? null;
   return legacyMatch;
 };
 
 /** Returns an existing cloud cycle only when it belongs to the current signed-in user. */
 const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): Promise<CloudCycle | null> => {
-  const existingSnapshot = await getCloudCycleDocSnapshot(cycleId);
+  const existingSnapshot = await getCloudCycleDocSnapshot({ cycleId });
   if (!existingSnapshot.exists()) {
     return null;
   }
 
-  const payload = await readCloudCyclePayload(cycleId);
+  const payload = await readCloudCyclePayload({ cycleId });
   const existingCycle = normalizeCloudCycleRecord({
     cycleId,
     rawRecord: existingSnapshot.data(),
@@ -450,7 +470,43 @@ const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): P
  * Saves a new cloud cycle or updates an existing one
  */
 const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
-  const cycleId = params.existingId || createCloudCycleId(params.userId, params.cycleDate);
+  const cycleId = params.existingId || createCloudCycleId({ userId: params.userId, cycleDate: params.cycleDate });
+  if (isBetaClerkD1Mode()) return buildBetaCloudCycleSaveContext(params, cycleId);
+  return buildFirestoreCloudCycleSaveContext(params, cycleId);
+};
+
+const buildBetaCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycleId: string) => {
+  const existingMetadata = await readBetaCloudCycleMetadata(params);
+  if (existingMetadata && 'error' in existingMetadata) return existingMetadata;
+  const now = new Date().toISOString();
+  const metadata: CloudCycleMetadata = {
+    id: cycleId, userId: params.userId, label: params.label, cycleDate: params.cycleDate,
+    createdAt: readTimestampString(existingMetadata?.createdAt, now), updatedAt: now, forecastDays: params.stats.forecastDays,
+    totalOutlooks: params.stats.totalOutlooks, totalFeatures: params.stats.totalFeatures,
+    isReadOnly: params.isReadOnly ?? false, payloadHash: computePayloadHash(params.payload),
+    workspaceId: params.workspaceId ?? DEFAULT_FORECAST_WORKSPACE,
+  };
+  return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
+};
+
+type ExistingBetaCycleMetadata = { createdAt: unknown };
+
+const readBetaCloudCycleMetadata = async (params: SaveCloudCycleParams): Promise<ExistingBetaCycleMetadata | { error: string } | null> => {
+  if (!params.existingId) return null;
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.existingId)}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) return { error: typeof body?.error === 'string' ? body.error : 'Unable to save cloud cycle' };
+  return readOwnedBetaCycleMetadata(body.cycle, params.userId);
+};
+
+const readOwnedBetaCycleMetadata = (cycle: unknown, userId: string): ExistingBetaCycleMetadata | { error: 'Cloud cycle not found' } => {
+  if (!isPlainObject(cycle)) return { error: 'Cloud cycle not found' as const };
+  const metadata = isPlainObject(cycle.metadata) ? cycle.metadata : cycle;
+  if ((cycle.userId ?? metadata.userId) !== userId) return { error: 'Cloud cycle not found' as const };
+  return { createdAt: metadata.createdAt };
+};
+
+const buildFirestoreCloudCycleSaveContext = async (params: SaveCloudCycleParams, cycleId: string) => {
   const existingCycle = params.existingId ? await getOwnedCloudCycle({ userId: params.userId, cycleId: params.existingId }) : null;
   if (params.existingId && !existingCycle) return { error: 'Cloud cycle not found' as const };
   const now = new Date().toISOString();
@@ -493,6 +549,7 @@ export const loadCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
   try {
+    if (isBetaClerkD1Mode()) return await loadBetaCloudCycle(params);
     const record = await fetchCloudCycleById(params);
 
     if (!record) {
@@ -515,18 +572,29 @@ export const loadCloudCycle = async (
   }
 };
 
+const loadBetaCloudCycle = async (params: UserCycleLookupParams): Promise<CloudOperationResult<CloudCycle>> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`);
+  const body = await response.json().catch(() => ({}));
+  const ownedCycle = readOwnedBetaCycleMetadata(body?.cycle, params.userId);
+  if (!response.ok || 'error' in ownedCycle) return { success: false, error: body?.error || 'Cloud cycle not found' };
+  const validatedPayload = parseCloudCyclePayload(body.cycle.payload);
+  const cycle = normalizeCloudCycleRecord({ cycleId: params.cycleId, rawRecord: body.cycle, fallbackUserId: params.userId, payload: validatedPayload ?? undefined });
+  return cycle ? { success: true, data: cycle } : { success: false, error: 'Cloud cycle data is invalid.' };
+};
+
 /** Deletes a cloud cycle only when it belongs to the requested user. */
 export const deleteCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
   try {
+    if (isBetaClerkD1Mode()) return await deleteBetaCloudCycle(params);
     const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
       return { success: true };
     }
 
-    await deleteDoc(getCloudCyclePayloadDocRef(params.cycleId));
-    await deleteDoc(getCloudCycleDocRef(params.cycleId));
+    await deleteDoc(getCloudCyclePayloadDocRef({ cycleId: params.cycleId }));
+    await deleteDoc(getCloudCycleDocRef({ cycleId: params.cycleId }));
 
     return { success: true };
   } catch (error) {
@@ -538,11 +606,26 @@ export const deleteCloudCycle = async (
   }
 };
 
+const deleteBetaCloudCycle = async (params: UserCycleLookupParams): Promise<CloudOperationResult> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, { method: 'DELETE' });
+  if (response.ok || response.status === 404) return { success: true };
+  const body = await response.json().catch(() => ({}));
+  return { success: false, error: body?.error || 'Unable to delete cloud cycle.' };
+};
+
 /** Renames a cloud cycle only when it belongs to the requested user. */
 export const renameCloudCycle = async (
   params: RenameCloudCycleParams
 ): Promise<CloudOperationResult> => {
   try {
+    if (isBetaClerkD1Mode()) {
+      const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, {
+        method: 'PATCH', body: JSON.stringify({ label: params.newLabel }),
+      });
+      if (response.ok) return { success: true };
+      const body = await response.json().catch(() => ({}));
+      return { success: false, error: body?.error || 'Cloud cycle not found' };
+    }
     const existing = await getOwnedCloudCycle(params);
     if (!existing) {
       return {
@@ -558,7 +641,7 @@ export const renameCloudCycle = async (
       payloadHash: computePayloadHash(existing.payload),
     };
 
-    await setDoc(getCloudCycleDocRef(params.cycleId), serializeCloudCycleDocument(nextMetadata));
+    await setDoc(getCloudCycleDocRef({ cycleId: params.cycleId }), serializeCloudCycleDocument(nextMetadata));
 
     return { success: true };
   } catch (error) {
@@ -579,9 +662,13 @@ export async function listCloudCycles(
   { userId }: ListCloudCyclesParams
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> {
   try {
+    if (isBetaClerkD1Mode()) {
+      const result = await listBetaCloudCyclePages(userId);
+      return result.success && result.data ? { success: true, data: sortCloudCycleMetadata(result.data) } : result;
+    }
     const snapshot = await getDocs(query(getCloudCyclesCollectionRef(), where('userId', '==', userId)));
     const metadata = readCloudCycleMetadataFromQuery({ snapshot, fallbackUserId: userId });
-    const legacyCycles = await readLegacyCloudCycles(userId);
+    const legacyCycles = await readLegacyCloudCycles({ userId });
     const visibleMetadata = [
       ...metadata,
       ...legacyCycles.map(toCloudCycleMetadata),
@@ -592,7 +679,7 @@ export async function listCloudCycles(
       return { success: true, data: sortCloudCycleMetadata(visibleMetadata) };
     }
 
-    const cycles = await readCloudCyclesForUser(userId);
+    const cycles = await readCloudCyclesForUser({ userId });
 
     return { success: true, data: sortCloudCycleMetadata(cycles.map(toCloudCycleMetadata)) };
   } catch (error) {
@@ -604,12 +691,119 @@ export async function listCloudCycles(
   }
 }
 
+type BetaCloudCyclePage = { cycles: CloudCycleMetadata[]; nextPage: number | null };
+type BetaCloudCyclePageResult = { success: true; data: BetaCloudCyclePage } | { success: false; error: string };
+
+const listBetaCloudCyclePages = async (userId: string): Promise<CloudOperationResult<CloudCycleMetadata[]>> => {
+  const cycles: CloudCycleMetadata[] = [];
+  let page = 0;
+  while (true) {
+    const result = await fetchBetaCloudCyclePage(userId, page);
+    if (!result.success) return result;
+    cycles.push(...result.data.cycles);
+    if (result.data.nextPage === null) return { success: true, data: cycles };
+    page = result.data.nextPage;
+  }
+};
+
+const fetchBetaCloudCyclePage = async (userId: string, page: number): Promise<BetaCloudCyclePageResult> => {
+  const response = await fetchBetaApi(`/api/cloud-cycles?page=${page}`);
+  const body = (await response.json().catch(() => ({}))) ?? {};
+  if (!response.ok) return { success: false, error: body.error || 'Unable to list cloud cycles' };
+  const cycles = Array.isArray(body?.cycles) ? body.cycles.map((raw: unknown) => normalizeBetaCloudCycle(raw, userId)).filter(isOwnedCycle(userId)) : [];
+  return { success: true, data: { cycles, nextPage: readNextCyclePage(body?.nextPage) } };
+};
+
+const hasBetaCloudCycleId = (record: Record<string, unknown>): boolean => {
+  if (typeof record.id !== 'string') return false;
+  return Boolean(record.id);
+};
+
+const betaCloudCycleOwnerId = (record: Record<string, unknown>): unknown => {
+  if (record.userId !== null && record.userId !== undefined) return record.userId;
+  if (!isPlainObject(record.metadata)) return undefined;
+  return record.metadata.userId;
+};
+
+const normalizeBetaCloudCycle = (raw: unknown, userId: string): CloudCycleMetadata | null => {
+  if (!isPlainObject(raw)) return null;
+  const record = raw as Record<string, unknown>;
+  if (!hasBetaCloudCycleId(record)) return null;
+  if (betaCloudCycleOwnerId(record) !== userId) return null;
+  return normalizeCloudCycleMetadataRecord({ cycleId: record.id as string, rawRecord: record, fallbackUserId: userId });
+};
+
+const isOwnedCycle = (userId: string) => (cycle: CloudCycleMetadata | null): cycle is CloudCycleMetadata => Boolean(cycle?.id && cycle.userId === userId);
+const readNextCyclePage = (nextPage: unknown): number | null => Number.isSafeInteger(nextPage) ? nextPage as number : null;
+
+const refreshBetaCloudCycles = async (
+  params: CloudCycleSubscriptionParams,
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  try {
+    const result = await listCloudCycles({ userId: params.userId });
+    applyCloudCycleRefreshResult(result, params, isActive, scheduleRetry);
+  } catch (error) {
+    reportCloudCycleRefreshError(error, params.onError, isActive, scheduleRetry);
+  }
+};
+
+const applyCloudCycleRefreshResult = (
+  result: CloudOperationResult<CloudCycleMetadata[]>,
+  params: CloudCycleSubscriptionParams,
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  if (!isActive()) return;
+  if (result.success && result.data) {
+    params.onUpdate(result.data);
+    return;
+  }
+  if (!result.success) applyCloudCycleRefreshFailure(result.error, params.onError, scheduleRetry);
+};
+
+const applyCloudCycleRefreshFailure = (
+  message: string | undefined,
+  onError: CloudCycleSubscriptionParams['onError'],
+  scheduleRetry: () => void,
+) => {
+  if (isBetaSessionInitializing(message)) {
+    scheduleRetry();
+    return;
+  }
+  onError?.(new Error(message || 'Unable to refresh cloud cycles.'));
+};
+
+const reportCloudCycleRefreshError = (
+  error: unknown,
+  onError: CloudCycleSubscriptionParams['onError'],
+  isActive: () => boolean,
+  scheduleRetry: () => void
+) => {
+  if (!isActive()) return;
+  if (isBetaSessionInitializing(error)) scheduleRetry();
+  else onError?.(error instanceof Error ? error : new Error('Unable to refresh cloud cycles.'));
+};
+
 /**
  * Subscribes to cloud cycles list for real-time updates
  */
 export const subscribeToCloudCycles = (
   { userId, onUpdate, onError }: CloudCycleSubscriptionParams
 ): (() => void) => {
+  if (isBetaClerkD1Mode()) {
+    let active = true;
+    let retryTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const scheduleRetry = () => {
+      if (!active || retryTimer !== undefined) return;
+      retryTimer = globalThis.setTimeout(() => { retryTimer = undefined; void refresh(); }, 250);
+    };
+    const refresh = () => refreshBetaCloudCycles({ userId, onUpdate, onError }, () => active, scheduleRetry);
+    refresh().catch(() => undefined);
+    const timer = globalThis.setInterval(() => refresh().catch(() => undefined), 15_000);
+    return () => { active = false; globalThis.clearInterval(timer); if (retryTimer !== undefined) globalThis.clearTimeout(retryTimer); };
+  }
   let active = true;
   try {
     const cyclesQuery = query(getCloudCyclesCollectionRef(), where('userId', '==', userId));
@@ -622,7 +816,7 @@ export const subscribeToCloudCycles = (
           return;
         }
 
-        readLegacyCloudCycles(userId)
+        readLegacyCloudCycles({ userId })
           .then((legacyCycles) => {
             if (!active) {
               return;
@@ -653,4 +847,3 @@ export const subscribeToCloudCycles = (
     return noopUnsubscribe;
   }
 };
-
