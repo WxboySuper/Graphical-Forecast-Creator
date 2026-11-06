@@ -41,9 +41,19 @@ require.cache[firebaseAdminPath] = {
 };
 
 let metrics;
+const adminReadsPath = require.resolve('./metricsAdminReads');
 const loadMetrics = () => {
   delete require.cache[metricsPath];
+  delete require.cache[adminReadsPath];
   metrics = require('./metrics');
+  metricsAdminReadsReset();
+};
+
+const metricsAdminReadsReset = () => {
+  const adminReads = require('./metricsAdminReads');
+  if (typeof adminReads.resetAdminMetricsCachesForTests === 'function') {
+    adminReads.resetAdminMetricsCachesForTests();
+  }
 };
 
 beforeEach(() => {
@@ -55,6 +65,7 @@ after(() => {
   if (originalFirebaseAdmin) require.cache[firebaseAdminPath] = originalFirebaseAdmin;
   else delete require.cache[firebaseAdminPath];
   delete require.cache[metricsPath];
+  delete require.cache[adminReadsPath];
 });
 
 describe('getCurrentStorageBytes bounded aggregation', () => {
