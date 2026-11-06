@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Server metrics test boundary: this suite verifies analytics event handling,
+ * validation, persistence, and failure behavior at the server metrics adapter
+ * with Firebase dependencies isolated in test doubles.
+ */
+
 const { after, beforeEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
