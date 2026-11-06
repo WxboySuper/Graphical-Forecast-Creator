@@ -1,3 +1,6 @@
+/**
+ * Export clone tests. Verify export payloads are copied without shared mutable state.
+ */
 jest.setTimeout(10000);
 
 afterEach(() => {

@@ -1,3 +1,6 @@
+/**
+ * Discussion utility tests. Verify discussion parsing, formatting, and validation helpers.
+ */
 import { compileDiscussionToText } from './discussionUtils';
 
 describe('discussionUtils', () => {
