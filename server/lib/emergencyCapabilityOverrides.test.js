@@ -1,3 +1,8 @@
+/**
+ * File: server/lib/emergencyCapabilityOverrides.test.js
+ * Purpose: Verifies emergency capability overrides, precedence, and safe fallback behavior.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');

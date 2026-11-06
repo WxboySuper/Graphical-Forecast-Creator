@@ -1,3 +1,8 @@
+/**
+ * Custom-products hook test boundary: this suite verifies authentication and
+ * entitlement gating, repository loading, mutations, and error state exposed
+ * by the custom-products data hook.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
