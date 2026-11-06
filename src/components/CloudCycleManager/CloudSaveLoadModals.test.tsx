@@ -1,8 +1,7 @@
 /**
- * File: src/components/CloudCycleManager/CloudSaveLoadModals.test.tsx
- * Purpose: Covers cloud cycle save/load modal state, validation, and user actions.
+ * Cloud save/load modal tests. Verify loading, saving, error, cancellation, and
+ * disabled states across the cloud-cycle modal boundary.
  */
-
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { CloudSaveModal } from './CloudSaveLoadModals';
 
