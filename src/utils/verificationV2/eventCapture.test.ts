@@ -1,3 +1,6 @@
+/**
+ * Verification event capture tests. Verify observed reports become events in the V2 grading timeline.
+ */
 import { circleContour, makeReport } from './testFixtures';
 import { scoreEventCapture } from './eventCapture';
 
