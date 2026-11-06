@@ -1,3 +1,7 @@
+/**
+ * Cloud-cycle toolbar button. It presents save and load actions, opens the
+ * corresponding modal, and delegates cloud state and requests to its parent.
+ */
 import React, { useState, useCallback } from 'react';
 import { Cloud, FolderOpen, LoaderCircle } from 'lucide-react';
 import { Button } from '../ui/button';

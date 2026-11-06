@@ -1,3 +1,8 @@
+/**
+ * Shared dropdown-menu primitives built on Radix UI. The exports provide the
+ * styled menu, item, label, separator, and submenu building blocks used across
+ * GFC without owning application-specific menu state.
+ */
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
