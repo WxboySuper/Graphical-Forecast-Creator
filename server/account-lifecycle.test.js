@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Account-lifecycle test boundary: this suite verifies server-side account
+ * deletion, cleanup ordering, authorization, and failure responses without
+ * requiring the production HTTP server or external account services.
+ */
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
