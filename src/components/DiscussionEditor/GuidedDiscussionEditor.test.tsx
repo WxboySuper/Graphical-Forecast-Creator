@@ -1,3 +1,8 @@
+/**
+ * File: src/components/DiscussionEditor/GuidedDiscussionEditor.test.tsx
+ * Purpose: Covers guided discussion editor prompts, responses, editing interactions, and rendered controls.
+ */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import GuidedDiscussionEditor from './GuidedDiscussionEditor';
 import type { GuidedDiscussionData } from '../../types/outlooks';
