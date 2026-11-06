@@ -1,8 +1,7 @@
 /**
- * File: src/components/Map/VerificationMap.tsx
- * Purpose: Renders the verification map and coordinates verification layers, controls, and map state.
+ * Verification-map compatibility barrel. Re-exports the OpenLayers verification
+ * map and its adapter-backed handle type for existing consumers.
  */
-
 import OLMap from 'ol/Map';
 import OpenLayersVerificationMap from './OpenLayersVerificationMap';
 import type { MapAdapterHandle } from '../../maps/contracts';
