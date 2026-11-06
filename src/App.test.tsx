@@ -1,3 +1,7 @@
+/**
+ * Application-shell tests. Verify route composition, mocked page rendering, and
+ * top-level application state around the main App component.
+ */
 import { render, screen, act } from '@testing-library/react';
 import App, { ForecastLegacyRedirect } from './App';
 import { MemoryRouter, Outlet as MockOutlet, Route, Routes, useLocation } from 'react-router';
