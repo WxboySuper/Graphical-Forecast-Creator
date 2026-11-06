@@ -1,3 +1,9 @@
+/**
+ * Forecast-feature normalization: this module converts drawn GeoJSON features
+ * into the canonical hazard and outlook shapes consumed by the forecast store.
+ * It owns pure normalization and metadata cleanup, not map editing, storage, or
+ * Redux orchestration.
+ */
 import type { Feature } from "geojson";
 
 import type { DrawingState, OutlookType } from "../types/outlooks";
