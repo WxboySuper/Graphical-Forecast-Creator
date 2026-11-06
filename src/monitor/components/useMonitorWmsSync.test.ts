@@ -1,3 +1,6 @@
+/**
+ * Monitor WMS theme synchronization tests. Verify map theme changes update WMS layer styling.
+ */
 import { renderHook } from '@testing-library/react';
 import type { WmsLayerConfig } from '../wms';
 import * as monitorMapLayerUtils from './monitorMapLayerUtils';
