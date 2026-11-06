@@ -1,3 +1,7 @@
+/**
+ * Reconciles OpenLayers forecast features with the current forecast geometry and outlook state.
+ * This module owns map-feature comparison and update coordination; store mutation, rendering setup, and user interactions remain separate.
+ */
 import { captureMessage } from "@sentry/react";
 import type VectorSource from "ol/source/Vector";
 import type OLFeature from "ol/Feature";

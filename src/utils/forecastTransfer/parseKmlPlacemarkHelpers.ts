@@ -1,3 +1,7 @@
+/**
+ * Parses KML placemark metadata into normalized forecast-transfer outlook values.
+ * This utility owns placemark label and type interpretation; XML traversal, transfer orchestration, and forecast persistence remain separate concerns.
+ */
 import type { DayType, OutlookType } from '../../types/outlooks';
 import { OUTLOOK_LABEL_TO_TYPE } from './types';
 
