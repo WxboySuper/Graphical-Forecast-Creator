@@ -1,3 +1,7 @@
+/**
+ * Local-auth settings helpers. This module defines persisted settings and
+ * normalizes account preferences before they enter auth state.
+ */
 import { serverTimestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';

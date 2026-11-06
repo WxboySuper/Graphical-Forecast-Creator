@@ -1,3 +1,7 @@
+/**
+ * Redux slice for map-overlay and basemap preferences. It stores selected map
+ * style, overlay visibility, and related display settings used by map views.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { OutlookType } from '../types/outlooks';
 import type { LandMaskStrategy } from '../utils/outlookPolygonMasking/types';
