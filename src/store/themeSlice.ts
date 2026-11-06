@@ -1,3 +1,6 @@
+/**
+ * Theme slice. Stores the selected application theme and actions that change it.
+ */
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 interface ThemeState {

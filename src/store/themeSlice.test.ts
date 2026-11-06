@@ -1,3 +1,6 @@
+/**
+ * Theme slice tests. Verify theme selection and persistence actions update application state.
+ */
 describe('themeSlice', () => {
   const loadSlice = async () => {
     let themeModule: typeof import('./themeSlice') | null = null;
