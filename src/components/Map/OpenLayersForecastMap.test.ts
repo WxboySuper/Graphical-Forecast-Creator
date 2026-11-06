@@ -1,8 +1,7 @@
 /**
- * Unit tests for helper functions in OpenLayersForecastMap
- * Focuses on pure utilities to raise coverage without instantiating a full OL Map.
+ * File: src/components/Map/OpenLayersForecastMap.test.ts
+ * Purpose: Tests the primary OpenLayers forecast map setup, layers, interactions, and lifecycle.
  */
-
 
 // Mock ol-mapbox-style (pulls pbf; avoid loading ESM module in Jest)
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));
