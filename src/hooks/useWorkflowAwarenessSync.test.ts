@@ -1,3 +1,6 @@
+/**
+ * Workflow awareness sync tests. Verify forecast workflow metadata stays synchronized with the active workspace.
+ */
 import {
   isWorkflowAwarenessResponseCurrent,
   readWorkflowAwarenessConsent,

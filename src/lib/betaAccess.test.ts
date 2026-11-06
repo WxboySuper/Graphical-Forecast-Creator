@@ -1,3 +1,6 @@
+/**
+ * Beta access tests. Verify invite and eligibility rules for beta-only product entry points.
+ */
 import {
   isLocalBetaBypassEnabled,
   isLocalBetaBypassHost,
