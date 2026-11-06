@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { verifyFirebaseToken } = require('./firebase-auth');
@@ -42,9 +43,28 @@ const sendUnavailableBetaClaimResponse = (res) => {
   return false;
 };
 
+/** Compares two strings without leaking their contents through comparison timing. */
+const timingSafeStringEqual = (left, right) => {
+  const leftDigest = crypto.createHash('sha256').update(left, 'utf8').digest();
+  const rightDigest = crypto.createHash('sha256').update(right, 'utf8').digest();
+  return crypto.timingSafeEqual(leftDigest, rightDigest);
+};
+
 /** True when the submitted invite token matches the configured server-side beta secret. */
-const isValidInviteToken = (value) =>
-  typeof value === 'string' && value.length > 0 && value === getBetaInviteToken();
+const isValidInviteToken = (value) => {
+  if (typeof value !== 'string' || value.length === 0) {
+    return false;
+  }
+
+  const expectedToken = getBetaInviteToken();
+  if (!expectedToken) {
+    return false;
+  }
+
+  // Hash both values first so differing lengths compare as equal-length
+  // digests instead of throwing inside timingSafeEqual.
+  return timingSafeStringEqual(value, expectedToken);
+};
 
 /** True when the submitted invite-path segment matches the configured beta path, if any. */
 const isValidInvitePath = (value) => {
@@ -145,5 +165,6 @@ module.exports = {
   registerBetaRoutes,
   __testing: {
     grantBetaAccess,
+    isValidInviteToken,
   },
 };

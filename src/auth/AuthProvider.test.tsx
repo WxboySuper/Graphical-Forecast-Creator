@@ -19,6 +19,7 @@ import {
   localUpdateSyncedSettings,
   postLocalJson,
   safeParseJson,
+  createHostedAutosyncSnapshot,
   createSettingsSnapshot as createProviderSettingsSnapshot,
   areUserSettingsEqual as areProviderUserSettingsEqual,
   createProfilePayload as createProviderProfilePayload,
@@ -164,6 +165,38 @@ describe('AuthProvider Utils', () => {
       lastSyncedSettingsRef,
     });
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
+  });
+
+  test('autosync snapshot uploads live monitor settings instead of stale synced ones', () => {
+    const syncedMonitorSettings = { ...DEFAULT_MONITOR_SETTINGS, radarMode: 'site' as const };
+    const liveMonitorSettings = {
+      ...DEFAULT_MONITOR_SETTINGS,
+      radarMode: 'none' as const,
+      animationEnabled: true,
+    };
+    const syncedSettings = createProviderSettingsSnapshot({
+      darkMode: false,
+      overlays: { ...TEST_OVERLAY_STATE },
+      defaultForecasterName: 'Synced Forecaster',
+      forecastUiVariant: 'workspace_dock',
+      monitorSettings: syncedMonitorSettings,
+    });
+
+    const snapshot = createHostedAutosyncSnapshot({
+      darkMode: false,
+      overlays: { ...TEST_OVERLAY_STATE },
+      displayName: 'Profile Forecaster',
+      syncedForecasterName: syncedSettings.defaultForecasterName,
+      syncedForecastUiVariant: syncedSettings.forecastUiVariant,
+      monitorSettings: liveMonitorSettings,
+    });
+
+    expect(snapshot.monitorSettings).toEqual(liveMonitorSettings);
+    // A changed monitor setting must not compare equal to the last synced
+    // document, otherwise the debounced write is skipped.
+    expect(areProviderUserSettingsEqual(syncedSettings, snapshot)).toBe(false);
+    expect(snapshot.defaultForecasterName).toBe('Synced Forecaster');
+    expect(snapshot.forecastUiVariant).toBe('workspace_dock');
   });
 
   test('auth utility fallbacks normalize errors', () => {
