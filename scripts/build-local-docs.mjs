@@ -118,7 +118,7 @@ function consumeTable(state, lines, index) {
 
 /** Strip inline Markdown formatting so heading slugs match GitHub anchor behavior. */
 function stripHeadingMarkdown(text) {
-  return text
+  const withoutMarkdown = text
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
@@ -126,8 +126,15 @@ function stripHeadingMarkdown(text) {
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/(^|\W)_([^_]+)_(\W|$)/g, '$1$2$3')
-    .replace(/<[^>]+>/g, '');
+    .replace(/(^|\W)_([^_]+)_(\W|$)/g, '$1$2$3');
+  // Repeat until stable so nested fragments cannot reassemble into a tag, then drop stray angle brackets.
+  let result = withoutMarkdown;
+  let previous;
+  do {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== previous);
+  return result.replace(/[<>]/g, '');
 }
 
 /** Derive a GitHub-style heading id, suffixing repeats within one document. */
