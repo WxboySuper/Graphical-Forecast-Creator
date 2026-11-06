@@ -1,8 +1,7 @@
 /**
- * File: src/components/ForecastGrade/ForecastGradeResultsPane.test.tsx
- * Purpose: Covers forecast-grade result rendering, status states, and result interactions.
+ * Forecast-grade results pane tests. Verify the pre-result empty state and the
+ * result, progress, and failure presentations used by the verification workflow.
  */
-
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import ForecastGradeResultsPane from './ForecastGradeResultsPane';
