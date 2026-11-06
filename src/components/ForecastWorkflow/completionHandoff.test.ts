@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/completionHandoff.test.ts
+ * Purpose: Verifies completion handoff policy decisions and workflow boundary rules.
+ */
+
 import { getCompletionHandoffEligibility, getCompletionHandoffIdentity } from './completionHandoffPolicy';
 import type { CycleMetadata, WorkflowMetadata } from '../../types/workflow';
 
