@@ -1,3 +1,7 @@
+/**
+ * Production-release banner helpers. It validates banner payloads, schedule
+ * windows, and links before release metadata is published.
+ */
 import { isWithinScheduleWindow, parseInstant } from './schedule.mjs';
 import { VALID_BANNER_TYPES } from './constants.mjs';
 import { sanitizeBannerLinkUrl } from './link-url.mjs';
