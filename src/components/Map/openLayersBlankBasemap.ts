@@ -1,7 +1,8 @@
 /**
- * Builds the blank OpenLayers basemap and its geographic boundary styling.
- * This module owns static basemap layer construction; interactive map state and forecast overlays are managed by map controllers.
+ * File: src/components/Map/openLayersBlankBasemap.ts
+ * Purpose: Defines the blank OpenLayers basemap used when imagery or base tiles are unavailable.
  */
+
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { Fill, Stroke, Style } from "ol/style";
