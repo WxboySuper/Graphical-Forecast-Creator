@@ -1,3 +1,7 @@
+/**
+ * Handles OpenLayers drawing interactions that create or update forecast geometry.
+ * This module owns draw-event translation and error reporting; forecast state mutation and map-layer setup remain with their controllers.
+ */
 import { captureException } from "@sentry/react";
 import GeoJSON from "ol/format/GeoJSON";
 import type OLFeature from "ol/Feature";
