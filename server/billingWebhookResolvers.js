@@ -1,3 +1,8 @@
+/**
+ * Billing webhook entitlement resolvers.
+ *
+ * This module translates Stripe webhook events into entitlement writes and billing state changes. Signature verification and HTTP response handling belong to the webhook route.
+ */
 'use strict';
 
 const {
