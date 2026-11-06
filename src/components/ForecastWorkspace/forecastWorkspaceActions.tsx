@@ -1,7 +1,8 @@
 /**
- * Forecast-workspace action helpers. It binds toolbar actions to forecast
- * state updates and navigation callbacks without owning the workspace layout.
+ * File: src/components/ForecastWorkspace/forecastWorkspaceActions.tsx
+ * Purpose: Defines forecast workspace action creators and user-driven workspace transitions.
  */
+
 import React, { useCallback } from 'react';
 import {
   redoLastEdit,

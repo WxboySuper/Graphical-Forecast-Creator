@@ -1,9 +1,8 @@
 /**
- * Forecast workspace controller: this hook assembles day/outlook selection,
- * map actions, completion validation, transfers, trimming, and export handlers
- * for the forecast editor. It owns UI orchestration while Redux owns forecast
- * state and lower-level helpers own geometry, persistence, and map rendering.
+ * File: src/components/ForecastWorkspace/useForecastWorkspaceController.tsx
+ * Purpose: Coordinates forecast workspace controller state, callbacks, persistence, and modal orchestration.
  */
+
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';

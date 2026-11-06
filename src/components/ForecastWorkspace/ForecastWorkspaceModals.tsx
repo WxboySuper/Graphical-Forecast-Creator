@@ -1,7 +1,8 @@
 /**
- * Renders modal dialogs used by the forecast workspace for secondary workflows.
- * This component owns modal composition and event wiring; workspace state and domain operations are supplied by its controller props.
+ * File: src/components/ForecastWorkspace/ForecastWorkspaceModals.tsx
+ * Purpose: Coordinates forecast workspace modal composition, visibility, and dialog actions.
  */
+
 import React from 'react';
 import {
   Dialog,
