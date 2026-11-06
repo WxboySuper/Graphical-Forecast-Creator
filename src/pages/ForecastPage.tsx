@@ -206,6 +206,9 @@ const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.R
   </div>
 );
 
+/** Supplies a valid no-op cleanup when no notice observer was created. */
+function noopForecastNoticeCleanup(): void {}
+
 const ARROW_KEYS = new Set(['arrowup', 'arrowright', 'arrowdown', 'arrowleft']);
 const INCREASE_PROBABILITY_KEYS = new Set(['arrowup', 'arrowright']);
 type ShortcutDispatch = Dispatch<UnknownAction>;
@@ -753,14 +756,14 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     function updateLegacyForecastNotice() {
       const shell = forecastShellRef.current;
       const notice = legacyNoticeRef.current;
-      if (!shell) return;
+      if (!shell) return noopForecastNoticeCleanup;
       if (!showLegacyNotice) {
         shell.style.removeProperty('--legacy-forecast-notice-height');
-        return;
+        return noopForecastNoticeCleanup;
       }
       if (!notice) {
         shell.style.removeProperty('--legacy-forecast-notice-height');
-        return;
+        return noopForecastNoticeCleanup;
       }
 
       /** Keeps the forecast shell offset in sync with the notice height. */
@@ -768,7 +771,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
         shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
       };
       updateNoticeHeight();
-      if (typeof ResizeObserver === 'undefined') return;
+      if (typeof ResizeObserver === 'undefined') return noopForecastNoticeCleanup;
       const observer = new ResizeObserver(updateNoticeHeight);
       observer.observe(notice);
       /** Disconnects the observer when the layout effect cleans up. */
