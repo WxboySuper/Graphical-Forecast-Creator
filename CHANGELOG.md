@@ -63,8 +63,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
 - **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
 - **Beta release checks:** Invalid retry settings now fall back to defaults so post-deploy smoke checks run as intended.
+- **Documentation drawer:** Keep the selected tab and scroll position when the layout updates while the drawer is open.
 - **Account deletion:** Retry final cleanup when the account identity has already been removed, while reporting incomplete billing or data cleanup as a failure.
 - **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
 - **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
