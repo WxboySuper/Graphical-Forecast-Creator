@@ -60,17 +60,28 @@ const getPythonCommand = (env = process.env) => (
   env.PYTHON_BIN || env.PYTHON || getDefaultCondaPython() || 'python'
 );
 
+/** Parses the generator JSON payload or throws the appropriate exit error. */
+const parseGeneratorResult = (code, stdout, stderr) => {
+  if (code !== 0) {
+    throw new Error(stderr || `TSTM_GENERATOR_EXIT_${code}`);
+  }
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    throw new Error('TSTM_GENERATOR_INVALID_JSON');
+  }
+};
+
 /** Executes the preserved GRIB2 generator while the capability is enabled. */
 const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject) => {
   const env = options.env || process.env;
   const spawnProcess = options.spawnProcess || spawn;
   const timeoutMs = readPositiveNumberEnv(env.TSTM_GENERATION_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
-  const killGraceMs = Number(options.killGraceMs ?? DEFAULT_KILL_GRACE_MS);
+  const killGraceMs = Number.isFinite(Number(options.killGraceMs)) && Number(options.killGraceMs) >= 0
+    ? Number(options.killGraceMs)
+    : DEFAULT_KILL_GRACE_MS;
   const script = path.join(__dirname, 'weather', 'generate_tstm.py');
-  const args = [script];
-  if (options.ingestionMode) {
-    args.push('--ingestion-mode');
-  }
+  const args = options.ingestionMode ? [script, '--ingestion-mode'] : [script];
   const child = spawnProcess(getPythonCommand(env), args, {
     cwd: __dirname,
     env: {
@@ -107,7 +118,7 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
     state.killTimer = setTimeout(() => {
       state.killTimer = null;
       child.kill('SIGKILL');
-    }, Number.isFinite(killGraceMs) && killGraceMs >= 0 ? killGraceMs : DEFAULT_KILL_GRACE_MS);
+    }, killGraceMs);
   }
   state.timer = setTimeout(() => {
     terminate();
@@ -137,14 +148,10 @@ const runTstmGenerator = (payload, options = {}) => new Promise((resolve, reject
   child.on('close', (code) => {
     clearKillTimer();
     finish(() => {
-      if (code !== 0) {
-        reject(new Error(stderr || `TSTM_GENERATOR_EXIT_${code}`));
-        return;
-      }
       try {
-        resolve(JSON.parse(stdout));
-      } catch {
-        reject(new Error('TSTM_GENERATOR_INVALID_JSON'));
+        resolve(parseGeneratorResult(code, stdout, stderr));
+      } catch (error) {
+        reject(error);
       }
     });
   });
