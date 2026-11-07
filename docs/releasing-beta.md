@@ -70,6 +70,9 @@ The git tag is created **before** deploy (when the draft release is created), so
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Wrangler deploy |
 | `BETA_SSH_KEY`, `BETA_SSH_HOST`, `BETA_SSH_KNOWN_HOSTS` | VPS API deploy (`deploy_api`) |
 | `BETA_INVITE_TOKEN`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT` | VPS API env |
+| `BETA_WORKER_SHARED_SECRET` | Optional shared secret for trusted beta Worker client IP forwarding. Set the same high-entropy value as a GitHub Actions secret and a Cloudflare Worker secret. When unset on either side, rate limits use the proxy address as before. |
 | `STRIPE_*`, `FIREBASE_ADMIN_*`, `SENTRY_DSN` | VPS API env |
 
 `github.token` creates and publishes the GitHub Release.
+
+To enable per-client beta API rate limits, create a high-entropy `BETA_WORKER_SHARED_SECRET` value and store it as a GitHub Actions repository secret. Add the same value to the `gfc-beta` Worker with `pnpm dlx wrangler@4 secret put BETA_WORKER_SHARED_SECRET --config cloudflare/wrangler.beta.jsonc`. The release workflow deploys that value to the beta API and updates the Worker secret during deploy. Direct VPS requests continue using the address supplied by Nginx.

@@ -1,4 +1,22 @@
 const API_PREFIX = '/api';
+const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
+const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
+
+const MAX_CLIENT_IP_LENGTH = 45; // longest IPv6 text form
+const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const IPV6_PATTERN = /^[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}$/i;
+
+/** Cheap shape check; the API server performs the authoritative net.isIP validation. */
+const looksLikeIpAddress = (value) =>
+  value.length <= MAX_CLIENT_IP_LENGTH && (IPV4_PATTERN.test(value) || (IPV6_PATTERN.test(value) && /[0-9a-f]/i.test(value) && !value.includes(':::')));
+
+/** Sets the trusted client-IP headers only when a shared secret and a plausible IP exist. */
+const applyTrustedClientIp = (headers, clientIp, secret) => {
+  if (!secret || !clientIp) return;
+  if (!looksLikeIpAddress(clientIp.trim())) return;
+  headers.set(WORKER_CLIENT_IP_HEADER, clientIp.trim());
+  headers.set(WORKER_SECRET_HEADER, secret);
+};
 
 const isApiPath = (pathname) =>
   pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
@@ -38,7 +56,14 @@ export default {
     apiOrigin.search = requestUrl.search;
     apiOrigin.hash = '';
 
-    const apiRequest = new Request(apiOrigin, request);
+    const headers = new Headers(request.headers);
+    // Never let browser-supplied copies cross the proxy boundary.
+    headers.delete(WORKER_CLIENT_IP_HEADER);
+    headers.delete(WORKER_SECRET_HEADER);
+
+    applyTrustedClientIp(headers, request.headers.get('cf-connecting-ip'), env.BETA_WORKER_SHARED_SECRET);
+
+    const apiRequest = new Request(apiOrigin, new Request(request, { headers }));
     let apiResponse;
     try {
       apiResponse = await fetch(apiRequest, { cf: { cacheTtl: 0 } });
