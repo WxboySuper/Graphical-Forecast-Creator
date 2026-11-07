@@ -129,6 +129,66 @@ describe('EntitlementProvider', () => {
     expect(result.current.effectiveSource).toBe('beta_override');
   });
 
+  test('ignores an entitlement document whose uid belongs to another user', async () => {
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({
+        exists: () => true,
+        data: () => ({
+          uid: 'other-user',
+          premiumActive: true,
+          betaOverrideActive: true,
+          effectiveSource: 'beta_override',
+        }),
+      });
+      return jest.fn();
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.entitlementStatus).toBe('free');
+    expect(result.current.premiumActive).toBe(false);
+    expect(result.current.betaOverrideActive).toBe(false);
+    expect(result.current.effectiveSource).toBe('none');
+  });
+
+  test('treats a missing entitlement uid as invalid and keeps the user free', async () => {
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({
+        exists: () => true,
+        data: () => ({ premiumActive: true, betaOverrideActive: true }),
+      });
+      return jest.fn();
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.entitlementStatus).toBe('free');
+    expect(result.current.premiumActive).toBe(false);
+    expect(result.current.betaOverrideActive).toBe(false);
+  });
+
   test('keeps a user without an entitlement document on the free tier', async () => {
     (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
       onNext({ exists: () => false });

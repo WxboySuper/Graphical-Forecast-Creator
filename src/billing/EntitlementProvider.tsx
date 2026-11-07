@@ -197,7 +197,21 @@ const applySignedOutEntitlementState = (
 };
 
 /** Converts a successful entitlement snapshot into provider state. */
-const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDocument> | undefined): EntitlementListenerState => {
+const createEntitlementListenerState = (
+  snapshotData: Partial<UserEntitlementDocument> | undefined,
+  userId: string
+): EntitlementListenerState => {
+  const documentUid = normalizeNullableString(snapshotData?.uid);
+  // Current Stripe and beta entitlement writers always include uid. Treat missing or mismatched uid
+  // as invalid and keep the signed-in user on the free tier rather than trusting the document flags.
+  if (documentUid !== userId) {
+    return {
+      entitlement: DEFAULT_ENTITLEMENT,
+      status: 'free',
+      error: null,
+    };
+  }
+
   const entitlement = readEntitlementDocument(snapshotData);
   return {
     entitlement,
@@ -237,7 +251,8 @@ const subscribeToEntitlements = (
       }
 
       const nextState = createEntitlementListenerState(
-        snapshot.data() as Partial<UserEntitlementDocument> | undefined
+        snapshot.data() as Partial<UserEntitlementDocument> | undefined,
+        userId
       );
       handlers.setEntitlement(nextState.entitlement);
       handlers.setEntitlementStatus(nextState.status);
