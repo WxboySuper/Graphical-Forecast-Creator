@@ -507,10 +507,9 @@ const handleBillingConfig = (_req, res) => {
 
 /** Handles webhook requests once Stripe availability has been confirmed. */
 const processWebhookRequest = async (req, res, stripe, webhookSecret) => {
+  let event;
   try {
-    const event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], webhookSecret);
-    await handleWebhookEvent(event, stripe);
-    res.status(200).json({ received: true });
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], webhookSecret);
   } catch (error) {
     sendBillingError({
       req,
@@ -519,6 +518,23 @@ const processWebhookRequest = async (req, res, stripe, webhookSecret) => {
       fallbackMessage: 'Invalid Stripe webhook payload.',
       failureCode: 'billing_webhook_invalid',
       statusCode: 400,
+    });
+    return;
+  }
+
+  // Failures after signature verification are server-side problems. Answering
+  // 5xx keeps Stripe retrying and stops blaming the sender for an outage.
+  try {
+    await handleWebhookEvent(event, stripe);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    sendBillingError({
+      req,
+      res,
+      error,
+      fallbackMessage: 'Stripe webhook processing failed.',
+      failureCode: 'billing_webhook_processing_failed',
+      statusCode: 500,
     });
   }
 };
