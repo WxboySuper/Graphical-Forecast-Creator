@@ -7,7 +7,7 @@ import { AlertTriangle } from 'lucide-react';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
 import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
-import { formatAlertsStatusLine } from './monitorControlsUtils';
+import { formatAlertsStatusLine, formatLayerTime } from './monitorControlsUtils';
 
 interface MonitorAlertsMeta {
   alertCollection: NwsAlertFeatureCollection;
@@ -15,6 +15,7 @@ interface MonitorAlertsMeta {
   frameIndex: number;
   loading: boolean;
   error: string | null;
+  fetchedAt: string | null;
   polygonCount: number;
 }
 
@@ -109,7 +110,15 @@ const MonitorAlertsSection: React.FC<MonitorAlertsSectionProps> = ({
       />
       <div className="monitor-controls__meta">
         {alertsMeta.loading && 'Loading NWS alerts…'}
-        {!alertsMeta.loading && alertsMeta.error}
+        {!alertsMeta.loading && alertsMeta.error && (
+          <>
+            <div>{alertsMeta.error} Refresh live layers to retry.</div>
+            <div>Last successful fetch: {formatLayerTime(alertsMeta.fetchedAt ?? undefined)}. Polygons on the map use that data.</div>
+          </>
+        )}
+        {!alertsMeta.loading && !alertsMeta.error && alertsMeta.fetchedAt && (
+          <div>Last successful fetch: {formatLayerTime(alertsMeta.fetchedAt)}</div>
+        )}
         {statusLine}
       </div>
     </MonitorControlsSection>
