@@ -1,7 +1,7 @@
 'use strict';
 
 const { setupExpressErrorHandler } = require('./sentry');
-const { timingSafeEqual } = require('node:crypto');
+const { createHash, timingSafeEqual } = require('node:crypto');
 const net = require('node:net');
 
 const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
@@ -9,9 +9,10 @@ const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
 /** True when the supplied value equals the configured secret, compared in constant time. */
 const matchesSharedSecret = (expectedSecret, suppliedSecret) => {
-  const expected = Buffer.from(expectedSecret || '');
-  const supplied = Buffer.from(suppliedSecret || '');
-  return expected.length > 0 && expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  if (!expectedSecret) return false;
+  // Hash both values so differing lengths still compare as equal-length digests.
+  const digest = (value) => createHash('sha256').update(String(value || ''), 'utf8').digest();
+  return timingSafeEqual(digest(expectedSecret), digest(suppliedSecret));
 };
 
 /** Uses a Worker-provided address only when the request proves it knows the shared secret. */
