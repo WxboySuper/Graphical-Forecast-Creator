@@ -2,6 +2,16 @@ const API_PREFIX = '/api';
 const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
 const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
+const CLIENT_IP_PATTERN = /^[0-9a-f:.]+$/i;
+
+/** Sets the trusted client-IP headers only when a shared secret and a plausible IP exist. */
+const applyTrustedClientIp = (headers, clientIp, secret) => {
+  if (!secret || !clientIp) return;
+  if (!CLIENT_IP_PATTERN.test(clientIp)) return;
+  headers.set(WORKER_CLIENT_IP_HEADER, clientIp);
+  headers.set(WORKER_SECRET_HEADER, secret);
+};
+
 const isApiPath = (pathname) =>
   pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
 
@@ -45,11 +55,7 @@ export default {
     headers.delete(WORKER_CLIENT_IP_HEADER);
     headers.delete(WORKER_SECRET_HEADER);
 
-    const clientIp = request.headers.get('cf-connecting-ip');
-    if (env.BETA_WORKER_SHARED_SECRET && clientIp && /^[0-9a-f:.]+$/i.test(clientIp)) {
-      headers.set(WORKER_CLIENT_IP_HEADER, clientIp);
-      headers.set(WORKER_SECRET_HEADER, env.BETA_WORKER_SHARED_SECRET);
-    }
+    applyTrustedClientIp(headers, request.headers.get('cf-connecting-ip'), env.BETA_WORKER_SHARED_SECRET);
 
     const apiRequest = new Request(apiOrigin, new Request(request, { headers }));
     let apiResponse;

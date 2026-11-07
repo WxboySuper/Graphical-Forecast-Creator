@@ -7,17 +7,19 @@ const net = require('node:net');
 const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
 const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
-/** Uses a Worker-provided address only when the request proves it knows the shared secret. */
-function trustBetaWorkerClientIp(req, _res, next) {
-  const expectedSecret = process.env.BETA_WORKER_SHARED_SECRET;
-  const suppliedSecret = req.get(WORKER_SECRET_HEADER);
-  const clientIp = req.get(WORKER_CLIENT_IP_HEADER);
-
+/** True when the supplied value equals the configured secret, compared in constant time. */
+const matchesSharedSecret = (expectedSecret, suppliedSecret) => {
   const expected = Buffer.from(expectedSecret || '');
   const supplied = Buffer.from(suppliedSecret || '');
-  const secretMatches = expected.length > 0 && expected.length === supplied.length && timingSafeEqual(expected, supplied);
+  return expected.length > 0 && expected.length === supplied.length && timingSafeEqual(expected, supplied);
+};
 
-  if (secretMatches && clientIp && net.isIP(clientIp)) {
+/** Uses a Worker-provided address only when the request proves it knows the shared secret. */
+function trustBetaWorkerClientIp(req, _res, next) {
+  const clientIp = req.get(WORKER_CLIENT_IP_HEADER);
+  const secretMatches = matchesSharedSecret(process.env.BETA_WORKER_SHARED_SECRET, req.get(WORKER_SECRET_HEADER));
+
+  if (secretMatches && net.isIP(clientIp || '')) {
     Object.defineProperty(req, 'ip', { configurable: true, value: clientIp });
   }
 

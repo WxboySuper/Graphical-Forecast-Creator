@@ -62,3 +62,33 @@ test('ignores Worker identity headers when the secret is not configured', () => 
     if (previousSecret !== undefined) process.env.BETA_WORKER_SHARED_SECRET = previousSecret;
   }
 });
+
+test('gives separate rate-limit allowances to different trusted Worker client IPs', async () => {
+  const express = require('express');
+  const rateLimit = require('express-rate-limit');
+  const previousSecret = process.env.BETA_WORKER_SHARED_SECRET;
+  process.env.BETA_WORKER_SHARED_SECRET = 'expected-secret';
+
+  const app = express();
+  app.set('trust proxy', 'loopback');
+  app.use(trustBetaWorkerClientIp);
+  app.use(rateLimit({ windowMs: 60_000, limit: 1, standardHeaders: false, legacyHeaders: false }));
+  app.get('/', (_req, res) => res.sendStatus(200));
+  const server = await new Promise((resolve) => {
+    const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
+  });
+  const { port } = server.address();
+  const request = async (clientIp) => (await fetch(`http://127.0.0.1:${port}/`, {
+    headers: { 'x-gfc-worker-client-ip': clientIp, 'x-gfc-worker-secret': 'expected-secret' },
+  })).status;
+
+  try {
+    assert.equal(await request('203.0.113.8'), 200);
+    assert.equal(await request('203.0.113.8'), 429);
+    assert.equal(await request('203.0.113.9'), 200);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    if (previousSecret === undefined) delete process.env.BETA_WORKER_SHARED_SECRET;
+    else process.env.BETA_WORKER_SHARED_SECRET = previousSecret;
+  }
+});
