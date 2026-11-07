@@ -45,6 +45,31 @@ describe('EntitlementProvider', () => {
     // Do not mock window.location here if it causes issues
   });
 
+  const expectInvalidEntitlementDocumentToBeFree = async (document: Record<string, unknown>) => {
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({ exists: () => true, data: () => document });
+      return jest.fn();
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.premiumActive).toBe(false);
+    expect(result.current.betaOverrideActive).toBe(false);
+    expect(result.current.effectiveSource).toBe('none');
+    return result.current;
+  };
+
   test('provides disabled status when hosted auth is disabled', async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -130,63 +155,18 @@ describe('EntitlementProvider', () => {
   });
 
   test('ignores an entitlement document whose uid belongs to another user', async () => {
-    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
-      onNext({
-        exists: () => true,
-        data: () => ({
-          uid: 'other-user',
-          premiumActive: true,
-          betaOverrideActive: true,
-          effectiveSource: 'beta_override',
-        }),
-      });
-      return jest.fn();
+    const entitlement = await expectInvalidEntitlementDocumentToBeFree({
+      uid: 'other-user',
+      premiumActive: true,
+      betaOverrideActive: true,
+      effectiveSource: 'beta_override',
     });
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_in',
-      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
-    });
-
-    const { result } = renderHook(() => useEntitlement(), {
-      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
-    });
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(result.current.entitlementStatus).toBe('free');
-    expect(result.current.premiumActive).toBe(false);
-    expect(result.current.betaOverrideActive).toBe(false);
-    expect(result.current.effectiveSource).toBe('none');
+    expect(entitlement.entitlementStatus).toBe('free');
   });
 
   test('treats a missing entitlement uid as invalid and keeps the user free', async () => {
-    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
-      onNext({
-        exists: () => true,
-        data: () => ({ premiumActive: true, betaOverrideActive: true }),
-      });
-      return jest.fn();
-    });
-    (useAuth as jest.Mock).mockReturnValue({
-      hostedAuthEnabled: true,
-      status: 'signed_in',
-      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
-    });
-
-    const { result } = renderHook(() => useEntitlement(), {
-      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
-    });
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    expect(result.current.entitlementStatus).toBe('free');
-    expect(result.current.premiumActive).toBe(false);
-    expect(result.current.betaOverrideActive).toBe(false);
+    const entitlement = await expectInvalidEntitlementDocumentToBeFree({ premiumActive: true, betaOverrideActive: true });
+    expect(entitlement.entitlementStatus).toBe('free');
   });
 
   test('keeps a user without an entitlement document on the free tier', async () => {
