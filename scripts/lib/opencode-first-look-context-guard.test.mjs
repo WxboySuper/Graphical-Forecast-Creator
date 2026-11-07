@@ -6,7 +6,13 @@ import {
   FirstLookReviewUnavailableError,
   renderOpenCodeFirstLookUnavailableComment,
 } from './opencode-first-look-context-guard.mjs';
-import { prepareFirstLookPublication, readFirstLookModelOutput, wrapFirstLookPublicationError } from './opencode-first-look-publish.mjs';
+import {
+  buildFirstLookSummaryBody,
+  buildFirstLookUnavailableBody,
+  prepareFirstLookPublication,
+  readFirstLookModelOutput,
+  wrapFirstLookPublicationError,
+} from './opencode-first-look-publish.mjs';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -164,4 +170,49 @@ test('renders an unavailable review comment without a score', () => {
   );
   assert.match(rendered, /review unavailable/i);
   assert.doesNotMatch(rendered, /\/10/);
+});
+
+test('bounds stored and rendered thread assessments while reporting the full count', () => {
+  const openReviewThreads = Array.from({ length: 30 }, (_, index) => ({
+    id: `thread-${index}`,
+    path: 'scripts/a.mjs',
+    line: index + 1,
+  }));
+  const reviewCommentAssessments = openReviewThreads.map(({ id }) => ({
+    threadId: id,
+    status: 'addressed',
+    summary: 'a'.repeat(900),
+  }));
+  const publicationContext = { ...context, openReviewThreads };
+  const rawOutput = JSON.stringify({
+    ...rawWithCoverage,
+    reviewCommentAssessments,
+  });
+  const parsed = prepareFirstLookPublication(rawOutput, publicationContext);
+  const body = buildFirstLookSummaryBody(parsed, publicationContext, {
+    expectedSha: 'a'.repeat(40),
+    reviewKind: 'manual',
+    requestId: 'request-1',
+  });
+  const dataMarker = body.match(/<!-- gfc-opencode-first-look-data:([^ ]+) -->/u)?.[1];
+  const stored = JSON.parse(Buffer.from(dataMarker, 'base64').toString('utf8'));
+
+  assert.equal(stored.reviewCommentAssessments.length, 20);
+  assert.equal(stored.reviewCommentAssessments[0].summary.length, 240);
+  assert.ok(body.length < 60_000);
+  assert.match(body, /30 unresolved/);
+  assert.match(body, /Additional review threads were omitted/);
+});
+
+test('keeps an unavailable notice under the comment limit with oversized diagnostic fields', () => {
+  const body = buildFirstLookUnavailableBody({
+    ci: { url: `https://example.com/${'a'.repeat(100_000)}`, conclusion: 'failure' },
+  }, 'x'.repeat(100_000), {
+    expectedSha: 'a'.repeat(40),
+    reviewKind: 'manual',
+    requestId: 'request-1',
+  });
+
+  assert.ok(body.length < 60_000);
+  assert.match(body, /OpenCode first-look review unavailable/);
 });
