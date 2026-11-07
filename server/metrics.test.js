@@ -262,6 +262,7 @@ describe('daily active device dedupe limits', () => {
     );
     assert.equal(deviceDedupes.length, 5);
     assert.equal(dailyMetrics.activeDevices, 5);
+    assert.equal(documents.get(`adminMetricDedupes/account:${getDayKey()}:user-1`).deviceCount, 5);
   });
 
   it('keeps identical client ids separate across authenticated accounts', async () => {
