@@ -229,3 +229,22 @@ test('builds checkout entitlement writes from retrieved string-ID subscriptions'
   );
   assert.strictEqual(getRetrievedId(), 'sub_1');
 });
+
+test('treats a deleted Stripe subscription as absent but rethrows other failures', async () => {
+  const missing = Object.assign(new Error('No such subscription'), { code: 'resource_missing' });
+  const missingStripe = { subscriptions: { retrieve: async () => { throw missing; } } };
+  for (const eventType of ['invoice.paid', 'invoice.payment_failed']) {
+    assert.strictEqual(
+      await resolveAuthoritativeSubscription(missingStripe, webhookEvent(eventType, { subscription: 'sub_gone' })),
+      null,
+      eventType,
+    );
+  }
+
+  const outage = Object.assign(new Error('Stripe unavailable'), { code: 'api_connection_error' });
+  const outageStripe = { subscriptions: { retrieve: async () => { throw outage; } } };
+  await assert.rejects(
+    resolveAuthoritativeSubscription(outageStripe, webhookEvent('invoice.paid', { subscription: 'sub_1' })),
+    outage,
+  );
+});
