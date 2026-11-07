@@ -1,9 +1,3 @@
-/**
- * Monitor route: this page coordinates live radar, satellite, reports, alerts,
- * reference layers, and the saved forecast view. It owns route-level lifecycle
- * and panel composition while upstream adapters, map synchronization, and
- * cloud settings remain in monitor hooks and service modules.
- */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useOutletContext, useSearchParams } from 'react-router';
@@ -51,6 +45,12 @@ import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { getLocalCalendarDate } from '../utils/localDate';
 import './MonitorPage.css';
 
+/**
+ * Composes the monitor page and wires Redux settings into its controls and map.
+ * useMonitorPageSources handles local and premium settings plus cloud outlook
+ * handoff; useMonitorPageLayers delegates live WMS, NWS alerts, storm reports,
+ * and reference layers to their monitor hooks.
+ */
 interface PageContext {
   addToast: AddToastFn;
 }
