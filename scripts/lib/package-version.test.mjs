@@ -22,6 +22,14 @@ describe('package-version policy', () => {
     assert.equal(deriveStableVersion('1.6.0'), '1.6.0');
   });
 
+  it('rejects prerelease suffixes that are not a numeric beta prerelease', () => {
+    assert.equal(deriveStableVersion('1.6.0-beta'), null);
+    assert.equal(deriveStableVersion('1.6.0-beta.foo'), null);
+    assert.equal(deriveStableVersion('1.6.0-beta.1.2'), null);
+    assert.equal(deriveStableVersion('1.6.0-rc.1'), null);
+    assert.equal(deriveStableVersion('v1.6.0'), null);
+  });
+
   it('builds release branch name', () => {
     assert.equal(releaseBranchForStable('1.6.0'), 'release/v1.6.0');
     assert.equal(isReleasePromotionBranch('release/v1.6.0'), true);
