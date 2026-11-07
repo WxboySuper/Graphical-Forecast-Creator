@@ -389,12 +389,14 @@ const cleanupBlockedCheckoutSession = async (
   if (!uid) return false;
   if (!stripe) throw new Error('Stripe is not configured for late Checkout cleanup.');
 
-  if (session.payment_status === 'unpaid') return false;
-
-  const subscription = await getCheckoutSubscription(stripe, session);
-  const refundTarget = await resolveCheckoutRefundTarget(stripe, session, subscription);
-  ensurePaidCheckoutHasRefundTarget(session, refundTarget);
-  await refundBlockedCheckout(stripe, session, refundTarget);
+  // An unpaid Checkout still creates a Stripe customer and subscription, so the
+  // customer must be deleted even though there is no payment to refund.
+  if (session.payment_status !== 'unpaid') {
+    const subscription = await getCheckoutSubscription(stripe, session);
+    const refundTarget = await resolveCheckoutRefundTarget(stripe, session, subscription);
+    ensurePaidCheckoutHasRefundTarget(session, refundTarget);
+    await refundBlockedCheckout(stripe, session, refundTarget);
+  }
 
   await deleteStripeCustomer({ stripe, customerId: getStripeObjectId(session.customer) });
   console.warn('[billing] checkout:refunded-deleted-user', {
