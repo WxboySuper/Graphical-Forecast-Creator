@@ -23,11 +23,10 @@ export const hasBetaPrerelease = (version) => BETA_PRERELEASE_PATTERN.test(versi
  * @returns {string | null}
  */
 export const deriveStableVersion = (version) => {
-  const stable = version.replace(/-beta(\.[0-9A-Za-z.-]*)?$/i, '');
-  if (stable === version) {
-    return STABLE_VERSION_PATTERN.test(stable) ? stable : null;
+  if (hasBetaPrerelease(version)) {
+    return version.replace(/-beta\.[0-9]+$/i, '');
   }
-  return STABLE_VERSION_PATTERN.test(stable) ? stable : null;
+  return STABLE_VERSION_PATTERN.test(version) ? version : null;
 };
 
 /**
