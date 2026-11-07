@@ -216,3 +216,29 @@ test('keeps an unavailable notice under the comment limit with oversized diagnos
   assert.ok(body.length < 60_000);
   assert.match(body, /OpenCode first-look review unavailable/);
 });
+
+test('guards threads beyond the stored sample before bounding the result', () => {
+  const openReviewThreads = Array.from({ length: 21 }, (_, index) => ({
+    id: `thread-${index}`,
+    path: 'scripts/a.mjs',
+    line: index + 1,
+    openedAtCommitOid: index === 20 ? context.head : 'old-commit',
+  }));
+  const publicationContext = { ...context, openReviewThreads };
+  const rawOutput = JSON.stringify({
+    ...rawWithCoverage,
+    reviewCommentAssessments: openReviewThreads.map(({ id }) => ({
+      threadId: id,
+      status: 'addressed',
+      summary: 'Fixed.',
+    })),
+  });
+
+  const parsed = prepareFirstLookPublication(rawOutput, publicationContext);
+
+  assert.equal(parsed.rating, 8);
+  assert.equal(parsed.badThings.length, 1);
+  assert.equal(parsed.reviewCommentAssessments.length, 20);
+  assert.equal(parsed.reviewCommentAssessments[0].threadId, 'thread-20');
+  assert.equal(parsed.reviewCommentAssessments[0].status, 'unclear');
+});
