@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { verifyFirebaseToken } = require('./firebase-auth');
+const { isAccountDeletionBlocked } = require('./account-lifecycle');
 
 const BETA_CLAIM_RATE_LIMIT = rateLimit({
   windowMs: 60 * 1000,
@@ -26,8 +27,13 @@ const getBetaInviteToken = () => process.env.BETA_INVITE_TOKEN || '';
 /** Returns the optional beta invite path fragment used in invite URLs. */
 const getBetaInvitePath = () => (process.env.BETA_INVITE_PATH || '').trim();
 
-/** Returns the verified Firebase user for authenticated beta-claim requests. */
-const verifyRequestUser = (req) => verifyFirebaseToken(req);
+/**
+ * Returns the verified Firebase user for authenticated beta-claim requests.
+ *
+ * Revocation is checked so an ID token issued to an account that has since been
+ * deleted (or signed out everywhere) cannot be replayed to grant beta access.
+ */
+const verifyRequestUser = (req) => verifyFirebaseToken(req, true);
 
 /** True when the beta-claim endpoint is ready to accept requests on this deployment. */
 const isBetaClaimConfigured = () => hasFirebaseAdminConfig() && Boolean(getBetaInviteToken());
@@ -149,6 +155,13 @@ const handleBetaClaim = async (req, res) => {
     return;
   }
 
+  // A deletion in progress (or already finished) must not be undone by a claim
+  // that would re-create the entitlement and profile documents the sweep removed.
+  if (await isAccountDeletionBlocked(getAdminDb(), decodedToken.uid)) {
+    res.status(409).json({ error: 'This account is being deleted and cannot claim beta access.' });
+    return;
+  }
+
   await grantBetaAccess(decodedToken.uid);
   res.status(200).json({ success: true });
 };
@@ -169,6 +182,7 @@ module.exports = {
   registerBetaRoutes,
   __testing: {
     grantBetaAccess,
+    handleBetaClaim,
     isValidInviteToken,
   },
 };

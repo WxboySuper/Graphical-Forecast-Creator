@@ -23,6 +23,16 @@ const createRef = (collection, id) => ({
   },
 });
 
+const verifyCalls = [];
+let verifiedUid = 'user-1';
+const adminAuth = {
+  verifyIdToken: async (token, checkRevoked) => {
+    verifyCalls.push({ token, checkRevoked });
+    if (token !== 'valid-token') throw new Error('invalid token');
+    return { uid: verifiedUid };
+  },
+};
+
 const db = {
   collection: (collection) => ({
     doc: (id) => createRef(collection, id),
@@ -47,7 +57,7 @@ require.cache[firebaseAdminPath] = {
   id: firebaseAdminPath,
   filename: firebaseAdminPath,
   loaded: true,
-  exports: { getAdminDb: () => db },
+  exports: { getAdminDb: () => db, getAdminAuth: () => adminAuth, hasFirebaseAdminConfig: () => true },
 };
 
 Module._load = function load(request, parent, isMain) {
@@ -60,10 +70,14 @@ const { __testing } = require('./beta');
 
 beforeEach(() => {
   documents.clear();
+  verifyCalls.length = 0;
+  verifiedUid = 'user-1';
+  process.env.BETA_MODE = 'true';
   process.env.BETA_INVITE_TOKEN = 'test-invite-token';
 });
 
 after(() => {
+  delete process.env.BETA_MODE;
   Module._load = originalModuleLoad;
   if (originalInviteToken === undefined) delete process.env.BETA_INVITE_TOKEN;
   else process.env.BETA_INVITE_TOKEN = originalInviteToken;
@@ -168,5 +182,53 @@ describe('beta entitlement grants', () => {
       currentPeriodEnd: null,
     });
     assert.ok(updatedAt instanceof Date);
+  });
+});
+
+describe('beta claim deleted-account guard', () => {
+  const createResponse = () => {
+    const response = { statusCode: null, body: null };
+    response.status = (code) => {
+      response.statusCode = code;
+      return response;
+    };
+    response.json = (body) => {
+      response.body = body;
+      return response;
+    };
+    return response;
+  };
+  const createRequest = () => ({
+    headers: { authorization: 'Bearer valid-token' },
+    body: { token: 'test-invite-token' },
+  });
+
+  it('verifies the ID token with revocation checking enabled', async () => {
+    const response = createResponse();
+    await __testing.handleBetaClaim(createRequest(), response);
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(verifyCalls, [{ token: 'valid-token', checkRevoked: true }]);
+    assert.equal(documents.get('userEntitlements/user-1').premiumActive, true);
+  });
+
+  it('refuses to recreate beta state while account deletion is in progress', async () => {
+    documents.set('accountDeletionRequests/user-1', { status: 'pending' });
+    const response = createResponse();
+    await __testing.handleBetaClaim(createRequest(), response);
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(documents.has('userEntitlements/user-1'), false);
+    assert.equal(documents.has('userProfiles/user-1'), false);
+  });
+
+  it('refuses to recreate beta state after account deletion completed', async () => {
+    const { getDeletionTombstoneId } = require('./account-lifecycle');
+    documents.set(`accountDeletionTombstones/${getDeletionTombstoneId('user-1')}`, { deletedAt: 'x' });
+    const response = createResponse();
+    await __testing.handleBetaClaim(createRequest(), response);
+
+    assert.equal(response.statusCode, 409);
+    assert.equal(documents.has('userEntitlements/user-1'), false);
   });
 });
