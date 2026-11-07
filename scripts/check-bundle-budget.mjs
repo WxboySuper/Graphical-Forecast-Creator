@@ -41,7 +41,7 @@ const resolveScriptPath = (src, base) => {
 
 /**
  * Finds the entry script chunk in built HTML. Prefers the module script Vite
- * emits and ignores non-JS, cross-origin, and query-string variants.
+ * emits, ignores non-JS and cross-origin scripts, and strips query strings.
  *
  * @param {string} html
  * @param {string} [base]
