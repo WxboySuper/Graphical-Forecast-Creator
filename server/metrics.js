@@ -33,6 +33,8 @@ const METRIC_EVENT_TYPES = new Set([
   'cloud_cycle_loaded',
 ]);
 
+const MAX_DAILY_DEVICES_PER_ACCOUNT = 5;
+
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
 const verifyRequestUser = (req, checkRevoked = false) => verifyFirebaseToken(req, checkRevoked);
 
@@ -48,8 +50,9 @@ const isAllowedAdminUid = (uid) => getAdminUidAllowlist().includes(uid);
 
 /** Builds the Firestore refs needed to record one metric event. */
 const createMetricEventRefs = ({ db, dayKey, installationId, uid }) => {
-  const installationHash = installationId ? hashInstallationId(installationId) : null;
-
+  const installationHash = installationId && uid
+    ? hashInstallationId(`${uid}:${installationId}`)
+    : null;
   return {
     dailyRef: db.collection('adminDailyMetrics').doc(dayKey),
     deviceDedupeRef: installationHash
@@ -108,29 +111,18 @@ const readMetricEventSnapshots = (transaction, {
     userMetricsRef ? transaction.get(userMetricsRef) : Promise.resolve(null),
   ]);
 
-/** Writes newly won device/account dedupe docs for the current day. */
-const writeMetricDedupeDocs = ({
+/** Writes one newly won device dedupe document. */
+const writeDeviceDedupeDoc = ({
   transaction,
   deviceDedupeRef,
-  accountDedupeRef,
-  incrementActiveDevices,
-  incrementActiveAccounts,
+  shouldWrite,
   dayKey,
   expiresAt,
   uid,
 }) => {
-  if (deviceDedupeRef && incrementActiveDevices) {
+  if (deviceDedupeRef && shouldWrite) {
     transaction.set(deviceDedupeRef, {
       kind: 'device',
-      dayKey,
-      expiresAt,
-      updatedAt: new Date(),
-    });
-  }
-
-  if (accountDedupeRef && incrementActiveAccounts) {
-    transaction.set(accountDedupeRef, {
-      kind: 'account',
       uid,
       dayKey,
       expiresAt,
@@ -138,6 +130,39 @@ const writeMetricDedupeDocs = ({
     });
   }
 };
+
+/** Writes the account dedupe document and its per-day device count. */
+const writeAccountDedupeDoc = ({
+  transaction,
+  accountDedupeRef,
+  shouldWrite,
+  incrementActiveDevices,
+  deviceCount,
+  dayKey,
+  expiresAt,
+  uid,
+}) => {
+  if (accountDedupeRef && shouldWrite) {
+    transaction.set(accountDedupeRef, {
+      kind: 'account',
+      uid,
+      dayKey,
+      expiresAt,
+      updatedAt: new Date(),
+      deviceCount: deviceCount + Number(incrementActiveDevices),
+    }, { merge: true });
+  }
+};
+
+/** Returns the number of distinct devices recorded for an account today. */
+const readAccountDeviceCount = (snapshot) => Number(snapshot?.data()?.deviceCount) || 0;
+
+/** Returns whether this event can claim a new device dedupe for the account. */
+const canCountActiveDevice = (refs, deviceSnapshot, accountSnapshot) => Boolean(
+  refs.deviceDedupeRef &&
+  !deviceSnapshot?.exists &&
+  readAccountDeviceCount(accountSnapshot) < MAX_DAILY_DEVICES_PER_ACCOUNT
+);
 
 /** Writes the next admin daily aggregate document for the current event. */
 const writeAdminDailyMetrics = ({
@@ -203,16 +228,26 @@ const writeMetricEventTransaction = async ({
     const [dailySnapshot, deviceDedupeSnapshot, accountDedupeSnapshot, userMetricsSnapshot] =
       await readMetricEventSnapshots(transaction, refs);
 
-    const incrementActiveDevices = Boolean(refs.deviceDedupeRef && !deviceDedupeSnapshot?.exists);
+    const deviceCount = readAccountDeviceCount(accountDedupeSnapshot);
+    const incrementActiveDevices = canCountActiveDevice(refs, deviceDedupeSnapshot, accountDedupeSnapshot);
     const incrementActiveAccounts = Boolean(refs.accountDedupeRef && !accountDedupeSnapshot?.exists);
     const expiresAt = getDedupeExpiryDate();
 
-    writeMetricDedupeDocs({
+    writeDeviceDedupeDoc({
       transaction,
       deviceDedupeRef: refs.deviceDedupeRef,
+      shouldWrite: incrementActiveDevices,
+      dayKey,
+      expiresAt,
+      uid,
+    });
+
+    writeAccountDedupeDoc({
+      transaction,
       accountDedupeRef: refs.accountDedupeRef,
+      shouldWrite: incrementActiveAccounts || incrementActiveDevices,
       incrementActiveDevices,
-      incrementActiveAccounts,
+      deviceCount,
       dayKey,
       expiresAt,
       uid,
