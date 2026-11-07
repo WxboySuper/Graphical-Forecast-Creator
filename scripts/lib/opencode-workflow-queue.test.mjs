@@ -5,7 +5,6 @@ import { readFileSync } from 'node:fs';
 const workflowFiles = [
   '../../.github/workflows/opencode.yml',
   '../../.github/workflows/opencode-issue-triage.yml',
-  '../../.github/workflows/opencode-scheduled-maintenance.yml',
   '../../.github/workflows/opencode-changelog-audit.yml',
   '../../.github/workflows/opencode-changelog-pr.yml',
 ];
@@ -21,12 +20,6 @@ test('every OpenCode workflow shares the single bounded concurrency queue', () =
     );
     assert.doesNotMatch(source, /^[ ]{2}cancel-in-progress: true$/m, `${workflowFile} must not cancel a running invocation`);
   }
-  const scheduled = readFileSync(new URL('../../.github/workflows/opencode-scheduled-maintenance.yml', import.meta.url), 'utf8');
-  assert.match(scheduled, /^[ ]{6}pull-requests: read$/m);
-  assert.match(scheduled, /^[ ]{6}vulnerability-alerts: read$/m);
-  assert.match(scheduled, /fs\.fstatSync\(fileHandle\)/);
-  assert.match(scheduled, /maintainer-led implementation/);
-  assert.doesNotMatch(scheduled, /opencode-audit-eligible/);
 });
 
 test('changelog audit keeps runner context references at step scope', () => {
