@@ -30,6 +30,11 @@ describe('glob-match', () => {
     assert.equal(pathMatches('other/a/b/c.css', 'src/**/*.css'), false);
   });
 
+  it('keeps single-star globs scoped to one path segment', () => {
+    assert.ok(pathMatches('src/a.css', 'src/*.css'));
+    assert.equal(pathMatches('src/a/b.css', 'src/*.css'), false);
+  });
+
   it('anchors suffix globs to a path segment boundary', () => {
     assert.ok(pathMatches('foo.ts', '**/foo.ts'));
     assert.ok(pathMatches('src/foo.ts', '**/foo.ts'));
