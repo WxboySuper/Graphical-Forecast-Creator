@@ -27,8 +27,8 @@ let adminAuth = null;
 const createRef = (collection, id) => ({ collection, id, key: `${collection}/${id}` });
 const snapshot = (ref) => ({ exists: documents.has(ref.key), data: () => documents.get(ref.key) || {} });
 const db = {
-  collection: (collection) => ({
-    doc: (id) => createRef(collection, id),
+  collection: (collectionName) => ({
+    doc: (id) => createRef(collectionName, id),
     where: () => ({
       get: () => premiumFallbackGet(),
       count: () => ({
@@ -89,9 +89,9 @@ const createUnauthenticatedRequest = (event) => ({
   body: { event, installationId: 'test-installation' },
 });
 
-const createAuthenticatedRequest = (event) => ({
+const createAuthenticatedRequest = (event, installationId = 'test-installation') => ({
   headers: { authorization: 'Bearer test-token' },
-  body: { event, installationId: 'test-installation' },
+  body: { event, installationId },
 });
 
 beforeEach(() => {
@@ -243,6 +243,39 @@ describe('product metric authentication contract', () => {
 
   it('does not classify unsupported events as trusted metric writes', () => {
     assert.equal(requiresAuthenticatedMetricEvent('unknown'), false);
+  });
+});
+
+describe('daily active device dedupe limits', () => {
+  it('counts at most five distinct devices per authenticated account per day', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+
+    for (let index = 1; index <= 6; index += 1) {
+      const response = createResponse();
+      await handleMetricEvent(createAuthenticatedRequest('cycle_saved', `installation-${index}`), response);
+      assert.equal(response.statusCode, 204);
+    }
+
+    const dailyMetrics = documents.get(`adminDailyMetrics/${getDayKey()}`);
+    const deviceDedupes = [...documents.entries()].filter(([key, data]) =>
+      key.startsWith('adminMetricDedupes/') && data.kind === 'device'
+    );
+    assert.equal(deviceDedupes.length, 5);
+    assert.equal(dailyMetrics.activeDevices, 5);
+  });
+
+  it('keeps identical client ids separate across authenticated accounts', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+    await handleMetricEvent(createAuthenticatedRequest('cycle_saved', 'shared-id'), createResponse());
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-2' }) };
+    await handleMetricEvent(createAuthenticatedRequest('cycle_saved', 'shared-id'), createResponse());
+
+    const deviceDedupes = [...documents.entries()].filter(([key, data]) =>
+      key.startsWith('adminMetricDedupes/') && data.kind === 'device'
+    );
+    assert.equal(deviceDedupes.length, 2);
+    assert.deepEqual(deviceDedupes.map(([, data]) => data.uid).sort(), ['user-1', 'user-2']);
+    assert.equal(documents.get(`adminDailyMetrics/${getDayKey()}`).activeDevices, 2);
   });
 });
 

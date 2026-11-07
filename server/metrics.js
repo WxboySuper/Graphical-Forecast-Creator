@@ -33,6 +33,8 @@ const METRIC_EVENT_TYPES = new Set([
   'cloud_cycle_loaded',
 ]);
 
+const MAX_DAILY_DEVICES_PER_ACCOUNT = 5;
+
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
 const verifyRequestUser = (req) => verifyFirebaseToken(req);
 
@@ -48,8 +50,9 @@ const isAllowedAdminUid = (uid) => getAdminUidAllowlist().includes(uid);
 
 /** Builds the Firestore refs needed to record one metric event. */
 const createMetricEventRefs = ({ db, dayKey, installationId, uid }) => {
-  const installationHash = installationId ? hashInstallationId(installationId) : null;
-
+  const installationHash = installationId && uid
+    ? hashInstallationId(`${uid}:${installationId}`)
+    : null;
   return {
     dailyRef: db.collection('adminDailyMetrics').doc(dayKey),
     deviceDedupeRef: installationHash
@@ -118,24 +121,28 @@ const writeMetricDedupeDocs = ({
   dayKey,
   expiresAt,
   uid,
+  accountDedupeSnapshot,
 }) => {
   if (deviceDedupeRef && incrementActiveDevices) {
     transaction.set(deviceDedupeRef, {
       kind: 'device',
+      uid,
       dayKey,
       expiresAt,
       updatedAt: new Date(),
     });
   }
 
-  if (accountDedupeRef && incrementActiveAccounts) {
+  if (accountDedupeRef && (incrementActiveAccounts || incrementActiveDevices)) {
+    const existingDeviceCount = Number(accountDedupeSnapshot?.data()?.deviceCount) || 0;
     transaction.set(accountDedupeRef, {
       kind: 'account',
       uid,
       dayKey,
       expiresAt,
       updatedAt: new Date(),
-    });
+      deviceCount: existingDeviceCount + Number(incrementActiveDevices),
+    }, { merge: true });
   }
 };
 
@@ -203,7 +210,10 @@ const writeMetricEventTransaction = async ({
     const [dailySnapshot, deviceDedupeSnapshot, accountDedupeSnapshot, userMetricsSnapshot] =
       await readMetricEventSnapshots(transaction, refs);
 
-    const incrementActiveDevices = Boolean(refs.deviceDedupeRef && !deviceDedupeSnapshot?.exists);
+    const deviceCount = Number(accountDedupeSnapshot?.data()?.deviceCount) || 0;
+    const incrementActiveDevices = Boolean(
+      refs.deviceDedupeRef && !deviceDedupeSnapshot?.exists && deviceCount < MAX_DAILY_DEVICES_PER_ACCOUNT
+    );
     const incrementActiveAccounts = Boolean(refs.accountDedupeRef && !accountDedupeSnapshot?.exists);
     const expiresAt = getDedupeExpiryDate();
 
@@ -216,6 +226,7 @@ const writeMetricEventTransaction = async ({
       dayKey,
       expiresAt,
       uid,
+      accountDedupeSnapshot,
     });
 
     writeAdminDailyMetrics({
