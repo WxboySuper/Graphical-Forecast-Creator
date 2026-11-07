@@ -449,21 +449,32 @@ const isInvoiceForDeletedAccount = (subscription, invoice, customerId) => {
     : isStripeCustomerDeletionBlocked(getAdminDb(), customerId);
 };
 
+/** Refunds a late invoice payment when its account deletion has started or finished. */
+const refundInvoiceForDeletedAccount = async (invoice, stripe) => {
+  const customerId = getStripeObjectId(invoice.customer);
+  await refundDeletedAccountInvoice(invoice, { stripe: stripe || getStripeClient(), customerId });
+};
+
 /** Applies invoice notifications from the current authoritative subscription state. */
 const handleInvoiceEvent = async (event, stripe) => {
   const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  const invoice = event.data.object;
+  const invoiceCustomerId = getStripeObjectId(invoice.customer);
   if (!subscription) {
+    // The subscription no longer exists (for example account deletion removed it
+    // before a delayed payment event arrived). That payment still needs a refund.
+    if (await isInvoiceForDeletedAccount(null, invoice, invoiceCustomerId)) {
+      await refundInvoiceForDeletedAccount(invoice, stripe);
+      return;
+    }
     console.warn('[billing] invoice:skipped-no-subscription', { eventId: event.id, eventType: event.type });
     return;
   }
   const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
-  const invoice = event.data.object;
-  const invoiceStripe = stripe || getStripeClient();
-  const invoiceCustomerId = getStripeObjectId(invoice.customer);
   const shouldRefund = result?.reason === 'deleted-user' ||
     (result?.reason === 'missing-target' && await isInvoiceForDeletedAccount(subscription, invoice, invoiceCustomerId));
   if (shouldRefund) {
-    await refundDeletedAccountInvoice(invoice, { stripe: invoiceStripe, customerId: invoiceCustomerId });
+    await refundInvoiceForDeletedAccount(invoice, stripe);
   }
 };
 

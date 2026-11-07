@@ -65,7 +65,7 @@ const buildCheckoutEntitlementWrite = async (stripe, event, session) => {
 
 /** Resolves the UID from subscription or invoice metadata. */
 const resolveInvoiceUid = (subscription, invoice) =>
-  getSubscriptionUid(subscription) ||
+  (subscription ? getSubscriptionUid(subscription) : '') ||
   invoice.parent?.subscription_details?.metadata?.uid ||
   invoice.subscription_details?.metadata?.uid ||
   '';

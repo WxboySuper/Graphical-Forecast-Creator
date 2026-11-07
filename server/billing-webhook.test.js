@@ -103,6 +103,50 @@ after(() => {
 });
 
 describe('billing webhook state', () => {
+  it('refunds a late invoice payment when its subscription was deleted with the account', async () => {
+    documents.set('accountDeletionRequests/user-1', { stripeCustomerId: 'cus_1' });
+    const calls = [];
+    const missing = Object.assign(new Error('No such subscription'), { code: 'resource_missing' });
+    const stripe = {
+      subscriptions: { retrieve: async () => { throw missing; } },
+      refunds: { create: async (...args) => { calls.push(['refund', ...args]); } },
+      customers: { del: async (id) => { calls.push(['delete', id]); } },
+    };
+    const event = {
+      id: 'evt_late',
+      type: 'invoice.paid',
+      created: 300,
+      data: { object: { id: 'in_late', subscription: 'sub_gone', customer: 'cus_1', payment_intent: 'pi_late' } },
+    };
+
+    await __testing.handleWebhookEvent(event, stripe);
+
+    assert.deepEqual(calls[0], [
+      'refund',
+      { payment_intent: 'pi_late' },
+      { idempotencyKey: 'account-deletion-invoice-refund:in_late' },
+    ]);
+  });
+
+  it('skips a missing-subscription invoice for an account that is not being deleted', async () => {
+    const calls = [];
+    const missing = Object.assign(new Error('No such subscription'), { code: 'resource_missing' });
+    const stripe = {
+      subscriptions: { retrieve: async () => { throw missing; } },
+      refunds: { create: async (...args) => { calls.push(args); } },
+    };
+    const event = {
+      id: 'evt_skip',
+      type: 'invoice.paid',
+      created: 300,
+      data: { object: { id: 'in_skip', subscription: 'sub_gone', customer: 'cus_other', payment_intent: 'pi_x' } },
+    };
+
+    await __testing.handleWebhookEvent(event, stripe);
+
+    assert.deepEqual(calls, []);
+  });
+
   it('derives invoice entitlement from the current subscription', async () => {
     const retrieved = subscription('canceled');
     const stripe = { subscriptions: { retrieve: async (id) => {
