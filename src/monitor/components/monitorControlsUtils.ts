@@ -13,7 +13,7 @@ export function formatLayerTime(time?: string): string {
 
   const parsed = new Date(time);
   if (Number.isNaN(parsed.getTime())) {
-    return 'Latest time unavailable';
+    return time;
   }
 
   return parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });

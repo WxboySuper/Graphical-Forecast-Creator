@@ -7,7 +7,7 @@ import { AlertTriangle } from 'lucide-react';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
 import type { MonitorSettings } from '../types';
 import MonitorControlsSection from './MonitorControlsSection';
-import { formatAlertsStatusLine, formatLayerTime } from './monitorControlsUtils';
+import { formatAlertsStatusLine } from './monitorControlsUtils';
 
 interface MonitorAlertsMeta {
   alertCollection: NwsAlertFeatureCollection;
@@ -18,6 +18,27 @@ interface MonitorAlertsMeta {
   fetchedAt: string | null;
   polygonCount: number;
 }
+
+/** Formats a fetch time with its date so stale alerts left open overnight are obvious. */
+const formatFetchTime = (value: string | null): string => {
+  const parsed = value ? new Date(value) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return 'Latest time unavailable';
+  return parsed.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+};
+
+/** Explains how fresh the displayed alerts are, including after a failed refresh. */
+const AlertsFreshness: React.FC<{ meta: MonitorAlertsMeta }> = ({ meta }) => {
+  if (meta.loading) return <>Loading NWS alerts…</>;
+  if (meta.error) {
+    return (
+      <>
+        <div>{meta.error} Refresh live layers to retry.</div>
+        {meta.frameCount > 0 && <div>Retained alert history was last updated {formatFetchTime(meta.fetchedAt)}.</div>}
+      </>
+    );
+  }
+  return meta.fetchedAt ? <div>Last successful fetch: {formatFetchTime(meta.fetchedAt)}</div> : null;
+};
 
 interface MonitorAlertCategoryCheckboxProps {
   label: string;
@@ -109,16 +130,7 @@ const MonitorAlertsSection: React.FC<MonitorAlertsSectionProps> = ({
         onChange={onAlertsShowAdvisoriesChange}
       />
       <div className="monitor-controls__meta">
-        {alertsMeta.loading && 'Loading NWS alerts…'}
-        {!alertsMeta.loading && alertsMeta.error && (
-          <>
-            <div>{alertsMeta.error} Refresh live layers to retry.</div>
-            <div>Last successful fetch: {formatLayerTime(alertsMeta.fetchedAt ?? undefined)}. Polygons on the map use that data.</div>
-          </>
-        )}
-        {!alertsMeta.loading && !alertsMeta.error && alertsMeta.fetchedAt && (
-          <div>Last successful fetch: {formatLayerTime(alertsMeta.fetchedAt)}</div>
-        )}
+        <AlertsFreshness meta={alertsMeta} />
         {statusLine}
       </div>
     </MonitorControlsSection>

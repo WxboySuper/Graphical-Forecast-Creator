@@ -45,7 +45,7 @@ describe('MonitorAlertsSection', () => {
     );
 
     expect(screen.getByText(/NWS alert refresh failed; showing last available data\. Refresh live layers to retry\./)).toBeInTheDocument();
-    expect(screen.getByText(/Last successful fetch:.*Polygons on the map use that data\./)).toBeInTheDocument();
+    expect(screen.getByText(/Retained alert history was last updated/)).toBeInTheDocument();
     expect(screen.queryByText(/frame 2\/2/)).not.toBeInTheDocument();
   });
 
@@ -72,6 +72,24 @@ describe('MonitorAlertsSection', () => {
       />,
     );
 
-    expect(screen.getByText(/Last successful fetch: Latest time unavailable/)).toBeInTheDocument();
+    expect(screen.getByText(/Retained alert history was last updated Latest time unavailable\./)).toBeInTheDocument();
+  });
+
+  test('shows only the retry message when no alerts were ever retained', () => {
+    render(
+      <MonitorAlertsSection
+        {...baseProps}
+        alertsMeta={{ ...baseProps.alertsMeta, error: 'Refresh failed.', fetchedAt: null, frameCount: 0, frameIndex: 0 }}
+      />,
+    );
+
+    expect(screen.getByText(/Refresh failed\. Refresh live layers to retry\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Retained alert history/)).not.toBeInTheDocument();
+  });
+
+  test('includes the calendar date in the fetch time', () => {
+    render(<MonitorAlertsSection {...baseProps} />);
+
+    expect(screen.getByText(/Last successful fetch: .*Nov/)).toBeInTheDocument();
   });
 });
