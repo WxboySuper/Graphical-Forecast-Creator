@@ -16,6 +16,7 @@ import {
   selectHasActiveWorkflow,
   startBlankCycle,
   createOutlookUpdate,
+  setForecastWorkspace,
   selectSavedCyclesForActiveWorkspace,
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
@@ -24,7 +25,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
@@ -46,7 +47,10 @@ const useHomePageLogic = () => {
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
-  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const persistedWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const workspaceId = getExposedForecastWorkspaces().some(({ id }) => id === persistedWorkspaceId)
+    ? persistedWorkspaceId
+    : DEFAULT_FORECAST_WORKSPACE;
   const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -82,6 +86,9 @@ const useHomePageLogic = () => {
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
     clearAutoSave(user?.uid, workspaceId);
+    // Move Redux to the resolved workspace first; otherwise the destination route
+    // would switch workspaces on mount and discard the day chosen here.
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(setForecastDay(day));
     navigate(getForecastWorkspacePath(workspaceId));
   };
@@ -95,6 +102,7 @@ const useHomePageLogic = () => {
       return;
     }
     clearAutoSave(user?.uid, workspaceId);
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
@@ -165,6 +173,7 @@ const useHomePageLogic = () => {
   const handleConfirmNewCycle = () => {
     clearAutoSave(user?.uid, workspaceId);
     if (pendingWorkflow) {
+      dispatch(setForecastWorkspace(workspaceId));
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
         cycleDate: getLocalCalendarDate(),
