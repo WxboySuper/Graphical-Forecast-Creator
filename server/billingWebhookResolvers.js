@@ -28,7 +28,7 @@ const getWebhookSubscription = (event) => {
 };
 
 /** Retrieves current Stripe lifecycle state when an event contains only an identifier. */
-const resolveAuthoritativeSubscription = (stripe, event) => {
+const resolveAuthoritativeSubscription = async (stripe, event) => {
   const subscription = getWebhookSubscription(event);
   if (!subscription) {
     return null;
@@ -36,7 +36,14 @@ const resolveAuthoritativeSubscription = (stripe, event) => {
   if (typeof subscription === 'object') {
     return subscription;
   }
-  return stripe.subscriptions.retrieve(subscription);
+  try {
+    return await stripe.subscriptions.retrieve(subscription);
+  } catch (error) {
+    // Delayed or retried events can reference a subscription that was deleted
+    // in the meantime (for example by account deletion). Treat it as absent.
+    if (error?.code === 'resource_missing') return null;
+    throw error;
+  }
 };
 
 /** Preserves checkout metadata when Stripe has not copied it to the subscription yet. */
