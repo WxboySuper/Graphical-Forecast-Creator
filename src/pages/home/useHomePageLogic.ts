@@ -24,7 +24,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import { DEFAULT_FORECAST_WORKSPACE, getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
@@ -46,7 +46,10 @@ const useHomePageLogic = () => {
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
-  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const persistedWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const workspaceId = getExposedForecastWorkspaces().some(({ id }) => id === persistedWorkspaceId)
+    ? persistedWorkspaceId
+    : DEFAULT_FORECAST_WORKSPACE;
   const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);

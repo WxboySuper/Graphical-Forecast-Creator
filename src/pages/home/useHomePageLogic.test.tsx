@@ -205,6 +205,30 @@ describe('useHomePageLogic', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
   });
 
+  test('quick-start falls back when the persisted workspace is not exposed', () => {
+    const store = buildStore({ workspaceId: 'mesoscale' });
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+    const button = document.createElement('button');
+    button.dataset.day = '2';
+
+    act(() => {
+      result.current.handleQuickStartClick({ currentTarget: button } as unknown as React.MouseEvent<HTMLButtonElement>);
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/severe');
+  });
+
+  test('workflow start falls back when the persisted workspace is not exposed', () => {
+    const store = buildStore({ workspaceId: 'mesoscale', isSaved: true });
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    act(() => {
+      result.current.handleStartWorkflow({ id: 'severe-day1', label: 'Day 1', groupings: ['day1'] });
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/severe');
+  });
+
   test('ignores malformed quick-start and recent-cycle clicks', () => {
     const store = buildStore({
       savedCycles: [
