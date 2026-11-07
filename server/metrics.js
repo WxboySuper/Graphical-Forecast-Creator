@@ -34,7 +34,7 @@ const METRIC_EVENT_TYPES = new Set([
 ]);
 
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
-const verifyRequestUser = (req) => verifyFirebaseToken(req);
+const verifyRequestUser = (req, checkRevoked = false) => verifyFirebaseToken(req, checkRevoked);
 
 /** Returns the current server-side admin UID allowlist parsed from env. */
 const getAdminUidAllowlist = () =>
@@ -343,7 +343,7 @@ const handleAdminMetrics = async (req, res) => {
     return;
   }
 
-  const decodedToken = await verifyRequestUser(req);
+  const decodedToken = await verifyRequestUser(req, true);
   if (!decodedToken) {
     console.warn('[metrics] admin:unauthenticated');
     res.status(401).json({ error: 'Missing or invalid Firebase ID token.' });
