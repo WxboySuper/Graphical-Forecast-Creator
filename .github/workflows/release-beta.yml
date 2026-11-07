@@ -408,10 +408,15 @@ jobs:
 
       - name: Deploy beta Worker and static assets
         id: deploy
-        run: pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.beta.jsonc
+        run: |
+          if [ -n "$BETA_WORKER_SHARED_SECRET" ]; then
+            printf '%s' "$BETA_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4 secret put BETA_WORKER_SHARED_SECRET --config cloudflare/wrangler.beta.jsonc
+          fi
+          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.beta.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
 
       - name: Print rollback command on deploy failure
         if: failure() && steps.deploy.outcome == 'failure'
@@ -490,6 +495,7 @@ jobs:
           BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           ADMIN_UID_ALLOWLIST: ${{ secrets.ADMIN_UID_ALLOWLIST }}
           METRICS_HASH_SALT: ${{ secrets.METRICS_HASH_SALT }}
+          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           BETA_STRIPE_WEBHOOK_SECRET: ${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_MONTHLY: ${{ secrets.STRIPE_PRICE_MONTHLY }}
@@ -511,6 +517,7 @@ jobs:
           BETA_INVITE_PATH=${BETA_INVITE_PATH}
           ADMIN_UID_ALLOWLIST=${ADMIN_UID_ALLOWLIST}
           METRICS_HASH_SALT=${METRICS_HASH_SALT}
+          BETA_WORKER_SHARED_SECRET=${BETA_WORKER_SHARED_SECRET}
           STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
           STRIPE_WEBHOOK_SECRET=${BETA_STRIPE_WEBHOOK_SECRET}
           STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY}

@@ -54,6 +54,63 @@ test('proxies API paths, query strings, request bodies, and response status', as
   }
 });
 
+test('replaces client-supplied worker headers with the Cloudflare client IP and secret', async () => {
+  const originalFetch = globalThis.fetch;
+  const request = new Request('https://beta.gfcweather.com/api/test', {
+    headers: {
+      'cf-connecting-ip': '203.0.113.8',
+      'x-gfc-worker-client-ip': '198.51.100.55',
+      'x-gfc-worker-secret': 'attacker-value',
+    },
+  });
+  let proxiedRequest;
+  globalThis.fetch = async (forwardedRequest) => {
+    proxiedRequest = forwardedRequest;
+    return new Response('ok');
+  };
+
+  try {
+    await worker.fetch(request, {
+      BETA_API_ORIGIN: 'https://beta-gfc.weatherboysuper.com',
+      BETA_WORKER_SHARED_SECRET: 'configured-secret',
+      ASSETS: { fetch: () => assert.fail('API paths must not fall through to assets') },
+    });
+
+    assert.equal(proxiedRequest.headers.get('x-gfc-worker-client-ip'), '203.0.113.8');
+    assert.equal(proxiedRequest.headers.get('x-gfc-worker-secret'), 'configured-secret');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('strips worker headers and does not add trusted identity headers when the secret is unset', async () => {
+  const originalFetch = globalThis.fetch;
+  const request = new Request('https://beta.gfcweather.com/api/test', {
+    headers: {
+      'cf-connecting-ip': '203.0.113.8',
+      'x-gfc-worker-client-ip': '198.51.100.55',
+      'x-gfc-worker-secret': 'attacker-value',
+    },
+  });
+  let proxiedRequest;
+  globalThis.fetch = async (forwardedRequest) => {
+    proxiedRequest = forwardedRequest;
+    return new Response('ok');
+  };
+
+  try {
+    await worker.fetch(request, {
+      BETA_API_ORIGIN: 'https://beta-gfc.weatherboysuper.com',
+      ASSETS: { fetch: () => assert.fail('API paths must not fall through to assets') },
+    });
+
+    assert.equal(proxiedRequest.headers.has('x-gfc-worker-client-ip'), false);
+    assert.equal(proxiedRequest.headers.has('x-gfc-worker-secret'), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('rejects API origins that are missing, invalid, or not HTTPS', async () => {
   for (const origin of [
     undefined,

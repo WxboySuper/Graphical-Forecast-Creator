@@ -1,4 +1,6 @@
 const API_PREFIX = '/api';
+const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
+const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
 const isApiPath = (pathname) =>
   pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
@@ -38,7 +40,18 @@ export default {
     apiOrigin.search = requestUrl.search;
     apiOrigin.hash = '';
 
-    const apiRequest = new Request(apiOrigin, request);
+    const headers = new Headers(request.headers);
+    // Never let browser-supplied copies cross the proxy boundary.
+    headers.delete(WORKER_CLIENT_IP_HEADER);
+    headers.delete(WORKER_SECRET_HEADER);
+
+    const clientIp = request.headers.get('cf-connecting-ip');
+    if (env.BETA_WORKER_SHARED_SECRET && clientIp && /^[0-9a-f:.]+$/i.test(clientIp)) {
+      headers.set(WORKER_CLIENT_IP_HEADER, clientIp);
+      headers.set(WORKER_SECRET_HEADER, env.BETA_WORKER_SHARED_SECRET);
+    }
+
+    const apiRequest = new Request(apiOrigin, new Request(request, { headers }));
     let apiResponse;
     try {
       apiResponse = await fetch(apiRequest, { cf: { cacheTtl: 0 } });
