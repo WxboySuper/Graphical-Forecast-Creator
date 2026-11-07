@@ -8,7 +8,7 @@ const crypto = require('node:crypto');
 const rateLimit = require('express-rate-limit');
 const { getAdminDb, hasFirebaseAdminConfig } = require('./firebase-admin');
 const { verifyFirebaseToken } = require('./firebase-auth');
-const { isAccountDeletionBlocked } = require('./account-lifecycle');
+const { getDeletionTombstoneId } = require('./account-lifecycle');
 
 const BETA_CLAIM_RATE_LIMIT = rateLimit({
   windowMs: 60 * 1000,
@@ -93,6 +93,10 @@ const isValidInvitePath = (value) => {
  * controls beta eligibility while the entitlement document controls premium
  * feature access. Keep the two writes together so a successful claim cannot
  * leave the account in a partially activated state.
+ *
+ * The account-deletion markers are read inside the same transaction, so a claim
+ * that raced with deletion cannot re-create documents the deletion sweep removed.
+ * Returns false (and writes nothing) when deletion is active or completed.
  */
 const grantBetaAccess = async (uid) => {
   const db = getAdminDb();
@@ -100,7 +104,15 @@ const grantBetaAccess = async (uid) => {
     throw new Error('Firebase Admin is not configured for beta claims.');
   }
 
-  await db.runTransaction(async (transaction) => {
+  return db.runTransaction(async (transaction) => {
+    const requestSnapshot = await transaction.get(db.collection('accountDeletionRequests').doc(uid));
+    const tombstoneSnapshot = await transaction.get(
+      db.collection('accountDeletionTombstones').doc(getDeletionTombstoneId(uid))
+    );
+    if (requestSnapshot.exists || tombstoneSnapshot.exists) {
+      return false;
+    }
+
     const profileRef = db.collection('userProfiles').doc(uid);
     const entitlementRef = db.collection('userEntitlements').doc(uid);
     const profileSnapshot = await transaction.get(profileRef);
@@ -135,6 +147,7 @@ const grantBetaAccess = async (uid) => {
       },
       { merge: true }
     );
+    return true;
   });
 };
 
@@ -157,12 +170,11 @@ const handleBetaClaim = async (req, res) => {
 
   // A deletion in progress (or already finished) must not be undone by a claim
   // that would re-create the entitlement and profile documents the sweep removed.
-  if (await isAccountDeletionBlocked(getAdminDb(), decodedToken.uid)) {
+  if (!(await grantBetaAccess(decodedToken.uid))) {
     res.status(409).json({ error: 'This account is being deleted and cannot claim beta access.' });
     return;
   }
 
-  await grantBetaAccess(decodedToken.uid);
   res.status(200).json({ success: true });
 };
 

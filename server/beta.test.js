@@ -39,7 +39,7 @@ const db = {
   }),
   runTransaction: async (callback) => {
     const writes = [];
-    await callback({
+    const result = await callback({
       get: async (ref) => ({
         exists: documents.has(ref.key),
         data: () => documents.get(ref.key) || {},
@@ -50,6 +50,7 @@ const db = {
       const previous = write.options?.merge ? documents.get(write.ref.key) || {} : {};
       documents.set(write.ref.key, { ...previous, ...write.data });
     }
+    return result;
   },
 };
 
@@ -230,5 +231,15 @@ describe('beta claim deleted-account guard', () => {
 
     assert.equal(response.statusCode, 409);
     assert.equal(documents.has('userEntitlements/user-1'), false);
+  });
+});
+
+describe('beta grant deletion race', () => {
+  it('writes nothing when a deletion marker exists at transaction time', async () => {
+    documents.set('accountDeletionRequests/user-9', { status: 'pending' });
+
+    assert.equal(await __testing.grantBetaAccess('user-9'), false);
+    assert.equal(documents.has('userEntitlements/user-9'), false);
+    assert.equal(documents.has('userProfiles/user-9'), false);
   });
 });
