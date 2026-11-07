@@ -265,6 +265,20 @@ describe('daily active device dedupe limits', () => {
     assert.equal(documents.get(`adminMetricDedupes/account:${getDayKey()}:user-1`).deviceCount, 5);
   });
 
+  it('keeps recording events and user progress after the device cap is reached', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+
+    for (let index = 1; index <= 6; index += 1) {
+      await handleMetricEvent(createAuthenticatedRequest('cycle_saved', `installation-${index}`), createResponse());
+    }
+    await handleMetricEvent(createAuthenticatedRequest('cloud_cycle_loaded', 'installation-7'), createResponse());
+
+    assert.equal(documents.get('userMetrics/user-1').cyclesCreated, 6);
+    const dailyMetrics = documents.get(`adminDailyMetrics/${getDayKey()}`);
+    assert.equal(dailyMetrics.cloudLoads, 1);
+    assert.equal(dailyMetrics.activeDevices, 5);
+  });
+
   it('keeps identical client ids separate across authenticated accounts', async () => {
     adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
     await handleMetricEvent(createAuthenticatedRequest('cycle_saved', 'shared-id'), createResponse());
