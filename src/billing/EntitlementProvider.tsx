@@ -197,7 +197,21 @@ const applySignedOutEntitlementState = (
 };
 
 /** Converts a successful entitlement snapshot into provider state. */
-const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDocument> | undefined): EntitlementListenerState => {
+const createEntitlementListenerState = (
+  snapshotData: Partial<UserEntitlementDocument> | undefined,
+  userId: string
+): EntitlementListenerState => {
+  const documentUid = normalizeNullableString(snapshotData?.uid);
+  // Current writers always include uid, but older documents may predate it. Only a uid that is present
+  // and belongs to someone else is invalid; keep the signed-in user free rather than trusting its flags.
+  if (documentUid && documentUid !== userId) {
+    return {
+      entitlement: DEFAULT_ENTITLEMENT,
+      status: 'free',
+      error: null,
+    };
+  }
+
   const entitlement = readEntitlementDocument(snapshotData);
   return {
     entitlement,
@@ -237,7 +251,8 @@ const subscribeToEntitlements = (
       }
 
       const nextState = createEntitlementListenerState(
-        snapshot.data() as Partial<UserEntitlementDocument> | undefined
+        snapshot.data() as Partial<UserEntitlementDocument> | undefined,
+        userId
       );
       handlers.setEntitlement(nextState.entitlement);
       handlers.setEntitlementStatus(nextState.status);
