@@ -16,6 +16,7 @@ import {
   selectHasActiveWorkflow,
   startBlankCycle,
   createOutlookUpdate,
+  setForecastWorkspace,
   selectSavedCyclesForActiveWorkspace,
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
@@ -85,6 +86,9 @@ const useHomePageLogic = () => {
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
     clearAutoSave(user?.uid, workspaceId);
+    // Move Redux to the resolved workspace first; otherwise the destination route
+    // would switch workspaces on mount and discard the day chosen here.
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(setForecastDay(day));
     navigate(getForecastWorkspacePath(workspaceId));
   };
@@ -98,6 +102,7 @@ const useHomePageLogic = () => {
       return;
     }
     clearAutoSave(user?.uid, workspaceId);
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
@@ -168,6 +173,7 @@ const useHomePageLogic = () => {
   const handleConfirmNewCycle = () => {
     clearAutoSave(user?.uid, workspaceId);
     if (pendingWorkflow) {
+      dispatch(setForecastWorkspace(workspaceId));
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
         cycleDate: getLocalCalendarDate(),
