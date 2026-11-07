@@ -15,15 +15,20 @@ const matchesSharedSecret = (expectedSecret, suppliedSecret) => {
   return timingSafeEqual(digest(expectedSecret), digest(suppliedSecret));
 };
 
+/** Returns the Worker-forwarded client IP when the request proves the shared secret, else null. */
+const getTrustedWorkerClientIp = (req) => {
+  const secret = process.env.BETA_WORKER_SHARED_SECRET;
+  if (!matchesSharedSecret(secret, req.get(WORKER_SECRET_HEADER))) return null;
+  const clientIp = req.get(WORKER_CLIENT_IP_HEADER) || '';
+  return net.isIP(clientIp) ? clientIp : null;
+};
+
 /** Uses a Worker-provided address only when the request proves it knows the shared secret. */
 function trustBetaWorkerClientIp(req, _res, next) {
-  const clientIp = req.get(WORKER_CLIENT_IP_HEADER);
-  const secretMatches = matchesSharedSecret(process.env.BETA_WORKER_SHARED_SECRET, req.get(WORKER_SECRET_HEADER));
-
-  if (secretMatches && net.isIP(clientIp || '')) {
+  const clientIp = getTrustedWorkerClientIp(req);
+  if (clientIp) {
     Object.defineProperty(req, 'ip', { configurable: true, value: clientIp });
   }
-
   next();
 }
 
