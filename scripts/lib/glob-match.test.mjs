@@ -18,6 +18,23 @@ describe('glob-match', () => {
     assert.ok(pathMatches('docs/foo.md', '**/*.md'));
   });
 
+  it('matches interior double-star globs across nested directories', () => {
+    assert.ok(pathMatches('src/a/b/c.css', 'src/**/*.css'));
+    assert.ok(pathMatches('src/a.css', 'src/**/*.css'));
+    assert.ok(pathMatches('.github/a/b/doc.md', '.github/**/*.md'));
+    assert.ok(pathMatches('.github/doc.md', '.github/**/*.md'));
+  });
+
+  it('does not let interior double-star globs cross path boundaries where a single star applies', () => {
+    assert.equal(pathMatches('src/a/b/c.ts', 'src/**/*.css'), false);
+    assert.equal(pathMatches('other/a/b/c.css', 'src/**/*.css'), false);
+  });
+
+  it('keeps single-star globs scoped to one path segment', () => {
+    assert.ok(pathMatches('src/a.css', 'src/*.css'));
+    assert.equal(pathMatches('src/a/b.css', 'src/*.css'), false);
+  });
+
   it('anchors suffix globs to a path segment boundary', () => {
     assert.ok(pathMatches('foo.ts', '**/foo.ts'));
     assert.ok(pathMatches('src/foo.ts', '**/foo.ts'));
