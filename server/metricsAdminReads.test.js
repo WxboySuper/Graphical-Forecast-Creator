@@ -208,6 +208,38 @@ describe('metrics admin reads extraction', () => {
     assert.equal(payload.summary.totalAccounts, 11);
   });
 
+  it('rejects revoked tokens on the admin metrics endpoint', async () => {
+    let checkedRevocation = false;
+    lastAuth = {
+      verifyIdToken: async (_token, checkRevoked) => {
+        checkedRevocation = checkRevoked;
+        if (checkRevoked) throw new Error('Firebase ID token has been revoked');
+        return { uid: 'admin-1' };
+      },
+    };
+    process.env.ADMIN_UID_ALLOWLIST = 'admin-1';
+    const metrics = require('./metrics');
+    const result = {};
+    const res = {
+      status: (code) => {
+        result.status = code;
+        return res;
+      },
+      json: (body) => { result.body = body; },
+    };
+
+    await metrics.handleAdminMetrics(
+      { query: { window: '7' }, headers: { authorization: 'Bearer revoked-token' } },
+      res
+    );
+
+    assert.equal(checkedRevocation, true);
+    assert.deepEqual(result, {
+      status: 401,
+      body: { error: 'Missing or invalid Firebase ID token.' },
+    });
+  });
+
   it('always returns a Promise from countPremiumSubscriptions, including no-database and cache-hit paths', async () => {
     await assertCounterPromiseContract(
       'countPremiumSubscriptions',
