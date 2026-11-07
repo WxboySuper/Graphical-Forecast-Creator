@@ -202,9 +202,9 @@ const createEntitlementListenerState = (
   userId: string
 ): EntitlementListenerState => {
   const documentUid = normalizeNullableString(snapshotData?.uid);
-  // Current Stripe and beta entitlement writers always include uid. Treat missing or mismatched uid
-  // as invalid and keep the signed-in user on the free tier rather than trusting the document flags.
-  if (documentUid !== userId) {
+  // Current writers always include uid, but older documents may predate it. Only a uid that is present
+  // and belongs to someone else is invalid; keep the signed-in user free rather than trusting its flags.
+  if (documentUid && documentUid !== userId) {
     return {
       entitlement: DEFAULT_ENTITLEMENT,
       status: 'free',

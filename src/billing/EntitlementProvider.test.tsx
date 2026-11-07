@@ -164,9 +164,25 @@ describe('EntitlementProvider', () => {
     expect(entitlement.entitlementStatus).toBe('free');
   });
 
-  test('treats a missing entitlement uid as invalid and keeps the user free', async () => {
-    const entitlement = await expectInvalidEntitlementDocumentToBeFree({ premiumActive: true, betaOverrideActive: true });
-    expect(entitlement.entitlementStatus).toBe('free');
+  test('still trusts a legacy entitlement document that has no uid field', async () => {
+    (onSnapshot as jest.Mock).mockImplementation((_reference, onNext) => {
+      onNext({ exists: () => true, data: () => ({ premiumActive: true, effectiveSource: 'stripe' }) });
+      return jest.fn();
+    });
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'user-123', getIdToken: jest.fn().mockResolvedValue('token') },
+    });
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.premiumActive).toBe(true);
   });
 
   test('keeps a user without an entitlement document on the free tier', async () => {
