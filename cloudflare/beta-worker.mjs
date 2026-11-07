@@ -2,13 +2,19 @@ const API_PREFIX = '/api';
 const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
 const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
-const CLIENT_IP_PATTERN = /^[0-9a-f:.]+$/i;
+const MAX_CLIENT_IP_LENGTH = 45; // longest IPv6 text form
+const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const IPV6_PATTERN = /^[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}$/i;
+
+/** Cheap shape check; the API server performs the authoritative net.isIP validation. */
+const looksLikeIpAddress = (value) =>
+  value.length <= MAX_CLIENT_IP_LENGTH && (IPV4_PATTERN.test(value) || (IPV6_PATTERN.test(value) && /[0-9a-f]/i.test(value) && !value.includes(':::')));
 
 /** Sets the trusted client-IP headers only when a shared secret and a plausible IP exist. */
 const applyTrustedClientIp = (headers, clientIp, secret) => {
   if (!secret || !clientIp) return;
-  if (!CLIENT_IP_PATTERN.test(clientIp)) return;
-  headers.set(WORKER_CLIENT_IP_HEADER, clientIp);
+  if (!looksLikeIpAddress(clientIp.trim())) return;
+  headers.set(WORKER_CLIENT_IP_HEADER, clientIp.trim());
   headers.set(WORKER_SECRET_HEADER, secret);
 };
 

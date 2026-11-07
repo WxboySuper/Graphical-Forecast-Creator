@@ -111,6 +111,34 @@ test('strips worker headers and does not add trusted identity headers when the s
   }
 });
 
+test('forwards IPv6 client addresses and drops invalid or missing ones', async () => {
+  const originalFetch = globalThis.fetch;
+  const env = {
+    BETA_API_ORIGIN: 'https://beta-gfc.weatherboysuper.com',
+    BETA_WORKER_SHARED_SECRET: 'configured-secret',
+    ASSETS: { fetch: () => assert.fail('API paths must not fall through to assets') },
+  };
+  const proxy = async (clientIp) => {
+    let proxiedRequest;
+    globalThis.fetch = async (forwardedRequest) => {
+      proxiedRequest = forwardedRequest;
+      return new Response('ok');
+    };
+    const headers = clientIp === undefined ? {} : { 'cf-connecting-ip': clientIp };
+    await worker.fetch(new Request('https://beta.gfcweather.com/api/test', { headers }), env);
+    return proxiedRequest.headers.get('x-gfc-worker-client-ip');
+  };
+
+  try {
+    assert.equal(await proxy('2001:db8::1'), '2001:db8::1');
+    for (const invalid of [undefined, '...', '::::', 'evil', '1.2.3', `${'a'.repeat(60)}`]) {
+      assert.equal(await proxy(invalid), null, String(invalid));
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('rejects API origins that are missing, invalid, or not HTTPS', async () => {
   for (const origin of [
     undefined,
