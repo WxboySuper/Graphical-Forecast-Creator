@@ -6,7 +6,7 @@ function createPayload(env, record) {
 **Plan:** ${record.plan ?? 'unknown'}
 **ID:** ${record.id}`;
   // Truncate the message, never the trailer, so the ID needed to correlate a thread always survives.
-  const description = `**Feedback:** ${record.message.slice(0, 4096 - 14 - trailer.length)}${trailer}`;
+  const description = `**Feedback:** ${record.message.slice(0, Math.max(0, 4096 - 14 - trailer.length))}${trailer}`;
   return {
     thread_name: `[${record.build_target === 'beta' ? 'BETA' : 'PROD'}] ${record.category}: ${record.message.slice(0, 80)}`.slice(0, 100),
     content: `Feedback ${record.id}`,
@@ -34,12 +34,15 @@ export async function postDiscord(env, record) {
 
 export async function notifyDiscord(env, ctx, record) {
   if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return;
-  ctx.waitUntil((async () => {
+  const task = (async () => {
     const status = await postDiscord(env, record);
     try {
       await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
     } catch {
       // The feedback row is already stored; a failed status update must not surface as an unhandled rejection.
     }
-  })());
+  })();
+  // Without an execution context (direct calls, tests) wait inline so the work is never dropped.
+  if (ctx?.waitUntil) ctx.waitUntil(task);
+  else await task;
 }

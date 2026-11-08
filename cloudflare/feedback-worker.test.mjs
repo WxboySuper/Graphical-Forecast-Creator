@@ -317,6 +317,20 @@ test('long messages are truncated without losing the Discord trailer ID', async 
   assert.ok(description.endsWith(`**ID:** ${id}`));
 });
 
+test('tolerates small clock skew but rejects tokens issued far in the future', async () => {
+  const { env, ctx } = harness();
+  const nowSeconds = 1950000000;
+  assert.equal((await post(env, ctx, { auth: await token({ iat: nowSeconds + 30, auth_time: nowSeconds + 30 }) })).status, 201);
+  assert.equal((await post(env, ctx, { auth: await token({ iat: nowSeconds + 300, auth_time: nowSeconds + 300, sub: 'late' }), body: validBody({ message: 'Different message for skew.' }) })).status, 401);
+});
+
+test('submission succeeds when no execution context is available', async () => {
+  const { env, db } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => new Response('{}') } });
+  const response = await post(env, undefined, { auth: await token() });
+  assert.equal(response.status, 201);
+  assert.equal(db.rows[0].discord_status, 'sent');
+});
+
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
   const { db, env, ctx } = harness(); const auth = await token();
   assert.equal((await post(env, ctx, { auth, body: validBody({ viewport: '   ' }) })).status, 201);

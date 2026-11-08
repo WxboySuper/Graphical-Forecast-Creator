@@ -1,4 +1,6 @@
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
+/** Tolerated clock skew between Google's token issuer and the Worker. */
+const CLOCK_LEEWAY_SECONDS = 60;
 let jwksCache = { keys: null, expiresAt: 0 };
 
 /** Decodes unpadded base64url to a binary string, restoring the padding atob may require. */
@@ -23,10 +25,10 @@ function claimsAreValid(claims, project, now) {
   const checks = [
     () => claims.iss === `https://securetoken.google.com/${project}`,
     () => claims.aud === project,
-    () => Number.isFinite(claims.exp) && claims.exp > now,
-    () => Number.isFinite(claims.iat) && claims.iat <= now,
+    () => Number.isFinite(claims.exp) && claims.exp + CLOCK_LEEWAY_SECONDS > now,
+    () => Number.isFinite(claims.iat) && claims.iat - CLOCK_LEEWAY_SECONDS <= now,
     () => typeof claims.sub === 'string' && claims.sub.length > 0,
-    () => Number.isFinite(claims.auth_time) && claims.auth_time <= now,
+    () => Number.isFinite(claims.auth_time) && claims.auth_time - CLOCK_LEEWAY_SECONDS <= now,
   ];
   return checks.every((check) => check());
 }

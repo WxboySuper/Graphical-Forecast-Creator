@@ -1,6 +1,9 @@
 import { digest } from './auth.mjs';
 import { clean } from './validate.mjs';
 
+const WINDOWS = { recent: 600000, daily: 86400000 };
+const LIMITS = { recent: 5, daily: 20 };
+
 export const MAX_BODY_BYTES = 16 * 1024;
 
 async function cancelReader(reader) {
@@ -46,8 +49,8 @@ export async function readLimitedBody(request) {
 }
 
 function rateLimitRetry(counts, now) {
-  if ((counts?.recent ?? 0) >= 5) return retryAt(counts.recent_at, 600000, now);
-  if ((counts?.daily ?? 0) >= 20) return retryAt(counts.daily_at, 86400000, now);
+  if ((counts?.recent ?? 0) >= LIMITS.recent) return retryAt(counts.recent_at, WINDOWS.recent, now);
+  if ((counts?.daily ?? 0) >= LIMITS.daily) return retryAt(counts.daily_at, WINDOWS.daily, now);
   return null;
 }
 
@@ -57,15 +60,12 @@ function retryAt(createdAt, window, now) {
 }
 
 export async function applyUserRateLimit(db, uidHash, message, now) {
-  const counts = await db.prepare('SELECT SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) AS recent, SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) AS daily, MAX(CASE WHEN created_at > ? THEN created_at END) AS recent_at, MAX(CASE WHEN created_at > ? THEN created_at END) AS daily_at FROM feedback WHERE uid_hash = ?').bind(now - 600000, now - 86400000, now - 600000, now - 86400000, uidHash).first();
+  const counts = await db.prepare('SELECT SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) AS recent, SUM(CASE WHEN created_at > ? THEN 1 ELSE 0 END) AS daily, MAX(CASE WHEN created_at > ? THEN created_at END) AS recent_at, MAX(CASE WHEN created_at > ? THEN created_at END) AS daily_at FROM feedback WHERE uid_hash = ?').bind(now - WINDOWS.recent, now - WINDOWS.daily, now - WINDOWS.recent, now - WINDOWS.daily, uidHash).first();
   const retry = rateLimitRetry(counts, now);
   if (retry) return { retry, duplicate: false };
-  const duplicate = await db.prepare('SELECT id FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ? LIMIT 1').bind(uidHash, message, now - 600000).first();
+  const duplicate = await db.prepare('SELECT id FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ? LIMIT 1').bind(uidHash, message, now - WINDOWS.recent).first();
   return duplicate ? { retry: 600, duplicate: true } : null;
 }
-
-const WINDOWS = { recent: 600000, daily: 86400000 };
-const LIMITS = { recent: 5, daily: 20 };
 
 /**
  * One atomic statement: the row is inserted only while the per-user rolling
