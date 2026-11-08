@@ -6,7 +6,7 @@ import { renderViewerPage } from './viewer-page.mjs';
 const statuses = ['new', 'triaged', 'resolved', 'wontfix'];
 const targets = ['beta', 'production'];
 const categories = ['bug', 'idea', 'praise', 'question', 'other'];
-const corsFreeHeaders = { 'cache-control': 'no-store' };
+const corsFreeHeaders = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
 
 function nonce() {
   const bytes = crypto.getRandomValues(new Uint8Array(18));

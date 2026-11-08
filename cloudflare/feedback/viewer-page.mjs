@@ -119,7 +119,7 @@ init();
 
 /** Returns the viewer document; `nonce` must match the CSP header sent with it. */
 export function renderViewerPage(nonce) {
-  if (!/^[A-Za-z0-9_-]+$/.test(nonce)) throw new Error('Invalid CSP nonce');
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(nonce)) throw new Error('Invalid CSP nonce');
   return `<!doctype html>
 <html lang="en">
 <head>

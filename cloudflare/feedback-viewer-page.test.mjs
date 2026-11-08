@@ -3,12 +3,12 @@ import test from 'node:test';
 import worker from './feedback-worker.mjs';
 import { renderViewerPage } from './feedback/viewer-page.mjs';
 
-const html = renderViewerPage('test-nonce');
+const html = renderViewerPage('test-nonce-0123456789abcd');
 
 test('every inline script and style carries the CSP nonce', () => {
   const tags = html.match(/<(script|style)\b[^>]*>/gi) ?? [];
   assert.ok(tags.length >= 2, 'page has an inline script and style');
-  for (const tag of tags) assert.ok(tag.includes('nonce="test-nonce"'), `nonce missing on ${tag}`);
+  for (const tag of tags) assert.ok(tag.includes('nonce="test-nonce-0123456789abcd"'), `nonce missing on ${tag}`);
 });
 
 test('the page loads nothing from other origins and has no inline event handlers', () => {
@@ -50,8 +50,8 @@ test('the page ignores stale list responses and serializes status saves', () => 
 });
 
 test('the renderer refuses a nonce that could break out of an attribute or header', () => {
-  for (const bad of ['', 'a"b', "a'b", 'a b', 'a;b', '<x>']) assert.throws(() => renderViewerPage(bad), /nonce/i, JSON.stringify(bad));
-  assert.doesNotThrow(() => renderViewerPage('aB3-_x'));
+  for (const bad of ['', 'a"b', "a'b", 'a b', 'a;b', '<x>', 'short', 'a'.repeat(65)]) assert.throws(() => renderViewerPage(bad), /nonce/i, JSON.stringify(bad));
+  assert.doesNotThrow(() => renderViewerPage('aB3-_x0123456789abcdef'));
 });
 
 test('the search text is never written to the URL', () => {
