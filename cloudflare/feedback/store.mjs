@@ -1,9 +1,9 @@
 import { digest } from './auth.mjs';
 import { clean } from './validate.mjs';
 
-const WINDOWS = { recent: 600000, daily: 86400000 };
+export const WINDOWS = { recent: 600000, daily: 86400000 };
 // `global` caps total submissions per recent window so floods from many throwaway accounts cannot fill storage or Discord.
-const LIMITS = { recent: 5, daily: 20, global: 120 };
+export const LIMITS = { recent: 5, daily: 20, global: 120 };
 
 export const MAX_BODY_BYTES = 16 * 1024;
 

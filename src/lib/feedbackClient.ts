@@ -63,6 +63,9 @@ export const submitFeedback = async (user: User, submission: FeedbackSubmission)
     throw new FeedbackSubmitError('Feedback is not available on this build.');
   }
 
+  if (typeof user.getIdToken !== 'function') {
+    throw new FeedbackSubmitError('Feedback needs a hosted GFC account. Sign in with a hosted account to send it.');
+  }
   const response = await postFeedback(baseUrl, await user.getIdToken(), buildPayload(submission));
   if (!response.ok) {
     throw new FeedbackSubmitError(STATUS_MESSAGES[response.status] ?? 'Feedback could not be sent right now. Please try again.');

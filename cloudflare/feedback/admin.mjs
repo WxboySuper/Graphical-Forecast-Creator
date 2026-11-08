@@ -10,8 +10,8 @@ const unauthorized = () => json({ error: 'Authentication required' }, 401);
 const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 
 async function attemptKey(request, env) {
-  // Without a client IP, throttle per presented token instead of lumping every such caller into one shared bucket.
-  const ip = request.headers.get('CF-Connecting-IP')?.trim() || `no-ip:${await digest(request.headers.get('authorization') ?? '')}`;
+  // Cloudflare always sets this header. Without it all callers share one fixed bucket, so rotating tokens can never buy fresh attempts.
+  const ip = request.headers.get('CF-Connecting-IP')?.trim() || 'no-ip';
   return digest(`admin-throttle:${ip}:${env.FEEDBACK_HASH_SALT}`);
 }
 

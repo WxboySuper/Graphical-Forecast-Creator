@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
+import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
 
 const project = 'gfc-test';
 let privateKey;
@@ -64,10 +65,10 @@ class FakeD1 {
       const [id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, user_agent, discord_status, ...guards] = args;
       const [, recentSince, , dailySince, , , dupSince, globalSince] = guards;
       const mine = db.rows.filter((row) => row.uid_hash === uid_hash);
-      const blocked = mine.filter((row) => row.created_at > recentSince).length >= 5
-        || mine.filter((row) => row.created_at > dailySince).length >= 20
+      const blocked = mine.filter((row) => row.created_at > recentSince).length >= LIMITS.recent
+        || mine.filter((row) => row.created_at > dailySince).length >= LIMITS.daily
         || mine.some((row) => row.message === message && row.created_at > dupSince)
-        || db.rows.filter((row) => row.created_at > globalSince).length >= 120;
+        || db.rows.filter((row) => row.created_at > globalSince).length >= LIMITS.global;
       if (blocked) return { meta: { changes: 0 } };
       db.rows.push({ id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, user_agent, discord_status, status: 'new' });
       return { meta: { changes: 1 } };
@@ -99,7 +100,7 @@ class FakeD1 {
       ];
       const activeFilters = filters.filter((filter) => predicates.includes(filter.predicate));
       const { rows } = activeFilters.reduce((state, filter) => filter.apply(state), { rows: [...db.rows], index: 0 });
-      rows.sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
+      rows.sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? 1 : -1));
       return { results: rows.slice(0, args.at(-1)).map((row) => selectColumns(row, sql)) };
     } },
   ];
@@ -176,7 +177,7 @@ test('validates fields and body size', async () => {
   assert.equal((await post(env, ctx, { body: validBody({ message: 'a\n b\t c' }), auth })).status, 400);
   assert.equal((await post(env, ctx, { body: validBody({ page: ' \n\t ' }), auth })).status, 400);
   assert.equal((await post(env, ctx, { body: validBody({ appVersion: '\n\t ' }), auth })).status, 400);
-  const big = new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'POST', headers: { authorization: `Bearer ${auth}`, origin: 'https://beta.gfcweather.com', 'content-type': 'application/json' }, body: 'x'.repeat(17000) });
+  const big = new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'POST', headers: { authorization: `Bearer ${auth}`, origin: 'https://beta.gfcweather.com', 'content-type': 'application/json' }, body: 'x'.repeat(MAX_BODY_BYTES + 1000) });
   assert.equal((await worker.fetch(big, env, ctx)).status, 413);
   const streamed = new Request('https://feedback.gfcweather.com/v1/feedback', {
     method: 'POST',
@@ -408,11 +409,23 @@ test('admin API refuses browser origins and rejects limit=0', async () => {
   assert.equal((await get('/v1/feedback?limit=1')).status, 200);
 });
 
-test('header-less admin callers are throttled per token, not in one shared bucket', async () => {
-  const { env, ctx, db } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+test('header-less admin callers share one fixed bucket so rotating tokens cannot dodge the throttle', async () => {
+  const { env, ctx } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
   const bad = (token) => worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: `Bearer ${token}` } }), env, ctx);
-  await bad('guess-one'); await bad('guess-two');
-  assert.equal(db.adminAttempts.size, 2);
+  for (let i = 0; i < 10; i += 1) assert.equal((await bad(`guess-${i}`)).status, 401);
+  assert.equal((await bad('guess-brand-new')).status, 429);
+});
+
+test('the guarded insert is one statement carrying every limit guard', async () => {
+  const { db, env, ctx } = harness();
+  const statements = [];
+  const original = db.prepare.bind(db);
+  db.prepare = (sql) => { statements.push(sql); return original(sql); };
+  await post(env, ctx, { auth: await token() });
+  const inserts = statements.filter((sql) => sql.startsWith('INSERT INTO feedback ('));
+  assert.equal(inserts.length, 1, 'submission performs exactly one insert statement');
+  for (const limit of [LIMITS.recent, LIMITS.daily, LIMITS.global]) assert.ok(inserts[0].includes(`) < ${limit}`), `guard for limit ${limit}`);
+  assert.match(inserts[0], /NOT EXISTS/);
 });
 
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {

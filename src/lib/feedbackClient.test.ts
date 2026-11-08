@@ -68,6 +68,13 @@ describe('submitFeedback', () => {
     await expect(submitFeedback(user, submission)).rejects.toThrow(pattern);
   });
 
+  test('explains when a local-dev user has no hosted token instead of throwing a TypeError', async () => {
+    globals.__GFC_BUILD_TARGET__ = 'beta';
+    const fetchMock = mockFetch({ ok: true, status: 201 });
+    await expect(submitFeedback({ uid: 'local' } as unknown as User, submission)).rejects.toThrow(/hosted GFC account/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   test('reports network failures as FeedbackSubmitError', async () => {
     mockFetch(new Error('offline'));
     await expect(submitFeedback(user, submission)).rejects.toBeInstanceOf(FeedbackSubmitError);
