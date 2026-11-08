@@ -244,7 +244,9 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
 
 /** Draw tab uses Severe controls in Severe and custom controls in Custom. */
 const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController; workspaceId?: ForecastWorkspaceId }> = ({ controller, workspaceId = 'severe' }) => {
-  const customExposed = workspaceId === 'custom' && isFeatureExposed('customWorkspace');
+  const customExposed = workspaceId === 'custom'
+    && isFeatureExposed('customProducts')
+    && isFeatureExposed('customWorkspace');
 
   if (!customExposed) {
     return <TabbedToolbarTabRow><SevereDrawControls controller={controller} /></TabbedToolbarTabRow>;
