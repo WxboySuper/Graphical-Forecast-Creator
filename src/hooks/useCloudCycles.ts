@@ -719,6 +719,9 @@ function applyCloudLoadSuccess({
   return buildLoadedCloudForecastPayload(data);
 }
 
+const isMesoscaleCloudPayload = (payload: unknown): boolean =>
+  isRecord(payload) && payload.workspaceId === 'mesoscale';
+
 /** Resolves one finished load request into selection-scoped state updates and payload. */
 function finishCloudLoadRequest({
   result,
@@ -758,6 +761,15 @@ function finishCloudLoadRequest({
   }
   if (!canApply) {
     return null;
+  }
+  if (isMesoscaleCloudPayload(result.data.payload)) {
+    return applyCloudLoadFailure({
+      resultError: 'Cloud storage is not supported for Mesoscale forecasts.',
+      cycleId,
+      canApply,
+      setError,
+      updateSyncState,
+    });
   }
   return applyCloudLoadSuccess({ cycles, cycleId, setCurrentCloud, updateSyncState, user, data: result.data });
 }
