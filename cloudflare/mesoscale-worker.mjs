@@ -104,6 +104,55 @@ const addConfiguredTemplateBase = (catalog, env) => {
   return catalog;
 };
 
+const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
+
+const catalogResponse = (value, request, env, route, headers, etag) => {
+  const domain = value.domain;
+  const invalid = value.schemaVersion !== 1 || value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle) || value.status !== 'complete' || !Array.isArray(value.frames) || !domain || !Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom) || domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM || domain.minZoom > domain.maxZoom;
+  if (invalid) return json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
+  try {
+    addConfiguredTemplateBase(value, env);
+  } catch {
+    return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+  }
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  if (matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
+  return new Response(JSON.stringify(value), { headers });
+};
+
+const latestResponse = (value, request, env, route, now, headers, etag) => {
+  const cycle = compactCycleFromIso(value.cycleTime);
+  if (value.schemaVersion !== 1 || value.modelId !== route.model || !cycle || typeof value.publishedAt !== 'string' || !Number.isFinite(Date.parse(value.publishedAt))) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
+  const age = ageMinutes(value.cycleTime, now);
+  const stale = age === null || age > Number(env.STALE_AFTER_MINUTES || 180);
+  headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
+  headers.set('X-Mesoscale-Stale', String(stale));
+  if (env.PUBLIC_BASE_URL) {
+    try {
+      const base = publicBaseUrl(env);
+      value.catalogUrl = `${base.origin}${base.pathname.replace(/\/$/, '')}/catalog/${route.model}/${cycle}.json`;
+    } catch {
+      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+    }
+  }
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  if (matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
+  return new Response(JSON.stringify(value), { headers });
+};
+
+const storedJsonResponse = async (request, env, route, object, now, headers, etag) => {
+  let value;
+  try {
+    value = await object.json();
+  } catch {
+    return malformedJsonResponse();
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return malformedJsonResponse();
+  return route.kind === 'catalog'
+    ? catalogResponse(value, request, env, route, headers, etag)
+    : latestResponse(value, request, env, route, now, headers, etag);
+};
+
 const getObjectResponse = async (request, env, route, now) => {
   if (!env.MESOSCALE_BUCKET || typeof env.MESOSCALE_BUCKET.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const object = await env.MESOSCALE_BUCKET.get(route.key);
@@ -113,43 +162,7 @@ const getObjectResponse = async (request, env, route, now) => {
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', route.kind === 'catalog' || route.kind === 'tile' ? `public, max-age=${route.kind === 'catalog' ? CATALOG_TTL : TILE_TTL}, immutable` : `public, max-age=${POINTER_TTL}`);
   if (route.kind === 'tile' && matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
-
-  if (route.kind === 'catalog' || route.kind === 'latest') {
-    let value;
-    try {
-      value = await object.json();
-    } catch {
-      return json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
-    }
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
-    if (route.kind === 'catalog') {
-      const domain = value.domain;
-      if (value.schemaVersion !== 1 || value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle) || value.status !== 'complete' || !Array.isArray(value.frames) || !domain || !Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom) || domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM || domain.minZoom > domain.maxZoom) return json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
-      try {
-        addConfiguredTemplateBase(value, env);
-      } catch {
-        return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-      }
-    } else {
-      if (value.schemaVersion !== 1 || value.modelId !== route.model || !compactCycleFromIso(value.cycleTime) || typeof value.publishedAt !== 'string' || !Number.isFinite(Date.parse(value.publishedAt))) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
-      const age = ageMinutes(value.cycleTime, now);
-      const stale = age === null || age > Number(env.STALE_AFTER_MINUTES || 180);
-      headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
-      headers.set('X-Mesoscale-Stale', String(stale));
-      if (env.PUBLIC_BASE_URL) {
-        try {
-          const base = publicBaseUrl(env);
-          const compactCycle = compactCycleFromIso(value.cycleTime);
-          value.catalogUrl = `${base.origin}${base.pathname.replace(/\/$/, '')}/catalog/${route.model}/${compactCycle}.json`;
-        } catch {
-          return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-        }
-      }
-    }
-    headers.set('Content-Type', 'application/json; charset=utf-8');
-    if (matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
-    return new Response(JSON.stringify(value), { headers });
-  }
+  if (route.kind !== 'tile') return storedJsonResponse(request, env, route, object, now, headers, etag);
   return new Response(request.method === 'HEAD' ? null : object.body, { headers });
 };
 
