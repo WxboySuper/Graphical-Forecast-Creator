@@ -54,6 +54,7 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(customMap).not.toHaveAttribute('aria-hidden', 'true');
     await expect(customMap).not.toHaveAttribute('inert', '');
     await expect(page.getByRole('button', { name: 'Pan map' })).toBeVisible();
+    await expect(page).not.toHaveURL(/surface=review/);
   });
 
   test('opens Discussion beside the map, resizes it, and remembers the layout', async ({ page }) => {

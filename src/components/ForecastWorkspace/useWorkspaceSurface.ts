@@ -17,14 +17,23 @@ const NON_MAP_SURFACES: ReadonlySet<string> = new Set(['discussion', 'review']);
 export const parseWorkspaceSurface = (value: string | null): WorkspaceSurface =>
   NON_MAP_SURFACES.has(value ?? '') ? (value as WorkspaceSurface) : 'map';
 
-/** Returns the active surface and a setter that updates the URL. */
-export const useWorkspaceSurface = (): {
+export const ALL_WORKSPACE_SURFACES: readonly WorkspaceSurface[] = ['map', 'discussion', 'review'];
+
+/**
+ * Returns the active surface and a setter that updates the URL. A surface the
+ * workspace does not offer falls back to the map and is removed from the URL, so
+ * the address never claims a surface the page is not showing.
+ */
+export const useWorkspaceSurface = (
+  allowed: readonly WorkspaceSurface[] = ALL_WORKSPACE_SURFACES,
+): {
   surface: WorkspaceSurface;
   selectSurface: (next: WorkspaceSurface) => void;
 } => {
   const location = useLocation();
   const navigate = useNavigate();
-  const surface = parseWorkspaceSurface(new URLSearchParams(location.search).get('surface'));
+  const requested = parseWorkspaceSurface(new URLSearchParams(location.search).get('surface'));
+  const surface = allowed.includes(requested) ? requested : 'map';
 
   const selectSurface = useCallback((next: WorkspaceSurface) => {
     const params = new URLSearchParams(location.search);
@@ -36,6 +45,10 @@ export const useWorkspaceSurface = (): {
       { replace: true },
     );
   }, [location.hash, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
+    if (surface !== requested) selectSurface('map');
+  }, [requested, selectSurface, surface]);
 
   useEffect(() => {
     const openDiscussion = () => selectSurface('discussion');

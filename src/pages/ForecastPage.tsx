@@ -67,7 +67,10 @@ import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
 import { ForecastWorkspaceSurfaces } from '../components/ForecastWorkspace/ForecastWorkspaceSurfaces';
-import { useWorkspaceSurface } from '../components/ForecastWorkspace/useWorkspaceSurface';
+import { ALL_WORKSPACE_SURFACES, useWorkspaceSurface, type WorkspaceSurface } from '../components/ForecastWorkspace/useWorkspaceSurface';
+
+/** Custom has no Review surface; a stale review link falls back to the map. */
+const CUSTOM_WORKSPACE_SURFACES: readonly WorkspaceSurface[] = ['map', 'discussion'];
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -757,7 +760,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     dispatch(setForecastWorkspace(workspaceId));
   }, [dispatch, workspaceId]);
   const navigate = useNavigate();
-  const { surface, selectSurface } = useWorkspaceSurface();
+  const { surface, selectSurface } = useWorkspaceSurface(workspaceId === 'severe' ? ALL_WORKSPACE_SURFACES : CUSTOM_WORKSPACE_SURFACES);
   const [discussionImportRevision, setDiscussionImportRevision] = useState(0);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
