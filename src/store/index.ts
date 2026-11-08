@@ -12,6 +12,7 @@ import appModeReducer from './appModeSlice';
 import themeReducer from './themeSlice';
 import verificationReducer from './verificationSlice';
 import monitorReducer from './monitorSlice';
+import mesoscaleReducer from './mesoscaleSlice';
 import {
   SERIALIZABLE_IGNORED_ACTIONS,
   SERIALIZABLE_IGNORED_PATHS,
@@ -26,6 +27,7 @@ export const store = configureStore({
     theme: themeReducer,
     verification: verificationReducer,
     monitor: monitorReducer,
+    mesoscale: mesoscaleReducer,
   },
   enhancers: (getDefaultEnhancers) => {
     const defaults = getDefaultEnhancers();

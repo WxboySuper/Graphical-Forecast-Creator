@@ -22,3 +22,10 @@ configuration details.
 
 Local fixtures require `mesoscaleWorkspace` exposure and the local-only
 `VITE_MESOSCALE_FIXTURES=true` build setting. Hosted build targets stay gated.
+
+For a full local demo of the Mesoscale workspace, also set
+`VITE_MESOSCALE_DEMO=true` (ignored outside the local target). It serves fresh,
+clearly labeled placeholder data: HRRR f00-f06, RAP and RRFS f00, eleven fields,
+and one tile image per field in `public/mesoscale-demo/`. Demo data is never real
+model output and the workspace says so on screen. The workspace UI lives in
+`src/components/Mesoscale/`.
