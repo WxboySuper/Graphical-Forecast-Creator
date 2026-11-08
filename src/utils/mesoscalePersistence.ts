@@ -12,6 +12,11 @@ export interface MesoscaleSaveEnvelope {
 }
 export type MesoscaleClassification = { ok: true; payload: MesoscaleSaveEnvelope } | { ok: false; reason: string };
 
+const hasValidEnvelopeOwner = (record: Record<string, unknown>): boolean => record.workspaceId === 'mesoscale';
+const hasSupportedSchema = (record: Record<string, unknown>): boolean => record.schemaVersion === MESOSCALE_SAVE_SCHEMA_VERSION;
+const hasOnlyEnvelopeFields = (record: Record<string, unknown>): boolean =>
+  Object.keys(record).every((key) => ['schemaVersion', 'workspaceId', 'product'].includes(key));
+
 export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvelope => {
   const error = getMesoscaleValidationError(product);
   if (error) throw new Error(error);
@@ -21,11 +26,9 @@ export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvel
 export const classifyMesoscaleSave = (value: unknown): MesoscaleClassification => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return { ok: false, reason: 'Mesoscale save must be an object.' };
   const record = value as Record<string, unknown>;
-  if (Object.keys(record).some((key) => !['schemaVersion', 'workspaceId', 'product'].includes(key))) {
-    return { ok: false, reason: 'Mesoscale save contains unsupported fields.' };
-  }
-  if (record.workspaceId !== 'mesoscale') return { ok: false, reason: 'This save belongs to a different forecast workspace.' };
-  if (record.schemaVersion !== MESOSCALE_SAVE_SCHEMA_VERSION) return { ok: false, reason: 'Unsupported Mesoscale save version.' };
+  if (!hasOnlyEnvelopeFields(record)) return { ok: false, reason: 'Mesoscale save contains unsupported fields.' };
+  if (!hasValidEnvelopeOwner(record)) return { ok: false, reason: 'This save belongs to a different forecast workspace.' };
+  if (!hasSupportedSchema(record)) return { ok: false, reason: 'Unsupported Mesoscale save version.' };
   const error = getMesoscaleValidationError(record.product);
   return error ? { ok: false, reason: error } : { ok: true, payload: record as unknown as MesoscaleSaveEnvelope };
 };

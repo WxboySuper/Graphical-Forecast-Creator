@@ -19,7 +19,7 @@ describe('Mesoscale persistence', () => {
     const tooManyAreas = { ...createInitialMesoscaleState(), areas: Array.from({ length: 21 }, (_, i) => ({ id: String(i) })) };
     expect(() => createMesoscaleSave(tooManyAreas as never)).toThrow(/at most 20 areas/i);
     const invalidArea = { id: 'a', title: 'Area', hazard: 'Rain', validStart: '2026-10-01T12:00:00Z', validEnd: '2026-10-01T13:00:00Z', createdAt: '2026-10-01T10:00:00Z', updatedAt: '2026-10-01T10:00:00Z', geometry: { type: 'Polygon', coordinates: [[[-97, 35], [-96, 35], [-96, 36], [-97, 36]]] } };
-    expect(() => createMesoscaleSave({ ...createInitialMesoscaleState(), areas: [invalidArea] })).toThrow(/invalid fields/i);
+    expect(() => createMesoscaleSave({ ...createInitialMesoscaleState(), areas: [invalidArea] } as never)).toThrow(/invalid fields/i);
   });
   test('stores and restores under account and Mesoscale-specific autosave keys', () => {
     const product = { ...createInitialMesoscaleState(), discussion: 'Draft' };

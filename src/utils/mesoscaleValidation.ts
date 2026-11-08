@@ -35,14 +35,20 @@ const isArea = (value: unknown): value is MesoscaleArea => {
     && Date.parse(value.validStart as string) <= Date.parse(value.validEnd as string)
     && isPolygon(value.geometry) && isIsoTime(value.createdAt) && isIsoTime(value.updatedAt);
 };
+const isModelId = (value: unknown): boolean => value === null || (typeof value === 'string' && value.length <= 120);
+const isForecastHour = (value: unknown): boolean => value === null
+  || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 999);
+const isActiveLayer = (value: unknown): boolean => {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['id', 'opacity'])) return false;
+  const validId = typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 120;
+  const validOpacity = typeof value.opacity === 'number' && Number.isFinite(value.opacity) && value.opacity >= 0 && value.opacity <= 1;
+  return validId && validOpacity;
+};
 const isModelContext = (value: unknown): value is MesoscaleModelContext => {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['modelId', 'cycle', 'forecastHour', 'activeLayers'])
-    || !(value.modelId === null || (typeof value.modelId === 'string' && value.modelId.length <= 120))
-    || !(value.cycle === null || isIsoTime(value.cycle))
-    || !(value.forecastHour === null || (Number.isInteger(value.forecastHour) && Number(value.forecastHour) >= 0 && Number(value.forecastHour) <= 999))
-    || !Array.isArray(value.activeLayers) || value.activeLayers.length > 100) return false;
-  return value.activeLayers.every((layer) => isRecord(layer) && hasOnlyKeys(layer, ['id', 'opacity']) && typeof layer.id === 'string' && layer.id.length > 0 && layer.id.length <= 120
-    && typeof layer.opacity === 'number' && Number.isFinite(layer.opacity) && layer.opacity >= 0 && layer.opacity <= 1);
+  if (!isRecord(value) || !hasOnlyKeys(value, ['modelId', 'cycle', 'forecastHour', 'activeLayers'])) return false;
+  if (!isModelId(value.modelId) || !(value.cycle === null || isIsoTime(value.cycle))) return false;
+  if (!isForecastHour(value.forecastHour) || !Array.isArray(value.activeLayers)) return false;
+  return value.activeLayers.length <= 100 && value.activeLayers.every(isActiveLayer);
 };
 
 export const validateMesoscaleState = (value: unknown): value is MesoscaleState =>

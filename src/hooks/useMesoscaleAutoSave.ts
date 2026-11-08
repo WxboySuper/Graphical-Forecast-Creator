@@ -6,6 +6,8 @@ import { getMesoscaleStorageKey, loadMesoscaleAutosave, saveMesoscaleAutosave } 
 
 const DEBOUNCE_MS = 5000;
 interface Scope { userId?: string | null; enabled: boolean }
+const shouldFlushScope = (previous: Scope, userId: string | null | undefined, enabled: boolean): boolean =>
+  previous.enabled && (previous.userId !== userId || !enabled);
 
 /** Restores the Mesoscale session and flushes pending edits before account-scope changes. */
 export const useMesoscaleAutoSave = (userId?: string | null, enabled = true): void => {
@@ -17,7 +19,7 @@ export const useMesoscaleAutoSave = (userId?: string | null, enabled = true): vo
 
   useLayoutEffect(() => {
     const oldScope = previousScope.current;
-    if (oldScope.enabled && (oldScope.userId !== userId || !enabled)) {
+    if (shouldFlushScope(oldScope, userId, enabled)) {
       try { saveMesoscaleAutosave(latestProduct.current, oldScope.userId); } catch { /* local storage may be unavailable */ }
     }
     previousScope.current = { userId, enabled };

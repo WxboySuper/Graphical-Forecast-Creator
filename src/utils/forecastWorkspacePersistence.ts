@@ -136,15 +136,19 @@ const assertCloudWorkspaceMatches = (
   }
 };
 
+const assertCloudWorkspaceSupported = (workspaceId: ForecastWorkspaceId): void => {
+  if (workspaceId === 'mesoscale') {
+    throw new Error('Cloud storage is not supported for Mesoscale forecasts. Use local autosave or JSON export.');
+  }
+};
+
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
   validators: ForecastWorkspaceLegacyValidators = {},
 ): ForecastWorkspaceSaveEnvelope => {
   const owner = requireForecastWorkspaceId(workspaceId);
-  if (owner === 'mesoscale') {
-    throw new Error('Cloud storage is not supported for Mesoscale forecasts. Use local autosave or JSON export.');
-  }
+  assertCloudWorkspaceSupported(owner);
   const classification = classifyForecastWorkspacePayload(payload, validators);
   if (!classification.ok) throw getForecastWorkspaceLoadError(classification);
 
