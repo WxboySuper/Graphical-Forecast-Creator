@@ -1,6 +1,6 @@
 {
   "measuredAt": "2026-11-08",
-  "method": "Anonymous HTTPS .idx inventory. Parameter, level and step strings are copied exactly from NOAA index rows. Units were not decoded in this environment and are marked unknown; do not treat parameter-name conventions as verification.",
+  "method": "Anonymous HTTPS .idx inventory. Parameter, level and step strings are copied exactly from NOAA index rows. Units cannot be read from .idx files and were not decoded in this environment.",
   "models": {
     "HRRR": {
       "cycle": "2026-11-08T12:00:00Z",
@@ -22,28 +22,28 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "K (GRIB2 parameter-table convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "K (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "wind10m": {
           "parameter": "UGRD/VGRD",
           "level": "10 m above ground",
-          "units": "m s-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "CAPE": {
           "parameter": "CAPE",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true,
           "note": "Surface-based and layer CAPE records exist; parcel identity not fully resolved from index text alone."
@@ -51,14 +51,14 @@
         "CIN": {
           "parameter": "CIN",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "SRH": {
           "parameter": "HLCY",
           "level": "1000-0 and 3000-0 m above ground",
-          "units": "m2 s-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
@@ -80,30 +80,117 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "kg m-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLMA",
           "level": "mean sea level",
-          "units": "Pa (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "updraftHelicity": {
           "parameter": "MXUPHL/MNUPHL",
           "level": "0-2000, 0-3000, 2000-5000 m above ground",
-          "units": "m2 s-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "0-0 day max/min fcst",
           "present": true
         },
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere",
-          "units": "dBZ (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
+        },
+        "wind10mU": {
+          "parameter": "UGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "wind10mV": {
+          "parameter": "VGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "capeCandidates": {
+          "SBCAPE": {
+            "parameter": "CAPE",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCAPE": {
+            "parameter": "CAPE",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "MUCAPE": {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground candidate only",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": false,
+            "note": "No message can be verified as most-unstable CAPE from the index alone."
+          },
+          "otherCAPERecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground",
+            "0-3000 m above ground"
+          ]
+        },
+        "cinCandidates": {
+          "SBCIN": {
+            "parameter": "CIN",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCIN": {
+            "parameter": "CIN",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "otherCINRecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground"
+          ]
+        },
+        "SRH0-1km": {
+          "parameter": "HLCY",
+          "level": "1000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "SRH0-3km": {
+          "parameter": "HLCY",
+          "level": "3000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "surfacePressure": {
+          "parameter": "",
+          "level": "surface",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No surface pressure record found in the inspected index."
         }
       },
       "fixedLayerSCP": {
@@ -140,28 +227,28 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "K (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "K (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "wind10m": {
           "parameter": "UGRD/VGRD",
           "level": "10 m above ground",
-          "units": "m s-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "CAPE": {
           "parameter": "CAPE",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true,
           "note": "Parcel identity not fully resolved from index text alone."
@@ -169,14 +256,14 @@
         "CIN": {
           "parameter": "CIN",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "SRH": {
           "parameter": "HLCY",
           "level": "1000-0 and 3000-0 m above ground",
-          "units": "m2 s-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
@@ -198,14 +285,14 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "kg m-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLMA",
           "level": "mean sea level",
-          "units": "Pa (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
@@ -219,9 +306,96 @@
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere",
-          "units": "dBZ (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
+        },
+        "wind10mU": {
+          "parameter": "UGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "wind10mV": {
+          "parameter": "VGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "capeCandidates": {
+          "SBCAPE": {
+            "parameter": "CAPE",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCAPE": {
+            "parameter": "CAPE",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "MUCAPE": {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground candidate only",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": false,
+            "note": "No message can be verified as most-unstable CAPE from the index alone."
+          },
+          "otherCAPERecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground",
+            "0-3000 m above ground"
+          ]
+        },
+        "cinCandidates": {
+          "SBCIN": {
+            "parameter": "CIN",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCIN": {
+            "parameter": "CIN",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "otherCINRecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground"
+          ]
+        },
+        "SRH0-1km": {
+          "parameter": "HLCY",
+          "level": "1000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "SRH0-3km": {
+          "parameter": "HLCY",
+          "level": "3000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "surfacePressure": {
+          "parameter": "",
+          "level": "surface",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No surface pressure record found in the inspected index."
         }
       },
       "fixedLayerSCP": {
@@ -258,28 +432,28 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "K (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "K (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "wind10m": {
           "parameter": "UGRD/VGRD",
           "level": "10 m above ground",
-          "units": "m s-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "CAPE": {
           "parameter": "CAPE",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true,
           "note": "Parcel identity not fully resolved from index text alone."
@@ -287,14 +461,14 @@
         "CIN": {
           "parameter": "CIN",
           "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "J kg-1 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "SRH": {
           "parameter": "HLCY",
           "level": "1000-0 and 3000-0 m above ground",
-          "units": "m2 s-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
@@ -316,30 +490,117 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "kg m-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLET",
           "level": "mean sea level",
-          "units": "Pa (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "updraftHelicity": {
           "parameter": "UPHL",
           "level": "5000-2000 m above ground",
-          "units": "m2 s-2 (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
         },
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "dBZ (convention; not decoded)",
+          "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
+        },
+        "wind10mU": {
+          "parameter": "UGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "wind10mV": {
+          "parameter": "VGRD",
+          "level": "10 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "capeCandidates": {
+          "SBCAPE": {
+            "parameter": "CAPE",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCAPE": {
+            "parameter": "CAPE",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "MUCAPE": {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground candidate only",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": false,
+            "note": "No message can be verified as most-unstable CAPE from the index alone."
+          },
+          "otherCAPERecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground",
+            "0-3000 m above ground"
+          ]
+        },
+        "cinCandidates": {
+          "SBCIN": {
+            "parameter": "CIN",
+            "level": "surface",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true
+          },
+          "MLCIN": {
+            "parameter": "CIN",
+            "level": "180-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "note": "Layer candidate; GRIB parcel metadata was not decoded."
+          },
+          "otherCINRecords": [
+            "90-0 mb above ground",
+            "255-0 mb above ground"
+          ]
+        },
+        "SRH0-1km": {
+          "parameter": "HLCY",
+          "level": "1000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "SRH0-3km": {
+          "parameter": "HLCY",
+          "level": "3000-0 m above ground",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "surfacePressure": {
+          "parameter": "",
+          "level": "surface",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No surface pressure record found in the inspected index."
         }
       },
       "fixedLayerSCP": {
