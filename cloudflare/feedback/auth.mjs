@@ -1,7 +1,9 @@
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 /** Tolerated clock skew between Google's token issuer and the Worker. */
 const CLOCK_LEEWAY_SECONDS = 60;
-let jwksCache = { keys: null, expiresAt: 0 };
+/** An unknown key id may trigger a JWKS refetch (key rotation), but at most this often. */
+const KEY_REFRESH_MIN_SECONDS = 60;
+let jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 };
 
 /** Decodes unpadded base64url to a binary string, restoring the padding atob may require. */
 const base64UrlToBinary = (part) => {
@@ -33,16 +35,26 @@ function claimsAreValid(claims, project, now) {
   return checks.every((check) => check());
 }
 
-async function loadKeys(env, now) {
-  if (jwksCache.keys && jwksCache.expiresAt > now) return jwksCache.keys;
+async function loadKeys(env, now, force = false) {
+  if (!force && jwksCache.keys && jwksCache.expiresAt > now) return jwksCache.keys;
   const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
   if (!response.ok) return null;
   const data = await response.json();
   if (!Array.isArray(data.keys)) return null;
   const cacheControl = response.headers.get('cache-control') ?? '';
   const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] ?? 300);
-  jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)) };
+  jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)), fetchedAt: now };
   return jwksCache.keys;
+}
+
+const hasSigningKey = (keys, kid) => keys.some((key) => key.kid === kid && key.kty === 'RSA');
+
+/** Loads cached keys, refetching once (rate-limited) when the token's key id is unknown after a rotation. */
+async function keysFor(env, now, kid) {
+  const keys = await loadKeys(env, now);
+  if (!keys || hasSigningKey(keys, kid)) return keys;
+  if (now - jwksCache.fetchedAt < KEY_REFRESH_MIN_SECONDS) return keys;
+  return loadKeys(env, now, true);
 }
 
 async function verifySignature(parts, header, keys) {
@@ -65,7 +77,7 @@ async function verifyTokenSafe(token, env) {
   if (!validHeader(parsed.header)) return null;
   const now = currentSeconds(env);
   if (!claimsAreValid(parsed.claims, project, now)) return null;
-  const keys = await loadKeys(env, now);
+  const keys = await keysFor(env, now, parsed.header.kid);
   if (!keys) return null;
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;
   return parsed.claims;

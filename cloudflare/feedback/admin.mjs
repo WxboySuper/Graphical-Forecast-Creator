@@ -10,7 +10,7 @@ const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 
 async function attemptKey(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  return digest(`${ip}:${env.FEEDBACK_HASH_SALT}`);
+  return digest(`admin-throttle:${ip}:${env.FEEDBACK_HASH_SALT}`);
 }
 
 async function throttleRetry(db, key, now) {

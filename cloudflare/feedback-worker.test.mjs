@@ -13,8 +13,8 @@ function isDuplicateRow(row, args) {
   return row.created_at > args[2];
 }
 
-async function token(overrides = {}, key = privateKey) {
-  const header = b64({ alg: 'RS256', kid: 'test-key' });
+async function token(overrides = {}, key = privateKey, kid = 'test-key') {
+  const header = b64({ alg: 'RS256', kid });
   const payload = b64({ iss: `https://securetoken.google.com/${project}`, aud: project, exp: 2000000000, iat: 1900000000, auth_time: 1900000000, sub: 'user-123', email: 'user@example.com', email_verified: true, ...overrides });
   const message = `${header}.${payload}`;
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(message));
@@ -329,6 +329,27 @@ test('submission succeeds when no execution context is available', async () => {
   const response = await post(env, undefined, { auth: await token() });
   assert.equal(response.status, 201);
   assert.equal(db.rows[0].discord_status, 'sent');
+});
+
+test('refetches signing keys once after a key rotation, rate-limited against forged key ids', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const rotated = await crypto.subtle.exportKey('jwk', pair.publicKey);
+  rotated.kid = 'rotated-key'; rotated.alg = 'RS256';
+  // Start well past any cache left by earlier tests; the first fetch lacks the rotated key, later fetches include it.
+  let fetches = 0; let clock = 1950000000000 + 6 * 3600 * 1000;
+  const jwksFetch = async () => { fetches += 1; return Response.json({ keys: fetches === 1 ? [jwk] : [jwk, rotated] }, { headers: { 'cache-control': 'max-age=3600' } }); };
+  const { env, ctx } = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  await post(env, ctx, { auth: await token() });
+  const before = fetches;
+  clock += 120000;
+  const ok = await post(env, ctx, { auth: await token({ sub: 'rotated-user' }, pair.privateKey, 'rotated-key'), body: validBody({ message: 'Signed with the rotated key.' }) });
+  assert.equal(ok.status, 201);
+  assert.equal(fetches, before + 1, 'unknown key id triggers exactly one refetch');
+
+  const forged = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  const afterRotation = fetches;
+  for (let i = 0; i < 5; i += 1) await post(forged.env, forged.ctx, { auth: await token({ sub: `forged-${i}` }, pair.privateKey, `unknown-${i}`) });
+  assert.ok(fetches - afterRotation <= 1, 'forged key ids must not trigger a refetch per request');
 });
 
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
