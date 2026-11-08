@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,7 +14,7 @@ from .discovery import discover_cycle
 from .fields import MODELS
 from .health import HealthReport, write_health
 from .publish import PublishRequest, already_published, publish_cycle, latest_is_newer, publish_pointer
-from .render import CycleContext, process_f00
+from .render import CycleContext, process_frames
 from .store import R2Credentials, R2Store
 
 
@@ -23,6 +24,7 @@ class HealthContext:
     cycle: datetime
     metrics: dict
     received_at: str
+    status: str = "complete"
 
 
 @dataclass(frozen=True)
@@ -39,13 +41,16 @@ class CycleRequest:
     health: HealthContext
     url: str
     modified: str
+    frames: tuple
+    missing_hours: tuple[int, ...]
+    already_published: bool = False
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=MODELS, required=True)
     parser.add_argument("--output", type=Path, default=Path("build/mesoscale"))
-    parser.add_argument("--dry-run", action="store_true", help="discover source and download/decode f00 without R2 credentials")
+    parser.add_argument("--dry-run", action="store_true", help="discover and render the model frames without R2 credentials")
     return parser
 
 
@@ -57,19 +62,23 @@ def main() -> None:
 
 
 def execute_pipeline(args, model, store) -> None:
+    started = time.perf_counter()
     health = initial_health(model.id)
     try:
-        cycle, url, modified = discover_cycle(model)
+        is_published = lambda cycle: store is not None and already_published(store, model.id, cycle)
+        source = discover_cycle(model, is_published=is_published)
     except Exception as error:
         record_failure(store, health, error)
         raise
-    health = health_for_cycle(health, cycle)
+    health = health_for_cycle(health, source.cycle)
     try:
-        output = run_cycle(CycleRequest(args, model, store, health, url, modified))
+        cycle_request = CycleRequest(args, model, store, health, source.analysis.url, source.analysis.modified, source.frames, source.missing_hours, source.already_published)
+        output = run_cycle(cycle_request)
     except Exception as error:
         record_failure(store, health, error)
         raise
     finish_cycle(store, output)
+    print(json.dumps({"model": model.id, "runtimeSeconds": round(time.perf_counter() - started, 2)}))
 
 
 def finish_cycle(store, output: PipelineOutput) -> None:
@@ -85,11 +94,18 @@ def finish_cycle(store, output: PipelineOutput) -> None:
 
 def run_cycle(request: CycleRequest) -> PipelineOutput:
     health, model, store = request.health, request.model, request.store
+    if request.already_published:
+        publish_pointer_if_missing(store, model.id, health.cycle)
+        return PipelineOutput(health, None)
     if store is not None and already_published(store, model.id, health.cycle):
         publish_pointer_if_missing(store, model.id, health.cycle)
         return PipelineOutput(health, None)
-    context = CycleContext(model, health.cycle, request.url, request.modified, request.args.output)
-    result = process_f00(context)
+    if request.missing_hours:
+        metrics = {"framesComplete": len(request.frames), "framesFailed": 0, "tiles": 0, "bytesDownloaded": 0, "bytesPublished": 0, "archives": 0, "missingForecastHours": list(request.missing_hours)}
+        partial = HealthContext(health.model_id, health.cycle, metrics, health.received_at, "partial")
+        return PipelineOutput(partial, None)
+    context = CycleContext(model, health.cycle, request.url, request.modified, request.args.output, request.frames)
+    result = process_frames(context)
     health = health_for_result(health, result)
     return PipelineOutput(health, result)
 
@@ -105,7 +121,7 @@ def health_for_cycle(health: HealthContext, cycle: datetime) -> HealthContext:
 
 
 def health_for_result(health: HealthContext, result: dict) -> HealthContext:
-    return HealthContext(health.model_id, health.cycle, result["metrics"], health.received_at)
+    return HealthContext(health.model_id, health.cycle, result["metrics"], health.received_at, result["catalog"]["status"])
 
 
 def publish_complete_result(store, model_id: str, cycle: datetime, result: dict | None) -> None:
@@ -115,13 +131,13 @@ def publish_complete_result(store, model_id: str, cycle: datetime, result: dict 
         return
     if result["catalog"]["status"] != "complete":
         return
-    publish_cycle(store, PublishRequest(model_id, cycle, result["catalog"], result["tiles"]))
+    publish_cycle(store, PublishRequest(model_id, cycle, result["catalog"], result["archives"]))
 
 
 def write_success_health(store, output: PipelineOutput) -> None:
     health = output.health
     if output.result is None:
-        report = HealthReport(health.model_id, health.cycle, "complete", health.metrics, health.received_at, current_time())
+        report = HealthReport(health.model_id, health.cycle, health.status, health.metrics, health.received_at, current_time())
     else:
         catalog = output.result["catalog"]
         report = HealthReport(health.model_id, health.cycle, catalog["status"], health.metrics, catalog["receivedAt"], catalog["processedAt"])
