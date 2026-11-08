@@ -87,9 +87,11 @@ def discover_cycle(model: Model, now: datetime | None = None, lookback_hours: in
     for age in range(lookback_hours):
         cycle = base - timedelta(hours=age)
         candidate = discover_cycle_candidate(model, cycle, is_published)
-        if candidate is not None and not candidate.missing_hours:
+        if candidate is None:
+            continue
+        if not candidate.missing_hours:
             return candidate
-        if candidate is not None and partial is None:
+        if partial is None:
             partial = candidate
     if partial is not None:
         return partial
