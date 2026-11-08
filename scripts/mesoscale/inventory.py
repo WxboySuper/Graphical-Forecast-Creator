@@ -60,16 +60,19 @@ def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple
     """Return inclusive ranges, ending each message before the next offset."""
     rows = list(records)
     next_offsets = _next_distinct_offsets(rows)
-    result = []
-    for record in rows:
-        next_offset = next_offsets.get(record.offset)
-        if next_offset is not None and next_offset > file_size:
-            raise ValueError(f"Invalid message offset {next_offset} for {file_size}-byte file")
-        end = _inclusive_end(next_offset, file_size)
-        if record.offset >= file_size or end < record.offset:
-            raise ValueError(f"Invalid message range at offset {record.offset} for {file_size}-byte file")
-        result.append((record, ByteRange(record.offset, end)))
-    return result
+    return [
+        (record, _record_range(record, next_offsets.get(record.offset), file_size))
+        for record in rows
+    ]
+
+
+def _record_range(record: IndexRecord, next_offset: int | None, file_size: int) -> ByteRange:
+    if next_offset is not None and next_offset > file_size:
+        raise ValueError(f"Invalid message offset {next_offset} for {file_size}-byte file")
+    end = _inclusive_end(next_offset, file_size)
+    if record.offset >= file_size or end < record.offset:
+        raise ValueError(f"Invalid message range at offset {record.offset} for {file_size}-byte file")
+    return ByteRange(record.offset, end)
 
 
 def _next_distinct_offsets(rows: list[IndexRecord]) -> dict[int, int]:
