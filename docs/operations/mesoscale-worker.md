@@ -96,6 +96,8 @@ pattern, and XYZ coordinates outside the zoom 0 to 24 numeric range. The
 catalog publishes a narrower usable zoom interval; clients should honor those
 catalog `minZoom` and `maxZoom` values. Missing tiles return a cacheable 404 so
 OpenLayers can leave that tile empty without downloading an image body.
+Catalog, pointer, and health JSON objects larger than 4 MiB are rejected before
+parsing so a corrupt object cannot consume unbounded Worker memory.
 
 CORS is an origin allowlist, not authentication. Public endpoints can still be
 called outside a browser, so monitor request spikes and use Cloudflare rate

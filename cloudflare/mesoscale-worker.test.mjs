@@ -18,6 +18,15 @@ const envFor = (objects = {}, overrides = {}) => ({
 
 const request = (path, options = {}) => new Request(`https://mesoscale.example.test${path}`, options);
 const pointer = (modelId, cycleTime = '2026-11-08T12:00:00Z') => ({ schemaVersion: 1, modelId, cycleTime, catalogUrl: 'https://old.example/catalog.json', publishedAt: '2026-11-08T12:04:00Z' });
+const makeCatalog = (overrides = {}) => ({
+  schemaVersion: 1,
+  model: { id: 'hrrr' },
+  cycleTime: '2026-11-08T12:00:00Z',
+  status: 'complete',
+  domain: { minZoom: 3, maxZoom: 6 },
+  frames: [{ forecastHour: 0, parameters: [] }],
+  ...overrides,
+});
 const withNow = async (timestamp, run) => {
   const originalNow = Date.now;
   Date.now = () => new Date(timestamp).getTime();
@@ -46,7 +55,10 @@ const withCache = async (run) => {
 
 test('strictly whitelists route segments and rejects traversal attempts without R2 reads', async () => {
   let reads = 0;
-  const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => { reads += 1; return null; } } });
+  const env = envFor({}, { MESOSCALE_BUCKET: {
+    get: async () => { reads += 1; return null; },
+    head: async () => { reads += 1; return null; },
+  } });
   for (const path of [
     '/catalog/other/20261108T1200Z.json',
     '/catalog/hrrr/20261108T1201Z.json',
@@ -102,16 +114,20 @@ test('CORS allows configured origins and omits permission for other origins', as
 
 test('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
   const cycleTime = '2026-11-08T12:00:00Z';
-  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime, status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
+  const catalog = makeCatalog({ cycleTime, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
   const env = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
   const response = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env);
   assert.equal(response.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
   assert.equal((await response.json()).frames[0].parameters[0].data.urlTemplate, 'https://mesoscale.example.test/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png');
   const etag = response.headers.get('ETag');
+  assert.ok(etag, 'expected synthesized catalog ETag');
   assert.notEqual(etag, '"obj-1"');
   const otherHostEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'https://other-mesoscale.example.test' });
   const otherHostResponse = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), otherHostEnv);
   assert.notEqual(otherHostResponse.headers.get('ETag'), etag);
+  const equivalentOriginEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'HTTPS://MESOSCALE.EXAMPLE.TEST:443/' });
+  const equivalentOrigin = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), equivalentOriginEnv);
+  assert.equal(equivalentOrigin.status, 200);
   const notModified = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), env);
   assert.equal(notModified.status, 304);
   assert.equal(notModified.headers.get('ETag'), etag);
@@ -121,6 +137,9 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': '*' } }), env)).status, 304);
   const pathBaseEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'https://mesoscale.example.test/catalog' });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), pathBaseEnv)).status, 503);
+  const missingBaseEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: '' });
+  const missingBaseConditional = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': '"obj-1"' } }), missingBaseEnv);
+  assert.equal(missingBaseConditional.status, 503);
   const malformedFrame = { ...catalog, frames: [null] };
   const malformedFrameEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': malformedFrame });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), malformedFrameEnv)).status, 502);
@@ -138,7 +157,7 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
 
 test('Cache API separates rewritten catalog representations by public base URL', async () => {
   await withCache(async () => {
-    const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
+    const catalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
     const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
     let reads = 0;
     const bucket = { get: async () => { reads += 1; return { json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
@@ -157,7 +176,7 @@ test('Cache API separates rewritten catalog representations by public base URL',
 });
 
 test('catalog and latest do not emit an ETag when R2 omits one', async () => {
-  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [] }] };
+  const catalog = makeCatalog();
   const pointerValue = pointer('hrrr');
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
     const value = key.includes('/catalog/') ? catalog : pointerValue;
@@ -197,6 +216,23 @@ test('tile HEAD uses R2 metadata without reading the tile body', async () => {
   assert.equal(response.headers.get('Content-Length'), '3');
   assert.equal(heads, 1);
   assert.equal(gets, 0);
+});
+
+test('tile HEAD falls back to get when head is unavailable and does not populate cache', async () => {
+  await withCache(async () => {
+    const key = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
+    const env = envFor({ [key]: { pixels: 'tile' } });
+    let reads = 0;
+    const get = env.MESOSCALE_BUCKET.get;
+    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
+    const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
+    assert.equal(head.status, 200);
+    assert.equal(head.body, null);
+    assert.equal(reads, 1);
+    assert.equal((await worker.fetch(request(path), env)).status, 200);
+    assert.equal(reads, 2);
+  });
 });
 
 test('Cache API stores tiles, serves hits, honors conditional hits, and caches missing tiles', async () => {
@@ -311,10 +347,15 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 502);
+  let parsedOversized = false;
+  const oversized = { size: 5 * 1024 * 1024, json: async () => { parsedOversized = true; throw new Error('must reject before parsing'); } };
+  const oversizedEnv = envFor({}, { MESOSCALE_BUCKET: { get: async () => oversized } });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), oversizedEnv)).status, 502);
+  assert.equal(parsedOversized, false);
 });
 
 test('status labels malformed pointer JSON as invalid instead of missing', async () => {
-  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { json: async () => { throw new SyntaxError('invalid'); } } : null } });
+  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { size: 5 * 1024 * 1024, json: async () => { throw new SyntaxError('invalid'); } } : null } });
   await withNow('2026-11-08T15:01:00Z', async () => {
     const response = await worker.fetch(request('/status'), env);
     const body = await response.json();
@@ -359,7 +400,7 @@ test('HEAD returns headers without a body, and unsupported methods return 405', 
     assert.equal(head.body, null);
     assert.equal(head.headers.get('X-Mesoscale-Stale'), 'true');
   });
-  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [] }] };
+  const catalog = makeCatalog();
   const catalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
   const catalogHead = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { method: 'HEAD' }), catalogEnv);
   assert.equal(catalogHead.status, 200);

@@ -5,6 +5,7 @@ const POINTER_TTL = 30;
 const STATUS_TTL = 30;
 const CATALOG_TTL = 31536000;
 const TILE_TTL = 31536000;
+const MAX_JSON_BYTES = 4 * 1024 * 1024;
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
@@ -125,12 +126,12 @@ const publicBaseUrl = (env) => {
   if (!value) throw new Error('PUBLIC_BASE_URL is required');
   const base = new URL(value);
   if (base.protocol !== 'https:') throw new Error('PUBLIC_BASE_URL must use HTTPS');
-  if (base.origin !== value.replace(/\/$/, '')) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
+  if (base.pathname !== '/' || base.search || base.hash || base.username || base.password) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
   return base;
 };
 
 const publicRepresentationEtag = (etag, env) => {
-  if (!etag || !env.PUBLIC_BASE_URL) return etag;
+  if (!etag) return etag;
   const value = `${etag}|${publicBaseUrl(env).origin}`;
   const bytes = new TextEncoder().encode(value);
   let binary = '';
@@ -159,7 +160,6 @@ const catalogTemplateMatches = (parts, route, parameterId, expectedHour) => {
 };
 
 const rewriteParameterTemplate = (parameter, base, route, expectedHour) => {
-  if (parameter.data.type !== 'xyz-raster') return;
   const parts = parseTileTemplate(parameter.data.urlTemplate);
   if (!catalogTemplateMatches(parts, route, parameter.id, expectedHour)) throw new Error('Catalog raster template does not match its immutable key');
   parameter.data.urlTemplate = `${base.origin}/tiles/${parts.path}`;
@@ -175,6 +175,7 @@ const addConfiguredTemplateBase = (catalog, base, route) => {
 
 const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
 const invalidCatalogResponse = () => json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
+const oversizedJsonObject = (object) => Number.isSafeInteger(object.size) && object.size > MAX_JSON_BYTES;
 const storedJsonForRoute = (context) => {
   if (context.route.kind === 'catalog') return catalogResponse(context);
   return latestResponse(context);
@@ -295,6 +296,7 @@ const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
 };
 
 const storedJsonResponse = async ({ request, env, route, object, now, headers, etag }) => {
+  if (oversizedJsonObject(object)) return malformedJsonResponse();
   let value;
   try {
     value = await object.json();
@@ -413,6 +415,7 @@ const readJson = async (bucket, key) => {
     return { state: 'invalid', value: null };
   }
   if (!object) return { state: 'missing', value: null };
+  if (oversizedJsonObject(object)) return { state: 'invalid', value: null };
   try {
     const value = await object.json();
     if (!value) return { state: 'invalid', value: null };
