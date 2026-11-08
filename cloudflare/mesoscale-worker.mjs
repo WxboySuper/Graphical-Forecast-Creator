@@ -459,6 +459,7 @@ const loadTileCatalog = async (bucket, catalogRoute) => {
 };
 
 const validTileArchiveData = (data, expectedKey) => {
+  if (!isJsonObject(data)) return false;
   if (data.archiveKey !== expectedKey) return false;
   if (data.format !== 'image/png') return false;
   if (data.tileCompression !== 'none') return false;

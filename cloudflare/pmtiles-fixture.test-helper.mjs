@@ -12,6 +12,8 @@ const directory = ({ tileId = 21, runLength = 1, length = 3, offset = 0 } = {}) 
   ...varint(1), ...varint(tileId), ...varint(runLength), ...varint(length), ...varint(offset + 1),
 ]);
 
+export const FIXTURE_ARCHIVE_KEY = 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles';
+
 const gzipBytes = async (value) => new Uint8Array(await new Response(
   new Blob([value]).stream().pipeThrough(new CompressionStream('gzip')),
 ).arrayBuffer());
@@ -66,14 +68,14 @@ const partForFixture = (archive, { offset, length }, etag) => {
   };
 };
 
-export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1', partialFirstRange = false } = {}) => {
+export const rangeBucket = (archive, { archiveKey = FIXTURE_ARCHIVE_KEY, failAt = null, etag = 'archive-v1', partialFirstRange = false } = {}) => {
   const reads = [];
   return {
     reads,
     async get(key, options = {}) {
       reads.push({ key, range: options.range });
       if (failAt === reads.length) throw new Error('range failed');
-      if (key !== 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles') return null;
+      if (key !== archiveKey) return null;
       if (!options.range) throw new Error('range required');
       if (!validRangeForFixture({ archive, ...options.range, partialFirstRange })) return null;
       return partForFixture(archive, { ...options.range }, etag);

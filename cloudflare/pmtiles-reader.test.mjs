@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { clearPmtilesCacheForTests, decodeDirectory, parseHeader, PmtilesError, readTile } from './pmtiles-reader.mjs';
-import { createPmtilesFixture, encodeVarintForTest, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
+import { createPmtilesFixture, encodeVarintForTest, FIXTURE_ARCHIVE_KEY, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
-const KEY = 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles';
+const KEY = FIXTURE_ARCHIVE_KEY;
 const read = (bucket, overrides = {}) => readTile({ bucket, key: KEY, zoom: 3, x: 0, y: 0, minZoom: 3, maxZoom: 4, ...overrides });
 
 test('parses the v3 header and delta encoded root directory', async () => {
@@ -33,6 +33,16 @@ test('returns missing tile and out of zoom without reading tile payload', async 
   assert.equal((await read(bucket, { zoom: 5, x: 0, y: 0 })).state, 'out-of-zoom');
   assert.equal((await read(bucket, { x: 8, y: 0 })).state, 'missing-tile');
   assert.equal((await read(bucket, { x: -1, y: 0 })).state, 'missing-tile');
+});
+
+test('head-only reads return metadata without fetching tile bytes', async () => {
+  clearPmtilesCacheForTests();
+  const bucket = rangeBucket(await createPmtilesFixture());
+  const tile = await read(bucket, { headOnly: true });
+  assert.equal(tile.state, 'found');
+  assert.equal(tile.length, 3);
+  assert.equal(tile.bytes, undefined);
+  assert.equal(bucket.reads.length, 2);
 });
 
 test('rejects truncated, corrupt, and unsupported archive data', async () => {
@@ -75,4 +85,5 @@ test('caches parsed archive data so warm tiles need one range read', async () =>
 
 test('rejects a malformed directory varint', () => {
   assert.throws(() => decodeDirectory(Uint8Array.from([1, ...encodeVarintForTest(21), 1, 3, ...Array(9).fill(0x80)])), PmtilesError);
+  assert.throws(() => decodeDirectory(Uint8Array.from([2, 21, 0, 1, 1, 3, 3, 1, 0])), /not ordered/);
 });

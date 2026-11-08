@@ -34,11 +34,21 @@ const readDirectoryColumns = (bytes, cursor, count) => {
   let lastId = 0;
   for (let index = 0; index < count; index += 1) {
     lastId += readVarint(bytes, cursor);
+    if (!Number.isSafeInteger(lastId)) throw new PmtilesError('Invalid PMTiles tile id range');
     tileIds.push(lastId);
   }
   const runs = readVarintColumn(bytes, cursor, count);
   const lengths = readVarintColumn(bytes, cursor, count);
   return { tileIds, runs, lengths };
+};
+
+const validateDirectoryOrdering = ({ tileIds, runs }) => {
+  for (let index = 1; index < tileIds.length; index += 1) {
+    if (tileIds[index] <= tileIds[index - 1]) throw new PmtilesError('PMTiles directory tile IDs are not ordered');
+    if (runs[index - 1] && tileIds[index] < tileIds[index - 1] + runs[index - 1]) {
+      throw new PmtilesError('PMTiles directory tile runs overlap');
+    }
+  }
 };
 
 const validateDirectoryEntry = ({ offset, length, tileId, runLength }) => {
@@ -70,7 +80,9 @@ export const decodeDirectory = (bytes) => {
   const cursor = { offset: 0 };
   const count = readVarint(bytes, cursor);
   if (!validDirectoryCount(count)) throw new PmtilesError('Invalid PMTiles directory entry count');
-  const entries = directoryEntries(bytes, cursor, readDirectoryColumns(bytes, cursor, count));
+  const columns = readDirectoryColumns(bytes, cursor, count);
+  validateDirectoryOrdering(columns);
+  const entries = directoryEntries(bytes, cursor, columns);
   if (hasTrailingBytes(cursor, bytes)) throw new PmtilesError('Trailing PMTiles directory data');
   return entries;
 };
