@@ -382,15 +382,27 @@ const responseForObject = (context) => {
   return objectBodyResponse({ ...context, headers, etag });
 };
 
-const getObjectResponse = async (request, env, route, now) => {
-  const bucket = env.MESOSCALE_BUCKET;
-  const headTile = request.method === 'HEAD' && route.kind === 'tile' && typeof bucket?.head === 'function';
-  if (!bucket || (!headTile && typeof bucket.get !== 'function')) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const object = headTile
-    ? await bucket.head(route.key)
-    : await bucket.get(route.key);
-  if (!object) return missingObjectResponse(route);
-  return responseForObject({ request, env, route, object, now });
+const isTileHead = (context) => {
+  if (context.request.method !== 'HEAD') return false;
+  if (context.route.kind !== 'tile') return false;
+  return typeof context.env.MESOSCALE_BUCKET?.head === 'function';
+};
+
+const canReadMesoscaleObject = (bucket, headTile) => {
+  if (headTile) return typeof bucket.head === 'function';
+  return typeof bucket.get === 'function';
+};
+
+const getObjectResponse = async (context) => {
+  const bucket = context.env.MESOSCALE_BUCKET;
+  if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const headTile = isTileHead(context);
+  if (!canReadMesoscaleObject(bucket, headTile)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  let object;
+  if (headTile) object = await bucket.head(context.route.key);
+  else object = await bucket.get(context.route.key);
+  if (!object) return missingObjectResponse(context.route);
+  return responseForObject({ ...context, object });
 };
 
 const readJson = async (bucket, key) => {
@@ -475,7 +487,9 @@ const statusResponse = async (request, env, now) => {
   return jsonWithEtag({ status: healthy ? 'healthy' : 'degraded', models }, request, `public, max-age=${STATUS_TTL}`);
 };
 
-const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(request, env, now) : getObjectResponse(request, env, route, now);
+const fetchUncached = (request, route, env, now) => route.kind === 'status'
+  ? statusResponse(request, env, now)
+  : getObjectResponse({ request, route, env, now });
 
 const cacheKeyFor = (request, env, route) => {
   const url = new URL(request.url);
