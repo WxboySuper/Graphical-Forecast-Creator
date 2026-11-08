@@ -130,7 +130,7 @@ const publicBaseUrl = (env) => {
   if (!value) throw new Error('PUBLIC_BASE_URL is required');
   const base = new URL(value);
   if (!isHttpsBaseUrl(base)) throw new Error('PUBLIC_BASE_URL must use HTTPS');
-  if (!isOriginOnlyBaseUrl(base) || !hasNoBaseUrlCredentials(base)) throw new Error('PUBLIC_BASE_URL must be an origin without credentials or a path');
+  if (!isOriginOnlyBaseUrl(base) || !hasNoBaseUrlCredentials(base)) throw new Error('PUBLIC_BASE_URL must be an origin without credentials, path, query, or fragment');
   return base;
 };
 
