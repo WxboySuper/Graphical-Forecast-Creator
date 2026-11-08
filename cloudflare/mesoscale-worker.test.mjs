@@ -96,6 +96,9 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal((await response.json()).frames[0].parameters[0].data.urlTemplate, 'https://mesoscale.example.test/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png');
   const etag = response.headers.get('ETag');
   assert.notEqual(etag, '"obj-1"');
+  const otherHostEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'https://other-mesoscale.example.test' });
+  const otherHostResponse = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), otherHostEnv);
+  assert.notEqual(otherHostResponse.headers.get('ETag'), etag);
   const notModified = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), env);
   assert.equal(notModified.status, 304);
   assert.equal(notModified.headers.get('ETag'), etag);

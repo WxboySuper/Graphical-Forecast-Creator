@@ -62,7 +62,11 @@ const parseLatestRoute = (parts) => {
   return MODELS.has(model) ? { kind: 'latest', model, key: `mesoscale/v1/latest/${model}.json` } : null;
 };
 
-const validTileCoordinates = (zoom, x, y) => zoom <= MAX_ZOOM && Number.isSafeInteger(x) && Number.isSafeInteger(y) && x < 2 ** zoom && y < 2 ** zoom;
+const validTileCoordinates = (zoom, x, y) => {
+  if (zoom > MAX_ZOOM) return false;
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return false;
+  return x < 2 ** zoom && y < 2 ** zoom;
+};
 
 const parseTileRoute = (parts) => {
   if (parts.length !== 8) return null;
@@ -194,26 +198,46 @@ const storedJsonResponse = async ({ request, env, route, object, now, headers, e
   return route.kind === 'catalog' ? catalogResponse(context) : latestResponse(context);
 };
 
+const cacheControlForRoute = (route) => {
+  if (route.kind === 'catalog') return `public, max-age=${CATALOG_TTL}, immutable`;
+  if (route.kind === 'tile') return `public, max-age=${TILE_TTL}, immutable`;
+  return `public, max-age=${POINTER_TTL}`;
+};
+
+const missingObjectResponse = (route) => {
+  const ttl = route.kind === 'tile' ? TILE_MISS_TTL : POINTER_TTL;
+  return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${ttl}` } });
+};
+
+const conditionalResponse = (request, etag, headers) =>
+  matchesEtag(request.headers.get('If-None-Match'), etag) ? new Response(null, { status: 304, headers }) : null;
+
+const catalogConditionalResponse = (request, etag, env, headers) => {
+  try {
+    const publicEtag = publicRepresentationEtag(etag, env);
+    headers.set('ETag', publicEtag);
+    return conditionalResponse(request, publicEtag, headers);
+  } catch {
+    return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+  }
+};
+
 const getObjectResponse = async (request, env, route, now) => {
-  if (!env.MESOSCALE_BUCKET || typeof env.MESOSCALE_BUCKET.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const object = await env.MESOSCALE_BUCKET.get(route.key);
-  if (!object) return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${route.kind === 'tile' ? TILE_MISS_TTL : POINTER_TTL}` } });
+  const bucket = env.MESOSCALE_BUCKET;
+  if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const object = await bucket.get(route.key);
+  if (!object) return missingObjectResponse(route);
   const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType;
   const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
-  headers.set('Cache-Control', route.kind === 'catalog' || route.kind === 'tile' ? `public, max-age=${route.kind === 'catalog' ? CATALOG_TTL : TILE_TTL}, immutable` : `public, max-age=${POINTER_TTL}`);
+  headers.set('Cache-Control', cacheControlForRoute(route));
   if (route.kind === 'catalog') {
-    try {
-      headers.set('ETag', publicRepresentationEtag(etag, env));
-    } catch {
-      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-    }
-    if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
+    const notModified = catalogConditionalResponse(request, etag, env, headers);
+    if (notModified) return notModified;
   }
-  if (route.kind === 'tile' && matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
-  if (route.kind !== 'tile') return storedJsonResponse({ request, env, route, object, now, headers, etag });
-  return new Response(request.method === 'HEAD' ? null : object.body, { headers });
+  if (route.kind === 'tile') return conditionalResponse(request, etag, headers) || new Response(request.method === 'HEAD' ? null : object.body, { headers });
+  return storedJsonResponse({ request, env, route, object, now, headers, etag });
 };
 
 const readJson = async (bucket, key) => {
@@ -227,14 +251,26 @@ const readJson = async (bucket, key) => {
   }
 };
 
-const modelStatus = async (bucket, modelId, day, previousDay, now, staleAfter) => {
+const healthForModel = (today, yesterday, modelId) => {
+  if (today?.modelId === modelId) return today;
+  if (yesterday?.modelId === modelId) return yesterday;
+  return null;
+};
+
+const validStatusPointer = (pointer, modelId) => {
+  if (!pointer || pointer.schemaVersion !== 1) return false;
+  if (pointer.modelId !== modelId || typeof pointer.cycleTime !== 'string') return false;
+  return Number.isFinite(Date.parse(pointer.cycleTime));
+};
+
+const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter }) => {
   const [pointer, today, yesterday] = await Promise.all([
     readJson(bucket, `mesoscale/v1/latest/${modelId}.json`),
     readJson(bucket, `mesoscale/v1/health/${day}/${modelId}.json`),
     readJson(bucket, `mesoscale/v1/health/${previousDay}/${modelId}.json`),
   ]);
-  const health = today?.modelId === modelId ? today : yesterday?.modelId === modelId ? yesterday : null;
-  const validPointer = pointer?.schemaVersion === 1 && pointer.modelId === modelId && typeof pointer.cycleTime === 'string' && Number.isFinite(Date.parse(pointer.cycleTime));
+  const health = healthForModel(today, yesterday, modelId);
+  const validPointer = validStatusPointer(pointer, modelId);
   const age = validPointer ? ageMinutes(pointer.cycleTime, now) : null;
   return { modelId, latestCycleTime: validPointer ? pointer.cycleTime : null, ageMinutes: age, stale: age === null || age > staleAfter, health: health?.status || (pointer ? 'invalid' : 'missing'), healthGeneratedAt: health?.generatedAt || null };
 };
@@ -245,7 +281,7 @@ const statusResponse = async (env, now) => {
   const day = new Date(now).toISOString().slice(0, 10);
   const previousDay = new Date(now - 86400000).toISOString().slice(0, 10);
   const staleAfter = staleThresholdMinutes(env);
-  const models = await Promise.all([...MODELS].map((modelId) => modelStatus(bucket, modelId, day, previousDay, now, staleAfter)));
+  const models = await Promise.all([...MODELS].map((modelId) => modelStatus({ bucket, modelId, day, previousDay, now, staleAfter })));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
   return json({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, 200, { 'Cache-Control': `public, max-age=${STATUS_TTL}` });
 };
