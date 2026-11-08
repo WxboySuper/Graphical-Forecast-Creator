@@ -38,6 +38,23 @@ class InventoryTests(unittest.TestCase):
             with self.subTest(allowlist=allowlist), self.assertRaises(ValueError):
                 resolve_allowlist(rows, 136859480, allowlist)
 
+    def test_hrrr_shear_and_surface_lcl_records_have_exact_ranges(self):
+        rows = parse_idx(FIXTURE_PATH.read_text(encoding="ascii"))
+        ranged = resolve_ranges(rows, 136859480)
+        expected = {
+            ("VUCSH", "0-6000 m above ground"): (96678494, 99298250),
+            ("VVCSH", "0-6000 m above ground"): (99298251, 101918007),
+            ("HGT", "level of adiabatic condensation from sfc"): (113587456, 116457854),
+        }
+        for identity, span in expected.items():
+            with self.subTest(identity=identity):
+                actual = next(
+                    byte_range
+                    for record, byte_range in ranged
+                    if (record.parameter, record.level) == identity
+                )
+                self.assertEqual((actual.start, actual.end), span)
+
     def test_shared_message_offset_gets_shared_range(self):
         rows = parse_idx("24.1:100:d=2026110812:UGRD:10 m above ground:anl:\n24.2:100:d=2026110812:VGRD:10 m above ground:anl:\n25:250:d=2026110812:TMP:2 m above ground:anl:")
         ranges = resolve_ranges(rows, 400)

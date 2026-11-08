@@ -16,9 +16,32 @@ These are single-cycle observations, not delivery guarantees. RAP 12Z and RRFS 1
 
 ## What the indexes establish
 
-All three indexes include native 2 m temperature and dewpoint, 10 m U/V wind, CAPE and CIN records, 0-1 km and 0-3 km helicity (`HLCY`), precipitable water, sea-level pressure, and composite reflectivity. The precise index identities and range-decoded GRIB metadata are in the manifest. ecCodes 2.41.0 confirmed parameter codes, units, level types, and instantaneous step metadata for selected messages. `CAPE:surface` is not enough to assert MUCAPE. Layer CAPE/CIN entries (`180-0`, `90-0`, and `255-0 mb above ground`) still need an authoritative model-specific mapping before assigning parcel names. No direct 0-6 km bulk-shear or LCL-height messages appear in these 2-D inventories. HRRR's `MXUPHL/MNUPHL` records are max/min forecast accumulations; RRFS lists `UPHL` for 2000-5000 m above ground. RAP f00 AWIP32 has no UPHL record.
+The expanded scan covers HRRR `wrfsfc`, `wrfprs`, and `wrfnat`; 12 RAP f00 products including `wrfprs`, `wrfnat`, and `awp130`, `awp236`, and `awp252` variants; and RRFS 3 km CONUS `2dfld`, `prslev`, and `2dfld_awipsubset`. The manifest records matching field families by product, index identity, step, units, and byte range. RRFS `natlev` CONUS/NA index requests returned 404. The NCEP RRFS product catalog lists `prslev` and `2dfld`.
 
-The literal 0-6 km bulk shear is absent as a precomputed field in the inspected product files. Wind profiles are available in separate pressure-level products, but deriving a layer difference is a later server-side computation. The fixed-layer SCP candidate formula from the research branch is `(MUCAPE / 1000) × (0-3 km SRH / 150) × (BRN shear denominator / 40)`. The required BRN shear denominator is absent too. The fixed-layer STP base formula uses MLCAPE, 0-6 km bulk vector shear, 0-1 km SRH and MLLCL. Its CIN-limited variant adds MLCIN. No inspected model has verified MLCAPE, MLCIN, MUCAPE or MLLCL identities in the available `.idx`; the layer records remain parcel-identity candidates. Neither formula's full input set is natively present in any of the three inspected files.
+All three models have 0-1 km and 0-3 km storm-relative helicity (`HLCY`). All three also have 0-6 km `VUCSH` and `VVCSH` component records in at least one scanned product. NCEP calls these Vertical U/V Component Shear and gives units `s**-1`. That is dimensionally different from the m s**-1 endpoint bulk wind difference used by standard SCP/STP formulations. Taking `sqrt(VUCSH^2 + VVCSH^2)` does not turn those values into m s**-1. The component fields are present; their equivalence to the required bulk-shear magnitude is unverified.
+
+`HGT:level of adiabatic condensation from sfc` is present in HRRR `wrfsfc/wrfprs/wrfnat`, RAP `wrfprs`, and RRFS `2dfld`. It is a surface-based parcel LCL. It does not establish mixed-layer LCL (`MLLCL`), which was not identified in any model.
+
+CAPE/CIN records exist at the surface and at `180-0`, `90-0`, and `255-0 mb above ground`; CAPE also exists at `0-3000 m`. The official HRRR and RAP inventories use generic CAPE/CIN labels and do not map these layers to named MUCAPE, MLCAPE, or SBCAPE. The `255-0` layer has a `PLPL` record, described as the pressure of the level from which the parcel was lifted, but this alone does not establish a named parcel. An NWS HREF change notice identifies 90-0 hPa as mixed-layer and 180-0 hPa as most-unstable/surface-based for HREF. That notice is HREF-specific and is not applied to HRRR/RAP/RRFS. Parcel identity is unverified for all three models.
+
+### Fixed-layer composite inputs
+
+| Model | Fixed-layer SCP | Fixed-layer STP |
+|---|---|---|
+| HRRR | 0-3 km SRH present. MUCAPE candidate present, parcel identity unverified. 0-6 km shear components present, standard bulk-wind-difference magnitude unverified. Not all inputs confirmed usable. | 0-1 km SRH present. MLCAPE/MLCIN candidates present, parcel identities unverified. Surface-based LCL present, MLLCL absent/unverified. Shear magnitude unverified. Not all inputs confirmed usable. |
+| RAP | Same CAPE candidate, SRH, and shear status as HRRR. | Same CAPE/CIN candidate, SRH, and shear status as HRRR. Surface-based LCL found in `wrfprs`; MLLCL absent/unverified. |
+| RRFS | Same CAPE candidate, SRH, and shear status as HRRR. | Same CAPE/CIN candidate, SRH, and shear status as HRRR. Surface-based LCL present in `2dfld`; MLLCL absent/unverified. |
+
+No model has every input confirmed with the required semantics for either composite. The limits are parcel identity, shear units/meaning, and the lack of mixed-layer LCL. The SCP equation in the research notes also uses a BRN shear denominator; no precomputed BRN denominator was identified. Its availability depends on the exact intended formula.
+
+HRRR has `MXUPHL/MNUPHL` max/min forecast accumulations. RRFS has `UPHL` for 2000-5000 m above ground. RAP f00 `AWIP32` has no UPHL record. RRFS uses `MSLET` for mean sea-level pressure; HRRR and RAP use `MSLMA`.
+
+## References
+
+- [NCEP HRRR `wrfsfc` f00 inventory](https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfsfcf00.grib2.shtml) documents shear units, generic CAPE/CIN layers, surface LCL HGT, and PLPL.
+- [NCEP RAP `wrfprs` f00 inventory](https://www.nco.ncep.noaa.gov/pmb/products/rap/rap.t00z.wrfprsf00.grib2.shtml) lists pressure-product shear, helicity, CAPE/CIN, and surface LCL fields.
+- [NCEP RRFS product page](https://www.nco.ncep.noaa.gov/pmb/products/rrfs/) lists product families.
+- [NWS HREF field change notice 17-106](https://www.weather.gov/media/notification/pdfs/scn17-106hi_res_href.pdf) documents HREF parcel descriptions only. This spike does not use it to label HRRR/RAP/RRFS.
 
 RRFS uses `MSLET` for mean sea-level pressure; HRRR and RAP use `MSLMA`. RRFS uses 3 km `2dfld` naming and its f00 file remains much larger than RAP. These product differences matter to manifest matching.
 
