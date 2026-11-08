@@ -25,6 +25,11 @@ type LegendOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail' | 'totalSev
 
 const DEFAULT_REPORT_FILTERS = { tornado: true, wind: true, hail: true };
 
+const shouldShowCustomLegend = (activeOutlookTypeOverride: LegendOutlookType | undefined, workspaceId: string): boolean => {
+  if (activeOutlookTypeOverride || workspaceId !== 'custom') return false;
+  return isFeatureExposed('customProducts') && isFeatureExposed('customWorkspace');
+};
+
 interface LegendProps {
   activeOutlookType?: LegendOutlookType;
   desktopOpen?: boolean;
@@ -50,10 +55,7 @@ const Legend: React.FC<LegendProps> = React.memo(({
   const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const customLayers = useSelector(selectCurrentCustomLayers);
   const activeOutlookType = activeOutlookTypeOverride || storeActiveOutlookType;
-  const customMode = !activeOutlookTypeOverride
-    && isFeatureExposed('customProducts')
-    && isFeatureExposed('customWorkspace')
-    && workspaceId === 'custom';
+  const customMode = shouldShowCustomLegend(activeOutlookTypeOverride, workspaceId);
   const activeCustomLayer = customLayers.layers.find(({ id }) => id === activeCustomLayerId) ?? customLayers.layers[0];
 
   /** Builds the fill and hatch styles for a custom category swatch. */
