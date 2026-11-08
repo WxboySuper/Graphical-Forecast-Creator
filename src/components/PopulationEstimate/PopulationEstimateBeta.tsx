@@ -157,7 +157,7 @@ const CitiesList: React.FC<{ cities: Place[] | null; failed: boolean }> = ({ cit
   return (
     <div className="rounded border border-border p-3 text-sm">
       <p className="font-medium">Cities inside the outlook ({cities.length})</p>
-      <ul className="mt-1 columns-2 text-muted-foreground">
+      <ul className="mt-1 grid grid-cols-2 gap-x-3 text-muted-foreground">
         {shown.map((city) => <li key={`${city.name}-${city.state}-${city.lon}`}>{city.name}, {city.state}</li>)}
       </ul>
       <p className="mt-1 text-xs text-muted-foreground">
