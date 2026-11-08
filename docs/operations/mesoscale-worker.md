@@ -107,8 +107,10 @@ Routes accept only the three contract models and construct keys under
 cycles, invalid forecast hours, parameter IDs outside the lowercase slug
 pattern, and XYZ coordinates outside the zoom 0 to 24 numeric range. The
 catalog publishes a narrower usable zoom interval; clients should honor those
-catalog `minZoom` and `maxZoom` values. Missing tiles return a cacheable 404 so
-OpenLayers can leave that tile empty without downloading an image body.
+catalog `minZoom` and `maxZoom` values. Missing tiles return a cacheable 404.
+OpenLayers 10.11.0's `ImageTile` error handler marks failed image loads as errors
+and substitutes its blank image, so this Worker does not need to download or
+store transparent PNG bodies for absent tiles.
 Catalog, pointer, and health JSON objects larger than 4 MiB are rejected before
 parsing so a corrupt object cannot consume unbounded Worker memory.
 
