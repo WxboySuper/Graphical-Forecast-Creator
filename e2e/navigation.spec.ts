@@ -45,7 +45,7 @@ test.describe('Navigation', () => {
     await page.getByRole('button', { name: '2', exact: true }).click();
 
     await navigateToDiscussion(page);
-    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     await expect(editor).toHaveValue('');
     await editor.fill('Day 2 draft');
 
@@ -54,7 +54,7 @@ test.describe('Navigation', () => {
     await page.getByRole('tab', { name: /^Days$/i }).click();
     await page.getByRole('button', { name: '1', exact: true }).click();
     await navigateToDiscussion(page);
-    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     await expect(editor).toHaveValue('Day 1 draft');
 
     await navigateToSevereForecast(page);
@@ -62,7 +62,7 @@ test.describe('Navigation', () => {
     await page.getByRole('tab', { name: /^Days$/i }).click();
     await page.getByRole('button', { name: '2', exact: true }).click();
     await navigateToDiscussion(page);
-    await expect(page).toHaveURL(/\/discussion$/);
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     await expect(editor).toHaveValue('Day 2 draft');
   });
 });

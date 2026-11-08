@@ -4,9 +4,10 @@
  * preview, export, and workflow handoff. It composes editors and shared state
  * helpers; discussion formatting and storage rules remain in utility modules.
  */
-import React, { useMemo, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import { 
   FileText, 
   Eye, 
@@ -79,7 +80,8 @@ const DiscussionHeaderBar: React.FC<{
   hasUnsavedChanges: boolean;
   onExport: () => void;
   onSave: () => void;
-}> = ({ currentDay, groupingLabel, hasUnsavedChanges, onExport, onSave }) => (
+  previewToggle?: { open: boolean; onToggle: () => void };
+}> = ({ currentDay, groupingLabel, hasUnsavedChanges, onExport, onSave, previewToggle }) => (
   <div className="discussion-header-bar flex-shrink-0 border-b border-border bg-card px-6 py-4">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -94,6 +96,17 @@ const DiscussionHeaderBar: React.FC<{
       </div>
 
       <div className="flex items-center gap-2">
+        {previewToggle ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="discussion-preview-toggle"
+            onClick={previewToggle.onToggle}
+          >
+            {previewToggle.open ? <Edit3 className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            {previewToggle.open ? 'Edit' : 'Preview'}
+          </Button>
+        ) : null}
         <Button variant="outline" size="sm" onClick={onExport}>
           <Download className="h-4 w-4 mr-2" />
           Export
@@ -361,6 +374,7 @@ interface DiscussionEditorStateOptions {
   defaultForecasterName: string;
   currentDay: DayType;
   discussionKey: string;
+  resetToken: number;
   dispatch: ReturnType<typeof useDispatch>;
   addToast: AddToastFn;
   user: ReturnType<typeof useAuth>['user'];
@@ -373,6 +387,7 @@ const useDiscussionEditorState = ({
   defaultForecasterName,
   currentDay,
   discussionKey,
+  resetToken,
   dispatch,
   addToast,
   user,
@@ -382,6 +397,7 @@ const useDiscussionEditorState = ({
     existingDiscussion,
     defaultForecasterName,
     discussionKey,
+    resetToken,
     dispatch,
   });
 
@@ -453,31 +469,54 @@ const useDiscussionEditorState = ({
 
 
 /** Synchronizes the selected discussion scope with the forecast day and URL query. */
+// @codescene(disable:"Complex Conditional", disable:"Complex Method")
 const useDiscussionScopeSync = (options: {
   currentDay: DayType;
   discussionDay: DayType;
   dispatch: ReturnType<typeof useDispatch>;
   hasActiveWorkflow: boolean;
+  embedded: boolean;
+  mapSelectedGroupingId: string;
   selectedGroupingId: string;
   searchParams: URLSearchParams;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
 }) => {
-  const { currentDay, discussionDay, dispatch, hasActiveWorkflow, selectedGroupingId, searchParams, setSearchParams } = options;
+  const { currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, selectedGroupingId, searchParams, setSearchParams } = options;
+  const previousCurrentDayRef = useRef(currentDay);
   useEffect(() => {
-    if (currentDay !== discussionDay) dispatch(setForecastDay(discussionDay));
-  }, [currentDay, discussionDay, dispatch]);
-  useEffect(() => {
-    if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
-      setSearchParams({ group: selectedGroupingId }, { replace: true });
+    const mapDayChanged = previousCurrentDayRef.current !== currentDay;
+    previousCurrentDayRef.current = currentDay;
+    if (currentDay === discussionDay) return;
+    if (embedded && hasActiveWorkflow) {
+      if (!mapDayChanged) {
+        dispatch(setForecastDay(discussionDay));
+        return;
+      }
+      if (mapSelectedGroupingId === selectedGroupingId || searchParams.get('group') === mapSelectedGroupingId) return;
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', mapSelectedGroupingId);
+      setSearchParams(nextParams, { replace: true });
+      return;
     }
-  }, [hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
+    dispatch(setForecastDay(discussionDay));
+  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, selectedGroupingId, setSearchParams]);
+  useEffect(() => {
+    if (embedded && hasActiveWorkflow && currentDay !== discussionDay) return;
+    if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', selectedGroupingId);
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [currentDay, discussionDay, embedded, hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
 };
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
-export const DiscussionPage: React.FC = () => {
+// @codescene(disable:"Complex Method")
+export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number }> = ({ embedded = false, resetToken = 0 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -497,6 +536,10 @@ export const DiscussionPage: React.FC = () => {
     () => resolveDiscussionGrouping(groupings, searchParams.get('group'), currentDay),
     [groupings, searchParams, currentDay],
   );
+  const mapSelectedGrouping = useMemo(
+    () => resolveDiscussionGrouping(groupings, null, currentDay),
+    [groupings, currentDay],
+  );
   const discussionDay = getDiscussionOwnerDay(forecastCycle, selectedGrouping);
   const outlookDay = forecastCycle.days[discussionDay];
   const discussionDraft = useSelector((state: RootState) => selectDiscussionDraftForScope(state, selectedGrouping.id));
@@ -508,6 +551,8 @@ export const DiscussionPage: React.FC = () => {
     discussionDay,
     dispatch,
     hasActiveWorkflow,
+    embedded,
+    mapSelectedGroupingId: mapSelectedGrouping.id,
     selectedGroupingId: selectedGrouping.id,
     searchParams,
     setSearchParams,
@@ -518,10 +563,11 @@ export const DiscussionPage: React.FC = () => {
     defaultForecasterName,
     currentDay: discussionDay,
     discussionKey: selectedGrouping.id,
+    resetToken,
     dispatch,
     addToast,
     user,
-    onSaved: () => navigate('/forecast'),
+    onSaved: () => { if (!embedded) navigate(getDefaultForecastWorkspacePath()); },
   });
 
   const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
@@ -538,11 +584,15 @@ export const DiscussionPage: React.FC = () => {
     if (!nextGrouping) return;
     editorState.persistDraft();
     dispatch(setForecastDay(getDiscussionOwnerDay(forecastCycle, nextGrouping)));
-    if (hasActiveWorkflow) setSearchParams({ group: groupingId });
-  }, [dispatch, editorState, forecastCycle, groupings, hasActiveWorkflow, setSearchParams]);
+    if (hasActiveWorkflow) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', groupingId);
+      setSearchParams(nextParams);
+    }
+  }, [dispatch, editorState, forecastCycle, groupings, hasActiveWorkflow, searchParams, setSearchParams]);
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className={`h-full min-h-0 flex flex-col bg-background${embedded ? ' discussion-page--embedded' : ''}`}>
       <ForecastWorkflowPanel context="discussion" />
       <DiscussionHeaderBar
         currentDay={discussionDay}
@@ -550,6 +600,7 @@ export const DiscussionPage: React.FC = () => {
         hasUnsavedChanges={editorState.hasUnsavedChanges}
         onExport={editorState.handleExport}
         onSave={editorState.handleSave}
+        previewToggle={embedded ? { open: previewOpen, onToggle: () => setPreviewOpen((open) => !open) } : undefined}
       />
       <DiscussionScopeSection
         groupings={groupings}
@@ -559,7 +610,7 @@ export const DiscussionPage: React.FC = () => {
         onReset={handleResetGroupings}
       />
 
-      <div className="discussion-layout flex-1 flex overflow-hidden">
+      <div className={`discussion-layout flex-1 flex overflow-hidden${previewOpen ? ' discussion-layout--preview' : ''}`}>
         <div className="discussion-editor-pane flex flex-col overflow-hidden border-r border-border">
           <MetadataSection
             validStart={editorState.validStart}

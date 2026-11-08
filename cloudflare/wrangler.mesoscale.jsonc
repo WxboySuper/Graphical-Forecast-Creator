@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "gfc-mesoscale",
+  "account_id": "00000000000000000000000000000000",
+  "main": "./mesoscale-worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "r2_buckets": [
+    {
+      "binding": "MESOSCALE_BUCKET",
+      "bucket_name": "mesoscale-bucket-placeholder",
+      "preview_bucket_name": "mesoscale-preview-placeholder"
+    }
+  ],
+  "vars": {
+    "PUBLIC_BASE_URL": "https://mesoscale-worker.example.invalid",
+    "CORS_ALLOWED_ORIGINS": "https://gfc.weatherboysuper.com,https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002",
+    "STALE_AFTER_MINUTES": "180"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": true, "head_sampling_rate": 1 }
+  }
+}

@@ -5,6 +5,22 @@
  */
 import { getBuildTarget, type BuildTarget } from './buildTarget';
 import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { getDefaultForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../routing/forecastWorkspaceRoutes';
+
+const SHORTCUT_PRESERVED_PARAMS = ['group', 'discussionLayout'] as const;
+
+/** Opens Discussion inside the workspace the user is in, keeping only the discussion scope and layout. */
+export const buildDiscussionShortcutPath = (pathname: string, search: string): string => {
+  const workspacePath = resolveRouteForecastWorkspaceContext(pathname, search)?.path ?? getDefaultForecastWorkspacePath();
+  const current = new URLSearchParams(search);
+  const params = new URLSearchParams();
+  for (const key of SHORTCUT_PRESERVED_PARAMS) {
+    const value = current.get(key);
+    if (value) params.set(key, value);
+  }
+  params.set('surface', 'discussion');
+  return `${workspacePath}?${params.toString()}`;
+};
 
 export type AppNavigationItem = {
   id: string;
@@ -20,7 +36,7 @@ export type AppNavigationItem = {
 const RAW_APP_NAVIGATION_ITEMS = [
   { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
   { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },
-  { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
+  { id: 'discussion', to: '/forecast/severe?surface=discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
   { id: 'verification', to: '/verification', label: 'Verification', shortcutKey: '3', shortcutLabel: '⌃3' },
   { id: 'monitor', to: '/monitor', label: 'Monitor', shortcutKey: '4', shortcutLabel: '⌃4' },
   {
@@ -65,7 +81,13 @@ export const getNavigationKeyboardShortcuts = (
 
   for (const item of getVisibleNavigationItems(target)) {
     if (item.shortcutKey) {
-      shortcuts[item.shortcutKey] = () => navigate(item.to);
+      shortcuts[item.shortcutKey] = () => {
+        if (item.id === 'discussion' && typeof window !== 'undefined') {
+          navigate(buildDiscussionShortcutPath(window.location.pathname, window.location.search));
+          return;
+        }
+        navigate(item.to);
+      };
     }
   }
 
