@@ -1,10 +1,9 @@
-import { NO_COMPRESSION, PmtilesError } from './pmtiles-format.mjs';
+import { GZIP_COMPRESSION, NO_COMPRESSION, PmtilesError } from './pmtiles-format.mjs';
 import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
 
 export const HEADER_BYTES = 127;
 const MAX_ROOT_DIRECTORY_BYTES = 16_257;
 const PNG_TILE_TYPE = 2;
-const GZIP_COMPRESSION = 2;
 
 const headerError = (message) => { throw new PmtilesError(message); };
 

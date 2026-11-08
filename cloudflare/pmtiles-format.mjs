@@ -4,6 +4,7 @@ import { PmtilesError } from './pmtiles-error.mjs';
 export const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
 export const MAX_DIRECTORY_ENTRIES = 10000;
 export const NO_COMPRESSION = 1;
+export const GZIP_COMPRESSION = 2;
 
 export { PmtilesError };
 

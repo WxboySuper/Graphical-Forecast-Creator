@@ -48,8 +48,8 @@ const fetchRangeObject = async ({ bucket, key, offset, length, missingAllowed })
   let object;
   try {
     object = await bucket.get(key, { range: { offset, length } });
-  } catch {
-    throw new PmtilesError('PMTiles range read failed');
+  } catch (error) {
+    throw new PmtilesError('PMTiles range read failed', { cause: error });
   }
   if (!object) {
     if (missingAllowed) return null;
@@ -61,8 +61,8 @@ const fetchRangeObject = async ({ bucket, key, offset, length, missingAllowed })
 const readRangeBody = async (object) => {
   try {
     return new Uint8Array(await object.arrayBuffer());
-  } catch {
-    throw new PmtilesError('PMTiles range body is unreadable');
+  } catch (error) {
+    throw new PmtilesError('PMTiles range body is unreadable', { cause: error });
   }
 };
 
@@ -183,12 +183,31 @@ const tileResult = async ({ bucket, key, state, entry, headOnly }) => {
 export const readTile = async ({ bucket, key, zoom, x, y, minZoom, maxZoom, headOnly = false }) => {
   const state = await archiveState(bucket, key);
   if (!state) return { state: 'missing-archive' };
-  const header = state.header;
-  if (header.minZoom !== minZoom || header.maxZoom !== maxZoom) throw new PmtilesError('PMTiles zoom interval does not match catalog');
-  if (!Number.isInteger(zoom) || zoom < header.minZoom || zoom > header.maxZoom) return { state: 'out-of-zoom' };
-  if (!validTileCoordinate({ zoom, x, y })) return { state: 'missing-tile' };
-  const entry = await tileEntry({ bucket, key, state, tileId: hilbertDistance(zoom, x, y) });
-  return tileResult({ bucket, key, state, entry, headOnly });
+  const requestState = tileRequestState({ header: state.header, minZoom, maxZoom, zoom, x, y });
+  if (requestState) return { state: requestState };
+  return resolveTileRequest({ bucket, key, state, zoom, x, y, headOnly });
 };
 
 export const clearPmtilesCacheForTests = () => archives.clear();
+
+const assertCatalogZoom = ({ header, minZoom, maxZoom }) => {
+  if (header.minZoom !== minZoom || header.maxZoom !== maxZoom) throw new PmtilesError('PMTiles zoom interval does not match catalog');
+};
+
+const validRequestedZoom = (zoom, header) => {
+  if (!Number.isInteger(zoom)) return false;
+  if (zoom < header.minZoom) return false;
+  return zoom <= header.maxZoom;
+};
+
+const tileRequestState = ({ header, minZoom, maxZoom, zoom, x, y }) => {
+  assertCatalogZoom({ header, minZoom, maxZoom });
+  if (!validRequestedZoom(zoom, header)) return 'out-of-zoom';
+  if (!validTileCoordinate({ zoom, x, y })) return 'missing-tile';
+  return null;
+};
+
+const resolveTileRequest = async ({ bucket, key, state, zoom, x, y, headOnly }) => {
+  const entry = await tileEntry({ bucket, key, state, tileId: hilbertDistance(zoom, x, y) });
+  return tileResult({ bucket, key, state, entry, headOnly });
+};

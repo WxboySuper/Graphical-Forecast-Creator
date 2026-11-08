@@ -1,4 +1,4 @@
-import { MAX_DIRECTORY_BYTES, NO_COMPRESSION, PmtilesError } from './pmtiles-format.mjs';
+import { GZIP_COMPRESSION, MAX_DIRECTORY_BYTES, NO_COMPRESSION, PmtilesError } from './pmtiles-format.mjs';
 
 const joinChunks = (chunks, length) => {
   const bytes = new Uint8Array(length);
@@ -32,7 +32,7 @@ const cancelReader = async (reader) => {
 
 export const decompressDirectory = async (bytes, compression) => {
   if (compression === NO_COMPRESSION) return bytes;
-  if (compression !== 2) throw new PmtilesError('Unsupported PMTiles directory compression');
+  if (compression !== GZIP_COMPRESSION) throw new PmtilesError('Unsupported PMTiles directory compression');
   let reader;
   try {
     reader = createGzipReader(bytes);
