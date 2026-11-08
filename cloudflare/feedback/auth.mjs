@@ -35,8 +35,10 @@ function claimsAreValid(claims, project, now) {
   return checks.every((check) => check());
 }
 
+const isCacheFresh = (now) => Boolean(jwksCache.keys) && jwksCache.expiresAt > now;
+
 async function loadKeys(env, now, force = false) {
-  if (!force && jwksCache.keys && jwksCache.expiresAt > now) return jwksCache.keys;
+  if (!force && isCacheFresh(now)) return jwksCache.keys;
   const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
   if (!response.ok) return null;
   const data = await response.json();
