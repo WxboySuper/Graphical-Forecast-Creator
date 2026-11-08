@@ -1,10 +1,10 @@
 # Mesoscale field inventory spike
 
-Checked 8 November 2026. The companion [JSON manifest](../data/mesoscale-field-inventory.json) records anonymous S3 URLs, object sizes, `.idx` timestamps and copied inventory strings for the newest f00 files available during this check.
+Checked 8 November 2026. The companion [JSON manifest](../data/mesoscale-field-inventory.json) records anonymous S3 URLs, object sizes, separate GRIB object and `.idx` Last-Modified timestamps, and copied inventory strings for the newest f00 files available during this check.
 
 ## Measured sample
 
-| Model | Cycle | f00 index/object timestamp | Latency from cycle | Object bytes | Selected message bytes |
+| Model | Cycle | f00 object Last-Modified | Latency from cycle | Object bytes | Selected message bytes |
 |---|---|---|---:|---:|---:|
 | HRRR CONUS `wrfsfc` | 12Z | 12:51:20Z | 51 min | 136,859,480 | 12,550,486 |
 | RAP `awip32` | 06Z | 06:48:05Z | 48 min | 19,614,935 | 561,337 |

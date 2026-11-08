@@ -4,18 +4,19 @@
   "models": {
     "HRRR": {
       "cycle": "2026-11-08T12:00:00Z",
-      "f00LastModified": "2026-11-08T12:51:20Z",
       "latencyMinutes": 51,
       "products": [
         {
           "url": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2",
           "index": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2.idx",
-          "sizeBytes": 136859480
+          "sizeBytes": 136859480,
+          "indexLastModified": "Sun, 08 Nov 2026 12:51:24 GMT"
         },
         {
           "url": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfprsf00.grib2",
           "index": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfprsf00.grib2.idx",
-          "sizeBytes": 382358670
+          "sizeBytes": 382358670,
+          "indexLastModified": "Sun, 08 Nov 2026 12:51:46 GMT"
         }
       ],
       "fields": {
@@ -364,17 +365,18 @@
           }
         ],
         "uniqueBytes": 12550486
-      }
+      },
+      "f00ObjectLastModified": "2026-11-08T12:51:20Z"
     },
     "RAP": {
       "cycle": "2026-11-08T06:00:00Z",
-      "f00LastModified": "2026-11-08T06:48:05Z",
       "latencyMinutes": 48,
       "products": [
         {
           "url": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2",
           "index": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2.idx",
-          "sizeBytes": 19614935
+          "sizeBytes": 19614935,
+          "indexLastModified": "Sun, 08 Nov 2026 06:48:06 GMT"
         }
       ],
       "fields": {
@@ -723,17 +725,18 @@
           }
         ],
         "uniqueBytes": 561337
-      }
+      },
+      "f00ObjectLastModified": "2026-11-08T06:48:05Z"
     },
     "RRFS": {
       "cycle": "2026-11-08T06:00:00Z",
-      "f00LastModified": "2026-11-08T07:15:26Z",
       "latencyMinutes": 75,
       "products": [
         {
           "url": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2",
           "index": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2.idx",
-          "sizeBytes": 302956136
+          "sizeBytes": 302956136,
+          "indexLastModified": "Sun, 08 Nov 2026 07:15:33 GMT"
         }
       ],
       "fields": {
@@ -1104,7 +1107,8 @@
           }
         ],
         "uniqueBytes": 14103011
-      }
+      },
+      "f00ObjectLastModified": "2026-11-08T07:15:26Z"
     }
   },
   "selectedMessageBytes": {
