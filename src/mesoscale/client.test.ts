@@ -32,6 +32,18 @@ describe('mesoscale client', () => {
     expect(result).toMatchObject({ state: 'partial', unavailableParameters: [{ id: 'cin' }, { id: 'srh' }] });
   });
 
+  it('maps a failed catalog parameter to unavailable data while keeping other fields', () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const frame = catalog.frames[0];
+    const failedCatalog = {
+      ...catalog,
+      frames: [{ ...frame, parameters: frame.parameters.map((parameter, index) => index === 0 ? { ...parameter, status: 'failed' as const } : parameter) }],
+    };
+    const normalized = normalizeMesoscaleCatalog(failedCatalog, Date.parse('2026-05-20T12:30:00Z'))[0];
+    expect(normalized).toMatchObject({ state: 'partial', unavailableParameters: [{ id: 'mlcape' }] });
+    if (normalized.state === 'partial') expect(normalized.parameters.map(parameter => parameter.definition.id)).toEqual(['stp', 'scp']);
+  });
+
   it('returns malformed for invalid JSON and upstream-failure for HTTP errors', async () => {
     const malformed = jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: () => Promise.reject(new SyntaxError('bad json')) });
     const badJson = await fetchMesoscaleLatest('hrrr', { fetcher: malformed, config: { ...fixtures.config!, fixtures: false } });

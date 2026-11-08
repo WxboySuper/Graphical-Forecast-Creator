@@ -176,6 +176,7 @@ const hasValidTileFormat = (tile: Record<string, unknown>): boolean => tile.form
 
 const isCatalogParameter = (value: unknown): boolean => {
   if (!isRecord(value) || !isRecord(value.data)) return false;
+  if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
   const tile = value.data;
   if (tile.type !== 'xyz-raster') return false;
   if (!hasValidTileUrl(tile)) return false;
@@ -213,7 +214,15 @@ export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: num
   const frame = catalog.frames[frameIndex];
   if (!frame) return { state: 'malformed', message: 'Catalog frame is missing.' };
   if (frame.status === 'failed') return { state: 'upstream-failure', message: 'Catalog frame is marked failed.', retryable: false };
-  const unavailable = frame.unavailableParameters ?? catalog.unavailableParameters;
+  const declaredUnavailable = frame.unavailableParameters ?? catalog.unavailableParameters ?? [];
+  const failedParameters = frame.parameters.filter(parameter => parameter.status === 'failed');
+  const failedIds = new Set(declaredUnavailable.map(parameter => parameter.id));
+  const unavailable = [...declaredUnavailable, ...failedParameters
+    .filter(parameter => !failedIds.has(parameter.id))
+    .map(parameter => ({ id: parameter.id, reason: 'Catalog parameter is marked failed.' }))];
+  let isPartial = frame.status === 'partial';
+  if (failedParameters.length > 0) isPartial = true;
+  if (frame.parameters.some(parameter => parameter.status === 'partial')) isPartial = true;
   const payload = {
     schemaVersion: 1,
     model: {
@@ -229,13 +238,13 @@ export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: num
     validTime: frame.validTime,
     domain: { id: catalog.domain.id, name: catalog.domain.name, bounds: catalog.domain.bounds },
     source: catalog.source ?? frame.parameters[0]?.source,
-    parameters: frame.parameters.map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data })),
-    requestedParameterIds: frame.requestedParameterIds ?? catalog.requestedParameterIds,
+    parameters: frame.parameters.filter(parameter => parameter.status !== 'failed').map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data })),
+    requestedParameterIds: frame.requestedParameterIds ?? catalog.requestedParameterIds ?? frame.parameters.map(parameter => parameter.id),
     unavailableParameters: unavailable,
     stale: Math.max(now - Date.parse(catalog.cycleTime), now - Date.parse(frame.validTime)) > 180 * 60_000,
   };
   const normalized = normalizeProviderPayload(payload, { now, staleAfterMs: 180 * 60 * 1000 });
-  if (frame.status === 'partial' && normalized.state === 'ready') {
+  if (isPartial && normalized.state === 'ready') {
     return { ...normalized, state: 'partial', completeness: 'partial' };
   }
   return normalized;
