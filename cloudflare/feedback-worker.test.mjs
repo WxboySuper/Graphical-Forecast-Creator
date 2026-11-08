@@ -60,11 +60,12 @@ class FakeD1 {
     { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts WHERE key_hash'), run: (db, args) => ({ meta: { changes: Number(db.adminAttempts.delete(args[0])) } }) },
     { matches: (sql) => sql.startsWith('INSERT INTO feedback ('), run: (db, args) => {
       const [id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, user_agent, discord_status, ...guards] = args;
-      const [, recentSince, , dailySince, , , dupSince] = guards;
+      const [, recentSince, , dailySince, , , dupSince, globalSince] = guards;
       const mine = db.rows.filter((row) => row.uid_hash === uid_hash);
       const blocked = mine.filter((row) => row.created_at > recentSince).length >= 5
         || mine.filter((row) => row.created_at > dailySince).length >= 20
-        || mine.some((row) => row.message === message && row.created_at > dupSince);
+        || mine.some((row) => row.message === message && row.created_at > dupSince)
+        || db.rows.filter((row) => row.created_at > globalSince).length >= 120;
       if (blocked) return { meta: { changes: 0 } };
       db.rows.push({ id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, user_agent, discord_status, status: 'new' });
       return { meta: { changes: 1 } };
@@ -350,6 +351,17 @@ test('refetches signing keys once after a key rotation, rate-limited against for
   const afterRotation = fetches;
   for (let i = 0; i < 5; i += 1) await post(forged.env, forged.ctx, { auth: await token({ sub: `forged-${i}` }, pair.privateKey, `unknown-${i}`) });
   assert.ok(fetches - afterRotation <= 1, 'forged key ids must not trigger a refetch per request');
+});
+
+test('a global cap stops floods from many accounts', async () => {
+  const { db, env, ctx } = harness();
+  const statuses = [];
+  for (let i = 0; i < 122; i += 1) {
+    statuses.push((await post(env, ctx, { auth: await token({ sub: `flood-user-${i}` }), body: validBody({ message: `Flood message number ${i}.` }) })).status);
+  }
+  assert.equal(statuses.filter((status) => status === 201).length, 120);
+  assert.deepEqual(statuses.slice(120), [429, 429]);
+  assert.equal(db.rows.length, 120);
 });
 
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {

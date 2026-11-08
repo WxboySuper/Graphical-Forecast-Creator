@@ -2,7 +2,8 @@ import { digest } from './auth.mjs';
 import { clean } from './validate.mjs';
 
 const WINDOWS = { recent: 600000, daily: 86400000 };
-const LIMITS = { recent: 5, daily: 20 };
+// `global` caps total submissions per recent window so floods from many throwaway accounts cannot fill storage or Discord.
+const LIMITS = { recent: 5, daily: 20, global: 120 };
 
 export const MAX_BODY_BYTES = 16 * 1024;
 
@@ -76,7 +77,8 @@ const GUARDED_INSERT = `INSERT INTO feedback (id, created_at, uid_hash, email, c
 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 WHERE (SELECT COUNT(*) FROM feedback WHERE uid_hash = ? AND created_at > ?) < ${LIMITS.recent}
 AND (SELECT COUNT(*) FROM feedback WHERE uid_hash = ? AND created_at > ?) < ${LIMITS.daily}
-AND NOT EXISTS (SELECT 1 FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ?)`;
+AND NOT EXISTS (SELECT 1 FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ?)
+AND (SELECT COUNT(*) FROM feedback WHERE created_at > ?) < ${LIMITS.global}`;
 
 /** Stores an email only with consent and only when the identity provider verified it. */
 function contactEmail(body, claims) {
@@ -102,7 +104,7 @@ export async function createRecord(db, context) {
   const uidHash = await digest(`uid:${claims.sub}:${env.FEEDBACK_HASH_SALT}`);
   const r = buildRecord(context, uidHash);
   const values = [r.id, r.created_at, r.uid_hash, r.email, r.category, r.message, r.page, r.app_version, r.build_target, r.plan, r.viewport, r.user_agent, r.discord_status];
-  const guards = [uidHash, now - WINDOWS.recent, uidHash, now - WINDOWS.daily, uidHash, body.message, now - WINDOWS.recent];
+  const guards = [uidHash, now - WINDOWS.recent, uidHash, now - WINDOWS.daily, uidHash, body.message, now - WINDOWS.recent, now - WINDOWS.recent];
   const result = await db.prepare(GUARDED_INSERT).bind(...values, ...guards).run();
   return { record: r, inserted: (result?.meta?.changes ?? 0) > 0, uidHash };
 }
