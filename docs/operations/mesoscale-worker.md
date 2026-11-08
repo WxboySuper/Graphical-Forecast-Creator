@@ -63,11 +63,31 @@ separate from a missing object or an invalid record.
 
 ## Cache and usage budget
 
-The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-request. Tile `HEAD` uses R2 object metadata. Catalog `HEAD` reads and validates
-the catalog just like `GET`, while latest `HEAD` reads its small pointer to
-compute live age headers. Each R2 read counts as a Class B operation. Each
-`/latest` request reads one pointer.
+Catalog and pointer requests read one R2 object on a Worker Cache API miss.
+Tile requests resolve their catalog frame and parameter, verify the catalog's
+`archiveKey` against the fixed archive key layout, then use PMTiles v3 byte
+ranges. A cold tile lookup reads the catalog once per Worker isolate and the
+archive header, root directory, and tile bytes. A tile routed through a leaf
+directory adds one leaf range. The Worker keeps up to eight immutable catalog
+records and eight archive headers in bounded isolate memory. It keeps at most
+four parsed directories for each cached archive. After those entries are warm,
+a tile `GET` costs one R2 range read for the PNG bytes. `HEAD` validates the
+cached archive identity with a one-byte range at the tile offset, without
+fetching the full payload. A first missing-tile lookup probes one byte from the
+root directory to validate its cached identity; out-of-zoom requests need no
+archive range. Each R2 range `get` counts as one
+Class B operation regardless of its byte length. Catalog `HEAD` reads and
+validates the catalog like `GET`; latest `HEAD` reads its small pointer to
+compute live age headers. Each `/latest` request reads one pointer.
+The in-memory entries are keyed by immutable catalog/archive keys; publication
+uses create-only writes and never replaces a cycle catalog or archive. LRU
+eviction bounds isolate memory, and a new cycle uses new keys. This cache
+assumption depends on the immutability rule in the catalog contract.
+The compressed root directory is capped at 16,257 bytes by PMTiles v3, leaf
+directory reads and decompressed directories are capped at 2 MiB, and an
+individual tile range is capped at 8 MiB before Worker memory is allocated.
+Oversized or malformed archive entries return the same safe 502 response as
+other invalid archive data.
 Each `/status` request reads up to nine objects: three latest
 pointers and today's and yesterday's health object for each of the three models.
 The Worker Cache API stores immutable catalogs, tiles, and short-lived missing
@@ -76,15 +96,23 @@ are recomputed from cached cycle timestamps on each hit. HTTP cache headers give
 catalogs and tiles one year, latest/status five seconds, and missing tiles 60
 seconds. R2 cache misses count as Class B operations.
 
-For an example load of 100,000 tile requests, 1,000 catalog requests, 10,000
-latest requests, and 1,000 status requests per month, an entirely cold cache
-would require about 120,000 R2 reads (status accounts for at most 9,000). With
-a 90% Cache API hit rate across routes, the estimate is about 12,000 reads.
-Ten million cold tile misses alone use
-the full 10 million included R2 Class B reads. A status-heavy workload can use
-up to nine Class B reads per Worker request; about 1.1 million status requests
-would reach the 10 million included reads. Estimate traffic mix and cache rates
-before broad rollout.
+For 100,000 tile requests, 1,000 catalog requests, 10,000 latest requests,
+and 1,000 status requests per month, an all-warm tile workload uses about
+100,000 tile `GET` range reads (plus one range per tile `HEAD`), up to 9,000
+status reads, and the pointer/catalog misses. An all-cold tile workload can use roughly 300,000 to 400,000 range
+reads, depending on how many tiles use leaf directories. With a 90% Worker
+Cache API hit rate, the tile range count falls to about 10,000 to 50,000,
+depending on whether the remaining Worker isolates have warm directory state.
+The $5 Workers Paid plan includes 10 million Worker requests and 30 million
+CPU milliseconds per month. Budget about 1 ms CPU for a warm tile request and
+up to 3 ms for a cold request as planning estimates, not measured Cloudflare
+analytics. At those rates the CPU allowance covers 30 million warm or 10
+million cold requests. R2's free allocation includes 10 million Class B reads,
+so 10 million warm uncached tiles use that full allowance; cold archive and
+directory ranges can reach it sooner. A status-heavy workload can use up to
+nine Class B reads per Worker request; about 1.1 million status requests would
+reach 10 million reads. Check Cloudflare CPU and R2 analytics after rollout,
+then replace these planning estimates with observed per-route values.
 
 The existing $5 Workers Paid plan includes 10 million requests and 30 million
 CPU milliseconds per month. The R2 free allocation includes 10 million Class B

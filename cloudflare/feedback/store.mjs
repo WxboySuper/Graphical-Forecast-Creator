@@ -70,7 +70,7 @@ export async function applyUserRateLimit(db, uidHash, message, now) {
   const retry = rateLimitRetry(counts, now);
   if (retry) return { retry, duplicate: false };
   const duplicate = await db.prepare('SELECT id FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ? LIMIT 1').bind(uidHash, message, now - WINDOWS.recent).first();
-  return duplicate ? { retry: 600, duplicate: true } : null;
+  return duplicate ? { retry: WINDOWS.recent / 1000, duplicate: true } : null;
 }
 
 /**

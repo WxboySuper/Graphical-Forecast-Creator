@@ -177,6 +177,7 @@ describe("AccountPage", () => {
     expect(screen.getAllByText("alex@example.com")).toHaveLength(2);
     expect(screen.getAllByText("Google")).toHaveLength(2);
     expect(screen.getByDisplayValue("Alex")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "contact@gfcweather.com" })).toHaveAttribute("href", "mailto:contact@gfcweather.com");
     expect(
       screen.getByRole("button", { name: /Sign Out/i }),
     ).toBeInTheDocument();

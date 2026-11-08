@@ -4,6 +4,7 @@
  * capabilities; billing state and checkout transport remain owned by the entitlement and
  * billing modules it consumes.
  */
+import ContactEmailLink from '../components/ContactEmailLink';
 import React, { useState } from 'react';
 import { Link } from 'react-router';
 import { Check, CircleUserRound, Cloud, Crown, LoaderCircle, ShieldCheck, X } from 'lucide-react';
@@ -453,6 +454,8 @@ const PricingPage: React.FC = () => {
               billingMessage={billingMessage}
             />
           </section>
+
+          <p className="pricing-contact-note">Billing questions or concerns? Email <ContactEmailLink />.</p>
         </div>
       </div>
     </div>

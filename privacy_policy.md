@@ -55,4 +55,4 @@ GFC is intended for general audiences and is not directed at children under the 
 We rely on enterprise-grade infrastructure from Google (Firebase), Stripe, and Cloudflare to keep your data safe. In the unlikely event of a data breach that compromises your account information, we will notify affected users via email as quickly as legally and technically possible.
 
 **10. Policy Changes & Contact**
-We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. For privacy questions, or to request manual data deletion, contact us at: alex@weatherboysuper.com.
+We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. For privacy questions, or to request manual data deletion, contact us at: contact@gfcweather.com.

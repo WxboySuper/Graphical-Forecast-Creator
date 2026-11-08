@@ -1,3 +1,5 @@
+import { readTile } from './pmtiles-reader.mjs';
+
 const MODELS = new Set(['hrrr', 'rap', 'rrfs']);
 const V1_PREFIX = 'mesoscale/v1';
 const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
@@ -6,6 +8,8 @@ const TILE_MISS_TTL = 60;
 const POINTER_TTL = 5;
 const STATUS_TTL = 5;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
+const MAX_TILE_CATALOGS = 8;
+const tileCatalogs = new Map();
 
 const json = (body, status = 200, headers = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', ...headers } });
@@ -100,7 +104,7 @@ const parseTileRoute = (parts) => {
   const coordinates = parseTileCoordinates(parts.slice(5));
   if (!coordinates) return null;
   const { zoom, x, y } = coordinates;
-  return { kind: 'tile', key: `${V1_PREFIX}/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${zoom}/${x}/${y}.png` };
+  return { kind: 'tile', model: parts[1], cycle: parts[2], hour: Number(parts[3].slice(1)), parameter: parts[4], zoom, x, y };
 };
 
 const parseRoute = (pathname) => {
@@ -326,9 +330,8 @@ const cacheControlForRoute = (route) => {
   return `public, max-age=${POINTER_TTL}`;
 };
 
-const missingObjectResponse = (route) => {
-  const ttl = route.kind === 'tile' ? TILE_MISS_TTL : POINTER_TTL;
-  return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${ttl}` } });
+const missingObjectResponse = () => {
+  return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${POINTER_TTL}` } });
 };
 
 const conditionalResponse = (request, etag, headers) => {
@@ -351,67 +354,110 @@ const jsonWithEtag = async (value, request, cacheControl) => {
   return conditionalResponse(request, headers.get('ETag'), headers) || new Response(body, { headers });
 };
 
-const contentTypeForObject = (route) => {
-  if (route.kind === 'tile') return 'image/png';
-  return 'application/json; charset=utf-8';
-};
-
-const setTileLength = (headers, route, object) => {
-  if (route.kind !== 'tile') return;
-  if (!Number.isSafeInteger(object.size)) return;
-  headers.set('Content-Length', String(object.size));
-};
-
 const headersForObject = (route, object) => {
-  const contentType = contentTypeForObject(route);
-  const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
-  setTileLength(headers, route, object);
+  const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8' });
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', cacheControlForRoute(route));
   return { headers, etag };
 };
 
-const objectConditionalResponse = ({ request, route, headers, etag }) => {
-  if (route.kind === 'tile') return conditionalResponse(request, etag, headers);
-  return null;
-};
-
-const objectBodyResponse = ({ request, env, route, object, now, headers, etag }) => {
-  if (route.kind === 'tile') return new Response(request.method === 'HEAD' ? null : object.body, { headers });
-  return storedJsonResponse({ request, env, route, object, now, headers, etag });
-};
-
-const responseForObject = (context) => {
+const responseForObject = async (context) => {
   const { headers, etag } = headersForObject(context.route, context.object);
-  const conditional = objectConditionalResponse({ ...context, headers, etag });
-  if (conditional) return conditional;
-  return objectBodyResponse({ ...context, headers, etag });
+  return storedJsonResponse({ ...context, headers, etag });
 };
-
-const isTileHead = (context) => {
-  if (context.request.method !== 'HEAD') return false;
-  if (context.route.kind !== 'tile') return false;
-  return typeof context.env.MESOSCALE_BUCKET?.head === 'function';
-};
-
-const canReadMesoscaleObject = (bucket, headOnly) => {
-  if (headOnly) return typeof bucket.head === 'function';
-  return typeof bucket.get === 'function';
-};
-
-const readMesoscaleObject = (bucket, route, headOnly) =>
-  headOnly ? bucket.head(route.key) : bucket.get(route.key);
 
 const getObjectResponse = async (context) => {
   const bucket = context.env.MESOSCALE_BUCKET;
   if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const headOnly = isTileHead(context);
-  if (!canReadMesoscaleObject(bucket, headOnly)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  // Tile HEAD can use metadata; JSON HEAD follows the validated GET path before its body is stripped.
-  const object = await readMesoscaleObject(bucket, context.route, headOnly);
-  if (!object) return missingObjectResponse(context.route);
+  if (context.route.kind === 'tile') return getTileResponse(context, bucket);
+  if (typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const object = await bucket.get(context.route.key);
+  if (!object) return missingObjectResponse();
   return responseForObject({ ...context, object });
+};
+
+const tileMissResponse = () => new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${TILE_MISS_TTL}` } });
+
+const cachedTileCatalog = (key) => {
+  const value = tileCatalogs.get(key);
+  if (!value) return null;
+  tileCatalogs.delete(key);
+  tileCatalogs.set(key, value);
+  return value;
+};
+
+const storeTileCatalog = (key, value) => {
+  // Cycle catalogs are create-only and immutable under the published catalog contract.
+  tileCatalogs.delete(key);
+  tileCatalogs.set(key, value);
+  while (tileCatalogs.size > MAX_TILE_CATALOGS) tileCatalogs.delete(tileCatalogs.keys().next().value);
+};
+
+export const clearTileCatalogCacheForTests = () => tileCatalogs.clear();
+
+const tileCatalogRoute = (route) => ({ kind: 'catalog', model: route.model, cycle: route.cycle, key: `${V1_PREFIX}/catalog/${route.model}/${route.cycle}.json` });
+
+const loadTileCatalog = async (bucket, catalogRoute) => {
+  const catalogKey = catalogRoute.key;
+  let catalog = cachedTileCatalog(catalogKey);
+  if (!catalog) {
+    let object;
+    try {
+      object = await bucket.get(catalogKey);
+      if (!object) return { state: 'missing' };
+      if (invalidJsonObjectSize(object)) return { state: 'invalid' };
+      catalog = await object.json();
+    } catch (error) {
+      throw new Error('Stored tile catalog cannot be read', { cause: error });
+    }
+    if (!isJsonObject(catalog) || !validCatalog(catalog, catalogRoute)) return { state: 'invalid' };
+    storeTileCatalog(catalogKey, catalog);
+  }
+  return { state: 'found', catalog };
+};
+
+const validTileArchiveData = (data, expectedKey) => {
+  if (!isJsonObject(data)) return false;
+  if (data.archiveKey !== expectedKey) return false;
+  if (data.format !== 'image/png') return false;
+  if (data.tileCompression !== 'none') return false;
+  if (!Number.isInteger(data.minZoom) || !Number.isInteger(data.maxZoom)) return false;
+  if (data.minZoom < 0 || data.maxZoom > MAX_ZOOM) return false;
+  return data.minZoom <= data.maxZoom;
+};
+
+const tileArchiveDescriptor = async (bucket, route) => {
+  const catalogRoute = tileCatalogRoute(route);
+  const result = await loadTileCatalog(bucket, catalogRoute);
+  if (result.state !== 'found') return result;
+  const { catalog } = result;
+  const frame = catalog.frames.find((item) => item.forecastHour === route.hour);
+  const parameter = frame?.parameters.find((item) => item.id === route.parameter);
+  if (!parameter) return { state: 'missing' };
+  const expectedKey = `${V1_PREFIX}/archives/${route.model}/${route.cycle}/f${String(route.hour).padStart(2, '0')}/${route.parameter}.pmtiles`;
+  const { data } = parameter;
+  if (!validTileArchiveData(data, expectedKey)) return { state: 'invalid' };
+  return { state: 'found', key: expectedKey, minZoom: data.minZoom, maxZoom: data.maxZoom };
+};
+
+const tileResponseForDescriptor = async ({ request, route, bucket, descriptor }) => {
+  if (descriptor.state === 'missing') return tileMissResponse();
+  if (descriptor.state === 'invalid') return invalidCatalogResponse();
+  if (route.zoom < descriptor.minZoom || route.zoom > descriptor.maxZoom) return tileMissResponse();
+  const tile = await readTile({ bucket, key: descriptor.key, zoom: route.zoom, x: route.x, y: route.y, minZoom: descriptor.minZoom, maxZoom: descriptor.maxZoom, headOnly: request.method === 'HEAD' });
+  if (tile.state !== 'found') return tileMissResponse();
+  const headers = new Headers({ 'Content-Type': 'image/png', 'Cache-Control': IMMUTABLE_CACHE_CONTROL, 'Content-Length': String(tile.length) });
+  if (tile.etag) headers.set('ETag', tile.etag);
+  const notModified = conditionalResponse(request, tile.etag, headers);
+  if (notModified) return notModified;
+  return new Response(request.method === 'HEAD' ? null : tile.bytes, { headers });
+};
+
+const getTileResponse = async ({ request, route }, bucket) => {
+  if (typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const descriptor = await tileArchiveDescriptor(bucket, route);
+  return tileResponseForDescriptor({ request, route, bucket, descriptor });
 };
 
 const readJson = async (bucket, key) => {

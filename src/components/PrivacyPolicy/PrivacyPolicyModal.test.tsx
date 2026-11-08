@@ -104,6 +104,13 @@ describe('PrivacyPolicyModal component', () => {
     expect(screen.getAllByText(/not removed automatically when you delete your account/u).length).toBeGreaterThan(0);
   });
 
+  test('lists contact@gfcweather.com as the privacy and deletion contact', () => {
+    render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
+    const link = screen.getByRole('link', { name: 'contact@gfcweather.com' });
+    expect(link).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
+    expect(screen.queryByText(/weatherboysuper\.com/u)).not.toBeInTheDocument();
+  });
+
   test('hides whats new for first-time users in acceptance mode', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
     expect(screen.getByText(/Last updated November 8, 2026/u)).toBeInTheDocument();
