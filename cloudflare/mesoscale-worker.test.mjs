@@ -72,6 +72,8 @@ test('strictly whitelists route segments and rejects traversal attempts without 
     '/tiles/hrrr/20261108T1200Z/f00/%2e%2e/3/0/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/8/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/25/0/0.png',
+    '/tiles/hrrr/20261108T1200Z/f00/temp/3/999999999999999999999/0.png',
+    '/tiles/hrrr/20261108T1200Z/f00/temp/3/0/999999999999999999999.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/0/0%2epng',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/0/0.png/extra',
   ]) {
@@ -151,6 +153,10 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   mismatchedTemplate.frames[0].parameters[0].data.urlTemplate = 'https://old.example/tiles/rap/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png';
   const mismatchedTemplateEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedTemplate });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedTemplateEnv)).status, 502);
+  const queryTemplate = structuredClone(catalog);
+  queryTemplate.frames[0].parameters[0].data.urlTemplate += '?token=unexpected';
+  const queryTemplateEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': queryTemplate });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), queryTemplateEnv)).status, 502);
   const mismatchedCatalog = { ...catalog, model: { id: 'rap' } };
   const mismatchedCatalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedCatalog });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedCatalogEnv)).status, 502);

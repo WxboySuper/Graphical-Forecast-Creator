@@ -79,8 +79,9 @@ const validTileCoordinates = (zoom, x, y) => {
 const parseTileCoordinates = (parts) => {
   const [zoomText, xText, yFile] = parts;
   if (!/^(?:0|[1-9]\d?)$/.test(zoomText)) return null;
-  if (!/^(?:0|[1-9]\d*)$/.test(xText)) return null;
-  if (!/^(?:0|[1-9]\d*)\.png$/.test(yFile)) return null;
+  // Zoom is capped at 24, so valid XYZ coordinates need at most eight digits.
+  if (!/^(?:0|[1-9]\d{0,7})$/.test(xText)) return null;
+  if (!/^(?:0|[1-9]\d{0,7})\.png$/.test(yFile)) return null;
   const zoom = Number(zoomText);
   const x = Number(xText);
   const y = Number(yFile.slice(0, -4));
@@ -149,6 +150,7 @@ const noBodyForHead = (response) => new Response(null, { status: response.status
 
 const parseTileTemplate = (template) => {
   if (typeof template !== 'string') return null;
+  // v1 publishes an exact public Worker PNG path with no query or fragment suffix.
   const match = template.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
   if (!match) return null;
   const [model, cycle, hour, parameterId] = match[1].split('/');

@@ -40,6 +40,10 @@ Set the app's catalog base to `PUBLIC_BASE_URL`, then use
 `urlTemplate` values in catalogs to that base and returns a matching
 `catalogUrl` from latest pointers. The app should use the catalog's
 `data.urlTemplate` directly. It must not build R2 URLs.
+Catalog templates must use the exact v1 public Worker PNG path
+`/tiles/{model}/{cycle}/f{hh}/{parameter}/{z}/{x}/{y}.png`, without a query
+or fragment. The Worker validates that shape before rewriting the host so
+catalogs cannot direct clients to a different object or route.
 The Worker Cache API stores immutable catalogs and tiles, plus five-second
 responses for latest/status. It recalculates age and stale fields from the cycle
 timestamp on every dynamic cache hit; status cache keys also include the stale
