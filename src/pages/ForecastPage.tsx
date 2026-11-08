@@ -1009,6 +1009,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                     onKeyDown={(event) => {
                       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                       event.preventDefault();
+                      event.stopPropagation();
                       setDiscussionPanelWidth((width) => Math.max(320, Math.min(800, width + (event.key === 'ArrowLeft' ? 24 : -24))));
                     }}
                   />

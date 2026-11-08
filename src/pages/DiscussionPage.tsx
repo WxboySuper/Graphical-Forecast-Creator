@@ -4,7 +4,7 @@
  * preview, export, and workflow handoff. It composes editors and shared state
  * helpers; discussion formatting and storage rules remain in utility modules.
  */
-import React, { useMemo, useCallback, useEffect } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router';
 import { 
@@ -469,9 +469,16 @@ const useDiscussionScopeSync = (options: {
   setSearchParams: ReturnType<typeof useSearchParams>[1];
 }) => {
   const { currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, selectedGroupingId, searchParams, setSearchParams } = options;
+  const previousCurrentDayRef = useRef(currentDay);
   useEffect(() => {
+    const mapDayChanged = previousCurrentDayRef.current !== currentDay;
+    previousCurrentDayRef.current = currentDay;
     if (currentDay === discussionDay) return;
     if (embedded && hasActiveWorkflow) {
+      if (!mapDayChanged) {
+        dispatch(setForecastDay(discussionDay));
+        return;
+      }
       if (mapSelectedGroupingId === selectedGroupingId || searchParams.get('group') === mapSelectedGroupingId) return;
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set('group', mapSelectedGroupingId);
