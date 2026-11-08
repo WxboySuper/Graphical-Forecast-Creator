@@ -18,7 +18,7 @@ async function attemptKey(request, env) {
 async function throttleRetry(db, key, now) {
   const attempt = await db.prepare('SELECT window_started, attempts FROM feedback_admin_attempts WHERE key_hash = ?').bind(key).first();
   if (!attempt || attempt.attempts < 10) return null;
-  const remaining = attempt.window_started + 600000 - now;
+  const remaining = attempt.window_started + ATTEMPT_WINDOW_MS - now;
   if (remaining <= 0) return null;
   return Math.max(1, Math.ceil(remaining / 1000));
 }
@@ -26,7 +26,7 @@ async function throttleRetry(db, key, now) {
 async function recordFailure(db, key, now) {
   // Expired windows from other keys are removed here so attacker-chosen addresses cannot accumulate.
   await db.prepare('DELETE FROM feedback_admin_attempts WHERE window_started <= ?').bind(now - ATTEMPT_WINDOW_MS).run();
-  await db.prepare('INSERT INTO feedback_admin_attempts (key_hash, window_started, attempts) VALUES (?, ?, 1) ON CONFLICT(key_hash) DO UPDATE SET window_started = CASE WHEN window_started + 600000 <= excluded.window_started THEN excluded.window_started ELSE window_started END, attempts = CASE WHEN window_started + 600000 <= excluded.window_started THEN 1 ELSE attempts + 1 END').bind(key, now).run();
+  await db.prepare(`INSERT INTO feedback_admin_attempts (key_hash, window_started, attempts) VALUES (?, ?, 1) ON CONFLICT(key_hash) DO UPDATE SET window_started = CASE WHEN window_started + ${ATTEMPT_WINDOW_MS} <= excluded.window_started THEN excluded.window_started ELSE window_started END, attempts = CASE WHEN window_started + ${ATTEMPT_WINDOW_MS} <= excluded.window_started THEN 1 ELSE attempts + 1 END`).bind(key, now).run();
 }
 
 async function authenticate(request, env) {
