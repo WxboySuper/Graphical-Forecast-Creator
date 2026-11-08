@@ -1,3 +1,5 @@
+import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
+
 const varint = (value) => {
   const bytes = [];
   while (value > 0x7f) {
@@ -43,9 +45,10 @@ export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 7
   put64(24, metadataOffset); put64(32, metadata.length);
   put64(40, leaf ? leafOffset : 0); put64(48, leaf ? leafBytes.length : 0);
   put64(56, tileOffset); put64(64, bytes.length);
-  archive[97] = gzip ? 2 : 1; archive[98] = 1; archive[99] = 2; archive[100] = 3; archive[101] = 4;
-  view.setInt32(102, -1300000000, true); view.setInt32(106, 200000000, true);
-  view.setInt32(110, -600000000, true); view.setInt32(114, 550000000, true);
+  archive[97] = gzip ? 2 : 1; archive[98] = 1; archive[99] = 2;
+  archive[100] = PUBLISHED_TILE_CONTRACT.minZoom; archive[101] = PUBLISHED_TILE_CONTRACT.maxZoom;
+  view.setInt32(102, PUBLISHED_TILE_CONTRACT.minLonE7, true); view.setInt32(106, PUBLISHED_TILE_CONTRACT.minLatE7, true);
+  view.setInt32(110, PUBLISHED_TILE_CONTRACT.maxLonE7, true); view.setInt32(114, PUBLISHED_TILE_CONTRACT.maxLatE7, true);
   archive.set(root, rootOffset);
   archive.set(metadata, metadataOffset);
   if (leafBytes) archive.set(leafBytes, leafOffset);

@@ -57,14 +57,14 @@ const tileCatalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{
     archiveKey: 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles', minZoom: 3, maxZoom: 4,
   },
 }] }] });
-const tileEnvFor = (bucket) => {
+const tileEnvFor = (bucket, catalog = tileCatalog) => {
   clearTileCatalogCacheForTests();
   clearPmtilesCacheForTests();
   const get = bucket.get.bind(bucket);
   bucket.get = async (key, options) => {
     if (key === 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json') {
-      const serialized = JSON.stringify(tileCatalog);
-      return { size: new TextEncoder().encode(serialized).length, json: async () => structuredClone(tileCatalog) };
+      const serialized = JSON.stringify(catalog);
+      return { size: new TextEncoder().encode(serialized).length, json: async () => structuredClone(catalog) };
     }
     return get(key, options);
   };
@@ -277,6 +277,15 @@ serialTest('tile response defaults to PNG content type when R2 metadata is absen
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
   assert.equal(response.headers.get('Content-Type'), 'image/png');
   assert.equal(response.headers.get('Content-Length'), '3');
+});
+
+serialTest('invalid catalog archive data returns a controlled gateway response', async () => {
+  const catalog = structuredClone(tileCatalog);
+  delete catalog.frames[0].parameters[0].data;
+  const env = tileEnvFor(rangeBucket(await createPmtilesFixture()), catalog);
+  const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
+  assert.equal(response.status, 502);
+  assert.match(await response.text(), /catalog/);
 });
 
 serialTest('tile HEAD reads directory ranges but skips the tile payload', async () => {

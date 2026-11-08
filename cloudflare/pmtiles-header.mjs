@@ -1,4 +1,5 @@
 import { NO_COMPRESSION, PmtilesError } from './pmtiles-format.mjs';
+import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
 
 export const HEADER_BYTES = 127;
 const MAX_ROOT_DIRECTORY_BYTES = 16_257;
@@ -35,14 +36,14 @@ const validateCompression = (header) => {
 };
 
 const validateZoom = (header) => {
-  if (header.minZoom !== 3 || header.maxZoom !== 4) headerError('PMTiles zoom interval does not match the published contract');
+  if (header.minZoom !== PUBLISHED_TILE_CONTRACT.minZoom || header.maxZoom !== PUBLISHED_TILE_CONTRACT.maxZoom) headerError('PMTiles zoom interval does not match the published contract');
 };
 
 const validateBounds = (header) => {
-  if (header.minLon !== -1300000000) headerError('PMTiles bounds do not match the published contract');
-  if (header.minLat !== 200000000) headerError('PMTiles bounds do not match the published contract');
-  if (header.maxLon !== -600000000) headerError('PMTiles bounds do not match the published contract');
-  if (header.maxLat !== 550000000) headerError('PMTiles bounds do not match the published contract');
+  if (header.minLon !== PUBLISHED_TILE_CONTRACT.minLonE7) headerError('PMTiles bounds do not match the published contract');
+  if (header.minLat !== PUBLISHED_TILE_CONTRACT.minLatE7) headerError('PMTiles bounds do not match the published contract');
+  if (header.maxLon !== PUBLISHED_TILE_CONTRACT.maxLonE7) headerError('PMTiles bounds do not match the published contract');
+  if (header.maxLat !== PUBLISHED_TILE_CONTRACT.maxLatE7) headerError('PMTiles bounds do not match the published contract');
 };
 
 const validateRootLength = (header) => {
