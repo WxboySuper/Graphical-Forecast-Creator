@@ -46,8 +46,7 @@ test.describe('Local reusable custom products', () => {
     await page.getByRole('button', { name: 'Create product' }).click();
 
     await expect(page.getByRole('heading', { name: 'Fire weather' })).toBeVisible();
-    await page.goto('/forecast?localTestAccount=premium');
-    await page.getByRole('radio', { name: 'Custom' }).click();
+    await page.goto('/forecast/custom?localTestAccount=premium');
     await page.getByRole('button', { name: 'Saved products' }).click();
     const savedProductsDialog = page.getByRole('dialog', { name: 'Saved products' });
     await expect(savedProductsDialog.getByText('Custom library', { exact: true })).toBeVisible();
@@ -56,7 +55,7 @@ test.describe('Local reusable custom products', () => {
     await fireWeatherCard.scrollIntoViewIfNeeded();
     await fireWeatherCard.getByRole('button', { name: 'Use in Forecast' }).click();
     await expect(savedProductsDialog).not.toBeVisible();
-    await expect(page).toHaveURL(/\/forecast\/severe(?:\?localTestAccount=premium)?$/);
+    await expect(page).toHaveURL(/\/forecast\/custom(?:\?localTestAccount=premium)?$/);
     await expect(page.getByLabel('Layer title')).toHaveValue('Fire weather');
     await expect(page.getByLabel('Category label')).toHaveValue('Critical');
     await expect(page.getByLabel('Category color')).toContainText('#F97316');
@@ -212,8 +211,7 @@ test.describe('Local reusable custom products', () => {
 
   test('shows free users the built-in catalog from the saved-products panel', async ({ page }) => {
     await prepareAppState(page);
-    await page.goto('/forecast?localTestAccount=free');
-    await page.getByRole('radio', { name: 'Custom' }).click();
+    await page.goto('/forecast/custom?localTestAccount=free');
     await page.getByRole('button', { name: 'Saved products' }).click();
 
     const savedProductsDialog = page.getByRole('dialog', { name: 'Saved products' });
@@ -247,16 +245,15 @@ test.describe('Non-release custom-product absence', () => {
 test.describe('Beta custom-product exposure', () => {
   test.skip(buildTarget !== 'beta', 'Requires a beta-target dev server.');
 
-  test('registers the library route and exposes Custom drawing controls', async ({ page }) => {
+  test('registers the library route and exposes Custom workspace controls', async ({ page }) => {
     await prepareAppState(page);
     await page.goto('/custom-products');
     await expect(page.getByRole('heading', { name: 'Rainfall', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Tropical AOI', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'New product' })).toBeDisabled();
 
-    await page.goto('/forecast');
-    await expect(page.getByRole('radio', { name: 'Custom' })).toBeVisible();
-    await page.getByRole('radio', { name: 'Custom' }).click();
+    await page.goto('/forecast/custom');
+    await expect(page.getByTestId('custom-workspace-controls')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Saved products' })).toBeVisible();
   });
 });
