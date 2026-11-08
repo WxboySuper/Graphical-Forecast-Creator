@@ -31,6 +31,12 @@ const countBucketReads = (bucket, methods = ['get']) => {
   }
   return () => reads;
 };
+const assertLongImmutableCache = (response) => {
+  const value = response.headers.get('Cache-Control') ?? '';
+  const match = value.match(/^public, max-age=(\d+), immutable$/);
+  assert.ok(match, `expected an immutable public cache policy, received ${value}`);
+  assert.ok(Number(match[1]) >= 31536000, `expected a one-year minimum TTL, received ${match[1]} seconds`);
+};
 const pointer = (modelId, cycleTime = '2026-11-08T12:00:00Z') => ({ schemaVersion: 1, modelId, cycleTime, catalogUrl: 'https://old.example/catalog.json', publishedAt: '2026-11-08T12:04:00Z' });
 const makeCatalog = (overrides = {}) => ({
   schemaVersion: 1,
@@ -139,7 +145,7 @@ serialTest('cycle catalog uses immutable caching, validates stored identity, and
   const catalog = makeCatalog({ cycleTime, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
   const env = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
   const response = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env);
-  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+  assertLongImmutableCache(response);
   assert.equal((await response.json()).frames[0].parameters[0].data.urlTemplate, 'https://mesoscale.example.test/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png');
   const etag = response.headers.get('ETag');
   assert.ok(etag, 'expected synthesized catalog ETag');
@@ -315,7 +321,7 @@ serialTest('Cache API stores tiles, serves hits, honors conditional hits, and ca
     assert.equal(await first.text(), '{"pixels":"tile"}');
     const etag = first.headers.get('ETag');
     assert.equal(first.headers.get('Content-Type'), 'image/png');
-    assert.match(first.headers.get('Cache-Control') ?? '', /^public, max-age=\d+, immutable$/);
+    assertLongImmutableCache(first);
     assert.equal(first.headers.get('X-Content-Type-Options'), 'nosniff');
     const hit = await worker.fetch(request(path), env);
     assert.equal(hit.status, 200);
@@ -585,7 +591,7 @@ serialTest('HEAD returns headers without a body, and unsupported methods return 
   assert.equal(tileHead.status, 200);
   assert.equal(tileHead.body, null);
   assert.equal(tileHead.headers.get('ETag'), '"tile"');
-  assert.match(tileHead.headers.get('Cache-Control') ?? '', /^public, max-age=\d+, immutable$/);
+  assertLongImmutableCache(tileHead);
   const rejected = await worker.fetch(request('/status', { method: 'POST' }), env);
   assert.equal(rejected.status, 405);
   assert.equal(rejected.headers.get('Allow'), 'GET, HEAD, OPTIONS');
