@@ -7,7 +7,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import forecastReducer, { addCustomLayer, setCustomEditorMode } from '../../store/forecastSlice';
+import forecastReducer, { addCustomLayer } from '../../store/forecastSlice';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION } from '../../types/customProducts';
 import { asCustomLayerId } from '../../lib/customProducts';
 import themeReducer from '../../store/themeSlice';
@@ -50,23 +50,37 @@ const renderSevereLegend = (
   return render(<Provider store={store}><Legend activeOutlookType={activeOutlookType} {...props} /></Provider>);
 };
 
+const addWinterCustomLayer = (store: ReturnType<typeof createMockStore>) => {
+  store.dispatch(addCustomLayer({
+    schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
+    id: asCustomLayerId('winter'), label: 'Winter impacts', order: 0,
+    categories: [
+      { id: 'major' as never, label: 'Major', order: 1, style: { fillColor: '#ef4444', fillOpacity: .7, strokeColor: '#111827', strokeOpacity: 1, strokeWidth: 2, hatch: 'crosshatch' } },
+      { id: 'minor' as never, label: 'Minor', order: 0, style: { fillColor: '#22c55e', fillOpacity: .5, strokeColor: '#111827', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' } },
+    ], features: [], createdAt: '2026-07-17T12:00:00.000Z', updatedAt: '2026-07-17T12:00:00.000Z',
+  }));
+};
+
 describe('Legend', () => {
-  it('renders ordered custom labels and exact hatch appearance in local custom mode', () => {
-    const store = createMockStore();
-    store.dispatch(addCustomLayer({
-      schemaVersion: CUSTOM_PRODUCTS_SCHEMA_VERSION,
-      id: asCustomLayerId('winter'), label: 'Winter impacts', order: 0,
-      categories: [
-        { id: 'major' as never, label: 'Major', order: 1, style: { fillColor: '#ef4444', fillOpacity: .7, strokeColor: '#111827', strokeOpacity: 1, strokeWidth: 2, hatch: 'crosshatch' } },
-        { id: 'minor' as never, label: 'Minor', order: 0, style: { fillColor: '#22c55e', fillOpacity: .5, strokeColor: '#111827', strokeOpacity: 1, strokeWidth: 2, hatch: 'none' } },
-      ], features: [], createdAt: '2026-07-17T12:00:00.000Z', updatedAt: '2026-07-17T12:00:00.000Z',
-    }));
-    store.dispatch(setCustomEditorMode('custom'));
+  it('renders custom categories in the Custom workspace without an editor-mode dispatch', () => {
+    const forecastState = forecastReducer(undefined, { type: 'test/init' });
+    const store = createMockStore({ forecast: { ...forecastState, workspaceId: 'custom' } });
+    addWinterCustomLayer(store);
     render(<Provider store={store}><Legend /></Provider>);
     expect(screen.getByText('Winter impacts')).toBeInTheDocument();
     const items = screen.getAllByRole('listitem');
     expect(items.map((item) => item.textContent)).toEqual(['Minor', 'Major']);
     expect(screen.getByRole('img', { name: 'Major custom style' })).toHaveStyle({ backgroundColor: '#ef4444', opacity: '1' });
+  });
+
+  it('keeps the Severe legend in Severe even when the saved cycle has custom layers', () => {
+    const forecastState = forecastReducer(undefined, { type: 'test/init' });
+    const store = createMockStore({ forecast: { ...forecastState, drawingState: { ...forecastState.drawingState, activeOutlookType: 'tornado' } } });
+    addWinterCustomLayer(store);
+    render(<Provider store={store}><Legend /></Provider>);
+
+    expect(screen.getByText(/tornado probabilities/i)).toBeInTheDocument();
+    expect(screen.queryByText('Winter impacts')).not.toBeInTheDocument();
   });
 
   it('renders the legend component without crashing', () => {

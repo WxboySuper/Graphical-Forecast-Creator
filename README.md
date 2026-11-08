@@ -70,7 +70,7 @@ Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
 ### Prerequisites
 
 - Node.js `22.22.0+`, `24.11.0+`, or `26.x`
-- pnpm `9`
+- pnpm `10` (version pinned in `package.json`)
 
 ### Installation
 
@@ -113,109 +113,43 @@ needs; `@typescript/native` provides the fast native `tsc` used by
 
 ### Build targets
 
-Every frontend build resolves one deployment target through `VITE_BUILD_TARGET`: `local`, `beta`, `staging`, or `production`. Local development and builds default to `local`; hosted deployment workflows set their target explicitly and invalid values stop the build. This target identifies the deployment surface and is separate from Vite's bundling mode and the open beta deployment.
+`VITE_BUILD_TARGET` is `local`, `beta`, `staging`, or `production` (default `local`; invalid values fail the build). It is separate from Vite's mode. The beta target is an open beta: anyone can use it, existing subscriptions apply, and it adds a beta banner and a floating feedback button.
 
-### Previewing the beta build locally (developer)
+### Local beta build
 
-The public beta (beta.gfcweather.com) is an open deployment: anyone can use it, and existing subscriptions apply. A beta build differs only by its build target, which adds the beta banner and the floating feedback button.
+```sh
+cross-env VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002
+```
 
-- Start a beta-target dev server on a different port:
-  - Unix/mac:
-    ```sh
-    cross-env VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002
-    ```
-  - Windows (PowerShell):
-    ```ps1
-    $env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002
-    ```
+PowerShell: `$env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002`. Point feedback at another Worker with `VITE_FEEDBACK_API_URL` (default `https://feedback.gfcweather.com`; see [beta feedback](docs/operations/beta-feedback.md)). On localhost, `?localBetaBypass=1` skips the Terms and Privacy modals (used by E2E). Hosted auth locally needs the `VITE_FIREBASE_*` variables.
 
-- Point feedback at a local or staging feedback Worker with `VITE_FEEDBACK_API_URL` (defaults to https://feedback.gfcweather.com). See `docs/operations/beta-feedback.md`.
+### Error monitoring
 
-- Dev-only: `?localBetaBypass=1` on localhost skips the Terms/Privacy acceptance modals (used by the E2E suite).
-
-- To enable hosted auth locally, provide Firebase web config via env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID and restart the dev server.
-
-### Hosted error monitoring (Sentry)
-
-Sentry is enabled on **production** (`stable/X.Y.x` → gfc.weatherboysuper.com) and **beta** (a prerelease from `main` → beta-gfc.weatherboysuper.com) when deploy secrets provide a DSN. Local dev builds without `VITE_SENTRY_DSN` stay inert. Events are separated in Sentry by environment (`production` vs `beta`).
-
-Hosted monitoring includes:
-
-- Error monitoring (React 19 `reactErrorHandler` + unhandled errors)
-- Performance tracing (React Router v7 navigation, 10% sample)
-- Redux action breadcrumbs (forecast map payloads stripped from breadcrumbs)
-- Structured logs (`Sentry.logger.*`)
-- Server-side errors on the analytics API (`@sentry/node`)
-
-Session replay is **disabled**. `dataCollection` explicitly opts out of PII (no user info, cookies, headers, bodies, or query params in error payloads by default).
-
-Create two Sentry projects (recommended):
-
-- **Web** — React client (`@sentry/react`)
-- **Analytics API** — Express server on the VPS (`@sentry/node`)
-
-Add these GitHub Actions secrets (repo → Settings → Secrets and variables → Actions):
-
-| Secret | Used for |
-|--------|----------|
-| `VITE_SENTRY_DSN` | Browser error + performance monitoring |
-| `SENTRY_DSN` | Analytics/billing API server |
-| `SENTRY_AUTH_TOKEN` | Upload source maps during the main deploy build (use a Sentry **Organization Auth Token**; `org:ci` scope is correct and fixed) |
-| `SENTRY_ORG` | Your Sentry organization slug |
-| `SENTRY_PROJECT` | Web project slug (source maps) — not the API project |
-
-Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the analytics VPS so `/api/sentry-tunnel` validates browser envelopes against the web project.
-
-After the next `main` deploy, verify in Sentry with a test error from the browser console on production (not from DevTools while paused — use a one-off button or `throw new Error('Sentry test')` in the console on the live site).
+Sentry runs on production and beta only when a DSN is provided; local builds are inert. Session replay is off and PII collection is disabled. Setup and secrets: [hosting and services](docs/guide/03-hosting-and-services.md).
 
 ---
 
 ## Project Structure
 
 ```
-src/
- components/
-    CycleManager/       # Cycle history modal, copy-from-previous modal
-    DaySelector/        # Day tab navigation panel
-    DiscussionEditor/   # DIY + Guided discussion editor
-    Documentation/      # In-app help/docs panel
-    DrawingTools/       # Export modal, map export hook
-    IntegratedToolbar/  # Main toolbar (all action buttons)
-    Map/                # OpenLayers map, overlay controls, legend
-    OutlookPanel/       # Probability/CIG selector panel
-    OutlookSelector/    # Outlook type picker
-    Toast/              # Notification toasts
-    Verification/       # Storm report panel
-    VerificationMode/   # Verification page layout
- hooks/
-    useAutoCategorical.ts   # Auto-derives categorical from hazards
-    useAutoSave.ts          # localStorage auto-save every 5s
- pages/
-    ForecastPage.tsx        # Main forecast editing page
-    VerificationPage.tsx    # Forecast verification page
-    DiscussionPage.tsx      # Discussion editor page
-    HomePage.tsx            # Landing / cycle overview page
- store/
-    forecastSlice.ts        # Active forecast editing state
-    verificationSlice.ts    # Isolated verification state
-    overlaysSlice.ts        # Map overlay toggle state
-    themeSlice.ts           # Dark mode state
- types/
-    outlooks.ts             # Core TypeScript interfaces
- utils/
-     fileUtils.ts            # JSON import/export, ZIP package
-     exportUtils.ts          # Map image capture (html2canvas)
-     verificationUtils.ts    # Storm report spatial analysis
-     outlookUtils.ts         # Color mappings, categorical rules
+src/        React app: pages, components, hooks, store (Redux), utils, monitor, config
+server/     Express API (metrics, billing, accounts, Auto-TSTM)
+e2e/        Playwright tests
+scripts/    Release, CI and validation tooling
+docs/       guide/ (human), agents/ (AI agents), reference docs
 ```
+
+Details: [how the code is organised](docs/guide/02-architecture.md).
 
 ---
 
 ## Documentation
 
-- [Outlook Information](docs/product/outlook-info.md) - risk levels, probability values, categorical conversion rules
-- [Roadmap](ROADMAP.md) - current product direction and active development focus
-- [Changelog](CHANGELOG.md) - release history
+- [**Guide**](docs/guide/README.md) - illustrated overview: product, architecture, hosting, releases, feature gating, automation
+- [Docs index](docs/README.md) - guide, agent docs, and detailed reference
+- [Outlook information](docs/product/outlook-info.md) - risk levels, probabilities, categorical conversion
+- [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md)
+- Contributors using AI agents: see [AGENTS.md](AGENTS.md)
 
 ---
 

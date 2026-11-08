@@ -3,10 +3,7 @@ import type { CycleMetadata, StandardGrouping, WorkflowMetadata } from '../types
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { readActionTimestamp } from './timestampMiddleware';
-import {
-  resolveForecastWorkspaceId,
-  type ForecastWorkspaceId,
-} from '../config/forecastWorkspaces';
+import { resolveForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getFirstExposedOutlookType } from '../config/productExposureSelectors';
 import type { ForecastState, SavedCycle } from './forecastSlice';
 import { freezeMap } from './forecastStateFactory';
@@ -213,21 +210,17 @@ export const normalizeCycleWorkspace = (cycle: SavedCycle | null | undefined): S
 };
 
 /**
- * Returns the tool and custom-editor defaults one workspace starts from.
- * The outlook type comes from build-target exposure and the custom editor only
- * opens in custom mode for the workspace that owns custom layers, so a switch
- * never seeds Severe's defaults into another product.
+ * Returns neutral tool and custom-editor selection defaults for a workspace.
+ * Workspace identity owns editor context; editor state only tracks selected
+ * custom layers and categories.
  */
-export const createWorkspaceEditorDefaults = (
-  workspaceId: ForecastWorkspaceId,
-): Pick<ForecastState, 'drawingState' | 'customEditor'> => ({
+export const createWorkspaceEditorDefaults = (): Pick<ForecastState, 'drawingState' | 'customEditor'> => ({
   drawingState: {
     activeOutlookType: getFirstExposedOutlookType() ?? 'tornado',
     activeProbability: '2%',
     isSignificant: false,
   },
   customEditor: {
-    mode: workspaceId === 'custom' ? 'custom' : 'severe',
     activeLayerId: null,
     activeCategoryId: null,
   },

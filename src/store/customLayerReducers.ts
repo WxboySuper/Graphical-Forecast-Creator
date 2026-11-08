@@ -14,10 +14,6 @@ import { canMoveCustomItem, cloneCustomValue, getCurrentCustomLayers, normalizeC
 
 /** Builds the custom-layer reducer group while reusing forecast day history. */
 export const createCustomLayerReducers = (pushUndoSnapshot: (state: ForecastState) => void) => ({
-  setCustomEditorMode: (state: ForecastState, action: PayloadAction<'severe' | 'custom'>) => {
-    state.customEditor.mode = action.payload;
-  },
-
   selectCustomLayer: (state: ForecastState, action: PayloadAction<string | null>) => {
     state.customEditor.activeLayerId = action.payload;
     const layer = getCurrentCustomLayers(state)?.layers.find(({ id }) => id === action.payload);

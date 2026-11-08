@@ -75,8 +75,8 @@ export const FORECAST_WORKSPACES = [
     focus: ['Custom forecast layers', 'Product-specific categories'],
     productType: 'custom',
     status: 'gated',
-    // #914 ships the route contract only: the Custom workspace stays off release
-    // targets until #915 registers it. The library route keeps its own gate.
+    // Custom editing remains limited to local and beta. The library route keeps
+    // its independent customProducts gate.
     exposureKey: 'customWorkspace',
     // /custom-products remains the separate Custom Products library route,
     // not a legacy Forecast editor route.
@@ -85,6 +85,13 @@ export const FORECAST_WORKSPACES = [
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 
 export const DEFAULT_FORECAST_WORKSPACE: ForecastWorkspaceId = 'severe';
+
+/** Custom editing is active only when the route and both rollout flags agree. */
+export const isCustomWorkspaceActive = (
+  workspaceId: string,
+  customProductsExposed: boolean,
+  customWorkspaceExposed: boolean,
+): boolean => workspaceId === 'custom' && customProductsExposed && customWorkspaceExposed;
 
 const WORKSPACES_BY_ID = new Map(
   FORECAST_WORKSPACES.map((workspace) => [workspace.id, workspace] as const),

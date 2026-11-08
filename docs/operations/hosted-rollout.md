@@ -4,8 +4,6 @@
 > This page documents the VPS layout only; it no longer defines a beta → main
 > promotion.
 
-Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
-
 ## VPS layout
 
 ```text

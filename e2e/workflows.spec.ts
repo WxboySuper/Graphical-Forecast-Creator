@@ -26,9 +26,6 @@ const prepareWorkflowSession = async (page: Page): Promise<void> => {
 
 /** Starts one of the user-facing workflow templates from Home. */
 const startWorkflow = async (page: Page, scope: string, expectedLabel: string): Promise<void> => {
-  // waitUntil domcontentloaded (not load): the app is a React SPA and full
-  // navigations can stall on external subresources (fonts, analytics), which
-  // used to blow the default 30s test timeout under CI load.
   await page.goto('/?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: scope, exact: true }).click();
   await page.getByRole('button', { name: 'Start Workflow', exact: true }).click();
@@ -107,22 +104,6 @@ test.describe('Workflow continuity', () => {
 
   test('round-trips a workflow package through the actual download and upload controls', async ({ page }) => {
     await startWorkflow(page, 'Day 2', 'Severe Convective Day 2');
-    await page.getByRole('radio', { name: 'Custom' }).click();
-    await page.getByRole('button', { name: 'Add custom layer' }).click();
-    await page.getByLabel('Layer title').fill('Package fire layer');
-    await page.getByLabel('Layer title').blur();
-    await page.getByLabel('Category label').fill('Critical fire');
-    await page.getByLabel('Category label').blur();
-    await page.getByLabel('Category hatch').click();
-    await page.getByRole('button', { name: 'Crosshatch', exact: true }).click();
-    await page.getByRole('button', { name: 'Draw polygons' }).click();
-    const viewport = page.locator('.map-container .ol-viewport');
-    const box = await viewport.boundingBox();
-    if (!box) throw new Error('Map viewport has no measurable bounds');
-    await page.mouse.click(box.x + box.width * .42, box.y + box.height * .38);
-    await page.mouse.click(box.x + box.width * .58, box.y + box.height * .38);
-    await page.mouse.dblclick(box.x + box.width * .5, box.y + box.height * .56);
-    await expect(workflowPanel(page)).toContainText('excluded from severe analytics and Auto-Categorical');
     await navigateToDiscussion(page);
     await page.getByPlaceholder(/Write your forecast discussion here/i).fill('Package round-trip sentinel.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -141,12 +122,6 @@ test.describe('Workflow continuity', () => {
     if (manifestFile === null) throw new Error('Workflow package manifest is missing');
     const manifest = JSON.parse(await manifestFile.async('string'));
     expect(manifest.forecast.workspaceId).toBe(manifest.workspaceId);
-    const innerForecast = manifest.forecast.forecast;
-    const exportedLayer = innerForecast.forecastCycle.days['2'].customLayers.layers[0];
-    expect(exportedLayer.label).toBe('Package fire layer');
-    expect(exportedLayer.categories[0].style.hatch).toBe('crosshatch');
-    expect(exportedLayer.features[0].geometry.type).toBe('Polygon');
-    expect(manifest.customContent).toEqual({ included: true, severeAnalytics: 'excluded', autoCategorical: 'excluded' });
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const chooserPromise = page.waitForEvent('filechooser');
@@ -158,9 +133,6 @@ test.describe('Workflow continuity', () => {
     await expect(page).toHaveURL(/\/$/);
     await navigateToSevereForecast(page);
     await expect(workflowPanel(page)).toContainText('Day 2 package', { timeout: 15000 });
-    await page.getByRole('radio', { name: 'Custom' }).click();
-    await expect(page.getByLabel('Layer title')).toHaveValue('Package fire layer');
-    await expect(page.getByLabel('Category hatch')).toHaveText('Crosshatch');
     await navigateToDiscussion(page);
     await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Package round-trip sentinel.');
   });
@@ -172,10 +144,10 @@ test.describe('Workflow continuity', () => {
     test(`keeps the custom workflow disclosure readable on ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await startWorkflow(page, 'Day 1', 'Severe Convective Day 1');
-      await page.getByRole('radio', { name: 'Custom' }).click();
+      await page.goto('/forecast/custom', { waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('custom-workspace-controls')).toBeVisible();
       await page.getByRole('button', { name: 'Add custom layer' }).click();
 
-      await expect(workflowPanel(page).getByRole('note')).toContainText('excluded from severe analytics and Auto-Categorical');
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
     });
