@@ -1,6 +1,6 @@
 export const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
 export const MAX_DIRECTORY_ENTRIES = 10000;
-const NO_COMPRESSION = 1;
+export const NO_COMPRESSION = 1;
 
 export class PmtilesError extends Error {}
 
@@ -73,43 +73,6 @@ export const decodeDirectory = (bytes) => {
   const entries = directoryEntries(bytes, cursor, readDirectoryColumns(bytes, cursor, count));
   if (hasTrailingBytes(cursor, bytes)) throw new PmtilesError('Trailing PMTiles directory data');
   return entries;
-};
-
-const joinChunks = (chunks, length) => {
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return bytes;
-};
-
-const readCompressedDirectory = async (reader) => {
-  const chunks = [];
-  let length = 0;
-  while (true) {
-    const result = await reader.read();
-    if (result.done) return joinChunks(chunks, length);
-    length += result.value.length;
-    if (length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles directory is too large');
-    chunks.push(result.value);
-  }
-};
-
-export const decompressDirectory = async (bytes, compression) => {
-  if (compression === NO_COMPRESSION) return bytes;
-  let reader;
-  try {
-    reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
-    return await readCompressedDirectory(reader);
-  } catch (error) {
-    try { await reader?.cancel(); } catch { /* Release a failed gzip stream. */ }
-    if (error instanceof PmtilesError) throw error;
-    throw new PmtilesError('Invalid compressed PMTiles directory');
-  } finally {
-    reader?.releaseLock();
-  }
 };
 
 export const hilbertDistance = (zoom, x, y) => {

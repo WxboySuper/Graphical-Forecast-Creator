@@ -1,8 +1,8 @@
 import { HEADER_BYTES, parseHeader } from './pmtiles-header.mjs';
 import { validateArchiveRanges } from './pmtiles-layout.mjs';
+import { decompressDirectory } from './pmtiles-compression.mjs';
 import {
-  MAX_DIRECTORY_BYTES, PmtilesError, safeEnd, decodeDirectory,
-  decompressDirectory, hilbertDistance,
+  MAX_DIRECTORY_BYTES, PmtilesError, safeEnd, decodeDirectory, hilbertDistance,
 } from './pmtiles-format.mjs';
 
 export { decodeDirectory, parseHeader, PmtilesError };
