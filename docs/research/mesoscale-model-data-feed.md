@@ -70,7 +70,7 @@ Suggested normalized contract:
 {
   "model": "HRRR", "cycle": "2026-11-08T12:00:00Z", "forecastHour": 1,
   "validTime": "2026-11-08T13:00:00Z", "parameter": "most_unstable_cape",
-  "level": {"type": "surface_based_parcel", "value": null, "layer": null},
+  "level": {"type": "most_unstable_parcel", "value": null, "layer": null},
   "units": "J kg-1", "source": "NOAA NCEP HRRR", "receivedAt": "...",
   "status": "current", "tileUrl": "/meso/HRRR/20261108T12/f01/mucape/{z}/{x}/{y}.png",
   "display": {"type": "raster", "palette": "mucape-v1", "min": 0, "max": 5000}
