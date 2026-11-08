@@ -159,14 +159,6 @@
           "step": "",
           "present": false
         },
-        "shear0-6km": {
-          "parameter": "",
-          "level": "",
-          "units": "",
-          "step": "",
-          "present": false,
-          "note": "No precomputed 0-6 km bulk-shear message in wrfsfc or wrfprs."
-        },
         "MUCIN": {
           "parameter": "CIN",
           "level": "",
@@ -515,14 +507,6 @@
           "step": "",
           "present": false
         },
-        "shear0-6km": {
-          "parameter": "",
-          "level": "",
-          "units": "",
-          "step": "",
-          "present": false,
-          "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
-        },
         "MUCIN": {
           "parameter": "CIN",
           "level": "",
@@ -860,14 +844,6 @@
           "units": "",
           "step": "",
           "present": false
-        },
-        "shear0-6km": {
-          "parameter": "",
-          "level": "",
-          "units": "",
-          "step": "",
-          "present": false,
-          "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
         },
         "MUCIN": {
           "parameter": "CIN",

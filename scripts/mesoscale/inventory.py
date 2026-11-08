@@ -87,12 +87,28 @@ def _validate_allowlist(allowlist: object) -> None:
     if not isinstance(allowlist, dict):
         raise ValueError("allowlist must be a JSON object")
     for field, identity in allowlist.items():
-        if not isinstance(field, str) or not isinstance(identity, dict):
-            raise ValueError("allowlist entries must map field names to identity objects")
-        if not isinstance(identity.get("parameter"), str) or not isinstance(identity.get("level"), str):
-            raise ValueError(f"allowlist entry {field!r} requires string parameter and level values")
-        if "step" in identity and not isinstance(identity["step"], str):
-            raise ValueError(f"allowlist entry {field!r} step must be a string")
+        if not isinstance(field, str):
+            raise ValueError("allowlist field names must be strings")
+        _validate_identity(field, identity)
+
+
+def _validate_identity(field: str, identity: object) -> None:
+    if not isinstance(identity, dict):
+        raise ValueError(f"allowlist entry {field!r} must be an identity object")
+    _required_string(identity, field, "parameter")
+    _required_string(identity, field, "level")
+    if "step" in identity:
+        _required_string(identity, field, "step")
+
+
+def _required_string(identity: dict, field: str, key: str) -> str:
+    try:
+        value = identity[key]
+    except KeyError as error:
+        raise ValueError(f"allowlist entry {field!r} is missing {key!r}") from error
+    if not isinstance(value, str):
+        raise ValueError(f"allowlist entry {field!r} {key!r} must be a string")
+    return value
 
 
 def _matches_identity(row: IndexRecord, identity: dict[str, str]) -> bool:
