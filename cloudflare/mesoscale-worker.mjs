@@ -17,7 +17,7 @@ const ageMinutes = (timestamp, now) => {
 };
 
 const staleThresholdMinutes = (env) => {
-  const value = env.STALE_AFTER_MINUTES?.trim();
+  const value = String(env.STALE_AFTER_MINUTES ?? '').trim();
   if (!value) return 180;
   const configured = Number(value);
   return Number.isFinite(configured) && configured >= 0 ? configured : 180;
@@ -104,7 +104,7 @@ const parseRoute = (pathname) => {
   return parseCatalogRoute(parts) || parseLatestRoute(parts) || parseTileRoute(parts);
 };
 
-const allowedOrigins = (env) => new Set((env.CORS_ALLOWED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean));
+const allowedOrigins = (env) => new Set(String(env.CORS_ALLOWED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean));
 
 const responseCors = (response, origin, allowed) => {
   const headers = new Headers(response.headers);
@@ -121,9 +121,11 @@ const responseCors = (response, origin, allowed) => {
 };
 
 const publicBaseUrl = (env) => {
-  const base = new URL(env.PUBLIC_BASE_URL);
+  const value = typeof env.PUBLIC_BASE_URL === 'string' ? env.PUBLIC_BASE_URL.trim() : '';
+  if (!value) throw new Error('PUBLIC_BASE_URL is required');
+  const base = new URL(value);
   if (base.protocol !== 'https:') throw new Error('PUBLIC_BASE_URL must use HTTPS');
-  if (base.origin !== env.PUBLIC_BASE_URL.replace(/\/$/, '')) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
+  if (base.origin !== value.replace(/\/$/, '')) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
   return base;
 };
 
@@ -139,21 +141,35 @@ const publicRepresentationEtag = (etag, env) => {
 
 const noBodyForHead = (response) => new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
 
-const rewriteParameterTemplate = (parameter, base, route) => {
-  if (parameter?.data?.type !== 'xyz-raster') return;
-  if (typeof parameter.data.urlTemplate !== 'string') throw new Error('Catalog raster template is missing');
-  const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
-  if (!match) throw new Error('Catalog raster template does not match the tile route');
+const parseTileTemplate = (template) => {
+  if (typeof template !== 'string') return null;
+  const match = template.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
+  if (!match) return null;
   const [model, cycle, hour, parameterId] = match[1].split('/');
-  if (model !== route.model) throw new Error('Catalog raster template does not match its immutable key');
-  if (cycle !== route.cycle) throw new Error('Catalog raster template does not match its immutable key');
-  if (!/^f\d{2}$/.test(hour)) throw new Error('Catalog raster template does not match its immutable key');
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parameterId)) throw new Error('Catalog raster template does not match its immutable key');
-  parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
+  return { path: match[1], model, cycle, hour, parameterId };
+};
+
+const catalogTemplateMatches = (parts, route, parameterId, expectedHour) => {
+  if (!parts) return false;
+  if (parts.model !== route.model) return false;
+  if (parts.cycle !== route.cycle) return false;
+  if (!cycleDate(parts.cycle)) return false;
+  if (parts.hour !== expectedHour) return false;
+  return parts.parameterId === parameterId;
+};
+
+const rewriteParameterTemplate = (parameter, base, route, expectedHour) => {
+  if (parameter.data.type !== 'xyz-raster') return;
+  const parts = parseTileTemplate(parameter.data.urlTemplate);
+  if (!catalogTemplateMatches(parts, route, parameter.id, expectedHour)) throw new Error('Catalog raster template does not match its immutable key');
+  parameter.data.urlTemplate = `${base.origin}/tiles/${parts.path}`;
 };
 
 const addConfiguredTemplateBase = (catalog, base, route) => {
-  for (const frame of catalog.frames) frame.parameters.forEach((parameter) => rewriteParameterTemplate(parameter, base, route));
+  for (const frame of catalog.frames) {
+    const expectedHour = `f${String(frame.forecastHour).padStart(2, '0')}`;
+    frame.parameters.forEach((parameter) => rewriteParameterTemplate(parameter, base, route, expectedHour));
+  }
   return catalog;
 };
 
@@ -176,15 +192,8 @@ const validCatalogParameter = (parameter, route, expectedHour) => {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parameter.id)) return false;
   if (!isJsonObject(parameter.data)) return false;
   if (parameter.data.type !== 'xyz-raster') return false;
-  if (typeof parameter.data.urlTemplate !== 'string') return false;
-  const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
-  if (!match) return false;
-  const [model, cycle, hour, parameterId] = match[1].split('/');
-  if (model !== route.model) return false;
-  if (cycle !== route.cycle) return false;
-  if (!cycleDate(cycle)) return false;
-  if (hour !== expectedHour) return false;
-  return parameterId === parameter.id;
+  const parts = parseTileTemplate(parameter.data.urlTemplate);
+  return catalogTemplateMatches(parts, route, parameter.id, expectedHour);
 };
 
 const validCatalogIdentity = (value, route) => {
@@ -234,7 +243,7 @@ const catalogResponse = ({ value, request, env, route, headers, etag }) => {
   if (!validCatalog(value, route)) return invalidCatalogResponse();
   let base;
   try {
-    if (env.PUBLIC_BASE_URL) base = publicBaseUrl(env);
+    base = publicBaseUrl(env);
   } catch {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   }
@@ -261,7 +270,7 @@ const validLatestPointer = (value, route, cycle) => {
 };
 
 const addLatestCatalogUrl = (value, env, route, cycle) => {
-  if (!env.PUBLIC_BASE_URL) return true;
+  if (!env.PUBLIC_BASE_URL) return false;
   try {
     value.catalogUrl = `${publicBaseUrl(env).origin}/catalog/${route.model}/${cycle}.json`;
     return true;
@@ -351,7 +360,6 @@ const objectConditionalResponse = ({ request, env, route, headers, etag }) => {
 
 const objectBodyResponse = ({ request, env, route, object, now, headers, etag }) => {
   if (route.kind === 'tile') return new Response(request.method === 'HEAD' ? null : object.body, { headers });
-  if (request.method === 'HEAD' && route.kind === 'catalog') return new Response(null, { headers });
   return storedJsonResponse({ request, env, route, object, now, headers, etag });
 };
 
@@ -460,7 +468,15 @@ const fetchUncached = (request, route, env, now) => route.kind === 'status' ? st
 const cacheKeyFor = (request, env, route) => {
   const url = new URL(request.url);
   url.search = '';
-  if (route.kind === 'catalog' || route.kind === 'latest') url.searchParams.set('__public_base', env.PUBLIC_BASE_URL || '');
+  if (route.kind === 'catalog' || route.kind === 'latest') {
+    let base = String(env.PUBLIC_BASE_URL || '').trim();
+    try {
+      base = publicBaseUrl(env).origin;
+    } catch {
+      // Preserve the bad value in the key; the route response will return a configuration error.
+    }
+    url.searchParams.set('__public_base', base);
+  }
   return new Request(url.toString(), { method: 'GET' });
 };
 

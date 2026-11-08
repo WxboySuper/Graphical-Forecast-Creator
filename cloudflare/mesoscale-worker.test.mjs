@@ -49,6 +49,7 @@ test('strictly whitelists route segments and rejects traversal attempts without 
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => { reads += 1; return null; } } });
   for (const path of [
     '/catalog/other/20261108T1200Z.json',
+    '/catalog/hrrr/20261108T1201Z.json',
     '/catalog/hrrr/20261108T1200Z.json/extra',
     '/catalog/hrrr/%2e%2e.json',
     '/latest/../secret.json',
@@ -123,6 +124,7 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   const malformedFrame = { ...catalog, frames: [null] };
   const malformedFrameEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': malformedFrame });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), malformedFrameEnv)).status, 502);
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { method: 'HEAD' }), malformedFrameEnv)).status, 502);
   const mismatchedTemplate = structuredClone(catalog);
   mismatchedTemplate.frames[0].parameters[0].data.urlTemplate = 'https://old.example/tiles/rap/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png';
   const mismatchedTemplateEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedTemplate });
@@ -142,11 +144,14 @@ test('Cache API separates rewritten catalog representations by public base URL',
     const bucket = { get: async () => { reads += 1; return { json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
     const firstEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test' });
     const secondEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://second.example.test' });
+    const normalizedEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test/' });
     const path = '/catalog/hrrr/20261108T1200Z.json';
     const first = await worker.fetch(request(path), firstEnv);
     const second = await worker.fetch(request(path), secondEnv);
+    const normalized = await worker.fetch(request(path), normalizedEnv);
     assert.match((await first.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/first\.example\.test/);
     assert.match((await second.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/second\.example\.test/);
+    assert.match((await normalized.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/first\.example\.test/);
     assert.equal(reads, 2);
   });
 });
@@ -360,7 +365,7 @@ test('HEAD returns headers without a body, and unsupported methods return 405', 
   assert.equal(catalogHead.status, 200);
   assert.equal(catalogHead.body, null);
   assert.ok(catalogHead.headers.get('ETag'));
-  assert.equal(catalogHead.headers.get('Content-Type'), 'application/json');
+  assert.equal(catalogHead.headers.get('Content-Type'), 'application/json; charset=utf-8');
   const tileEnv = envFor({}, { MESOSCALE_BUCKET: { head: async () => ({ size: 3, httpEtag: '"tile"' }) } });
   const tileHead = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png', { method: 'HEAD' }), tileEnv);
   assert.equal(tileHead.status, 200);
