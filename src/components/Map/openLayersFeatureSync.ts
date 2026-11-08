@@ -41,6 +41,7 @@ export type ForecastSourceDescriptorPlan = {
 export type ForecastSourceDescriptorPlanOptions = {
   normalDescriptors: FeatureSyncDescriptor[];
   customMode: boolean;
+  showCustomLayers?: boolean;
   customDescriptors: FeatureSyncDescriptor[];
   source: VectorSource;
   categoricalSource: VectorSource;
@@ -78,6 +79,7 @@ export const getForecastSourceDescriptorPlan = (
   {
     normalDescriptors,
     customMode,
+    showCustomLayers = false,
     customDescriptors,
     source,
     categoricalSource,
@@ -85,7 +87,10 @@ export const getForecastSourceDescriptorPlan = (
 ): ForecastSourceDescriptorPlan => ({
   source: customMode
     ? customDescriptors
-    : normalDescriptors.filter(({ targetSource }) => targetSource === source),
+    : [
+        ...normalDescriptors.filter(({ targetSource }) => targetSource === source),
+        ...(showCustomLayers ? customDescriptors : []),
+      ],
   categorical: customMode
     ? []
     : normalDescriptors.filter(({ targetSource }) => targetSource === categoricalSource),

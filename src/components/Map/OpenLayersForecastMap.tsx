@@ -122,6 +122,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       canUndo,
       canRedo,
       customMode,
+      showCustomLayers,
       activeCustomLayer,
       activeCustomCategory,
       currentMapView,
@@ -1077,7 +1078,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         ),
         700,
       );
-      const customDescriptors: FeatureSyncDescriptor[] = customMode
+      const customDescriptors: FeatureSyncDescriptor[] = showCustomLayers
         ? serializedCustomFeatures.map(({ feature, category, layer }, index) => {
             const stableId = feature.id == null ? `legacy-index-${index}` : String(feature.id);
             const zIndex = 700 + layer.order * 20 + category.order;
@@ -1167,6 +1168,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       const sourceDescriptorPlan = getForecastSourceDescriptorPlan({
         normalDescriptors,
         customMode,
+        showCustomLayers,
         customDescriptors,
         source,
         categoricalSource: catSource,
@@ -1202,6 +1204,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       outlookOpacity,
       serializedCustomFeatures,
       customMode,
+      showCustomLayers,
       outlooks,
       drawingState.activeOutlookType,
       ghostOutlooks,
