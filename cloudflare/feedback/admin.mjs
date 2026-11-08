@@ -146,7 +146,6 @@ const adminRoutes = [
   { method: 'GET', hasId: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', hasId: true, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
   { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
-  { method: 'DELETE', hasId: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 
 export async function handleAdmin(request, env, url, id) {

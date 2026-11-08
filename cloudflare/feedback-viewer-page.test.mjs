@@ -12,9 +12,9 @@ test('every inline script and style carries the CSP nonce', () => {
 });
 
 test('the page loads nothing from other origins and has no inline event handlers', () => {
-  assert.equal(/(?:src|href)\s*=\s*"https?:/i.test(html), false, 'no external src/href');
+  assert.equal(/(?:src|href)\s*=\s*["']?https?:/i.test(html), false, 'no external src/href');
   assert.equal(/url\(\s*['"]?https?:/i.test(html), false, 'no external CSS urls');
-  assert.equal(/\son[a-z]+\s*=\s*"/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')), false, 'no inline handler attributes in markup');
+  assert.equal(/\son[a-z]+\s*=\s*["']/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')), false, 'no inline handler attributes in markup');
 });
 
 test('feedback text is never inserted as HTML', () => {
@@ -44,4 +44,9 @@ test('the page ignores stale list responses and serializes status saves', () => 
   assert.ok(html.includes('state.seq'), 'list loads are sequence-guarded');
   assert.ok(html.includes('i.saving'), 'status changes are serialized per item');
   assert.equal(html.includes('state.items.indexOf'), false, 'delete never relies on a stale array index');
+});
+
+test('the renderer refuses a nonce that could break out of an attribute or header', () => {
+  for (const bad of ['', 'a"b', "a'b", 'a b', 'a;b', '<x>']) assert.throws(() => renderViewerPage(bad), /nonce/i, JSON.stringify(bad));
+  assert.doesNotThrow(() => renderViewerPage('aB3-_x'));
 });

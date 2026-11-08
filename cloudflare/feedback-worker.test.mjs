@@ -496,7 +496,9 @@ test('Access viewer serves a nonce-protected page and has no CORS headers', asyn
   } });
   const response = await viewerRequest(env, ctx, '/admin', { auth: await accessToken() });
   const html = await response.text();
-  const nonce = response.headers.get('content-security-policy').match(/script-src 'nonce-([^']+)'/)[1];
+  const csp = response.headers.get('content-security-policy');
+  assert.ok(csp, 'CSP header must be present');
+  const nonce = csp.match(/script-src 'nonce-([^']+)'/)[1];
   assert.equal(response.status, 200);
   assert.match(html, new RegExp(`<style nonce="${nonce}">`));
   assert.match(html, new RegExp(`<script nonce="${nonce}">`));
@@ -532,6 +534,26 @@ test('Access viewer fails closed without config and can restrict allowed emails'
   const response = await viewerRequest(denied.env, denied.ctx, '/admin', { auth: await accessToken() });
   assert.equal(response.status, 403);
   assert.equal(response.headers.has('access-control-allow-origin'), false);
+  const odd = await viewerRequest(denied.env, denied.ctx, '/admin', { auth: await accessToken({ email: 12345 }) });
+  assert.equal(odd.status, 403, 'a non-string email claim is denied, not a 500');
+});
+
+test('expired or exp-less tokens are rejected without fetching signing keys', async () => {
+  let fetches = 0;
+  const { env, ctx } = harness({ env: { JWKS_FETCH: async () => { fetches += 1; return Response.json({ keys: [jwk] }); } } });
+  const expired = await post(env, ctx, { auth: await token({ exp: 1000, sub: 'expired-user' }) });
+  const noExp = await post(env, ctx, { auth: await token({ exp: undefined, sub: 'no-exp-user' }) });
+  assert.deepStrictEqual([expired.status, noExp.status], [401, 401]);
+  assert.equal(fetches, 0, 'no JWKS fetch for tokens that fail the expiry pre-check');
+});
+
+test('the bearer-token API cannot delete feedback; deletion is viewer-only', async () => {
+  const { db, env, ctx } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+  const id = '00000000-0000-4000-8000-0000000000aa';
+  db.rows = [{ id, created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'keep me please', page: '/', app_version: '1', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', discord_status: 'disabled' }];
+  const response = await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${id}`, { method: 'DELETE', headers: { authorization: 'Bearer admin-secret', 'CF-Connecting-IP': '192.0.2.5' } }), env, ctx);
+  assert.equal(response.status, 404);
+  assert.equal(db.rows.length, 1);
 });
 
 test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', async () => {

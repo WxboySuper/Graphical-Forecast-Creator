@@ -82,7 +82,7 @@ function renderList(){let list=$('list');list.textContent='';let rows=visible();
     el('div',{class:'preview',text:i.message})]);list.appendChild(b);});
   if(state.cursor){list.appendChild(el('button',{id:'more',class:'btn',type:'button',onclick:function(){loadList(false);}},[document.createTextNode(state.loading?'Loading…':'Load more')]));}}
 function renderMore(){let m=$('more');if(m){m.textContent=state.loading?'Loading…':'Load more';m.disabled=state.loading;}}
-function field(dl,k,v){if(!String(v==null?'':v).length)return;dl.appendChild(el('dt',{text:k}));dl.appendChild(el('dd',{text:String(v)}));}
+function field(dl,k,v){if(!String(v??'').length)return;dl.appendChild(el('dt',{text:k}));dl.appendChild(el('dd',{text:String(v)}));}
 function markdown(i){return ['### Feedback '+i.id,'','- **Type:** '+i.category,'- **Build:** '+i.build_target+' v'+i.app_version,'- **Page:** '+i.page,'- **Status:** '+i.status,'- **Received:** '+full(i.created_at),'','> '+i.message.split('\\n').join('\\n> ')].join('\\n');}
 function renderDetail(){let d=$('detail');d.textContent='';let i=state.items.filter(function(x){return x.id===state.selected;})[0];
   if(!i){d.appendChild(el('p',{class:'empty',text:'Select feedback to read it.'}));return;}
@@ -119,6 +119,7 @@ init();
 
 /** Returns the viewer document; `nonce` must match the CSP header sent with it. */
 export function renderViewerPage(nonce) {
+  if (!/^[A-Za-z0-9_-]+$/.test(nonce)) throw new Error('Invalid CSP nonce');
   return `<!doctype html>
 <html lang="en">
 <head>

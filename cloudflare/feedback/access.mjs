@@ -49,7 +49,8 @@ function allowedEmail(claims, env) {
   const configured = env.CF_ACCESS_ALLOWED_EMAILS;
   if (!configured) return true;
   const allowlist = configured.split(',').map((email) => email.trim().toLowerCase()).filter(Boolean);
-  return allowlist.includes((claims.email ?? '').trim().toLowerCase());
+  const email = typeof claims.email === 'string' ? claims.email.trim().toLowerCase() : '';
+  return allowlist.includes(email);
 }
 
 export async function authorizeViewer(request, env) {
