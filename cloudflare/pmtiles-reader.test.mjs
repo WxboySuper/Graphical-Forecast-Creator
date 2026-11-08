@@ -40,6 +40,10 @@ test('rejects truncated, corrupt, and unsupported archive data', async () => {
   const corrupt = await createPmtilesFixture();
   corrupt[0] = 0;
   await assert.rejects(() => read(rangeBucket(corrupt)), PmtilesError);
+  clearPmtilesCacheForTests();
+  const overlappingMetadata = await createPmtilesFixture();
+  new DataView(overlappingMetadata.buffer).setBigUint64(24, 127n, true);
+  await assert.rejects(() => read(rangeBucket(overlappingMetadata)), /metadata range/);
   assert.throws(() => decodeDirectory(Uint8Array.from([...Array(10).fill(0x80)])), PmtilesError);
 });
 
