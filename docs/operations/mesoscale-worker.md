@@ -34,8 +34,11 @@ access is read-only through the R2 binding.
 
 ## App URL configuration
 
-Set the app's catalog base to `PUBLIC_BASE_URL`, then use
-`{base}/catalog/{model}/{cycle}.json` and
+Set the app's catalog base to `PUBLIC_BASE_URL` using the build-target
+environment variables `VITE_MESOSCALE_WORKER_URL_LOCAL`,
+`VITE_MESOSCALE_WORKER_URL_BETA`, `VITE_MESOSCALE_WORKER_URL_STAGING`, and
+`VITE_MESOSCALE_WORKER_URL_PRODUCTION`. `VITE_MESOSCALE_WORKER_URL` can supply
+one common fallback. Then use `{base}/catalog/{model}/{cycle}.json` and
 `{base}/latest/{model}.json`. The Worker rewrites valid `xyz-raster`
 `urlTemplate` values in catalogs to that base and returns a matching
 `catalogUrl` from latest pointers. The app should use the catalog's
@@ -121,3 +124,8 @@ problem. Keep `STALE_AFTER_MINUTES` aligned with the feed cadence. `/status`
 reports the latest pointer's age and health-object status; `/latest/{model}.json`
 reports recomputed age and `X-Mesoscale-Stale`. Neither endpoint promotes an
 older cycle when the feed is delayed.
+
+For local offline development, set `VITE_MESOSCALE_FIXTURES=true` with the local
+build target. The client then reads the checked-in provider fixtures and uses
+the transparent 8 by 8 `/mesoscale-fixtures-tile.png` placeholder for raster tiles. Fixture mode is ignored for
+beta, staging, and production builds.

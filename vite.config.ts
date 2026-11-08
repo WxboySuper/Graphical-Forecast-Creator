@@ -55,6 +55,13 @@ export default defineConfig(({ mode }) => {
     define: {
       __GFC_APP_VERSION__: JSON.stringify(pkg.version),
       __GFC_BUILD_TARGET__: JSON.stringify(buildTarget),
+      __MESOSCALE_WORKER_URLS__: JSON.stringify({
+        local: env.VITE_MESOSCALE_WORKER_URL_LOCAL || env.VITE_MESOSCALE_WORKER_URL || '',
+        beta: env.VITE_MESOSCALE_WORKER_URL_BETA || env.VITE_MESOSCALE_WORKER_URL || '',
+        staging: env.VITE_MESOSCALE_WORKER_URL_STAGING || env.VITE_MESOSCALE_WORKER_URL || '',
+        production: env.VITE_MESOSCALE_WORKER_URL_PRODUCTION || env.VITE_MESOSCALE_WORKER_URL || '',
+      }),
+      __MESOSCALE_FIXTURES__: JSON.stringify(env.VITE_MESOSCALE_FIXTURES === 'true'),
       __GFC_DEV_MODE__: JSON.stringify(mode === 'development'),
       __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
       __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),

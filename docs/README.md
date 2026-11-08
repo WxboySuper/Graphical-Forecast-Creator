@@ -43,6 +43,7 @@ Short guides live beside the code. Read the relevant one before moving a module 
 - [Maps](../src/maps/README.md)
 - [Metrics](../src/metrics/README.md) - read-only `userMetrics` hook that feeds progress numbers to the account page.
 - [Monitor](../src/monitor/README.md)
+- [Mesoscale client](../src/mesoscale/README.md)
 - [Pages](../src/pages/README.md)
 - [Routing](../src/routing/README.md)
 - [Store](../src/store/README.md)
