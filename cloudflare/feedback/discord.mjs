@@ -32,16 +32,23 @@ export async function postDiscord(env, record) {
   return sendWebhook(env, createPayload(env, record));
 }
 
+async function deliver(env, record) {
+  let status = 'failed';
+  try {
+    status = await postDiscord(env, record);
+  } catch {
+    // Building or sending the payload failed; the row is stored and is marked failed below.
+  }
+  try {
+    await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
+  } catch {
+    // A failed status update must not surface as an unhandled rejection.
+  }
+}
+
 export async function notifyDiscord(env, ctx, record) {
   if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return;
-  const task = (async () => {
-    const status = await postDiscord(env, record);
-    try {
-      await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
-    } catch {
-      // The feedback row is already stored; a failed status update must not surface as an unhandled rejection.
-    }
-  })();
+  const task = deliver(env, record);
   // Without an execution context (direct calls, tests) wait inline so the work is never dropped.
   if (ctx?.waitUntil) ctx.waitUntil(task);
   else await task;

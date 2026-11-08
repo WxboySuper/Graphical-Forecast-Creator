@@ -387,6 +387,17 @@ test('rejects pages that are not plain relative router paths', async () => {
   assert.equal(db.rows[0].page, '/forecast/outlooks');
 });
 
+test('only well-formed verified emails are stored, and a throwing payload still marks Discord failed', async () => {
+  const { db, env, ctx } = harness();
+  assert.equal((await post(env, ctx, { auth: await token({ email: 'bad\nvalue' }), body: validBody({ contactOk: true }) })).status, 201);
+  assert.equal(db.rows[0].email, null);
+
+  const failing = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => { throw new Error('network down'); } } });
+  assert.equal((await post(failing.env, failing.ctx, { auth: await token({ sub: 'other-user' }) })).status, 201);
+  await Promise.all(failing.waits);
+  assert.equal(failing.db.rows[0].discord_status, 'failed');
+});
+
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
   const { db, env, ctx } = harness(); const auth = await token();
   assert.equal((await post(env, ctx, { auth, body: validBody({ viewport: '   ' }) })).status, 201);

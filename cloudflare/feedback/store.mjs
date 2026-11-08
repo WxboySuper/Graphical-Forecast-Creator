@@ -81,9 +81,13 @@ AND NOT EXISTS (SELECT 1 FROM feedback WHERE uid_hash = ? AND message = ? AND cr
 AND (SELECT COUNT(*) FROM feedback WHERE created_at > ?) < ${LIMITS.global}`;
 
 /** Stores an email only with consent and only when the identity provider verified it. */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+$/;
+
 function contactEmail(body, claims) {
   const usable = body.contactOk && claims.email_verified === true && typeof claims.email === 'string';
-  return usable ? claims.email.slice(0, 320) : null;
+  if (!usable) return null;
+  const email = clean(claims.email).slice(0, 320);
+  return EMAIL_SHAPE.test(email) ? email : null;
 }
 
 function buildRecord({ env, request, claims, body, now }, uidHash) {
