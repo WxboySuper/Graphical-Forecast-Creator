@@ -1,4 +1,3 @@
-// @codescene(disable:"Overall Code Complexity")
 /**
  * Forecast workspace page orchestration.
  *
@@ -72,6 +71,9 @@ import { lazyWithReload } from '../routing/lazyWithReload';
 const EmbeddedDiscussionPage = lazyWithReload('discussion', () =>
   import('./DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
 );
+const DISCUSSION_WORKSPACE_SURFACES = new Set(['discussion', 'review']);
+const getWorkspaceSurface = (value: string | null): 'map' | 'discussion' | 'review' =>
+  DISCUSSION_WORKSPACE_SURFACES.has(value ?? '') ? value as 'discussion' | 'review' : 'map';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -789,13 +791,11 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const [resizingDiscussionPanel, setResizingDiscussionPanel] = useState(false);
   const discussionPanelResizeRef = useRef({ pointerX: 0, width: discussionPanelWidth });
   const requestedSurface = searchParams.get('surface');
-  const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(
-    requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map',
-  );
+  const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(() => getWorkspaceSurface(requestedSurface));
   const hideMapForDiscussion = surface === 'discussion'
     && (discussionLayout === 'tabs' || (discussionLayout === 'panel' && discussionPanelCollapsed));
   useEffect(() => {
-    setSurface(requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map');
+    setSurface(getWorkspaceSurface(requestedSurface));
   }, [requestedSurface]);
   useEffect(() => {
     const openDiscussion = () => {
@@ -830,6 +830,13 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const mapIsHidden = surface === 'review' || hideMapForDiscussion;
+    const map = workspaceRef.current?.querySelector('.severe-workspace__map');
+    if (!mapIsHidden) return;
+    if (!map?.contains(document.activeElement)) return;
+    workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  }, [hideMapForDiscussion, surface]);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(
@@ -870,7 +877,9 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   useEffect(() => {
-    if (workspaceId !== 'severe' || hideMapForDiscussion || resizingDiscussionPanel) return undefined;
+    if (workspaceId !== 'severe') return undefined;
+    if (hideMapForDiscussion) return undefined;
+    if (resizingDiscussionPanel) return undefined;
     let nextFrame = 0;
     const frame = window.requestAnimationFrame(() => {
       nextFrame = window.requestAnimationFrame(() => mapRef.current?.getMap()?.updateSize());

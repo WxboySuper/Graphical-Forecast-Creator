@@ -91,6 +91,15 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('heading', { name: 'Export Forecast Image' })).toBeVisible();
   });
 
+  test('moves focus out of the map when an external action opens Discussion', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/forecast/severe?discussionLayout=tabs');
+    await page.getByRole('button', { name: 'Pan map' }).focus();
+    await page.evaluate(() => window.dispatchEvent(new Event('gfc-open-severe-discussion')));
+    await expect(page.getByRole('tab', { name: 'Discussion' })).toBeFocused();
+    await expect(page).toHaveURL(/surface=discussion/);
+  });
+
   test('keeps Discussion open on a phone when the side panel is collapsed', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/forecast/severe?surface=discussion&discussionLayout=panel');
