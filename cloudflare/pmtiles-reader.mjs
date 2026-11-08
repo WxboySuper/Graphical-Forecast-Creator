@@ -130,13 +130,24 @@ const directoryAt = async ({ bucket, key, state, offset, length }) => {
   return decoded;
 };
 
-const directoryEntry = (entries, tileId) => {
+const predecessorEntry = (entries, tileId) => {
+  let lower = 0;
+  let upper = entries.length - 1;
   let found = null;
-  for (const entry of entries) {
-    if (entry.tileId > tileId) break;
-    found = entry;
+  while (lower <= upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const candidate = entries[middle];
+    if (candidate.tileId > tileId) upper = middle - 1;
+    else { found = candidate; lower = middle + 1; }
   }
-  return found && (found.runLength === 0 || tileId < found.tileId + found.runLength) ? found : null;
+  return found;
+};
+
+export const findDirectoryEntry = (entries, tileId) => {
+  const found = predecessorEntry(entries, tileId);
+  if (!found) return null;
+  if (found.runLength === 0) return found;
+  return tileId < found.tileId + found.runLength ? found : null;
 };
 
 const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
@@ -147,7 +158,7 @@ const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
   if (end > header.leafLength) throw new PmtilesError('PMTiles leaf directory entry exceeds its section');
   if (entry.length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles leaf directory entry is too large');
   const leaf = await directoryAt({ bucket, key, state, offset, length: entry.length });
-  const resolved = directoryEntry(leaf, tileId);
+  const resolved = findDirectoryEntry(leaf, tileId);
   if (resolved?.runLength === 0) throw new PmtilesError('PMTiles leaf directory cannot reference another leaf');
   return resolved;
 };
@@ -155,7 +166,7 @@ const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
 const tileEntry = async ({ bucket, key, state, tileId }) => {
   const { header } = state;
   const root = await directoryAt({ bucket, key, state, offset: header.rootOffset, length: header.rootLength });
-  const entry = directoryEntry(root, tileId);
+  const entry = findDirectoryEntry(root, tileId);
   if (entry?.runLength !== 0) return entry;
   return leafEntry({ bucket, key, state, tileId, entry });
 };

@@ -22,7 +22,7 @@ const readCompressedDirectory = async (reader) => {
   }
 };
 
-const createGzipReader = (bytes) => new Blob([bytes]).stream()
+const createGzipReader = (bytes) => new Response(bytes).body
   .pipeThrough(new DecompressionStream('gzip'))
   .getReader();
 

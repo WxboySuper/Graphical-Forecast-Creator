@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clearPmtilesCacheForTests, decodeDirectory, parseHeader, PmtilesError, readTile } from './pmtiles-reader.mjs';
+import { clearPmtilesCacheForTests, decodeDirectory, findDirectoryEntry, parseHeader, PmtilesError, readTile } from './pmtiles-reader.mjs';
+import { validateDirectoryOrdering } from './pmtiles-directory-validation.mjs';
 import { createPmtilesFixture, encodeVarintForTest, FIXTURE_ARCHIVE_KEY, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
 const KEY = FIXTURE_ARCHIVE_KEY;
@@ -112,4 +113,17 @@ test('rejects unsupported directory compression values', async () => {
 test('rejects a malformed directory varint', () => {
   assert.throws(() => decodeDirectory(Uint8Array.from([1, ...encodeVarintForTest(21), 1, 3, ...Array(9).fill(0x80)])), PmtilesError);
   assert.throws(() => decodeDirectory(Uint8Array.from([2, 21, 0, 1, 1, 3, 3, 1, 0])), /not ordered/);
+  assert.throws(() => validateDirectoryOrdering({ tileIds: [1, 2], runs: [Number.MAX_SAFE_INTEGER, 1] }), /tile id range/);
+});
+
+test('binary search finds the predecessor directory entry and its tile run', () => {
+  const entries = [
+    { tileId: 1, runLength: 2 },
+    { tileId: 4, runLength: 1 },
+    { tileId: 7, runLength: 3 },
+  ];
+  assert.equal(findDirectoryEntry(entries, 4), entries[1]);
+  assert.equal(findDirectoryEntry(entries, 5), null);
+  assert.equal(findDirectoryEntry(entries, 9), entries[2]);
+  assert.equal(findDirectoryEntry(entries, 10), null);
 });

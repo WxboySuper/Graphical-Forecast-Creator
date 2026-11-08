@@ -1,3 +1,4 @@
+// Published mesoscale catalog contract in E7 degrees; keep zooms aligned with catalog descriptors.
 export const PUBLISHED_TILE_CONTRACT = Object.freeze({
   minZoom: 3,
   maxZoom: 4,

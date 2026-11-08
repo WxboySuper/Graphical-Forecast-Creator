@@ -11,8 +11,10 @@ const validateIncreasingTileId = (previousId, nextId) => {
 };
 
 const validateTileRun = (previousId, previousRun, nextId) => {
-  if (!previousRun) return;
-  if (nextId < previousId + previousRun) throw new PmtilesError('PMTiles directory tile runs overlap');
+  if (previousRun === 0) return;
+  const runEnd = previousId + previousRun;
+  if (!Number.isSafeInteger(runEnd)) throw new PmtilesError('Invalid PMTiles tile id range');
+  if (nextId < runEnd) throw new PmtilesError('PMTiles directory tile runs overlap');
 };
 
 export const validateDirectoryOrdering = ({ tileIds, runs }) => {

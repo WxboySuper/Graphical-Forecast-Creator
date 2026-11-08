@@ -2,6 +2,7 @@ import { GZIP_COMPRESSION, NO_COMPRESSION, PmtilesError } from './pmtiles-format
 import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
 
 export const HEADER_BYTES = 127;
+const HEADER_DECODER = new TextDecoder();
 const MAX_ROOT_DIRECTORY_BYTES = 16_257;
 const PNG_TILE_TYPE = 2;
 
@@ -15,7 +16,7 @@ const uint64 = (view, offset) => {
 
 const headerFromBytes = (bytes) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const hasSignature = new TextDecoder().decode(bytes.slice(0, 7)) === 'PMTiles';
+  const hasSignature = HEADER_DECODER.decode(bytes.subarray(0, 7)) === 'PMTiles';
   if (!hasSignature || bytes[7] !== 3) headerError('Unsupported PMTiles archive');
   return {
     rootOffset: uint64(view, 8), rootLength: uint64(view, 16), metadataOffset: uint64(view, 24), metadataLength: uint64(view, 32),
