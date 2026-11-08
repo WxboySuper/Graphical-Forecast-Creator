@@ -242,17 +242,8 @@
         "objectSizeBytes": 136859480,
         "messages": [
           {
-            "field": "reflectivity",
-            "parameter": "REFC",
-            "level": "entire atmosphere",
-            "step": "anl",
-            "offset": 0,
-            "rangeStart": 0,
-            "rangeEnd": 292348,
-            "bytes": 292349
-          },
-          {
             "field": "seaLevelPressure",
+            "recordNumber": "41",
             "parameter": "MSLMA",
             "level": "mean sea level",
             "step": "anl",
@@ -263,6 +254,7 @@
           },
           {
             "field": "T2m",
+            "recordNumber": "71",
             "parameter": "TMP",
             "level": "2 m above ground",
             "step": "anl",
@@ -273,6 +265,7 @@
           },
           {
             "field": "Td2m",
+            "recordNumber": "74",
             "parameter": "DPT",
             "level": "2 m above ground",
             "step": "anl",
@@ -283,6 +276,7 @@
           },
           {
             "field": "wind10mU",
+            "recordNumber": "77",
             "parameter": "UGRD",
             "level": "10 m above ground",
             "step": "anl",
@@ -293,6 +287,7 @@
           },
           {
             "field": "wind10mV",
+            "recordNumber": "78",
             "parameter": "VGRD",
             "level": "10 m above ground",
             "step": "anl",
@@ -303,6 +298,7 @@
           },
           {
             "field": "SBCAPE",
+            "recordNumber": "105",
             "parameter": "CAPE",
             "level": "surface",
             "step": "anl",
@@ -313,6 +309,7 @@
           },
           {
             "field": "SBCIN",
+            "recordNumber": "106",
             "parameter": "CIN",
             "level": "surface",
             "step": "anl",
@@ -323,6 +320,7 @@
           },
           {
             "field": "SRH0-3km",
+            "recordNumber": "131",
             "parameter": "HLCY",
             "level": "3000-0 m above ground",
             "step": "anl",
@@ -333,6 +331,7 @@
           },
           {
             "field": "SRH0-1km",
+            "recordNumber": "132",
             "parameter": "HLCY",
             "level": "1000-0 m above ground",
             "step": "anl",
@@ -343,6 +342,7 @@
           },
           {
             "field": "PWAT",
+            "recordNumber": "107",
             "parameter": "PWAT",
             "level": "entire atmosphere (considered as a single layer)",
             "step": "anl",
@@ -350,6 +350,17 @@
             "rangeStart": 66493218,
             "rangeEnd": 67413270,
             "bytes": 920053
+          },
+          {
+            "field": "reflectivity",
+            "recordNumber": "1",
+            "parameter": "REFC",
+            "level": "entire atmosphere",
+            "step": "anl",
+            "offset": 0,
+            "rangeStart": 0,
+            "rangeEnd": 292348,
+            "bytes": 292349
           }
         ],
         "uniqueBytes": 12550486
@@ -590,17 +601,8 @@
         "objectSizeBytes": 19614935,
         "messages": [
           {
-            "field": "reflectivity",
-            "parameter": "REFC",
-            "level": "entire atmosphere",
-            "step": "anl",
-            "offset": 425611,
-            "rangeStart": 425611,
-            "rangeEnd": 503972,
-            "bytes": 78362
-          },
-          {
             "field": "seaLevelPressure",
+            "recordNumber": "427",
             "parameter": "MSLMA",
             "level": "mean sea level",
             "step": "anl",
@@ -611,6 +613,7 @@
           },
           {
             "field": "T2m",
+            "recordNumber": "454",
             "parameter": "TMP",
             "level": "2 m above ground",
             "step": "anl",
@@ -621,6 +624,7 @@
           },
           {
             "field": "Td2m",
+            "recordNumber": "456",
             "parameter": "DPT",
             "level": "2 m above ground",
             "step": "anl",
@@ -631,6 +635,7 @@
           },
           {
             "field": "wind10mU",
+            "recordNumber": "460.1",
             "parameter": "UGRD",
             "level": "10 m above ground",
             "step": "anl",
@@ -640,7 +645,19 @@
             "bytes": 127019
           },
           {
+            "field": "wind10mV",
+            "recordNumber": "460.2",
+            "parameter": "VGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 14914225,
+            "rangeStart": 14914225,
+            "rangeEnd": 15041243,
+            "bytes": 127019
+          },
+          {
             "field": "SBCAPE",
+            "recordNumber": "476",
             "parameter": "CAPE",
             "level": "surface",
             "step": "anl",
@@ -651,6 +668,7 @@
           },
           {
             "field": "SBCIN",
+            "recordNumber": "477",
             "parameter": "CIN",
             "level": "surface",
             "step": "anl",
@@ -661,6 +679,7 @@
           },
           {
             "field": "SRH0-3km",
+            "recordNumber": "489",
             "parameter": "HLCY",
             "level": "3000-0 m above ground",
             "step": "anl",
@@ -671,6 +690,7 @@
           },
           {
             "field": "SRH0-1km",
+            "recordNumber": "490",
             "parameter": "HLCY",
             "level": "1000-0 m above ground",
             "step": "anl",
@@ -681,6 +701,7 @@
           },
           {
             "field": "PWAT",
+            "recordNumber": "478",
             "parameter": "PWAT",
             "level": "entire atmosphere (considered as a single layer)",
             "step": "anl",
@@ -688,6 +709,17 @@
             "rangeStart": 15261288,
             "rangeEnd": 15314496,
             "bytes": 53209
+          },
+          {
+            "field": "reflectivity",
+            "recordNumber": "8",
+            "parameter": "REFC",
+            "level": "entire atmosphere",
+            "step": "anl",
+            "offset": 425611,
+            "rangeStart": 425611,
+            "rangeEnd": 503972,
+            "bytes": 78362
           }
         ],
         "uniqueBytes": 561337
@@ -929,6 +961,7 @@
         "messages": [
           {
             "field": "reflectivity",
+            "recordNumber": "1",
             "parameter": "REFC",
             "level": "entire atmosphere (considered as a single layer)",
             "step": "anl",
@@ -939,6 +972,7 @@
           },
           {
             "field": "seaLevelPressure",
+            "recordNumber": "12",
             "parameter": "MSLET",
             "level": "mean sea level",
             "step": "anl",
@@ -949,6 +983,7 @@
           },
           {
             "field": "T2m",
+            "recordNumber": "58",
             "parameter": "TMP",
             "level": "2 m above ground",
             "step": "anl",
@@ -959,6 +994,7 @@
           },
           {
             "field": "Td2m",
+            "recordNumber": "60",
             "parameter": "DPT",
             "level": "2 m above ground",
             "step": "anl",
@@ -969,6 +1005,7 @@
           },
           {
             "field": "wind10mU",
+            "recordNumber": "66",
             "parameter": "UGRD",
             "level": "10 m above ground",
             "step": "anl",
@@ -979,6 +1016,7 @@
           },
           {
             "field": "wind10mV",
+            "recordNumber": "67",
             "parameter": "VGRD",
             "level": "10 m above ground",
             "step": "anl",
@@ -989,6 +1027,7 @@
           },
           {
             "field": "SBCAPE",
+            "recordNumber": "95",
             "parameter": "CAPE",
             "level": "surface",
             "step": "anl",
@@ -999,6 +1038,7 @@
           },
           {
             "field": "SBCIN",
+            "recordNumber": "96",
             "parameter": "CIN",
             "level": "surface",
             "step": "anl",
@@ -1009,6 +1049,7 @@
           },
           {
             "field": "SRH0-3km",
+            "recordNumber": "134",
             "parameter": "HLCY",
             "level": "3000-0 m above ground",
             "step": "anl",
@@ -1019,6 +1060,7 @@
           },
           {
             "field": "SRH0-1km",
+            "recordNumber": "135",
             "parameter": "HLCY",
             "level": "1000-0 m above ground",
             "step": "anl",
@@ -1029,6 +1071,7 @@
           },
           {
             "field": "PWAT",
+            "recordNumber": "97",
             "parameter": "PWAT",
             "level": "entire atmosphere (considered as a single layer)",
             "step": "anl",
@@ -1039,6 +1082,7 @@
           },
           {
             "field": "updraftHelicity",
+            "recordNumber": "138",
             "parameter": "UPHL",
             "level": "5000-2000 m above ground",
             "step": "anl",
@@ -1046,6 +1090,17 @@
             "rangeStart": 137229153,
             "rangeEnd": 137314264,
             "bytes": 85112
+          },
+          {
+            "field": "reflectivity",
+            "recordNumber": "1",
+            "parameter": "REFC",
+            "level": "entire atmosphere (considered as a single layer)",
+            "step": "anl",
+            "offset": 0,
+            "rangeStart": 0,
+            "rangeEnd": 525576,
+            "bytes": 525577
           }
         ],
         "uniqueBytes": 14103011
