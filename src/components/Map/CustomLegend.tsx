@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { isCustomWorkspaceActive } from '../../config/forecastWorkspaces';
 import { selectCurrentCustomLayers } from '../../store/forecastSlice';
 import type { RootState } from '../../store';
 import type { CustomCategoryTemplate } from '../../types/customProducts';
@@ -8,10 +9,11 @@ import type { CustomCategoryTemplate } from '../../types/customProducts';
 /** Shows the custom-layer legend only when the active route owns custom editing. */
 export const useCustomLegendMode = (activeOutlookTypeOverride?: string): boolean => {
   const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  return !activeOutlookTypeOverride
-    && workspaceId === 'custom'
-    && isFeatureExposed('customProducts')
-    && isFeatureExposed('customWorkspace');
+  return !activeOutlookTypeOverride && isCustomWorkspaceActive(
+    workspaceId,
+    isFeatureExposed('customProducts'),
+    isFeatureExposed('customWorkspace'),
+  );
 };
 
 /** Builds the fill and hatch styles for a custom category swatch. */

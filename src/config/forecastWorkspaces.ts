@@ -86,6 +86,13 @@ export const FORECAST_WORKSPACES = [
 
 export const DEFAULT_FORECAST_WORKSPACE: ForecastWorkspaceId = 'severe';
 
+/** Custom editing is active only when the route and both rollout flags agree. */
+export const isCustomWorkspaceActive = (
+  workspaceId: string,
+  customProductsExposed: boolean,
+  customWorkspaceExposed: boolean,
+): boolean => workspaceId === 'custom' && customProductsExposed && customWorkspaceExposed;
+
 const WORKSPACES_BY_ID = new Map(
   FORECAST_WORKSPACES.map((workspace) => [workspace.id, workspace] as const),
 );
