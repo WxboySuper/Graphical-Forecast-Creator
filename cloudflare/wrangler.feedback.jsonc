@@ -6,9 +6,9 @@
   "compatibility_date": "2026-09-29",
   "workers_dev": false,
   "routes": [{ "pattern": "feedback.gfcweather.com", "custom_domain": true }],
-  "d1_databases": [{ "binding": "FEEDBACK_DB", "database_name": "gfc-feedback", "database_id": "REPLACE_WITH_D1_DATABASE_ID", "migrations_dir": "./feedback/migrations" }],
+  "d1_databases": [{ "binding": "FEEDBACK_DB", "database_name": "gfc-feedback", "database_id": "fee363b4-0a32-41a4-887c-2ec7e917e0b0", "migrations_dir": "./feedback/migrations" }],
   "vars": {
-    "FIREBASE_PROJECT_ID": "REPLACE_WITH_FIREBASE_PROJECT_ID",
+    "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
     "FEEDBACK_ALLOWED_ORIGINS": "https://beta.gfcweather.com,https://gfc.weatherboysuper.com,http://localhost:3000,http://localhost:5173"
   },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
