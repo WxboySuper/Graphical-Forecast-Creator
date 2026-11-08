@@ -6,7 +6,7 @@ import { renderViewerPage } from './feedback/viewer-page.mjs';
 const html = renderViewerPage('test-nonce');
 
 test('every inline script and style carries the CSP nonce', () => {
-  const tags = html.match(/<(script|style)\b[^>]*>/g) ?? [];
+  const tags = html.match(/<(script|style)\b[^>]*>/gi) ?? [];
   assert.ok(tags.length >= 2, 'page has an inline script and style');
   for (const tag of tags) assert.ok(tag.includes('nonce="test-nonce"'), `nonce missing on ${tag}`);
 });
@@ -15,7 +15,9 @@ test('the page loads nothing from other origins and has no inline event handlers
   assert.equal(/(?:src|href|srcset)\s*=\s*["']?\s*(?:https?:|\/\/|data:text\/html|javascript:)/i.test(html), false, 'no external or script-bearing src/href/srcset');
   assert.equal(/@import/i.test(html), false, 'no CSS imports');
   assert.equal(/url\(\s*['"]?\s*(?:https?:|\/\/)/i.test(html), false, 'no external CSS urls');
-  assert.equal(/\son[a-z]+\s*=\s*["']/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')), false, 'no inline handler attributes in markup');
+  const openingTags = html.match(/<[a-z][a-z0-9-]*\s[^<>]*>/gi) ?? [];
+  assert.ok(openingTags.length > 0, 'page has markup tags');
+  for (const tag of openingTags) assert.equal(/\son[a-z]+\s*=/i.test(tag), false, `inline handler attribute in ${tag}`);
 });
 
 test('feedback text is never inserted as HTML', () => {
