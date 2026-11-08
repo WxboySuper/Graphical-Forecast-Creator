@@ -42,6 +42,6 @@ export const decompressDirectory = async (bytes, compression) => {
     if (error instanceof PmtilesError) throw error;
     throw new PmtilesError('Invalid compressed PMTiles directory');
   } finally {
-    reader?.releaseLock();
+    try { reader?.releaseLock(); } catch { /* Keep the original decompression error. */ }
   }
 };

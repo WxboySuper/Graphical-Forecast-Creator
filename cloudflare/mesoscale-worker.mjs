@@ -388,6 +388,7 @@ const cachedTileCatalog = (key) => {
 };
 
 const storeTileCatalog = (key, value) => {
+  // Cycle catalogs are create-only and immutable under the published catalog contract.
   tileCatalogs.delete(key);
   tileCatalogs.set(key, value);
   while (tileCatalogs.size > MAX_TILE_CATALOGS) tileCatalogs.delete(tileCatalogs.keys().next().value);
