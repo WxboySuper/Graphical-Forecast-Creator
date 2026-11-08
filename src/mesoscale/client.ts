@@ -1,6 +1,6 @@
 import type { MesoscaleModelId, MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog, MesoscaleLatestPointer } from './catalogContracts';
-import { getCatalogError, isLatestPointer, resolveCycleId } from './catalogAdapter';
+import { getCatalogError, isLatestPointer, resolveCycleId } from './catalogRequestValidation';
 import { normalizeCatalogFrame, normalizeMesoscaleCatalog } from './catalogNormalization';
 import { readMesoscaleJson, type MesoscaleRequestResult, type RequestOptions } from './request';
 import { fetchMesoscaleStatus } from './statusClient';
