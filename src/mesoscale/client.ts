@@ -47,16 +47,24 @@ const retryCount = (options: RequestOptions): number => Math.max(0, Math.min(opt
 
 const pauseBeforeRetry = (attempt: number): Promise<void> => new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
 
+const shouldKeepResponse = (response: Response, attempt: number, attempts: number): boolean => {
+  if (response.ok) return true;
+  if (response.status < 500) return true;
+  return attempt === attempts;
+};
+
+const shouldThrowAttemptError = (error: unknown, attempt: number, attempts: number): boolean => {
+  if (isAbort(error)) return true;
+  return attempt === attempts;
+};
+
 async function attemptWithRetry(url: string, options: RequestOptions, attempt: number, attempts: number) {
   try {
     const request = await fetchAttempt(url, options);
-    if (request.response.ok) return request;
-    if (request.response.status < 500) return request;
-    if (attempt === attempts) return request;
+    if (shouldKeepResponse(request.response, attempt, attempts)) return request;
     request.cleanup();
   } catch (error) {
-    if (isAbort(error)) throw error;
-    if (attempt === attempts) throw error;
+    if (shouldThrowAttemptError(error, attempt, attempts)) throw error;
   }
   return undefined;
 }

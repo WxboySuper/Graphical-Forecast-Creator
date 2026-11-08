@@ -61,14 +61,17 @@ const isValidZoomRange = (value: Record<string, unknown>): boolean => {
   return Number(value.minZoom) <= Number(value.maxZoom);
 };
 
-const isCatalogDomain = (value: unknown): boolean => {
-  if (!isRecord(value)) return false;
+const validateCatalogDomainFields = (value: Record<string, unknown>): boolean => {
   if (!isBoundsTuple(value.bounds)) return false;
   if (!isValidZoomRange(value)) return false;
   if (typeof value.id !== 'string') return false;
   if (typeof value.name !== 'string') return false;
-  if (value.projection !== 'EPSG:3857') return false;
-  return true;
+  return value.projection === 'EPSG:3857';
+};
+
+const isCatalogDomain = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  return validateCatalogDomainFields(value);
 };
 
 const validateIdentity = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined => {
