@@ -75,6 +75,12 @@ describe('submitFeedback', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  test('treats a successful response with a JSON null body as accepted', async () => {
+    globals.__GFC_BUILD_TARGET__ = 'beta';
+    mockFetch({ ok: true, status: 201, json: () => Promise.resolve(null) });
+    await expect(submitFeedback(user, submission)).resolves.toBe('');
+  });
+
   test('reports network failures as FeedbackSubmitError', async () => {
     mockFetch(new Error('offline'));
     await expect(submitFeedback(user, submission)).rejects.toBeInstanceOf(FeedbackSubmitError);

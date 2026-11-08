@@ -27,12 +27,14 @@ const STATUS_MESSAGES: Record<number, string> = {
 /** Reduces a location to a bare pathname so user-specific query data stays local. */
 export const toFeedbackPagePath = (pathname: string): string => pathname.split(/[?#]/)[0].slice(0, 200) || '/';
 
+const appVersion = (): string => (typeof __GFC_APP_VERSION__ === 'string' && __GFC_APP_VERSION__ ? __GFC_APP_VERSION__ : 'dev').slice(0, 40);
+
 /** Builds the JSON body documented by the feedback service contract. */
 const buildPayload = (submission: FeedbackSubmission) => ({
   category: submission.category,
   message: submission.message.trim(),
   page: toFeedbackPagePath(submission.page),
-  appVersion: __GFC_APP_VERSION__.slice(0, 40),
+  appVersion: appVersion(),
   buildTarget: getBuildTarget() === 'beta' ? 'beta' : 'production',
   contactOk: submission.contactOk,
   viewport: `${window.innerWidth}x${window.innerHeight}`,
@@ -53,8 +55,8 @@ const postFeedback = async (baseUrl: string, token: string, body: unknown): Prom
 
 /** Reads the created entry id, tolerating an empty or malformed body. */
 const readEntryId = async (response: Response): Promise<string> => {
-  const data = (await response.json().catch(() => ({}))) as { id?: unknown };
-  return typeof data.id === 'string' ? data.id : '';
+  const data = (await response.json().catch(() => null)) as { id?: unknown } | null;
+  return typeof data?.id === 'string' ? data.id : '';
 };
 
 /** Posts feedback and resolves with the new entry id. */

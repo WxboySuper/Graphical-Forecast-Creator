@@ -29,4 +29,7 @@ export const isFeedbackEnabled = (): boolean => {
 };
 
 /** Base URL of the feedback service, without a trailing slash. */
-export const getFeedbackApiUrl = (): string => __GFC_FEEDBACK_API_URL__.trim().replace(/\/+$/, '');
+export const getFeedbackApiUrl = (): string => {
+  const configured = typeof __GFC_FEEDBACK_API_URL__ === 'string' ? __GFC_FEEDBACK_API_URL__ : '';
+  return configured.trim().replace(/\/+$/, '');
+};
