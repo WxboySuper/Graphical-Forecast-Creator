@@ -73,7 +73,7 @@ function loadList(reset){if(reset){state.seq+=1;state.cursor=null;state.items=[]
   let seq=state.seq;state.loading=true;setError('');renderMore();
   return api('/admin/api/feedback'+query()).then(function(b){if(seq!==state.seq)return;state.items=state.items.concat(b.items||[]);state.cursor=b.nextCursor||null;
     if(!state.selected&&state.items.length)state.selected=state.items[0].id;}).catch(function(e){if(seq===state.seq)setError(e.message);}).then(function(){if(seq!==state.seq)return;state.loading=false;render();});}
-function renderTiles(){let s=state.summary;if(!s||!s.byStatus||!s.byTarget)return;let t=$('tiles');t.textContent='';
+function renderTiles(){let s=state.summary;if(![s?.byStatus,s?.byTarget].every(Boolean))return;let t=$('tiles');t.textContent='';
   [['Total',s.total],['New',s.byStatus.new],['Beta',s.byTarget.beta],['Production',s.byTarget.production]].forEach(function(x){t.appendChild(el('div',{class:'tile'},[el('b',{text:String(x[1])}),el('span',{text:x[0]})]));});}
 function renderList(){let list=$('list');list.textContent='';let rows=visible();
   if(!rows.length){list.appendChild(el('p',{class:'note',text:state.loading?'Loading…':'No feedback matches these filters.'}));}
@@ -111,7 +111,7 @@ function bind(){['status','target','category'].forEach(function(k){$('f-'+k).add
   $('f-q').addEventListener('input',function(e){state.filters.q=e.target.value;syncUrl();render();});
   $('refresh').addEventListener('click',function(){loadSummary();loadList(true);});
   document.addEventListener('keydown',onKey);}
-function onKey(e){let t=e.target?e.target.tagName:'';if(['INPUT','SELECT','TEXTAREA'].indexOf(t)>=0)return;if(e.target&&e.target.isContentEditable)return;if([e.metaKey,e.ctrlKey,e.altKey].some(Boolean))return;if(e.key==='j')move(1);else if(e.key==='k')move(-1);}
+function onKey(e){let t=e.target?e.target.tagName:'';if(['INPUT','SELECT','TEXTAREA'].indexOf(t)>=0)return;if(e.target?.isContentEditable)return;if([e.metaKey,e.ctrlKey,e.altKey].some(Boolean))return;if(e.key==='j')move(1);else if(e.key==='k')move(-1);}
 function init(){let p=new URLSearchParams(location.search);Object.keys(state.filters).forEach(function(k){let v=p.get(k)||'';state.filters[k]=v;let n=$('f-'+k);if(n)n.value=v;});bind();loadSummary();loadList(true);}
 init();
 })();
