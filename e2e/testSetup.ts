@@ -15,11 +15,13 @@ export const navigateToSevereForecast = async (page: Page): Promise<void> => {
   await page.getByRole('menuitem', { name: 'Severe forecast workspace' }).click();
 };
 
-/** Opens the compatibility Discussion destination from the Forecast menu. */
+/** Opens Discussion in the Severe workspace; safe to call when Discussion is already open. */
 export const navigateToDiscussion = async (page: Page): Promise<void> => {
   await navigateToSevereForecast(page);
-  await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') !== 'discussion');
-  await page.getByRole('tab', { name: 'Discussion' }).click();
-  await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') === 'discussion');
+  await page.waitForURL((url) => url.pathname === '/forecast/severe');
+  if (new URL(page.url()).searchParams.get('surface') !== 'discussion') {
+    await page.getByRole('tab', { name: 'Discussion', exact: true }).click();
+    await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') === 'discussion');
+  }
   await page.getByRole('heading', { name: 'Forecast Discussion' }).waitFor();
 };
