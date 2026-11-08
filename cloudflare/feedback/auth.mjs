@@ -47,7 +47,7 @@ const isCacheFresh = (now) => Boolean(jwksCache.keys) && jwksCache.expiresAt > n
 /** Keeps serving the last-known keys when Google's endpoint is briefly unavailable, retrying soon instead of on every request. */
 function staleKeys(now) {
   if (!jwksCache.keys) return null;
-  jwksCache = { ...jwksCache, expiresAt: now + STALE_RETRY_SECONDS };
+  jwksCache = { ...jwksCache, expiresAt: now + STALE_RETRY_SECONDS, fetchedAt: now };
   return jwksCache.keys;
 }
 

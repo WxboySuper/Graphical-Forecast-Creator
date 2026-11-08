@@ -378,6 +378,19 @@ test('reports 503 instead of 401 when signing keys cannot be loaded at all', asy
   assert.equal(response.headers.get('retry-after'), '30');
 });
 
+test('unknown key ids do not trigger a refetch per request while the key endpoint is down', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  let down = false; let fetches = 0; let clock = 1950000000000 + 80 * 3600 * 1000;
+  const jwksFetch = async () => { fetches += 1; if (down) throw new Error('offline'); return Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }); };
+  const { env, ctx } = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  resetKeyCache();
+  await post(env, ctx, { auth: await token({ sub: 'down-a' }) });
+  down = true; clock += 3600 * 1000;
+  const before = fetches;
+  for (let i = 0; i < 5; i += 1) await post(env, ctx, { auth: await token({ sub: `down-${i}` }, pair.privateKey, `unknown-${i}`) });
+  assert.ok(fetches - before <= 2, `expected at most 2 fetches while down, saw ${fetches - before}`);
+});
+
 test('a global cap stops floods from many accounts', async () => {
   const { db, env, ctx } = harness();
   const statuses = [];
