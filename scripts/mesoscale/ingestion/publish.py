@@ -41,8 +41,14 @@ def latest_is_newer(store: Store, model_id: str, cycle: datetime) -> bool:
     if not current:
         return False
     try:
-        current_cycle = datetime.fromisoformat(json.loads(current)["cycleTime"].replace("Z", "+00:00"))
+        pointer = json.loads(current)
     except (json.JSONDecodeError, UnicodeError, KeyError, TypeError, ValueError):
+        return False
+    if not isinstance(pointer, dict) or not isinstance(pointer.get("cycleTime"), str):
+        return False
+    try:
+        current_cycle = datetime.fromisoformat(pointer["cycleTime"].replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
         return False
     return current_cycle >= cycle
 

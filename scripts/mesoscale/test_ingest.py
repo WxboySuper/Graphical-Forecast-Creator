@@ -348,6 +348,14 @@ class IngestTests(unittest.TestCase):
             store.put("mesoscale/v1/latest/hrrr.json", b"{broken", "application/json")
             self.assertFalse(latest_is_newer(store, "hrrr", datetime(2026, 11, 8, 12, tzinfo=UTC)))
 
+    def test_non_string_latest_cycle_is_treated_as_corrupt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = MemoryStore(Path(temporary))
+            key = "mesoscale/v1/latest/hrrr.json"
+            for cycle_time in (None, 42, [], {}):
+                store.put(key, json.dumps({"cycleTime": cycle_time}).encode(), "application/json")
+                self.assertFalse(latest_is_newer(store, "hrrr", datetime(2026, 11, 8, 12, tzinfo=UTC)))
+
     def test_discovery_selects_latest_complete_candidate_from_fixture(self):
         from types import SimpleNamespace
         fixture = (Path(__file__).parent / "fixtures" / "hrrr_t12_wrfscf00.idx").read_bytes()
