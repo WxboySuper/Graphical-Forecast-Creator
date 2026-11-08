@@ -341,11 +341,23 @@ const catalogConditionalResponse = (request, etag, env, headers) => {
   }
 };
 
+const contentTypeForObject = (route, object) => {
+  if (route.kind === 'tile') return 'image/png';
+  if (route.kind === 'catalog') return 'application/json; charset=utf-8';
+  if (route.kind === 'latest') return 'application/json; charset=utf-8';
+  return object.httpMetadata?.contentType;
+};
+
+const setTileLength = (headers, route, object) => {
+  if (route.kind !== 'tile') return;
+  if (!Number.isSafeInteger(object.size)) return;
+  headers.set('Content-Length', String(object.size));
+};
+
 const headersForObject = (route, object) => {
-  const jsonType = route.kind === 'catalog' || route.kind === 'latest' ? 'application/json; charset=utf-8' : null;
-  const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType || jsonType;
+  const contentType = contentTypeForObject(route, object);
   const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
-  if (route.kind === 'tile' && Number.isSafeInteger(object.size)) headers.set('Content-Length', String(object.size));
+  setTileLength(headers, route, object);
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', cacheControlForRoute(route));
