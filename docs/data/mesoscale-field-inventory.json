@@ -1,0 +1,371 @@
+{
+  "measuredAt": "2026-11-08",
+  "method": "Anonymous HTTPS .idx inventory. Parameter, level and step strings are copied exactly from NOAA index rows. Units were not decoded in this environment and are marked unknown; do not treat parameter-name conventions as verification.",
+  "models": {
+    "HRRR": {
+      "cycle": "2026-11-08T12:00:00Z",
+      "f00LastModified": "2026-11-08T12:51:20Z",
+      "latencyMinutes": 51,
+      "products": [
+        {
+          "url": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2",
+          "index": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2.idx",
+          "sizeBytes": 136859480
+        },
+        {
+          "url": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfprsf00.grib2",
+          "index": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfprsf00.grib2.idx",
+          "sizeBytes": 382358670
+        }
+      ],
+      "fields": {
+        "T2m": {
+          "parameter": "TMP",
+          "level": "2 m above ground",
+          "units": "K (GRIB2 parameter-table convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "Td2m": {
+          "parameter": "DPT",
+          "level": "2 m above ground",
+          "units": "K (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "wind10m": {
+          "parameter": "UGRD/VGRD",
+          "level": "10 m above ground",
+          "units": "m s-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "CAPE": {
+          "parameter": "CAPE",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true,
+          "note": "Surface-based and layer CAPE records exist; parcel identity not fully resolved from index text alone."
+        },
+        "CIN": {
+          "parameter": "CIN",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "SRH": {
+          "parameter": "HLCY",
+          "level": "1000-0 and 3000-0 m above ground",
+          "units": "m2 s-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "bulkShear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No direct 0-6 km bulk shear record found in wrfsfc/wrfprs index."
+        },
+        "LCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "PWAT": {
+          "parameter": "PWAT",
+          "level": "entire atmosphere (considered as a single layer)",
+          "units": "kg m-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "MSLP": {
+          "parameter": "MSLMA",
+          "level": "mean sea level",
+          "units": "Pa (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "updraftHelicity": {
+          "parameter": "MXUPHL/MNUPHL",
+          "level": "0-2000, 0-3000, 2000-5000 m above ground",
+          "units": "m2 s-2 (convention; not decoded)",
+          "step": "0-0 day max/min fcst",
+          "present": true
+        },
+        "reflectivity": {
+          "parameter": "REFC",
+          "level": "entire atmosphere",
+          "units": "dBZ (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        }
+      },
+      "fixedLayerSCP": {
+        "allNative": false,
+        "inputs": {
+          "MUCAPE": false,
+          "SRH0-3km": true,
+          "shear0-6km": false
+        }
+      },
+      "fixedLayerSTP": {
+        "allNative": false,
+        "inputs": {
+          "MLCAPE": true,
+          "shear0-6km": false,
+          "SRH0-1km": true,
+          "MLLCL": false,
+          "MLCIN": true
+        }
+      }
+    },
+    "RAP": {
+      "cycle": "2026-11-08T06:00:00Z",
+      "f00LastModified": "2026-11-08T06:48:05Z",
+      "latencyMinutes": 48,
+      "products": [
+        {
+          "url": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2",
+          "index": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2.idx",
+          "sizeBytes": 19614935
+        }
+      ],
+      "fields": {
+        "T2m": {
+          "parameter": "TMP",
+          "level": "2 m above ground",
+          "units": "K (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "Td2m": {
+          "parameter": "DPT",
+          "level": "2 m above ground",
+          "units": "K (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "wind10m": {
+          "parameter": "UGRD/VGRD",
+          "level": "10 m above ground",
+          "units": "m s-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "CAPE": {
+          "parameter": "CAPE",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true,
+          "note": "Parcel identity not fully resolved from index text alone."
+        },
+        "CIN": {
+          "parameter": "CIN",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "SRH": {
+          "parameter": "HLCY",
+          "level": "1000-0 and 3000-0 m above ground",
+          "units": "m2 s-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "bulkShear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No direct record found in the f00 AWIP32 index."
+        },
+        "LCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "PWAT": {
+          "parameter": "PWAT",
+          "level": "entire atmosphere (considered as a single layer)",
+          "units": "kg m-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "MSLP": {
+          "parameter": "MSLMA",
+          "level": "mean sea level",
+          "units": "Pa (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "updraftHelicity": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "reflectivity": {
+          "parameter": "REFC",
+          "level": "entire atmosphere",
+          "units": "dBZ (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        }
+      },
+      "fixedLayerSCP": {
+        "allNative": false,
+        "inputs": {
+          "MUCAPE": false,
+          "SRH0-3km": true,
+          "shear0-6km": false
+        }
+      },
+      "fixedLayerSTP": {
+        "allNative": false,
+        "inputs": {
+          "MLCAPE": true,
+          "shear0-6km": false,
+          "SRH0-1km": true,
+          "MLLCL": false,
+          "MLCIN": true
+        }
+      }
+    },
+    "RRFS": {
+      "cycle": "2026-11-08T06:00:00Z",
+      "f00LastModified": "2026-11-08T07:15:26Z",
+      "latencyMinutes": 75,
+      "products": [
+        {
+          "url": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2",
+          "index": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2.idx",
+          "sizeBytes": 302956136
+        }
+      ],
+      "fields": {
+        "T2m": {
+          "parameter": "TMP",
+          "level": "2 m above ground",
+          "units": "K (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "Td2m": {
+          "parameter": "DPT",
+          "level": "2 m above ground",
+          "units": "K (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "wind10m": {
+          "parameter": "UGRD/VGRD",
+          "level": "10 m above ground",
+          "units": "m s-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "CAPE": {
+          "parameter": "CAPE",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true,
+          "note": "Parcel identity not fully resolved from index text alone."
+        },
+        "CIN": {
+          "parameter": "CIN",
+          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
+          "units": "J kg-1 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "SRH": {
+          "parameter": "HLCY",
+          "level": "1000-0 and 3000-0 m above ground",
+          "units": "m2 s-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "bulkShear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No direct 0-6 km bulk shear record found in the 2-D index."
+        },
+        "LCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "PWAT": {
+          "parameter": "PWAT",
+          "level": "entire atmosphere (considered as a single layer)",
+          "units": "kg m-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "MSLP": {
+          "parameter": "MSLET",
+          "level": "mean sea level",
+          "units": "Pa (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "updraftHelicity": {
+          "parameter": "UPHL",
+          "level": "5000-2000 m above ground",
+          "units": "m2 s-2 (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        },
+        "reflectivity": {
+          "parameter": "REFC",
+          "level": "entire atmosphere (considered as a single layer)",
+          "units": "dBZ (convention; not decoded)",
+          "step": "anl",
+          "present": true
+        }
+      },
+      "fixedLayerSCP": {
+        "allNative": false,
+        "inputs": {
+          "MUCAPE": false,
+          "SRH0-3km": true,
+          "shear0-6km": false
+        }
+      },
+      "fixedLayerSTP": {
+        "allNative": false,
+        "inputs": {
+          "MLCAPE": true,
+          "shear0-6km": false,
+          "SRH0-1km": true,
+          "MLLCL": false,
+          "MLCIN": true
+        }
+      }
+    }
+  },
+  "selectedMessageBytes": {
+    "HRRR": 12550486,
+    "RAP": 688356,
+    "RRFS": 14103011,
+    "selection": "RECF, sea-level pressure, 2 m T/DPT, 10 m U/V, surface CAPE/CIN, HLCY 0-1/0-3 km, PWAT; RRFS UPHL included. Sum of unique message byte ranges; see report for product boundaries."
+  }
+}
