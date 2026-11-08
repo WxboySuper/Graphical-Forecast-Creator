@@ -1,12 +1,15 @@
+import { HEADER_BYTES, parseHeader } from './pmtiles-header.mjs';
+import { validateArchiveRanges } from './pmtiles-layout.mjs';
 import {
-  HEADER_BYTES, MAX_DIRECTORY_BYTES, MAX_TILE_BYTES, PmtilesError, safeEnd,
-  parseHeader, decodeDirectory, decompressDirectory, hilbertDistance,
+  MAX_DIRECTORY_BYTES, PmtilesError, safeEnd, decodeDirectory,
+  decompressDirectory, hilbertDistance,
 } from './pmtiles-format.mjs';
 
-export { decodeDirectory, parseHeader, PmtilesError } from './pmtiles-format.mjs';
+export { decodeDirectory, parseHeader, PmtilesError };
 
 const MAX_ARCHIVES = 8;
 const MAX_DIRECTORIES = 4;
+const MAX_TILE_BYTES = 8 * 1024 * 1024;
 const archives = new Map();
 
 const validTileCoordinate = ({ zoom, x, y }) => {
@@ -79,49 +82,6 @@ const archiveState = async (bucket, key) => {
   const state = { header, etag: result.etag, directories: new Map() };
   cacheArchive(key, state);
   return state;
-};
-
-const validateArchiveSize = (size) => {
-  if (!Number.isSafeInteger(size)) throw new PmtilesError('Invalid PMTiles archive size');
-};
-
-const validateRootRange = (header, size) => {
-  const end = safeEnd(header.rootOffset, header.rootLength, 'Invalid PMTiles root range');
-  if (header.rootOffset < HEADER_BYTES || end > size) throw new PmtilesError('PMTiles root directory exceeds archive size');
-};
-
-const validateMetadataRange = (header, size) => {
-  if (!header.metadataLength) return;
-  const metadataEnd = safeEnd(header.metadataOffset, header.metadataLength, 'Invalid PMTiles metadata range');
-  const rootEnd = safeEnd(header.rootOffset, header.rootLength, 'Invalid PMTiles root range');
-  if (header.metadataOffset < rootEnd || metadataEnd > size) throw new PmtilesError('PMTiles metadata range exceeds archive size');
-};
-
-const validateLeafRange = (header, size) => {
-  if (!header.leafLength) return;
-  const leafEnd = safeEnd(header.leafOffset, header.leafLength, 'Invalid PMTiles leaf range');
-  const metadataEnd = header.metadataLength ? safeEnd(header.metadataOffset, header.metadataLength, 'Invalid PMTiles metadata range') : safeEnd(header.rootOffset, header.rootLength, 'Invalid PMTiles root range');
-  if (header.leafOffset < metadataEnd || leafEnd > size) throw new PmtilesError('PMTiles leaf directory exceeds archive size');
-};
-
-const directoryEnd = (header) => {
-  if (header.leafLength) return safeEnd(header.leafOffset, header.leafLength, 'Invalid PMTiles leaf range');
-  if (header.metadataLength) return safeEnd(header.metadataOffset, header.metadataLength, 'Invalid PMTiles metadata range');
-  return safeEnd(header.rootOffset, header.rootLength, 'Invalid PMTiles root range');
-};
-
-const validateTileRange = (header, size) => {
-  const endOfDirectories = directoryEnd(header);
-  const tileEnd = safeEnd(header.tileOffset, header.tileLength, 'Invalid PMTiles tile data range');
-  if (header.tileOffset < endOfDirectories || tileEnd > size) throw new PmtilesError('PMTiles tile data exceeds archive size');
-};
-
-const validateArchiveRanges = (header, size) => {
-  validateArchiveSize(size);
-  validateRootRange(header, size);
-  validateMetadataRange(header, size);
-  validateLeafRange(header, size);
-  validateTileRange(header, size);
 };
 
 const directoryAt = async ({ bucket, key, state, offset, length }) => {

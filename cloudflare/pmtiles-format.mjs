@@ -1,10 +1,6 @@
-export const HEADER_BYTES = 127;
 export const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
 export const MAX_DIRECTORY_ENTRIES = 10000;
-export const MAX_TILE_BYTES = 8 * 1024 * 1024;
-const PNG_TILE_TYPE = 2;
 const NO_COMPRESSION = 1;
-const GZIP_COMPRESSION = 2;
 
 export class PmtilesError extends Error {}
 
@@ -25,47 +21,6 @@ const readVarint = (bytes, cursor) => {
     shift += 7;
   }
   throw new PmtilesError('Invalid PMTiles directory varint');
-};
-
-const uint64 = (view, offset) => {
-  const value = view.getBigUint64(offset, true);
-  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new PmtilesError('PMTiles offset exceeds safe range');
-  return Number(value);
-};
-
-const matchesPublishedBounds = (header) => {
-  if (header.minLon !== -1300000000) return false;
-  if (header.minLat !== 200000000) return false;
-  if (header.maxLon !== -600000000) return false;
-  return header.maxLat === 550000000;
-};
-
-const headerFromBytes = (bytes) => {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const hasSignature = new TextDecoder().decode(bytes.slice(0, 7)) === 'PMTiles';
-  if (!hasSignature || bytes[7] !== 3) throw new PmtilesError('Unsupported PMTiles archive');
-  return {
-    rootOffset: uint64(view, 8), rootLength: uint64(view, 16), metadataOffset: uint64(view, 24), metadataLength: uint64(view, 32),
-    leafOffset: uint64(view, 40), leafLength: uint64(view, 48),
-    tileOffset: uint64(view, 56), tileLength: uint64(view, 64), internalCompression: bytes[97],
-    tileCompression: bytes[98], tileType: bytes[99], minZoom: bytes[100], maxZoom: bytes[101],
-    minLon: view.getInt32(102, true), minLat: view.getInt32(106, true), maxLon: view.getInt32(110, true), maxLat: view.getInt32(114, true),
-  };
-};
-
-const validateHeader = (header) => {
-  if (header.tileType !== PNG_TILE_TYPE || header.tileCompression !== NO_COMPRESSION) throw new PmtilesError('PMTiles archive is not uncompressed PNG');
-  if (![NO_COMPRESSION, GZIP_COMPRESSION].includes(header.internalCompression)) throw new PmtilesError('Unsupported PMTiles directory compression');
-  if (header.minZoom !== 3 || header.maxZoom !== 4) throw new PmtilesError('PMTiles zoom interval does not match the published contract');
-  if (!matchesPublishedBounds(header)) throw new PmtilesError('PMTiles bounds do not match the published contract');
-  if (!header.rootLength || header.rootLength > MAX_DIRECTORY_BYTES) throw new PmtilesError('Invalid PMTiles root directory range');
-};
-
-export const parseHeader = (bytes) => {
-  if (bytes.byteLength !== HEADER_BYTES) throw new PmtilesError('Invalid PMTiles header length');
-  const header = headerFromBytes(bytes);
-  validateHeader(header);
-  return header;
 };
 
 const readDirectoryColumns = (bytes, cursor, count) => {
