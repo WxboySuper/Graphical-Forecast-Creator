@@ -99,7 +99,7 @@ export interface MesoscaleModelMetadata {
 export interface MesoscaleModelCapabilities {
   availableParameterIds: string[];
   maxForecastHour: number;
-  cycleCadenceMinutes: number;
+  cycleCadenceMinutes?: number;
 }
 
 export interface MesoscaleDomain {

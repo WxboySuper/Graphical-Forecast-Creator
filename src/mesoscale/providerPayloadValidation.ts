@@ -46,8 +46,13 @@ function hasCapabilityParameters(value: unknown): boolean {
 function hasCapabilityLimits(value: unknown): boolean {
   return allChecks(value, [isRecord, candidate => isRecord(candidate) && Number.isInteger(candidate.maxForecastHour),
     candidate => isRecord(candidate) && (candidate.maxForecastHour as number) >= 0,
-    candidate => isRecord(candidate) && Number.isInteger(candidate.cycleCadenceMinutes),
-    candidate => isRecord(candidate) && (candidate.cycleCadenceMinutes as number) > 0]);
+    candidate => isRecord(candidate) && isValidCadence(candidate.cycleCadenceMinutes)]);
+}
+
+function isValidCadence(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Number.isInteger(value)) return false;
+  return (value as number) > 0;
 }
 
 function isValidCapabilities(value: unknown): boolean {
