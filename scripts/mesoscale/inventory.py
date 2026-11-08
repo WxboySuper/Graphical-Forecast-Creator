@@ -62,6 +62,8 @@ def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple
     result = []
     for index, record in enumerate(rows):
         next_offset = next((row.offset for row in rows[index + 1:] if row.offset > record.offset), None)
+        if next_offset is not None and next_offset > file_size:
+            raise ValueError(f"Invalid message offset {next_offset} for {file_size}-byte file")
         end = _inclusive_end(next_offset, file_size)
         if record.offset >= file_size or end < record.offset:
             raise ValueError(f"Invalid message range at offset {record.offset} for {file_size}-byte file")

@@ -27,6 +27,11 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_idx("1:10:d=2026110812:TMP:surface:anl\n2:9:d=2026110812:CAPE:surface:anl")
 
+    def test_rejects_offsets_beyond_object_size(self):
+        rows = parse_idx("1:0:d=2026110812:TMP:surface:anl\n2:200:d=2026110812:CAPE:surface:anl")
+        with self.assertRaises(ValueError):
+            resolve_ranges(rows, 100)
+
     def test_rejects_malformed_allowlists_with_clear_errors(self):
         rows = parse_idx(FIXTURE_PATH.read_text(encoding="ascii"))
         for allowlist in ([], {"t2m": {"parameter": "TMP"}}, {"t2m": None}, {"t2m": {"parameter": "TMP", "level": "2 m above ground", "steps": "anl"}}):
