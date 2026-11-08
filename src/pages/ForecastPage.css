@@ -136,8 +136,8 @@
   .severe-workspace__discussion { min-width: 0; border-left: 0; }
   .severe-workspace--panel .severe-workspace__discussion { display: none; }
   .severe-workspace--panel .severe-workspace__map { flex: 1 1 100%; }
-  .severe-workspace--panel:has(.severe-workspace__navigation [aria-selected='true'][role='tab']:nth-child(2)) .severe-workspace__discussion { display: flex; flex: 1 1 100%; }
-  .severe-workspace--panel:has(.severe-workspace__navigation [aria-selected='true'][role='tab']:nth-child(2)) .severe-workspace__map { display: none; }
+  .severe-workspace--panel[data-surface='discussion'][data-panel-collapsed='false'] .severe-workspace__discussion { display: flex; flex: 1 1 100%; }
+  .severe-workspace--panel[data-surface='discussion'][data-panel-collapsed='false'] .severe-workspace__map { display: none; }
 }
 
 @media (max-width: 520px) {

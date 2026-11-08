@@ -469,13 +469,14 @@ const useDiscussionScopeSync = (options: {
   useEffect(() => {
     if (currentDay === discussionDay) return;
     if (embedded && hasActiveWorkflow) {
+      if (mapSelectedGroupingId === selectedGroupingId || searchParams.get('group') === mapSelectedGroupingId) return;
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set('group', mapSelectedGroupingId);
       setSearchParams(nextParams, { replace: true });
       return;
     }
     dispatch(setForecastDay(discussionDay));
-  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, setSearchParams]);
+  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, selectedGroupingId, setSearchParams]);
   useEffect(() => {
     if (embedded && hasActiveWorkflow && currentDay !== discussionDay) return;
     if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {

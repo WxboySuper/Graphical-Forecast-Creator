@@ -40,6 +40,9 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.goto('/forecast/severe');
     await page.getByRole('button', { name: 'Side panel' }).click();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
+    await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toHaveCount(0);
+    await page.getByRole('tab', { name: 'Discussion' }).click();
+    await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toBeVisible();
     const splitter = page.getByRole('separator', { name: 'Resize discussion panel' });
     await splitter.focus();
     await page.keyboard.press('ArrowLeft');
@@ -69,5 +72,15 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('button', { name: 'Save forecast' })).toBeVisible();
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Export Forecast Image' })).toBeVisible();
+  });
+
+  test('uses the map as the phone fallback when the side panel is collapsed', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/forecast/severe?surface=discussion&discussionLayout=panel');
+    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+    const map = page.locator('.severe-workspace__map');
+    await expect(map).not.toBeVisible();
+    await page.getByRole('button', { name: 'Hide panel' }).click();
+    await expect(map).toBeVisible();
   });
 });

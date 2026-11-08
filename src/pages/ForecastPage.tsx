@@ -792,9 +792,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map',
   );
   useEffect(() => {
-    const nextSurface = new URLSearchParams(location.search).get('surface');
-    setSurface(nextSurface === 'discussion' || nextSurface === 'review' ? nextSurface : 'map');
-  }, [location.search]);
+    setSurface(requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map');
+  }, [requestedSurface]);
   useEffect(() => {
     const openDiscussion = () => {
       const nextParams = new URLSearchParams(location.search);
@@ -922,10 +921,13 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
       ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {workspaceId === 'severe' ? (
-          <div className={`severe-workspace severe-workspace--${discussionLayout}`} data-testid="severe-workspace">
+            <div className={`severe-workspace severe-workspace--${discussionLayout}`} data-surface={surface} data-panel-collapsed={discussionPanelCollapsed} data-testid="severe-workspace">
             <div className="severe-workspace__navigation" role="tablist" aria-label="Severe forecast workspace" onKeyDown={(event) => {
+              if (!(event.target instanceof HTMLElement) || !event.target.matches('[role="tab"]')) return;
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-              const activeIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+              const selectedIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+              const focusIndex = tabs.findIndex((tab) => tab === document.activeElement);
+              const activeIndex = focusIndex >= 0 ? focusIndex : selectedIndex;
               const nextIndex = event.key === 'ArrowRight' ? (activeIndex + 1) % tabs.length
                 : event.key === 'ArrowLeft' ? (activeIndex - 1 + tabs.length) % tabs.length
                   : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
@@ -935,9 +937,9 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               tabs[nextIndex]?.focus();
               tabs[nextIndex]?.click();
             }}>
-              <button role="tab" tabIndex={surface === 'map' ? 0 : -1} aria-selected={surface === 'map'} onClick={() => updateSurface('map')}>Map</button>
-              <button role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
-              <button role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
+              <button type="button" role="tab" tabIndex={surface === 'map' ? 0 : -1} aria-selected={surface === 'map'} onClick={() => updateSurface('map')}>Map</button>
+              <button type="button" role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
+              <button type="button" role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
               <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
                 <button type="button" aria-pressed={discussionLayout === 'tabs'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
                 <button type="button" aria-pressed={discussionLayout === 'panel'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
@@ -945,10 +947,10 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               </div>
             </div>
             <div className="severe-workspace__content">
-              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : (discussionLayout === 'tabs' && surface === 'discussion') ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion')}>
+              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : (discussionLayout === 'tabs' && surface === 'discussion') ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion')} inert={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion') ? true : undefined}>
                   <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
               </div>
-              {discussionLayout === 'panel' && surface !== 'review' && !discussionPanelCollapsed ? (
+              {discussionLayout === 'panel' && surface === 'discussion' && !discussionPanelCollapsed ? (
                 <>
                   <div
                     className="severe-workspace__splitter"
