@@ -14,6 +14,11 @@ const ageMinutes = (timestamp, now) => {
   return Number.isFinite(parsed) ? Math.max(0, Math.floor((now - parsed) / 60000)) : null;
 };
 
+const staleThresholdMinutes = (env) => {
+  const configured = Number(env.STALE_AFTER_MINUTES ?? 180);
+  return Number.isFinite(configured) && configured >= 0 ? configured : 180;
+};
+
 const matchesEtag = (header, etag) => {
   if (!header || !etag) return false;
   const opaque = (value) => value.replace(/^W\//, '');
@@ -108,35 +113,35 @@ const publicRepresentationEtag = (etag, env) => {
 
 const noBodyForHead = (response) => new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
 
+const rewriteParameterTemplate = (parameter, base) => {
+  if (parameter?.data?.type !== 'xyz-raster') return;
+  if (typeof parameter.data.urlTemplate !== 'string') throw new Error('Catalog raster template is missing');
+  const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
+  if (!match) throw new Error('Catalog raster template does not match the tile route');
+  parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
+};
+
 const addConfiguredTemplateBase = (catalog, env) => {
   if (!env.PUBLIC_BASE_URL) return catalog;
-  let base;
-  try {
-    base = publicBaseUrl(env);
-  } catch {
-    throw new Error('PUBLIC_BASE_URL is invalid');
-  }
-  for (const frame of catalog.frames || []) {
-    for (const parameter of frame.parameters || []) {
-      if (parameter?.data?.type === 'xyz-raster' && typeof parameter.data.urlTemplate === 'string') {
-        const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
-        if (match) parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
-      }
-    }
-  }
+  const base = publicBaseUrl(env);
+  for (const frame of catalog.frames || []) (frame.parameters || []).forEach((parameter) => rewriteParameterTemplate(parameter, base));
   return catalog;
 };
 
 const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
 const invalidCatalogResponse = () => json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
 
-const catalogResponse = (value, request, env, route, headers, etag) => {
+const validCatalog = (value, route) => {
   const domain = value.domain;
-  if (value.schemaVersion !== 1) return invalidCatalogResponse();
-  if (value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle)) return invalidCatalogResponse();
-  if (value.status !== 'complete' || !Array.isArray(value.frames) || !domain) return invalidCatalogResponse();
-  if (!Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return invalidCatalogResponse();
-  if (domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM || domain.minZoom > domain.maxZoom) return invalidCatalogResponse();
+  if (value.schemaVersion !== 1) return false;
+  if (value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle)) return false;
+  if (value.status !== 'complete' || !Array.isArray(value.frames) || !domain) return false;
+  if (!Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return false;
+  return domain.minZoom >= 0 && domain.maxZoom <= MAX_ZOOM && domain.minZoom <= domain.maxZoom;
+};
+
+const catalogResponse = ({ value, request, env, route, headers, etag }) => {
+  if (!validCatalog(value, route)) return invalidCatalogResponse();
   try {
     addConfiguredTemplateBase(value, env);
   } catch {
@@ -148,28 +153,36 @@ const catalogResponse = (value, request, env, route, headers, etag) => {
   return new Response(JSON.stringify(value), { headers });
 };
 
-const latestResponse = (value, request, env, route, now, headers, etag) => {
+const validLatestPointer = (value, route, cycle) => {
+  if (value.schemaVersion !== 1 || value.modelId !== route.model || !cycle) return false;
+  return typeof value.publishedAt === 'string' && Number.isFinite(Date.parse(value.publishedAt));
+};
+
+const addLatestCatalogUrl = (value, env, route, cycle) => {
+  if (!env.PUBLIC_BASE_URL) return true;
+  try {
+    value.catalogUrl = `${publicBaseUrl(env).origin}/catalog/${route.model}/${cycle}.json`;
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
   const cycle = compactCycleFromIso(value.cycleTime);
-  if (value.schemaVersion !== 1 || value.modelId !== route.model || !cycle || typeof value.publishedAt !== 'string' || !Number.isFinite(Date.parse(value.publishedAt))) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
+  if (!validLatestPointer(value, route, cycle)) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
   const age = ageMinutes(value.cycleTime, now);
-  const stale = age === null || age > Number(env.STALE_AFTER_MINUTES || 180);
+  const stale = age === null || age > staleThresholdMinutes(env);
   headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
   headers.set('X-Mesoscale-Stale', String(stale));
-  if (env.PUBLIC_BASE_URL) {
-    try {
-      const base = publicBaseUrl(env);
-      value.catalogUrl = `${base.origin}/catalog/${route.model}/${cycle}.json`;
-    } catch {
-      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-    }
-  }
+  if (!addLatestCatalogUrl(value, env, route, cycle)) return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   headers.set('ETag', publicRepresentationEtag(etag, env));
   headers.set('Content-Type', 'application/json; charset=utf-8');
   if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify(value), { headers });
 };
 
-const storedJsonResponse = async (request, env, route, object, now, headers, etag) => {
+const storedJsonResponse = async ({ request, env, route, object, now, headers, etag }) => {
   let value;
   try {
     value = await object.json();
@@ -177,21 +190,29 @@ const storedJsonResponse = async (request, env, route, object, now, headers, eta
     return malformedJsonResponse();
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return malformedJsonResponse();
-  return route.kind === 'catalog'
-    ? catalogResponse(value, request, env, route, headers, etag)
-    : latestResponse(value, request, env, route, now, headers, etag);
+  const context = { value, request, env, route, now, headers, etag };
+  return route.kind === 'catalog' ? catalogResponse(context) : latestResponse(context);
 };
 
 const getObjectResponse = async (request, env, route, now) => {
   if (!env.MESOSCALE_BUCKET || typeof env.MESOSCALE_BUCKET.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const object = await env.MESOSCALE_BUCKET.get(route.key);
   if (!object) return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${route.kind === 'tile' ? TILE_MISS_TTL : POINTER_TTL}` } });
-  const headers = new Headers(object.httpMetadata?.contentType ? { 'Content-Type': object.httpMetadata.contentType } : {});
+  const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType;
+  const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', route.kind === 'catalog' || route.kind === 'tile' ? `public, max-age=${route.kind === 'catalog' ? CATALOG_TTL : TILE_TTL}, immutable` : `public, max-age=${POINTER_TTL}`);
+  if (route.kind === 'catalog') {
+    try {
+      headers.set('ETag', publicRepresentationEtag(etag, env));
+    } catch {
+      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+    }
+    if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
+  }
   if (route.kind === 'tile' && matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
-  if (route.kind !== 'tile') return storedJsonResponse(request, env, route, object, now, headers, etag);
+  if (route.kind !== 'tile') return storedJsonResponse({ request, env, route, object, now, headers, etag });
   return new Response(request.method === 'HEAD' ? null : object.body, { headers });
 };
 
@@ -223,7 +244,7 @@ const statusResponse = async (env, now) => {
   if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const day = new Date(now).toISOString().slice(0, 10);
   const previousDay = new Date(now - 86400000).toISOString().slice(0, 10);
-  const staleAfter = Number(env.STALE_AFTER_MINUTES || 180);
+  const staleAfter = staleThresholdMinutes(env);
   const models = await Promise.all([...MODELS].map((modelId) => modelStatus(bucket, modelId, day, previousDay, now, staleAfter)));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
   return json({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, 200, { 'Cache-Control': `public, max-age=${STATUS_TTL}` });
