@@ -1,8 +1,11 @@
+import { addTileIdDelta, validateDirectoryOrdering } from './pmtiles-directory-validation.mjs';
+import { PmtilesError } from './pmtiles-error.mjs';
+
 export const MAX_DIRECTORY_BYTES = 2 * 1024 * 1024;
 export const MAX_DIRECTORY_ENTRIES = 10000;
 export const NO_COMPRESSION = 1;
 
-export class PmtilesError extends Error {}
+export { PmtilesError };
 
 export const safeEnd = (offset, length, message) => {
   const end = offset + length;
@@ -33,22 +36,12 @@ const readDirectoryColumns = (bytes, cursor, count) => {
   const tileIds = [];
   let lastId = 0;
   for (let index = 0; index < count; index += 1) {
-    lastId += readVarint(bytes, cursor);
-    if (!Number.isSafeInteger(lastId)) throw new PmtilesError('Invalid PMTiles tile id range');
+    lastId = addTileIdDelta(lastId, readVarint(bytes, cursor));
     tileIds.push(lastId);
   }
   const runs = readVarintColumn(bytes, cursor, count);
   const lengths = readVarintColumn(bytes, cursor, count);
   return { tileIds, runs, lengths };
-};
-
-const validateDirectoryOrdering = ({ tileIds, runs }) => {
-  for (let index = 1; index < tileIds.length; index += 1) {
-    if (tileIds[index] <= tileIds[index - 1]) throw new PmtilesError('PMTiles directory tile IDs are not ordered');
-    if (runs[index - 1] && tileIds[index] < tileIds[index - 1] + runs[index - 1]) {
-      throw new PmtilesError('PMTiles directory tile runs overlap');
-    }
-  }
 };
 
 const validateDirectoryEntry = ({ offset, length, tileId, runLength }) => {
