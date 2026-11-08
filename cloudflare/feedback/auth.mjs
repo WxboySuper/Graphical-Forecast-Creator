@@ -6,9 +6,9 @@ const KEY_REFRESH_MIN_SECONDS = 60;
 const STALE_RETRY_SECONDS = 30;
 /** Thrown when Google's signing keys cannot be loaded at all, so callers can report an outage instead of a bad token. */
 export class KeysUnavailableError extends Error {}
-let jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 };
-/** Test hook: forgets the cached signing keys. */
-export const resetKeyCache = () => { jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 }; };
+const jwksCache = new Map();
+/** Test hook: forgets every cached signing key set. */
+export const resetKeyCache = () => jwksCache.clear();
 
 /** Decodes unpadded base64url to bytes, restoring the padding atob may require. */
 const base64UrlToBytes = (part) => {
@@ -42,18 +42,27 @@ function claimsAreValid(claims, project, now) {
   return checks.every((check) => check());
 }
 
-const isCacheFresh = (now) => Boolean(jwksCache.keys) && jwksCache.expiresAt > now;
-
-/** Keeps serving the last-known keys when Google's endpoint is briefly unavailable, retrying soon instead of on every request. */
-function staleKeys(now) {
-  if (!jwksCache.keys) return null;
-  jwksCache = { ...jwksCache, expiresAt: now + STALE_RETRY_SECONDS, fetchedAt: now };
-  return jwksCache.keys;
+function cacheFor(url) {
+  if (!jwksCache.has(url)) jwksCache.set(url, { keys: null, expiresAt: 0, fetchedAt: 0 });
+  return jwksCache.get(url);
 }
 
-async function fetchJwks(env) {
+function freshKeys(cache, now) {
+  if (!cache.keys) return null;
+  return cache.expiresAt > now ? cache.keys : null;
+}
+
+/** Keeps serving the last-known keys when the key endpoint is briefly unavailable, retrying soon instead of on every request. */
+function staleKeys(cache, now) {
+  if (!cache.keys) return null;
+  cache.expiresAt = now + STALE_RETRY_SECONDS;
+  cache.fetchedAt = now;
+  return cache.keys;
+}
+
+async function fetchJwks(env, url) {
   try {
-    const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
+    const response = await (env.JWKS_FETCH ?? fetch)(url);
     if (!response.ok) return null;
     const data = await response.json();
     return Array.isArray(data.keys) ? { keys: data.keys, response } : null;
@@ -62,24 +71,29 @@ async function fetchJwks(env) {
   }
 }
 
-async function loadKeys(env, now, force = false) {
-  if (!force && isCacheFresh(now)) return jwksCache.keys;
-  const data = await fetchJwks(env);
-  if (!data) return staleKeys(now);
+async function loadKeys(env, now, url, force = false) {
+  const cache = cacheFor(url);
+  const cached = force ? null : freshKeys(cache, now);
+  if (cached) return cached;
+  const data = await fetchJwks(env, url);
+  if (!data) return staleKeys(cache, now);
   const cacheControl = data.response.headers.get('cache-control') ?? '';
   const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] ?? 300);
-  jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)), fetchedAt: now };
-  return jwksCache.keys;
+  cache.keys = data.keys;
+  cache.expiresAt = now + Math.max(60, Math.min(maxAge, 3600));
+  cache.fetchedAt = now;
+  return cache.keys;
 }
 
 const hasSigningKey = (keys, kid) => keys.some((key) => key.kid === kid && key.kty === 'RSA');
 
 /** Loads cached keys, refetching once (rate-limited) when the token's key id is unknown after a rotation. */
-async function keysFor(env, now, kid) {
-  const keys = await loadKeys(env, now);
+async function keysFor(env, now, url, kid) {
+  const cache = cacheFor(url);
+  const keys = await loadKeys(env, now, url);
   if (!keys || hasSigningKey(keys, kid)) return keys;
-  if (now - jwksCache.fetchedAt < KEY_REFRESH_MIN_SECONDS) return keys;
-  return loadKeys(env, now, true);
+  if (now - cache.fetchedAt < KEY_REFRESH_MIN_SECONDS) return keys;
+  return loadKeys(env, now, url, true);
 }
 
 async function verifySignature(parts, header, keys) {
@@ -94,23 +108,39 @@ async function verifySignature(parts, header, keys) {
 const validHeader = (header) => typeof header === 'object' && header !== null && header.alg === 'RS256' && typeof header.kid === 'string';
 const currentSeconds = (env) => Math.floor((env.NOW?.() ?? Date.now()) / 1000);
 
-async function verifyTokenSafe(token, env) {
-  const project = env.FIREBASE_PROJECT_ID;
-  if (!project || !token) return null;
-  const parsed = parseToken(token);
-  if (!parsed) return null;
-  if (!validHeader(parsed.header)) return null;
+/** Parses the token and rejects malformed or already-expired ones before any JWKS fetch, so junk tokens never cost a network call. */
+function parseLiveToken(token, now) {
+  const parsed = token ? parseToken(token) : null;
+  if (!parsed || !validHeader(parsed.header)) return null;
+  const exp = parsed.claims?.exp;
+  return Number.isFinite(exp) && exp + CLOCK_LEEWAY_SECONDS > now ? parsed : null;
+}
+
+async function verifySignatureSafe(token, env, url) {
   const now = currentSeconds(env);
-  if (!claimsAreValid(parsed.claims, project, now)) return null;
-  const keys = await keysFor(env, now, parsed.header.kid);
+  const parsed = parseLiveToken(token, now);
+  if (!parsed) return null;
+  const keys = await keysFor(env, now, url, parsed.header.kid);
   if (!keys) throw new KeysUnavailableError('signing keys unavailable');
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;
-  return parsed.claims;
+  return { claims: parsed.claims, now };
+}
+
+export async function verifyRs256Token(token, env, url) {
+  try { return await verifySignatureSafe(token, env, url); }
+  catch (error) {
+    if (error instanceof KeysUnavailableError) throw error;
+    return null;
+  }
 }
 
 export async function verifyToken(token, env) {
-  try { return await verifyTokenSafe(token, env); }
-  catch (error) {
+  const project = env.FIREBASE_PROJECT_ID;
+  if (!project) return null;
+  try {
+    const verified = await verifySignatureSafe(token, env, JWKS_URL);
+    return verified && claimsAreValid(verified.claims, project, verified.now) ? verified.claims : null;
+  } catch (error) {
     if (error instanceof KeysUnavailableError) throw error;
     return null;
   }
