@@ -96,7 +96,9 @@ export async function fetchFeedback(request, env, ctx) {
     return await route.run(request, env, url, ctx);
   } catch {
     // Never log request content; surface a stable error instead of an opaque Worker 500.
-    const headers = isAdminPath(url) ? { 'cache-control': 'no-store' } : corsHeaders(request, env);
+    // Only the public submit route is browser-facing; every other route must never get CORS headers.
+    const publicSubmit = url.pathname === '/v1/feedback' && request.method === 'POST';
+    const headers = publicSubmit ? corsHeaders(request, env) : { 'cache-control': 'no-store' };
     return json({ error: 'Feedback service error' }, 500, headers);
   }
 }

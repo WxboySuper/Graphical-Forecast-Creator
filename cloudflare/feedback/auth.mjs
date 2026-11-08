@@ -83,7 +83,7 @@ async function verifySignature(parts, header, keys) {
   return crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, input);
 }
 
-const validHeader = (header) => header.alg === 'RS256' && typeof header.kid === 'string';
+const validHeader = (header) => typeof header === 'object' && header !== null && header.alg === 'RS256' && typeof header.kid === 'string';
 const currentSeconds = (env) => Math.floor((env.NOW?.() ?? Date.now()) / 1000);
 
 async function verifySignatureSafe(token, env, url) {
