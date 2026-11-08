@@ -77,6 +77,29 @@ const resetDiscussionScopeDraft = ({
   applyFields({ ...getDiscussionFormDefaults(existingDiscussion), forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
 };
 
+const resetDiscussionScopeAfterImport = (options: {
+  drafts: Map<string, DiscussionFormDefaults>;
+  previousKey: string;
+  discussionKey: string;
+  resetToken: number;
+  previousResetTokenRef: { current: number };
+  previousKeyRef: { current: string };
+  existingDiscussion?: DiscussionData;
+  defaultForecasterName: string;
+  fields: DiscussionFormDefaults;
+  hasUnsavedChanges: boolean;
+  applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void;
+}) => {
+  const {
+    drafts, previousKey, discussionKey, resetToken, previousResetTokenRef, previousKeyRef,
+    existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields,
+  } = options;
+  if (previousKey !== discussionKey && hasUnsavedChanges) drafts.set(previousKey, fields);
+  resetDiscussionScopeDraft({ drafts, discussionKey, existingDiscussion, defaultForecasterName, applyFields });
+  previousResetTokenRef.current = resetToken;
+  previousKeyRef.current = discussionKey;
+};
+
 /** Keeps unsaved discussion fields isolated while the user changes discussion scope. */
 const useDiscussionScopeDrafts = (options: {
   discussionKey: string;
@@ -95,11 +118,19 @@ const useDiscussionScopeDrafts = (options: {
 
   useEffect(() => {
     if (previousResetTokenRef.current !== resetToken) {
-      const previousKey = previousKeyRef.current;
-      if (previousKey !== discussionKey && hasUnsavedChanges) draftsRef.current.set(previousKey, fields);
-      resetDiscussionScopeDraft({ drafts: draftsRef.current, discussionKey, existingDiscussion, defaultForecasterName, applyFields });
-      previousResetTokenRef.current = resetToken;
-      previousKeyRef.current = discussionKey;
+      resetDiscussionScopeAfterImport({
+        drafts: draftsRef.current,
+        previousKey: previousKeyRef.current,
+        discussionKey,
+        resetToken,
+        previousResetTokenRef,
+        previousKeyRef,
+        existingDiscussion,
+        defaultForecasterName,
+        fields,
+        hasUnsavedChanges,
+        applyFields,
+      });
       scopeChangedRef.current = true;
       return;
     }
