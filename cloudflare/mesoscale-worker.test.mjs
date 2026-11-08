@@ -106,6 +106,9 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': '*' } }), env)).status, 304);
   const pathBaseEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'https://mesoscale.example.test/catalog' });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), pathBaseEnv)).status, 503);
+  const malformedFrame = { ...catalog, frames: [null] };
+  const malformedFrameEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': malformedFrame });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), malformedFrameEnv)).status, 502);
   const notReadCatalog = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ json: async () => { throw new Error('should not parse'); }, httpEtag: '"obj-1"' }) } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), notReadCatalog)).status, 304);
 });

@@ -105,7 +105,8 @@ const responseCors = (response, origin, allowed) => {
   headers.set('X-Content-Type-Options', 'nosniff');
   if (origin && allowed.has(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
-    headers.set('Vary', 'Origin');
+    const vary = headers.get('Vary');
+    headers.set('Vary', vary ? `${vary}, Origin` : 'Origin');
     headers.set('Access-Control-Expose-Headers', 'ETag, Cache-Control, X-Mesoscale-Stale, X-Mesoscale-Age-Minutes');
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -134,10 +135,8 @@ const rewriteParameterTemplate = (parameter, base) => {
   parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
 };
 
-const addConfiguredTemplateBase = (catalog, env) => {
-  if (!env.PUBLIC_BASE_URL) return catalog;
-  const base = publicBaseUrl(env);
-  for (const frame of catalog.frames || []) (frame.parameters || []).forEach((parameter) => rewriteParameterTemplate(parameter, base));
+const addConfiguredTemplateBase = (catalog, base) => {
+  for (const frame of catalog.frames) frame.parameters.forEach((parameter) => rewriteParameterTemplate(parameter, base));
   return catalog;
 };
 
@@ -160,6 +159,13 @@ const validCatalogIdentity = (value, route) => {
   return true;
 };
 
+const validCatalogFrame = (frame) => isJsonObject(frame) && Array.isArray(frame.parameters);
+
+const validCatalogFrames = (frames) => {
+  if (!Array.isArray(frames)) return false;
+  return frames.every(validCatalogFrame);
+};
+
 const validCatalogDomain = (domain) => {
   if (!isJsonObject(domain)) return false;
   if (!Number.isInteger(domain.minZoom)) return false;
@@ -171,7 +177,7 @@ const validCatalogDomain = (domain) => {
 
 const validCatalogContent = (value) => {
   if (value.status !== 'complete') return false;
-  if (!Array.isArray(value.frames)) return false;
+  if (!validCatalogFrames(value.frames)) return false;
   return validCatalogDomain(value.domain);
 };
 
@@ -183,10 +189,16 @@ const validCatalog = (value, route) => {
 
 const catalogResponse = ({ value, request, env, route, headers, etag }) => {
   if (!validCatalog(value, route)) return invalidCatalogResponse();
+  let base;
   try {
-    addConfiguredTemplateBase(value, env);
+    if (env.PUBLIC_BASE_URL) base = publicBaseUrl(env);
   } catch {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+  }
+  try {
+    if (base) addConfiguredTemplateBase(value, base);
+  } catch {
+    return invalidCatalogResponse();
   }
   headers.set('ETag', publicRepresentationEtag(etag, env));
   headers.set('Content-Type', 'application/json; charset=utf-8');
