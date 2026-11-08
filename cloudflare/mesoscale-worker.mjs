@@ -40,6 +40,7 @@ const compactCycleFromIso = (value) => {
 };
 
 const pathSegments = (pathname) => {
+  // WHATWG URL parsing normalizes dot-segments before fetch sees pathname; reject percent escapes, empty segments, and backslashes explicitly before routing.
   const raw = pathname.split('/').slice(1);
   if (raw.some(isUnsafePathSegment)) return null;
   return raw;
@@ -103,10 +104,12 @@ const allowedOrigins = (env) => new Set((env.CORS_ALLOWED_ORIGINS || '').split('
 const responseCors = (response, origin, allowed) => {
   const headers = new Headers(response.headers);
   headers.set('X-Content-Type-Options', 'nosniff');
+  const vary = headers.get('Vary');
+  if (!vary?.split(',').map((value) => value.trim().toLowerCase()).includes('origin')) {
+    headers.set('Vary', vary ? `${vary}, Origin` : 'Origin');
+  }
   if (origin && allowed.has(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
-    const vary = headers.get('Vary');
-    headers.set('Vary', vary ? `${vary}, Origin` : 'Origin');
     headers.set('Access-Control-Expose-Headers', 'ETag, Cache-Control, X-Mesoscale-Stale, X-Mesoscale-Age-Minutes');
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -159,10 +162,14 @@ const validCatalogIdentity = (value, route) => {
   return true;
 };
 
-const validCatalogFrame = (frame) => isJsonObject(frame) && Array.isArray(frame.parameters);
+const validCatalogFrame = (frame) => {
+  if (!isJsonObject(frame)) return false;
+  return Array.isArray(frame.parameters);
+};
 
 const validCatalogFrames = (frames) => {
   if (!Array.isArray(frames)) return false;
+  if (frames.length === 0) return false;
   return frames.every(validCatalogFrame);
 };
 
@@ -318,7 +325,12 @@ const getObjectResponse = async (request, env, route, now) => {
 };
 
 const readJson = async (bucket, key) => {
-  const object = await bucket.get(key);
+  let object;
+  try {
+    object = await bucket.get(key);
+  } catch {
+    return { state: 'invalid', value: null };
+  }
   if (!object) return { state: 'missing', value: null };
   try {
     const value = await object.json();
@@ -335,8 +347,12 @@ const validateJsonRecord = (record, isValid) => {
 };
 
 const validStatusPointerValue = (value, modelId) => {
-  if (value.schemaVersion !== 1 || value.modelId !== modelId || typeof value.cycleTime !== 'string') return false;
-  return Number.isFinite(Date.parse(value.cycleTime));
+  if (value.schemaVersion !== 1) return false;
+  if (value.modelId !== modelId) return false;
+  if (!compactCycleFromIso(value.cycleTime)) return false;
+  if (typeof value.catalogUrl !== 'string') return false;
+  if (typeof value.publishedAt !== 'string') return false;
+  return Number.isFinite(Date.parse(value.publishedAt));
 };
 
 const validHealthValue = (value, modelId) => {
@@ -347,6 +363,7 @@ const validHealthValue = (value, modelId) => {
 
 const healthForModel = (today, yesterday) => {
   if (today.state === 'ok') return today.value;
+  // A corrupt current-day object should stay visible instead of being masked by yesterday's record.
   if (today.state === 'invalid') return null;
   if (yesterday.state === 'ok') return yesterday.value;
   return null;
@@ -387,9 +404,10 @@ const statusResponse = async (request, env, now) => {
 
 const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(request, env, now) : getObjectResponse(request, env, route, now);
 
-const cacheKeyFor = (request) => {
+const cacheKeyFor = (request, env, route) => {
   const url = new URL(request.url);
   url.search = '';
+  if (route.kind === 'catalog' || route.kind === 'latest') url.searchParams.set('__public_base', env.PUBLIC_BASE_URL || '');
   return new Request(url.toString(), { method: 'GET' });
 };
 
@@ -414,7 +432,7 @@ const cacheStoreResponse = async (cache, key, response) => {
 const cachedFetch = async (request, route, env, now) => {
   const cache = globalThis.caches?.default;
   if (!['GET', 'HEAD'].includes(request.method) || !cache) return fetchUncached(request, route, env, now);
-  const key = cacheKeyFor(request);
+  const key = cacheKeyFor(request, env, route);
   const hit = await cache.match(key);
   if (hit) return applyHeadMethod(request, cacheHitResponse(request, hit));
   const getRequest = request.method === 'HEAD' ? new Request(request.url, { method: 'GET', headers: request.headers }) : request;

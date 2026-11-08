@@ -79,12 +79,24 @@ test('CORS allows configured origins and omits permission for other origins', as
   assert.match(allowed.headers.get('Vary'), /Origin/);
   const localBeta = await worker.fetch(request('/status', { headers: { Origin: 'http://localhost:3002' } }), env);
   assert.equal(localBeta.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3002');
+  assert.match(localBeta.headers.get('Vary'), /Origin/);
   const denied = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: 'https://attacker.example' } }), env);
   assert.equal(denied.headers.has('Access-Control-Allow-Origin'), false);
+  assert.match(denied.headers.get('Vary'), /Origin/);
+  const noOrigin = await worker.fetch(request('/status'), env);
+  assert.equal(noOrigin.headers.has('Access-Control-Allow-Origin'), false);
+  assert.match(noOrigin.headers.get('Vary'), /Origin/);
+  assert.equal((await noOrigin.json()).status, 'degraded');
   const preflight = await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('Access-Control-Allow-Methods'), 'GET, HEAD, OPTIONS');
-  assert.equal((await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: 'https://attacker.example' } }), env)).status, 403);
+  const deniedPreflight = await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: 'https://attacker.example' } }), env);
+  assert.equal(deniedPreflight.status, 403);
+  assert.match(deniedPreflight.headers.get('Vary'), /Origin/);
+  const noOriginPreflight = await worker.fetch(request('/status', { method: 'OPTIONS' }), env);
+  assert.equal(noOriginPreflight.status, 204);
+  assert.equal(noOriginPreflight.headers.has('Access-Control-Allow-Origin'), false);
+  assert.match(noOriginPreflight.headers.get('Vary'), /Origin/);
 });
 
 test('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
@@ -109,8 +121,28 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   const malformedFrame = { ...catalog, frames: [null] };
   const malformedFrameEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': malformedFrame });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), malformedFrameEnv)).status, 502);
+  const mismatchedCatalog = { ...catalog, model: { id: 'rap' } };
+  const mismatchedCatalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedCatalog });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedCatalogEnv)).status, 502);
   const notReadCatalog = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ json: async () => { throw new Error('should not parse'); }, httpEtag: '"obj-1"' }) } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), notReadCatalog)).status, 304);
+});
+
+test('Cache API separates rewritten catalog representations by public base URL', async () => {
+  await withCache(async () => {
+    const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ parameters: [{ data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
+    const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
+    let reads = 0;
+    const bucket = { get: async () => { reads += 1; return { json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
+    const firstEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test' });
+    const secondEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://second.example.test' });
+    const path = '/catalog/hrrr/20261108T1200Z.json';
+    const first = await worker.fetch(request(path), firstEnv);
+    const second = await worker.fetch(request(path), secondEnv);
+    assert.match((await first.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/first\.example\.test/);
+    assert.match((await second.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/second\.example\.test/);
+    assert.equal(reads, 2);
+  });
 });
 
 test('missing tile is a short-cache 404 and missing latest pointer is also a 404', async () => {
@@ -232,6 +264,21 @@ test('status labels parsed records with missing required fields as invalid', asy
     assert.equal(model.latestCycleTime, null);
     assert.equal(model.health, 'invalid');
   });
+});
+
+test('status degrades on R2 read errors and rejects unsupported health states', async () => {
+  const env = envFor({}, {
+    MESOSCALE_BUCKET: { get: async (key) => {
+      if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'mystery' }) };
+      if (key === 'mesoscale/v1/latest/hrrr.json' || key === 'mesoscale/v1/health/2026-11-07/hrrr.json') throw new Error('temporary R2 read failure');
+      return null;
+    } },
+  });
+  const response = await withNow('2026-11-08T15:00:00Z', () => worker.fetch(request('/status'), env));
+  assert.equal(response.status, 200);
+  const value = await response.json();
+  assert.equal(value.status, 'degraded');
+  assert.equal(value.models.find((model) => model.modelId === 'hrrr').health, 'invalid');
 });
 
 test('HEAD returns headers without a body, and unsupported methods return 405', async () => {
