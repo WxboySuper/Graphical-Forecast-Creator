@@ -149,7 +149,7 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
 const MAX_CITIES_SHOWN = 15;
 
 const CitiesList: React.FC<{ cities: Place[] | null; failed: boolean }> = ({ cities, failed }) => {
-  if (failed) return <p className="text-sm text-muted-foreground">Cities could not be loaded. Try again.</p>;
+  if (failed) return <p className="text-sm text-muted-foreground">Cities could not be loaded. Re-run the estimate to try again.</p>;
   if (!cities) return null;
   if (cities.length === 0) return <p className="text-sm text-muted-foreground">No tracked cities (5,000+ residents) fall inside the outlook.</p>;
   const shown = cities.slice(0, MAX_CITIES_SHOWN);

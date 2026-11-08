@@ -114,7 +114,7 @@ describe('PopulationEstimateBeta', () => {
     renderEstimate(store);
     await user.click(screen.getByRole('button', { name: /Estimate affected population/i }));
 
-    expect(await screen.findByText('Cities could not be loaded. Try again.')).toBeInTheDocument();
+    expect(await screen.findByText('Cities could not be loaded. Re-run the estimate to try again.')).toBeInTheDocument();
     expect(screen.queryByText(/No tracked cities/)).not.toBeInTheDocument();
   });
 
