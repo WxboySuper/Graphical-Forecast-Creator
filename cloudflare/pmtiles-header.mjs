@@ -1,6 +1,7 @@
-import { MAX_DIRECTORY_BYTES, PmtilesError } from './pmtiles-format.mjs';
+import { PmtilesError } from './pmtiles-format.mjs';
 
 export const HEADER_BYTES = 127;
+const MAX_ROOT_DIRECTORY_BYTES = 16_257;
 const PNG_TILE_TYPE = 2;
 const NO_COMPRESSION = 1;
 const GZIP_COMPRESSION = 2;
@@ -47,7 +48,7 @@ const validateBounds = (header) => {
 
 const validateRootLength = (header) => {
   if (!header.rootLength) headerError('Invalid PMTiles root directory range');
-  if (header.rootLength > MAX_DIRECTORY_BYTES) headerError('Invalid PMTiles root directory range');
+  if (header.rootLength > MAX_ROOT_DIRECTORY_BYTES) headerError('Invalid PMTiles root directory range');
 };
 
 const HEADER_VALIDATORS = [validateFormat, validateCompression, validateZoom, validateBounds, validateRootLength];

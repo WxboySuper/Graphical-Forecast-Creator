@@ -77,7 +77,8 @@ The in-memory entries are keyed by immutable catalog/archive keys; publication
 uses create-only writes and never replaces a cycle catalog or archive. LRU
 eviction bounds isolate memory, and a new cycle uses new keys. This cache
 assumption depends on the immutability rule in the catalog contract.
-Directory range reads and decompressed directories are capped at 2 MiB, and an
+The compressed root directory is capped at 16,257 bytes by PMTiles v3, leaf
+directory reads and decompressed directories are capped at 2 MiB, and an
 individual tile range is capped at 8 MiB before Worker memory is allocated.
 Oversized or malformed archive entries return the same safe 502 response as
 other invalid archive data.

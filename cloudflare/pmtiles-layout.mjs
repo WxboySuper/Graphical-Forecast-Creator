@@ -1,13 +1,17 @@
 import { HEADER_BYTES } from './pmtiles-header.mjs';
 import { PmtilesError, safeEnd } from './pmtiles-format.mjs';
 
+const MAX_ROOT_END = 16_384;
+
 const validateArchiveSize = (size) => {
   if (!Number.isSafeInteger(size)) throw new PmtilesError('Invalid PMTiles archive size');
 };
 
 const validateRootRange = (header, size) => {
   const end = safeEnd(header.rootOffset, header.rootLength, 'Invalid PMTiles root range');
-  if (header.rootOffset < HEADER_BYTES || end > size) throw new PmtilesError('PMTiles root directory exceeds archive size');
+  if (header.rootOffset < HEADER_BYTES) throw new PmtilesError('PMTiles root directory exceeds archive size');
+  if (end > size) throw new PmtilesError('PMTiles root directory exceeds archive size');
+  if (end > MAX_ROOT_END) throw new PmtilesError('PMTiles root directory exceeds archive size');
 };
 
 const validateMetadataRange = (header, size) => {

@@ -12,6 +12,9 @@ test('parses the v3 header and delta encoded root directory', async () => {
   assert.equal(parseHeader(archive.slice(0, 127)).tileType, 2);
   assert.equal(decodeDirectory(Uint8Array.from([1, 21, 1, 3, 1]))[0].tileId, 21);
   assert.equal((await read(rangeBucket(archive))).state, 'found');
+  const oversizedRootHeader = archive.slice(0, 127);
+  new DataView(oversizedRootHeader.buffer).setBigUint64(16, 16_258n, true);
+  assert.throws(() => parseHeader(oversizedRootHeader), /root directory range/);
 });
 
 test('reads leaf directories and gzip compressed directory bytes', async () => {
