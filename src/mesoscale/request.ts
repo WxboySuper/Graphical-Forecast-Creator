@@ -25,8 +25,11 @@ const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_RETRIES = 2;
 
 const isAbort = (error: unknown): boolean => {
-  if (!error || typeof error !== 'object' || !('name' in error)) return false;
-  return error.name === 'AbortError' || error.name === 'TimeoutError';
+  if (!error) return false;
+  if (typeof error !== 'object') return false;
+  if (!('name' in error)) return false;
+  if (error.name === 'AbortError') return true;
+  return error.name === 'TimeoutError';
 };
 
 const combineSignal = ({ parent, timeoutMs }: { parent?: AbortSignal; timeoutMs: number }) => {

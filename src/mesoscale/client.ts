@@ -3,6 +3,7 @@ import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from '
 import { getCatalogError, isLatestPointer, resolveCycleId } from './catalogAdapter';
 import { normalizeCatalogFrame, normalizeMesoscaleCatalog } from './catalogNormalization';
 import { readMesoscaleJson, type MesoscaleRequestResult, type RequestOptions } from './request';
+import { isRecord } from './providerPayloadValidation';
 
 export type { MesoscaleRequestResult, RequestOptions } from './request';
 export interface LatestRequestOptions { model: MesoscaleModelId; options?: RequestOptions }
@@ -51,16 +52,34 @@ export const fetchMesoscaleCatalog = ({ model, cycle, options = {} }: CatalogReq
   });
 };
 
-const isStatusModel = (value: unknown): boolean => {
-  if (!value || typeof value !== 'object') return false;
-  if (!('modelId' in value) || !['hrrr', 'rap', 'rrfs'].includes(String(value.modelId))) return false;
-  if ('latestCycleTime' in value && typeof value.latestCycleTime === 'string' && !Number.isFinite(Date.parse(value.latestCycleTime))) return false;
-  if ('latestCycleTime' in value && value.latestCycleTime !== null && typeof value.latestCycleTime !== 'string') return false;
-  if (!('ageMinutes' in value) || (value.ageMinutes !== null && !Number.isFinite(value.ageMinutes))) return false;
-  if (!('stale' in value) || typeof value.stale !== 'boolean') return false;
-  if (!('health' in value) || !['complete', 'partial', 'failed', 'missing', 'invalid', 'unavailable'].includes(String(value.health))) return false;
-  return 'healthGeneratedAt' in value && (value.healthGeneratedAt === null || Number.isFinite(Date.parse(String(value.healthGeneratedAt))));
+const isValidLatestTime = (value: Record<string, unknown>): boolean => {
+  if (!('latestCycleTime' in value)) return false;
+  if (value.latestCycleTime === null) return true;
+  if (typeof value.latestCycleTime !== 'string') return false;
+  return Number.isFinite(Date.parse(value.latestCycleTime));
 };
+
+const isValidStatusAge = (value: Record<string, unknown>): boolean => {
+  if (!('ageMinutes' in value)) return false;
+  if (value.ageMinutes === null) return true;
+  return Number.isFinite(value.ageMinutes);
+};
+
+const isValidHealth = (value: Record<string, unknown>): boolean => {
+  if (!('health' in value)) return false;
+  return ['complete', 'partial', 'failed', 'missing', 'invalid', 'unavailable'].includes(String(value.health));
+};
+
+const isValidStatusModel = (value: Record<string, unknown>): boolean => {
+  if (!('modelId' in value) || !['hrrr', 'rap', 'rrfs'].includes(String(value.modelId))) return false;
+  if (!isValidLatestTime(value)) return false;
+  if (!isValidStatusAge(value)) return false;
+  if (!('stale' in value) || typeof value.stale !== 'boolean') return false;
+  if (!isValidHealth(value) || !('healthGeneratedAt' in value)) return false;
+  return value.healthGeneratedAt === null || Number.isFinite(Date.parse(String(value.healthGeneratedAt)));
+};
+
+const isStatusModel = (value: unknown): boolean => isRecord(value) && isValidStatusModel(value);
 
 const isValidStatus = (value: MesoscaleStatus): boolean => {
   if (!['healthy', 'degraded'].includes(value.status)) return false;

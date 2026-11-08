@@ -106,6 +106,7 @@ export const resolveCycleId = (cycleTime: string): string => {
 };
 
 export const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined => {
+  if (!isRecord(catalog)) return 'Catalog response must be an object.';
   const identityError = validateIdentity(catalog, model, cycle);
   if (identityError) return identityError;
   if (!isValidCatalogDomain(catalog.domain)) return 'Catalog domain metadata is invalid.';

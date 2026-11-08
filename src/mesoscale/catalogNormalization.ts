@@ -71,6 +71,7 @@ const toProviderPayload = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['f
   });
 
 export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
+  if (!isRecord(catalog)) return { state: 'malformed', message: 'Catalog response must be an object.' };
   const frameError = getFrameError(catalog, frameIndex);
   if (frameError) return { state: 'malformed', message: frameError };
   const frame = catalog.frames[frameIndex]!;
@@ -82,6 +83,7 @@ export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: num
 };
 
 export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now()): MesoscaleParameterResponse[] => {
+  if (!isRecord(catalog)) return [{ state: 'malformed', message: 'Catalog response must be an object.' }];
   if (!isValidCatalogDomain(catalog.domain)) return [{ state: 'malformed', message: 'Catalog domain metadata is invalid.' }];
   if (!Array.isArray(catalog.frames)) return [{ state: 'malformed', message: 'Catalog frames are invalid.' }];
   return catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now));
