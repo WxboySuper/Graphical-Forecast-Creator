@@ -11,8 +11,8 @@ import { isProductAnalyticsEnabled, setProductAnalyticsEnabled, trackProductPage
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.7.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'July 21, 2026';
+const PRIVACY_POLICY_VERSION = '1.8.0';
+const PRIVACY_POLICY_LAST_UPDATED = 'November 8, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -42,6 +42,11 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
   '1.7.0': [
     'We minimized new product-analytics location collection and documented how to request access or deletion help for pseudonymous telemetry.',
     'We clarified that a fixed event-level telemetry retention period is still an unresolved operational decision.',
+  ],
+  '1.8.0': [
+    'We added a section describing the optional Send feedback form: what it collects, where it is stored (Cloudflare and a private Discord channel), and how long it is kept.',
+    'Feedback is kept until we delete it and is not removed automatically when you delete your account; you can ask us to delete it at any time.',
+    'We now list Cloudflare among the infrastructure providers that process requests for the beta site and feedback service.',
   ],
 };
 
@@ -212,7 +217,7 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       Firebase account, Firebase account deletion does not identify a matching telemetry record. A fixed event-level
       telemetry retention period has not yet been adopted; we will publish and implement one before representing a
       fixed deletion schedule. For a telemetry access or deletion request, or any privacy question, contact us at the
-      address in section 9 with the approximate date, browser/device, and route or event details you want us to locate.
+      address in section 10 with the approximate date, browser/device, and route or event details you want us to locate.
     </p>
     <p>
       On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
@@ -222,7 +227,43 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
     </p>
 
-    <h3>6. Data Retention &amp; Deletion</h3>
+    <h3>6. Feedback You Send Us</h3>
+    <p>
+      The Send feedback form is optional and available to signed-in users; you can share feedback in our Discord
+      instead if you prefer not to use it. When you send feedback we collect:
+    </p>
+    <ul>
+      <li>The message you write and the type you choose (bug, idea, praise, question, or other).</li>
+      <li>
+        Technical context added automatically: the page you were on (path only, without query strings or
+        fragments), the GFC version, whether you were using beta or production, your screen size, and your browser
+        user-agent. We do not attach your forecast data.
+      </li>
+      <li>
+        A one-way hash of your account identifier, created with a secret value. We use it only to limit spam and
+        duplicate submissions; it is not your account identifier.
+      </li>
+      <li>
+        Your email address, only if you tick &quot;You can email me about this feedback&quot; and your email address is
+        verified. We contact you only if you opted in.
+      </li>
+    </ul>
+    <p>
+      Please do not put passwords, payment details, or other sensitive personal information in your message. We use
+      feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored
+      with Cloudflare (our feedback service and database), and a copy of each submission is posted to a private
+      channel in our Discord server, where Discord&apos;s own privacy policy applies. Only GFC maintainers can read
+      these. Cloudflare also processes requests to the feedback service and may keep routine technical logs, such as
+      IP address and timestamps, under its own policies.
+    </p>
+    <p>
+      We keep feedback until we delete it, and we may keep useful feedback after you delete your account because it
+      is stored without your profile (it includes your email only if you opted in). Deleting your account does not
+      automatically remove feedback you sent. To have specific feedback deleted, contact us at the address in
+      section 10 and describe roughly when you sent it and what it said; we will remove it.
+    </p>
+
+    <h3>7. Data Retention &amp; Deletion</h3>
     <p>
       You own your data. You can delete your account from the Account page after confirming the request and
       authenticating again. The deletion process ends any subscription linked to the account, then permanently removes
@@ -231,27 +272,28 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       sign-in is kept available so you can retry. We retain a one-way hash of the deleted Firebase identifier as a
       deletion-safety marker so delayed billing events cannot recreate the account; it contains no email, profile,
       settings, metrics, or forecast content. Stripe may retain transaction records it is independently required to
-      keep for payment, fraud-prevention, tax, or legal purposes.
+      keep for payment, fraud-prevention, tax, or legal purposes. Feedback you sent through the feedback form is
+      described in section 6 and is not removed automatically when you delete your account.
     </p>
     <p>
       Aggregate admin metrics may be retained in a non-user-specific form for product operations. Short-lived dedupe
       records used for daily unique counts are intended to expire automatically after a limited retention window.
     </p>
 
-    <h3>7. Age Restrictions</h3>
+    <h3>8. Age Restrictions</h3>
     <p>
       GFC is intended for general audiences and is not directed at children under the age of 13. By creating an
       account, you confirm you are 13 years of age or older.
     </p>
 
-    <h3>8. Security &amp; Breach Notification</h3>
+    <h3>9. Security &amp; Breach Notification</h3>
     <p>
-      We rely on enterprise-grade infrastructure from Google (Firebase) and Stripe to keep your data safe. In the
+      We rely on enterprise-grade infrastructure from Google (Firebase), Stripe, and Cloudflare to keep your data safe. In the
       unlikely event of a data breach that compromises your account information, we will notify affected users via
       email as quickly as legally and technically possible.
     </p>
 
-    <h3>9. Policy Changes &amp; Contact</h3>
+    <h3>10. Policy Changes &amp; Contact</h3>
     <p>
       We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email.
       For privacy questions, or to request manual data deletion, contact us at{' '}
