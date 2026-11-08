@@ -332,7 +332,7 @@ test('latest pointer reports live age and stale state without changing its cycle
   });
 });
 
-test('latest bypasses Worker Cache API so age is recalculated for each request', async () => {
+test('latest recalculates age on Worker Cache API hits', async () => {
   await withCache(async () => {
     let reads = 0;
     const value = pointer('hrrr');
@@ -349,17 +349,33 @@ test('latest bypasses Worker Cache API so age is recalculated for each request',
         assert.equal(second.headers.get('X-Mesoscale-Age-Minutes'), '182');
       });
     });
-    assert.equal(reads, 2);
+    assert.equal(reads, 1);
   });
 });
 
-test('status bypasses Worker Cache API to refresh pointers and health records', async () => {
+test('status recalculates age on Worker Cache API hits', async () => {
   await withCache(async () => {
     let reads = 0;
-    const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => { reads += 1; return null; } } });
-    await worker.fetch(request('/status'), env);
-    await worker.fetch(request('/status'), env);
-    assert.equal(reads, 18);
+    const value = pointer('hrrr');
+    const serialized = JSON.stringify(value);
+    const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
+      reads += 1;
+      if (key !== 'mesoscale/v1/latest/hrrr.json') return null;
+      return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value) };
+    } } });
+    await withNow('2026-11-08T15:01:00Z', async () => {
+      const first = await worker.fetch(request('/status'), env);
+      const firstBody = await first.json();
+      assert.equal(firstBody.models.find((model) => model.modelId === 'hrrr').ageMinutes, 181);
+      await withNow('2026-11-08T15:02:00Z', async () => {
+        const second = await worker.fetch(request('/status'), env);
+        const secondBody = await second.json();
+        assert.equal(secondBody.models.find((model) => model.modelId === 'hrrr').ageMinutes, 182);
+        assert.notEqual(second.headers.get('ETag'), first.headers.get('ETag'));
+      });
+    });
+    // One cold status response reads one pointer and two health dates for each of three models.
+    assert.equal(reads, 3 * (1 + 2));
   });
 });
 

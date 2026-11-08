@@ -413,6 +413,7 @@ const getObjectResponse = async (context) => {
   const headTile = isTileHead(context);
   if (!canReadMesoscaleObject(bucket, headTile)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   let object;
+  // R2 bindings provide head(); get() is a compatibility fallback for test/custom bindings that do not.
   if (headTile) object = await bucket.head(context.route.key);
   else object = await bucket.get(context.route.key);
   if (!object) return missingObjectResponse(context.route);
@@ -518,15 +519,46 @@ const cacheKeyFor = (request, env, route) => {
     }
     url.searchParams.set('__public_base', base);
   }
+  if (route.kind === 'latest' || route.kind === 'status') {
+    url.searchParams.set('__stale_after', String(staleThresholdMinutes(env)));
+  }
   return new Request(url.toString(), { method: 'GET' });
 };
 
-const cacheHitResponse = (request, response) => {
-  const etag = response.headers.get('ETag');
-  return conditionalResponse(request, etag, response.headers) || response;
+const refreshDynamicCacheHit = async (context, response) => {
+  if (context.route.kind !== 'latest' && context.route.kind !== 'status') return response;
+  let value;
+  try {
+    value = await response.clone().json();
+  } catch {
+    return response;
+  }
+  const headers = new Headers(response.headers);
+  if (context.route.kind === 'latest') {
+    const age = ageMinutes(value.cycleTime, context.now);
+    headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
+    headers.set('X-Mesoscale-Stale', String(age === null || age > staleThresholdMinutes(context.env)));
+    return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(JSON.stringify(value), { headers });
+  }
+  for (const model of value.models) {
+    const age = ageMinutes(model.latestCycleTime, context.now);
+    model.ageMinutes = age;
+    model.stale = age === null || age > staleThresholdMinutes(context.env);
+  }
+  value.status = value.models.every((model) => model.health === 'complete' && !model.stale) ? 'healthy' : 'degraded';
+  const body = JSON.stringify(value);
+  const etag = await etagForText(body);
+  headers.set('ETag', etag);
+  return conditionalResponse(context.request, etag, headers) || new Response(body, { headers });
 };
 
-const applyHeadMethod = (request, response) => request.method === 'HEAD' ? noBodyForHead(response) : response;
+const cacheHitResponse = async (context, response) => {
+  if (context.route.kind === 'latest' || context.route.kind === 'status') return refreshDynamicCacheHit(context, response);
+  const etag = response.headers.get('ETag');
+  return conditionalResponse(context.request, etag, response.headers) || response;
+};
+
+const applyHeadMethod = (request, response) => request.method === 'HEAD' && response.body ? noBodyForHead(response) : response;
 
 const cacheStoreResponse = async (cache, key, response, context) => {
   if (![200, 404].includes(response.status) || !response.headers.get('Cache-Control')?.includes('max-age=')) return;
@@ -537,8 +569,6 @@ const cacheStoreResponse = async (cache, key, response, context) => {
 
 const cachedFetch = async (context) => {
   const cache = globalThis.caches?.default;
-  if (!['GET', 'HEAD'].includes(context.request.method)) return fetchUncached(context.request, context.route, context.env, context.now);
-  if (context.route.kind === 'latest' || context.route.kind === 'status') return fetchUncached(context.request, context.route, context.env, context.now);
   if (!cache) return fetchUncached(context.request, context.route, context.env, context.now);
   const key = cacheKeyFor(context.request, context.env, context.route);
   let hit;
@@ -547,7 +577,7 @@ const cachedFetch = async (context) => {
   } catch {
     return fetchUncached(context.request, context.route, context.env, context.now);
   }
-  if (hit) return applyHeadMethod(context.request, cacheHitResponse(context.request, hit));
+  if (hit) return applyHeadMethod(context.request, await cacheHitResponse(context, hit));
   const response = await fetchUncached(context.request, context.route, context.env, context.now);
   if (context.request.method === 'GET') await cacheStoreResponse(cache, key, response, context.executionContext);
   return applyHeadMethod(context.request, response);
