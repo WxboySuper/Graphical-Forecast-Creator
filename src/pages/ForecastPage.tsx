@@ -1004,7 +1004,12 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
             </div>
           </div>
         ) : showHintedCustomDiscussion ? (
-          <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense>
+          <div className="custom-workspace-discussion">
+            <div className="custom-workspace-discussion__navigation">
+              <Button type="button" variant="outline" onClick={() => updateSurface('map')}>Return to Custom map</Button>
+            </div>
+            <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense>
+          </div>
         ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />

@@ -39,6 +39,9 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.goto('/discussion?workspace=custom&group=day1&keep=1#editor');
     await expect(page).toHaveURL(/\/forecast\/custom\?workspace=custom&group=day1&keep=1&surface=discussion#editor/);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+    await page.getByRole('button', { name: 'Return to Custom map' }).click();
+    await expect(page).toHaveURL(/\/forecast\/custom\?workspace=custom&group=day1&keep=1#editor/);
+    await expect(page.locator('.forecast-workspace-layout')).toBeVisible();
   });
 
   test('persists the layout choice and allows a query override', async ({ page }) => {

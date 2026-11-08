@@ -127,6 +127,8 @@
 
 .severe-workspace__discussion--tab { flex: 1 1 100%; min-width: 0; }
 .discussion-page--embedded { width: 100%; }
+.custom-workspace-discussion { display: flex; flex: 1 1 100%; min-width: 0; min-height: 0; flex-direction: column; }
+.custom-workspace-discussion__navigation { flex: 0 0 auto; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); }
 .severe-workspace__review { flex: 1 1 100%; min-width: 0; min-height: 0; overflow: auto; padding: 1rem; }
 .severe-workspace__review > section { max-width: 72rem; margin-inline: auto; }
 .severe-workspace__review-heading { margin-right: auto; }
