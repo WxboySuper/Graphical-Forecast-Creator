@@ -96,7 +96,11 @@ export const ForecastLegacyRedirect = () => {
   );
 };
 
-/** Sends legacy Discussion links into Severe with their discussion scope and URL state intact. */
+/**
+ * Sends legacy Discussion links into the matching workspace with their query and
+ * hash intact. The legacy Discussion page had a single URL, so any extra path
+ * after `/discussion` carries no meaning and is intentionally dropped.
+ */
 export const DiscussionLegacyRedirect = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);

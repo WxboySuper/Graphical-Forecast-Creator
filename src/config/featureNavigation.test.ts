@@ -60,13 +60,16 @@ describe('featureNavigation', () => {
     expect(navigate).toHaveBeenLastCalledWith('/forecast');
     window.history.replaceState({}, '', '/forecast/severe?group=day2&workspace=custom&unused=1');
     shortcuts['2']();
-    expect(navigate).toHaveBeenLastCalledWith('/discussion?group=day2&surface=discussion');
-    window.history.replaceState({}, '', '/forecast/custom?group=day2&workspace=severe&unused=1');
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day2&surface=discussion');
+    window.history.replaceState({}, '', '/discussion/anything?group=day3&discussionLayout=panel&unused=1');
     shortcuts['2']();
-    expect(navigate).toHaveBeenLastCalledWith('/discussion?group=day2&workspace=custom&surface=discussion');
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day3&discussionLayout=panel&surface=discussion');
     window.history.replaceState({}, '', '/forecast/tropical?group=day2&workspace=tropical&unused=1');
     shortcuts['2']();
-    expect(navigate).toHaveBeenLastCalledWith('/discussion?surface=discussion');
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day2&surface=discussion');
+    window.history.replaceState({}, '', '/monitor?layer=radar');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?surface=discussion');
   });
 
   test('declares every navigation item with a stable id', () => {

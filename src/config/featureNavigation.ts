@@ -5,6 +5,22 @@
  */
 import { getBuildTarget, type BuildTarget } from './buildTarget';
 import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { getDefaultForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../routing/forecastWorkspaceRoutes';
+
+const SHORTCUT_PRESERVED_PARAMS = ['group', 'discussionLayout'] as const;
+
+/** Opens Discussion inside the workspace the user is in, keeping only the discussion scope and layout. */
+export const buildDiscussionShortcutPath = (pathname: string, search: string): string => {
+  const workspacePath = resolveRouteForecastWorkspaceContext(pathname, search)?.path ?? getDefaultForecastWorkspacePath();
+  const current = new URLSearchParams(search);
+  const params = new URLSearchParams();
+  for (const key of SHORTCUT_PRESERVED_PARAMS) {
+    const value = current.get(key);
+    if (value) params.set(key, value);
+  }
+  params.set('surface', 'discussion');
+  return `${workspacePath}?${params.toString()}`;
+};
 
 export type AppNavigationItem = {
   id: string;
@@ -67,20 +83,7 @@ export const getNavigationKeyboardShortcuts = (
     if (item.shortcutKey) {
       shortcuts[item.shortcutKey] = () => {
         if (item.id === 'discussion' && typeof window !== 'undefined') {
-          const currentParams = new URLSearchParams(window.location.search);
-          const params = new URLSearchParams();
-          const currentWorkspace = window.location.pathname.match(/^\/forecast\/(severe|custom)(?:\/|$)/)?.[1];
-          const isLegacyDiscussionPath = window.location.pathname.startsWith('/discussion');
-          const legacyWorkspaceHint = isLegacyDiscussionPath
-            ? currentParams.get('workspace')
-            : null;
-          const group = currentWorkspace || isLegacyDiscussionPath ? currentParams.get('group') : null;
-          if (group) params.set('group', group);
-          if (currentWorkspace === 'custom' || (!currentWorkspace && legacyWorkspaceHint === 'custom')) {
-            params.set('workspace', 'custom');
-          }
-          params.set('surface', 'discussion');
-          navigate(`/discussion?${params.toString()}`);
+          navigate(buildDiscussionShortcutPath(window.location.pathname, window.location.search));
           return;
         }
         navigate(item.to);
