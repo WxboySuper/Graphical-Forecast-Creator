@@ -33,25 +33,27 @@ class ByteRange:
 
 def parse_idx(text: str) -> list[IndexRecord]:
     """Parse wgrib2-style index rows; preserve parameter, level and step text."""
-    records = []
-    for line_number, line in enumerate(text.splitlines(), 1):
-        if not line.strip():
-            continue
-        parts = line.split(":")
-        if len(parts) < 6 or not parts[1].isdigit():
-            raise ValueError(f"Invalid .idx row {line_number}: {line!r}")
-        match = re.fullmatch(r"d=(\d+)", parts[2])
-        if not match:
-            raise ValueError(f"Invalid reference time on .idx row {line_number}")
-        step_parts = parts[5:]
-        if step_parts and not step_parts[-1]:
-            step_parts.pop()
-        records.append(IndexRecord(parts[0], int(parts[1]), match.group(1), parts[3], parts[4], ":".join(step_parts)))
+    records = [
+        _parse_idx_row(line, line_number)
+        for line_number, line in enumerate(text.splitlines(), 1)
+        if line.strip()
+    ]
     if not records:
         raise ValueError("The .idx inventory is empty")
     if any(a.offset > b.offset for a, b in zip(records, records[1:])):
         raise ValueError(".idx offsets must be non-decreasing")
     return records
+
+
+def _parse_idx_row(line: str, line_number: int) -> IndexRecord:
+    parts = line.split(":")
+    if len(parts) < 6 or not parts[1].isdigit():
+        raise ValueError(f"Invalid .idx row {line_number}: {line!r}")
+    reference_time = re.fullmatch(r"d=(\d+)", parts[2])
+    if not reference_time:
+        raise ValueError(f"Invalid reference time on .idx row {line_number}")
+    step = ":".join(parts[5:]).rstrip(":")
+    return IndexRecord(parts[0], int(parts[1]), reference_time.group(1), parts[3], parts[4], step)
 
 
 def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple[IndexRecord, ByteRange]]:
@@ -74,10 +76,18 @@ def resolve_allowlist(records: Iterable[IndexRecord], file_size: int, allowlist:
     for field, identity in allowlist.items():
         matches = []
         for row, byte_range in ranged:
-            if row.parameter == identity["parameter"] and row.level == identity["level"] and row.step == identity.get("step", row.step):
+            if _matches_identity(row, identity):
                 matches.append({"record": asdict(row), "range": asdict(byte_range), "bytes": byte_range.size})
         output[field] = matches
     return output
+
+
+def _matches_identity(row: IndexRecord, identity: dict[str, str]) -> bool:
+    return (
+        row.parameter == identity["parameter"]
+        and row.level == identity["level"]
+        and ("step" not in identity or row.step == identity["step"])
+    )
 
 
 def fetch_text(url: str) -> tuple[str, dict[str, str]]:
