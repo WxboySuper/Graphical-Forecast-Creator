@@ -8,11 +8,25 @@ import {
   getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
+  isCustomWorkspaceActive,
   requireForecastWorkspaceId,
   resolveStoredWorkspaceId,
 } from './forecastWorkspaces';
 
 describe('forecast workspace product contract', () => {
+  test.each([
+    [false, false, false],
+    [false, true, false],
+    [true, false, false],
+    [true, true, true],
+  ])('activates Custom only when both feature flags are enabled (%s, %s)', (customProducts, customWorkspace, expected) => {
+    expect(isCustomWorkspaceActive('custom', customProducts, customWorkspace)).toBe(expected);
+  });
+
+  test('does not activate Custom for another workspace even when both flags are enabled', () => {
+    expect(isCustomWorkspaceActive('severe', true, true)).toBe(false);
+  });
+
   test('defines canonical workspace paths in product order', () => {
     expect(FORECAST_WORKSPACES.map((workspace) => workspace.path)).toEqual([
       '/forecast/severe',

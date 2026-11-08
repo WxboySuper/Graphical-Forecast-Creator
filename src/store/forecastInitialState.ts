@@ -18,7 +18,7 @@ export const createInitialForecastState = (): ForecastState => ({
     currentDay: 1,
     cycleDate: INITIAL_CYCLE_DATE,
   },
-  ...createWorkspaceEditorDefaults(DEFAULT_FORECAST_WORKSPACE),
+  ...createWorkspaceEditorDefaults(),
   currentMapView: {
     center: [39.8283, -98.5795],
     zoom: 4,

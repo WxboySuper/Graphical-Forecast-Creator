@@ -100,23 +100,23 @@ const createFeature = () => ({
   },
 });
 
-const ToolbarTestHarness: React.FC = () => {
+const ToolbarTestHarness: React.FC<{ workspaceId?: 'severe' | 'custom' }> = ({ workspaceId = 'severe' }) => {
   const mapRef = useRef<ForecastMapHandle | null>(null);
   const controller = useForecastWorkspaceController({
     mapRef,
     addToast: mockAddToast,
     onImportResult: jest.fn(),
     onExportComplete: jest.fn(),
-    workspaceId: 'severe',
+    workspaceId,
   });
 
-  return <TabbedIntegratedToolbar controller={controller} />;
+  return <TabbedIntegratedToolbar controller={controller} workspaceId={workspaceId} />;
 };
 
-const renderToolbar = (store = createStore()) => render(
+const renderToolbar = (store = createStore(), workspaceId: 'severe' | 'custom' = 'severe') => render(
   <MemoryRouter>
     <Provider store={store}>
-      <ToolbarTestHarness />
+      <ToolbarTestHarness workspaceId={workspaceId} />
     </Provider>
   </MemoryRouter>
 );
@@ -233,29 +233,19 @@ describe('custom Draw mode exposure', () => {
     expect(screen.queryByText(/not available/i)).not.toBeInTheDocument();
   });
 
-  test('animates a clean Severe/Custom swap and creates signed-out layers', async () => {
+  test('keeps Custom controls out of Severe and creates signed-out layers in Custom', async () => {
     jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
     const user = userEvent.setup();
     const store = createStore();
-    renderToolbar(store);
-    await user.click(screen.getByRole('tab', { name: /Tools/i }));
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
-    await user.click(screen.getByRole('tab', { name: /Draw/i }));
-    const toggle = screen.getByTestId('custom-product-toggle');
-    expect(toggle).not.toHaveClass('is-custom-mode');
-    expect(screen.getByRole('radio', { name: 'Severe' }))
-      .toHaveClass('custom-product-toggle__button--leading');
-    const customButton = screen.getByRole('radio', { name: 'Custom' });
-    expect(customButton).toHaveClass('custom-product-toggle__button--trailing');
-    expect(customButton).toHaveClass('integrated-toolbar-mode-toggle-btn');
-    expect(customButton).not.toHaveClass('mode-toggle-btn');
-    expect(screen.getByRole('radio', { name: 'Severe' })).toHaveAttribute('aria-checked', 'true');
+    const severeRender = renderToolbar(store);
     expect(screen.queryByRole('button', { name: /Saved products/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('custom-draw-panel')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Wind')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('radio', { name: 'Custom' }));
-    expect(toggle).toHaveClass('is-custom-mode');
-    expect(screen.queryByTitle('Wind')).not.toBeInTheDocument();
+    severeRender.unmount();
+    renderToolbar(store, 'custom');
+    await user.click(screen.getByRole('tab', { name: /Draw/i }));
+    expect(screen.getByTestId('custom-workspace-controls')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Saved products/i })).toBeInTheDocument();
     expect(screen.getByTestId('custom-draw-panel')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add custom layer' }));
@@ -275,8 +265,6 @@ describe('custom Draw mode exposure', () => {
     await user.click(screen.getByRole('tab', { name: /Draw/i }));
     await waitFor(() => expect(screen.getByLabelText('Layer title')).toHaveValue('Winter impacts'));
 
-    await user.click(screen.getByRole('radio', { name: 'Severe' }));
-    expect(screen.getByTitle('Wind')).toBeInTheDocument();
-    expect(screen.queryByTestId('custom-draw-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Wind')).not.toBeInTheDocument();
   });
 });

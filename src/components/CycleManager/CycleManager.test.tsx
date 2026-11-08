@@ -93,7 +93,7 @@ const baseForecastState: ForecastState = {
   historyByDay: {},
   discussionDraftsByScope: {},
   discussionDraftsByWorkspace: {},
-  customEditor: { mode: 'severe', activeLayerId: null, activeCategoryId: null },
+  customEditor: { activeLayerId: null, activeCategoryId: null },
   isWorkflowActive: false,
   completionValidation: { lastResult: null, showCompletionModal: false, omittedDays: {} },
   outlookVersionSnapshots: [],

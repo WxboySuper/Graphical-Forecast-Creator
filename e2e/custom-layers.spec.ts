@@ -9,7 +9,7 @@ import { prepareAppState } from './testSetup';
 
 const openForecast = async (page: import('@playwright/test').Page) => {
   await prepareAppState(page);
-  await page.goto('/forecast?localBetaBypass=true');
+  await page.goto('/forecast/custom?localBetaBypass=true');
   await expect(page.locator('.map-container')).toBeVisible({ timeout: 10_000 });
 };
 
@@ -22,18 +22,17 @@ const downloadForecast = async (page: import('@playwright/test').Page) => {
   const savedPath = await download.path();
   if (!savedPath) throw new Error('Custom forecast download has no readable path');
   const payload = JSON.parse(await readFile(savedPath, 'utf8'));
-  expect(payload.workspaceId).toBe('severe');
+  expect(payload.workspaceId).toBe('custom');
   const saved = payload.forecast ?? payload;
   await page.getByRole('tab', { name: 'Draw' }).click();
   return saved;
 };
 
 test.describe('custom layers', () => {
-  test('switches cleanly, draws, identifies, deletes, and undoes a custom polygon', async ({ page }) => {
+  test('draws, identifies, deletes, and undoes a custom polygon', async ({ page }) => {
     test.setTimeout(60_000);
     await openForecast(page);
-    await expect(page.getByRole('radiogroup', { name: 'Drawing product' })).toBeVisible();
-    await page.getByRole('radio', { name: 'Custom' }).click();
+    await expect(page.getByTestId('custom-workspace-controls')).toBeVisible();
     await page.getByRole('button', { name: 'Add custom layer' }).click();
     await page.getByLabel('Layer title').fill('Winter impacts');
     await page.getByLabel('Layer title').blur();
@@ -79,8 +78,9 @@ test.describe('custom layers', () => {
     await page.locator('.map-history-button[aria-label="Redo"]').click();
     await expect(page.locator('.map-history-button[aria-label="Undo"]')).toBeEnabled();
 
-    await page.getByRole('radio', { name: 'Severe' }).click();
+    await page.goto('/forecast/severe?localBetaBypass=true');
     await expect(page.getByRole('button', { name: 'Add custom layer' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /wind/i })).toBeVisible();
     await expect(page.locator('.map-container')).toBeVisible();
     await page.getByRole('button', { name: 'Cat', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Categorical Risk Levels' })).toBeVisible();
@@ -90,19 +90,10 @@ test.describe('custom layers', () => {
     { name: 'portrait phone', width: 390, height: 844 },
     { name: 'landscape phone', width: 932, height: 430 },
   ]) {
-    test(`keeps the toggle and map usable on ${viewport.name}`, async ({ page }) => {
+    test(`keeps Custom controls and map usable on ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await openForecast(page);
-      await expect(page.getByRole('radio', { name: 'Severe' })).toBeVisible();
-      const drawModeBox = await page.locator('.tabbed-integrated-toolbar__section--product-mode').boundingBox();
-      const toggleBox = await page.getByTestId('custom-product-toggle').boundingBox();
-      const outlookTypeBox = await page.locator('.tabbed-integrated-toolbar__section--type').boundingBox();
-      if (!drawModeBox || !toggleBox || !outlookTypeBox) {
-        throw new Error('Expected Draw mode and Outlook Type sections to have measurable bounds');
-      }
-      expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(drawModeBox.x + drawModeBox.width + 1);
-      expect(drawModeBox.x + drawModeBox.width).toBeLessThanOrEqual(outlookTypeBox.x + 1);
-      await page.getByRole('radio', { name: 'Custom' }).click();
+      await expect(page.getByTestId('custom-workspace-controls')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Add custom layer' })).toBeVisible();
       await expect(page.locator('.map-container')).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

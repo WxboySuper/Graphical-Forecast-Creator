@@ -77,8 +77,8 @@ const tabScenarios = [
   {
     name: 'Draw Custom',
     activate: async (page: Page) => {
+      await page.goto('/forecast/custom?localBetaBypass=true&forecastUi=tabbed_toolbar&localTestAccount=free');
       await page.getByRole('tab', { name: 'Draw', exact: true }).click();
-      await page.getByRole('radio', { name: 'Custom', exact: true }).click();
       await expect(page.getByTestId('custom-draw-panel')).toBeVisible();
     },
     requireDaysRowFits: false,

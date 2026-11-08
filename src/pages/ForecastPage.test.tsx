@@ -555,7 +555,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
-    expect(store.getState().forecast.customEditor.mode).toBe('custom');
+    expect(store.getState().forecast.workspaceId).toBe('custom');
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
@@ -585,7 +585,7 @@ describe('ForecastPage layout selection', () => {
     // The restore toast proves the handoff effect has run with ready=true.
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
-    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    expect(store.getState().forecast.workspaceId).toBe('severe');
     expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
       workspaceId: 'custom',
       layer: stagedLayer,
@@ -641,8 +641,8 @@ describe('ForecastPage layout selection', () => {
       workspaceId: 'custom',
       layer: stagedLayer,
     });
-    // The failed handoff adds no layer, and the workspace keeps its own editor mode.
-    expect(store.getState().forecast.customEditor.mode).toBe('custom');
+    // The failed handoff adds no layer, and the route keeps ownership of the workspace.
+    expect(store.getState().forecast.workspaceId).toBe('custom');
   });
 
   test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {

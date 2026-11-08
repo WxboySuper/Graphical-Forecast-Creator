@@ -9,7 +9,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 ## Routes
 
 - `/forecast/severe` is the available editor. `/forecast` redirects there and keeps query parameters and hash.
-- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor. Issue #914 ships the route contract, so staging and production keep the workspace on the unavailable-workspace page instead of opening a second production editor.
+- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor and owns custom layer and product editing controls. Staging and production keep the workspace on the unavailable-workspace page.
 - `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
 - `/custom-products` stays a separate library route gated by `customProducts`. It is not a legacy Forecast editor path.
 - Canonical matching tolerates trailing slashes. Non-forecast pages leave Redux workspace ownership alone instead of resetting it to Severe.
@@ -49,7 +49,8 @@ This record pins down what #1456 actually built. The base doc describes the plan
 ## Follow-ups, not in scope
 
 - Full workspace switcher stays with #917.
-- Custom UI move and compatibility redirect stay with #915.
+- `/custom-products` remains the product library. Selecting a product hands its detached snapshot to `/forecast/custom`; Severe never offers custom editing controls.
+- Legacy forecast files and saved cycles keep their embedded `customLayers` data and remain readable through existing render, export, and import paths. They are not relabeled as Custom workspace records because no owner metadata exists to safely move the whole forecast.
 - Discussion embedding and `/discussion` handoff stay with #916.
 - Mesoscale registration stays with #919.
 
