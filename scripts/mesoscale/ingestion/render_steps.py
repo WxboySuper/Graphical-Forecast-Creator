@@ -1,17 +1,20 @@
-"""Small orchestration steps used by the f00 renderer."""
+"""Small orchestration steps for model cycle rendering."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from inventory import parse_idx, resolve_ranges
 
+from .archives import ArchiveRequest, create_archive
+from .discovery import FrameSource, request
 from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, Model, identities_for_field, source_metadata
-from .discovery import request
+
+BOUNDS = [-130, 20, -60, 55]
 
 
 @dataclass(frozen=True)
@@ -25,7 +28,7 @@ class SourceBundle:
 @dataclass(frozen=True)
 class RenderResult:
     catalog: dict
-    tiles: dict[str, Path]
+    archives: dict[str, Path]
     metrics: dict
 
 
@@ -41,23 +44,58 @@ class ParameterBuild:
 
 
 @dataclass(frozen=True)
-class CatalogBuild:
-    context: object
-    source: SourceBundle
-    parameters: list
-    downloaded: int
-    tile_count: int
+class FrameResult:
+    source: FrameSource
+    parameters: list[dict]
+    archives: dict[str, Path]
+    tiles: int
     tile_bytes: int
+    archive_bytes: int
+    downloaded: int
+    received: datetime
+
+
+@dataclass(frozen=True)
+class CycleBuild:
+    context: object
+    frames: list[dict]
+    results: list[FrameResult]
+
+
+@dataclass(frozen=True)
+class FrameProcessRequest:
+    context: object
+    frame: FrameSource
+    decode_range: object
+    render_tiles: object
+    combine_wind: object
+    numpy: object
 
 
 def process(context, decode_range, render_tiles, combine_wind) -> RenderResult:
     import numpy as np
-    source = load_source(context)
-    fields, downloaded = decode_source(context, source, decode_range, np)
-    params, tiles, tile_count, tile_bytes = render_fields(context, source, combine_wind(fields, np), render_tiles)
-    catalog = build_catalog(CatalogBuild(context, source, params, downloaded, tile_count, tile_bytes))
-    print(json.dumps({"model": context.model.id, "cycle": catalog["cycleTime"], "bytesDownloaded": downloaded, "tiles": tile_count, "tileBytes": tile_bytes, "fields": sorted(item["id"] for item in params), "missing": catalog["unavailableParameters"]}, indent=2))
-    return RenderResult(catalog, tiles, catalog["metrics"])
+    results = [process_frame(FrameProcessRequest(context, frame, decode_range, render_tiles, combine_wind, np)) for frame in context.frames]
+    catalog = build_catalog(CycleBuild(context, [frame_record(context, result) for result in results], results))
+    archives = {key: path for result in results for key, path in result.archives.items()}
+    metrics = cycle_metrics(results)
+    catalog["metrics"] = metrics
+    report_result(catalog, metrics)
+    return RenderResult(catalog, archives, metrics)
+
+
+def process_frame(request: FrameProcessRequest) -> FrameResult:
+    context, frame, np = request.context, request.frame, request.numpy
+    frame_context = frame_context_for(context, frame)
+    source = load_source(frame_context)
+    fields, downloaded = decode_source(frame_context, source, request.decode_range, np)
+    combined = request.combine_wind(fields, np)
+    params, archives, tiles, tile_bytes, archive_bytes = render_fields(frame_context, source, combined, request.render_tiles)
+    return FrameResult(frame, params, archives, tiles, tile_bytes, archive_bytes, downloaded, source.received)
+
+
+def frame_context_for(context, frame):
+    from dataclasses import replace
+    return replace(context, source_url=frame.url, modified=frame.modified, forecast_hour=frame.forecast_hour)
 
 
 def load_source(context) -> SourceBundle:
@@ -67,8 +105,7 @@ def load_source(context) -> SourceBundle:
     records = parse_idx(idx.decode("ascii"))
     selected = select_fields(context.model, records, size)
     ranged = resolve_ranges(records, size)
-    received = received_time(context.modified)
-    return SourceBundle(size, ranged, group_ranges(selected), received)
+    return SourceBundle(size, ranged, group_ranges(selected), received_time(context.modified))
 
 
 def select_fields(model: Model, records: list, size: int) -> dict:
@@ -123,44 +160,65 @@ def valid_range_response(response, data: bytes, expected_range: str, expected_by
     return response.status == 206 and response.headers.get("Content-Range") == expected_range and len(data) == expected_bytes
 
 
-def render_fields(context, source: SourceBundle, fields: dict, render_tiles) -> tuple[list, dict, int, int]:
-    params, tiles, count, size = [], {}, 0, 0
-    root = context.output / context.model.id / context.cycle.strftime("%Y%m%dT%H00Z")
+def render_fields(context, source: SourceBundle, fields: dict, render_tiles) -> tuple[list, dict, int, int, int]:
+    params, archives, count, tile_size, archive_size = [], {}, 0, 0, 0
+    root = context.output / context.model.id / context.cycle.strftime("%Y%m%dT%H00Z") / f"f{context.forecast_hour:02d}"
     processed = datetime.now(UTC)
     for field_id, descriptors in fields.items():
-        item = descriptors[0]
-        spec = FIELDS[field_id]
+        item, spec = descriptors[0], FIELDS[field_id]
         field_dir = root / field_id
         from .render import TileRenderRequest
-        tile_count, tile_size = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4]))
-        params.append(parameter_metadata(ParameterBuild(context, source, processed, field_id, item, spec, descriptors)))
-        tiles.update(tile_objects(context, field_id, field_dir))
+        tile_count, bytes_written = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4]))
+        key = archive_key(context, field_id)
+        archive = create_archive(ArchiveRequest(field_dir, root / f"{field_id}.pmtiles", ZOOM_MIN, ZOOM_MAX))
+        parameter = parameter_metadata(ParameterBuild(context, source, processed, field_id, item, spec, descriptors))
+        parameter["data"].update({"archiveKey": key, "archiveSha256": archive.sha256, "archiveBytes": archive.size, "tileCompression": "none"})
+        params.append(parameter)
+        archives[key] = archive.path
         count += tile_count
-        size += tile_size
-    return params, tiles, count, size
+        tile_size += bytes_written
+        archive_size += archive.size
+    return params, archives, count, tile_size, archive_size
+
+
+def archive_key(context, field_id: str) -> str:
+    cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
+    return f"mesoscale/v1/archives/{context.model.id}/{cycle_id}/f{context.forecast_hour:02d}/{field_id}.pmtiles"
 
 
 def parameter_metadata(request: ParameterBuild) -> dict:
     context, source, processed = request.context, request.source, request.processed
     field_id, item, spec, descriptors = request.field_id, request.item, request.spec, request.descriptors
     cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
+    hour = context.forecast_hour
+    valid_time = (context.cycle + timedelta(hours=hour)).strftime("%Y-%m-%dT%H:%M:%SZ")
     level = next((entry["record"].get("level") for entry in descriptors if entry["record"].get("level")), spec[3])
-    return {"id": field_id, "displayName": field_id.replace("-", " ").title(), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f00/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX, "bounds": [-130, 20, -60, 55]}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
+    return {"id": field_id, "displayName": field_id.replace("-", " ").title(), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
 
 
-def tile_objects(context, field_id: str, field_dir: Path) -> dict:
-    cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
-    return {f"mesoscale/v1/tiles/{context.model.id}/{cycle_id}/f00/{field_id}/{path.relative_to(field_dir).as_posix()}": path for path in field_dir.rglob("*.png")}
-
-
-def build_catalog(request: CatalogBuild) -> dict:
-    context, source, params = request.context, request.source, request.parameters
-    downloaded, tile_count, tile_bytes = request.downloaded, request.tile_count, request.tile_bytes
+def frame_record(context, result: FrameResult) -> dict:
+    hour = result.source.forecast_hour
+    cycle_text = (context.cycle + timedelta(hours=hour)).strftime("%Y-%m-%dT%H:%M:%SZ")
     expected = set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())
-    available = {item["id"] for item in params}
-    missing = [{"id": field_id, "reason": "No exact parameter and level match in the model .idx for this cycle"} for field_id in sorted(expected - available)]
+    available = {parameter["id"] for parameter in result.parameters}
+    missing = [{"id": field_id, "reason": "No exact parameter and level match in the frame .idx"} for field_id in sorted(expected - available)]
     status = "complete" if not missing else "partial"
+    return {"forecastHour": hour, "validTime": cycle_text, "frameType": "analysis" if hour == 0 else "forecast", "status": status, "parameters": result.parameters, "unavailableParameters": missing}
+
+
+def build_catalog(request: CycleBuild) -> dict:
+    context, frames = request.context, request.frames
+    complete = all(frame["status"] == "complete" for frame in frames)
     processed = datetime.now(UTC)
     cycle_text = context.cycle.strftime("%Y-%m-%dT%H:%M:%SZ")
+    received = min((result.received for result in request.results), default=processed)
     age = max(0, int((processed-context.cycle).total_seconds() // 60))
-    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": status, "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": [-130, 20, -60, 55], "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX}, "source": source_metadata(context.model), "requestedParameterIds": sorted(expected), "unavailableParameters": missing, "frames": [{"forecastHour": 0, "validTime": cycle_text, "frameType": "analysis", "status": status, "parameters": params, "unavailableParameters": missing}], "metrics": {"bytesDownloaded": downloaded, "tiles": tile_count, "bytesPublished": tile_bytes}}
+    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX}, "source": source_metadata(context.model), "requestedParameterIds": sorted(set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())), "frames": frames}
+
+
+def cycle_metrics(results: list[FrameResult]) -> dict:
+    return {"framesComplete": sum(all(parameter.get("status") == "complete" for parameter in result.parameters) for result in results), "framesFailed": 0, "tiles": sum(result.tiles for result in results), "bytesDownloaded": sum(result.downloaded for result in results), "bytesPublished": sum(result.archive_bytes for result in results), "archives": sum(len(result.archives) for result in results)}
+
+
+def report_result(catalog: dict, metrics: dict) -> None:
+    print(json.dumps({"model": catalog["model"]["id"], "cycle": catalog["cycleTime"], "status": catalog["status"], **metrics, "fieldsPerFrame": {f"f{frame['forecastHour']:02d}": len(frame["parameters"]) for frame in catalog["frames"]}}, indent=2))
