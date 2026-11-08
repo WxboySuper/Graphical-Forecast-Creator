@@ -30,7 +30,7 @@ const GROUP_COLUMNS = ['status', 'build_target', 'category'];
 async function groupedCounts(db, column) {
   if (!GROUP_COLUMNS.includes(column)) throw new Error('Unsupported summary column');
   const result = await db.prepare(`SELECT ${column} AS value, COUNT(*) AS count FROM feedback GROUP BY ${column}`).all();
-  return result.results;
+  return result.results ?? [];
 }
 
 function fillCounts(rows, keys) {

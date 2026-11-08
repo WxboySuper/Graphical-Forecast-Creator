@@ -12,8 +12,9 @@ test('every inline script and style carries the CSP nonce', () => {
 });
 
 test('the page loads nothing from other origins and has no inline event handlers', () => {
-  assert.equal(/(?:src|href)\s*=\s*["']?https?:/i.test(html), false, 'no external src/href');
-  assert.equal(/url\(\s*['"]?https?:/i.test(html), false, 'no external CSS urls');
+  assert.equal(/(?:src|href|srcset)\s*=\s*["']?\s*(?:https?:|\/\/|data:text\/html|javascript:)/i.test(html), false, 'no external or script-bearing src/href/srcset');
+  assert.equal(/@import/i.test(html), false, 'no CSS imports');
+  assert.equal(/url\(\s*['"]?\s*(?:https?:|\/\/)/i.test(html), false, 'no external CSS urls');
   assert.equal(/\son[a-z]+\s*=\s*["']/i.test(html.replace(/<script[\s\S]*?<\/script>/g, '')), false, 'no inline handler attributes in markup');
 });
 
@@ -25,7 +26,7 @@ test('feedback text is never inserted as HTML', () => {
 
 test('mutations carry the same-origin viewer header and the page only talks to /admin/api', () => {
   assert.ok(html.includes("'x-gfc-viewer'"));
-  const calls = [...html.matchAll(/'(\/[^']*)'/g)].map((match) => match[1]).filter((path) => path.startsWith('/admin'));
+  const calls = [...html.matchAll(/['"`](\/[^'"`]*)['"`]/g)].map((match) => match[1]).filter((path) => path.startsWith('/admin'));
   assert.ok(calls.length > 0);
   for (const path of calls) assert.ok(path.startsWith('/admin/api/'), `unexpected path ${path}`);
 });
