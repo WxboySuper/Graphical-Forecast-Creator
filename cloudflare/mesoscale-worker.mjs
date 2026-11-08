@@ -265,14 +265,16 @@ const catalogResponse = ({ value, request, env, route, headers, etag }) => {
   return new Response(JSON.stringify(value), { headers });
 };
 
-const validLatestPointer = (value, route, cycle) => {
+const validPointerEnvelope = (value, modelId) => {
   if (value.schemaVersion !== 1) return false;
-  if (value.modelId !== route.model) return false;
-  if (!cycle) return false;
+  if (value.modelId !== modelId) return false;
   if (typeof value.catalogUrl !== 'string') return false;
   if (typeof value.publishedAt !== 'string') return false;
   return Number.isFinite(Date.parse(value.publishedAt));
 };
+
+const validLatestPointer = (value, route, cycle) => validPointerEnvelope(value, route.model)
+  && Boolean(cycle);
 
 const addLatestCatalogUrl = (value, env, route, cycle) => {
   if (!env.PUBLIC_BASE_URL) return false;
@@ -344,16 +346,6 @@ const jsonWithEtag = async (value, request, cacheControl) => {
   return conditionalResponse(request, headers.get('ETag'), headers) || new Response(body, { headers });
 };
 
-const catalogConditionalResponse = (request, etag, env, headers) => {
-  try {
-    const publicEtag = publicRepresentationEtag(etag, env);
-    if (publicEtag) headers.set('ETag', publicEtag);
-    return conditionalResponse(request, publicEtag, headers);
-  } catch {
-    return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-  }
-};
-
 const contentTypeForObject = (route) => {
   if (route.kind === 'tile') return 'image/png';
   return 'application/json; charset=utf-8';
@@ -375,8 +367,7 @@ const headersForObject = (route, object) => {
   return { headers, etag };
 };
 
-const objectConditionalResponse = ({ request, env, route, headers, etag }) => {
-  if (route.kind === 'catalog') return catalogConditionalResponse(request, etag, env, headers);
+const objectConditionalResponse = ({ request, route, headers, etag }) => {
   if (route.kind === 'tile') return conditionalResponse(request, etag, headers);
   return null;
 };
@@ -399,11 +390,6 @@ const isTileHead = (context) => {
   return typeof context.env.MESOSCALE_BUCKET?.head === 'function';
 };
 
-// The publisher validates immutable catalogs before publishing. Latest HEAD still reads its tiny pointer to refresh age headers.
-const isCatalogHead = (context) => context.request.method === 'HEAD'
-  && context.route.kind === 'catalog'
-  && typeof context.env.MESOSCALE_BUCKET?.head === 'function';
-
 const canReadMesoscaleObject = (bucket, headOnly) => {
   if (headOnly) return typeof bucket.head === 'function';
   return typeof bucket.get === 'function';
@@ -412,28 +398,14 @@ const canReadMesoscaleObject = (bucket, headOnly) => {
 const readMesoscaleObject = (bucket, route, headOnly) =>
   headOnly ? bucket.head(route.key) : bucket.get(route.key);
 
-const catalogHeadResponse = (context, object) => {
-  const { headers, etag } = headersForObject(context.route, object);
-  try {
-    publicBaseUrl(context.env);
-    const publicEtag = publicRepresentationEtag(etag, context.env);
-    if (publicEtag) headers.set('ETag', publicEtag);
-  } catch {
-    return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-  }
-  headers.set('Content-Type', 'application/json; charset=utf-8');
-  return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(null, { headers });
-};
-
 const getObjectResponse = async (context) => {
   const bucket = context.env.MESOSCALE_BUCKET;
   if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const headOnly = isTileHead(context) || isCatalogHead(context);
+  const headOnly = isTileHead(context);
   if (!canReadMesoscaleObject(bucket, headOnly)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  // R2 bindings provide head(); get() is a compatibility fallback for test/custom bindings that do not.
+  // Tile HEAD can use metadata; JSON HEAD follows the validated GET path before its body is stripped.
   const object = await readMesoscaleObject(bucket, context.route, headOnly);
   if (!object) return missingObjectResponse(context.route);
-  if (isCatalogHead(context)) return catalogHeadResponse(context, object);
   return responseForObject({ ...context, object });
 };
 
@@ -463,12 +435,7 @@ const validateJsonRecord = (record, isValid) => {
 };
 
 const validStatusPointerValue = (value, modelId) => {
-  if (value.schemaVersion !== 1) return false;
-  if (value.modelId !== modelId) return false;
-  if (!compactCycleFromIso(value.cycleTime)) return false;
-  if (typeof value.catalogUrl !== 'string') return false;
-  if (typeof value.publishedAt !== 'string') return false;
-  return Number.isFinite(Date.parse(value.publishedAt));
+  return validPointerEnvelope(value, modelId) && Boolean(compactCycleFromIso(value.cycleTime));
 };
 
 const validHealthValue = (value, modelId) => {

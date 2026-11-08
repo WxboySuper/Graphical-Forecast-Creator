@@ -153,8 +153,10 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   const mismatchedCatalog = { ...catalog, model: { id: 'rap' } };
   const mismatchedCatalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedCatalog });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedCatalogEnv)).status, 502);
-  const notReadCatalog = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ json: async () => { throw new Error('should not parse'); }, httpEtag: '"obj-1"' }) } });
-  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), notReadCatalog)).status, 304);
+  let parsedConditionalCatalog = false;
+  const malformedConditionalCatalog = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ size: 16, json: async () => { parsedConditionalCatalog = true; throw new SyntaxError('invalid'); }, httpEtag: '"obj-1"' }) } });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), malformedConditionalCatalog)).status, 502);
+  assert.equal(parsedConditionalCatalog, true);
 });
 
 test('Cache API separates rewritten catalog representations by public base URL', async () => {
@@ -222,11 +224,13 @@ test('tile HEAD uses R2 metadata without reading the tile body', async () => {
   assert.equal(gets, 0);
 });
 
-test('catalog HEAD uses immutable R2 metadata and matches GET validators', async () => {
+test('catalog HEAD validates the stored catalog and matches GET status and validators', async () => {
   let gets = 0;
   let heads = 0;
+  const catalog = makeCatalog();
+  const baseEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
   const env = envFor({}, { MESOSCALE_BUCKET: {
-    get: async () => { gets += 1; return null; },
+    get: async (...args) => { gets += 1; return baseEnv.MESOSCALE_BUCKET.get(...args); },
     head: async () => { heads += 1; return { httpEtag: '"catalog-head"' }; },
   } });
   const path = '/catalog/hrrr/20261108T1200Z.json';
@@ -235,11 +239,14 @@ test('catalog HEAD uses immutable R2 metadata and matches GET validators', async
   assert.equal(head.body, null);
   assert.equal(head.headers.get('Content-Type'), 'application/json; charset=utf-8');
   assert.ok(head.headers.get('ETag'));
+  const get = await worker.fetch(request(path), env);
+  assert.equal(get.status, head.status);
+  assert.equal(get.headers.get('ETag'), head.headers.get('ETag'));
   const conditional = await worker.fetch(request(path, { method: 'HEAD', headers: { 'If-None-Match': head.headers.get('ETag') } }), env);
   assert.equal(conditional.status, 304);
   assert.equal(conditional.headers.has('Content-Type'), false);
-  assert.equal(heads, 2);
-  assert.equal(gets, 0);
+  assert.equal(heads, 0);
+  assert.equal(gets, 3);
 });
 
 test('tile HEAD falls back to get when head is unavailable and does not populate cache', async () => {
@@ -428,6 +435,9 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const malformed = { size: 8, json: async () => { throw new SyntaxError('invalid'); }, httpEtag: '"bad"' };
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { method: 'HEAD' }), env)).status, 502);
+  const malformedEtag = `W/"${Buffer.from('"bad"|https://mesoscale.example.test').toString('base64url')}"`;
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': malformedEtag } }), env)).status, 502);
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 502);
   let parsedOversized = false;
   const oversized = { size: 5 * 1024 * 1024, json: async () => { parsedOversized = true; throw new Error('must reject before parsing'); } };
