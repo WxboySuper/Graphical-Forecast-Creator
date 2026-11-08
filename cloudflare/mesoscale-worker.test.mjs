@@ -184,6 +184,9 @@ test('status aggregates latest pointers and current or previous daily health rec
     assert.equal(body.models.find((item) => item.modelId === 'rap').health, 'partial');
     assert.equal(body.models.find((item) => item.modelId === 'rrfs').health, 'missing');
     assert.equal(body.status, 'degraded');
+    const notModified = await worker.fetch(request('/status', { headers: { 'If-None-Match': response.headers.get('ETag') } }), env);
+    assert.equal(notModified.status, 304);
+    assert.equal(notModified.headers.get('ETag'), response.headers.get('ETag'));
   });
 });
 

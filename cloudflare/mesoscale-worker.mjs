@@ -212,6 +212,18 @@ const missingObjectResponse = (route) => {
 const conditionalResponse = (request, etag, headers) =>
   matchesEtag(request.headers.get('If-None-Match'), etag) ? new Response(null, { status: 304, headers }) : null;
 
+const etagForText = async (value) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `"${hash}"`;
+};
+
+const jsonWithEtag = async (value, request, cacheControl) => {
+  const body = JSON.stringify(value);
+  const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': cacheControl, ETag: await etagForText(body) });
+  return conditionalResponse(request, headers.get('ETag'), headers) || new Response(body, { headers });
+};
+
 const catalogConditionalResponse = (request, etag, env, headers) => {
   try {
     const publicEtag = publicRepresentationEtag(etag, env);
@@ -292,7 +304,7 @@ const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter 
   return { modelId, latestCycleTime: validPointer ? pointer.cycleTime : null, ageMinutes: age, stale: age === null || age > staleAfter, health: health?.status || (pointer ? 'invalid' : 'missing'), healthGeneratedAt: health?.generatedAt || null };
 };
 
-const statusResponse = async (env, now) => {
+const statusResponse = async (request, env, now) => {
   const bucket = env.MESOSCALE_BUCKET;
   if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const day = new Date(now).toISOString().slice(0, 10);
@@ -300,10 +312,10 @@ const statusResponse = async (env, now) => {
   const staleAfter = staleThresholdMinutes(env);
   const models = await Promise.all([...MODELS].map((modelId) => modelStatus({ bucket, modelId, day, previousDay, now, staleAfter })));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
-  return json({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, 200, { 'Cache-Control': `public, max-age=${STATUS_TTL}` });
+  return jsonWithEtag({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, request, `public, max-age=${STATUS_TTL}`);
 };
 
-const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(env, now) : getObjectResponse(request, env, route, now);
+const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(request, env, now) : getObjectResponse(request, env, route, now);
 
 const cacheKeyFor = (request) => {
   const url = new URL(request.url);
