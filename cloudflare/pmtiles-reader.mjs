@@ -83,11 +83,19 @@ const rangeBytes = async (options) => {
   return object ? rangeBody({ object, offset: options.offset, length: options.length }) : null;
 };
 
-const assertArchiveIdentity = ({ state, range }) => {
-  if (state.etag && range.etag && state.etag !== range.etag) throw new PmtilesError('PMTiles archive changed during request');
-  if (Number.isSafeInteger(state.size) && Number.isSafeInteger(range.size) && state.size !== range.size) {
-    throw new PmtilesError('PMTiles archive changed during request');
-  }
+const assertArchiveEtag = ({ state, range }) => {
+  if (!state.etag || !range.etag) return;
+  if (state.etag !== range.etag) throw new PmtilesError('PMTiles archive changed during request');
+};
+
+const assertArchiveSize = ({ state, range }) => {
+  if (!Number.isSafeInteger(state.size) || !Number.isSafeInteger(range.size)) return;
+  if (state.size !== range.size) throw new PmtilesError('PMTiles archive changed during request');
+};
+
+const assertArchiveIdentity = (identity) => {
+  assertArchiveEtag(identity);
+  assertArchiveSize(identity);
 };
 
 const archiveState = async (bucket, key) => {
