@@ -29,9 +29,14 @@ export const useMesoscaleSelection = (): MesoscaleSelection => {
   const dispatch = useDispatch();
   const context = useSelector((state: RootState) => selectMesoscaleState(state).modelContext);
   const modelId = isModelId(context.modelId) ? context.modelId : 'hrrr';
+  // The default layer applies only before any selection is stored (modelId is still null), so a
+  // user who removes every layer gets an empty map instead of the default coming back.
+  const neverChosen = context.modelId === null;
   const activeLayers = useMemo(
-    () => (context.activeLayers.length > 0 ? context.activeLayers : [{ id: DEFAULT_LAYER_ID, opacity: DEFAULT_LAYER_OPACITY }]),
-    [context.activeLayers],
+    () => (neverChosen && context.activeLayers.length === 0
+      ? [{ id: DEFAULT_LAYER_ID, opacity: DEFAULT_LAYER_OPACITY }]
+      : context.activeLayers),
+    [context.activeLayers, neverChosen],
   );
   const update = useCallback((next: Partial<MesoscaleModelContext>) => {
     dispatch(setMesoscaleModelContext({ ...context, modelId, activeLayers, ...next }));

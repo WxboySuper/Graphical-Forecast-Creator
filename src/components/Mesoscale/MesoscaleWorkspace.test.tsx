@@ -99,6 +99,16 @@ describe('MesoscaleWorkspace', () => {
     expect(screen.getByTestId('map-stub')).toHaveTextContent('cape-surface:0.7');
   });
 
+  it('lets the user remove every layer and keeps the map empty', () => {
+    givenReady();
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove CAPE (surface)' }));
+    expect(screen.getByTestId('map-stub')).toHaveTextContent('');
+    expect(screen.getByText(/no layers on the map/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'CAPE (surface)' }));
+    expect(screen.getByTestId('map-stub')).toHaveTextContent('cape-surface:0.7');
+  });
+
   it('calls out a stale run and a partial frame', () => {
     const partial = { ...catalog, frames: catalog.frames.map(frame => ({ ...frame, status: 'partial' as const })) };
     givenReady({ state: 'stale', data: partial, stale: true, ageMinutes: 400 }, { ageMinutes: 400, stale: true });
