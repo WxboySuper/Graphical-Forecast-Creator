@@ -160,13 +160,19 @@ const validCatalogIdentity = (value, route) => {
   return true;
 };
 
+const validCatalogDomain = (domain) => {
+  if (!isJsonObject(domain)) return false;
+  if (!Number.isInteger(domain.minZoom)) return false;
+  if (!Number.isInteger(domain.maxZoom)) return false;
+  if (domain.minZoom < 0) return false;
+  if (domain.maxZoom > MAX_ZOOM) return false;
+  return domain.minZoom <= domain.maxZoom;
+};
+
 const validCatalogContent = (value) => {
-  const domain = value.domain;
   if (value.status !== 'complete') return false;
   if (!Array.isArray(value.frames)) return false;
-  if (!domain || !Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return false;
-  if (domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM) return false;
-  return domain.minZoom <= domain.maxZoom;
+  return validCatalogDomain(value.domain);
 };
 
 const validCatalog = (value, route) => {
