@@ -54,8 +54,9 @@ masked by yesterday's summary.
 ## Cache and usage budget
 
 The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-cache miss. Tile `HEAD` uses R2 object metadata when the binding supports it.
-A status cache miss reads up to nine objects: three latest pointers
+cache miss. Tile `HEAD` uses R2 object metadata when the binding supports it;
+uncached HEAD requests still count as Class B operations. A status cache miss
+reads up to nine objects: three latest pointers
 and today's and yesterday's health object for each of the three models. The
 Worker uses Cloudflare's Cache API when available, and also sets HTTP cache
 headers: immutable catalogs and tiles get one year, latest and status get 30
