@@ -148,13 +148,31 @@ const storedJsonForRoute = (context) => {
   return latestResponse(context);
 };
 
-const validCatalog = (value, route) => {
+const isJsonObject = (value) => {
+  if (!value) return false;
+  if (typeof value !== 'object') return false;
+  return !Array.isArray(value);
+};
+
+const validCatalogIdentity = (value, route) => {
+  if (value.model?.id !== route.model) return false;
+  if (value.cycleTime !== cycleDate(route.cycle)) return false;
+  return true;
+};
+
+const validCatalogContent = (value) => {
   const domain = value.domain;
+  if (value.status !== 'complete') return false;
+  if (!Array.isArray(value.frames)) return false;
+  if (!domain || !Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return false;
+  if (domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM) return false;
+  return domain.minZoom <= domain.maxZoom;
+};
+
+const validCatalog = (value, route) => {
   if (value.schemaVersion !== 1) return false;
-  if (value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle)) return false;
-  if (value.status !== 'complete' || !Array.isArray(value.frames) || !domain) return false;
-  if (!Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return false;
-  return domain.minZoom >= 0 && domain.maxZoom <= MAX_ZOOM && domain.minZoom <= domain.maxZoom;
+  if (!validCatalogIdentity(value, route)) return false;
+  return validCatalogContent(value);
 };
 
 const catalogResponse = ({ value, request, env, route, headers, etag }) => {
@@ -206,7 +224,7 @@ const storedJsonResponse = async ({ request, env, route, object, now, headers, e
   } catch {
     return malformedJsonResponse();
   }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return malformedJsonResponse();
+  if (!isJsonObject(value)) return malformedJsonResponse();
   return storedJsonForRoute({ value, request, env, route, now, headers, etag });
 };
 
