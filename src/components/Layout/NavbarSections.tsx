@@ -165,15 +165,17 @@ const MainNavigationLink: FC<{
 
 // The MainTabs component keeps primary navigation next to the brand so the header reads left-to-right instead of as separate islands.
 export const MainTabs: FC = () => {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const visibleItems = getVisibleNavigationItems();
   const navItems = visibleItems.filter(({ id }) => MAIN_NAVIGATION_IDS.has(id));
-  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id));
+  // Discussion now lives inside the Severe workspace; keep its keyboard
+  // shortcut metadata while removing the duplicate destination from this menu.
+  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id) && id !== 'discussion');
 
   return (
     <div className="app-navbar__tabs">
       {navItems.map((item) => item.id === 'forecast'
-        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} otherItems={otherItems} icons={NAV_ITEM_ICONS} />
+        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} search={search} otherItems={otherItems} icons={NAV_ITEM_ICONS} />
         : <MainNavigationLink key={item.id} item={item} pathname={pathname} />)}
     </div>
   );

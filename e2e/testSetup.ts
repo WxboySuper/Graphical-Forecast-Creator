@@ -15,8 +15,15 @@ export const navigateToSevereForecast = async (page: Page): Promise<void> => {
   await page.getByRole('menuitem', { name: 'Severe forecast workspace' }).click();
 };
 
-/** Opens the compatibility Discussion destination from the Forecast menu. */
+/**
+ * Opens Discussion in the Severe workspace. The Severe menu link always drops the
+ * `surface` query parameter, so wait for that before choosing the Discussion tab;
+ * checking earlier would read the stale URL of the page being left.
+ */
 export const navigateToDiscussion = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: /^Forecast menu(?:,|$)/ }).click();
-  await page.getByRole('menuitem', { name: 'Discussion', exact: true }).click();
+  await navigateToSevereForecast(page);
+  await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') !== 'discussion');
+  await page.getByRole('tab', { name: 'Discussion', exact: true }).click();
+  await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') === 'discussion');
+  await page.getByRole('heading', { name: 'Forecast Discussion' }).waitFor();
 };

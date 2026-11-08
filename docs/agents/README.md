@@ -25,6 +25,7 @@ Entry point is [`/AGENTS.md`](../../AGENTS.md). Load only what the task needs:
 | Map styling | [forecast-map-styling-seam](../architecture/forecast-map-styling-seam.md) |
 | Polygon editing | [precision-polygon-editing-624](../architecture/precision-polygon-editing-624.md) |
 | Mesoscale providers | [mesoscale-provider-contract](../architecture/mesoscale-provider-contract.md) |
+| Mesoscale ingest catalog and operations | [mesoscale-catalog-contract](../architecture/mesoscale-catalog-contract.md), [mesoscale-ingest-operations](../architecture/mesoscale-ingest-operations.md) |
 | Outlook rules, styles, exports | [outlook-info](../product/outlook-info.md), [specialty-style-policy](../product/specialty-style-policy.md), [kmz-export](../product/kmz-export.md), [custom-products](../custom-products.md) |
 | Telemetry | [workflow-analytics](../workflow-analytics.md), [umami-telemetry](../operations/umami-telemetry.md), [umami privacy](../operations/umami-telemetry-privacy-operations.md) |
 | Public API schema | [public-status-schema](../public-status-schema.md) |

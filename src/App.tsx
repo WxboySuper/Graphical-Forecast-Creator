@@ -42,6 +42,7 @@ import { lazyWithReload } from './routing/lazyWithReload';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
+  getForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
   getUnavailableForecastWorkspaceRoutes,
   resolveRouteForecastWorkspaceContext,
@@ -53,9 +54,6 @@ import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWor
 // once on a stale-asset chunk failure (GFC-WEB-16) to pick up fresh hashes.
 const ForecastPage = lazyWithReload('forecast', () =>
   import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
-);
-const DiscussionPage = lazyWithReload('discussion', () =>
-  import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage }))
 );
 const VerificationPage = lazyWithReload('verification', () =>
   import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
@@ -96,6 +94,21 @@ export const ForecastLegacyRedirect = () => {
       replace
     />
   );
+};
+
+/**
+ * Sends legacy Discussion links into the matching workspace with their query and
+ * hash intact. The legacy Discussion page had a single URL, so any extra path
+ * after `/discussion` carries no meaning and is intentionally dropped.
+ */
+export const DiscussionLegacyRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.delete('workspace');
+  params.set('surface', 'discussion');
+  const hintedWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
+  const pathname = hintedWorkspace ? getForecastWorkspacePath(hintedWorkspace.id) : '/forecast/severe';
+  return <Navigate to={{ pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
 };
 
 const BETA_MODE = __GFC_BETA_MODE__;
@@ -191,7 +204,7 @@ const AppRoutes: React.FC = () => {
             />
           ))}
         </Route>
-        <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
+        <Route path="discussion/*" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
         {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
