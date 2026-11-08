@@ -2,7 +2,7 @@ import { getMesoscaleClientConfig, type MesoscaleClientConfig } from '../config/
 import { normalizeProviderPayload } from './normalizeProviderPayload';
 import type { MesoscaleModelId, MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from './catalogContracts';
-import { FIXTURE_STATUS, getFixtureCatalog, getFixtureLatest } from './fixtures/catalogs';
+import { readMesoscaleFixture } from './fixtures/client';
 import { isRecord } from './providerPayloadValidation';
 
 export interface RequestOptions {
@@ -50,10 +50,13 @@ const pauseBeforeRetry = (attempt: number): Promise<void> => new Promise(resolve
 async function attemptWithRetry(url: string, options: RequestOptions, attempt: number, attempts: number) {
   try {
     const request = await fetchAttempt(url, options);
-    if (request.response.ok || request.response.status < 500 || attempt === attempts) return request;
+    if (request.response.ok) return request;
+    if (request.response.status < 500) return request;
+    if (attempt === attempts) return request;
     request.cleanup();
   } catch (error) {
-    if (isAbort(error) || attempt === attempts) throw error;
+    if (isAbort(error)) throw error;
+    if (attempt === attempts) throw error;
   }
   return undefined;
 }
@@ -104,7 +107,7 @@ async function readJson<T>(path: string, options: RequestOptions = {}): Promise<
   const failure = getReadConfigFailure(options);
   if (failure) return failure;
   const config = options.config ?? getMesoscaleClientConfig();
-  if (config.fixtures) return readFixture<T>(path);
+  if (config.fixtures) return readMesoscaleFixture<T>(path);
   try {
     return await readHttpJson<T>(endpoint(config, path), options);
   } catch (error) {
@@ -112,31 +115,6 @@ async function readJson<T>(path: string, options: RequestOptions = {}): Promise<
     if (error instanceof SyntaxError) return { state: 'malformed', message: 'Mesoscale response is not valid JSON.' };
     return { state: 'upstream-failure', message: 'Mesoscale service is unavailable.', retryable: true };
   }
-}
-
-const fixtureFailure = (message: string): MesoscaleRequestResult<never> => ({ state: 'upstream-failure', message, retryable: false });
-
-function readFixtureLatest<T>(model: MesoscaleModelId): MesoscaleRequestResult<T> {
-  const data = getFixtureLatest(model);
-  return data ? { state: 'stale', data: data as T, stale: true, ageMinutes: null } : fixtureFailure('No fixture exists for this model.');
-}
-
-function readFixtureCatalog<T>(model: MesoscaleModelId, cycle: string): MesoscaleRequestResult<T> {
-  const data = getFixtureCatalog(model, cycle);
-  if (!data) return fixtureFailure('Fixture catalog was not found.');
-  const ageMinutes = Math.floor((Date.now() - Date.parse(data.cycleTime)) / 60000);
-  const stale = Date.now() - Date.parse(data.cycleTime) > 180 * 60000;
-  const state = stale ? 'stale' : data.status === 'partial' ? 'partial' : 'ready';
-  return { state, data: data as T, stale, ageMinutes };
-}
-
-function readFixture<T>(path: string): MesoscaleRequestResult<T> {
-  if (path === 'status') return { state: 'partial', data: FIXTURE_STATUS as T, stale: true, ageMinutes: null };
-  const latest = path.match(/^latest\/(hrrr|rap|rrfs)\.json$/);
-  if (latest) return readFixtureLatest<T>(latest[1] as MesoscaleModelId);
-  const catalog = path.match(/^catalog\/(hrrr|rap|rrfs)\/([\wTZ]+)\.json$/);
-  if (catalog) return readFixtureCatalog<T>(catalog[1] as MesoscaleModelId, catalog[2]);
-  return { state: 'malformed', message: 'Unknown mesoscale fixture route.' };
 }
 
 export const fetchMesoscaleLatest = (model: MesoscaleModelId, options?: RequestOptions) =>
@@ -210,7 +188,9 @@ const isLatestPointer = (value: MesoscaleLatestPointer, model: MesoscaleModelId)
   return typeof value.catalogUrl === 'string';
 };
 
-const hasValidTileUrl = (tile: Record<string, unknown>): boolean => typeof tile.urlTemplate === 'string';
+const TILE_TEMPLATE = /\{z\}.*\{x\}.*\{y\}/;
+const hasValidTileUrl = (tile: Record<string, unknown>): boolean => typeof tile.urlTemplate === 'string'
+  && TILE_TEMPLATE.test(tile.urlTemplate);
 
 const hasValidTileZoom = (tile: Record<string, unknown>): boolean => {
   if (!Number.isInteger(tile.minZoom) || !Number.isInteger(tile.maxZoom)) return false;
@@ -254,6 +234,19 @@ const validateCatalogIdentity = (catalog: MesoscaleCatalog, model: MesoscaleMode
   return undefined;
 };
 
+const isCatalogDomain = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  const boundsValid = Array.isArray(value.bounds) && value.bounds.length === 4 && value.bounds.every(Number.isFinite);
+  const zoomValid = Number.isInteger(value.minZoom) && Number.isInteger(value.maxZoom)
+    && Number(value.minZoom) <= Number(value.maxZoom);
+  return typeof value.id === 'string' && typeof value.name === 'string'
+    && value.projection === 'EPSG:3857' && boundsValid && zoomValid;
+};
+
+const validateCatalogDomain = (catalog: MesoscaleCatalog): string | undefined => isCatalogDomain(catalog.domain)
+  ? undefined
+  : 'Catalog domain metadata is invalid.';
+
 const validateCatalogFrames = (catalog: MesoscaleCatalog): string | undefined => {
   if (!Array.isArray(catalog.frames) || catalog.frames.length === 0) return 'Catalog has no frames.';
   if (!catalog.frames.every(isCatalogFrame)) return 'Catalog frame or tile metadata is malformed.';
@@ -261,7 +254,9 @@ const validateCatalogFrames = (catalog: MesoscaleCatalog): string | undefined =>
 };
 
 const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined =>
-  validateCatalogIdentity(catalog, model, cycle) ?? validateCatalogFrames(catalog);
+  validateCatalogIdentity(catalog, model, cycle)
+  ?? validateCatalogDomain(catalog)
+  ?? validateCatalogFrames(catalog);
 
 export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
   const frame = catalog.frames[frameIndex];

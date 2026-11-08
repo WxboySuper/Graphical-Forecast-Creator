@@ -85,18 +85,33 @@ export interface MesoscaleFramesState {
   stale: boolean;
 }
 
+const ageMinutesAt = (time: string, now: number): number | null => {
+  const parsed = Date.parse(time);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor((now - parsed) / 60_000)) : null;
+};
+
+const useFrameSelection = (catalog: MesoscaleCatalog | null, type: MesoscaleFrameType) =>
+  useMemo(() => catalog ? selectMesoscaleFrames(catalog, type) : [], [catalog, type]);
+
+const useFrameParameters = (catalog: MesoscaleCatalog | null, now: number) =>
+  useMemo(() => catalog ? normalizeMesoscaleCatalog(catalog, now) : [], [catalog, now]);
+
+const currentFrameResult = (result: MesoscaleRequestResult<MesoscaleCatalog>, stale: boolean) =>
+  stale && hasData(result) ? { ...result, state: 'stale' as const, stale: true } : result;
+
+const useFrameState = (result: MesoscaleRequestResult<MesoscaleCatalog>, now: number): MesoscaleFramesState => {
+  const data = hasData(result) ? result.data : null;
+  const ageMinutes = data ? ageMinutesAt(data.cycleTime, now) : null;
+  const stale = (hasData(result) && result.stale) || (data !== null && (ageMinutes === null || ageMinutes > STALE_AFTER_MS / 60_000));
+  const analysis = useFrameSelection(data, 'analysis');
+  const forecast = useFrameSelection(data, 'forecast');
+  const normalizedParameters = useFrameParameters(data, now);
+  return { result: currentFrameResult(result, stale), analysis, forecast, normalizedParameters, ageMinutes, stale };
+};
+
 export const useMesoscaleFrames = (model: MesoscaleModelId, cycle: string, options: MesoscaleHookOptions = {}): MesoscaleFramesState => {
   const requestOptions = useStableRequestOptions(options);
   const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleCatalog(model, resolveCycleId(cycle), { ...requestOptions, signal }), [model, cycle, requestOptions]);
   const { result, now } = useTimedRequest(load);
-  const data = hasData(result) ? result.data : null;
-  const ageMinutes = data ? Math.max(0, Math.floor((now - Date.parse(data.cycleTime)) / 60_000)) : null;
-  const staleFromResponse = hasData(result) ? result.stale : false;
-  const staleFromAge = data ? now - Date.parse(data.cycleTime) > STALE_AFTER_MS : false;
-  const stale = staleFromResponse || staleFromAge;
-  const currentResult = stale && hasData(result) ? { ...result, state: 'stale' as const, stale: true } : result;
-  const analysis = useMemo(() => data ? selectMesoscaleFrames(data, 'analysis') : [], [data]);
-  const forecast = useMemo(() => data ? selectMesoscaleFrames(data, 'forecast') : [], [data]);
-  const normalizedParameters = useMemo(() => data ? normalizeMesoscaleCatalog(data, now) : [], [data, now]);
-  return { result: currentResult, analysis, forecast, normalizedParameters, ageMinutes, stale };
+  return useFrameState(result, now);
 };

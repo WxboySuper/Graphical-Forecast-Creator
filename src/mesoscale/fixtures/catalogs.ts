@@ -4,7 +4,7 @@ import stale from './stale.json';
 import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from '../catalogContracts';
 import type { MesoscaleModelId, MesoscaleProviderPayload } from '../contracts';
 
-const FIXTURE_TILE_URL = '/mesoscale-fixtures-tile.png';
+const FIXTURE_TILE_URL = '/mesoscale-fixtures-tile.png?z={z}&x={x}&y={y}';
 const cycleKey = (time: string) => new Date(time).toISOString().replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}\.\d{3}Z$/, '$1$2$3T$4$5Z');
 
 const catalogFromPayload = (payload: MesoscaleProviderPayload): MesoscaleCatalog => {

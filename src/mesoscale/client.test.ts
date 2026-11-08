@@ -73,4 +73,24 @@ describe('mesoscale client', () => {
     });
     expect(malformed).toMatchObject({ state: 'malformed', message: 'Catalog cycle does not match the request.' });
   });
+
+  it('rejects invalid tile templates and missing catalog domains', async () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const options = (payload: unknown): RequestOptions => ({
+      fetcher: jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: async () => payload }),
+      config: { ...fixtures.config!, fixtures: false },
+    });
+    const cycle = resolveCycleId(catalog.cycleTime);
+    const badTemplate = {
+      ...catalog,
+      frames: catalog.frames.map(frame => ({
+        ...frame,
+        parameters: frame.parameters.map(parameter => ({ ...parameter, data: { ...parameter.data, urlTemplate: '' } })),
+      })),
+    };
+    await expect(fetchMesoscaleCatalog('hrrr', cycle, options(badTemplate)))
+      .resolves.toMatchObject({ state: 'malformed' });
+    await expect(fetchMesoscaleCatalog('hrrr', cycle, options({ ...catalog, domain: null })))
+      .resolves.toMatchObject({ state: 'malformed', message: 'Catalog domain metadata is invalid.' });
+  });
 });
