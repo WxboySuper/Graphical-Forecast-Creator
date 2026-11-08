@@ -275,9 +275,9 @@
         "inputs": {
           "MUCAPE": "present, parcel identity unverified",
           "SRH0-3km": "present",
-          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+          "BRN_shear_denominator": "absent"
         },
-        "note": "HLCY 0-3 km is present. CAPE candidates exist, but no model-specific authoritative mapping verified MUCAPE. 0-6 km VUCSH/VVCSH exist with s**-1 units; the standard m s**-1 bulk wind-difference input is unverified.",
+        "note": "The companion research document defines this SCP variant with a BRN shear denominator, not 0-6 km bulk shear. No native BRN denominator was found. Separately, the requested MUCAPE/SRH/0-6 km shear availability check is recorded as fixedLayerSCPWindShearVariant.",
         "allConfirmedUsable": false
       },
       "fixedLayerSTP": {
@@ -1971,6 +1971,16 @@
           "https://www.nco.ncep.noaa.gov/pmb/products/rrfs/",
           "https://www.weather.gov/media/notification/pdfs/scn17-106hi_res_href.pdf"
         ]
+      },
+      "fixedLayerSCPWindShearVariant": {
+        "formula": "SCP wind-shear input availability only; no numeric equation asserted",
+        "allConfirmedUsable": false,
+        "inputs": {
+          "MUCAPE": "present, parcel identity unverified",
+          "SRH0-3km": "present",
+          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+        },
+        "note": "Answers the requested MUCAPE, 0-3 km SRH, and 0-6 km shear field availability without changing the BRN-denominator equation in the research document."
       }
     },
     "RAP": {
@@ -2239,9 +2249,9 @@
         "inputs": {
           "MUCAPE": "present, parcel identity unverified",
           "SRH0-3km": "present",
-          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+          "BRN_shear_denominator": "absent"
         },
-        "note": "HLCY 0-3 km is present. CAPE candidates exist, but no model-specific authoritative mapping verified MUCAPE. 0-6 km VUCSH/VVCSH exist with s**-1 units; the standard m s**-1 bulk wind-difference input is unverified.",
+        "note": "The companion research document defines this SCP variant with a BRN shear denominator, not 0-6 km bulk shear. No native BRN denominator was found. Separately, the requested MUCAPE/SRH/0-6 km shear availability check is recorded as fixedLayerSCPWindShearVariant.",
         "allConfirmedUsable": false
       },
       "fixedLayerSTP": {
@@ -4739,6 +4749,16 @@
           "https://www.nco.ncep.noaa.gov/pmb/products/rrfs/",
           "https://www.weather.gov/media/notification/pdfs/scn17-106hi_res_href.pdf"
         ]
+      },
+      "fixedLayerSCPWindShearVariant": {
+        "formula": "SCP wind-shear input availability only; no numeric equation asserted",
+        "allConfirmedUsable": false,
+        "inputs": {
+          "MUCAPE": "present, parcel identity unverified",
+          "SRH0-3km": "present",
+          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+        },
+        "note": "Answers the requested MUCAPE, 0-3 km SRH, and 0-6 km shear field availability without changing the BRN-denominator equation in the research document."
       }
     },
     "RRFS": {
@@ -4998,9 +5018,9 @@
         "inputs": {
           "MUCAPE": "present, parcel identity unverified",
           "SRH0-3km": "present",
-          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+          "BRN_shear_denominator": "absent"
         },
-        "note": "HLCY 0-3 km is present. CAPE candidates exist, but no model-specific authoritative mapping verified MUCAPE. 0-6 km VUCSH/VVCSH exist with s**-1 units; the standard m s**-1 bulk wind-difference input is unverified.",
+        "note": "The companion research document defines this SCP variant with a BRN shear denominator, not 0-6 km bulk shear. No native BRN denominator was found. Separately, the requested MUCAPE/SRH/0-6 km shear availability check is recorded as fixedLayerSCPWindShearVariant.",
         "allConfirmedUsable": false
       },
       "fixedLayerSTP": {
@@ -6175,7 +6195,17 @@
           "https://www.weather.gov/media/notification/pdfs/scn17-106hi_res_href.pdf"
         ]
       },
-      "productAvailabilityNote": "Scanned 2dfld, prslev, and 2dfld_awipsubset. RRFS natlev 3 km CONUS/NA .idx requests returned 404; NCEP product catalog lists prslev and 2dfld, not natlev."
+      "productAvailabilityNote": "Scanned 2dfld, prslev, and 2dfld_awipsubset. RRFS natlev 3 km CONUS/NA .idx requests returned 404; NCEP product catalog lists prslev and 2dfld, not natlev.",
+      "fixedLayerSCPWindShearVariant": {
+        "formula": "SCP wind-shear input availability only; no numeric equation asserted",
+        "allConfirmedUsable": false,
+        "inputs": {
+          "MUCAPE": "present, parcel identity unverified",
+          "SRH0-3km": "present",
+          "0-6km shear": "component records present, standard bulk-vector magnitude unverified"
+        },
+        "note": "Answers the requested MUCAPE, 0-3 km SRH, and 0-6 km shear field availability without changing the BRN-denominator equation in the research document."
+      }
     }
   },
   "selectedMessageBytes": {
