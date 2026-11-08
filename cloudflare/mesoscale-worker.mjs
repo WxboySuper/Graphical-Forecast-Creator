@@ -121,19 +121,16 @@ const responseCors = (response, origin, allowed) => {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
 
+const isHttpsBaseUrl = (base) => base.protocol === 'https:';
+const isOriginOnlyBaseUrl = (base) => base.pathname === '/' && !base.search && !base.hash;
+const hasNoBaseUrlCredentials = (base) => !base.username && !base.password;
+
 const publicBaseUrl = (env) => {
   const value = typeof env.PUBLIC_BASE_URL === 'string' ? env.PUBLIC_BASE_URL.trim() : '';
   if (!value) throw new Error('PUBLIC_BASE_URL is required');
   const base = new URL(value);
-  const originOnly = [
-    base.protocol === 'https:',
-    base.pathname === '/',
-    !base.search,
-    !base.hash,
-    !base.username,
-    !base.password,
-  ].every(Boolean);
-  if (!originOnly) throw new Error('PUBLIC_BASE_URL must be an HTTPS origin without credentials or a path');
+  if (!isHttpsBaseUrl(base)) throw new Error('PUBLIC_BASE_URL must use HTTPS');
+  if (!isOriginOnlyBaseUrl(base) || !hasNoBaseUrlCredentials(base)) throw new Error('PUBLIC_BASE_URL must be an origin without credentials or a path');
   return base;
 };
 
@@ -182,7 +179,7 @@ const addConfiguredTemplateBase = (catalog, base, route) => {
 
 const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
 const invalidCatalogResponse = () => json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
-const oversizedJsonObject = (object) => Number.isSafeInteger(object.size) && object.size > MAX_JSON_BYTES;
+const invalidJsonObjectSize = (object) => !Number.isSafeInteger(object.size) || object.size < 0 || object.size > MAX_JSON_BYTES;
 const storedJsonForRoute = (context) => {
   if (context.route.kind === 'catalog') return catalogResponse(context);
   return latestResponse(context);
@@ -298,12 +295,14 @@ const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
   const publicEtag = publicRepresentationEtag(etag, env);
   if (publicEtag) headers.set('ETag', publicEtag);
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (publicEtag && matchesEtag(request.headers.get('If-None-Match'), publicEtag)) return new Response(null, { status: 304, headers });
+  // Parse the pointer on every read so age and stale headers stay current, including conditional responses.
+  const notModified = conditionalResponse(request, publicEtag, headers);
+  if (notModified) return notModified;
   return new Response(JSON.stringify(value), { headers });
 };
 
 const storedJsonResponse = async ({ request, env, route, object, now, headers, etag }) => {
-  if (oversizedJsonObject(object)) return malformedJsonResponse();
+  if (invalidJsonObjectSize(object)) return malformedJsonResponse();
   let value;
   try {
     value = await object.json();
@@ -325,8 +324,13 @@ const missingObjectResponse = (route) => {
   return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${ttl}` } });
 };
 
-const conditionalResponse = (request, etag, headers) =>
-  matchesEtag(request.headers.get('If-None-Match'), etag) ? new Response(null, { status: 304, headers }) : null;
+const conditionalResponse = (request, etag, headers) => {
+  if (!matchesEtag(request.headers.get('If-None-Match'), etag)) return null;
+  const notModifiedHeaders = new Headers(headers);
+  notModifiedHeaders.delete('Content-Length');
+  notModifiedHeaders.delete('Content-Type');
+  return new Response(null, { status: 304, headers: notModifiedHeaders });
+};
 
 const etagForText = async (value) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -422,7 +426,7 @@ const readJson = async (bucket, key) => {
     return { state: 'invalid', value: null };
   }
   if (!object) return { state: 'missing', value: null };
-  if (oversizedJsonObject(object)) return { state: 'invalid', value: null };
+  if (invalidJsonObjectSize(object)) return { state: 'invalid', value: null };
   try {
     const value = await object.json();
     if (!value) return { state: 'invalid', value: null };

@@ -8,7 +8,8 @@ const envFor = (objects = {}, overrides = {}) => ({
     get: async (key) => {
       const value = objects[key];
       if (value === undefined) return null;
-      return { json: async () => structuredClone(value), body: new Blob([JSON.stringify(value)]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
+      const serialized = JSON.stringify(value);
+      return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value), body: new Blob([serialized]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
     },
   },
   CORS_ALLOWED_ORIGINS: `${ORIGIN},https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
@@ -130,6 +131,7 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal(equivalentOrigin.status, 200);
   const notModified = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), env);
   assert.equal(notModified.status, 304);
+  assert.equal(notModified.headers.has('Content-Type'), false);
   assert.equal(notModified.headers.get('ETag'), etag);
   const etagList = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': `"other", ${etag}` } }), env);
   assert.equal(etagList.status, 304);
@@ -160,7 +162,7 @@ test('Cache API separates rewritten catalog representations by public base URL',
     const catalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
     const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
     let reads = 0;
-    const bucket = { get: async () => { reads += 1; return { json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
+    const bucket = { get: async () => { reads += 1; return { size: new TextEncoder().encode(JSON.stringify(catalog)).byteLength, json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
     const firstEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test' });
     const secondEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://second.example.test' });
     const normalizedEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test/' });
@@ -305,6 +307,12 @@ test('latest pointer reports live age and stale state without changing its cycle
     const notModified = await worker.fetch(request('/latest/hrrr.json', { headers: { 'If-None-Match': response.headers.get('ETag') } }), env);
     assert.equal(notModified.status, 304);
     assert.equal(notModified.headers.get('X-Mesoscale-Stale'), 'true');
+    assert.equal(notModified.headers.has('Content-Type'), false);
+    await withNow('2026-11-08T15:30:00Z', async () => {
+      const laterNotModified = await worker.fetch(request('/latest/hrrr.json', { headers: { 'If-None-Match': response.headers.get('ETag') } }), env);
+      assert.equal(laterNotModified.status, 304);
+      assert.equal(laterNotModified.headers.get('X-Mesoscale-Age-Minutes'), '210');
+    });
     const invalidThreshold = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: 'abc' });
     const invalidConfigResponse = await worker.fetch(request('/latest/hrrr.json'), invalidThreshold);
     assert.equal(invalidConfigResponse.headers.get('X-Mesoscale-Stale'), 'true');
@@ -352,6 +360,10 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const oversizedEnv = envFor({}, { MESOSCALE_BUCKET: { get: async () => oversized } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), oversizedEnv)).status, 502);
   assert.equal(parsedOversized, false);
+  const unknownSize = { json: async () => { parsedOversized = true; return {}; } };
+  const unknownSizeResponse = await worker.fetch(request('/latest/hrrr.json'), envFor({}, { MESOSCALE_BUCKET: { get: async () => unknownSize } }));
+  assert.equal(unknownSizeResponse.status, 502);
+  assert.equal(parsedOversized, false);
 });
 
 test('status labels malformed pointer JSON as invalid instead of missing', async () => {
@@ -365,8 +377,8 @@ test('status labels malformed pointer JSON as invalid instead of missing', async
 
 test('status labels parsed records with missing required fields as invalid', async () => {
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
-    if (key === 'mesoscale/v1/latest/hrrr.json') return { json: async () => ({ schemaVersion: 1, modelId: 'rap', cycleTime: '2026-11-08T12:00:00Z' }) };
-    if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T15:00:00Z' }) };
+    if (key === 'mesoscale/v1/latest/hrrr.json') return { size: 70, json: async () => ({ schemaVersion: 1, modelId: 'rap', cycleTime: '2026-11-08T12:00:00Z' }) };
+    if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 70, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T15:00:00Z' }) };
     return null;
   } } });
   await withNow('2026-11-08T15:01:00Z', async () => {
@@ -380,7 +392,7 @@ test('status labels parsed records with missing required fields as invalid', asy
 test('status degrades on R2 read errors and rejects unsupported health states', async () => {
   const env = envFor({}, {
     MESOSCALE_BUCKET: { get: async (key) => {
-      if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'mystery' }) };
+      if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 90, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'mystery' }) };
       if (key === 'mesoscale/v1/latest/hrrr.json' || key === 'mesoscale/v1/health/2026-11-07/hrrr.json') throw new Error('temporary R2 read failure');
       return null;
     } },
