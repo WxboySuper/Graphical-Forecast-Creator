@@ -398,6 +398,23 @@ test('only well-formed verified emails are stored, and a throwing payload still 
   assert.equal(failing.db.rows[0].discord_status, 'failed');
 });
 
+test('admin API refuses browser origins and rejects limit=0', async () => {
+  const { env, ctx } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+  const get = (path, headers = {}) => worker.fetch(new Request(`https://feedback.gfcweather.com${path}`, { headers: { authorization: 'Bearer admin-secret', 'CF-Connecting-IP': '192.0.2.9', ...headers } }), env, ctx);
+  const browser = await get('/v1/feedback', { origin: 'https://beta.gfcweather.com' });
+  assert.equal(browser.status, 403);
+  assert.equal(browser.headers.get('access-control-allow-origin'), null);
+  assert.equal((await get('/v1/feedback?limit=0')).status, 400);
+  assert.equal((await get('/v1/feedback?limit=1')).status, 200);
+});
+
+test('header-less admin callers are throttled per token, not in one shared bucket', async () => {
+  const { env, ctx, db } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+  const bad = (token) => worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: `Bearer ${token}` } }), env, ctx);
+  await bad('guess-one'); await bad('guess-two');
+  assert.equal(db.adminAttempts.size, 2);
+});
+
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
   const { db, env, ctx } = harness(); const auth = await token();
   assert.equal((await post(env, ctx, { auth, body: validBody({ viewport: '   ' }) })).status, 201);

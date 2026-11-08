@@ -9,7 +9,8 @@ const unauthorized = () => json({ error: 'Authentication required' }, 401);
 const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 
 async function attemptKey(request, env) {
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+  // Without a client IP, throttle per presented token instead of lumping every such caller into one shared bucket.
+  const ip = request.headers.get('CF-Connecting-IP')?.trim() || `no-ip:${await digest(request.headers.get('authorization') ?? '')}`;
   return digest(`admin-throttle:${ip}:${env.FEEDBACK_HASH_SALT}`);
 }
 
@@ -142,6 +143,8 @@ const adminRoutes = [
 ];
 
 export async function handleAdmin(request, env, url, id) {
+  // The admin API is for curl and server-side agents. It sends no CORS headers, and browsers (which always send Origin) are refused outright.
+  if (request.headers.has('origin')) return json({ error: 'Admin API is not available from browsers' }, 403);
   if (!isAdminConfigured(env)) return json({ error: 'Admin API unavailable' }, 503);
   const auth = await authenticate(request, env);
   if (!auth.ok) return auth.response;

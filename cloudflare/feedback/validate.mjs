@@ -39,7 +39,8 @@ export function validatePageLimit(value) {
   if (value === null) return 50;
   if (!/^\d+$/.test(value)) return null;
   const number = Number(value);
-  return Number.isSafeInteger(number) ? Math.min(100, Math.max(1, number)) : null;
+  if (!Number.isSafeInteger(number) || number < 1) return null;
+  return Math.min(100, number);
 }
 
 export function validateSince(value) {
