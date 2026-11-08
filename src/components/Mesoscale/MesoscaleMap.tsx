@@ -49,8 +49,12 @@ export const MesoscaleMap: React.FC<MesoscaleMapProps> = ({ layers, domainBounds
     mapRef.current = map;
     map.updateSize();
     fitToDomain(map, domainBounds);
+    // The data rail opening or closing, and window resizes, change the container's size.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.updateSize());
+    observer?.observe(targetRef.current);
     const registry = registryRef.current;
     return () => {
+      observer?.disconnect();
       syncMesoscaleLayers({ map, specs: [], registry });
       map.setTarget(undefined);
       mapRef.current = null;
