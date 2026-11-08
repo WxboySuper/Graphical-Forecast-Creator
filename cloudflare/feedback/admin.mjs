@@ -132,12 +132,19 @@ async function patchFeedback(request, id, db) {
   return result.meta?.changes ? json({ id, status: body.status }) : json({ error: 'Feedback not found' }, 404);
 }
 
+const ADMIN_BINDINGS = ['FEEDBACK_ADMIN_TOKEN', 'FEEDBACK_HASH_SALT', 'FEEDBACK_DB'];
+const isAdminConfigured = (env) => ADMIN_BINDINGS.every((name) => Boolean(env[name]));
+
+const adminRoutes = [
+  { method: 'GET', hasId: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
+  { method: 'GET', hasId: true, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
+  { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+];
+
 export async function handleAdmin(request, env, url, id) {
-  if (!env.FEEDBACK_ADMIN_TOKEN || !env.FEEDBACK_HASH_SALT || !env.FEEDBACK_DB) return json({ error: 'Admin API unavailable' }, 503);
+  if (!isAdminConfigured(env)) return json({ error: 'Admin API unavailable' }, 503);
   const auth = await authenticate(request, env);
   if (!auth.ok) return auth.response;
-  if (!id && request.method === 'GET') return listFeedback(url, env.FEEDBACK_DB);
-  if (id && request.method === 'GET') return getFeedback(id, env.FEEDBACK_DB);
-  if (id && request.method === 'PATCH') return patchFeedback(request, id, env.FEEDBACK_DB);
-  return json({ error: 'Not found' }, 404);
+  const route = adminRoutes.find((item) => item.method === request.method && item.hasId === Boolean(id));
+  return route ? route.run({ request, env, url, id }) : json({ error: 'Not found' }, 404);
 }
