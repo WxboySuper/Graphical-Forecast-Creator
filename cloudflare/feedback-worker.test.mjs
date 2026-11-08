@@ -41,7 +41,9 @@ class FakeD1 {
       const mine = db.rows.filter((row) => row.uid_hash === uid);
       const recent = mine.filter((row) => row.created_at > recentSince);
       const daily = mine.filter((row) => row.created_at > dailySince);
-      return { recent: recent.length, daily: daily.length, recent_at: Math.max(0, ...mine.filter((row) => row.created_at > recentAtSince).map((row) => row.created_at)), daily_at: Math.max(0, ...mine.filter((row) => row.created_at > dailyAtSince).map((row) => row.created_at)) };
+      // Real D1 returns NULL for SUM and MAX over no rows.
+      const latest = (since) => { const times = mine.filter((row) => row.created_at > since).map((row) => row.created_at); return times.length ? Math.max(...times) : null; };
+      return { recent: recent.length || null, daily: daily.length || null, recent_at: latest(recentAtSince), daily_at: latest(dailyAtSince) };
     } },
     { matches: (sql) => sql.includes('AND message = ?'), run: (db, args) => db.rows.find((row) => isDuplicateRow(row, args)) ?? null },
     { matches: (sql) => sql.includes('FROM feedback_admin_attempts'), run: (db, args) => db.adminAttempts.get(args[0]) ?? null },

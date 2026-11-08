@@ -60,7 +60,7 @@ function rateLimitRetry(counts, now) {
 }
 
 function retryAt(createdAt, window, now) {
-  const last = Number(createdAt);
+  const last = createdAt === null || createdAt === undefined ? Number.NaN : Number(createdAt);
   const base = Number.isFinite(last) ? last : now;
   return Math.max(1, Math.ceil((base + window - now) / 1000));
 }
