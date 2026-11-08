@@ -7,6 +7,7 @@
 import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router';
+import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import { 
   FileText, 
   Eye, 
@@ -566,7 +567,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number 
     dispatch,
     addToast,
     user,
-    onSaved: () => { if (!embedded) navigate('/forecast/severe?surface=map'); },
+    onSaved: () => { if (!embedded) navigate(getDefaultForecastWorkspacePath()); },
   });
 
   const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
