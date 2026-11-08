@@ -56,11 +56,27 @@ The rules regarding maintaining the project change all the time. If something se
 For a PR tied to one GitHub issue, make only the changes needed to fix that issue and add focused regression coverage. Treat adjacent features, UI improvements, broad refactors, and general hardening as separate work. Do not add them to the PR. Create or use a separate GitHub issue for each valid follow-up, and link it from the review response. Include an adjacent change only when the target fix cannot be correct without it.
 
 ## Project Locations
-- `.github/` - Github Resources
+- `.github/` - Github Resources (workflows, PR template)
 - `docs/` - Documentation
+    - `docs/guide/` - Human-readable guide for the owner. Visual, explanatory. Don't put agent rules here.
+    - `docs/agents/` - Your docs: workflow, codebase map, testing, feature exposure, release ops.
     - `docs/personal/` - A git ignored directory for local docs for the local maintainer. It may or may not exist but is the place for things like local plans, one time documents, and other documents not to be commited.
 - `server/` - All backend code that runs on the VPS
 - `src/`
     - `src/components/` - All the different components used in GFC
 
 Anything else I can trust you to find what you need. The codebase isn't too hard to navigate.
+
+## Agent Quick Rules
+
+Read [`docs/agents/README.md`](docs/agents/README.md) for the index; load only what your task needs.
+
+- **pnpm only.** Never `npm`/`yarn` for dependencies.
+- **Branches**: PRs target `main`. Production lives on `stable/X.Y.x`; hotfixes branch from there. Use Conventional Commits.
+- **Every PR** declares exactly one `Changelog-Impact: beta|hotfix|none|inherited` (CI-enforced). See [`docs/agents/workflow.md`](docs/agents/workflow.md).
+- **Gated features** fail closed and need exposure tests: [`docs/agents/feature-exposure.md`](docs/agents/feature-exposure.md).
+- **Where code goes**: [`docs/agents/codebase.md`](docs/agents/codebase.md) and the `README.md` in the target folder.
+- **Releases/deploys** are manual and owner-initiated: [`docs/agents/release-ops.md`](docs/agents/release-ops.md).
+- **Validate**: `pnpm run typecheck`, `pnpm run lint`, focused `pnpm test --runInBand <path>`, `pnpm run build`; exercise UI changes in a real browser.
+- **Traps and lookups**: [`docs/agents/ci-and-gotchas.md`](docs/agents/ci-and-gotchas.md), [`docs/agents/reference.md`](docs/agents/reference.md).
+- **Docs**: update the relevant doc in the same PR as the change. Don't add point-in-time plan/investigation/release-note docs; use the issue or PR.

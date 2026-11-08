@@ -106,46 +106,9 @@ These services are optional from the local developer experience. A local build
 must remain useful without hosted credentials, while hosted-only capabilities
 must be visibly gated and server-checked.
 
-## Historical inventory baseline
+## Current counts
 
-The original read-only audit indexed **591 files** and recorded **11 mutual
-owner edges**. The tables below preserve that historical baseline for the
-review that produced DOC-03 (#488); they are not a live count of the current
-checkout. DOC-03's deterministic generator is the source for current file and
-dependency counts, and its ignored output should not be copied into this
-curated guide without an intentional documentation update.
-
-Largest owner/file counts:
-
-| Owner | Files |
-| --- | ---: |
-| `src/components` | 155 |
-| `src/utils` | 57 |
-| `scripts/lib` | 50 |
-| `src/pages` | 44 |
-| `scripts/root` | 33 |
-| `src/monitor` | 31 |
-| `server/root` | 21 |
-| `src/hooks` | 20 |
-| `server/lib` | 19 |
-| `src/config` | 15 |
-| `src/store` | 13 |
-| `.github/workflows` | 11 |
-
-Highest cross-owner import edges:
-
-| Edge | Count |
-| --- | ---: |
-| `src/components -> src/store` | 55 |
-| `src/pages -> src/components` | 49 |
-| `src/components -> src/monitor` | 47 |
-| `scripts/root -> scripts/lib` | 45 |
-| `src/components -> src/types` | 36 |
-| `src/pages -> src/store` | 31 |
-| `src/components -> src/utils` | 26 |
-| `src/components -> src/lib` | 24 |
-| `src/hooks -> src/utils` | 19 |
-| `src/hooks -> src/types` | 17 |
+File and import-edge counts go stale quickly. Generate them with `pnpm run docs:inventory` (output is ignored, under `docs/personal`).
 
 ## Build, test, and deployment
 
