@@ -90,16 +90,16 @@ test('CORS allows configured origins and omits permission for other origins', as
   const env = envFor();
   const allowed = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: ORIGIN } }), env);
   assert.equal(allowed.headers.get('Access-Control-Allow-Origin'), ORIGIN);
-  assert.match(allowed.headers.get('Vary'), /Origin/);
+  assert.match(allowed.headers.get('Vary') ?? '', /Origin/);
   const localBeta = await worker.fetch(request('/status', { headers: { Origin: 'http://localhost:3002' } }), env);
   assert.equal(localBeta.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3002');
-  assert.match(localBeta.headers.get('Vary'), /Origin/);
+  assert.match(localBeta.headers.get('Vary') ?? '', /Origin/);
   const denied = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: 'https://attacker.example' } }), env);
   assert.equal(denied.headers.has('Access-Control-Allow-Origin'), false);
-  assert.match(denied.headers.get('Vary'), /Origin/);
+  assert.match(denied.headers.get('Vary') ?? '', /Origin/);
   const noOrigin = await worker.fetch(request('/status'), env);
   assert.equal(noOrigin.headers.has('Access-Control-Allow-Origin'), false);
-  assert.match(noOrigin.headers.get('Vary'), /Origin/);
+  assert.match(noOrigin.headers.get('Vary') ?? '', /Origin/);
   assert.equal((await noOrigin.json()).status, 'degraded');
   const preflight = await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env);
   assert.equal(preflight.status, 204);
@@ -219,6 +219,26 @@ test('tile HEAD uses R2 metadata without reading the tile body', async () => {
   assert.equal(response.body, null);
   assert.equal(response.headers.get('Content-Length'), '3');
   assert.equal(heads, 1);
+  assert.equal(gets, 0);
+});
+
+test('catalog HEAD uses immutable R2 metadata and matches GET validators', async () => {
+  let gets = 0;
+  let heads = 0;
+  const env = envFor({}, { MESOSCALE_BUCKET: {
+    get: async () => { gets += 1; return null; },
+    head: async () => { heads += 1; return { httpEtag: '"catalog-head"' }; },
+  } });
+  const path = '/catalog/hrrr/20261108T1200Z.json';
+  const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
+  assert.equal(head.status, 200);
+  assert.equal(head.body, null);
+  assert.equal(head.headers.get('Content-Type'), 'application/json; charset=utf-8');
+  assert.ok(head.headers.get('ETag'));
+  const conditional = await worker.fetch(request(path, { method: 'HEAD', headers: { 'If-None-Match': head.headers.get('ETag') } }), env);
+  assert.equal(conditional.status, 304);
+  assert.equal(conditional.headers.has('Content-Type'), false);
+  assert.equal(heads, 2);
   assert.equal(gets, 0);
 });
 
@@ -342,6 +362,7 @@ test('latest recalculates age on Worker Cache API hits', async () => {
       return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value), httpEtag: '"latest"' };
     } } });
     await withNow('2026-11-08T15:01:00Z', async () => {
+      // Cycle 12:00Z to 15:01Z is 181 minutes; one minute later it is 182.
       const first = await worker.fetch(request('/latest/hrrr.json'), env);
       assert.equal(first.headers.get('X-Mesoscale-Age-Minutes'), '181');
       await withNow('2026-11-08T15:02:00Z', async () => {
@@ -367,15 +388,16 @@ test('status recalculates age on Worker Cache API hits', async () => {
       const first = await worker.fetch(request('/status'), env);
       const firstBody = await first.json();
       assert.equal(firstBody.models.find((model) => model.modelId === 'hrrr').ageMinutes, 181);
+      const firstReads = reads;
+      assert.ok(firstReads > 0);
       await withNow('2026-11-08T15:02:00Z', async () => {
         const second = await worker.fetch(request('/status'), env);
         const secondBody = await second.json();
         assert.equal(secondBody.models.find((model) => model.modelId === 'hrrr').ageMinutes, 182);
         assert.notEqual(second.headers.get('ETag'), first.headers.get('ETag'));
       });
+      assert.equal(reads, firstReads, 'the short-lived cache hit avoids another R2 fan-out');
     });
-    // One cold status response reads one pointer and two health dates for each of three models.
-    assert.equal(reads, 3 * (1 + 2));
   });
 });
 
@@ -411,10 +433,11 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const oversizedEnv = envFor({}, { MESOSCALE_BUCKET: { get: async () => oversized } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), oversizedEnv)).status, 502);
   assert.equal(parsedOversized, false);
-  const unknownSize = { json: async () => { parsedOversized = true; return {}; } };
+  let parsedUnknownSize = false;
+  const unknownSize = { json: async () => { parsedUnknownSize = true; return {}; } };
   const unknownSizeResponse = await worker.fetch(request('/latest/hrrr.json'), envFor({}, { MESOSCALE_BUCKET: { get: async () => unknownSize } }));
   assert.equal(unknownSizeResponse.status, 502);
-  assert.equal(parsedOversized, false);
+  assert.equal(parsedUnknownSize, false);
 });
 
 test('status labels malformed pointer JSON as invalid instead of missing', async () => {
@@ -443,8 +466,8 @@ test('status labels parsed records with missing required fields as invalid', asy
 test('status degrades on R2 read errors and rejects unsupported health states', async () => {
   const env = envFor({}, {
     MESOSCALE_BUCKET: { get: async (key) => {
-      if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 90, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'mystery' }) };
-      if (key === 'mesoscale/v1/latest/hrrr.json' || key === 'mesoscale/v1/health/2026-11-07/hrrr.json') throw new Error('temporary R2 read failure');
+      if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 92, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'complete' }) };
+      if (key === 'mesoscale/v1/latest/hrrr.json') throw new Error('temporary R2 read failure');
       return null;
     } },
   });
@@ -452,7 +475,13 @@ test('status degrades on R2 read errors and rejects unsupported health states', 
   assert.equal(response.status, 200);
   const value = await response.json();
   assert.equal(value.status, 'degraded');
-  assert.equal(value.models.find((model) => model.modelId === 'hrrr').health, 'invalid');
+  assert.equal(value.models.find((model) => model.modelId === 'hrrr').health, 'unavailable');
+  const unsupportedHealth = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
+    if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 90, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'mystery' }) };
+    return null;
+  } } });
+  const unsupported = await withNow('2026-11-08T15:00:00Z', () => worker.fetch(request('/status'), unsupportedHealth));
+  assert.equal((await unsupported.json()).models.find((model) => model.modelId === 'hrrr').health, 'invalid');
 });
 
 test('HEAD returns headers without a body, and unsupported methods return 405', async () => {

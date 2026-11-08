@@ -253,7 +253,7 @@ const catalogResponse = ({ value, request, env, route, headers, etag }) => {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   }
   try {
-    if (base) addConfiguredTemplateBase(value, base, route);
+    addConfiguredTemplateBase(value, base, route);
   } catch {
     return invalidCatalogResponse();
   }
@@ -269,7 +269,6 @@ const validLatestPointer = (value, route, cycle) => {
   if (value.schemaVersion !== 1) return false;
   if (value.modelId !== route.model) return false;
   if (!cycle) return false;
-  if (compactCycleFromIso(value.cycleTime) !== cycle) return false;
   if (typeof value.catalogUrl !== 'string') return false;
   if (typeof value.publishedAt !== 'string') return false;
   return Number.isFinite(Date.parse(value.publishedAt));
@@ -355,11 +354,9 @@ const catalogConditionalResponse = (request, etag, env, headers) => {
   }
 };
 
-const contentTypeForObject = (route, object) => {
+const contentTypeForObject = (route) => {
   if (route.kind === 'tile') return 'image/png';
-  if (route.kind === 'catalog') return 'application/json; charset=utf-8';
-  if (route.kind === 'latest') return 'application/json; charset=utf-8';
-  return object.httpMetadata?.contentType;
+  return 'application/json; charset=utf-8';
 };
 
 const setTileLength = (headers, route, object) => {
@@ -369,7 +366,7 @@ const setTileLength = (headers, route, object) => {
 };
 
 const headersForObject = (route, object) => {
-  const contentType = contentTypeForObject(route, object);
+  const contentType = contentTypeForObject(route);
   const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
   setTileLength(headers, route, object);
   const etag = object.httpEtag || object.etag;
@@ -402,21 +399,38 @@ const isTileHead = (context) => {
   return typeof context.env.MESOSCALE_BUCKET?.head === 'function';
 };
 
-const canReadMesoscaleObject = (bucket, headTile) => {
-  if (headTile) return typeof bucket.head === 'function';
+// The publisher validates immutable catalogs before publishing. Latest HEAD still reads its tiny pointer to refresh age headers.
+const isCatalogHead = (context) => context.request.method === 'HEAD'
+  && context.route.kind === 'catalog'
+  && typeof context.env.MESOSCALE_BUCKET?.head === 'function';
+
+const canReadMesoscaleObject = (bucket, headOnly) => {
+  if (headOnly) return typeof bucket.head === 'function';
   return typeof bucket.get === 'function';
 };
 
 const getObjectResponse = async (context) => {
   const bucket = context.env.MESOSCALE_BUCKET;
   if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const headTile = isTileHead(context);
-  if (!canReadMesoscaleObject(bucket, headTile)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const headOnly = isTileHead(context) || isCatalogHead(context);
+  if (!canReadMesoscaleObject(bucket, headOnly)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   let object;
   // R2 bindings provide head(); get() is a compatibility fallback for test/custom bindings that do not.
-  if (headTile) object = await bucket.head(context.route.key);
+  if (headOnly) object = await bucket.head(context.route.key);
   else object = await bucket.get(context.route.key);
   if (!object) return missingObjectResponse(context.route);
+  if (context.route.kind === 'catalog' && isCatalogHead(context)) {
+    const { headers, etag } = headersForObject(context.route, object);
+    try {
+      publicBaseUrl(context.env);
+      const publicEtag = publicRepresentationEtag(etag, context.env);
+      if (publicEtag) headers.set('ETag', publicEtag);
+    } catch {
+      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+    }
+    headers.set('Content-Type', 'application/json; charset=utf-8');
+    return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(null, { headers });
+  }
   return responseForObject({ ...context, object });
 };
 
@@ -425,7 +439,7 @@ const readJson = async (bucket, key) => {
   try {
     object = await bucket.get(key);
   } catch {
-    return { state: 'invalid', value: null };
+    return { state: 'error', value: null };
   }
   if (!object) return { state: 'missing', value: null };
   if (invalidJsonObjectSize(object)) return { state: 'invalid', value: null };
@@ -465,14 +479,15 @@ const validHealthValue = (value, modelId) => {
 const healthForModel = (today, yesterday) => {
   if (today.state === 'ok') return today.value;
   // A corrupt current-day object should stay visible instead of being masked by yesterday's record.
-  if (today.state === 'invalid') return null;
+  if (today.state === 'invalid' || today.state === 'error') return null;
   if (yesterday.state === 'ok') return yesterday.value;
   return null;
 };
 
 const modelHealthState = (health, today, yesterday, pointer) => {
-  if (health) return health.status;
   if ([today, yesterday, pointer].some((record) => record.state === 'invalid')) return 'invalid';
+  if ([today, yesterday, pointer].some((record) => record.state === 'error')) return 'unavailable';
+  if (health) return health.status;
   return 'missing';
 };
 

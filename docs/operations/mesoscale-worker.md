@@ -51,14 +51,16 @@ model with `latestCycleTime`, recomputed `ageMinutes`, `stale`, `health`, and
 `healthGeneratedAt`. Health values include the publisher's `complete`,
 `partial`, and `failed` states plus `missing` or `invalid` for absent or broken
 records. A broken current-day health record remains `invalid` rather than being
-masked by yesterday's summary.
+masked by yesterday's summary. A failed R2 read is reported as `unavailable`,
+separate from a missing object or an invalid record.
 
 ## Cache and usage budget
 
 The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-request. Tile `HEAD` uses R2 object metadata when the binding supports it;
-uncached HEAD requests still count as Class B operations. Each `/latest` request
-reads one pointer. Each `/status` request reads up to nine objects: three latest
+request. Catalog and tile `HEAD` use R2 object metadata; latest `HEAD` reads its
+small pointer to compute live age headers. Metadata and uncached HEAD requests
+still count as Class B operations. Each `/latest` request reads one pointer.
+Each `/status` request reads up to nine objects: three latest
 pointers and today's and yesterday's health object for each of the three models.
 The Worker Cache API stores immutable catalogs, tiles, and short-lived missing
 tiles. Latest/status cache entries last five seconds; their age and stale fields
