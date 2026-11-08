@@ -22,6 +22,7 @@ export interface DiscussionFormStateOptions {
   existingDiscussion: DiscussionData | undefined;
   defaultForecasterName: string;
   discussionKey: string;
+  resetToken?: number;
   dispatch: ReturnType<typeof import('react-redux').useDispatch>;
 }
 
@@ -59,21 +60,80 @@ export const buildDiscussionDataFrom = (fields: DiscussionFormDefaults): Discuss
   lastModified: new Date().toISOString(),
 });
 
+const resetDiscussionScopeDraft = ({
+  drafts,
+  discussionKey,
+  existingDiscussion,
+  defaultForecasterName,
+  applyFields,
+}: {
+  drafts: Map<string, DiscussionFormDefaults>;
+  discussionKey: string;
+  existingDiscussion: DiscussionData | undefined;
+  defaultForecasterName: string;
+  applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void;
+}) => {
+  drafts.delete(discussionKey);
+  applyFields({ ...getDiscussionFormDefaults(existingDiscussion), forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
+};
+
+/**
+ * Resets the editor after a forecast import. An import replaces the whole cycle,
+ * including its discussions, so unsaved fields for every scope describe data that
+ * no longer exists. Keeping any of them would let a later scope switch or autosave
+ * overwrite the imported discussion with stale text, so all drafts are cleared.
+ */
+const resetDiscussionScopeAfterImport = (options: {
+  drafts: Map<string, DiscussionFormDefaults>;
+  discussionKey: string;
+  resetToken: number;
+  previousResetTokenRef: { current: number };
+  previousKeyRef: { current: string };
+  existingDiscussion?: DiscussionData;
+  defaultForecasterName: string;
+  applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void;
+}) => {
+  const {
+    drafts, discussionKey, resetToken, previousResetTokenRef, previousKeyRef,
+    existingDiscussion, defaultForecasterName, applyFields,
+  } = options;
+  drafts.clear();
+  resetDiscussionScopeDraft({ drafts, discussionKey, existingDiscussion, defaultForecasterName, applyFields });
+  previousResetTokenRef.current = resetToken;
+  previousKeyRef.current = discussionKey;
+};
+
 /** Keeps unsaved discussion fields isolated while the user changes discussion scope. */
 const useDiscussionScopeDrafts = (options: {
   discussionKey: string;
+  resetToken: number;
   existingDiscussion?: DiscussionData;
   defaultForecasterName: string;
   fields: DiscussionFormDefaults;
   hasUnsavedChanges: boolean;
   applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void;
 }) => {
-  const { discussionKey, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields } = options;
+  const { discussionKey, resetToken, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields } = options;
   const previousKeyRef = useRef(discussionKey);
+  const previousResetTokenRef = useRef(resetToken);
   const scopeChangedRef = useRef(false);
   const draftsRef = useRef(new Map<string, DiscussionFormDefaults>());
 
   useEffect(() => {
+    if (previousResetTokenRef.current !== resetToken) {
+      resetDiscussionScopeAfterImport({
+        drafts: draftsRef.current,
+        discussionKey,
+        resetToken,
+        previousResetTokenRef,
+        previousKeyRef,
+        existingDiscussion,
+        defaultForecasterName,
+        applyFields,
+      });
+      scopeChangedRef.current = true;
+      return;
+    }
     const previousKey = previousKeyRef.current;
     if (previousKey === discussionKey) return;
     scopeChangedRef.current = true;
@@ -84,7 +144,7 @@ const useDiscussionScopeDrafts = (options: {
     // Only an explicit field handler should arm autosave.
     applyFields(saved ?? { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
     previousKeyRef.current = discussionKey;
-  }, [discussionKey, existingDiscussion, defaultForecasterName, hasUnsavedChanges, fields, applyFields]);
+  }, [discussionKey, resetToken, existingDiscussion, defaultForecasterName, hasUnsavedChanges, fields, applyFields]);
 
   useEffect(() => {
     if (scopeChangedRef.current) { scopeChangedRef.current = false; return; }
@@ -93,7 +153,7 @@ const useDiscussionScopeDrafts = (options: {
 };
 
 /** Manages editable discussion fields and persists changes for the active scope. */
-const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, discussionKey, dispatch }: DiscussionFormStateOptions) => {
+const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, discussionKey, dispatch, resetToken = 0 }: DiscussionFormStateOptions) => {
   const defaults = getDiscussionFormDefaults(existingDiscussion);
   const initial = { ...defaults, forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName };
   const [mode, setMode] = useState<DiscussionMode>(initial.mode);
@@ -112,7 +172,7 @@ const useDiscussionFormState = ({ existingDiscussion, defaultForecasterName, dis
     setForecasterName(next.forecasterName); setDiyContent(next.diyContent); setGuidedContent(next.guidedContent);
     setHasUnsavedChanges(hasChanges);
   }, []);
-  useDiscussionScopeDrafts({ discussionKey, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields });
+  useDiscussionScopeDrafts({ discussionKey, resetToken, existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields });
 
   const persist = useCallback((next: DiscussionFormDefaults) => dispatch(updateDiscussionDraft({ scopeId: discussionKey, draft: {
     ...next, diyContent: next.mode === 'diy' ? next.diyContent : undefined,

@@ -1,12 +1,12 @@
 /**
  * Discussion page tests. Verify discussion editing, loading, and forecast-context behavior.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router';
 import { DiscussionPage } from './DiscussionPage';
-import forecastReducer, { setDiscussionGroupings, setForecastDay } from '../store/forecastSlice';
+import forecastReducer, { setDiscussionGroupings, setForecastDay, setWorkflowActive } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import stormReportsReducer from '../store/stormReportsSlice';
 import appModeReducer from '../store/appModeSlice';
@@ -93,6 +93,31 @@ describe('DiscussionPage', () => {
     const state = store.getState().forecast;
     expect(state.discussionDraftsByScope['day-1']?.diyContent).toBe('Unsaved scope text');
     expect(state.forecastCycle.days[1].discussion).toBeUndefined();
+  });
+
+  test('honors the requested discussion day when opening a workflow link', async () => {
+    mockUseAuth.mockReturnValue({
+      syncedSettings: { defaultForecasterName: '' },
+      user: { displayName: '' },
+    });
+
+    const store = createStore();
+    store.dispatch(setDiscussionGroupings([
+      { id: 'day-1', label: 'Day 1', days: [1], discussionDay: 1 },
+      { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
+    ]));
+    store.dispatch(setWorkflowActive(true));
+
+    render(
+      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day-2']}>
+        <Provider store={store}>
+          <DiscussionPage embedded />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(2));
+    expect(screen.getByRole('combobox', { name: 'Discussion scope' })).toHaveValue('day-2');
   });
 
   test('keeps unsaved drafts across unmounts without mixing forecast days', () => {

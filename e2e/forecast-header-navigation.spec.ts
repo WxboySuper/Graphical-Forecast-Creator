@@ -36,9 +36,8 @@ test.describe('Forecast header navigation', () => {
     await page.mouse.click(1300, 800);
     await expect(menu).toBeHidden();
 
-    await trigger.click();
-    await page.getByRole('menuitem', { name: 'Discussion' }).click();
-    await expect(page).toHaveURL(/\/discussion/);
+    await page.getByRole('tab', { name: 'Discussion' }).click();
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     const discussionTrigger = page.getByRole('button', {
       name: 'Forecast menu, current page Discussion',
     });

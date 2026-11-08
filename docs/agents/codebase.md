@@ -9,6 +9,7 @@
 | `e2e/` | Playwright specs |
 | `tests/` | Firestore rules tests |
 | `scripts/`, `scripts/lib/` | CI, release, changelog, exposure tooling. Logic in `lib/`, entry points thin |
+| `scripts/mesoscale/` | NOAA HRRR/RAP/RRFS ingest package and local fixtures; scheduled upload workflow is `.github/workflows/mesoscale-ingest.yml` |
 | `deploy/` | `*-deployment-config.json` (server capability switches), `production-release.json`, umami |
 | `cloudflare/` | Beta Worker (`beta-worker.mjs`, `wrangler.beta.jsonc`) and the feedback Worker + D1 (`feedback-worker.mjs`, `feedback/`, `wrangler.feedback.jsonc`) |
 | `.github/workflows/` | CI, release, deploy, OpenCode automation |
