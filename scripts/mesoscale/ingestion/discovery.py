@@ -51,9 +51,6 @@ def request_once(url: str, headers: dict[str, str] | None, method: str) -> tuple
         return response.read(), ResponseInfo(response.status, response.headers)
 
 
-def fail_permanent_http_error(error: Exception, url: str) -> None:
-    check_retryable(error, url)
-
 def discover_cycle(model: Model, now: datetime | None = None, lookback_hours: int = 30) -> tuple[datetime, str, str]:
     """Return newest f00 whose GRIB and index exist and whose index resolves all required fields."""
     now = now or datetime.now(UTC)

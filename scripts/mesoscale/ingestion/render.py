@@ -14,6 +14,11 @@ from pathlib import Path
 from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, TILE_SIZE, WEB_MERCATOR_LIMIT, Model, source_metadata
 from .discovery import request
 
+VALUE_CONVERSIONS = {
+    "temperature": lambda values: values - 273.15,
+    "pressure": lambda values: values / 100,
+}
+
 
 @dataclass(frozen=True)
 class TileRenderRequest:
@@ -346,6 +351,10 @@ def source_record(request: DecodeRequest, parameter: str) -> dict:
 
 def decoded_field(field_id: str, request: DecodeRequest, grid: GridData, record: dict) -> tuple[str, dict]:
     operation = FIELDS[field_id][5]
-    converted = {"temperature": grid.values - 273.15, "pressure": grid.values / 100}.get(operation, grid.values)
+    converted = VALUE_CONVERSIONS.get(operation, identity_conversion)(grid.values)
     item = {"values": converted, "lats": grid.latitudes, "lons": grid.longitudes, "sourceHash": request.digest, "sourceBytes": len(request.content), "record": record}
     return field_id, item
+
+
+def identity_conversion(values):
+    return values

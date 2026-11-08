@@ -19,6 +19,7 @@ class R2Credentials:
 class Store(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> str | None: ...
     def get(self, key: str) -> bytes | None: ...
+    def head(self, key: str) -> dict | None: ...
     def list(self, prefix: str) -> list[str]: ...
     def delete(self, key: str) -> None: ...
 
@@ -50,6 +51,10 @@ class LocalStore:
     def get(self, key: str) -> bytes | None:
         path = self._path(key)
         return path.read_bytes() if path.is_file() else None
+
+    def head(self, key: str) -> dict | None:
+        path = self._path(key)
+        return {"ContentLength": path.stat().st_size} if path.is_file() else None
 
     def list(self, prefix: str) -> list[str]:
         base = self._path(prefix)
@@ -89,6 +94,15 @@ class R2Store:
                 return None
             raise
 
+    def head(self, key: str) -> dict | None:
+        from botocore.exceptions import ClientError
+        try:
+            return self.client.head_object(Bucket=self.bucket, Key=key)
+        except ClientError as error:
+            if is_missing_object(error):
+                return None
+            raise
+
     def list(self, prefix: str) -> list[str]:
         paginator = self.client.get_paginator("list_objects_v2")
         return [obj["Key"] for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix) for obj in page.get("Contents", [])]
@@ -106,18 +120,21 @@ class R2Store:
             raise IOError(f"stored object verification failed: {missing[0]}")
 
 
-def is_missing_object(error: Exception) -> bool:
-    response = getattr(error, "response", {})
-    code = response.get("Error", {}).get("Code")
-    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
-    return code in {"NoSuchKey", "NotFound", "404"} or status == 404
-
     def list_sizes(self, prefix: str) -> dict[str, int]:
         paginator = self.client.get_paginator("list_objects_v2")
         found = {}
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
             found.update({obj["Key"]: obj["Size"] for obj in page.get("Contents", [])})
         return found
+
+
+def is_missing_object(error: Exception) -> bool:
+    response = getattr(error, "response", {})
+    code = response.get("Error", {}).get("Code")
+    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    if code == "NoSuchBucket":
+        return False
+    return code in {"NoSuchKey", "NotFound", "404"} or status == 404
 
 
 def shared_tile_prefix(expected: dict[str, int]) -> str:

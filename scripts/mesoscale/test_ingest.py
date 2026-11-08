@@ -17,6 +17,7 @@ from ingestion.publish import PublishRequest, latest_is_newer
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
 from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range
+from ingestion.store import R2Credentials, R2Store
 from inventory import IndexRecord
 
 
@@ -60,7 +61,122 @@ class FailedVerificationStore(MemoryStore):
         raise IOError("missing uploaded tile")
 
 
+class FakePaginator:
+    def __init__(self, client):
+        self.client = client
+
+    def paginate(self, Bucket, Prefix):
+        self.client.list_calls.append((Bucket, Prefix))
+        keys = sorted(key for key in self.client.objects if key.startswith(Prefix))
+        for start in range(0, len(keys), 2):
+            page_keys = keys[start:start + 2]
+            self.client.pages_returned += 1
+            yield {"Contents": [{"Key": key, "Size": len(self.client.objects[key])} for key in page_keys]}
+
+
+class FakeS3Client:
+    def __init__(self):
+        self.objects = {}
+        self.list_calls = []
+        self.pages_returned = 0
+        self.missing_code = None
+
+    def put_object(self, Bucket, Key, Body, ContentType):
+        import hashlib
+        self.objects[Key] = Body
+        return {"ETag": f'"{hashlib.md5(Body, usedforsecurity=False).hexdigest()}"'}
+
+    def get_object(self, Bucket, Key):
+        if self.missing_code or Key not in self.objects:
+            raise s3_error(self.missing_code or "NoSuchKey", "GetObject")
+        from io import BytesIO
+        return {"Body": BytesIO(self.objects[Key])}
+
+    def head_object(self, Bucket, Key):
+        if self.missing_code or Key not in self.objects:
+            raise s3_error(self.missing_code or "NoSuchKey", "HeadObject")
+        return {"ContentLength": len(self.objects[Key])}
+
+    def get_paginator(self, operation):
+        if operation != "list_objects_v2":
+            raise AssertionError(f"unexpected paginator: {operation}")
+        return FakePaginator(self)
+
+    def delete_object(self, Bucket, Key):
+        self.objects.pop(Key, None)
+
+
+def s3_error(code, operation):
+    from botocore.exceptions import ClientError
+    response = {"Error": {"Code": code, "Message": code}, "ResponseMetadata": {"HTTPStatusCode": 404}}
+    return ClientError(response, operation)
+
+
 class IngestTests(unittest.TestCase):
+    def make_r2_store(self, client):
+        with patch("boto3.client", return_value=client):
+            return R2Store(R2Credentials("account", "bucket", "access", "secret"))
+
+    def test_r2_adapter_roundtrip_heads_and_paginates(self):
+        client = FakeS3Client()
+        store = self.make_r2_store(client)
+        for index in range(5):
+            store.put(f"prefix/object-{index}", f"value-{index}".encode(), "text/plain")
+        self.assertEqual(store.get("prefix/object-0"), b"value-0")
+        self.assertEqual(store.head("prefix/object-0"), {"ContentLength": 7})
+        self.assertEqual(len(store.list("prefix/")), 5)
+        self.assertGreaterEqual(client.pages_returned, 3)
+        store.delete("prefix/object-0")
+        self.assertIsNone(store.get("prefix/object-0"))
+
+    def test_r2_adapter_handles_missing_object_errors_but_not_bucket_errors(self):
+        from botocore.exceptions import ClientError
+        client = FakeS3Client()
+        store = self.make_r2_store(client)
+        for code in ("NoSuchKey", "404"):
+            client.missing_code = code
+            self.assertIsNone(store.get("missing"))
+            self.assertIsNone(store.head("missing"))
+        client.missing_code = "NoSuchBucket"
+        with self.assertRaises(ClientError):
+            store.get("missing")
+        with self.assertRaises(ClientError):
+            store.head("missing")
+
+    def test_r2_verify_sizes_uses_one_paginated_prefix_listing(self):
+        client = FakeS3Client()
+        store = self.make_r2_store(client)
+        expected = {}
+        for index in range(5):
+            key = f"mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/t/{index}.png"
+            content = f"tile-{index}".encode()
+            store.put(key, content, "image/png")
+            expected[key] = len(content)
+        store.verify_sizes(expected)
+        self.assertEqual(len(client.list_calls), 1)
+        self.assertGreaterEqual(client.pages_returned, 3)
+        with self.assertRaisesRegex(IOError, "verification failed"):
+            store.verify_sizes({**expected, "mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/t/missing.png": 10})
+
+    def test_r2_publish_retention_deletes_old_catalog_and_tiles(self):
+        client = FakeS3Client()
+        store = self.make_r2_store(client)
+        with tempfile.TemporaryDirectory() as temporary:
+            tile = Path(temporary) / "tile.png"
+            tile.write_bytes(b"tile data")
+            for hour in range(7):
+                cycle = datetime(2026, 11, 8, hour, tzinfo=UTC)
+                cycle_id = cycle.strftime("%Y%m%dT%H00Z")
+                catalog = sample_catalog(cycle.strftime("%Y-%m-%dT%H:00:00Z"))
+                key = f"mesoscale/v1/tiles/hrrr/{cycle_id}/f00/t/4/1/1.png"
+                publish_cycle(store, PublishRequest("hrrr", cycle, catalog, {key: tile}, keep=6))
+            old_cycle = "20261108T0000Z"
+            old_catalog = f"mesoscale/v1/catalog/hrrr/{old_cycle}.json"
+            old_tile = f"mesoscale/v1/tiles/hrrr/{old_cycle}/f00/t/4/1/1.png"
+            self.assertNotIn(old_catalog, client.objects)
+            self.assertNotIn(old_tile, client.objects)
+            self.assertEqual(len(store.list("mesoscale/v1/catalog/hrrr/")), 6)
+
     def test_catalog_matches_json_schema_and_contract_validator(self):
         schema = json.loads((Path(__file__).parent / "catalog.schema.json").read_text())
         catalog = sample_catalog()
