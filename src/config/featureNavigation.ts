@@ -16,7 +16,7 @@ export type AppNavigationItem = {
   feature?: FeatureKey;
 };
 
-/** Primary navbar destinations. Items with a feature key render only when that feature is exposed. */
+/** Navigation and shortcut metadata. Items with a feature key are included only when exposed. */
 const RAW_APP_NAVIGATION_ITEMS = [
   { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
   { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },

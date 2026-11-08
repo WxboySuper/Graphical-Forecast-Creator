@@ -37,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <TooltipProvider>
       <header className="app-navbar sticky top-0 z-panel">
         <div className="app-navbar__shine" />
-        <nav className="app-navbar__inner">
+        <nav className="app-navbar__inner" aria-label="Main navigation">
           <div className="app-navbar__left">
             <BrandSection />
           </div>
