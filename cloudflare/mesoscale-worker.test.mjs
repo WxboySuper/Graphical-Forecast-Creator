@@ -160,6 +160,21 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal(parsedConditionalCatalog, true);
 });
 
+test('serves schema-valid partial and failed catalogs as diagnostic cycles', async () => {
+  const path = '/catalog/hrrr/20261108T1200Z.json';
+  for (const status of ['partial', 'failed']) {
+    const catalog = makeCatalog({ status });
+    const env = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
+    const response = await worker.fetch(request(path), env);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).status, status);
+  }
+  const unknownStatus = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': makeCatalog({ status: 'unknown' }) });
+  assert.equal((await worker.fetch(request(path), unknownStatus)).status, 502);
+  const latest = await worker.fetch(request('/latest/hrrr.json'), envFor());
+  assert.equal(latest.status, 404);
+});
+
 test('Cache API separates rewritten catalog representations by public base URL', async () => {
   await withCache(async () => {
     const catalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
@@ -304,6 +319,22 @@ test('Cache API stores tiles, serves hits, honors conditional hits, and caches m
   });
 });
 
+test('catalog HEAD warms the validated GET Cache API representation', async () => {
+  await withCache(async () => {
+    const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
+    const env = envFor({ [key]: makeCatalog() });
+    let reads = 0;
+    const get = env.MESOSCALE_BUCKET.get;
+    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const path = '/catalog/hrrr/20261108T1200Z.json';
+    const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
+    assert.equal(head.status, 200);
+    assert.equal(head.body, null);
+    assert.equal((await worker.fetch(request(path), env)).status, 200);
+    assert.equal(reads, 1);
+  });
+});
+
 test('cache read failure falls back to R2 and put uses waitUntil when available', async () => {
   await withCache(async (cache) => {
     cache.match = async () => { throw new Error('cache unavailable'); };
@@ -357,6 +388,23 @@ test('latest pointer reports live age and stale state without changing its cycle
     const fresh = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T15:00:00Z') }, { STALE_AFTER_MINUTES: '60' });
     const freshResponse = await worker.fetch(request('/latest/hrrr.json'), fresh);
     assert.equal(freshResponse.headers.get('X-Mesoscale-Stale'), 'false');
+  });
+});
+
+test('latest treats small future cycle skew as age zero and larger skew as stale', async () => {
+  const path = '/latest/hrrr.json';
+  await withNow('2026-11-08T11:58:00Z', async () => {
+    const smallSkew = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T12:00:00Z') });
+    const response = await worker.fetch(request(path), smallSkew);
+    assert.equal(response.headers.get('X-Mesoscale-Age-Minutes'), '0');
+    assert.equal(response.headers.get('X-Mesoscale-Stale'), 'false');
+    assert.equal((await response.json()).cycleTime, '2026-11-08T12:00:00Z');
+  });
+  await withNow('2026-11-08T11:54:00Z', async () => {
+    const largeSkew = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T12:00:00Z') });
+    const response = await worker.fetch(request(path), largeSkew);
+    assert.equal(response.headers.get('X-Mesoscale-Age-Minutes'), 'unknown');
+    assert.equal(response.headers.get('X-Mesoscale-Stale'), 'true');
   });
 });
 

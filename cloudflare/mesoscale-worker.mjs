@@ -13,7 +13,8 @@ const json = (body, status = 200, headers = {}) =>
 const ageMinutes = (timestamp, now) => {
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return null;
-  if (parsed > now) return null;
+  if (parsed > now + 5 * 60000) return null;
+  if (parsed > now) return 0;
   return Math.floor((now - parsed) / 60000);
 };
 
@@ -233,7 +234,7 @@ const validCatalogDomain = (domain) => {
 };
 
 const validCatalogContent = (value, route) => {
-  if (value.status !== 'complete') return false;
+  if (!['complete', 'partial', 'failed'].includes(value.status)) return false;
   if (!validCatalogFrames(value.frames, route)) return false;
   return validCatalogDomain(value.domain);
 };
@@ -581,7 +582,9 @@ const cachedFetch = async (context) => {
   }
   if (hit) return applyHeadMethod(context.request, await cacheHitResponse(context, hit));
   const response = await fetchUncached(context.request, context.route, context.env, context.now);
-  if (context.request.method === 'GET') await cacheStoreResponse(cache, key, response, context.executionContext);
+  const cacheableRead = context.request.method === 'GET'
+    || (context.request.method === 'HEAD' && ['catalog', 'latest'].includes(context.route.kind));
+  if (cacheableRead) await cacheStoreResponse(cache, key, response, context.executionContext);
   return applyHeadMethod(context.request, response);
 };
 
