@@ -480,9 +480,7 @@ const tileArchiveDescriptor = async (bucket, route) => {
   return { state: 'found', key: expectedKey, minZoom: data.minZoom, maxZoom: data.maxZoom };
 };
 
-const getTileResponse = async ({ request, route }, bucket) => {
-  if (typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const descriptor = await tileArchiveDescriptor(bucket, route);
+const tileResponseForDescriptor = async ({ request, route, bucket, descriptor }) => {
   if (descriptor.state === 'missing') return tileMissResponse();
   if (descriptor.state === 'invalid') return invalidCatalogResponse();
   if (route.zoom < descriptor.minZoom || route.zoom > descriptor.maxZoom) return tileMissResponse();
@@ -493,6 +491,12 @@ const getTileResponse = async ({ request, route }, bucket) => {
   const notModified = conditionalResponse(request, tile.etag, headers);
   if (notModified) return notModified;
   return new Response(request.method === 'HEAD' ? null : tile.bytes, { headers });
+};
+
+const getTileResponse = async ({ request, route }, bucket) => {
+  if (typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const descriptor = await tileArchiveDescriptor(bucket, route);
+  return tileResponseForDescriptor({ request, route, bucket, descriptor });
 };
 
 const readJson = async (bucket, key) => {

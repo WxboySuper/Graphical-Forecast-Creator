@@ -12,14 +12,20 @@ const directory = ({ tileId = 21, runLength = 1, length = 3, offset = 0 } = {}) 
   ...varint(1), ...varint(tileId), ...varint(runLength), ...varint(length), ...varint(offset + 1),
 ]);
 
-export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false } = {}) => {
+const gzipBytes = async (value) => new Uint8Array(await new Response(
+  new Blob([value]).stream().pipeThrough(new CompressionStream('gzip')),
+).arrayBuffer());
+
+const fixtureDirectories = async ({ bytes, leaf, gzip }) => {
   let leafBytes = leaf ? directory({ length: bytes.length }) : null;
-  if (gzip) {
-    const compress = async (value) => new Uint8Array(await new Response(new Blob([value]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
-    if (leafBytes) leafBytes = await compress(leafBytes);
-  }
+  if (gzip && leafBytes) leafBytes = await gzipBytes(leafBytes);
   let root = leaf ? directory({ runLength: 0, length: leafBytes.length }) : directory({ length: bytes.length });
-  if (gzip) root = new Uint8Array(await new Response(new Blob([root]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+  if (gzip) root = await gzipBytes(root);
+  return { root, leafBytes };
+};
+
+export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false } = {}) => {
+  const { root, leafBytes } = await fixtureDirectories({ bytes, leaf, gzip });
   const rootOffset = 127;
   const leafOffset = rootOffset + root.length;
   const tileOffset = leaf ? leafOffset + leafBytes.length : rootOffset + root.length;
