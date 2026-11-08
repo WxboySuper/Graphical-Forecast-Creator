@@ -62,11 +62,15 @@ def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple
     result = []
     for index, record in enumerate(rows):
         next_offset = next((row.offset for row in rows[index + 1:] if row.offset > record.offset), None)
-        end = next_offset - 1 if next_offset is not None else file_size - 1
+        end = _inclusive_end(next_offset, file_size)
         if record.offset >= file_size or end < record.offset:
             raise ValueError(f"Invalid message range at offset {record.offset} for {file_size}-byte file")
         result.append((record, ByteRange(record.offset, end)))
     return result
+
+
+def _inclusive_end(next_offset: int | None, file_size: int) -> int:
+    return file_size - 1 if next_offset is None else next_offset - 1
 
 
 def resolve_allowlist(records: Iterable[IndexRecord], file_size: int, allowlist: dict[str, dict[str, str]]) -> dict[str, list[dict]]:
@@ -112,11 +116,12 @@ def _required_string(identity: dict, field: str, key: str) -> str:
 
 
 def _matches_identity(row: IndexRecord, identity: dict[str, str]) -> bool:
-    return (
-        row.parameter == identity["parameter"]
-        and row.level == identity["level"]
-        and ("step" not in identity or row.step == identity["step"])
-    )
+    actual = (row.parameter, row.level)
+    expected = (identity["parameter"], identity["level"])
+    if "step" in identity:
+        actual += (row.step,)
+        expected += (identity["step"],)
+    return actual == expected
 
 
 def fetch_text(url: str) -> tuple[str, dict[str, str]]:
@@ -125,17 +130,19 @@ def fetch_text(url: str) -> tuple[str, dict[str, str]]:
         return response.read().decode("ascii"), {"lastModified": response.headers.get("Last-Modified", ""), "url": url}
 
 
+def _read_index_source(source: str) -> tuple[str, dict[str, str]]:
+    if source.startswith("https://"):
+        return fetch_text(source)
+    return Path(source).read_text(encoding="ascii"), {"url": str(Path(source))}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("idx", help="HTTPS .idx URL or local .idx path")
     parser.add_argument("--size", required=True, type=int, help="GRIB2 object size in bytes")
     parser.add_argument("--allowlist", help="JSON object mapping field names to exact parameter/level[/step]")
     args = parser.parse_args()
-    source = args.idx
-    if source.startswith("https://"):
-        text, metadata = fetch_text(source)
-    else:
-        text, metadata = Path(source).read_text(encoding="ascii"), {"url": str(Path(source))}
+    text, metadata = _read_index_source(args.idx)
     identities = json.loads(Path(args.allowlist).read_text()) if args.allowlist else {}
     records = parse_idx(text)
     result = {"source": metadata, "fileSizeBytes": args.size, "records": [asdict(record) for record in records], "selected": resolve_allowlist(records, args.size, identities)}
