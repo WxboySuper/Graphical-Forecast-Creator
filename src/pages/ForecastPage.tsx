@@ -952,9 +952,13 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               const selectedIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
               const focusIndex = tabs.findIndex((tab) => tab === document.activeElement);
               const activeIndex = focusIndex >= 0 ? focusIndex : selectedIndex;
-              const nextIndex = event.key === 'ArrowRight' ? (activeIndex + 1) % tabs.length
-                : event.key === 'ArrowLeft' ? (activeIndex - 1 + tabs.length) % tabs.length
-                  : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+              const nextIndexByKey: Record<string, number> = {
+                ArrowRight: (activeIndex + 1) % tabs.length,
+                ArrowLeft: (activeIndex - 1 + tabs.length) % tabs.length,
+                Home: 0,
+                End: tabs.length - 1,
+              };
+              const nextIndex = nextIndexByKey[event.key] ?? -1;
               if (nextIndex < 0) return;
               event.preventDefault();
               event.stopPropagation();
