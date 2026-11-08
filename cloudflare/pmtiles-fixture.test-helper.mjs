@@ -46,6 +46,21 @@ export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 7
   return archive;
 };
 
+const validRangeForFixture = ({ archive, offset, length, partialFirstRange }) => {
+  if (offset < 0 || offset >= archive.length) return false;
+  if (offset + length <= archive.length) return true;
+  return partialFirstRange && offset === 0;
+};
+
+const partForFixture = (archive, { offset, length }, etag) => {
+  const part = archive.slice(offset, offset + length);
+  return {
+    size: archive.length,
+    httpEtag: etag,
+    arrayBuffer: async () => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength),
+  };
+};
+
 export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1', partialFirstRange = false } = {}) => {
   const reads = [];
   return {
@@ -55,11 +70,8 @@ export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1', parti
       if (failAt === reads.length) throw new Error('range failed');
       if (key !== 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles') return null;
       if (!options.range) throw new Error('range required');
-      const { offset, length } = options.range;
-      if (offset < 0 || offset >= archive.length) return null;
-      if (offset + length > archive.length && !(partialFirstRange && offset === 0)) return null;
-      const part = archive.slice(offset, offset + length);
-      return { size: archive.length, httpEtag: etag, arrayBuffer: async () => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength) };
+      if (!validRangeForFixture({ archive, ...options.range, partialFirstRange })) return null;
+      return partForFixture(archive, { ...options.range }, etag);
     },
   };
 };
