@@ -114,6 +114,21 @@ describe('FeedbackDialog sessions', () => {
 });
 
 describe('beta chrome', () => {
+  test('hides the banner feedback action when the feedback service is not configured', () => {
+    const scope = globalThis as typeof globalThis & { __GFC_FEEDBACK_API_URL__?: string };
+    const original = scope.__GFC_FEEDBACK_API_URL__;
+    globals.__GFC_BUILD_TARGET__ = 'beta';
+    scope.__GFC_FEEDBACK_API_URL__ = '';
+    try {
+      render(<><BetaFeedbackBanner /><BetaFeedbackButton /></>);
+      expect(screen.getByRole('region', { name: 'Beta notice' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Send feedback' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Send beta feedback' })).not.toBeInTheDocument();
+    } finally {
+      scope.__GFC_FEEDBACK_API_URL__ = original;
+    }
+  });
+
   test('renders nothing outside the beta build', () => {
     globals.__GFC_BUILD_TARGET__ = 'production';
     const { container } = render(<><BetaFeedbackBanner /><BetaFeedbackButton /></>);

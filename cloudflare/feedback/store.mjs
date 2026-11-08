@@ -77,10 +77,16 @@ WHERE (SELECT COUNT(*) FROM feedback WHERE uid_hash = ? AND created_at > ?) < ${
 AND (SELECT COUNT(*) FROM feedback WHERE uid_hash = ? AND created_at > ?) < ${LIMITS.daily}
 AND NOT EXISTS (SELECT 1 FROM feedback WHERE uid_hash = ? AND message = ? AND created_at > ?)`;
 
+/** Stores an email only with consent and only when the identity provider verified it. */
+function contactEmail(body, claims) {
+  const usable = body.contactOk && claims.email_verified === true && typeof claims.email === 'string';
+  return usable ? claims.email.slice(0, 320) : null;
+}
+
 function buildRecord({ env, request, claims, body, now }, uidHash) {
   return {
     id: crypto.randomUUID(), created_at: now, uid_hash: uidHash,
-    email: body.contactOk && typeof claims.email === 'string' ? claims.email.slice(0, 320) : null,
+    email: contactEmail(body, claims),
     category: body.category, message: body.message, page: body.page,
     app_version: body.appVersion, build_target: body.buildTarget,
     plan: body.plan ?? null, viewport: body.viewport,

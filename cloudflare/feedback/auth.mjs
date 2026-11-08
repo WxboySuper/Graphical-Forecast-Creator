@@ -1,7 +1,13 @@
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
 let jwksCache = { keys: null, expiresAt: 0 };
 
-const decodePart = (part) => JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+/** Decodes unpadded base64url to a binary string, restoring the padding atob may require. */
+const base64UrlToBinary = (part) => {
+  const base64 = part.replace(/-/g, '+').replace(/_/g, '/');
+  return atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
+};
+
+const decodePart = (part) => JSON.parse(base64UrlToBinary(part));
 
 function parseToken(token) {
   const parts = token.split('.');
@@ -42,7 +48,7 @@ async function verifySignature(parts, header, keys) {
   if (!jwk) return false;
   const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
   const input = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
-  const signature = Uint8Array.from(atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0));
+  const signature = Uint8Array.from(base64UrlToBinary(parts[2]), (char) => char.charCodeAt(0));
   return crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, signature, input);
 }
 

@@ -80,9 +80,11 @@ const BetaBanner: React.FC = () => {
           You are previewing unreleased features. Things may break. Your account and plan work here as usual.
         </span>
       </p>
-      <Button variant="link" size="sm" className="h-auto p-0" onClick={openFeedback}>
-        Send feedback
-      </Button>
+      {isFeedbackEnabled() ? (
+        <Button variant="link" size="sm" className="h-auto p-0" onClick={openFeedback}>
+          Send feedback
+        </Button>
+      ) : null}
       <a
         href={DISCORD_INVITE_URL}
         target="_blank"

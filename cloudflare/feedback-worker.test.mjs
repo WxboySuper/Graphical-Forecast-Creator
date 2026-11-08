@@ -15,7 +15,7 @@ function isDuplicateRow(row, args) {
 
 async function token(overrides = {}, key = privateKey) {
   const header = b64({ alg: 'RS256', kid: 'test-key' });
-  const payload = b64({ iss: `https://securetoken.google.com/${project}`, aud: project, exp: 2000000000, iat: 1900000000, auth_time: 1900000000, sub: 'user-123', email: 'user@example.com', ...overrides });
+  const payload = b64({ iss: `https://securetoken.google.com/${project}`, aud: project, exp: 2000000000, iat: 1900000000, auth_time: 1900000000, sub: 'user-123', email: 'user@example.com', email_verified: true, ...overrides });
   const message = `${header}.${payload}`;
   const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(message));
   return `${message}.${Buffer.from(signature).toString('base64url')}`;
@@ -174,6 +174,9 @@ test('hashes uid, strips query and hash, and stores email only with contact cons
   assert.notEqual(db.rows[0].uid_hash, 'user-123');
   assert.equal((await post(env, ctx, { body: validBody({ message: 'A distinct helpful note.', contactOk: true }), auth })).status, 201);
   assert.equal(db.rows[1].email, 'user@example.com');
+  const unverified = await token({ email_verified: false, sub: 'user-unverified' });
+  assert.equal((await post(env, ctx, { body: validBody({ message: 'Another distinct helpful note.', contactOk: true }), auth: unverified })).status, 201);
+  assert.equal(db.rows[2].email, null);
 });
 
 test('enforces duplicate and rolling-window rate limits', async () => {
