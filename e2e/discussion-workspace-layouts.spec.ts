@@ -51,6 +51,15 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.locator('.forecast-workspace-layout')).toBeVisible();
   });
 
+  test('keeps the Custom map interactive when a review surface hint is present', async ({ page }) => {
+    await page.goto('/forecast/custom?surface=review');
+    const customMap = page.locator('.custom-workspace__map');
+    await expect(customMap).toBeVisible();
+    await expect(customMap).not.toHaveAttribute('aria-hidden', 'true');
+    await expect(customMap).not.toHaveAttribute('inert', '');
+    await expect(page.getByRole('button', { name: 'Pan map' })).toBeVisible();
+  });
+
   test('persists the layout choice and allows a query override', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/forecast/severe');

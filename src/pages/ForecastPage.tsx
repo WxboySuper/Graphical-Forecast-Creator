@@ -842,19 +842,19 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
+  const mapIsHidden = (workspaceId === 'severe' && surface === 'review') || hideMapForDiscussion || showHintedCustomDiscussion;
   useEffect(() => {
-    const mapIsHidden = surface === 'review' || hideMapForDiscussion || showHintedCustomDiscussion;
     const map = workspaceRef.current?.querySelector('.severe-workspace__map, .custom-workspace__map');
     if (!mapIsHidden) return;
     if (!map?.contains(document.activeElement)) return;
     workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"], [data-workspace-return-map]')?.focus();
-  }, [hideMapForDiscussion, showHintedCustomDiscussion, surface]);
+  }, [mapIsHidden, surface]);
   useEffect(() => {
-    if (surface !== 'review' && !hideMapForDiscussion && !showHintedCustomDiscussion) return undefined;
+    if (!mapIsHidden) return undefined;
     const map = workspaceRef.current?.querySelector<HTMLElement>('.severe-workspace__map, .custom-workspace__map');
     if (!map || 'inert' in map) return undefined;
     return makeSubtreeUntabbable(map);
-  }, [hideMapForDiscussion, showHintedCustomDiscussion, surface]);
+  }, [mapIsHidden]);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(
