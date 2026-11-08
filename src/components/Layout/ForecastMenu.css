@@ -34,17 +34,12 @@
   color: rgb(148, 163, 184);
 }
 
+/*
+ * DropdownMenuItem asChild merges its class and data-highlighted attribute onto
+ * the NavLink itself, so item, card, and row styles all target the same element.
+ */
 .forecast-menu__item {
-  display: block;
-  padding: 0;
-  border-radius: 14px;
-  background: transparent;
   outline: none;
-}
-
-.forecast-menu__item:focus,
-.forecast-menu__item[data-highlighted] {
-  background: transparent;
 }
 
 .forecast-menu__card,
@@ -63,14 +58,14 @@
   transition: background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.forecast-menu__item[data-highlighted] .forecast-menu__card,
+.forecast-menu__card[data-highlighted],
 .forecast-menu__card:hover {
   background: rgba(var(--forecast-menu-accent), 0.09);
   border-color: rgba(var(--forecast-menu-accent), 0.32);
 }
 
-.forecast-menu__item:focus-visible .forecast-menu__card,
-.forecast-menu__item[data-highlighted] .forecast-menu__card {
+.forecast-menu__card[data-highlighted],
+.forecast-menu__card:focus-visible {
   box-shadow: 0 0 0 2px rgba(var(--forecast-menu-accent), 0.45);
 }
 
@@ -199,7 +194,7 @@
   transition: opacity 0.16s ease, transform 0.16s ease;
 }
 
-.forecast-menu__item[data-highlighted] .forecast-menu__go,
+.forecast-menu__card[data-highlighted] .forecast-menu__go,
 .forecast-menu__card:hover .forecast-menu__go {
   opacity: 1;
   transform: translateX(0);
@@ -250,9 +245,14 @@
   color: rgb(226, 232, 240);
 }
 
-.forecast-menu__item[data-highlighted] .forecast-menu__other,
+.forecast-menu__other[data-highlighted],
 .forecast-menu__other:hover {
   background: rgba(100, 116, 139, 0.12);
+}
+
+.forecast-menu__other[data-highlighted],
+.forecast-menu__other:focus-visible {
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.45);
 }
 
 .forecast-menu__otherIcon {
