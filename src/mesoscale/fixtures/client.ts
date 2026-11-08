@@ -1,5 +1,5 @@
 import type { MesoscaleModelId } from '../contracts';
-import type { MesoscaleRequestResult } from '../client';
+import type { MesoscaleRequestResult } from '../request';
 import { FIXTURE_STATUS, getFixtureCatalog, getFixtureLatest } from './catalogs';
 
 const failure = (message: string): MesoscaleRequestResult<never> => ({ state: 'upstream-failure', message, retryable: false });
