@@ -5,11 +5,11 @@
  * discussion, and review content arrive as props; this module owns presentation
  * and focus handling only.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import type { KeyboardEvent, ReactNode, RefObject } from 'react';
 import { ClipboardCheck, FileText, Map as MapIcon, PanelRight, RectangleHorizontal, type LucideIcon } from 'lucide-react';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
-import { makeSubtreeUntabbable } from '../../pages/forecastWorkspaceFocus';
+import { useHiddenMapGuards } from './useHiddenMapGuards';
 import type { WorkspaceSurface } from './useWorkspaceSurface';
 import {
   PANEL_MAX_WIDTH,
@@ -98,39 +98,36 @@ const LayoutChoice: React.FC<{
   </div>
 );
 
-/** Keeps map-size, focus, and tab order sane while the map is hidden behind another surface. */
-const useHiddenMapGuards = (
-  rootRef: RefObject<HTMLDivElement | null>,
-  mapHidden: boolean,
-  mapRef: RefObject<ForecastMapHandle | null>,
-  layoutKey: string,
-): void => {
-  useEffect(() => {
-    if (!mapHidden) return;
-    const map = rootRef.current?.querySelector('.severe-workspace__map');
-    if (!map?.contains(document.activeElement)) return;
-    rootRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
-  }, [mapHidden, rootRef]);
-
-  useEffect(() => {
-    if (!mapHidden) return undefined;
-    const map = rootRef.current?.querySelector<HTMLElement>('.severe-workspace__map');
-    if (!map || 'inert' in map) return undefined;
-    return makeSubtreeUntabbable(map);
-  }, [mapHidden, rootRef]);
-
-  useEffect(() => {
-    if (mapHidden) return undefined;
-    let nested = 0;
-    const frame = window.requestAnimationFrame(() => {
-      nested = window.requestAnimationFrame(() => mapRef.current?.getMap()?.updateSize());
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (nested) window.cancelAnimationFrame(nested);
-    };
-  }, [layoutKey, mapHidden, mapRef]);
-};
+/** The resizable side panel and its splitter. */
+const DiscussionSidePanel: React.FC<{
+  panel: ReturnType<typeof useResizableDiscussionPanel>;
+  children: ReactNode;
+}> = ({ panel, children }) => (
+  <>
+    <div
+      className="severe-workspace__splitter"
+      role="separator"
+      aria-label="Resize discussion panel"
+      aria-orientation="vertical"
+      aria-valuemin={PANEL_MIN_WIDTH}
+      aria-valuemax={PANEL_MAX_WIDTH}
+      aria-valuenow={panel.width}
+      tabIndex={0}
+      onPointerDown={panel.startResize}
+      onPointerUp={panel.stopResize}
+      onPointerCancel={panel.stopResize}
+      onLostPointerCapture={panel.stopResize}
+      onKeyDown={panel.handleKeyDown}
+    />
+    <aside
+      className="severe-workspace__discussion"
+      style={{ width: panel.width, flexBasis: panel.width }}
+      aria-label="Forecast discussion"
+    >
+      {children}
+    </aside>
+  </>
+);
 
 export interface SevereWorkspaceShellProps {
   surface: WorkspaceSurface;
@@ -140,6 +137,13 @@ export interface SevereWorkspaceShellProps {
   discussion: ReactNode;
   review: ReactNode;
 }
+
+/** Decides how the active surface and layout share the screen. */
+const resolvePresentation = (surface: WorkspaceSurface, layout: DiscussionLayout) => {
+  const panelOpen = layout === 'panel' && surface === 'discussion';
+  const fullDiscussion = surface === 'discussion' && !panelOpen;
+  return { panelOpen, fullDiscussion, mapHidden: surface === 'review' || fullDiscussion };
+};
 
 /** Renders the Severe workspace's surface switcher and the active surface. */
 export const SevereWorkspaceShell: React.FC<SevereWorkspaceShellProps> = ({
@@ -153,9 +157,15 @@ export const SevereWorkspaceShell: React.FC<SevereWorkspaceShellProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const layout = useDiscussionLayoutChoice();
   const panel = useResizableDiscussionPanel();
-  const panelOpen = layout.effective === 'panel' && surface === 'discussion';
-  const mapHidden = surface === 'review' || (surface === 'discussion' && !panelOpen);
-  useHiddenMapGuards(rootRef, mapHidden, mapRef, `${panelOpen}-${panel.resizing ? 'resizing' : panel.width}`);
+  const { panelOpen, fullDiscussion, mapHidden } = resolvePresentation(surface, layout.effective);
+  useHiddenMapGuards({
+    rootRef,
+    mapRef,
+    mapSelector: '.severe-workspace__map',
+    returnSelector: '[role="tab"][aria-selected="true"]',
+    hidden: mapHidden,
+    layoutKey: `${panelOpen}-${panel.resizing ? 'resizing' : panel.width}`,
+  });
 
   return (
     <div
@@ -179,33 +189,8 @@ export const SevereWorkspaceShell: React.FC<SevereWorkspaceShellProps> = ({
         >
           {map}
         </div>
-        {panelOpen ? (
-          <>
-            <div
-              className="severe-workspace__splitter"
-              role="separator"
-              aria-label="Resize discussion panel"
-              aria-orientation="vertical"
-              aria-valuemin={PANEL_MIN_WIDTH}
-              aria-valuemax={PANEL_MAX_WIDTH}
-              aria-valuenow={panel.width}
-              tabIndex={0}
-              onPointerDown={panel.startResize}
-              onPointerUp={panel.stopResize}
-              onPointerCancel={panel.stopResize}
-              onLostPointerCapture={panel.stopResize}
-              onKeyDown={panel.handleKeyDown}
-            />
-            <aside
-              className="severe-workspace__discussion"
-              style={{ width: panel.width, flexBasis: panel.width }}
-              aria-label="Forecast discussion"
-            >
-              {discussion}
-            </aside>
-          </>
-        ) : null}
-        {surface === 'discussion' && !panelOpen ? (
+        {panelOpen ? <DiscussionSidePanel panel={panel}>{discussion}</DiscussionSidePanel> : null}
+        {fullDiscussion ? (
           <section className="severe-workspace__discussion severe-workspace__discussion--full" role="tabpanel" aria-label="Forecast discussion">
             {discussion}
           </section>

@@ -4,15 +4,16 @@
  * switcher; Custom keeps its map in place and shows Discussion only when a
  * legacy link asks for it. Map and review content arrive as props.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { Button } from '../ui/button';
 import { lazyWithReload } from '../../routing/lazyWithReload';
-import { makeSubtreeUntabbable } from '../../pages/forecastWorkspaceFocus';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 import { SevereWorkspaceShell } from './SevereWorkspaceShell';
+import { useHiddenMapGuards } from './useHiddenMapGuards';
 import type { WorkspaceSurface } from './useWorkspaceSurface';
+import './ForecastWorkspaceSurfaces.css';
 
 const EmbeddedDiscussionPage = lazyWithReload('discussion', () =>
   import('../../pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
@@ -28,25 +29,20 @@ const DiscussionSurface: React.FC<{ revision: number }> = ({ revision }) => (
 const CustomWorkspaceSurfaces: React.FC<{
   surface: WorkspaceSurface;
   onSurfaceChange: (next: WorkspaceSurface) => void;
+  mapRef: RefObject<ForecastMapHandle | null>;
   map: ReactNode;
   discussionRevision: number;
-}> = ({ surface, onSurfaceChange, map, discussionRevision }) => {
+}> = ({ surface, onSurfaceChange, mapRef, map, discussionRevision }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const discussionOpen = surface === 'discussion';
-
-  useEffect(() => {
-    if (!discussionOpen) return;
-    const mapNode = rootRef.current?.querySelector('.custom-workspace__map');
-    if (!mapNode?.contains(document.activeElement)) return;
-    rootRef.current?.querySelector<HTMLElement>('[data-workspace-return-map]')?.focus();
-  }, [discussionOpen]);
-
-  useEffect(() => {
-    if (!discussionOpen) return undefined;
-    const mapNode = rootRef.current?.querySelector<HTMLElement>('.custom-workspace__map');
-    if (!mapNode || 'inert' in mapNode) return undefined;
-    return makeSubtreeUntabbable(mapNode);
-  }, [discussionOpen]);
+  useHiddenMapGuards({
+    rootRef,
+    mapRef,
+    mapSelector: '.custom-workspace__map',
+    returnSelector: '[data-workspace-return-map]',
+    hidden: discussionOpen,
+    layoutKey: 'custom',
+  });
 
   return (
     <div ref={rootRef} className="custom-forecast-workspace">
@@ -103,6 +99,7 @@ export const ForecastWorkspaceSurfaces: React.FC<ForecastWorkspaceSurfacesProps>
   <CustomWorkspaceSurfaces
     surface={surface}
     onSurfaceChange={onSurfaceChange}
+    mapRef={mapRef}
     map={map}
     discussionRevision={discussionRevision}
   />
