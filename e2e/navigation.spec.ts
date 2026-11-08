@@ -1,6 +1,6 @@
 /** Verifies home, forecast, verification, and navbar links, one forecastUi query parameter on the legacy forecast redirect, and per-day discussion drafts across route changes. */
 import { test, expect } from '@playwright/test';
-import { prepareAppState } from './testSetup';
+import { navigateToDiscussion, navigateToSevereForecast, prepareAppState } from './testSetup';
 
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -39,29 +39,29 @@ test.describe('Navigation', () => {
     await expect(editor).toBeVisible();
 
     await editor.fill('Day 1 draft');
-    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
     await page.getByRole('button', { name: '2', exact: true }).click();
 
-    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/discussion$/);
     await expect(editor).toHaveValue('');
     await editor.fill('Day 2 draft');
 
-    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
     await page.getByRole('button', { name: '1', exact: true }).click();
-    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/discussion$/);
     await expect(editor).toHaveValue('Day 1 draft');
 
-    await page.getByRole('link', { name: /^Forecast$/i }).click();
+    await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
     await page.getByRole('button', { name: '2', exact: true }).click();
-    await page.getByRole('link', { name: /^Discussion$/i }).click();
+    await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/discussion$/);
     await expect(editor).toHaveValue('Day 2 draft');
   });

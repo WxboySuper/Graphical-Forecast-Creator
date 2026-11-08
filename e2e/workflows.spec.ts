@@ -6,11 +6,10 @@
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';
+import { navigateToDiscussion, navigateToSevereForecast } from './testSetup';
 
 const workflowPanel = (page: Page) => page.locator('section[aria-label="Forecast package workflow"]');
 const homeNav = (page: Page) => page.locator('a[href="/"]').last();
-const forecastNav = (page: Page) => page.locator('a[href="/forecast"]');
-const discussionNav = (page: Page) => page.locator('a[href="/discussion"]');
 
 /** Starts each test from a genuinely empty local session while accepting app agreements. */
 const prepareWorkflowSession = async (page: Page): Promise<void> => {
@@ -38,7 +37,7 @@ const startWorkflow = async (page: Page, scope: string, expectedLabel: string): 
   await expect(page).toHaveURL(/\/forecast\/severe$/, { timeout: 15000 });
   await homeNav(page).click();
   await expect(page.locator('main').last()).toContainText(expectedLabel, { timeout: 15000 });
-  await forecastNav(page).click();
+  await navigateToSevereForecast(page);
   await expect(workflowPanel(page)).toBeVisible({ timeout: 15000 });
 };
 
@@ -67,7 +66,7 @@ test.describe('Workflow continuity', () => {
   test('does not carry a Day 1 discussion into a new Days 4-8 workflow', async ({ page }) => {
     await startWorkflow(page, 'Day 1', 'Severe Convective Day 1');
 
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     const editor = page.getByPlaceholder(/Write your forecast discussion here/i);
     await editor.fill('Day 1 continuity sentinel — must never appear in Days 4-8.');
 
@@ -77,28 +76,28 @@ test.describe('Workflow continuity', () => {
     await page.getByRole('button', { name: 'Start Workflow', exact: true }).click();
     await homeNav(page).click();
     await expect(page.locator('main').last()).toContainText('Severe Convective Days 4-8');
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
 
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(editor).toHaveValue('');
     await expect(page.getByText(/Day 1 continuity sentinel/i)).not.toBeVisible();
   });
 
   test('preserves multiple saved scoped discussions through route navigation', async ({ page }) => {
     await startWorkflow(page, 'Full Outlook', 'Convective Outlook (Full)');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
 
     const scope = page.getByRole('combobox', { name: 'Discussion scope' });
     const editor = page.getByPlaceholder(/Write your forecast discussion here/i);
     await scope.selectOption('day1');
     await editor.fill('Day 1 draft survives a hard reload.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await scope.selectOption('day4-8');
     await expect(scope).toHaveValue('day4-8');
     await editor.fill('Days 4-8 draft survives a hard reload.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(scope).toHaveValue('day4-8');
     await expect(editor).toHaveValue('Days 4-8 draft survives a hard reload.');
 
@@ -124,10 +123,10 @@ test.describe('Workflow continuity', () => {
     await page.mouse.click(box.x + box.width * .58, box.y + box.height * .38);
     await page.mouse.dblclick(box.x + box.width * .5, box.y + box.height * .56);
     await expect(workflowPanel(page)).toContainText('excluded from severe analytics and Auto-Categorical');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await page.getByPlaceholder(/Write your forecast discussion here/i).fill('Package round-trip sentinel.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
 
     const downloadPromise = page.waitForEvent('download');
     await workflowPanel(page).getByRole('button', { name: 'Export', exact: true }).click();
@@ -157,12 +156,12 @@ test.describe('Workflow continuity', () => {
     await page.waitForTimeout(1000);
 
     await expect(page).toHaveURL(/\/$/);
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
     await expect(workflowPanel(page)).toContainText('Day 2 package', { timeout: 15000 });
     await page.getByRole('radio', { name: 'Custom' }).click();
     await expect(page.getByLabel('Layer title')).toHaveValue('Package fire layer');
     await expect(page.getByLabel('Category hatch')).toHaveText('Crosshatch');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Package round-trip sentinel.');
   });
 
@@ -184,7 +183,7 @@ test.describe('Workflow continuity', () => {
 
   test('keeps workflow state after opening a second page in the same browser context', async ({ page, context }) => {
     await startWorkflow(page, 'Day 3', 'Severe Convective Day 3');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await page.getByPlaceholder(/Write your forecast discussion here/i).fill('Cross-page continuity sentinel.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     // Save dispatches to Redux immediately, but the snapshot is persisted to
@@ -207,7 +206,7 @@ test.describe('Workflow continuity', () => {
     const secondPage = await context.newPage();
     await secondPage.goto('/forecast?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
     await expect(workflowPanel(secondPage)).toContainText('Day 3 package', { timeout: 15000 });
-    await discussionNav(secondPage).click();
+    await navigateToDiscussion(secondPage);
     await expect(secondPage.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Cross-page continuity sentinel.');
     await secondPage.close();
   });
