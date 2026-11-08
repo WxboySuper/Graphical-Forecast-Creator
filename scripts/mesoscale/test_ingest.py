@@ -16,7 +16,7 @@ from ingest import LocalStore, MODELS, colorize, discover_cycle, publish_cycle, 
 from ingestion.publish import PublishRequest, latest_is_newer
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
-from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range
+from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range, write_temp_content
 from ingestion.store import R2Credentials, R2Store
 from inventory import IndexRecord
 
@@ -382,6 +382,17 @@ class IngestTests(unittest.TestCase):
         import numpy as np
         mask = valid_data(np.array([1.0, np.nan, 9999.0, -9999.0, 1e20]))
         self.assertEqual(mask.tolist(), [True, False, False, False, False])
+
+    def test_temp_range_file_is_removed_when_write_fails(self):
+        from unittest.mock import MagicMock
+        temporary = MagicMock()
+        temporary.name = "fixture.grib2"
+        temporary.__enter__.return_value = temporary
+        temporary.write.side_effect = OSError("disk full")
+        with patch("ingestion.render.tempfile.NamedTemporaryFile", return_value=temporary), patch("ingestion.render.os.unlink") as unlink:
+            with self.assertRaisesRegex(OSError, "disk full"):
+                write_temp_content(b"grib")
+        unlink.assert_called_once_with("fixture.grib2")
 
     def test_shared_range_wind_components_keep_both_sources(self):
         import numpy as np

@@ -257,9 +257,7 @@ def matching_coordinates(u: dict, v: dict, np) -> bool:
 def decode_range(request: DecodeRequest):
     content, field_ids, offset, ranged, digest = request.content, request.field_ids, request.offset, request.ranged, request.digest
     from eccodes import codes_get, codes_get_values, codes_grib_new_from_file, codes_grib_multi_support_off, codes_grib_multi_support_on, codes_release
-    with tempfile.NamedTemporaryFile(delete=False) as temporary:
-        temporary.write(content)
-        path = temporary.name
+    path = write_temp_content(content)
     codes_grib_multi_support_on()
     try:
         decoded = read_grib_range(path, request, codes_grib_new_from_file, codes_release)
@@ -269,6 +267,20 @@ def decode_range(request: DecodeRequest):
     if not decoded:
         raise ValueError(f"no selected fields decoded from GRIB range at {offset}")
     return decoded
+
+
+def write_temp_content(content: bytes) -> str:
+    with tempfile.NamedTemporaryFile(delete=False) as temporary:
+        path = temporary.name
+        try:
+            temporary.write(content)
+        except BaseException:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
+    return path
 
 
 def read_grib_range(path: str, request: DecodeRequest, new_handle, release) -> list:
