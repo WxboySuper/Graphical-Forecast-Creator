@@ -71,7 +71,7 @@ async function submit(request, env, ctx, headers) {
 }
 
 const routeTable = [
-  { match: (url) => url.pathname.startsWith('/admin'), run: (request, env, url) => handleViewer(request, env, url) },
+  { match: (url) => url.pathname === '/admin' || url.pathname.startsWith('/admin/'), run: (request, env, url) => handleViewer(request, env, url) },
   { match: (url, method) => url.pathname === '/health' && method === 'GET', run: () => json({ ok: true }) },
   { match: (url, method) => url.pathname === '/v1/feedback' && method === 'OPTIONS', run: (request, env) => {
     const headers = corsHeaders(request, env);
@@ -93,7 +93,7 @@ export async function fetchFeedback(request, env, ctx) {
     return await route.run(request, env, url, ctx);
   } catch {
     // Never log request content; surface a stable error instead of an opaque Worker 500.
-    const headers = url.pathname.startsWith('/admin') ? {} : corsHeaders(request, env);
+    const headers = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? {} : corsHeaders(request, env);
     return json({ error: 'Feedback service error' }, 500, headers);
   }
 }

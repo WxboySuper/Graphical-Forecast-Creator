@@ -42,7 +42,7 @@ async function summary(db) {
     groupedCounts(db, 'status'), groupedCounts(db, 'build_target'), groupedCounts(db, 'category'),
   ]);
   return json({
-    total: totalRow.total,
+    total: totalRow?.total ?? 0,
     byStatus: fillCounts(statusRows, statuses),
     byTarget: fillCounts(targetRows, targets),
     byCategory: fillCounts(categoryRows, categories),
