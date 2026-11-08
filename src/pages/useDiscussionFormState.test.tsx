@@ -63,7 +63,7 @@ describe('useDiscussionFormState', () => {
     expect(result.current.hasUnsavedChanges).toBe(false);
   });
 
-  test('keeps the active key in sync when an import also changes discussion scope', () => {
+  test('discards unsaved drafts for every scope when an import also changes discussion scope', () => {
     const importedDiscussion = { ...loadedDiscussion, diyContent: 'Imported scope text' };
     const initialProps: { discussionKey: string; existingDiscussion?: DiscussionData; resetToken: number } = {
       discussionKey: 'group-a',
@@ -88,7 +88,8 @@ describe('useDiscussionFormState', () => {
 
     act(() => result.current.handleDiy('Edited imported scope text'));
     rerender({ discussionKey: 'group-a', existingDiscussion: undefined, resetToken: 1 });
-    expect(result.current.diyContent).toBe('Unsaved original scope text');
+    // The import replaced the cycle, so the old scope's unsaved text must not resurface.
+    expect(result.current.diyContent).not.toBe('Unsaved original scope text');
   });
 
   test('new discussions default to local wall-clock times with a 24-hour window', () => {

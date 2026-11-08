@@ -51,10 +51,11 @@ export const useWorkspaceSurface = (
   }, [requested, selectSurface, surface]);
 
   useEffect(() => {
+    if (!allowed.includes('discussion')) return undefined;
     const openDiscussion = () => selectSurface('discussion');
     window.addEventListener(OPEN_DISCUSSION_EVENT, openDiscussion);
     return () => window.removeEventListener(OPEN_DISCUSSION_EVENT, openDiscussion);
-  }, [selectSurface]);
+  }, [allowed, selectSurface]);
 
   return { surface, selectSurface };
 };

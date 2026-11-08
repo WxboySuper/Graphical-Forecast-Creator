@@ -86,21 +86,30 @@ export const ForecastWorkspaceSurfaces: React.FC<ForecastWorkspaceSurfacesProps>
   map,
   review,
   discussionRevision,
-}) => (workspaceId === 'severe' ? (
-  <SevereWorkspaceShell
-    surface={surface}
-    onSurfaceChange={onSurfaceChange}
-    mapRef={mapRef}
-    map={map}
-    review={review}
-    discussion={<DiscussionSurface revision={discussionRevision} />}
-  />
-) : (
-  <CustomWorkspaceSurfaces
-    surface={surface}
-    onSurfaceChange={onSurfaceChange}
-    mapRef={mapRef}
-    map={map}
-    discussionRevision={discussionRevision}
-  />
-));
+}) => {
+  if (workspaceId === 'severe') {
+    return (
+      <SevereWorkspaceShell
+        surface={surface}
+        onSurfaceChange={onSurfaceChange}
+        mapRef={mapRef}
+        map={map}
+        review={review}
+        discussion={<DiscussionSurface revision={discussionRevision} />}
+      />
+    );
+  }
+  if (workspaceId === 'custom') {
+    return (
+      <CustomWorkspaceSurfaces
+        surface={surface}
+        onSurfaceChange={onSurfaceChange}
+        mapRef={mapRef}
+        map={map}
+        discussionRevision={discussionRevision}
+      />
+    );
+  }
+  // Other workspaces own no extra surfaces until their editors are registered.
+  return <>{map}</>;
+};

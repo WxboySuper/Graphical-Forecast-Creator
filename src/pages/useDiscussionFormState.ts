@@ -79,28 +79,25 @@ const resetDiscussionScopeDraft = ({
 
 /**
  * Resets the editor after a forecast import. An import replaces the whole cycle,
- * including its discussions, so any unsaved fields for this scope describe data
- * that no longer exists. Keeping them would let autosave overwrite the imported
- * discussion with stale text. The scope being left keeps its unsaved draft.
+ * including its discussions, so unsaved fields for every scope describe data that
+ * no longer exists. Keeping any of them would let a later scope switch or autosave
+ * overwrite the imported discussion with stale text, so all drafts are cleared.
  */
 const resetDiscussionScopeAfterImport = (options: {
   drafts: Map<string, DiscussionFormDefaults>;
-  previousKey: string;
   discussionKey: string;
   resetToken: number;
   previousResetTokenRef: { current: number };
   previousKeyRef: { current: string };
   existingDiscussion?: DiscussionData;
   defaultForecasterName: string;
-  fields: DiscussionFormDefaults;
-  hasUnsavedChanges: boolean;
   applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void;
 }) => {
   const {
-    drafts, previousKey, discussionKey, resetToken, previousResetTokenRef, previousKeyRef,
-    existingDiscussion, defaultForecasterName, fields, hasUnsavedChanges, applyFields,
+    drafts, discussionKey, resetToken, previousResetTokenRef, previousKeyRef,
+    existingDiscussion, defaultForecasterName, applyFields,
   } = options;
-  if (previousKey !== discussionKey && hasUnsavedChanges) drafts.set(previousKey, fields);
+  drafts.clear();
   resetDiscussionScopeDraft({ drafts, discussionKey, existingDiscussion, defaultForecasterName, applyFields });
   previousResetTokenRef.current = resetToken;
   previousKeyRef.current = discussionKey;
@@ -126,15 +123,12 @@ const useDiscussionScopeDrafts = (options: {
     if (previousResetTokenRef.current !== resetToken) {
       resetDiscussionScopeAfterImport({
         drafts: draftsRef.current,
-        previousKey: previousKeyRef.current,
         discussionKey,
         resetToken,
         previousResetTokenRef,
         previousKeyRef,
         existingDiscussion,
         defaultForecasterName,
-        fields,
-        hasUnsavedChanges,
         applyFields,
       });
       scopeChangedRef.current = true;
