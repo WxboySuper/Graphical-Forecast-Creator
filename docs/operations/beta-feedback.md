@@ -49,3 +49,5 @@ DELETE FROM feedback WHERE created_at < (unixepoch('now') - 365 * 86400) * 1000;
 ## Local tests
 
 Run `pnpm test:cloudflare` to execute the standalone Worker tests with Node's built-in test runner. Tests generate an RSA keypair and use a small in-memory D1 fake.
+
+Invalid list filters return HTTP 400. Admin token failures are tracked by a salted hash of the client IP. After 10 failed attempts in 10 minutes, further failures from that IP return HTTP 429 with Retry-After; a valid token clears that IP's failure count.
