@@ -19,6 +19,7 @@ def validate_catalog(catalog: dict) -> None:
         if errors:
             raise ValueError(f"invalid catalog: {errors[0].message}")
     validate_frame_types(catalog)
+    validate_model_frames(catalog)
 
 
 def validate_catalog_minimum(catalog: dict) -> None:
@@ -54,6 +55,15 @@ def validate_catalog_status(status: str) -> None:
 def validate_frame_types(catalog: dict) -> None:
     if any(not valid_frame_type(frame) for frame in catalog["frames"]):
         raise ValueError("frame type must agree with forecast hour")
+
+
+def validate_model_frames(catalog: dict) -> None:
+    model = catalog.get("model")
+    model_id = model.get("id") if isinstance(model, dict) else None
+    expected = list(range(7)) if model_id == "hrrr" else [0]
+    actual = [frame.get("forecastHour") for frame in catalog["frames"] if isinstance(frame, dict)]
+    if actual != expected:
+        raise ValueError(f"{model_id or 'unknown'} catalog frames must be {expected}")
 
 
 def valid_frame_type(frame: dict) -> bool:

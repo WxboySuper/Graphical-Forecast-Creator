@@ -14,25 +14,53 @@ model's latest pointer:
 
 ```
 mesoscale/v1/catalog/{model}/{cycle}.json
-mesoscale/v1/tiles/{model}/{cycle}/f{forecastHour:02d}/{parameter}/{z}/{x}/{y}.png
+mesoscale/v1/archives/{model}/{cycle}/f{forecastHour:02d}/{parameter}.pmtiles
 mesoscale/v1/latest/{model}.json
 mesoscale/v1/health/{YYYY-MM-DD}/{model}.json
 ```
 
 `model` is `hrrr`, `rap`, or `rrfs`; `cycle` is UTC `YYYYMMDDTHH00Z` and
-`forecastHour` is a zero-padded integer. The tile template in the catalog is a
-public Worker URL, not an R2 URL, and has literal `{z}`, `{x}`, and `{y}`
-placeholders. PNG tiles use XYZ/Web Mercator coordinates, EPSG:3857, and
-transparent pixels outside the data/domain. The published zoom interval is
-inclusive and measured by the producer. Clients must not request outside it.
+`forecastHour` is a zero-padded integer. Each field in each published frame is
+one PMTiles v3 archive. The public tile template in the catalog does not expose
+the archive and remains
+`/api/mesoscale/tiles/{model}/{cycle}/f{hh}/{parameter}/{z}/{x}/{y}.png`, with
+literal `{z}`, `{x}`, and `{y}` placeholders. The Worker parses those route
+parts, finds the matching frame and parameter in the cycle catalog, verifies
+that the parameter's `data.archiveKey` matches the deterministic archive key
+above, converts XYZ `z/x/y` to the PMTiles tile id, then reads that tile from
+the archive. The Worker range-read implementation is tracked separately in
+#1776. Clients continue to request ordinary XYZ PNGs.
 
-Write all field tiles first, then the immutable cycle catalog. Validate the
-catalog and verify every referenced tile before writing the latest pointer.
-The latest pointer is the final write. A failed or partial cycle may appear in
-the health report but must never become latest. Never overwrite an already
-complete cycle; a retry can safely skip its existing objects. Retention removes
-old cycles only after a newer complete pointer is live, and keeps six complete
-cycles per model by default.
+Archives contain PNG bytes unchanged. The PMTiles header uses `tile_type: png`
+and `tile_compression: none`; do not gzip or otherwise recompress PNG tile
+payloads. PMTiles directory/metadata compression is independent of tile
+compression. Header `min_zoom` and `max_zoom` are the inclusive published zoom
+limits, and header `min_lon_e7`, `min_lat_e7`, `max_lon_e7`, and `max_lat_e7`
+match the catalog domain bounds. For the current CONUS domain these are
+`[-130, 20, -60, 55]` and zooms 3 through 4. Clients must not request outside
+that domain or zoom interval. Archives and cycle catalogs are immutable once
+published. Archive writes use R2's atomic `If-None-Match: *` create-only
+condition. If a retry finds an existing archive, it reuses it only when its
+ETag matches the expected PNG archive bytes; it never replaces the object.
+
+Write all archives first, then make one batched size and ETag/MD5 verification
+of every referenced archive. Each parameter also records the local archive's
+SHA-256 in `data.archiveSha256`. Write the immutable cycle catalog only after
+that succeeds. Validate the catalog and finally write the latest pointer. The
+latest pointer is always the last publication write. A failed or partial cycle
+may appear in the health report but must never become latest. Never overwrite
+an already complete cycle; a retry can safely skip its existing objects.
+Retention removes old catalogs and their archives only after a newer complete
+pointer is live, and keeps six complete cycles per model by default.
+
+HRRR cycles require complete f00 through f06 frames. RAP and RRFS require f00
+only. f00 is `analysis`; f01 and later are `forecast`. If a requested HRRR
+forecast hour is not yet available, record the cycle as `partial` in health
+and do not write its archives or catalog. The hourly run retries that same
+cycle. This avoids freezing a partial catalog at the immutable
+`catalog/{model}/{cycle}.json` key. A cycle with a decoded but unavailable
+required field follows the existing failed/partial field rules and never
+becomes latest.
 
 ## Cycle catalog JSON
 
@@ -95,6 +123,8 @@ be passed to `normalizeProviderPayload` unchanged:
   "data": {
     "type": "xyz-raster",
     "urlTemplate": "https://gfc.weatherboysuper.com/api/mesoscale/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png",
+    "archiveKey": "mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles",
+    "tileCompression": "none",
     "format": "image/png",
     "projection": "EPSG:3857",
     "minZoom": 3,

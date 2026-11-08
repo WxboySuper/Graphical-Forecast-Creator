@@ -197,13 +197,22 @@ class CycleContext:
     source_url: str
     modified: str
     output: Path
+    frames: tuple = ()
+    forecast_hour: int = 0
+
+
+def process_frames(context: CycleContext) -> dict:
+    """Render the discovered cycle frames into per-field PMTiles archives."""
+    from . import render_steps
+    result = render_steps.process(context, decode_range, render_tiles, combine_wind)
+    return {"catalog": result.catalog, "archives": result.archives, "metrics": result.metrics}
 
 
 def process_f00(context: CycleContext) -> dict:
-    """Run the isolated f00 stages and return the completed render result."""
-    from . import render_steps
-    result = render_steps.process(context, decode_range, render_tiles, combine_wind)
-    return {"catalog": result.catalog, "tiles": result.tiles, "metrics": result.metrics}
+    """Compatibility entry point for a single-frame f00 render."""
+    from .discovery import FrameSource
+    frame = FrameSource(0, context.source_url, context.modified)
+    return process_frames(CycleContext(context.model, context.cycle, context.source_url, context.modified, context.output, (frame,)))
 
 
 
