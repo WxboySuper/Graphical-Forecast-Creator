@@ -60,6 +60,17 @@ export const buildDiscussionDataFrom = (fields: DiscussionFormDefaults): Discuss
   lastModified: new Date().toISOString(),
 });
 
+const resetDiscussionScopeDraft = (
+  drafts: Map<string, DiscussionFormDefaults>,
+  discussionKey: string,
+  existingDiscussion: DiscussionData | undefined,
+  defaultForecasterName: string,
+  applyFields: (fields: DiscussionFormDefaults, hasChanges: boolean) => void,
+) => {
+  drafts.delete(discussionKey);
+  applyFields({ ...getDiscussionFormDefaults(existingDiscussion), forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
+};
+
 /** Keeps unsaved discussion fields isolated while the user changes discussion scope. */
 const useDiscussionScopeDrafts = (options: {
   discussionKey: string;
@@ -78,8 +89,7 @@ const useDiscussionScopeDrafts = (options: {
 
   useEffect(() => {
     if (previousResetTokenRef.current !== resetToken) {
-      draftsRef.current.delete(discussionKey);
-      applyFields({ ...getDiscussionFormDefaults(existingDiscussion), forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
+      resetDiscussionScopeDraft(draftsRef.current, discussionKey, existingDiscussion, defaultForecasterName, applyFields);
       previousResetTokenRef.current = resetToken;
       scopeChangedRef.current = true;
       return;
