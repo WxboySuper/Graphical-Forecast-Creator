@@ -522,20 +522,21 @@ const cacheStoreResponse = async (cache, key, response, context) => {
   else await put;
 };
 
-const cachedFetch = async (request, route, env, now, context) => {
+const cachedFetch = async (context) => {
   const cache = globalThis.caches?.default;
-  if (!['GET', 'HEAD'].includes(request.method) || !cache) return fetchUncached(request, route, env, now);
-  const key = cacheKeyFor(request, env, route);
+  if (!['GET', 'HEAD'].includes(context.request.method)) return fetchUncached(context.request, context.route, context.env, context.now);
+  if (!cache) return fetchUncached(context.request, context.route, context.env, context.now);
+  const key = cacheKeyFor(context.request, context.env, context.route);
   let hit;
   try {
     hit = await cache.match(key);
   } catch {
-    return fetchUncached(request, route, env, now);
+    return fetchUncached(context.request, context.route, context.env, context.now);
   }
-  if (hit) return applyHeadMethod(request, cacheHitResponse(request, hit));
-  const response = await fetchUncached(request, route, env, now);
-  if (request.method === 'GET') await cacheStoreResponse(cache, key, response, context);
-  return applyHeadMethod(request, response);
+  if (hit) return applyHeadMethod(context.request, cacheHitResponse(context.request, hit));
+  const response = await fetchUncached(context.request, context.route, context.env, context.now);
+  if (context.request.method === 'GET') await cacheStoreResponse(cache, key, response, context.executionContext);
+  return applyHeadMethod(context.request, response);
 };
 
 export default {
@@ -553,7 +554,7 @@ export default {
     if (!route) return responseCors(json({ error: 'Not found.' }, 404, { 'Cache-Control': 'no-store' }), origin, allowed);
     try {
       const now = Date.now();
-      let response = await cachedFetch(request, route, env, now, context);
+      let response = await cachedFetch({ request, route, env, now, executionContext: context });
       if (request.method === 'HEAD') response = noBodyForHead(response);
       return responseCors(response, origin, allowed);
     } catch {
