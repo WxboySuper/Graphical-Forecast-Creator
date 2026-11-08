@@ -311,17 +311,27 @@ const readJson = async (bucket, key) => {
   }
 };
 
-const healthForModel = (today, yesterday, modelId) => {
-  if (today.state === 'ok' && today.value.modelId === modelId) return today.value;
-  if (yesterday.state === 'ok' && yesterday.value.modelId === modelId) return yesterday.value;
-  return null;
+const validateJsonRecord = (record, isValid) => {
+  if (record.state !== 'ok') return record;
+  return isValid(record.value) ? record : { state: 'invalid', value: null };
 };
 
-const validStatusPointer = (pointer, modelId) => {
-  if (pointer.state !== 'ok') return false;
-  if (pointer.value.schemaVersion !== 1) return false;
-  if (pointer.value.modelId !== modelId || typeof pointer.value.cycleTime !== 'string') return false;
-  return Number.isFinite(Date.parse(pointer.value.cycleTime));
+const validStatusPointerValue = (value, modelId) => {
+  if (value.schemaVersion !== 1 || value.modelId !== modelId || typeof value.cycleTime !== 'string') return false;
+  return Number.isFinite(Date.parse(value.cycleTime));
+};
+
+const validHealthValue = (value, modelId) => {
+  if (value.schemaVersion !== 1 || value.modelId !== modelId) return false;
+  if (!['complete', 'partial', 'failed'].includes(value.status)) return false;
+  return typeof value.generatedAt === 'string' && Number.isFinite(Date.parse(value.generatedAt));
+};
+
+const healthForModel = (today, yesterday) => {
+  if (today.state === 'ok') return today.value;
+  if (today.state === 'invalid') return null;
+  if (yesterday.state === 'ok') return yesterday.value;
+  return null;
 };
 
 const modelHealthState = (health, today, yesterday, pointer) => {
@@ -336,11 +346,13 @@ const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter 
     readJson(bucket, `mesoscale/v1/health/${day}/${modelId}.json`),
     readJson(bucket, `mesoscale/v1/health/${previousDay}/${modelId}.json`),
   ]);
-  const health = healthForModel(today, yesterday, modelId);
-  const validPointer = validStatusPointer(pointer, modelId);
-  const pointerValue = validPointer ? pointer.value : null;
+  const validPointer = validateJsonRecord(pointer, (value) => validStatusPointerValue(value, modelId));
+  const validToday = validateJsonRecord(today, (value) => validHealthValue(value, modelId));
+  const validYesterday = validateJsonRecord(yesterday, (value) => validHealthValue(value, modelId));
+  const health = healthForModel(validToday, validYesterday);
+  const pointerValue = validPointer.state === 'ok' ? validPointer.value : null;
   const age = pointerValue ? ageMinutes(pointerValue.cycleTime, now) : null;
-  const healthState = modelHealthState(health, today, yesterday, pointer);
+  const healthState = modelHealthState(health, validToday, validYesterday, validPointer);
   return { modelId, latestCycleTime: pointerValue?.cycleTime || null, ageMinutes: age, stale: age === null || age > staleAfter, health: healthState, healthGeneratedAt: health?.generatedAt || null };
 };
 
