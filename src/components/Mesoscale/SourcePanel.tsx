@@ -22,14 +22,17 @@ export const formatUtc = (iso: string): string => {
   return `${pad(date.getUTCHours())}Z ${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
 };
 
-/** Describes an age in minutes as "45 min" or "1 h 12 min". */
-export const formatAge = (minutes: number | null): string => {
-  if (minutes === null) return 'age unknown';
-  if (minutes < 60) return `${minutes} min old`;
+/** Describes a duration in minutes as "45 min", "2 h", or "1 h 12 min". */
+export const formatDuration = (minutes: number): string => {
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return rest === 0 ? `${hours} h old` : `${hours} h ${rest} min old`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 };
+
+/** Describes an age in minutes as "45 min old", or "age unknown" when it cannot be computed. */
+export const formatAge = (minutes: number | null): string =>
+  minutes === null ? 'age unknown' : `${formatDuration(minutes)} old`;
 
 const hourLabel = (hour: number): string => (hour === 0 ? 'f00' : `+${hour} h`);
 

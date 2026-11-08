@@ -18,7 +18,7 @@ import UnofficialBadge from '../Map/UnofficialBadge';
 import { LayerPanel } from './LayerPanel';
 import { MesoscaleLegend } from './MesoscaleLegend';
 import { MesoscaleMap } from './MesoscaleMap';
-import { SourcePanel, formatAge } from './SourcePanel';
+import { SourcePanel, formatDuration } from './SourcePanel';
 import { StateMessage } from './StateMessage';
 import { useMesoscaleSelection, type MesoscaleSelection } from './useMesoscaleSelection';
 import './Mesoscale.css';
@@ -37,10 +37,16 @@ const buildLayerSpecs = (parameters: MesoscaleCatalogParameter[], selection: Mes
   });
 };
 
+/** Words the stale notice, including the case where the run's age cannot be computed. */
+const staleMessage = (ageMinutes: number | null): string =>
+  ageMinutes === null
+    ? 'This run may be out of date: its age is unknown. Newer data may not have arrived yet.'
+    : `This run is ${formatDuration(ageMinutes)} old. Newer data may not have arrived yet.`;
+
 const FrameNotices: React.FC<{ frame: Frame; stale: boolean; ageMinutes: number | null }> = ({ frame, stale, ageMinutes }) => (
   <>
     {isMesoscaleDemoData() ? <p className="mesoscale-notice mesoscale-notice--demo" role="note">Demo data: placeholder imagery, not real model output.</p> : null}
-    {stale ? <p className="mesoscale-notice mesoscale-notice--warn" role="status">This run is {formatAge(ageMinutes).replace(' old', '')} old. Newer data may not have arrived yet.</p> : null}
+    {stale ? <p className="mesoscale-notice mesoscale-notice--warn" role="status">{staleMessage(ageMinutes)}</p> : null}
     {frame.status === 'partial' ? <p className="mesoscale-notice" role="status">Some fields are unavailable for this frame.</p> : null}
   </>
 );

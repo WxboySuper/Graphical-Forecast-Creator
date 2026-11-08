@@ -108,6 +108,13 @@ describe('MesoscaleWorkspace', () => {
     expect(screen.getByText(/stale/)).toBeInTheDocument();
   });
 
+  it('words the stale notice sensibly when the age is unknown', () => {
+    givenReady({ state: 'stale', data: catalog, stale: true, ageMinutes: null }, { ageMinutes: null, stale: true });
+    renderWorkspace();
+    expect(screen.getByText(/its age is unknown/i)).toBeInTheDocument();
+    expect(screen.queryByText(/age unknown old/i)).not.toBeInTheDocument();
+  });
+
   it('shows an explicit message when the catalog is malformed', () => {
     givenReady({ state: 'malformed', message: 'bad' });
     renderWorkspace();
