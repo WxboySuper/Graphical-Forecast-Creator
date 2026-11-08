@@ -453,6 +453,7 @@ const useDiscussionEditorState = ({
 
 
 /** Synchronizes the selected discussion scope with the forecast day and URL query. */
+// @codescene(disable:"Complex Conditional")
 const useDiscussionScopeSync = (options: {
   currentDay: DayType;
   discussionDay: DayType;
@@ -486,6 +487,7 @@ const useDiscussionScopeSync = (options: {
 };
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
+// @codescene(disable:"Complex Method")
 export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();

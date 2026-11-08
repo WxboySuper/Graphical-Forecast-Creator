@@ -65,7 +65,15 @@ export const getNavigationKeyboardShortcuts = (
 
   for (const item of getVisibleNavigationItems(target)) {
     if (item.shortcutKey) {
-      shortcuts[item.shortcutKey] = () => navigate(item.to);
+      shortcuts[item.shortcutKey] = () => {
+        if (item.id === 'discussion' && typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          params.set('surface', 'discussion');
+          navigate(`/discussion?${params.toString()}`);
+          return;
+        }
+        navigate(item.to);
+      };
     }
   }
 

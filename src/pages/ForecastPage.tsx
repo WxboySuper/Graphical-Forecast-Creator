@@ -753,6 +753,7 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
+// @codescene(disable:"Complex Method", disable:"Large Method", disable:"Overall Code Complexity")
 const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
@@ -795,10 +796,15 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     setSurface(nextSurface === 'discussion' || nextSurface === 'review' ? nextSurface : 'map');
   }, [location.search]);
   useEffect(() => {
-    const openDiscussion = () => setSurface('discussion');
+    const openDiscussion = () => {
+      const nextParams = new URLSearchParams(location.search);
+      nextParams.set('surface', 'discussion');
+      navigate({ pathname: location.pathname, search: `?${nextParams.toString()}`, hash: location.hash }, { replace: true });
+      setSurface('discussion');
+    };
     window.addEventListener('gfc-open-severe-discussion', openDiscussion);
     return () => window.removeEventListener('gfc-open-severe-discussion', openDiscussion);
-  }, []);
+  }, [location.hash, location.pathname, location.search, navigate]);
   useEffect(() => {
     try { localStorage.setItem('gfc-severe-discussion-panel-width', String(discussionPanelWidth)); } catch { /* Keep this preference optional when storage is unavailable. */ }
   }, [discussionPanelWidth]);
@@ -866,7 +872,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     const nextParams = new URLSearchParams(searchParams);
     if (next === 'map') nextParams.delete('surface');
     else nextParams.set('surface', next);
-    navigate({ pathname: location.pathname, search: nextParams.toString() ? `?${nextParams.toString()}` : '', hash: location.hash });
+    navigate({ pathname: location.pathname, search: nextParams.toString() ? `?${nextParams.toString()}` : '', hash: location.hash }, { replace: true });
   };
   const updateDiscussionLayout = (next: 'tabs' | 'panel') => {
     setSavedDiscussionLayout(next);

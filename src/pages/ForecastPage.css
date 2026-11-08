@@ -133,6 +133,7 @@
 
 @media (max-width: 900px) {
   .severe-workspace__splitter { display: none; }
+  .severe-workspace__discussion { min-width: 0; border-left: 0; }
   .severe-workspace--panel .severe-workspace__discussion { display: none; }
   .severe-workspace--panel .severe-workspace__map { flex: 1 1 100%; }
   .severe-workspace--panel:has(.severe-workspace__navigation [aria-selected='true'][role='tab']:nth-child(2)) .severe-workspace__discussion { display: flex; flex: 1 1 100%; }
