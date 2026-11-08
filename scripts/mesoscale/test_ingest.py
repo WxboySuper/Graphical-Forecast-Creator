@@ -16,6 +16,7 @@ from ingest import LocalStore, MODELS, colorize, discover_cycle, publish_cycle, 
 from ingestion.publish import PublishRequest, latest_is_newer
 from ingestion.discovery import CycleSource, FrameSource
 from ingestion.archives import ArchiveRequest, create_archive
+from ingestion.render_steps import FrameResult, cycle_metrics
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
 from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range, write_temp_content
@@ -225,6 +226,17 @@ class IngestTests(unittest.TestCase):
         catalog["frames"][0]["frameType"] = "forecast"
         with self.assertRaises(ValueError):
             validate_catalog(catalog)
+
+    def test_cycle_metrics_count_frame_statuses(self):
+        source = FrameSource(0, "source", "modified")
+        processed = datetime(2026, 11, 8, 12, tzinfo=UTC)
+        result = FrameResult(source, [], {}, 0, 0, 0, 0, processed)
+        metrics = cycle_metrics(
+            [{"status": "complete"}, {"status": "partial"}, {"status": "failed"}],
+            [result, result, result],
+        )
+        self.assertEqual(metrics["framesComplete"], 1)
+        self.assertEqual(metrics["framesFailed"], 1)
 
     def test_catalog_malformed_frame_raises_value_error(self):
         catalog = sample_catalog()

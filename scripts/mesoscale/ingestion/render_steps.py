@@ -75,9 +75,10 @@ class FrameProcessRequest:
 def process(context, decode_range, render_tiles, combine_wind) -> RenderResult:
     import numpy as np
     results = [process_frame(FrameProcessRequest(context, frame, decode_range, render_tiles, combine_wind, np)) for frame in context.frames]
-    catalog = build_catalog(CycleBuild(context, [frame_record(context, result) for result in results], results))
+    frames = [frame_record(context, result) for result in results]
+    catalog = build_catalog(CycleBuild(context, frames, results))
     archives = {key: path for result in results for key, path in result.archives.items()}
-    metrics = cycle_metrics(results)
+    metrics = cycle_metrics(frames, results)
     catalog["metrics"] = metrics
     report_result(catalog, metrics)
     return RenderResult(catalog, archives, metrics)
@@ -191,7 +192,6 @@ def parameter_metadata(request: ParameterBuild) -> dict:
     field_id, item, spec, descriptors = request.field_id, request.item, request.spec, request.descriptors
     cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
     hour = context.forecast_hour
-    valid_time = (context.cycle + timedelta(hours=hour)).strftime("%Y-%m-%dT%H:%M:%SZ")
     level = next((entry["record"].get("level") for entry in descriptors if entry["record"].get("level")), spec[3])
     return {"id": field_id, "displayName": field_id.replace("-", " ").title(), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
 
@@ -216,8 +216,8 @@ def build_catalog(request: CycleBuild) -> dict:
     return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX}, "source": source_metadata(context.model), "requestedParameterIds": sorted(set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())), "frames": frames}
 
 
-def cycle_metrics(results: list[FrameResult]) -> dict:
-    return {"framesComplete": sum(all(parameter.get("status") == "complete" for parameter in result.parameters) for result in results), "framesFailed": 0, "tiles": sum(result.tiles for result in results), "bytesDownloaded": sum(result.downloaded for result in results), "bytesPublished": sum(result.archive_bytes for result in results), "archives": sum(len(result.archives) for result in results)}
+def cycle_metrics(frames: list[dict], results: list[FrameResult]) -> dict:
+    return {"framesComplete": sum(frame["status"] == "complete" for frame in frames), "framesFailed": sum(frame["status"] == "failed" for frame in frames), "tiles": sum(result.tiles for result in results), "bytesDownloaded": sum(result.downloaded for result in results), "bytesPublished": sum(result.archive_bytes for result in results), "archives": sum(len(result.archives) for result in results)}
 
 
 def report_result(catalog: dict, metrics: dict) -> None:
