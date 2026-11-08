@@ -10,8 +10,7 @@ const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 
 async function attemptKey(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const salt = env.FEEDBACK_HASH_SALT ?? env.FEEDBACK_ADMIN_TOKEN;
-  return digest(`${ip}:${salt}`);
+  return digest(`${ip}:${env.FEEDBACK_HASH_SALT}`);
 }
 
 async function throttleRetry(db, key, now) {
@@ -134,7 +133,7 @@ async function patchFeedback(request, id, db) {
 }
 
 export async function handleAdmin(request, env, url, id) {
-  if (!env.FEEDBACK_ADMIN_TOKEN) return json({ error: 'Admin API unavailable' }, 503);
+  if (!env.FEEDBACK_ADMIN_TOKEN || !env.FEEDBACK_HASH_SALT || !env.FEEDBACK_DB) return json({ error: 'Admin API unavailable' }, 503);
   const auth = await authenticate(request, env);
   if (!auth.ok) return auth.response;
   if (!id && request.method === 'GET') return listFeedback(url, env.FEEDBACK_DB);

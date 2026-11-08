@@ -307,6 +307,16 @@ test('a failed Discord status update never rejects the background task', async (
   await assert.doesNotReject(Promise.all(waits));
 });
 
+test('long messages are truncated without losing the Discord trailer ID', async () => {
+  const bodies = [];
+  const { env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async (url, init) => { bodies.push(JSON.parse(init.body)); return new Response('{}'); } } });
+  const response = await post(env, ctx, { auth: await token(), body: validBody({ message: 'x'.repeat(4000) }) });
+  const { id } = await response.json(); await Promise.all(waits);
+  const [{ embeds: [{ description }] }] = bodies;
+  assert.ok(description.length <= 4096);
+  assert.ok(description.endsWith(`**ID:** ${id}`));
+});
+
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
   const { db, env, ctx } = harness(); const auth = await token();
   assert.equal((await post(env, ctx, { auth, body: validBody({ viewport: '   ' }) })).status, 201);

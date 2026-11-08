@@ -39,7 +39,7 @@ async function loadKeys(env, now) {
   if (!Array.isArray(data.keys)) return null;
   const cacheControl = response.headers.get('cache-control') ?? '';
   const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] ?? 300);
-  jwksCache = { keys: data.keys, expiresAt: now + Math.max(0, Math.min(maxAge, 3600)) };
+  jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)) };
   return jwksCache.keys;
 }
 

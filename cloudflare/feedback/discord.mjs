@@ -1,6 +1,12 @@
 function createPayload(env, record) {
   const tag = record.build_target === 'beta' ? env.FEEDBACK_DISCORD_TAG_BETA : env.FEEDBACK_DISCORD_TAG_PROD;
-  const description = `**Feedback:** ${record.message.slice(0, 3800)}\n**Page:** ${record.page}\n**Version:** ${record.app_version}\n**Plan:** ${record.plan ?? 'unknown'}\n**ID:** ${record.id}`.slice(0, 4096);
+  const trailer = `
+**Page:** ${record.page}
+**Version:** ${record.app_version}
+**Plan:** ${record.plan ?? 'unknown'}
+**ID:** ${record.id}`;
+  // Truncate the message, never the trailer, so the ID needed to correlate a thread always survives.
+  const description = `**Feedback:** ${record.message.slice(0, 4096 - 14 - trailer.length)}${trailer}`;
   return {
     thread_name: `[${record.build_target === 'beta' ? 'BETA' : 'PROD'}] ${record.category}: ${record.message.slice(0, 80)}`.slice(0, 100),
     content: `Feedback ${record.id}`,
