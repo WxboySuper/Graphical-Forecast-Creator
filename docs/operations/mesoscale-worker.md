@@ -57,9 +57,10 @@ separate from a missing object or an invalid record.
 ## Cache and usage budget
 
 The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-request. Catalog and tile `HEAD` use R2 object metadata; latest `HEAD` reads its
-small pointer to compute live age headers. Metadata and uncached HEAD requests
-still count as Class B operations. Each `/latest` request reads one pointer.
+request. Tile `HEAD` uses R2 object metadata. Catalog `HEAD` reads and validates
+the catalog just like `GET`, while latest `HEAD` reads its small pointer to
+compute live age headers. Each R2 read counts as a Class B operation. Each
+`/latest` request reads one pointer.
 Each `/status` request reads up to nine objects: three latest
 pointers and today's and yesterday's health object for each of the three models.
 The Worker Cache API stores immutable catalogs, tiles, and short-lived missing
