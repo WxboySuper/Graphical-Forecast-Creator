@@ -11,11 +11,11 @@ import { parseDeclaredDatasets, sha256Of, verifyVendoredDatasets } from './valid
 const ROOT = resolve(import.meta.dirname, '..');
 
 describe('vendored boundary dataset validation', () => {
-  test('parses exactly the three declared datasets', () => {
+  test('parses exactly the four declared datasets', () => {
     const datasets = parseDeclaredDatasets();
-    assert.equal(datasets.length, 3);
+    assert.equal(datasets.length, 4);
     const keys = datasets.map((d) => d.key).sort();
-    assert.deepEqual(keys, ['lakes', 'usStates', 'worldCountries']);
+    assert.deepEqual(keys, ['lakes', 'usPlaces', 'usStates', 'worldCountries']);
   });
 
   test('every declared dataset exists and matches its pinned checksum', () => {
