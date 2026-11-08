@@ -42,8 +42,12 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.goto('/discussion?workspace=custom&group=day1&keep=1#editor');
     await expect(page).toHaveURL(/\/forecast\/custom\?group=day1&keep=1&surface=discussion#editor/);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+    const customMap = page.locator('.custom-workspace__map');
+    await expect(customMap).toBeAttached();
+    await expect(customMap).toHaveAttribute('aria-hidden', 'true');
     await page.getByRole('button', { name: 'Return to Custom map' }).click();
     await expect(page).toHaveURL(/\/forecast\/custom\?group=day1&keep=1#editor/);
+    await expect(customMap).toBeVisible();
     await expect(page.locator('.forecast-workspace-layout')).toBeVisible();
   });
 
@@ -109,6 +113,7 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
     const map = page.locator('.severe-workspace__map');
     await expect(map).not.toBeVisible();
+    await expect(map).toHaveAttribute('aria-hidden', 'true');
     await page.getByRole('button', { name: 'Hide panel' }).click();
     await expect(map).not.toBeVisible();
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();

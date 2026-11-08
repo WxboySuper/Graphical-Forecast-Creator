@@ -793,8 +793,19 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const discussionPanelResizeRef = useRef({ pointerX: 0, width: discussionPanelWidth });
   const requestedSurface = searchParams.get('surface');
   const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(() => getWorkspaceSurface(requestedSurface));
+  const [isCompactWorkspace, setIsCompactWorkspace] = useState(() =>
+    typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches,
+  );
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const mediaQuery = window.matchMedia('(max-width: 900px)');
+    const updateCompactLayout = () => setIsCompactWorkspace(mediaQuery.matches);
+    mediaQuery.addEventListener?.('change', updateCompactLayout);
+    return () => mediaQuery.removeEventListener?.('change', updateCompactLayout);
+  }, []);
+  const showHintedCustomDiscussion = workspaceId === 'custom' && surface === 'discussion';
   const hideMapForDiscussion = surface === 'discussion'
-    && (discussionLayout === 'tabs' || (discussionLayout === 'panel' && discussionPanelCollapsed));
+    && (discussionLayout === 'tabs' || (discussionLayout === 'panel' && (discussionPanelCollapsed || isCompactWorkspace)));
   useEffect(() => {
     setSurface(getWorkspaceSurface(requestedSurface));
   }, [requestedSurface]);
@@ -832,18 +843,18 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const mapIsHidden = surface === 'review' || hideMapForDiscussion;
-    const map = workspaceRef.current?.querySelector('.severe-workspace__map');
+    const mapIsHidden = surface === 'review' || hideMapForDiscussion || showHintedCustomDiscussion;
+    const map = workspaceRef.current?.querySelector('.severe-workspace__map, .custom-workspace__map');
     if (!mapIsHidden) return;
     if (!map?.contains(document.activeElement)) return;
-    workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
-  }, [hideMapForDiscussion, surface]);
+    workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"], [data-workspace-return-map]')?.focus();
+  }, [hideMapForDiscussion, showHintedCustomDiscussion, surface]);
   useEffect(() => {
-    if (surface !== 'review') return undefined;
-    const map = workspaceRef.current?.querySelector<HTMLElement>('.severe-workspace__map');
+    if (surface !== 'review' && !hideMapForDiscussion && !showHintedCustomDiscussion) return undefined;
+    const map = workspaceRef.current?.querySelector<HTMLElement>('.severe-workspace__map, .custom-workspace__map');
     if (!map || 'inert' in map) return undefined;
     return makeSubtreeUntabbable(map);
-  }, [surface]);
+  }, [hideMapForDiscussion, showHintedCustomDiscussion, surface]);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(
@@ -938,8 +949,6 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   if (emergencyMode) {
     return <EmergencyModeMessage />;
   }
-  const showHintedCustomDiscussion = workspaceId === 'custom' && surface === 'discussion';
-
   return (
     <div ref={forecastShellRef} className={`forecast-page-shell${showLegacyNotice ? ' forecast-page-shell--legacy-notice' : ''}${AUTO_TSTM_DISABLED ? ' forecast-page-shell--auto-tstm-disabled' : ''}`}>
       {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
@@ -1030,14 +1039,25 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               ) : null}
             </div>
           </div>
-        ) : showHintedCustomDiscussion ? (
-          <div className="custom-workspace-discussion">
-            <div className="custom-workspace-discussion__navigation">
-              <Button type="button" variant="outline" onClick={() => updateSurface('map')}>Return to Custom map</Button>
+        ) : (
+          <div className="custom-forecast-workspace">
+            <div
+              className={`custom-workspace__map${showHintedCustomDiscussion ? ' is-offscreen' : ''}`}
+              aria-hidden={showHintedCustomDiscussion}
+              inert={showHintedCustomDiscussion ? true : undefined}
+            >
+              <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
             </div>
-            <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense>
+            {showHintedCustomDiscussion ? (
+              <div className="custom-workspace-discussion">
+                <div className="custom-workspace-discussion__navigation">
+                  <Button type="button" variant="outline" data-workspace-return-map onClick={() => updateSurface('map')}>Return to Custom map</Button>
+                </div>
+                <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense>
+              </div>
+            ) : null}
           </div>
-        ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
+        )}
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog

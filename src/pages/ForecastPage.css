@@ -135,6 +135,9 @@
 .severe-workspace__review { flex: 1 1 100%; min-width: 0; min-height: 0; overflow: auto; padding: 1rem; }
 .severe-workspace__review > section { max-width: 72rem; margin-inline: auto; }
 .severe-workspace__review-heading { margin-right: auto; }
+.custom-forecast-workspace { position: relative; display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; }
+.custom-workspace__map { display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; }
+.custom-workspace__map.is-offscreen { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
 
 @media (max-width: 900px) {
   .severe-workspace__splitter { display: none; }
