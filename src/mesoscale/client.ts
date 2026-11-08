@@ -75,8 +75,8 @@ const shouldKeepResponse = ({ response, attempt, attempts }: { response: Respons
   return attempt === attempts;
 };
 
-const shouldThrowAttemptError = ({ error, attempt, attempts }: { error: unknown; attempt: number; attempts: number }): boolean => {
-  if (isAbort(error)) return true;
+const shouldThrowAttemptError = ({ error, attempt, attempts, signal }: { error: unknown; attempt: number; attempts: number; signal?: AbortSignal }): boolean => {
+  if (isAbort(error) && signal?.aborted) return true;
   return attempt === attempts;
 };
 
@@ -86,7 +86,7 @@ async function attemptWithRetry({ url, options, attempt, attempts }: RetryAttemp
     if (shouldKeepResponse({ response: request.response, attempt, attempts })) return request;
     request.cleanup();
   } catch (error) {
-    if (shouldThrowAttemptError({ error, attempt, attempts })) throw error;
+    if (shouldThrowAttemptError({ error, attempt, attempts, signal: options.signal })) throw error;
   }
   return undefined;
 }
@@ -141,7 +141,8 @@ async function readJson<T>({ path, options }: JsonRequestOptions): Promise<Mesos
   try {
     return await readHttpJson<T>({ url: endpoint({ config, path }), options });
   } catch (error) {
-    if (isAbort(error)) return { state: 'upstream-failure', message: 'Mesoscale request timed out or was cancelled.', retryable: false };
+    if (options.signal?.aborted) return { state: 'upstream-failure', message: 'Mesoscale request was cancelled.', retryable: false };
+    if (isAbort(error)) return { state: 'upstream-failure', message: 'Mesoscale request timed out.', retryable: true };
     if (error instanceof SyntaxError) return { state: 'malformed', message: 'Mesoscale response is not valid JSON.' };
     return { state: 'upstream-failure', message: 'Mesoscale service is unavailable.', retryable: true };
   }

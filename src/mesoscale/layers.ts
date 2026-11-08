@@ -53,7 +53,7 @@ const layerSignature = (spec: MesoscaleLayerSpec) => JSON.stringify({
   units: spec.parameter.units,
   legend: spec.parameter.legend,
   source: spec.parameter.source,
-  attribution: spec.parameter.source.attribution,
+  attribution: spec.parameter.source?.attribution ?? '',
 });
 
 export interface SyncMesoscaleLayersOptions {

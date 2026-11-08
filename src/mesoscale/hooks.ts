@@ -37,6 +37,10 @@ const useRequest = <T,>(load: (signal: AbortSignal) => Promise<MesoscaleRequestR
     setResult({ state: 'loading' });
     void load(controller.signal).then(value => {
       if (!controller.signal.aborted) setResult(value);
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setResult({ state: 'upstream-failure', message: 'Mesoscale request failed.', retryable: true });
+      }
     });
     return () => controller.abort();
   }, [load]);
@@ -54,7 +58,7 @@ export const useMesoscaleLatest = (model: MesoscaleModelId, options: MesoscaleHo
   const { result, now } = useTimedRequest(load);
   const cycle = hasData(result) ? Date.parse(result.data.cycleTime) : Number.NaN;
   const ageMinutes = Number.isFinite(cycle) ? Math.max(0, Math.floor((now - cycle) / 60_000)) : null;
-  const stale = hasData(result) && (result.stale || now - cycle > STALE_AFTER_MS);
+  const stale = hasData(result) && (result.stale || ageMinutes === null || ageMinutes > STALE_AFTER_MS / 60_000);
   const currentResult = stale ? { ...result, state: 'stale' as const, stale: true } : result;
   return { result: currentResult, ageMinutes, stale };
 };
