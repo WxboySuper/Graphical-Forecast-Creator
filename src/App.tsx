@@ -55,6 +55,9 @@ import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWor
 const ForecastPage = lazyWithReload('forecast', () =>
   import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
 );
+const MesoscalePage = lazyWithReload('mesoscale', () =>
+  import('./pages/MesoscalePage').then((module) => ({ default: module.MesoscalePage }))
+);
 const VerificationPage = lazyWithReload('verification', () =>
   import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
 );
@@ -193,7 +196,7 @@ const AppRoutes: React.FC = () => {
             <Route
               key={route.id}
               path={route.routePath}
-              element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={route.id} /></Suspense>}
+              element={<Suspense fallback={<RouteFallback />}>{route.id === 'mesoscale' ? <MesoscalePage /> : <ForecastPage workspaceId={route.id} />}</Suspense>}
             />
           ))}
           {getUnavailableForecastWorkspaceRoutes().map((route) => (

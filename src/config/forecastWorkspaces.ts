@@ -41,8 +41,9 @@ export const FORECAST_WORKSPACES = [
     description: 'Short-term forecasts built from live model data.',
     focus: ['HRRR, RAP, and RRFS', 'Mesoscale discussions'],
     productType: 'mesoscale',
-    status: 'future',
-    exposureKey: null,
+    status: 'gated',
+    // Local only until the Worker is deployed and a production decision is made (#919).
+    exposureKey: 'mesoscaleWorkspace',
     legacyPaths: [],
   },
   {
@@ -85,6 +86,12 @@ export const FORECAST_WORKSPACES = [
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 
 export const DEFAULT_FORECAST_WORKSPACE: ForecastWorkspaceId = 'severe';
+
+/** Workspaces whose products have no cloud storage (local autosave and file export only). */
+const LOCAL_ONLY_WORKSPACES: ReadonlySet<ForecastWorkspaceId> = new Set(['mesoscale']);
+
+/** Returns whether a workspace's products can be saved to and loaded from cloud storage. */
+export const hasCloudStorage = (workspaceId: ForecastWorkspaceId): boolean => !LOCAL_ONLY_WORKSPACES.has(workspaceId);
 
 /** Custom editing is active only when the route and both rollout flags agree. */
 export const isCustomWorkspaceActive = (

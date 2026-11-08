@@ -18,7 +18,7 @@ The planned Forecast routes are:
 | Workspace | Canonical path | v1.8 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
+| Mesoscale | `/forecast/mesoscale` | gated by `mesoscaleWorkspace` (local only); tracked in #919 | Workspace status |
 | Tropical | `/forecast/tropical` | future; tracked in #432 | Workspace status |
 | Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |

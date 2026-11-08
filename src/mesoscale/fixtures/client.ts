@@ -1,16 +1,23 @@
 import type { MesoscaleModelId } from '../contracts';
 import type { MesoscaleRequestResult } from '../request';
 import { FIXTURE_STATUS, getFixtureCatalog, getFixtureLatest } from './catalogs';
+import { getDemoCatalogForCycle, getDemoLatest } from './demoCatalogs';
+
+declare const __MESOSCALE_DEMO__: boolean;
+
+/** Demo data is a local-only development aid: it never exists unless the build flag is on. */
+export const isMesoscaleDemoData = (): boolean => typeof __MESOSCALE_DEMO__ !== 'undefined' && __MESOSCALE_DEMO__;
 
 const failure = (message: string): MesoscaleRequestResult<never> => ({ state: 'upstream-failure', message, retryable: false });
 
 const readLatest = <T,>(model: MesoscaleModelId): MesoscaleRequestResult<T> => {
+  if (isMesoscaleDemoData()) return { state: 'ready', data: getDemoLatest(model) as T, stale: false, ageMinutes: null };
   const data = getFixtureLatest(model);
   return data ? { state: 'stale', data: data as T, stale: true, ageMinutes: null } : failure('No fixture exists for this model.');
 };
 
 const readCatalog = <T,>(model: MesoscaleModelId, cycle: string): MesoscaleRequestResult<T> => {
-  const data = getFixtureCatalog(model, cycle);
+  const data = isMesoscaleDemoData() ? getDemoCatalogForCycle(model, cycle) : getFixtureCatalog(model, cycle);
   if (!data) return failure('Fixture catalog was not found.');
   const ageMinutes = Math.floor((Date.now() - Date.parse(data.cycleTime)) / 60000);
   const stale = Date.now() - Date.parse(data.cycleTime) > 180 * 60000;

@@ -10,7 +10,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 
 - `/forecast/severe` is the available editor. `/forecast` redirects there and keeps query parameters and hash.
 - `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor and owns custom layer and product editing controls. Staging and production keep the workspace on the unavailable-workspace page.
-- `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
+- `/forecast/mesoscale` renders its own page (`MesoscalePage`, not `ForecastPage`) and is registered only where `mesoscaleWorkspace` is on, which today means local builds. Mesoscale products have no cloud storage, so the workspace is excluded from cloud loads and from Cloud Library tabs. `/forecast/tropical` and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
 - `/custom-products` stays a separate library route gated by `customProducts`. It is not a legacy Forecast editor path.
 - Canonical matching tolerates trailing slashes. Non-forecast pages leave Redux workspace ownership alone instead of resetting it to Severe.
 

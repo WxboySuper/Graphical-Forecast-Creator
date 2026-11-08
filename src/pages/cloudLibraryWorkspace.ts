@@ -1,6 +1,7 @@
 import {
   getExposedForecastWorkspaces,
   getForecastWorkspace,
+  hasCloudStorage,
   isForecastWorkspaceExposed,
   resolveStoredWorkspaceId,
   type ForecastWorkspaceId,
@@ -113,7 +114,7 @@ export const getCloudLibraryTabs = (
 ): CloudLibraryTab[] => {
   const tabs: CloudLibraryTab[] = [{ id: 'all', label: 'All', cycleCount: cycles.length }];
 
-  for (const workspace of getExposedForecastWorkspaces(target)) {
+  for (const workspace of getExposedForecastWorkspaces(target).filter((candidate) => hasCloudStorage(candidate.id))) {
     if (workspace.status === 'future') continue;
     tabs.push({
       id: workspace.id,
