@@ -1,6 +1,6 @@
 {
   "measuredAt": "2026-11-08",
-  "method": "Anonymous HTTPS .idx inventory. Parameter, level and step strings are copied exactly from NOAA index rows. Units cannot be read from .idx files and were not decoded in this environment.",
+  "method": "Anonymous HTTPS .idx inventory; selected-message GRIB metadata decoded from HTTP byte ranges with ecCodes 2.41.0. Parameter/level/step index identities are copied exactly from NOAA indexes; selected messages record GRIB2 codes, units and step metadata where resolved. CAPE/CIN parcel semantics remain unverified.",
   "models": {
     "HRRR": {
       "cycle": "2026-11-08T12:00:00Z",
@@ -23,14 +23,14 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
@@ -52,56 +52,56 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "kg m**-2",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLMA",
           "level": "mean sea level",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "Pa",
           "step": "anl",
           "present": true
         },
         "updraftHelicity": {
           "parameter": "MXUPHL/MNUPHL",
           "level": "5000-2000, 2000-0, and 3000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "0-0 day max/min fcst",
           "present": true
         },
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "dB",
           "step": "anl",
           "present": true
         },
         "wind10mU": {
           "parameter": "UGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "wind10mV": {
           "parameter": "VGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
         "SRH0-3km": {
           "parameter": "HLCY",
           "level": "3000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
@@ -116,7 +116,7 @@
         "SBCAPE": {
           "parameter": "CAPE",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -140,7 +140,7 @@
         "SBCIN": {
           "parameter": "CIN",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -172,7 +172,7 @@
           {
             "parameter": "CAPE",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -180,7 +180,7 @@
           {
             "parameter": "CAPE",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -188,7 +188,7 @@
           {
             "parameter": "CAPE",
             "level": "0-3000 m above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -198,7 +198,7 @@
           {
             "parameter": "CIN",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -206,7 +206,7 @@
           {
             "parameter": "CIN",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -251,7 +251,21 @@
             "offset": 24864321,
             "rangeStart": 24864321,
             "rangeEnd": 25490920,
-            "bytes": 626600
+            "bytes": 626600,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 3,
+              "parameterNumber": 198,
+              "shortName": "mslma",
+              "name": "MSLP (MAPS System Reduction)",
+              "units": "Pa",
+              "typeOfLevel": "meanSea",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "T2m",
@@ -262,7 +276,21 @@
             "offset": 35958451,
             "rangeStart": 35958451,
             "rangeEnd": 37196037,
-            "bytes": 1237587
+            "bytes": 1237587,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 0,
+              "shortName": "2t",
+              "name": "2 metre temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "Td2m",
@@ -273,7 +301,21 @@
             "offset": 39902767,
             "rangeStart": 39902767,
             "rangeEnd": 41099131,
-            "bytes": 1196365
+            "bytes": 1196365,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 6,
+              "shortName": "2d",
+              "name": "2 metre dewpoint temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mU",
@@ -284,7 +326,21 @@
             "offset": 44127882,
             "rangeStart": 44127882,
             "rangeEnd": 46509496,
-            "bytes": 2381615
+            "bytes": 2381615,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 2,
+              "shortName": "10u",
+              "name": "10 metre U wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mV",
@@ -295,7 +351,21 @@
             "offset": 46509497,
             "rangeStart": 46509497,
             "rangeEnd": 48652968,
-            "bytes": 2143472
+            "bytes": 2143472,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 3,
+              "shortName": "10v",
+              "name": "10 metre V wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SBCAPE",
@@ -306,7 +376,21 @@
             "offset": 65877665,
             "rangeStart": 65877665,
             "rangeEnd": 66165470,
-            "bytes": 287806
+            "bytes": 287806,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 6,
+              "shortName": "cape",
+              "name": "Convective available potential energy",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SBCIN",
@@ -317,7 +401,21 @@
             "offset": 66165471,
             "rangeStart": 66165471,
             "rangeEnd": 66493217,
-            "bytes": 327747
+            "bytes": 327747,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 7,
+              "shortName": "cin",
+              "name": "Convective inhibition",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-3km",
@@ -328,7 +426,21 @@
             "offset": 86786072,
             "rangeStart": 86786072,
             "rangeEnd": 87995318,
-            "bytes": 1209247
+            "bytes": 1209247,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 3000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-1km",
@@ -339,7 +451,21 @@
             "offset": 87995319,
             "rangeStart": 87995319,
             "rangeEnd": 89922963,
-            "bytes": 1927645
+            "bytes": 1927645,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 1000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "PWAT",
@@ -350,7 +476,21 @@
             "offset": 66493218,
             "rangeStart": 66493218,
             "rangeEnd": 67413270,
-            "bytes": 920053
+            "bytes": 920053,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 1,
+              "parameterNumber": 3,
+              "shortName": "pwat",
+              "name": "Precipitable water",
+              "units": "kg m**-2",
+              "typeOfLevel": "atmosphereSingleLayer",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "reflectivity",
@@ -361,12 +501,36 @@
             "offset": 0,
             "rangeStart": 0,
             "rangeEnd": 292348,
-            "bytes": 292349
+            "bytes": 292349,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 16,
+              "parameterNumber": 196,
+              "shortName": "refc",
+              "name": "Maximum/Composite radar reflectivity",
+              "units": "dB",
+              "typeOfLevel": "atmosphere",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           }
         ],
         "uniqueBytes": 12550486
       },
-      "f00ObjectLastModified": "2026-11-08T12:51:20Z"
+      "f00ObjectLastModified": "2026-11-08T12:51:20Z",
+      "decodeSample": {
+        "field": "T2m",
+        "rangeBytes": 1237587,
+        "downloadSeconds": 0.429,
+        "ecCodesVersion": "2.41.0",
+        "decodeAndLatLonSeconds": 1.026,
+        "pyprojVersion": "3.7.1",
+        "reprojectToEPSG3857Seconds": 0.295,
+        "note": "Decode plus lat/lon array generation; projection timing transforms coordinates only, not value resampling or tiling."
+      }
     },
     "RAP": {
       "cycle": "2026-11-08T06:00:00Z",
@@ -383,14 +547,14 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
@@ -412,14 +576,14 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "kg m**-2",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLMA",
           "level": "mean sea level",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "Pa",
           "step": "anl",
           "present": true
         },
@@ -433,35 +597,35 @@
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "dB",
           "step": "anl",
           "present": true
         },
         "wind10mU": {
           "parameter": "UGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "wind10mV": {
           "parameter": "VGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
         "SRH0-3km": {
           "parameter": "HLCY",
           "level": "3000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
@@ -476,7 +640,7 @@
         "SBCAPE": {
           "parameter": "CAPE",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -500,7 +664,7 @@
         "SBCIN": {
           "parameter": "CIN",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -532,7 +696,7 @@
           {
             "parameter": "CAPE",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -540,7 +704,7 @@
           {
             "parameter": "CAPE",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -548,7 +712,7 @@
           {
             "parameter": "CAPE",
             "level": "0-3000 m above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -558,7 +722,7 @@
           {
             "parameter": "CIN",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -566,7 +730,7 @@
           {
             "parameter": "CIN",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -611,7 +775,21 @@
             "offset": 13508095,
             "rangeStart": 13508095,
             "rangeEnd": 13549664,
-            "bytes": 41570
+            "bytes": 41570,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 3,
+              "parameterNumber": 198,
+              "shortName": "mslma",
+              "name": "MSLP (MAPS System Reduction)",
+              "units": "Pa",
+              "typeOfLevel": "meanSea",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "T2m",
@@ -622,7 +800,21 @@
             "offset": 14557274,
             "rangeStart": 14557274,
             "rangeEnd": 14612428,
-            "bytes": 55155
+            "bytes": 55155,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 0,
+              "shortName": "2t",
+              "name": "2 metre temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "Td2m",
@@ -633,7 +825,21 @@
             "offset": 14690468,
             "rangeStart": 14690468,
             "rangeEnd": 14751925,
-            "bytes": 61458
+            "bytes": 61458,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 6,
+              "shortName": "2d",
+              "name": "2 metre dewpoint temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mU",
@@ -644,7 +850,21 @@
             "offset": 14914225,
             "rangeStart": 14914225,
             "rangeEnd": 15041243,
-            "bytes": 127019
+            "bytes": 127019,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 2,
+              "shortName": "10u",
+              "name": "10 metre U wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mV",
@@ -655,7 +875,22 @@
             "offset": 14914225,
             "rangeStart": 14914225,
             "rangeEnd": 15041243,
-            "bytes": 127019
+            "bytes": 127019,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 2,
+              "shortName": "10u",
+              "name": "10 metre U wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            },
+            "decodeNote": "The shared range decodes as its first GRIB field (10u); NOAA index record 460.2 identifies VGRD. The V-component submessage was not independently resolved."
           },
           {
             "field": "SBCAPE",
@@ -666,7 +901,21 @@
             "offset": 15212567,
             "rangeStart": 15212567,
             "rangeEnd": 15248895,
-            "bytes": 36329
+            "bytes": 36329,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 6,
+              "shortName": "cape",
+              "name": "Convective available potential energy",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SBCIN",
@@ -677,7 +926,21 @@
             "offset": 15248896,
             "rangeStart": 15248896,
             "rangeEnd": 15261287,
-            "bytes": 12392
+            "bytes": 12392,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 7,
+              "shortName": "cin",
+              "name": "Convective inhibition",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-3km",
@@ -688,7 +951,21 @@
             "offset": 15966586,
             "rangeStart": 15966586,
             "rangeEnd": 15999449,
-            "bytes": 32864
+            "bytes": 32864,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 3000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-1km",
@@ -699,7 +976,21 @@
             "offset": 15999450,
             "rangeStart": 15999450,
             "rangeEnd": 16062428,
-            "bytes": 62979
+            "bytes": 62979,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 1000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "PWAT",
@@ -710,7 +1001,21 @@
             "offset": 15261288,
             "rangeStart": 15261288,
             "rangeEnd": 15314496,
-            "bytes": 53209
+            "bytes": 53209,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 1,
+              "parameterNumber": 3,
+              "shortName": "pwat",
+              "name": "Precipitable water",
+              "units": "kg m**-2",
+              "typeOfLevel": "atmosphereSingleLayer",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "reflectivity",
@@ -721,7 +1026,21 @@
             "offset": 425611,
             "rangeStart": 425611,
             "rangeEnd": 503972,
-            "bytes": 78362
+            "bytes": 78362,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 16,
+              "parameterNumber": 196,
+              "shortName": "refc",
+              "name": "Maximum/Composite radar reflectivity",
+              "units": "dB",
+              "typeOfLevel": "atmosphere",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           }
         ],
         "uniqueBytes": 561337
@@ -743,14 +1062,14 @@
         "T2m": {
           "parameter": "TMP",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "K",
           "step": "anl",
           "present": true
         },
@@ -772,56 +1091,56 @@
         "PWAT": {
           "parameter": "PWAT",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "kg m**-2",
           "step": "anl",
           "present": true
         },
         "MSLP": {
           "parameter": "MSLET",
           "level": "mean sea level",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "Pa",
           "step": "anl",
           "present": true
         },
         "updraftHelicity": {
           "parameter": "UPHL",
           "level": "5000-2000 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
         "reflectivity": {
           "parameter": "REFC",
           "level": "entire atmosphere (considered as a single layer)",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "dB",
           "step": "anl",
           "present": true
         },
         "wind10mU": {
           "parameter": "UGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "wind10mV": {
           "parameter": "VGRD",
           "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m s**-1",
           "step": "anl",
           "present": true
         },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
         "SRH0-3km": {
           "parameter": "HLCY",
           "level": "3000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "m**2 s**-2",
           "step": "anl",
           "present": true
         },
@@ -836,7 +1155,7 @@
         "SBCAPE": {
           "parameter": "CAPE",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -860,7 +1179,7 @@
         "SBCIN": {
           "parameter": "CIN",
           "level": "surface",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1",
           "step": "anl",
           "present": true
         },
@@ -892,7 +1211,7 @@
           {
             "parameter": "CAPE",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -900,7 +1219,7 @@
           {
             "parameter": "CAPE",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -908,7 +1227,7 @@
           {
             "parameter": "CAPE",
             "level": "0-3000 m above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -918,7 +1237,7 @@
           {
             "parameter": "CIN",
             "level": "90-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -926,7 +1245,7 @@
           {
             "parameter": "CIN",
             "level": "255-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
+            "units": "J kg**-1",
             "step": "anl",
             "present": true,
             "parcelIdentity": "unverified"
@@ -971,7 +1290,21 @@
             "offset": 0,
             "rangeStart": 0,
             "rangeEnd": 525576,
-            "bytes": 525577
+            "bytes": 525577,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 16,
+              "parameterNumber": 5,
+              "shortName": "unknown",
+              "name": "unknown",
+              "units": "unknown",
+              "typeOfLevel": "atmosphereSingleLayer",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "seaLevelPressure",
@@ -982,7 +1315,21 @@
             "offset": 9964508,
             "rangeStart": 9964508,
             "rangeEnd": 11844381,
-            "bytes": 1879874
+            "bytes": 1879874,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 3,
+              "parameterNumber": 192,
+              "shortName": "mslet",
+              "name": "MSLP (Eta model reduction)",
+              "units": "Pa",
+              "typeOfLevel": "meanSea",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "T2m",
@@ -993,7 +1340,21 @@
             "offset": 64830979,
             "rangeStart": 64830979,
             "rangeEnd": 66524993,
-            "bytes": 1694015
+            "bytes": 1694015,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 0,
+              "shortName": "2t",
+              "name": "2 metre temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "Td2m",
@@ -1004,7 +1365,21 @@
             "offset": 67988934,
             "rangeStart": 67988934,
             "rangeEnd": 69734825,
-            "bytes": 1745892
+            "bytes": 1745892,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 0,
+              "parameterNumber": 6,
+              "shortName": "2d",
+              "name": "2 metre dewpoint temperature",
+              "units": "K",
+              "typeOfLevel": "heightAboveGround",
+              "level": 2,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mU",
@@ -1015,7 +1390,21 @@
             "offset": 73522539,
             "rangeStart": 73522539,
             "rangeEnd": 75435425,
-            "bytes": 1912887
+            "bytes": 1912887,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 2,
+              "shortName": "10u",
+              "name": "10 metre U wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "wind10mV",
@@ -1026,7 +1415,21 @@
             "offset": 75435426,
             "rangeStart": 75435426,
             "rangeEnd": 77284904,
-            "bytes": 1849479
+            "bytes": 1849479,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 2,
+              "parameterNumber": 3,
+              "shortName": "10v",
+              "name": "10 metre V wind component",
+              "units": "m s**-1",
+              "typeOfLevel": "heightAboveGround",
+              "level": 10,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SBCAPE",
@@ -1037,7 +1440,21 @@
             "offset": 96513536,
             "rangeStart": 96513536,
             "rangeEnd": 97136649,
-            "bytes": 623114
+            "bytes": 623114,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 6,
+              "shortName": "cape",
+              "name": "Convective available potential energy",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SBCIN",
@@ -1048,7 +1465,21 @@
             "offset": 97136650,
             "rangeStart": 97136650,
             "rangeEnd": 97463957,
-            "bytes": 327308
+            "bytes": 327308,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 7,
+              "shortName": "cin",
+              "name": "Convective inhibition",
+              "units": "J kg**-1",
+              "typeOfLevel": "surface",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-3km",
@@ -1059,7 +1490,21 @@
             "offset": 131382312,
             "rangeStart": 131382312,
             "rangeEnd": 132652905,
-            "bytes": 1270594
+            "bytes": 1270594,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 3000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "SRH0-1km",
@@ -1070,7 +1515,21 @@
             "offset": 132652906,
             "rangeStart": 132652906,
             "rangeEnd": 133873410,
-            "bytes": 1220505
+            "bytes": 1220505,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 8,
+              "shortName": "hlcy",
+              "name": "Storm relative helicity",
+              "units": "m**2 s**-2",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 1000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "PWAT",
@@ -1081,7 +1540,21 @@
             "offset": 97463958,
             "rangeStart": 97463958,
             "rangeEnd": 98432611,
-            "bytes": 968654
+            "bytes": 968654,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 1,
+              "parameterNumber": 3,
+              "shortName": "pwat",
+              "name": "Precipitable water",
+              "units": "kg m**-2",
+              "typeOfLevel": "atmosphereSingleLayer",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "updraftHelicity",
@@ -1092,7 +1565,21 @@
             "offset": 137229153,
             "rangeStart": 137229153,
             "rangeEnd": 137314264,
-            "bytes": 85112
+            "bytes": 85112,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 7,
+              "parameterNumber": 15,
+              "shortName": "unknown",
+              "name": "unknown",
+              "units": "unknown",
+              "typeOfLevel": "heightAboveGroundLayer",
+              "level": 5000,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           },
           {
             "field": "reflectivity",
@@ -1103,7 +1590,21 @@
             "offset": 0,
             "rangeStart": 0,
             "rangeEnd": 525576,
-            "bytes": 525577
+            "bytes": 525577,
+            "gribMetadata": {
+              "discipline": 0,
+              "parameterCategory": 16,
+              "parameterNumber": 5,
+              "shortName": "unknown",
+              "name": "unknown",
+              "units": "unknown",
+              "typeOfLevel": "atmosphereSingleLayer",
+              "level": 0,
+              "stepType": "instant",
+              "startStep": 0,
+              "endStep": 0,
+              "gridType": "lambert"
+            }
           }
         ],
         "uniqueBytes": 14103011
