@@ -14,15 +14,15 @@ async function cancelReader(reader) {
 async function readChunks(reader) {
   const chunks = [];
   let size = 0;
-  while (size <= MAX_BODY_BYTES) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await cancelReader(reader);
+      return { tooLarge: true };
+    }
     chunks.push(value);
-  }
-  if (size > MAX_BODY_BYTES) {
-    await cancelReader(reader);
-    return { tooLarge: true };
   }
   return { chunks, size };
 }
@@ -60,8 +60,9 @@ function rateLimitRetry(counts, now) {
 }
 
 function retryAt(createdAt, window, now) {
-  const last = Number(createdAt) || now;
-  return Math.max(1, Math.ceil((last + window - now) / 1000));
+  const last = Number(createdAt);
+  const base = Number.isFinite(last) ? last : now;
+  return Math.max(1, Math.ceil((base + window - now) / 1000));
 }
 
 export async function applyUserRateLimit(db, uidHash, message, now) {
