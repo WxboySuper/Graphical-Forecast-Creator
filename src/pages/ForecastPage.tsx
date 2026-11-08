@@ -1,3 +1,4 @@
+// @codescene(disable:"Overall Code Complexity")
 /**
  * Forecast workspace page orchestration.
  *
@@ -6,7 +7,6 @@
  * persistence services stay in their own modules; this page coordinates them
  * for the active forecast route and translates outcomes into UI feedback.
  */
-// @codescene(disable:"Overall Code Complexity")
 import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate, useOutletContext } from 'react-router';
