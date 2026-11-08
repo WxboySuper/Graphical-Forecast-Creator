@@ -3,7 +3,6 @@ import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
 import { resetKeyCache } from './feedback/auth.mjs';
-import { validate } from './feedback/validate.mjs';
 
 const project = 'gfc-test';
 let privateKey;
