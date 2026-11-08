@@ -70,10 +70,13 @@ const parseLatestRoute = (parts) => {
   return MODELS.has(model) ? { kind: 'latest', model, key: `${V1_PREFIX}/latest/${model}.json` } : null;
 };
 
+const validTileIndex = (index, limit) => Number.isSafeInteger(index) && index >= 0 && index < limit;
+
 const validTileCoordinates = (zoom, x, y) => {
-  if (!Number.isSafeInteger(zoom) || zoom < 0 || zoom > MAX_ZOOM) return false;
-  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return false;
-  return x >= 0 && y >= 0 && x < 2 ** zoom && y < 2 ** zoom;
+  if (zoom < 0) return false;
+  if (zoom > MAX_ZOOM) return false;
+  const limit = 2 ** zoom;
+  return validTileIndex(x, limit) && validTileIndex(y, limit);
 };
 
 const parseTileCoordinates = (parts) => {
