@@ -60,3 +60,11 @@ test('the search text is never written to the URL', () => {
   assert.ok(body.includes("'status','target','category'"), 'only the three filters are persisted');
   assert.equal(body.includes("'q'") || body.includes('Object.keys(state.filters)'), false, 'the search box is not persisted');
 });
+
+test('JSON responses are never cacheable or sniffable, including bearer API errors', async () => {
+  const env = { FEEDBACK_ADMIN_TOKEN: 'secret', FEEDBACK_HASH_SALT: 'salt', FEEDBACK_DB: { prepare: () => ({ bind: () => ({ first: async () => null, run: async () => ({}) }) }) } };
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback'), env, {});
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+});

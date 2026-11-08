@@ -89,7 +89,7 @@ function renderDetail(){let d=$('detail');d.textContent='';let i=state.items.fil
   d.appendChild(el('div',{class:'meta-head'},[el('span',{class:'badge '+i.category,text:i.category}),document.createTextNode(' '),el('span',{class:'badge '+i.build_target,text:i.build_target})]));
   d.appendChild(el('div',{class:'msg',text:i.message}));
   let dl=el('dl',{class:'grid'});field(dl,'Received',full(i.created_at));field(dl,'Page',i.page);field(dl,'Version',i.app_version);field(dl,'Screen',i.viewport);field(dl,'Plan',i.plan);field(dl,'Browser',i.user_agent);field(dl,'Discord',i.discord_status);field(dl,'ID',i.id);
-  if(i.email){dl.appendChild(el('dt',{text:'Email (opted in)'}));dl.appendChild(el('dd',{},[el('a',{href:'mailto:'+encodeURIComponent(i.email).replace('%40','@'),text:i.email})]));}
+  if(i.email){dl.appendChild(el('dt',{text:'Email (opted in)'}));dl.appendChild(el('dd',{},[/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$/.test(i.email)?el('a',{href:'mailto:'+i.email,text:i.email}):el('span',{text:i.email})]));}
   d.appendChild(dl);
   let seg=el('div',{class:'seg',role:'group','aria-label':'Status'});STATUSES.forEach(function(s){let sb=el('button',{type:'button','aria-pressed':String(i.status===s[0]),text:s[1],onclick:function(){setStatus(i,s[0]);}});if(i.saving)sb.disabled=true;seg.appendChild(sb);});
   let actions=el('div',{class:'actions'},[seg,el('button',{class:'btn',type:'button',text:'Copy as Markdown',onclick:function(ev){copy(markdown(i),ev.target);}}),el('button',{id:'del',class:'btn danger',type:'button',text:'Delete…',onclick:function(ev){confirmDelete(i,ev.target);}})]);
