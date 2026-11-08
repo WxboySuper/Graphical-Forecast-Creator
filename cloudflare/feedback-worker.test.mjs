@@ -517,6 +517,14 @@ test('admin token failures are throttled by salted client IP', async () => {
   assert.equal(db.adminAttempts.size, 1);
 });
 
+test('Access viewer reports 503, not 401, when the Access keys cannot be loaded', async () => {
+  resetKeyCache();
+  const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud, JWKS_FETCH: async () => { throw new Error('offline'); } } });
+  const response = await viewerRequest(env, ctx, '/admin', { auth: await accessToken() });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '30');
+});
+
 test('Access viewer serves a nonce-protected page and has no CORS headers', async () => {
   const accessUrl = `https://${accessDomain}/cdn-cgi/access/certs`;
   const { env, ctx } = harness({ env: {

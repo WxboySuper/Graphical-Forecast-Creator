@@ -1,4 +1,4 @@
-import { verifyRs256Token } from './auth.mjs';
+import { KeysUnavailableError, verifyRs256Token } from './auth.mjs';
 import { json } from './response.mjs';
 
 const leeway = 60;
@@ -57,7 +57,12 @@ export async function authorizeViewer(request, env) {
   const domain = env.CF_ACCESS_TEAM_DOMAIN;
   const aud = env.CF_ACCESS_AUD;
   if (!domain || !aud) return { response: json({ error: 'Viewer unavailable' }, 503) };
-  const verified = await verifyRs256Token(accessToken(request), env, `https://${domain}/cdn-cgi/access/certs`);
+  let verified;
+  try { verified = await verifyRs256Token(accessToken(request), env, `https://${domain}/cdn-cgi/access/certs`); }
+  catch (error) {
+    if (!(error instanceof KeysUnavailableError)) throw error;
+    return { response: json({ error: 'Access keys are temporarily unavailable' }, 503, { 'retry-after': '30' }) };
+  }
   if (!verified || !claimsAreValid(verified.claims, domain, aud, verified.now)) {
     return { response: json({ error: 'Authentication required' }, 401) };
   }

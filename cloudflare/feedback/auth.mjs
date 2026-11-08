@@ -128,7 +128,10 @@ async function verifySignatureSafe(token, env, url) {
 
 export async function verifyRs256Token(token, env, url) {
   try { return await verifySignatureSafe(token, env, url); }
-  catch { return null; }
+  catch (error) {
+    if (error instanceof KeysUnavailableError) throw error;
+    return null;
+  }
 }
 
 export async function verifyToken(token, env) {
