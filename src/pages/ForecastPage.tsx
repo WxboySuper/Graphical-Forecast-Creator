@@ -840,6 +840,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
           controller={workspaceController}
           autoTstmTools={autoTstmTools}
           tstmPreviewFeatures={tstmPreviewFeatures}
+          workspaceId={workspaceId}
         />
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />

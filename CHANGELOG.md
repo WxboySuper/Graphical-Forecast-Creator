@@ -63,6 +63,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
 
 - **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves and loads to the active workspace, including a beta-gated Custom workspace at `/forecast/custom`.
+- **Custom products:** Move custom layer and reusable product editing into the beta-gated Custom Forecast workspace; preserve embedded legacy layers and snapshots for existing saved cycles and exports.
 - **Cloud Library workspaces:** Organize saved forecasts with workspace tabs and shareable workspace links.
 
 #### Fixed
