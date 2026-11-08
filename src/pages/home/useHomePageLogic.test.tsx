@@ -215,7 +215,7 @@ describe('useHomePageLogic', () => {
       result.current.handleStartWorkflow({ id: 'severe-day1', label: 'Day 1', groupings: ['day1'] });
     }],
   ])('%s falls back to the exposed workspace when the persisted one is not exposed', (_name, run) => {
-    const store = buildStore({ workspaceId: 'mesoscale', isSaved: true });
+    const store = buildStore({ workspaceId: 'winter', isSaved: true });
     const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
 
     act(() => run(result));

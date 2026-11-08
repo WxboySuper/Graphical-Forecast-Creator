@@ -46,10 +46,15 @@ describe('forecast workspace product contract', () => {
     }
   });
 
-  test.each(BUILD_TARGETS)('exposes Severe and gates Custom on the %s target', (target: BuildTarget) => {
-    const expected = target === 'production' || target === 'staging'
-      ? ['severe']
-      : ['severe', 'custom'];
+  const EXPECTED_EXPOSED: Record<BuildTarget, string[]> = {
+    production: ['severe'],
+    staging: ['severe'],
+    beta: ['severe', 'custom'],
+    local: ['severe', 'mesoscale', 'custom'],
+  };
+
+  test.each(BUILD_TARGETS)('exposes Severe and gates Custom and Mesoscale on the %s target', (target: BuildTarget) => {
+    const expected = EXPECTED_EXPOSED[target];
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(expected);
   });
 
@@ -69,8 +74,8 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('mesoscale')).toMatchObject({
       path: '/forecast/mesoscale',
       productType: 'mesoscale',
-      status: 'future',
-      exposureKey: null,
+      status: 'gated',
+      exposureKey: 'mesoscaleWorkspace',
     });
     expect(getForecastWorkspaceByPath('/forecast/custom')).toMatchObject({
       id: 'custom',

@@ -62,6 +62,7 @@ export default defineConfig(({ mode }) => {
         production: env.VITE_MESOSCALE_WORKER_URL_PRODUCTION || env.VITE_MESOSCALE_WORKER_URL || '',
       }),
       __MESOSCALE_FIXTURES__: JSON.stringify(env.VITE_MESOSCALE_FIXTURES === 'true'),
+      __MESOSCALE_DEMO__: JSON.stringify(env.VITE_MESOSCALE_DEMO === 'true' && buildTarget === 'local'),
       __GFC_DEV_MODE__: JSON.stringify(mode === 'development'),
       __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
       __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),
