@@ -50,7 +50,7 @@ const useTimedRequest = <T,>(load: (signal: AbortSignal) => Promise<MesoscaleReq
 
 export const useMesoscaleLatest = (model: MesoscaleModelId, options: MesoscaleHookOptions = {}): MesoscaleLatestState => {
   const requestOptions = useStableRequestOptions(options);
-  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleLatest(model, { ...requestOptions, signal }), [model, requestOptions]);
+  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleLatest({ model, options: { ...requestOptions, signal } }), [model, requestOptions]);
   const { result, now } = useTimedRequest(load);
   const cycle = hasData(result) ? Date.parse(result.data.cycleTime) : Number.NaN;
   const ageMinutes = Number.isFinite(cycle) ? Math.max(0, Math.floor((now - cycle) / 60_000)) : null;
@@ -111,7 +111,7 @@ const useFrameState = (result: MesoscaleRequestResult<MesoscaleCatalog>, now: nu
 
 export const useMesoscaleFrames = (model: MesoscaleModelId, cycle: string, options: MesoscaleHookOptions = {}): MesoscaleFramesState => {
   const requestOptions = useStableRequestOptions(options);
-  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleCatalog(model, resolveCycleId(cycle), { ...requestOptions, signal }), [model, cycle, requestOptions]);
+  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleCatalog({ model, cycle: resolveCycleId(cycle), options: { ...requestOptions, signal } }), [model, cycle, requestOptions]);
   const { result, now } = useTimedRequest(load);
   return useFrameState(result, now);
 };

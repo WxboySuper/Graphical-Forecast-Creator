@@ -3,7 +3,8 @@ import type { MesoscaleModelId, MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from './catalogContracts';
 import { readMesoscaleFixture } from './fixtures/client';
 import { isRecord } from './providerPayloadValidation';
-import { getCatalogError, isLatestPointer, normalizeCatalogFrame, normalizeMesoscaleCatalog, resolveCycleId } from './catalogAdapter';
+import { getCatalogError, isLatestPointer, resolveCycleId } from './catalogAdapter';
+import { normalizeCatalogFrame, normalizeMesoscaleCatalog } from './catalogNormalization';
 
 export interface RequestOptions {
   signal?: AbortSignal;
@@ -13,17 +14,25 @@ export interface RequestOptions {
   config?: MesoscaleClientConfig;
 }
 
+interface JsonRequestOptions { path: string; options: RequestOptions }
+interface UrlRequestOptions { url: string; options: RequestOptions }
+interface RetryAttemptOptions extends UrlRequestOptions { attempt: number; attempts: number }
+interface EndpointOptions { config: MesoscaleClientConfig; path: string }
+
 export type MesoscaleRequestResult<T> =
   | { state: 'loading' }
   | { state: 'ready' | 'partial' | 'stale'; data: T; stale: boolean; ageMinutes: number | null }
   | { state: 'upstream-failure'; message: string; retryable: boolean }
   | { state: 'malformed'; message: string };
 
+export interface LatestRequestOptions { model: MesoscaleModelId; options?: RequestOptions }
+export interface CatalogRequestOptions { model: MesoscaleModelId; cycle: string; options?: RequestOptions }
+
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_RETRIES = 2;
 const isAbort = (error: unknown): boolean => error instanceof DOMException && error.name === 'AbortError';
 
-const combineSignal = (parent: AbortSignal | undefined, timeoutMs: number) => {
+const combineSignal = ({ parent, timeoutMs }: { parent?: AbortSignal; timeoutMs: number }) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();
@@ -32,8 +41,8 @@ const combineSignal = (parent: AbortSignal | undefined, timeoutMs: number) => {
   return { signal: controller.signal, cleanup: () => { clearTimeout(timer); parent?.removeEventListener('abort', abort); } };
 };
 
-async function fetchAttempt(url: string, options: RequestOptions): Promise<{ response: Response; cleanup: () => void }> {
-  const request = combineSignal(options.signal, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+async function fetchAttempt({ url, options }: UrlRequestOptions): Promise<{ response: Response; cleanup: () => void }> {
+  const request = combineSignal({ parent: options.signal, timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS });
   try {
     const response = await (options.fetcher ?? fetch)(url, { signal: request.signal, headers: { Accept: 'application/json' } });
     return { response, cleanup: request.cleanup };
@@ -45,44 +54,44 @@ async function fetchAttempt(url: string, options: RequestOptions): Promise<{ res
 
 const retryCount = (options: RequestOptions): number => Math.max(0, Math.min(options.retries ?? DEFAULT_RETRIES, 3));
 
-const pauseBeforeRetry = (attempt: number): Promise<void> => new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
+const pauseBeforeRetry = ({ attempt }: { attempt: number }): Promise<void> => new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
 
-const shouldKeepResponse = (response: Response, attempt: number, attempts: number): boolean => {
+const shouldKeepResponse = ({ response, attempt, attempts }: { response: Response; attempt: number; attempts: number }): boolean => {
   if (response.ok) return true;
   if (response.status < 500) return true;
   return attempt === attempts;
 };
 
-const shouldThrowAttemptError = (error: unknown, attempt: number, attempts: number): boolean => {
+const shouldThrowAttemptError = ({ error, attempt, attempts }: { error: unknown; attempt: number; attempts: number }): boolean => {
   if (isAbort(error)) return true;
   return attempt === attempts;
 };
 
-async function attemptWithRetry(url: string, options: RequestOptions, attempt: number, attempts: number) {
+async function attemptWithRetry({ url, options, attempt, attempts }: RetryAttemptOptions) {
   try {
-    const request = await fetchAttempt(url, options);
-    if (shouldKeepResponse(request.response, attempt, attempts)) return request;
+    const request = await fetchAttempt({ url, options });
+    if (shouldKeepResponse({ response: request.response, attempt, attempts })) return request;
     request.cleanup();
   } catch (error) {
-    if (shouldThrowAttemptError(error, attempt, attempts)) throw error;
+    if (shouldThrowAttemptError({ error, attempt, attempts })) throw error;
   }
   return undefined;
 }
 
-async function fetchResponse(url: string, options: RequestOptions): Promise<{ response: Response; cleanup: () => void }> {
+async function fetchResponse({ url, options }: UrlRequestOptions): Promise<{ response: Response; cleanup: () => void }> {
   const attempts = retryCount(options);
   for (let attempt = 0; attempt <= attempts; attempt += 1) {
-    const request = await attemptWithRetry(url, options, attempt, attempts);
+    const request = await attemptWithRetry({ url, options, attempt, attempts });
     if (request) return request;
-    await pauseBeforeRetry(attempt);
+    await pauseBeforeRetry({ attempt });
   }
   throw new Error('Mesoscale request failed.');
 }
 
-const endpoint = (config: MesoscaleClientConfig, path: string): string => `${config.baseUrl.replace(/\/$/, '')}/${path}`;
+const endpoint = ({ config, path }: EndpointOptions): string => `${config.baseUrl.replace(/\/$/, '')}/${path}`;
 
-const readHttpJson = async <T,>(url: string, options: RequestOptions): Promise<MesoscaleRequestResult<T>> => {
-  const request = await fetchResponse(url, options);
+const readHttpJson = async <T,>({ url, options }: UrlRequestOptions): Promise<MesoscaleRequestResult<T>> => {
+  const request = await fetchResponse({ url, options });
   const { response } = request;
   try {
     if (!response.ok) return { state: 'upstream-failure', message: `Mesoscale request failed (${response.status}).`, retryable: response.status >= 500 };
@@ -111,13 +120,13 @@ const getReadConfigFailure = (options: RequestOptions): MesoscaleRequestResult<n
   return undefined;
 };
 
-async function readJson<T>(path: string, options: RequestOptions = {}): Promise<MesoscaleRequestResult<T>> {
+async function readJson<T>({ path, options }: JsonRequestOptions): Promise<MesoscaleRequestResult<T>> {
   const failure = getReadConfigFailure(options);
   if (failure) return failure;
   const config = options.config ?? getMesoscaleClientConfig();
   if (config.fixtures) return readMesoscaleFixture<T>(path);
   try {
-    return await readHttpJson<T>(endpoint(config, path), options);
+    return await readHttpJson<T>({ url: endpoint({ config, path }), options });
   } catch (error) {
     if (isAbort(error)) return { state: 'upstream-failure', message: 'Mesoscale request timed out or was cancelled.', retryable: false };
     if (error instanceof SyntaxError) return { state: 'malformed', message: 'Mesoscale response is not valid JSON.' };
@@ -125,8 +134,8 @@ async function readJson<T>(path: string, options: RequestOptions = {}): Promise<
   }
 }
 
-export const fetchMesoscaleLatest = (model: MesoscaleModelId, options?: RequestOptions) =>
-  readJson<MesoscaleLatestPointer>(`latest/${model}.json`, options).then(result => {
+export const fetchMesoscaleLatest = ({ model, options = {} }: LatestRequestOptions) =>
+  readJson<MesoscaleLatestPointer>({ path: `latest/${model}.json`, options }).then(result => {
     if (!hasData(result)) return result;
     const pointer = result.data;
     if (!isLatestPointer(pointer, model)) {
@@ -155,22 +164,22 @@ const catalogState = (catalog: MesoscaleCatalog, result: Extract<MesoscaleReques
   return partial ? { ...result, state: 'partial' } : result;
 };
 
-const validateCatalogResult = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycleId: string): MesoscaleRequestResult<never> | undefined => {
+const validateCatalogResult = ({ catalog, model, cycleId }: { catalog: MesoscaleCatalog; model: MesoscaleModelId; cycleId: string }): MesoscaleRequestResult<never> | undefined => {
   const error = getCatalogError(catalog, model, cycleId);
   return error ? malformed(error) : undefined;
 };
 
-export const fetchMesoscaleCatalog = (model: MesoscaleModelId, cycle: string, options?: RequestOptions) => {
+export const fetchMesoscaleCatalog = ({ model, cycle, options = {} }: CatalogRequestOptions) => {
   const cycleId = resolveCycleId(cycle);
   if (!cycleId) return Promise.resolve(malformed('Requested catalog cycle is invalid.'));
-  return readJson<MesoscaleCatalog>(`catalog/${model}/${cycleId}.json`, options).then(result => {
+  return readJson<MesoscaleCatalog>({ path: `catalog/${model}/${cycleId}.json`, options }).then(result => {
     if (!hasData(result)) return result;
-    const validation = validateCatalogResult(result.data, model, cycleId);
+    const validation = validateCatalogResult({ catalog: result.data, model, cycleId });
     return validation ?? catalogState(result.data, result);
   });
 };
 
-export const fetchMesoscaleStatus = (options?: RequestOptions) => readJson<MesoscaleStatus>('status', options).then(result => {
+export const fetchMesoscaleStatus = (options: RequestOptions = {}) => readJson<MesoscaleStatus>({ path: 'status', options }).then(result => {
   if (!hasData(result)) return result;
   if (!['healthy', 'degraded'].includes(result.data.status) || !Array.isArray(result.data.models)) {
     return { state: 'malformed' as const, message: 'Status response does not match the catalog contract.' };
@@ -182,4 +191,5 @@ function hasData<T>(result: MesoscaleRequestResult<T>): result is Extract<Mesosc
   return 'data' in result;
 }
 
-export { normalizeCatalogFrame, normalizeMesoscaleCatalog, resolveCycleId };
+export { normalizeCatalogFrame, normalizeMesoscaleCatalog };
+export { resolveCycleId };

@@ -8,7 +8,7 @@ describe('mesoscaleWorkspace disabled exposure', () => {
     const fetcher = jest.fn();
     await runWithBuildTarget(target, async () => {
       expect(getMesoscaleClientConfig().enabled).toBe(false);
-      const result = await fetchMesoscaleLatest('hrrr', { fetcher });
+      const result = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher } });
       expect(result).toMatchObject({ state: 'upstream-failure', retryable: false });
       expect(fetcher).not.toHaveBeenCalled();
     });

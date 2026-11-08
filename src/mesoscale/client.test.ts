@@ -7,10 +7,10 @@ describe('mesoscale client', () => {
   it('reads latest, catalog, and status from local fixtures without network access', async () => {
     const fetcher = jest.fn();
     const options = { ...fixtures, fetcher };
-    const latest = await fetchMesoscaleLatest('hrrr', options);
+    const latest = await fetchMesoscaleLatest({ model: 'hrrr', options });
     expect(latest).toMatchObject({ state: 'stale', data: { modelId: 'hrrr' } });
     const cycle = latest.state === 'stale' ? resolveCycleId(latest.data.cycleTime) : '';
-    const catalog = await fetchMesoscaleCatalog('hrrr', cycle, options);
+    const catalog = await fetchMesoscaleCatalog({ model: 'hrrr', cycle, options });
     expect(catalog.state).toBe('stale');
     const status = await fetchMesoscaleStatus(options);
     expect(status.state).toBe('partial');
@@ -46,31 +46,31 @@ describe('mesoscale client', () => {
 
   it('returns malformed for invalid JSON and upstream-failure for HTTP errors', async () => {
     const malformed = jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: () => Promise.reject(new SyntaxError('bad json')) });
-    const badJson = await fetchMesoscaleLatest('hrrr', { fetcher: malformed, config: { ...fixtures.config!, fixtures: false } });
+    const badJson = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher: malformed, config: { ...fixtures.config!, fixtures: false } } });
     expect(badJson.state).toBe('malformed');
     const unavailable = jest.fn().mockResolvedValue({ ok: false, status: 503, headers: new Headers() });
-    const failure = await fetchMesoscaleLatest('hrrr', { fetcher: unavailable, retries: 0, config: { ...fixtures.config!, fixtures: false } });
+    const failure = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher: unavailable, retries: 0, config: { ...fixtures.config!, fixtures: false } } });
     expect(failure).toMatchObject({ state: 'upstream-failure', retryable: true });
   });
 
   it('keeps missing worker age headers unknown', async () => {
     const fetcher = jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: async () => getFixtureLatest('hrrr') });
-    const result = await fetchMesoscaleLatest('hrrr', { fetcher, config: { ...fixtures.config!, fixtures: false } });
+    const result = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher, config: { ...fixtures.config!, fixtures: false } } });
     expect(result).toMatchObject({ state: 'ready', ageMinutes: null });
   });
 
   it('caps retries and rejects a catalog whose cycle differs from the request', async () => {
     const failed = jest.fn().mockRejectedValue(new TypeError('offline'));
-    const result = await fetchMesoscaleLatest('hrrr', { fetcher: failed, retries: 20, config: { ...fixtures.config!, fixtures: false } });
+    const result = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher: failed, retries: 20, config: { ...fixtures.config!, fixtures: false } } });
     expect(result.state).toBe('upstream-failure');
     expect(failed).toHaveBeenCalledTimes(4);
 
     const catalog = getFixtureCatalog('hrrr')!;
     const fetcher = jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: async () => catalog });
-    const malformed = await fetchMesoscaleCatalog('hrrr', '20260520T1300Z', {
+    const malformed = await fetchMesoscaleCatalog({ model: 'hrrr', cycle: '20260520T1300Z', options: {
       fetcher,
       config: { ...fixtures.config!, fixtures: false },
-    });
+    } });
     expect(malformed).toMatchObject({ state: 'malformed', message: 'Catalog cycle does not match the request.' });
   });
 
@@ -88,17 +88,17 @@ describe('mesoscale client', () => {
         parameters: frame.parameters.map(parameter => ({ ...parameter, data: { ...parameter.data, urlTemplate: '' } })),
       })),
     };
-    await expect(fetchMesoscaleCatalog('hrrr', cycle, options(badTemplate)))
+    await expect(fetchMesoscaleCatalog({ model: 'hrrr', cycle, options: options(badTemplate) }))
       .resolves.toMatchObject({ state: 'malformed' });
-    await expect(fetchMesoscaleCatalog('hrrr', cycle, options({ ...catalog, domain: null })))
+    await expect(fetchMesoscaleCatalog({ model: 'hrrr', cycle, options: options({ ...catalog, domain: null }) }))
       .resolves.toMatchObject({ state: 'malformed', message: 'Catalog domain metadata is invalid.' });
-    await expect(fetchMesoscaleCatalog('hrrr', cycle, options({
+    await expect(fetchMesoscaleCatalog({ model: 'hrrr', cycle, options: options({
       ...catalog,
       frames: catalog.frames.map(frame => ({
         ...frame,
         parameters: frame.parameters.map(parameter => ({ ...parameter, source: null })),
       })),
-    }))).resolves.toMatchObject({ state: 'malformed' });
+    }) })).resolves.toMatchObject({ state: 'malformed' });
     expect(normalizeCatalogFrame({ ...catalog, domain: null } as never, 0).state).toBe('malformed');
     expect(normalizeMesoscaleCatalog({ ...catalog, domain: null } as never)[0].state).toBe('malformed');
   });
