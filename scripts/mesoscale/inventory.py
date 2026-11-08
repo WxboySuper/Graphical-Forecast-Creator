@@ -59,9 +59,10 @@ def _parse_idx_row(line: str, line_number: int) -> IndexRecord:
 def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple[IndexRecord, ByteRange]]:
     """Return inclusive ranges, ending each message before the next offset."""
     rows = list(records)
+    next_offsets = _next_distinct_offsets(rows)
     result = []
-    for index, record in enumerate(rows):
-        next_offset = next((row.offset for row in rows[index + 1:] if row.offset > record.offset), None)
+    for record in rows:
+        next_offset = next_offsets.get(record.offset)
         if next_offset is not None and next_offset > file_size:
             raise ValueError(f"Invalid message offset {next_offset} for {file_size}-byte file")
         end = _inclusive_end(next_offset, file_size)
@@ -69,6 +70,11 @@ def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple
             raise ValueError(f"Invalid message range at offset {record.offset} for {file_size}-byte file")
         result.append((record, ByteRange(record.offset, end)))
     return result
+
+
+def _next_distinct_offsets(rows: list[IndexRecord]) -> dict[int, int]:
+    offsets = sorted({row.offset for row in rows})
+    return dict(zip(offsets, offsets[1:]))
 
 
 def _inclusive_end(next_offset: int | None, file_size: int) -> int:
