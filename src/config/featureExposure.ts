@@ -181,12 +181,12 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 915,
   },
   mesoscaleWorkspace: {
-    exposure: { ...ALL_TARGETS_OFF },
+    exposure: { local: true, beta: false, staging: false, production: false },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,
     removalCondition:
-      'Remove after the Mesoscale Forecast workspace and provider contract complete their staged rollout (#919).',
+      'Keep hosted targets disabled until the Mesoscale Forecast workspace rollout (#919); local exposure is for offline fixtures only.',
     serverBacked: false,
     trackingIssue: 919,
   },

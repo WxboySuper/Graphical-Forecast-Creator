@@ -33,10 +33,9 @@ export const getMesoscaleClientConfig = (): MesoscaleClientConfig => {
   const target = getBuildTarget();
   const fixtures = typeof __MESOSCALE_FIXTURES__ !== 'undefined' && __MESOSCALE_FIXTURES__ && target === 'local';
   const baseUrl = fixtures ? '/mesoscale-fixtures' : getWorkerUrls()[target];
-  if (fixtures) return { baseUrl, fixtures, enabled: true };
   return {
     baseUrl,
     fixtures,
-    enabled: isFeatureExposed('mesoscaleWorkspace') && isValidWorkerUrl(baseUrl),
+    enabled: isFeatureExposed('mesoscaleWorkspace') && (fixtures || isValidWorkerUrl(baseUrl)),
   };
 };

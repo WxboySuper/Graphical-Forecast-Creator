@@ -31,7 +31,7 @@ const getFrameError = (catalog: MesoscaleCatalog, frameIndex: number): string | 
   if (!Array.isArray(catalog.frames)) return 'Catalog frames are invalid.';
   const frame = catalog.frames[frameIndex];
   if (!frame) return 'Catalog frame is missing.';
-  if (!isCatalogFrame(frame)) return 'Catalog frame or tile metadata is malformed.';
+  if (!catalog.frames.every(isCatalogFrame)) return 'Catalog frame or tile metadata is malformed.';
   if (!frame.parameters.every(hasParameterSource)) return 'Catalog parameter source metadata is invalid.';
   if (!validUnavailableLists(catalog, frameIndex)) return 'Catalog unavailable parameters are invalid.';
   return undefined;

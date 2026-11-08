@@ -19,3 +19,6 @@ Map consumers can call `createMesoscaleTileLayer` for one catalog parameter and
 opacity. See [the provider contract](../../docs/architecture/mesoscale-provider-contract.md)
 and [Worker operations](../../docs/operations/mesoscale-worker.md) for data and
 configuration details.
+
+Local fixtures require `mesoscaleWorkspace` exposure and the local-only
+`VITE_MESOSCALE_FIXTURES=true` build setting. Hosted build targets stay gated.

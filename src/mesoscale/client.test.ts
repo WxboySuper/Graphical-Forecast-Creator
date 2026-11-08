@@ -129,4 +129,10 @@ describe('mesoscale client', () => {
     expect(normalizeMesoscaleCatalog({ ...catalog, domain: null } as never)[0].state).toBe('malformed');
     expect(normalizeCatalogFrame(badTemplate, 0).state).toBe('malformed');
   });
+
+  it('rejects a malformed sibling frame before aggregating capabilities', () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const malformedSibling = { ...catalog, frames: [catalog.frames[0], { ...catalog.frames[1], parameters: null }] };
+    expect(normalizeCatalogFrame(malformedSibling as never, 0).state).toBe('malformed');
+  });
 });
