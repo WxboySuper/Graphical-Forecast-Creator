@@ -92,5 +92,14 @@ describe('mesoscale client', () => {
       .resolves.toMatchObject({ state: 'malformed' });
     await expect(fetchMesoscaleCatalog('hrrr', cycle, options({ ...catalog, domain: null })))
       .resolves.toMatchObject({ state: 'malformed', message: 'Catalog domain metadata is invalid.' });
+    await expect(fetchMesoscaleCatalog('hrrr', cycle, options({
+      ...catalog,
+      frames: catalog.frames.map(frame => ({
+        ...frame,
+        parameters: frame.parameters.map(parameter => ({ ...parameter, source: null })),
+      })),
+    }))).resolves.toMatchObject({ state: 'malformed' });
+    expect(normalizeCatalogFrame({ ...catalog, domain: null } as never, 0).state).toBe('malformed');
+    expect(normalizeMesoscaleCatalog({ ...catalog, domain: null } as never)[0].state).toBe('malformed');
   });
 });

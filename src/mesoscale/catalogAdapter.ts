@@ -26,6 +26,14 @@ const hasValidTileZoom = (tile: Record<string, unknown>): boolean => {
 };
 const hasValidTileFormat = (tile: Record<string, unknown>): boolean => tile.format === 'image/png' && tile.projection === 'EPSG:3857';
 
+const hasValidSource = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  if (typeof value.providerId !== 'string') return false;
+  if (typeof value.providerName !== 'string') return false;
+  if (typeof value.datasetId !== 'string') return false;
+  return typeof value.attribution === 'string';
+};
+
 const isCatalogParameter = (value: unknown): boolean => {
   if (!isRecord(value) || !isRecord(value.data)) return false;
   if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
@@ -33,6 +41,7 @@ const isCatalogParameter = (value: unknown): boolean => {
   if (tile.type !== 'xyz-raster') return false;
   if (!hasValidTileUrl(tile) || !hasValidTileFormat(tile)) return false;
   if (!hasValidTileZoom(tile)) return false;
+  if (!hasValidSource(value.source)) return false;
   return hasBounds(tile.bounds);
 };
 
@@ -98,6 +107,8 @@ export const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModel
 };
 
 export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
+  if (!isCatalogDomain(catalog.domain)) return { state: 'malformed', message: 'Catalog domain metadata is invalid.' };
+  if (!Array.isArray(catalog.frames)) return { state: 'malformed', message: 'Catalog frames are invalid.' };
   const frame = catalog.frames[frameIndex];
   if (!frame) return { state: 'malformed', message: 'Catalog frame is missing.' };
   if (frame.status === 'failed') return { state: 'upstream-failure', message: 'Catalog frame is marked failed.', retryable: false };
@@ -134,5 +145,8 @@ export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: num
   return isPartial && normalized.state === 'ready' ? { ...normalized, state: 'partial', completeness: 'partial' } : normalized;
 };
 
-export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now()): MesoscaleParameterResponse[] =>
-  catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now));
+export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now()): MesoscaleParameterResponse[] => {
+  if (!isCatalogDomain(catalog.domain)) return [{ state: 'malformed', message: 'Catalog domain metadata is invalid.' }];
+  if (!Array.isArray(catalog.frames)) return [{ state: 'malformed', message: 'Catalog frames are invalid.' }];
+  return catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now));
+};

@@ -27,7 +27,7 @@ const sourceFor = (parameter: MesoscaleCatalogParameter) => new XYZ({
   minZoom: parameter.data.minZoom,
   maxZoom: parameter.data.maxZoom,
   crossOrigin: 'anonymous',
-  attributions: parameter.source.attribution,
+  attributions: parameter.source?.attribution ?? '',
 });
 
 export const createMesoscaleTileLayer = (spec: MesoscaleLayerSpec): MesoscaleTileLayer => {

@@ -17,6 +17,11 @@ describe('mesoscale OpenLayers layers', () => {
     expect(layer.getSource()?.getAttributions()?.({} as never)).toContain('Data provided by Example Provider');
   });
 
+  it('handles a missing source attribution without crashing layer creation', () => {
+    const parameter = { ...spec('broken').parameter, source: null } as unknown as MesoscaleLayerSpec['parameter'];
+    expect(() => createMesoscaleTileLayer({ id: 'broken', parameter, opacity: 1 })).not.toThrow();
+  });
+
   it('adds, removes, reorders, and updates opacity while retaining unchanged instances', () => {
     Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: class { observe() {} unobserve() {} disconnect() {} } });
     const map = new OLMap({ controls: [], interactions: [], layers: [] });
