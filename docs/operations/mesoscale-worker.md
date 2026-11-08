@@ -68,8 +68,9 @@ archive header, root directory, and tile bytes. A tile routed through a leaf
 directory adds one leaf range. The Worker keeps up to eight immutable catalog
 records and eight archive headers in bounded isolate memory. It keeps at most
 four parsed directories for each cached archive. After those entries are warm,
-a tile `GET` costs one R2 range read for the PNG bytes. `HEAD` reads the header
-and directories but skips the tile payload. An R2 range `get` counts as one
+a tile `GET` costs one R2 range read for the PNG bytes. `HEAD` validates the
+cached archive identity with a one-byte range at the tile offset, without
+fetching the full payload. Each R2 range `get` counts as one
 Class B operation regardless of its byte length. Catalog `HEAD` reads and
 validates the catalog like `GET`; latest `HEAD` reads its small pointer to
 compute live age headers. Each `/latest` request reads one pointer.
@@ -92,8 +93,8 @@ seconds. R2 cache misses count as Class B operations.
 
 For 100,000 tile requests, 1,000 catalog requests, 10,000 latest requests,
 and 1,000 status requests per month, an all-warm tile workload uses about
-100,000 tile range reads, plus up to 9,000 status reads and the pointer/catalog
-misses. An all-cold tile workload can use roughly 300,000 to 400,000 range
+100,000 tile `GET` range reads (plus one range per tile `HEAD`), up to 9,000
+status reads, and the pointer/catalog misses. An all-cold tile workload can use roughly 300,000 to 400,000 range
 reads, depending on how many tiles use leaf directories. With a 90% Worker
 Cache API hit rate, the tile range count falls to about 10,000 to 50,000,
 depending on whether the remaining Worker isolates have warm directory state.

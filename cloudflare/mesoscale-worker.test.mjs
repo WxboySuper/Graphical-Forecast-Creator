@@ -296,7 +296,7 @@ serialTest('tile HEAD reads directory ranges but skips the tile payload', async 
   assert.equal(response.status, 200);
   assert.equal(response.body, null);
   assert.equal(response.headers.get('Content-Length'), '3');
-  assert.equal(bucket.reads.length, 2);
+  assert.equal(bucket.reads.length, 3);
 });
 
 serialTest('malformed archives return a safe gateway error', async () => {
@@ -345,9 +345,9 @@ serialTest('tile HEAD warms metadata and the following GET reads only the tile b
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
-    assert.equal(bucket.reads.length, 2);
-    assert.equal((await worker.fetch(request(path), env)).status, 200);
     assert.equal(bucket.reads.length, 3);
+    assert.equal((await worker.fetch(request(path), env)).status, 200);
+    assert.equal(bucket.reads.length, 4);
   });
 });
 

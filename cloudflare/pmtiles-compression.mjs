@@ -32,6 +32,7 @@ const cancelReader = async (reader) => {
 
 export const decompressDirectory = async (bytes, compression) => {
   if (compression === NO_COMPRESSION) return bytes;
+  if (compression !== 2) throw new PmtilesError('Unsupported PMTiles directory compression');
   let reader;
   try {
     reader = createGzipReader(bytes);

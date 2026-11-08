@@ -31,6 +31,7 @@ test('returns missing tile and out of zoom without reading tile payload', async 
   const bucket = rangeBucket(archive);
   assert.equal((await read(bucket, { x: 1, y: 1 })).state, 'missing-tile');
   assert.equal((await read(bucket, { zoom: 5, x: 0, y: 0 })).state, 'out-of-zoom');
+  assert.equal((await read(bucket, { zoom: 3.5, x: 0, y: 0 })).state, 'out-of-zoom');
   assert.equal((await read(bucket, { x: 8, y: 0 })).state, 'missing-tile');
   assert.equal((await read(bucket, { x: -1, y: 0 })).state, 'missing-tile');
 });
@@ -42,7 +43,7 @@ test('head-only reads return metadata without fetching tile bytes', async () => 
   assert.equal(tile.state, 'found');
   assert.equal(tile.length, 3);
   assert.equal(tile.bytes, undefined);
-  assert.equal(bucket.reads.length, 2);
+  assert.equal(bucket.reads.length, 3);
 });
 
 test('rejects truncated, corrupt, and unsupported archive data', async () => {
@@ -81,6 +82,25 @@ test('caches parsed archive data so warm tiles need one range read', async () =>
   assert.ok(coldReads >= 3);
   assert.equal((await read(bucket, { x: 0, y: 0 })).state, 'found');
   assert.equal(bucket.reads.length, coldReads + 1);
+});
+
+test('rejects cached offsets when an immutable archive key changes', async () => {
+  clearPmtilesCacheForTests();
+  const original = await createPmtilesFixture();
+  const bucket = rangeBucket(original, { etag: 'archive-v1' });
+  assert.equal((await read(bucket)).state, 'found');
+  const changed = rangeBucket(await createPmtilesFixture({ bytes: Uint8Array.from([1, 2, 3]) }), { etag: 'archive-v2' });
+  const combined = {
+    async get(key, options) {
+      return changed.get(key, options);
+    },
+  };
+  await assert.rejects(() => read(combined), /archive changed/);
+});
+
+test('rejects unsupported directory compression values', async () => {
+  const { decompressDirectory } = await import('./pmtiles-compression.mjs');
+  await assert.rejects(() => decompressDirectory(new Uint8Array(), 3), /Unsupported PMTiles directory compression/);
 });
 
 test('rejects a malformed directory varint', () => {
