@@ -67,6 +67,7 @@ import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
 import { lazyWithReload } from '../routing/lazyWithReload';
+import { makeSubtreeUntabbable } from './forecastWorkspaceFocus';
 
 const EmbeddedDiscussionPage = lazyWithReload('discussion', () =>
   import('./DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
@@ -837,6 +838,12 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     if (!map?.contains(document.activeElement)) return;
     workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
   }, [hideMapForDiscussion, surface]);
+  useEffect(() => {
+    if (surface !== 'review') return undefined;
+    const map = workspaceRef.current?.querySelector<HTMLElement>('.severe-workspace__map');
+    if (!map || 'inert' in map) return undefined;
+    return makeSubtreeUntabbable(map);
+  }, [surface]);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(
@@ -946,7 +953,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
         {workspaceId === 'severe' ? (
             <div className={`severe-workspace severe-workspace--${discussionLayout}`} data-surface={surface} data-panel-collapsed={discussionPanelCollapsed} data-testid="severe-workspace">
-            <div className="severe-workspace__navigation" role="tablist" aria-label="Severe forecast workspace" onKeyDown={(event) => {
+            <div className="severe-workspace__navigation">
+              <div className="severe-workspace__tabs" role="tablist" aria-label="Severe forecast workspace" onKeyDown={(event) => {
               if (!(event.target instanceof HTMLElement) || !event.target.matches('[role="tab"]')) return;
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const selectedIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
@@ -968,6 +976,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               <button type="button" role="tab" tabIndex={surface === 'map' ? 0 : -1} aria-selected={surface === 'map'} onClick={() => updateSurface('map')}>Map</button>
               <button type="button" role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
               <button type="button" role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
+              </div>
               <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
                 <button type="button" aria-pressed={discussionLayout === 'tabs'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
                 <button type="button" aria-pressed={discussionLayout === 'panel'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>

@@ -19,6 +19,9 @@ test.describe('Severe discussion workspace layouts', () => {
       test(`captures ${layout} at ${viewport.name}`, async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(`/forecast/severe?surface=discussion&discussionLayout=${layout}`);
+        const tabList = page.getByRole('tablist', { name: 'Severe forecast workspace' });
+        await expect(tabList.getByRole('tab')).toHaveCount(3);
+        await expect(tabList.locator('button:not([role="tab"])')).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
         await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toBeVisible();
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

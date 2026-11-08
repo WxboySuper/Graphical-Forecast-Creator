@@ -37,6 +37,8 @@
   background: var(--background);
 }
 
+.severe-workspace__tabs { display: flex; align-items: center; gap: 0.25rem; }
+
 .severe-workspace__navigation [role='tab'],
 .severe-workspace__layout-choice button {
   min-height: 2.25rem;
@@ -146,7 +148,8 @@
 
 @media (max-width: 520px) {
   .severe-workspace__navigation { flex-wrap: wrap; gap: 0.2rem; padding: 0.25rem; }
-  .severe-workspace__navigation [role='tab'] { flex: 1 1 auto; padding-inline: 0.35rem; font-size: 0.8rem; }
+  .severe-workspace__tabs { flex: 1 1 100%; }
+  .severe-workspace__tabs [role='tab'] { flex: 1 1 auto; padding-inline: 0.35rem; font-size: 0.8rem; }
   .severe-workspace__layout-choice { width: 100%; margin-left: 0; justify-content: center; }
 }
 
