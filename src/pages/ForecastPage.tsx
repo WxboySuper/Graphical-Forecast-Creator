@@ -987,18 +987,22 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                     tabIndex={0}
                     onPointerDown={(event) => {
                       discussionPanelResizeRef.current = { pointerX: event.clientX, width: discussionPanelWidth };
+                      event.currentTarget.setPointerCapture(event.pointerId);
                       setResizingDiscussionPanel(true);
                     }}
+                    onPointerUp={() => setResizingDiscussionPanel(false)}
+                    onPointerCancel={() => setResizingDiscussionPanel(false)}
+                    onLostPointerCapture={() => setResizingDiscussionPanel(false)}
                     onKeyDown={(event) => {
                       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                       event.preventDefault();
                       setDiscussionPanelWidth((width) => Math.max(320, Math.min(800, width + (event.key === 'ArrowLeft' ? 24 : -24))));
                     }}
                   />
-                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></aside>
+                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense></aside>
                 </>
               ) : surface === 'discussion' ? (
-                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></section>
+                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense></section>
               ) : surface === 'review' ? (
                 <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
                   {workflowMetadata ? <ForecastWorkflowPanel controller={workspaceController} /> : (
@@ -1017,7 +1021,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
             <div className="custom-workspace-discussion__navigation">
               <Button type="button" variant="outline" onClick={() => updateSurface('map')}>Return to Custom map</Button>
             </div>
-            <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense>
+            <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense>
           </div>
         ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
       </div>

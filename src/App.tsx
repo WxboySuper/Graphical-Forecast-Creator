@@ -100,6 +100,7 @@ export const ForecastLegacyRedirect = () => {
 export const DiscussionLegacyRedirect = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
+  params.delete('workspace');
   params.set('surface', 'discussion');
   const hintedWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
   const pathname = hintedWorkspace ? getForecastWorkspacePath(hintedWorkspace.id) : '/forecast/severe';

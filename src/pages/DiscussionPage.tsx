@@ -361,6 +361,7 @@ interface DiscussionEditorStateOptions {
   defaultForecasterName: string;
   currentDay: DayType;
   discussionKey: string;
+  resetToken: number;
   dispatch: ReturnType<typeof useDispatch>;
   addToast: AddToastFn;
   user: ReturnType<typeof useAuth>['user'];
@@ -373,6 +374,7 @@ const useDiscussionEditorState = ({
   defaultForecasterName,
   currentDay,
   discussionKey,
+  resetToken,
   dispatch,
   addToast,
   user,
@@ -382,6 +384,7 @@ const useDiscussionEditorState = ({
     existingDiscussion,
     defaultForecasterName,
     discussionKey,
+    resetToken,
     dispatch,
   });
 
@@ -489,7 +492,7 @@ const useDiscussionScopeSync = (options: {
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
 // @codescene(disable:"Complex Method")
-export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number }> = ({ embedded = false, resetToken = 0 }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -539,6 +542,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = fa
     defaultForecasterName,
     currentDay: discussionDay,
     discussionKey: selectedGrouping.id,
+    resetToken,
     dispatch,
     addToast,
     user,

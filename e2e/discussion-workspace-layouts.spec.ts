@@ -31,16 +31,16 @@ test.describe('Severe discussion workspace layouts', () => {
 
   test('legacy discussion links preserve query, group, and hash while opening Discussion', async ({ page }) => {
     await page.goto('/discussion/thread/42?workspace=severe&group=day1&keep=1#editor');
-    await expect(page).toHaveURL(/\/forecast\/severe\?workspace=severe&group=day1&keep=1&surface=discussion#editor/);
+    await expect(page).toHaveURL(/\/forecast\/severe\?group=day1&keep=1&surface=discussion#editor/);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
   });
 
   test('preserves the custom workspace hint on a legacy Discussion link', async ({ page }) => {
     await page.goto('/discussion?workspace=custom&group=day1&keep=1#editor');
-    await expect(page).toHaveURL(/\/forecast\/custom\?workspace=custom&group=day1&keep=1&surface=discussion#editor/);
+    await expect(page).toHaveURL(/\/forecast\/custom\?group=day1&keep=1&surface=discussion#editor/);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
     await page.getByRole('button', { name: 'Return to Custom map' }).click();
-    await expect(page).toHaveURL(/\/forecast\/custom\?workspace=custom&group=day1&keep=1#editor/);
+    await expect(page).toHaveURL(/\/forecast\/custom\?group=day1&keep=1#editor/);
     await expect(page.locator('.forecast-workspace-layout')).toBeVisible();
   });
 

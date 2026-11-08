@@ -42,6 +42,27 @@ describe('useDiscussionFormState', () => {
     jest.useRealTimers();
   });
 
+  test('reloads imported discussion data without remounting the editor', () => {
+    const importedDiscussion = { ...loadedDiscussion, diyContent: 'Imported discussion text' };
+    const { result, rerender } = renderHook(
+      ({ existingDiscussion, resetToken }: { existingDiscussion?: DiscussionData; resetToken: number }) =>
+        useDiscussionFormState({
+          discussionKey: 'group-a',
+          existingDiscussion,
+          defaultForecasterName: 'Default forecaster',
+          dispatch: jest.fn(),
+          resetToken,
+        }),
+      { initialProps: { existingDiscussion: loadedDiscussion, resetToken: 0 } },
+    );
+
+    act(() => result.current.handleDiy('Unsaved discussion text'));
+    rerender({ existingDiscussion: importedDiscussion, resetToken: 1 });
+
+    expect(result.current.diyContent).toBe('Imported discussion text');
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+
   test('new discussions default to local wall-clock times with a 24-hour window', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date(2026, 6, 13, 9, 5));

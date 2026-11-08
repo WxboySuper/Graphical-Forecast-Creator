@@ -58,7 +58,10 @@ describe('featureNavigation', () => {
 
     shortcuts['1']();
     expect(navigate).toHaveBeenLastCalledWith('/forecast');
-    window.history.replaceState({}, '', '/forecast/severe?group=day2&workspace=custom');
+    window.history.replaceState({}, '', '/forecast/severe?group=day2&workspace=custom&unused=1');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/discussion?group=day2&surface=discussion');
+    window.history.replaceState({}, '', '/forecast/custom?group=day2&workspace=severe&unused=1');
     shortcuts['2']();
     expect(navigate).toHaveBeenLastCalledWith('/discussion?group=day2&workspace=custom&surface=discussion');
   });

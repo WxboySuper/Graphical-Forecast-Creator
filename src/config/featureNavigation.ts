@@ -67,7 +67,17 @@ export const getNavigationKeyboardShortcuts = (
     if (item.shortcutKey) {
       shortcuts[item.shortcutKey] = () => {
         if (item.id === 'discussion' && typeof window !== 'undefined') {
-          const params = new URLSearchParams(window.location.search);
+          const currentParams = new URLSearchParams(window.location.search);
+          const params = new URLSearchParams();
+          const currentWorkspace = window.location.pathname.match(/^\/forecast\/(severe|custom)(?:\/|$)/)?.[1];
+          const legacyWorkspaceHint = window.location.pathname.startsWith('/discussion')
+            ? currentParams.get('workspace')
+            : null;
+          const group = currentParams.get('group');
+          if (group) params.set('group', group);
+          if (currentWorkspace === 'custom' || (!currentWorkspace && legacyWorkspaceHint === 'custom')) {
+            params.set('workspace', 'custom');
+          }
           params.set('surface', 'discussion');
           navigate(`/discussion?${params.toString()}`);
           return;
