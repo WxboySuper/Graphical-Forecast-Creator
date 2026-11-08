@@ -166,7 +166,59 @@
           "step": "",
           "present": false,
           "note": "No precomputed 0-6 km bulk-shear message in wrfsfc or wrfprs."
-        }
+        },
+        "MUCIN": {
+          "parameter": "CIN",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No CIN record was verified as most-unstable inhibition."
+        },
+        "unassignedCAPERecords": [
+          {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "0-3000 m above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ],
+        "unassignedCINRecords": [
+          {
+            "parameter": "CIN",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CIN",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ]
       },
       "fixedLayerSCP": {
         "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",
@@ -470,7 +522,59 @@
           "step": "",
           "present": false,
           "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
-        }
+        },
+        "MUCIN": {
+          "parameter": "CIN",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No CIN record was verified as most-unstable inhibition."
+        },
+        "unassignedCAPERecords": [
+          {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "0-3000 m above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ],
+        "unassignedCINRecords": [
+          {
+            "parameter": "CIN",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CIN",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ]
       },
       "fixedLayerSCP": {
         "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",
@@ -764,7 +868,59 @@
           "step": "",
           "present": false,
           "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
-        }
+        },
+        "MUCIN": {
+          "parameter": "CIN",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No CIN record was verified as most-unstable inhibition."
+        },
+        "unassignedCAPERecords": [
+          {
+            "parameter": "CAPE",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CAPE",
+            "level": "0-3000 m above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ],
+        "unassignedCINRecords": [
+          {
+            "parameter": "CIN",
+            "level": "90-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          },
+          {
+            "parameter": "CIN",
+            "level": "255-0 mb above ground",
+            "units": "unknown; .idx omits units and no decoder was installed",
+            "step": "anl",
+            "present": true,
+            "parcelIdentity": "unverified"
+          }
+        ]
       },
       "fixedLayerSCP": {
         "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",

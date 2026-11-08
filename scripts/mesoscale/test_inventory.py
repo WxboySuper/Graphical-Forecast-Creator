@@ -27,6 +27,12 @@ class InventoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_idx("1:10:d=2026110812:TMP:surface:anl\n2:9:d=2026110812:CAPE:surface:anl")
 
+    def test_rejects_malformed_allowlists_with_clear_errors(self):
+        rows = parse_idx(FIXTURE_PATH.read_text(encoding="ascii"))
+        for allowlist in ([], {"t2m": {"parameter": "TMP"}}, {"t2m": None}):
+            with self.subTest(allowlist=allowlist), self.assertRaises(ValueError):
+                resolve_allowlist(rows, 136859480, allowlist)
+
     def test_shared_message_offset_gets_shared_range(self):
         rows = parse_idx("24.1:100:d=2026110812:UGRD:10 m above ground:anl:\n24.2:100:d=2026110812:VGRD:10 m above ground:anl:\n25:250:d=2026110812:TMP:2 m above ground:anl:")
         ranges = resolve_ranges(rows, 400)

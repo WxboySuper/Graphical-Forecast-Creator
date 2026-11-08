@@ -71,6 +71,7 @@ def resolve_ranges(records: Iterable[IndexRecord], file_size: int) -> list[tuple
 
 def resolve_allowlist(records: Iterable[IndexRecord], file_size: int, allowlist: dict[str, dict[str, str]]) -> dict[str, list[dict]]:
     """Match exact parameter and level strings and return their ranges."""
+    _validate_allowlist(allowlist)
     ranged = resolve_ranges(records, file_size)
     output = {}
     for field, identity in allowlist.items():
@@ -80,6 +81,18 @@ def resolve_allowlist(records: Iterable[IndexRecord], file_size: int, allowlist:
                 matches.append({"record": asdict(row), "range": asdict(byte_range), "bytes": byte_range.size})
         output[field] = matches
     return output
+
+
+def _validate_allowlist(allowlist: object) -> None:
+    if not isinstance(allowlist, dict):
+        raise ValueError("allowlist must be a JSON object")
+    for field, identity in allowlist.items():
+        if not isinstance(field, str) or not isinstance(identity, dict):
+            raise ValueError("allowlist entries must map field names to identity objects")
+        if not isinstance(identity.get("parameter"), str) or not isinstance(identity.get("level"), str):
+            raise ValueError(f"allowlist entry {field!r} requires string parameter and level values")
+        if "step" in identity and not isinstance(identity["step"], str):
+            raise ValueError(f"allowlist entry {field!r} step must be a string")
 
 
 def _matches_identity(row: IndexRecord, identity: dict[str, str]) -> bool:
@@ -108,7 +121,8 @@ def main() -> None:
     else:
         text, metadata = Path(source).read_text(encoding="ascii"), {"url": str(Path(source))}
     identities = json.loads(Path(args.allowlist).read_text()) if args.allowlist else {}
-    result = {"source": metadata, "fileSizeBytes": args.size, "records": [asdict(record) for record in parse_idx(text)], "selected": resolve_allowlist(parse_idx(text), args.size, identities)}
+    records = parse_idx(text)
+    result = {"source": metadata, "fileSizeBytes": args.size, "records": [asdict(record) for record in records], "selected": resolve_allowlist(records, args.size, identities)}
     print(json.dumps(result, indent=2))
 
 
