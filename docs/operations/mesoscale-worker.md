@@ -17,8 +17,8 @@ the placeholders in `cloudflare/wrangler.mesoscale.jsonc`:
 2. Replace the account, bucket, and preview bucket placeholders. Add the
    production Worker route or custom domain in the
    Cloudflare dashboard after the hostname is ready.
-3. Set `PUBLIC_BASE_URL` to that public HTTPS base URL. The Worker uses it when
-   building catalog tile templates and latest catalog links.
+3. Set `PUBLIC_BASE_URL` to that public HTTPS origin, without a path. The Worker
+   uses it when building catalog tile templates and latest catalog links.
 4. Set `CORS_ALLOWED_ORIGINS` to a comma-separated exact origin list. The
    default covers production (`https://gfc.weatherboysuper.com`), staging
    (`https://staging-gfc.weatherboysuper.com`), beta

@@ -36,32 +36,50 @@ const compactCycleFromIso = (value) => {
 
 const pathSegments = (pathname) => {
   const raw = pathname.split('/').slice(1);
-  if (raw.some((part) => !part || part.includes('%') || part.includes('\\') || part === '.' || part === '..')) return null;
+  if (raw.some(isUnsafePathSegment)) return null;
   return raw;
+};
+
+const isUnsafePathSegment = (part) => !part || /[%\\]|^\.{1,2}$/.test(part);
+
+const parseCatalogRoute = (parts) => {
+  if (parts.length !== 3) return null;
+  if (parts[0] !== 'catalog' || !MODELS.has(parts[1])) return null;
+  if (!/^\d{8}T\d{4}Z\.json$/.test(parts[2])) return null;
+  const cycle = parts[2].slice(0, -5);
+  return cycleDate(cycle) ? { kind: 'catalog', model: parts[1], cycle, key: `mesoscale/v1/catalog/${parts[1]}/${cycle}.json` } : null;
+};
+
+const parseLatestRoute = (parts) => {
+  if (parts.length !== 2) return null;
+  if (parts[0] !== 'latest' || !parts[1].endsWith('.json')) return null;
+  const model = parts[1].slice(0, -5);
+  return MODELS.has(model) ? { kind: 'latest', model, key: `mesoscale/v1/latest/${model}.json` } : null;
+};
+
+const validTileCoordinates = (zoom, x, y) => zoom <= MAX_ZOOM && Number.isSafeInteger(x) && Number.isSafeInteger(y) && x < 2 ** zoom && y < 2 ** zoom;
+
+const parseTileRoute = (parts) => {
+  if (parts.length !== 8) return null;
+  if (parts[0] !== 'tiles' || !MODELS.has(parts[1])) return null;
+  if (!cycleDate(parts[2]) || !/^f\d{2}$/.test(parts[3])) return null;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[4])) return null;
+  const [zoomText, xText, yFile] = parts.slice(5);
+  if (!/^(?:0|[1-9]\d?)$/.test(zoomText)) return null;
+  if (!/^(?:0|[1-9]\d*)$/.test(xText)) return null;
+  if (!/^(?:0|[1-9]\d*)\.png$/.test(yFile)) return null;
+  const zoom = Number(zoomText);
+  const x = Number(xText);
+  const y = Number(yFile.slice(0, -4));
+  if (!validTileCoordinates(zoom, x, y)) return null;
+  return { kind: 'tile', key: `mesoscale/v1/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${zoom}/${x}/${y}.png` };
 };
 
 const parseRoute = (pathname) => {
   const parts = pathSegments(pathname);
   if (!parts) return null;
-  if (parts.length === 3 && parts[0] === 'catalog' && MODELS.has(parts[1]) && /^\d{8}T\d{4}Z\.json$/.test(parts[2])) {
-    const cycle = parts[2].slice(0, -5);
-    return cycleDate(cycle) ? { kind: 'catalog', model: parts[1], cycle, key: `mesoscale/v1/catalog/${parts[1]}/${cycle}.json` } : null;
-  }
-  if (parts.length === 2 && parts[0] === 'latest' && parts[1].endsWith('.json')) {
-    const model = parts[1].slice(0, -5);
-    return MODELS.has(model) ? { kind: 'latest', model, key: `mesoscale/v1/latest/${model}.json` } : null;
-  }
-  if (parts.length === 8 && parts[0] === 'tiles' && MODELS.has(parts[1]) && cycleDate(parts[2]) && /^f\d{2}$/.test(parts[3]) && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[4])) {
-    const [zText, xText, yFile] = parts.slice(5);
-    if (!/^(?:0|[1-9]\d?)$/.test(zText) || !/^(?:0|[1-9]\d*)$/.test(xText) || !/^(?:0|[1-9]\d*)\.png$/.test(yFile)) return null;
-    const z = Number(zText);
-    const x = Number(xText);
-    const y = Number(yFile.slice(0, -4));
-    if (z > MAX_ZOOM || !Number.isSafeInteger(x) || !Number.isSafeInteger(y) || x >= 2 ** z || y >= 2 ** z) return null;
-    return { kind: 'tile', key: `mesoscale/v1/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${z}/${x}/${y}.png` };
-  }
   if (parts.length === 1 && parts[0] === 'status') return { kind: 'status' };
-  return null;
+  return parseCatalogRoute(parts) || parseLatestRoute(parts) || parseTileRoute(parts);
 };
 
 const allowedOrigins = (env) => new Set((env.CORS_ALLOWED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean));
@@ -78,8 +96,14 @@ const responseCors = (response, origin, allowed) => {
 
 const publicBaseUrl = (env) => {
   const base = new URL(env.PUBLIC_BASE_URL);
-  if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw new Error('PUBLIC_BASE_URL must be a public HTTPS URL');
+  if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash) throw new Error('PUBLIC_BASE_URL must be an origin-only HTTPS URL');
   return base;
+};
+
+const publicRepresentationEtag = (etag, env) => {
+  if (!etag || !env.PUBLIC_BASE_URL) return etag;
+  const encoded = btoa(`${etag}|${publicBaseUrl(env).origin}`).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `W/"${encoded}"`;
 };
 
 const noBodyForHead = (response) => new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
@@ -92,12 +116,11 @@ const addConfiguredTemplateBase = (catalog, env) => {
   } catch {
     throw new Error('PUBLIC_BASE_URL is invalid');
   }
-  const prefix = `${base.origin}${base.pathname.replace(/\/$/, '')}`;
   for (const frame of catalog.frames || []) {
     for (const parameter of frame.parameters || []) {
       if (parameter?.data?.type === 'xyz-raster' && typeof parameter.data.urlTemplate === 'string') {
         const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
-        if (match) parameter.data.urlTemplate = `${prefix}/tiles/${match[1]}`;
+        if (match) parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
       }
     }
   }
@@ -105,18 +128,23 @@ const addConfiguredTemplateBase = (catalog, env) => {
 };
 
 const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
+const invalidCatalogResponse = () => json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
 
 const catalogResponse = (value, request, env, route, headers, etag) => {
   const domain = value.domain;
-  const invalid = value.schemaVersion !== 1 || value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle) || value.status !== 'complete' || !Array.isArray(value.frames) || !domain || !Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom) || domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM || domain.minZoom > domain.maxZoom;
-  if (invalid) return json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
+  if (value.schemaVersion !== 1) return invalidCatalogResponse();
+  if (value.model?.id !== route.model || value.cycleTime !== cycleDate(route.cycle)) return invalidCatalogResponse();
+  if (value.status !== 'complete' || !Array.isArray(value.frames) || !domain) return invalidCatalogResponse();
+  if (!Number.isInteger(domain.minZoom) || !Number.isInteger(domain.maxZoom)) return invalidCatalogResponse();
+  if (domain.minZoom < 0 || domain.maxZoom > MAX_ZOOM || domain.minZoom > domain.maxZoom) return invalidCatalogResponse();
   try {
     addConfiguredTemplateBase(value, env);
   } catch {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   }
+  headers.set('ETag', publicRepresentationEtag(etag, env));
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
+  if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify(value), { headers });
 };
 
@@ -130,13 +158,14 @@ const latestResponse = (value, request, env, route, now, headers, etag) => {
   if (env.PUBLIC_BASE_URL) {
     try {
       const base = publicBaseUrl(env);
-      value.catalogUrl = `${base.origin}${base.pathname.replace(/\/$/, '')}/catalog/${route.model}/${cycle}.json`;
+      value.catalogUrl = `${base.origin}/catalog/${route.model}/${cycle}.json`;
     } catch {
       return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
     }
   }
+  headers.set('ETag', publicRepresentationEtag(etag, env));
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (matchesEtag(request.headers.get('If-None-Match'), etag)) return new Response(null, { status: 304, headers });
+  if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify(value), { headers });
 };
 
@@ -177,48 +206,61 @@ const readJson = async (bucket, key) => {
   }
 };
 
+const modelStatus = async (bucket, modelId, day, previousDay, now, staleAfter) => {
+  const [pointer, today, yesterday] = await Promise.all([
+    readJson(bucket, `mesoscale/v1/latest/${modelId}.json`),
+    readJson(bucket, `mesoscale/v1/health/${day}/${modelId}.json`),
+    readJson(bucket, `mesoscale/v1/health/${previousDay}/${modelId}.json`),
+  ]);
+  const health = today?.modelId === modelId ? today : yesterday?.modelId === modelId ? yesterday : null;
+  const validPointer = pointer?.schemaVersion === 1 && pointer.modelId === modelId && typeof pointer.cycleTime === 'string' && Number.isFinite(Date.parse(pointer.cycleTime));
+  const age = validPointer ? ageMinutes(pointer.cycleTime, now) : null;
+  return { modelId, latestCycleTime: validPointer ? pointer.cycleTime : null, ageMinutes: age, stale: age === null || age > staleAfter, health: health?.status || (pointer ? 'invalid' : 'missing'), healthGeneratedAt: health?.generatedAt || null };
+};
+
 const statusResponse = async (env, now) => {
-  if (!env.MESOSCALE_BUCKET || typeof env.MESOSCALE_BUCKET.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const bucket = env.MESOSCALE_BUCKET;
+  if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const day = new Date(now).toISOString().slice(0, 10);
   const previousDay = new Date(now - 86400000).toISOString().slice(0, 10);
-  const models = await Promise.all([...MODELS].map(async (modelId) => {
-    const [pointer, today, yesterday] = await Promise.all([
-      readJson(env.MESOSCALE_BUCKET, `mesoscale/v1/latest/${modelId}.json`),
-      readJson(env.MESOSCALE_BUCKET, `mesoscale/v1/health/${day}/${modelId}.json`),
-      readJson(env.MESOSCALE_BUCKET, `mesoscale/v1/health/${previousDay}/${modelId}.json`),
-    ]);
-    const health = today?.modelId === modelId ? today : yesterday?.modelId === modelId ? yesterday : null;
-    const validPointer = pointer?.schemaVersion === 1 && pointer.modelId === modelId && typeof pointer.cycleTime === 'string' && Number.isFinite(Date.parse(pointer.cycleTime));
-    const age = validPointer ? ageMinutes(pointer.cycleTime, now) : null;
-    const stale = age === null || age > Number(env.STALE_AFTER_MINUTES || 180);
-    return { modelId, latestCycleTime: validPointer ? pointer.cycleTime : null, ageMinutes: age, stale, health: health?.status || (pointer ? 'invalid' : 'missing'), healthGeneratedAt: health?.generatedAt || null };
-  }));
+  const staleAfter = Number(env.STALE_AFTER_MINUTES || 180);
+  const models = await Promise.all([...MODELS].map((modelId) => modelStatus(bucket, modelId, day, previousDay, now, staleAfter)));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
   return json({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, 200, { 'Cache-Control': `public, max-age=${STATUS_TTL}` });
 };
 
+const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(env, now) : getObjectResponse(request, env, route, now);
+
+const cacheKeyFor = (request) => {
+  const url = new URL(request.url);
+  url.search = '';
+  return new Request(url.toString(), { method: 'GET' });
+};
+
+const cacheHitResponse = (request, response) => {
+  const etag = response.headers.get('ETag');
+  return matchesEtag(request.headers.get('If-None-Match'), etag)
+    ? new Response(null, { status: 304, headers: response.headers })
+    : response;
+};
+
+const cacheStoreResponse = async (cache, key, response) => {
+  if (![200, 404].includes(response.status) || !response.headers.get('Cache-Control')?.includes('max-age=')) return;
+  try {
+    await cache.put(key, response.clone());
+  } catch {
+    // Cache API availability does not affect the R2 response.
+  }
+};
+
 const cachedFetch = async (request, route, env, now) => {
   const cache = globalThis.caches?.default;
-  if (request.method !== 'GET' || !cache) return route.kind === 'status' ? statusResponse(env, now) : getObjectResponse(request, env, route, now);
-  const cacheUrl = new URL(request.url);
-  cacheUrl.search = '';
-  const cacheKey = new Request(cacheUrl.toString(), { method: 'GET' });
-  let response = await cache.match(cacheKey);
-  if (!response) {
-    response = route.kind === 'status' ? await statusResponse(env, now) : await getObjectResponse(request, env, route, now);
-    if ([200, 404].includes(response.status) && response.headers.get('Cache-Control')?.includes('max-age=')) {
-      try {
-        await cache.put(cacheKey, response.clone());
-      } catch {
-        // Cache API availability does not affect the R2 response.
-      }
-    }
-  } else {
-    const etag = response.headers.get('ETag');
-    if (matchesEtag(request.headers.get('If-None-Match'), etag)) {
-      return new Response(null, { status: 304, headers: response.headers });
-    }
-  }
+  if (request.method !== 'GET' || !cache) return fetchUncached(request, route, env, now);
+  const key = cacheKeyFor(request);
+  const hit = await cache.match(key);
+  if (hit) return cacheHitResponse(request, hit);
+  const response = await fetchUncached(request, route, env, now);
+  await cacheStoreResponse(cache, key, response);
   return response;
 };
 
