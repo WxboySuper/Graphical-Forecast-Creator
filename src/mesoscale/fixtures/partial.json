@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "model": { "id": "rap", "name": "Rapid Refresh", "capabilities": { "availableParameterIds": ["cape", "cin", "srh"], "maxForecastHour": 51, "cycleCadenceMinutes": 60 } },
+  "frameType": "analysis",
+  "cycleTime": "2026-05-20T12:00:00Z",
+  "forecastHour": 0,
+  "validTime": "2026-05-20T12:00:00Z",
+  "domain": { "id": "conus", "name": "Contiguous United States" },
+  "source": { "providerId": "example-provider", "providerName": "Example Provider", "datasetId": "rap", "attribution": "Data provided by Example Provider" },
+  "requestedParameterIds": ["cape", "cin", "srh"],
+  "parameters": [
+    {
+      "id": "cape",
+      "displayName": "Convective Available Potential Energy",
+      "units": "J kg-1",
+      "level": { "type": "layer", "label": "Most unstable parcel" },
+      "legend": [{ "value": 0, "label": "0" }, { "value": 2000, "label": "2000" }],
+      "displayType": "raster",
+      "data": [[0, 500, 2000]]
+    }
+  ],
+  "unavailableParameters": [{ "id": "cin", "reason": "Not available for this cycle." }]
+}

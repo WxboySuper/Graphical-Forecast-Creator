@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "model": { "id": "hrrr", "name": "High-Resolution Rapid Refresh", "capabilities": { "availableParameterIds": ["mlcape", "stp", "scp"], "maxForecastHour": 48, "cycleCadenceMinutes": 60 } },
+  "frameType": "forecast",
+  "cycleTime": "2026-05-20T12:00:00Z",
+  "forecastHour": 3,
+  "validTime": "2026-05-20T15:00:00Z",
+  "domain": { "id": "conus", "name": "Contiguous United States", "bounds": [-125, 24, -66, 50] },
+  "source": {
+    "providerId": "example-provider",
+    "providerName": "Example Provider",
+    "datasetId": "hrrr-native",
+    "attribution": "Data provided by Example Provider"
+  },
+  "requestedParameterIds": ["mlcape", "stp", "scp"],
+  "parameters": [
+    {
+      "id": "mlcape",
+      "displayName": "Mixed-layer CAPE",
+      "units": "J kg-1",
+      "level": { "type": "layer", "label": "Mixed layer", "top": 0, "bottom": 100, "units": "hPa" },
+      "legend": [{ "value": 0, "label": "0" }, { "value": 1000, "label": "1000", "color": "#ffcc00" }],
+      "displayType": "raster",
+      "data": [[0, 250, 500], [1000, 1250, 1500]]
+    },
+    {
+      "id": "stp",
+      "displayName": "Significant Tornado Parameter",
+      "units": "dimensionless",
+      "level": { "type": "model", "label": "Provider supplied composite" },
+      "legend": [{ "value": 0, "label": "0" }, { "value": 1, "label": "1" }],
+      "displayType": "raster",
+      "data": [[0, 0.4, 1.2]]
+    },
+    {
+      "id": "scp",
+      "displayName": "Supercell Composite Parameter",
+      "units": "dimensionless",
+      "level": { "type": "model", "label": "Provider supplied composite" },
+      "legend": [{ "value": 0, "label": "0" }, { "value": 4, "label": "4" }],
+      "displayType": "raster",
+      "data": [[0.2, 1.5, 4.25]]
+    }
+  ]
+}
