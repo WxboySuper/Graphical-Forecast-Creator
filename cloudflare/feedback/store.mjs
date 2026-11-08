@@ -98,7 +98,7 @@ function buildRecord({ env, request, claims, body, now }, uidHash) {
 /** Inserts the feedback row unless a limit or duplicate rule rejects it; resolves { record, inserted }. */
 export async function createRecord(db, context) {
   const { env, claims, body, now } = context;
-  const uidHash = await digest(`${claims.sub}${env.FEEDBACK_HASH_SALT}`);
+  const uidHash = await digest(`${claims.sub}:${env.FEEDBACK_HASH_SALT}`);
   const r = buildRecord(context, uidHash);
   const values = [r.id, r.created_at, r.uid_hash, r.email, r.category, r.message, r.page, r.app_version, r.build_target, r.plan, r.viewport, r.user_agent, r.discord_status];
   const guards = [uidHash, now - WINDOWS.recent, uidHash, now - WINDOWS.daily, uidHash, body.message, now - WINDOWS.recent];

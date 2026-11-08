@@ -44,6 +44,13 @@ describe('FeedbackDialog', () => {
     expect(screen.queryByLabelText(/what happened/i)).not.toBeInTheDocument();
   });
 
+  test('shows a loading state instead of sign-in prompts while auth resolves', () => {
+    mockUseAuth.mockReturnValue({ status: 'loading', user: null });
+    renderDialog();
+    expect(screen.getByRole('status')).toHaveTextContent(/checking your account/i);
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
+  });
+
   test('requires a minimum message length before enabling send', () => {
     mockUseAuth.mockReturnValue(signedIn);
     renderDialog();

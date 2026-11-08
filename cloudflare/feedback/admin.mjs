@@ -1,6 +1,8 @@
 import { constantTimeEqual, digest } from './auth.mjs';
 import { isCategory, isTarget, validateCursor, validatePageLimit, validateSince } from './validate.mjs';
 
+// Explicit columns: the salted user hash is never exposed; email is present only when the user consented to contact.
+const PUBLIC_COLUMNS = 'id, created_at, email, category, message, page, app_version, build_target, plan, viewport, status, discord_status, user_agent';
 const STATUSES = new Set(['new', 'triaged', 'resolved', 'wontfix']);
 const json = (body, status = 200, headers = {}) => Response.json(body, { status, headers });
 const unauthorized = () => json({ error: 'Authentication required' }, 401);
@@ -21,6 +23,8 @@ async function throttleRetry(db, key, now) {
 }
 
 async function recordFailure(db, key, now) {
+  // Expired windows from other keys are removed here so attacker-chosen addresses cannot accumulate.
+  await db.prepare('DELETE FROM feedback_admin_attempts WHERE window_started + 600000 <= ?').bind(now).run();
   await db.prepare('INSERT INTO feedback_admin_attempts (key_hash, window_started, attempts) VALUES (?, ?, 1) ON CONFLICT(key_hash) DO UPDATE SET window_started = CASE WHEN window_started + 600000 <= excluded.window_started THEN excluded.window_started ELSE window_started END, attempts = CASE WHEN window_started + 600000 <= excluded.window_started THEN 1 ELSE attempts + 1 END').bind(key, now).run();
 }
 
@@ -100,7 +104,7 @@ function listSql(query) {
   if (query.since !== undefined) { predicates.push('created_at >= ?'); values.push(query.since); }
   if (query.cursor) { predicates.push('(created_at, id) < (?, ?)'); values.push(query.cursor.time, query.cursor.id); }
   const where = predicates.length ? `WHERE ${predicates.join(' AND ')}` : '';
-  return { sql: `SELECT * FROM feedback ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, values };
+  return { sql: `SELECT ${PUBLIC_COLUMNS} FROM feedback ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, values };
 }
 
 async function listFeedback(requestUrl, db) {
@@ -115,7 +119,7 @@ async function listFeedback(requestUrl, db) {
 }
 
 async function getFeedback(id, db) {
-  const item = await db.prepare('SELECT * FROM feedback WHERE id = ?').bind(id).first();
+  const item = await db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM feedback WHERE id = ?`).bind(id).first();
   return item ? json(item) : json({ error: 'Feedback not found' }, 404);
 }
 

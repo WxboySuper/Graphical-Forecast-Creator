@@ -21,6 +21,12 @@ async function token(overrides = {}, key = privateKey) {
   return `${message}.${Buffer.from(signature).toString('base64url')}`;
 }
 
+/** Mirrors the SQL column list so tests see exactly the columns the Worker selects. */
+function selectColumns(row, sql) {
+  const columns = sql.match(/^SELECT (.*?) FROM feedback/)[1].split(', ');
+  return Object.fromEntries(columns.map((column) => [column, row[column]]));
+}
+
 class FakeD1 {
   rows = [];
   adminAttempts = new Map();
@@ -34,7 +40,10 @@ class FakeD1 {
     } },
     { matches: (sql) => sql.includes('AND message = ?'), run: (db, args) => db.rows.find((row) => isDuplicateRow(row, args)) ?? null },
     { matches: (sql) => sql.includes('FROM feedback_admin_attempts'), run: (db, args) => db.adminAttempts.get(args[0]) ?? null },
-    { matches: (sql) => sql.includes('FROM feedback WHERE id = ?'), run: (db, args) => db.rows.find((row) => row.id === args[0]) ?? null },
+    { matches: (sql) => sql.includes('FROM feedback WHERE id = ?'), run: (db, args, sql) => {
+      const row = db.rows.find((item) => item.id === args[0]);
+      return row ? selectColumns(row, sql) : null;
+    } },
   ];
   runHandlers = [
     { matches: (sql) => sql.startsWith('INSERT INTO feedback_admin_attempts'), run: (db, args) => {
@@ -43,7 +52,12 @@ class FakeD1 {
       db.adminAttempts.set(key, !current || current.window_started + 600000 <= now ? { window_started: now, attempts: 1 } : { ...current, attempts: current.attempts + 1 });
       return { meta: { changes: 1 } };
     } },
-    { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts'), run: (db, args) => ({ meta: { changes: Number(db.adminAttempts.delete(args[0])) } }) },
+    { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts WHERE window_started'), run: (db, args) => {
+      let removed = 0;
+      for (const [key, value] of db.adminAttempts) if (value.window_started + 600000 <= args[0]) { db.adminAttempts.delete(key); removed += 1; }
+      return { meta: { changes: removed } };
+    } },
+    { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts WHERE key_hash'), run: (db, args) => ({ meta: { changes: Number(db.adminAttempts.delete(args[0])) } }) },
     { matches: (sql) => sql.startsWith('INSERT INTO feedback ('), run: (db, args) => {
       const [id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, user_agent, discord_status, ...guards] = args;
       const [, recentSince, , dailySince, , , dupSince] = guards;
@@ -67,7 +81,7 @@ class FakeD1 {
     } },
   ];
   allHandlers = [
-    { matches: (sql) => sql.startsWith('SELECT * FROM feedback'), run: (db, sql, args) => {
+    { matches: (sql) => sql.startsWith('SELECT id, created_at') && sql.includes('FROM feedback'), run: (db, sql, args) => {
       const predicates = sql.match(/WHERE (.*?) ORDER BY/)?.[1]?.split(' AND ') ?? [];
       const filters = [
         { predicate: 'status = ?', apply: (state) => ({ rows: state.rows.filter((row) => row.status === args[state.index]), index: state.index + 1 }) },
@@ -83,7 +97,7 @@ class FakeD1 {
       const activeFilters = filters.filter((filter) => predicates.includes(filter.predicate));
       const { rows } = activeFilters.reduce((state, filter) => filter.apply(state), { rows: [...db.rows], index: 0 });
       rows.sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
-      return { results: rows.slice(0, args.at(-1)) };
+      return { results: rows.slice(0, args.at(-1)).map((row) => selectColumns(row, sql)) };
     } },
   ];
 
@@ -97,7 +111,7 @@ class FakeD1 {
     const statement = {
       bind(...values) { args = values; return statement; },
       async first() {
-        return firstHandler ? firstHandler.run(db, args) : null;
+        return firstHandler ? firstHandler.run(db, args, sql) : null;
       },
       async all() {
         return allHandler ? allHandler.run(db, sql, args) : { results: [] };
@@ -254,6 +268,51 @@ test('admin list validates filters and paginates filtered results', async () => 
   const second = await (await request(`/v1/feedback?status=new&target=beta&category=bug&since=700&limit=1&cursor=${encodeURIComponent(first.nextCursor)}`)).json();
   assert.deepEqual(second.items.map((item) => item.id), [ids[2]]);
   assert.equal(second.nextCursor, null);
+  assert.ok(first.items.every((item) => !('uid_hash' in item)), 'list never exposes the salted user hash');
+  const detail = await (await request(`/v1/feedback/${ids[0]}`)).json();
+  assert.equal('uid_hash' in detail, false);
+  assert.equal(detail.id, ids[0]);
+});
+
+test('expired admin throttle rows are removed when another key fails', async () => {
+  let now = 1950000000000;
+  const { env, ctx, db } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', NOW: () => now } });
+  const fail = (ip) => worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: 'Bearer wrong', 'CF-Connecting-IP': ip } }), env, ctx);
+  await fail('198.51.100.1'); await fail('198.51.100.2');
+  assert.equal(db.adminAttempts.size, 2);
+  now += 11 * 60 * 1000;
+  await fail('198.51.100.3');
+  assert.equal(db.adminAttempts.size, 1);
+});
+
+test('infrastructure failures return controlled errors instead of Worker 500s', async () => {
+  const auth = await token();
+  const missingDb = harness({ env: { FEEDBACK_DB: undefined } });
+  assert.equal((await post(missingDb.env, missingDb.ctx, { auth })).status, 503);
+
+  const brokenDb = new FakeD1();
+  brokenDb.prepare = () => { throw new Error('D1 unavailable'); };
+  const broken = harness({ db: brokenDb });
+  const response = await post(broken.env, broken.ctx, { auth });
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { error: 'Feedback service error' });
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://beta.gfcweather.com');
+});
+
+test('a failed Discord status update never rejects the background task', async () => {
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => new Response('{}', { status: 200 }) } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  const original = db.prepare.bind(db);
+  db.prepare = (sql) => (sql.startsWith('UPDATE feedback SET discord_status') ? { bind() { return { run: async () => { throw new Error('D1 write failed'); } }; } } : original(sql));
+  await assert.doesNotReject(Promise.all(waits));
+});
+
+test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
+  const { db, env, ctx } = harness(); const auth = await token();
+  assert.equal((await post(env, ctx, { auth, body: validBody({ viewport: '   ' }) })).status, 201);
+  assert.equal(db.rows[0].viewport, null);
+  assert.equal((await post(env, ctx, { auth, body: validBody({ message: 'Another distinct note here.', viewport: `${' '.repeat(10)}1280x800${' '.repeat(10)}` }) })).status, 201);
+  assert.equal(db.rows[1].viewport, '1280x800');
 });
 
 test('admin token failures are throttled by salted client IP', async () => {

@@ -14,7 +14,7 @@ const fields = {
   appVersion: (value) => isText(value) && hasLength(clean(value), 1, 40),
   buildTarget: (value) => typeof value === 'string' && TARGETS.has(value),
   contactOk: (value) => typeof value === 'boolean',
-  viewport: (value) => value === undefined || (typeof value === 'string' && value.length <= 20),
+  viewport: (value) => value === undefined || (isText(value) && clean(value).length <= 20),
   plan: (value) => value === undefined || (typeof value === 'string' && PLANS.has(value)),
 };
 const allowedFields = new Set(Object.keys(fields));
@@ -29,7 +29,7 @@ export function validate(body) {
     message: clean(body.message),
     page: cleanPage(body.page),
     appVersion: clean(body.appVersion),
-    viewport: body.viewport ? clean(body.viewport) : null,
+    viewport: body.viewport ? clean(body.viewport) || null : null,
   };
 }
 

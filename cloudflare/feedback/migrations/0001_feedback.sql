@@ -15,8 +15,5 @@ CREATE TABLE feedback (
   user_agent TEXT NOT NULL DEFAULT ''
 );
 
-CREATE INDEX feedback_created_at_idx ON feedback(created_at DESC);
-CREATE INDEX feedback_status_idx ON feedback(status);
-CREATE INDEX feedback_build_target_idx ON feedback(build_target);
+CREATE INDEX feedback_created_id_idx ON feedback(created_at DESC, id DESC);
 CREATE INDEX feedback_uid_created_idx ON feedback(uid_hash, created_at DESC);
-CREATE INDEX feedback_uid_message_created_idx ON feedback(uid_hash, message, created_at DESC);

@@ -46,22 +46,25 @@ async function parsePayload(request, headers) {
 }
 
 /** Explains an atomic-insert rejection as a duplicate or rate-limit 429. */
-async function rejection(env, uidHash, message, now, headers) {
+async function rejection({ env, uidHash, message, now, headers }) {
   const result = (await applyUserRateLimit(env.FEEDBACK_DB, uidHash, message, now)) ?? { retry: 60, duplicate: false };
   return json({ error: result.duplicate ? 'Duplicate feedback' : 'Rate limit exceeded' }, 429, { ...headers, 'retry-after': String(result.retry) });
 }
 
+/** True when every binding and variable the submit path needs is present. */
+const isConfigured = (env) => Boolean(env.FEEDBACK_HASH_SALT && env.FEEDBACK_DB && env.FIREBASE_PROJECT_ID);
+
 async function submit(request, env, ctx, headers) {
   const error = requestError(request, headers);
   if (error) return error;
-  if (!env.FEEDBACK_HASH_SALT) return json({ error: 'Feedback service is not configured' }, 503, headers);
+  if (!isConfigured(env)) return json({ error: 'Feedback service is not configured' }, 503, headers);
   const auth = await authenticateSubmission(request, env, headers);
   if (auth.response) return auth.response;
   const parsed = await parsePayload(request, headers);
   if (parsed.response) return parsed.response;
   const now = env.NOW?.() ?? Date.now();
   const { record, inserted, uidHash } = await createRecord(env.FEEDBACK_DB, { env, request, claims: auth.claims, body: parsed.body, now });
-  if (!inserted) return rejection(env, uidHash, parsed.body.message, now, headers);
+  if (!inserted) return rejection({ env, uidHash, message: parsed.body.message, now, headers });
   await notifyDiscord(env, ctx, record);
   return json({ id: record.id }, 201, headers);
 }
@@ -83,5 +86,11 @@ const routeTable = [
 export async function fetchFeedback(request, env, ctx) {
   const url = new URL(request.url);
   const route = routeTable.find((item) => item.match(url, request.method));
-  return route ? route.run(request, env, url, ctx) : json({ error: 'Not found' }, 404);
+  if (!route) return json({ error: 'Not found' }, 404);
+  try {
+    return await route.run(request, env, url, ctx);
+  } catch {
+    // Never log request content; surface a stable error instead of an opaque Worker 500.
+    return json({ error: 'Feedback service error' }, 500, corsHeaders(request, env));
+  }
 }

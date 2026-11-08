@@ -37,7 +37,7 @@ List filters are `status`, `target`, `category`, `since` (Unix milliseconds), `l
 
 ## Retention
 
-Submissions have no automatic expiry. Review the D1 data periodically and delete records when they are no longer useful. Keep enough history to support follow-up and product review, then use a D1 SQL query to remove older rows. Email is saved only when the submitter opts into contact. User IDs are stored only as salted SHA-256 hashes. Back up or export records before a bulk deletion if the owner needs an archive.
+Submissions have no automatic expiry. Review the D1 data periodically and delete records when they are no longer useful. Keep enough history to support follow-up and product review, then use a D1 SQL query to remove older rows. Email is saved only when the submitter opts into contact and Firebase reports the address as verified. User IDs are stored only as salted SHA-256 hashes, and the admin API never returns that hash. It returns `email` only for submitters who opted in, so treat the admin token as sensitive. Back up or export records before a bulk deletion if the owner needs an archive.
 
 Example to remove feedback older than one year, after checking the affected count:
 

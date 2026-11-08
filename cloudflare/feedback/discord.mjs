@@ -30,6 +30,10 @@ export async function notifyDiscord(env, ctx, record) {
   if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return;
   ctx.waitUntil((async () => {
     const status = await postDiscord(env, record);
-    await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
+    try {
+      await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
+    } catch {
+      // The feedback row is already stored; a failed status update must not surface as an unhandled rejection.
+    }
   })());
 }

@@ -190,7 +190,9 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onOpenChan
   };
 
   let body: React.ReactNode;
-  if (!signedIn) {
+  if (status === 'loading') {
+    body = <p role="status" className="text-sm text-muted-foreground">Checking your account…</p>;
+  } else if (!signedIn) {
     body = <SignedOutNotice onClose={() => handleOpenChange(false)} />;
   } else if (sent) {
     body = <SentNotice onClose={() => handleOpenChange(false)} />;

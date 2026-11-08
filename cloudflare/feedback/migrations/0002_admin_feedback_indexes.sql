@@ -5,5 +5,5 @@ CREATE INDEX feedback_category_created_id_idx ON feedback(category, created_at D
 CREATE TABLE feedback_admin_attempts (
   key_hash TEXT PRIMARY KEY,
   window_started INTEGER NOT NULL,
-  attempts INTEGER NOT NULL
+  attempts INTEGER NOT NULL CHECK (attempts >= 0)
 );
