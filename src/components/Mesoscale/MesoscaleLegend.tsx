@@ -5,13 +5,17 @@
 import React from 'react';
 import type { MesoscaleCatalogParameter } from '../../mesoscale';
 
+/** A catalog parameter may omit its legend; every helper below treats that as an empty one. */
+const stopsOf = (parameter: MesoscaleCatalogParameter): MesoscaleCatalogParameter['legend'] =>
+  Array.isArray(parameter.legend) ? parameter.legend : [];
+
 const rampFor = (parameter: MesoscaleCatalogParameter): string => {
-  const colors = parameter.legend.map(stop => stop.color).filter((color): color is string => Boolean(color));
+  const colors = stopsOf(parameter).map(stop => stop.color).filter((color): color is string => Boolean(color));
   return colors.length > 1 ? `linear-gradient(90deg, ${colors.join(', ')})` : (colors[0] ?? 'transparent');
 };
 
 const endLabels = (parameter: MesoscaleCatalogParameter): [string, string] => {
-  const stops = parameter.legend;
+  const stops = stopsOf(parameter);
   return [stops[0]?.label ?? '', stops[stops.length - 1]?.label ?? ''];
 };
 
