@@ -4,6 +4,7 @@
  * modal presentation and local acknowledgment state; policy text and account
  * persistence are supplied by their respective boundaries.
  */
+import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
@@ -47,6 +48,7 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
     'We added a section describing the optional Send feedback form: what it collects, where it is stored (Cloudflare and a private Discord channel), and how long it is kept.',
     'Feedback is kept until we delete it and is not removed automatically when you delete your account; you can ask us to delete it at any time.',
     'We now list Cloudflare among the infrastructure providers that process requests for the beta site and feedback service.',
+    'Our contact address for privacy questions and deletion requests is now contact@gfcweather.com.',
   ],
 };
 
@@ -297,7 +299,7 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     <p>
       We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email.
       For privacy questions, or to request manual data deletion, contact us at{' '}
-      <a href="mailto:alex@weatherboysuper.com">alex@weatherboysuper.com</a>.
+      <ContactEmailLink />.
     </p>
   </>
 );

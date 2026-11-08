@@ -42,7 +42,7 @@ Welcome to the Graphical Forecast Creator ("GFC", "the App"). By clicking "I Agr
    These Terms shall be governed by and construed in accordance with the laws of the State of Oklahoma, United States, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts located in Oklahoma.
 
 10. **Contact Us**  
-    If you have any questions regarding these Terms, please reach out via the official GFC Support Discord.
+    If you have any questions regarding these Terms, please reach out via the official GFC Support Discord or email contact@gfcweather.com.
 
 11. **Accounts, Premium Subscriptions, and Billing**  
     - GFC offers an optional premium subscription for hosted cloud storage and cross-device synchronization.

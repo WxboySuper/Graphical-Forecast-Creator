@@ -16,6 +16,7 @@ import {
   Folder,
   History,
   Lock,
+  Mail,
   Map,
   MessageSquare,
   MoreVertical,
@@ -26,6 +27,7 @@ import {
   Upload,
   Zap,
 } from 'lucide-react';
+import ContactEmailLink from '../../components/ContactEmailLink';
 import type { SavedCycle } from '../../store/forecastSlice';
 import type { ForecastCycle, OutlookDay } from '../../types/outlooks';
 import { DEFAULT_WORKFLOW_TEMPLATES } from '../../components/ForecastWorkflow/workflowTemplates';
@@ -461,6 +463,7 @@ const SignedInConcept: React.FC<HomeConceptPageProps> = ({
         <RecentTimeline cycles={savedCycles} onLoad={onLoadRecentCycle} onOpenHistory={onOpenHistory} />
       </aside>
     </div>
+    <p className="home-concept-contact home-concept-contact-footer"><Mail className="h-4 w-4" />Questions or concerns? <ContactEmailLink /></p>
   </main>
 );
 
@@ -560,6 +563,7 @@ const SignedOutToolRail: React.FC<{
     </section>
 
     <p className="home-concept-privacy"><Lock className="h-4 w-4" />Your data is private. You&apos;re in control.</p>
+    <p className="home-concept-contact"><Mail className="h-4 w-4" />Questions or concerns? <ContactEmailLink /></p>
   </aside>
 );
 

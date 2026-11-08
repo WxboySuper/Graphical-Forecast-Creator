@@ -145,6 +145,9 @@ describe('NavbarSections', () => {
       '_blank',
       'noopener,noreferrer'
     );
+    const contactLink = screen.getByRole('link', { name: /Contact us/i });
+    expect(contactLink).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
+    expect(contactLink).toHaveTextContent('contact@gfcweather.com');
     const whatsNewLink = screen.getByRole('link', { name: /What's New/i });
     expect(whatsNewLink).toHaveAttribute('href', '/updates');
     fireEvent.click(whatsNewLink);

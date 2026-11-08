@@ -41,6 +41,7 @@ import {
   getSyncStatusMeta,
   type SyncStatusMeta,
 } from "./accountPageUtils";
+import ContactEmailLink from "../components/ContactEmailLink";
 import { AccountDeletionCard } from "./AccountDeletionCard";
 import { AccountBillingCard } from "./AccountBillingCard";
 import { AccountSummaryTile as SummaryTile } from "./AccountSummaryTile";
@@ -539,6 +540,8 @@ const SignedInAccountView: React.FC = () => {
           <AccountDeletionCard />
         </div>
       </div>
+
+      <p className="account-help-note">Questions, billing issues, or concerns? Email <ContactEmailLink />.</p>
     </div>
   );
 };

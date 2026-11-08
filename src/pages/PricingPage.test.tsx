@@ -67,6 +67,7 @@ describe('PricingPage', () => {
 
     expect(screen.getByRole('button', { name: /Choose monthly/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Choose annual/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contact@gfcweather.com' })).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
   });
 
   test('shows the active premium tier when the user already has a subscription', () => {
