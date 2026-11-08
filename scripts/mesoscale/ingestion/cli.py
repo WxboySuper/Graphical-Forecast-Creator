@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+import argparse
+import json
+import os
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
-
-from inventory import IndexRecord, parse_idx, resolve_ranges
 
 from .fields import MODELS
 from .discovery import discover_cycle
@@ -63,5 +61,4 @@ def publish_pointer_if_missing(store: R2Store, model_id: str, cycle: datetime) -
         return
     payload = store.get(f"mesoscale/v1/catalog/{model_id}/{cycle.strftime('%Y%m%dT%H00Z')}.json")
     if payload:
-        from .publish import publish_pointer
         publish_pointer(store, model_id, cycle, json.loads(payload))

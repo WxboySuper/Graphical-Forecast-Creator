@@ -2,20 +2,28 @@
 
 from __future__ import annotations
 
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
-from dataclasses import asdict, dataclass
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from typing import Protocol
 
-from inventory import IndexRecord, parse_idx, resolve_ranges
+from inventory import parse_idx, resolve_ranges
 
 from .fields import Model, required_identities, RETRIES, RETRY_BASE_SECONDS
-def request(url: str, headers: dict[str, str] | None = None, attempts: int = RETRIES) -> tuple[bytes, object]:
+
+
+@dataclass(frozen=True)
+class ResponseInfo:
+    status: int
+    headers: object
+
+
+def request(url: str, headers: dict[str, str] | None = None, attempts: int = RETRIES, method: str = "GET") -> tuple[bytes, object]:
     error = None
     for attempt in range(attempts):
         try:
-            return request_once(url, headers)
+            return request_once(url, headers, method)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
             check_retryable(exc, url)
             error = exc
@@ -37,10 +45,10 @@ def is_permanent_http_error(error: Exception) -> bool:
     return isinstance(error, urllib.error.HTTPError) and 400 <= error.code < 500 and error.code != 429
 
 
-def request_once(url: str, headers: dict[str, str] | None) -> tuple[bytes, object]:
-    req = urllib.request.Request(url, headers={"User-Agent": "GFC-mesoscale-ingest/1.0", **(headers or {})})
-    response = urllib.request.urlopen(req, timeout=30)
-    return response.read(), response
+def request_once(url: str, headers: dict[str, str] | None, method: str) -> tuple[bytes, object]:
+    req = urllib.request.Request(url, headers={"User-Agent": "GFC-mesoscale-ingest/1.0", **(headers or {})}, method=method)
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return response.read(), ResponseInfo(response.status, response.headers)
 
 
 def fail_permanent_http_error(error: Exception, url: str) -> None:
@@ -72,7 +80,7 @@ def discover_candidate(model: Model, cycle: datetime) -> tuple[datetime, str, st
     object_key = model.path.format(date=date, hour=hour, fh=0)
     root = f"https://{model.bucket}.s3.amazonaws.com/{object_key}"
     idx, _ = request(f"{root}.idx")
-    head = urllib.request.urlopen(urllib.request.Request(root, method="HEAD", headers={"User-Agent": "GFC-mesoscale-ingest/1.0"}), timeout=15)
+    _, head = request(root, {"User-Agent": "GFC-mesoscale-ingest/1.0"}, method="HEAD")
     if complete_index(idx, int(head.headers["Content-Length"]), model.id):
         return cycle, root, head.headers.get("Last-Modified") or ""
     return None

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request, ctypes
+import hashlib
+import math
+import os
+import tempfile
+import ctypes
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
-
-from inventory import IndexRecord, parse_idx, resolve_ranges
 
 from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, TILE_SIZE, WEB_MERCATOR_LIMIT, Model, source_metadata
 from .discovery import request
@@ -93,6 +94,8 @@ def render_tiles(request: TileRenderRequest) -> tuple[int, int]:
     width = TILE_SIZE * 2**ZOOM_MAX
     height = width
     inside = valid & (px >= 0) & (px < width) & (py >= 0) & (py < height)
+    if not inside.any():
+        raise ValueError("decoded field does not overlap the Web Mercator tile domain")
     rgba = resampled_rgba(RasterRequest(px[inside], py[inside], values[inside], width, height, stops))
     image = Image.fromarray(rgba, "RGBA")
     root.mkdir(parents=True, exist_ok=True)
@@ -202,6 +205,7 @@ def combine_wind(field_outputs, np):
     v = next((part for part in components if part["record"].get("parameter") == "VGRD"), None)
     if u is None or v is None:
         return field_outputs
+    require_matching_wind_grids(u, v, np)
     u["values"] = np.hypot(u["values"], v["values"])
     sources = [u, v]
     u["sourceInputs"] = [{"parameter": part["record"].get("parameter"), "message": part["record"], "sha256": part["sourceHash"], "bytes": part["sourceBytes"]} for part in sources]
@@ -211,37 +215,68 @@ def combine_wind(field_outputs, np):
     return field_outputs
 
 
+def require_matching_wind_grids(u: dict, v: dict, np) -> None:
+    if np.shape(u["values"]) != np.shape(v["values"]):
+        raise ValueError("10 m U/V wind grids have different shapes")
+    coordinates = ["lats" in item and "lons" in item for item in (u, v)]
+    if not any(coordinates):
+        return
+    if not all(coordinates):
+        raise ValueError("10 m U/V wind grid coordinates are incomplete")
+    same_coordinates = np.allclose(u["lats"], v["lats"]) and np.allclose(u["lons"], v["lons"])
+    if not same_coordinates:
+        raise ValueError("10 m U/V wind grids are not aligned")
+
+
 def decode_range(request: DecodeRequest):
     content, field_ids, offset, ranged, digest = request.content, request.field_ids, request.offset, request.ranged, request.digest
     from eccodes import codes_get, codes_get_values, codes_grib_new_from_file, codes_grib_multi_support_off, codes_grib_multi_support_on, codes_release
-    from gribapi.bindings import ffi
     with tempfile.NamedTemporaryFile(delete=False) as temporary:
         temporary.write(content)
         path = temporary.name
-    library = ctypes.CDLL("ucrtbase.dll" if os.name == "nt" else None)
+    codes_grib_multi_support_on()
+    try:
+        decoded = read_grib_range(path, request, codes_grib_new_from_file, codes_release)
+    finally:
+        codes_grib_multi_support_off()
+        os.unlink(path)
+    if not decoded:
+        raise ValueError(f"no selected fields decoded from GRIB range at {offset}")
+    return decoded
+
+
+def read_grib_range(path: str, request: DecodeRequest, new_handle, release) -> list:
+    if os.name == "nt":
+        return read_windows_grib_file(path, request, new_handle, release)
+    with open(path, "rb") as stream:
+        return read_stream_handles(stream, request, new_handle, release)
+
+
+def read_stream_handles(stream, request: DecodeRequest, new_handle, release) -> list:
+    decoded = []
+    while handle := new_handle(stream):
+        try:
+            decoded.extend(decode_handle(handle, request))
+        finally:
+            release(handle)
+    return decoded
+
+
+def read_windows_grib_file(path: str, request: DecodeRequest, new_handle, release) -> list:
+    # Windows ecCodes wheels use UCRT's FILE ABI for multi-field GRIB iteration.
+    from gribapi.bindings import ffi
+    library = ctypes.CDLL("ucrtbase.dll")
     library.fopen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     library.fopen.restype = ctypes.c_void_p
     library.fclose.argtypes = [ctypes.c_void_p]
     file_pointer = library.fopen(os.fsencode(path), b"rb")
     if not file_pointer:
-        os.unlink(path)
-        raise OSError(f"could not open temporary GRIB range at {offset}")
-    codes_grib_multi_support_on()
-    decoded = []
+        raise OSError(f"could not open temporary GRIB range at {request.offset}")
     try:
         stream = ffi.cast("FILE *", file_pointer)
-        while handle := codes_grib_new_from_file(stream):
-            try:
-                decoded.extend(decode_handle(handle, request))
-            finally:
-                codes_release(handle)
+        return read_stream_handles(stream, request, new_handle, release)
     finally:
-        codes_grib_multi_support_off()
         library.fclose(file_pointer)
-        os.unlink(path)
-    if not decoded:
-        raise ValueError(f"no selected fields decoded from GRIB range at {offset}")
-    return decoded
 
 
 def decode_handle(handle, request: DecodeRequest):
@@ -258,6 +293,8 @@ def decode_handle(handle, request: DecodeRequest):
     param_id = codes_get(handle, "paramId")
     native_parameter = native_identity(parameter, param_id)
     matching = matched_field_ids(request.field_ids, native_parameter)
+    if not matching:
+        matching = verified_single_field(request)
     record_parameter = resolved_record_parameter(matching, native_parameter)
     record = source_record(request, record_parameter)
     grid = GridData(values, lats, lons)
@@ -270,8 +307,15 @@ def native_identity(parameter: str, param_id: int) -> str:
 
 
 def matched_field_ids(field_ids: list[str], parameter: str) -> list[str]:
-    matches = [field_id for field_id in field_ids if field_id.rsplit(":", 1)[-1] == parameter]
-    return matches or field_ids if len(field_ids) == 1 else matches
+    return [field_id for field_id in field_ids if field_id.rsplit(":", 1)[-1] == parameter]
+
+
+def verified_single_field(request: DecodeRequest) -> list[str]:
+    if len(request.field_ids) != 1:
+        return []
+    field_parameter = request.field_ids[0].rsplit(":", 1)[-1]
+    matches = [row for row, _ in request.ranged if row.offset == request.offset and row.parameter == field_parameter]
+    return request.field_ids if matches else []
 
 
 def resolved_record_parameter(matches: list[str], parameter: str) -> str:

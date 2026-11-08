@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+import hashlib
+import os
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
-import hashlib
-
-from inventory import IndexRecord, parse_idx, resolve_ranges
 
 
 @dataclass(frozen=True)
@@ -59,7 +57,8 @@ class LocalStore:
             return [prefix]
         if not base.exists():
             return []
-        return [p.relative_to(self.root).as_posix() for p in base.rglob("*") if p.is_file()]
+        resolved_root = self.root.resolve()
+        return [p.relative_to(resolved_root).as_posix() for p in base.rglob("*") if p.is_file()]
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
@@ -82,10 +81,13 @@ class R2Store:
         return response.get("ETag", "").strip('"') or None
 
     def get(self, key: str) -> bytes | None:
+        from botocore.exceptions import ClientError
         try:
             return self.client.get_object(Bucket=self.bucket, Key=key)["Body"].read()
-        except self.client.exceptions.NoSuchKey:
-            return None
+        except ClientError as error:
+            if is_missing_object(error):
+                return None
+            raise
 
     def list(self, prefix: str) -> list[str]:
         paginator = self.client.get_paginator("list_objects_v2")
@@ -102,6 +104,13 @@ class R2Store:
         missing = missing_size_keys(expected, found)
         if missing:
             raise IOError(f"stored object verification failed: {missing[0]}")
+
+
+def is_missing_object(error: Exception) -> bool:
+    response = getattr(error, "response", {})
+    code = response.get("Error", {}).get("Code")
+    status = response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+    return code in {"NoSuchKey", "NotFound", "404"} or status == 404
 
     def list_sizes(self, prefix: str) -> dict[str, int]:
         paginator = self.client.get_paginator("list_objects_v2")

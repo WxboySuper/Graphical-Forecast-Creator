@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import warnings
-
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+import hashlib
+import json
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Protocol
-
-from inventory import IndexRecord, parse_idx, resolve_ranges
 
 from .catalog import validate_catalog
 from .store import Store
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -36,15 +33,27 @@ def catalog_key(model_id: str, cycle: datetime) -> str:
 
 def already_published(store: Store, model_id: str, cycle: datetime) -> bool:
     payload = store.get(catalog_key(model_id, cycle))
-    return bool(payload and json.loads(payload).get("status") == "complete")
+    return object_status(payload) == "complete"
 
 
 def latest_is_newer(store: Store, model_id: str, cycle: datetime) -> bool:
     current = store.get(f"mesoscale/v1/latest/{model_id}.json")
     if not current:
         return False
-    current_cycle = datetime.fromisoformat(json.loads(current)["cycleTime"].replace("Z", "+00:00"))
+    try:
+        current_cycle = datetime.fromisoformat(json.loads(current)["cycleTime"].replace("Z", "+00:00"))
+    except (json.JSONDecodeError, UnicodeError, KeyError, TypeError, ValueError):
+        return False
     return current_cycle >= cycle
+
+
+def object_status(payload: bytes | None) -> str | None:
+    if payload is None:
+        return None
+    try:
+        return json.loads(payload).get("status")
+    except (json.JSONDecodeError, UnicodeError, AttributeError, TypeError):
+        return None
 
 
 def upload_tiles(store: Store, request: PublishRequest) -> None:

@@ -13,7 +13,7 @@ except ImportError:
     FormatChecker = None
 
 from ingest import LocalStore, MODELS, colorize, discover_cycle, publish_cycle, validate_catalog
-from ingestion.publish import PublishRequest
+from ingestion.publish import PublishRequest, latest_is_newer
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
 from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range
@@ -73,6 +73,12 @@ class IngestTests(unittest.TestCase):
     def test_catalog_rejects_wrong_analysis_frame(self):
         catalog = sample_catalog()
         catalog["frames"][0]["frameType"] = "forecast"
+        with self.assertRaises(ValueError):
+            validate_catalog(catalog)
+
+    def test_catalog_malformed_frame_raises_value_error(self):
+        catalog = sample_catalog()
+        catalog["frames"][0].pop("forecastHour")
         with self.assertRaises(ValueError):
             validate_catalog(catalog)
 
@@ -170,11 +176,11 @@ class IngestTests(unittest.TestCase):
     def test_decode_and_publish_failures_write_failed_health(self):
         cycle = datetime(2026, 11, 8, 12, tzinfo=UTC)
         parser = type("Parser", (), {"parse_args": lambda self: type("Args", (), {"model": "hrrr", "dry_run": False, "output": Path("out")})()})()
-        for stage in ("decode", "publish"):
+        for stage in ("decode", "render", "publish"):
             with self.subTest(stage=stage), tempfile.TemporaryDirectory() as temporary:
                 store = MemoryStore(Path(temporary))
                 dependencies = [patch.object(cli, "build_parser", return_value=parser), patch.object(cli, "create_store", return_value=store), patch.object(cli, "discover_cycle", return_value=(cycle, "source", "modified"))]
-                if stage == "decode":
+                if stage in {"decode", "render"}:
                     dependencies.append(patch.object(cli, "process_f00", side_effect=ValueError("decode failed")))
                 else:
                     result = {"catalog": sample_catalog(), "metrics": {}, "tiles": {}}
@@ -209,14 +215,26 @@ class IngestTests(unittest.TestCase):
             keys = store.list("mesoscale/v1/catalog/hrrr")
             self.assertEqual(len(keys), 6)
 
+    def test_corrupt_latest_pointer_does_not_crash_cycle_discovery(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            store = MemoryStore(Path(temporary))
+            store.put("mesoscale/v1/latest/hrrr.json", b"{broken", "application/json")
+            self.assertFalse(latest_is_newer(store, "hrrr", datetime(2026, 11, 8, 12, tzinfo=UTC)))
+
     def test_discovery_selects_latest_complete_candidate_from_fixture(self):
+        from types import SimpleNamespace
         fixture = (Path(__file__).parent / "fixtures" / "hrrr_t12_wrfscf00.idx").read_bytes()
 
-        class Head:
-            headers = {"Content-Length": "136859480", "Last-Modified": "Sun, 08 Nov 2026 12:51:24 GMT"}
+        headers = {"Content-Length": "136859480", "Last-Modified": "Sun, 08 Nov 2026 12:51:24 GMT"}
+        def fake_request(url, headers=None, attempts=4, method="GET"):
+            if url.endswith(".idx"):
+                return fixture, None
+            return b"", SimpleNamespace(status=200, headers=headers_response)
+
+        headers_response = headers
 
         now = datetime(2026, 11, 8, 12, 55, tzinfo=UTC)
-        with patch("ingestion.discovery.request", return_value=(fixture, None)), patch("ingestion.discovery.urllib.request.urlopen", return_value=Head()):
+        with patch("ingestion.discovery.request", side_effect=fake_request):
             cycle, url, modified = discover_cycle(MODELS["hrrr"], now=now)
         self.assertEqual(cycle, datetime(2026, 11, 8, 12, tzinfo=UTC))
         self.assertIn("hrrr.20261108", url)
@@ -246,6 +264,15 @@ class IngestTests(unittest.TestCase):
         output = combine_wind({"wind-speed-10m": components}, np)["wind-speed-10m"][0]
         self.assertEqual(float(output["values"][0, 0]), 5.0)
         self.assertEqual([source["parameter"] for source in output["sourceInputs"]], ["UGRD", "VGRD"])
+
+    def test_wind_components_must_have_matching_grid_shapes(self):
+        import numpy as np
+        components = [
+            {"values": np.ones((1, 2)), "record": {"parameter": "UGRD"}},
+            {"values": np.ones((2, 1)), "record": {"parameter": "VGRD"}},
+        ]
+        with self.assertRaisesRegex(ValueError, "different shapes"):
+            combine_wind({"wind-speed-10m": components}, np)
 
     def test_decode_reads_both_wind_messages_from_one_byte_range(self):
         try:

@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
-from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+import json
 from pathlib import Path
-from typing import Protocol
-
-from inventory import IndexRecord, parse_idx, resolve_ranges
 
 SCHEMA_PATH = Path(__file__).parents[1] / "catalog.schema.json"
 
@@ -57,8 +52,16 @@ def validate_catalog_status(status: str) -> None:
 
 
 def validate_frame_types(catalog: dict) -> None:
-    if any(frame["frameType"] != frame_type(frame["forecastHour"]) for frame in catalog["frames"]):
+    if any(not valid_frame_type(frame) for frame in catalog["frames"]):
         raise ValueError("frame type must agree with forecast hour")
+
+
+def valid_frame_type(frame: dict) -> bool:
+    if not isinstance(frame, dict) or "frameType" not in frame or "forecastHour" not in frame:
+        return False
+    if type(frame["forecastHour"]) is not int or not isinstance(frame["frameType"], str):
+        return False
+    return frame["frameType"] == frame_type(frame["forecastHour"])
 
 
 def frame_type(forecast_hour: int) -> str:

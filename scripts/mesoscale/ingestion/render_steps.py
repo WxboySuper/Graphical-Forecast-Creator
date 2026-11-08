@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -63,7 +62,7 @@ def process(context, decode_range, render_tiles, combine_wind) -> RenderResult:
 
 def load_source(context) -> SourceBundle:
     idx, _ = request(f"{context.source_url}.idx")
-    head = urllib.request.urlopen(urllib.request.Request(context.source_url, method="HEAD", headers={"User-Agent": "GFC-mesoscale-ingest/1.0"}), timeout=30)
+    _, head = request(context.source_url, method="HEAD")
     size = int(head.headers["Content-Length"])
     records = parse_idx(idx.decode("ascii"))
     selected = select_fields(context.model, records, size)
@@ -146,7 +145,6 @@ def parameter_metadata(request: ParameterBuild) -> dict:
     context, source, processed = request.context, request.source, request.processed
     field_id, item, spec, descriptors = request.field_id, request.item, request.spec, request.descriptors
     cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
-    cycle_text = context.cycle.strftime("%Y-%m-%dT%H:%M:%SZ")
     level = next((entry["record"].get("level") for entry in descriptors if entry["record"].get("level")), spec[3])
     return {"id": field_id, "displayName": field_id.replace("-", " ").title(), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f00/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX, "bounds": [-130, 20, -60, 55]}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
 
