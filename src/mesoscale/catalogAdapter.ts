@@ -63,6 +63,7 @@ export const isCatalogFrame = (value: unknown): boolean => {
   if (!Number.isInteger(value.forecastHour)) return false;
   if (!Number.isFinite(Date.parse(String(value.validTime)))) return false;
   if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
+  if (value.parameters.length === 0 && value.status !== 'failed') return false;
   return value.parameters.every(isCatalogParameter);
 };
 

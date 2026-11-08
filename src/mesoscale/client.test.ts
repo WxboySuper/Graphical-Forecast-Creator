@@ -135,4 +135,12 @@ describe('mesoscale client', () => {
     const malformedSibling = { ...catalog, frames: [catalog.frames[0], { ...catalog.frames[1], parameters: null }] };
     expect(normalizeCatalogFrame(malformedSibling as never, 0).state).toBe('malformed');
   });
+
+  it('rejects empty complete frames and preserves explicit failed frames', () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const emptyComplete = { ...catalog, frames: [{ ...catalog.frames[0], parameters: [] }] };
+    const emptyFailed = { ...catalog, frames: [{ ...catalog.frames[0], parameters: [], status: 'failed' as const }] };
+    expect(normalizeCatalogFrame(emptyComplete, 0).state).toBe('malformed');
+    expect(normalizeCatalogFrame(emptyFailed, 0).state).toBe('upstream-failure');
+  });
 });
