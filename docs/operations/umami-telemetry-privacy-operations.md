@@ -56,7 +56,7 @@ Firebase account deletion cannot automatically remove Umami data because no acco
 
 ## Operational ownership and incident response
 
-- Privacy questions and access/deletion requests: `alex@weatherboysuper.com`.
+- Privacy questions and access/deletion requests: `contact@gfcweather.com`.
 - VPS/Umami/Nginx/backup operator: GFC operator.
 - On a suspected telemetry or VPS breach: preserve minimum necessary evidence, rotate impacted access credentials/secrets, assess affected systems and records, consult counsel on notification duties, notify affected people/regulators where required, and document remediation.
 - Restrict Umami admin access to named operators, use unique strong credentials and HTTPS, and review access after any role or infrastructure change.
