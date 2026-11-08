@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { describe } from 'node:test';
 import worker from './mesoscale-worker.mjs';
 
 const serialTest = (name, run) => test(name, { concurrency: false }, run);
@@ -56,8 +56,8 @@ const withCache = async (run) => {
   const originalCaches = globalThis.caches;
   const entries = new Map();
   const cache = {
-    match: async (key) => entries.get(key.url)?.clone(),
-    put: async (key, value) => { entries.set(key.url, value.clone()); },
+    match: async (key) => entries.get(`${key.method}:${key.url}`)?.clone(),
+    put: async (key, value) => { entries.set(`${key.method}:${key.url}`, value.clone()); },
   };
   globalThis.caches = { default: cache };
   try {
@@ -68,6 +68,7 @@ const withCache = async (run) => {
   }
 };
 
+describe('mesoscale worker', { concurrency: false }, () => {
 serialTest('strictly whitelists route segments and rejects traversal attempts without R2 reads', async () => {
   let reads = 0;
   const env = envFor({}, { MESOSCALE_BUCKET: {
@@ -113,6 +114,10 @@ serialTest('CORS allows configured origins and omits permission for other origin
   const denied = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: 'https://attacker.example' } }), env);
   assert.equal(denied.headers.has('Access-Control-Allow-Origin'), false);
   assert.match(denied.headers.get('Vary') ?? '', /Origin/);
+  for (const spoof of [`${ORIGIN}.evil.com`, `${ORIGIN}/`, ORIGIN.toUpperCase()]) {
+    const response = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: spoof } }), env);
+    assert.equal(response.headers.has('Access-Control-Allow-Origin'), false, spoof);
+  }
   const noOrigin = await worker.fetch(request('/status'), env);
   assert.equal(noOrigin.headers.has('Access-Control-Allow-Origin'), false);
   assert.match(noOrigin.headers.get('Vary') ?? '', /Origin/);
@@ -584,4 +589,5 @@ serialTest('HEAD returns headers without a body, and unsupported methods return 
   const rejected = await worker.fetch(request('/status', { method: 'POST' }), env);
   assert.equal(rejected.status, 405);
   assert.equal(rejected.headers.get('Allow'), 'GET, HEAD, OPTIONS');
+});
 });
