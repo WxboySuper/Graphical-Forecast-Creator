@@ -14,8 +14,8 @@ deployment is configured for `gfc-mesoscale`; deploy it manually after filling
 the placeholders in `cloudflare/wrangler.mesoscale.jsonc`:
 
 1. Create or select the dedicated R2 bucket used by the ingest publisher.
-2. Replace the account, bucket, preview bucket, and public Worker host
-   placeholders. Add the production Worker route or custom domain in the
+2. Replace the account, bucket, and preview bucket placeholders. Add the
+   production Worker route or custom domain in the
    Cloudflare dashboard after the hostname is ready.
 3. Set `PUBLIC_BASE_URL` to that public HTTPS base URL. The Worker uses it when
    building catalog tile templates and latest catalog links.
@@ -23,7 +23,8 @@ the placeholders in `cloudflare/wrangler.mesoscale.jsonc`:
    default covers production (`https://gfc.weatherboysuper.com`), staging
    (`https://staging-gfc.weatherboysuper.com`), beta
    (`https://beta.gfcweather.com`), and local Vite development
-   (`http://localhost:3000`). Add another local port only when needed.
+   (`http://localhost:3000` and `http://localhost:3002`). Add another local
+   port only when needed.
 5. Set `STALE_AFTER_MINUTES` to the operational age limit. It defaults to 180.
 6. Deploy with `pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale.jsonc`.
 

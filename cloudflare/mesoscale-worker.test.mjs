@@ -12,7 +12,7 @@ const envFor = (objects = {}, overrides = {}) => ({
       return { json: async () => structuredClone(value), body: new Blob([JSON.stringify(value)]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
     },
   },
-  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000`,
+  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
   PUBLIC_BASE_URL: 'https://mesoscale.example.test',
   ...overrides,
 });
@@ -52,6 +52,8 @@ test('CORS allows configured origins and omits permission for other origins', as
   const allowed = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: ORIGIN } }), env);
   assert.equal(allowed.headers.get('Access-Control-Allow-Origin'), ORIGIN);
   assert.match(allowed.headers.get('Vary'), /Origin/);
+  const localBeta = await worker.fetch(request('/status', { headers: { Origin: 'http://localhost:3002' } }), env);
+  assert.equal(localBeta.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3002');
   const denied = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: 'https://attacker.example' } }), env);
   assert.equal(denied.headers.has('Access-Control-Allow-Origin'), false);
   const preflight = await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env);

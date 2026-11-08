@@ -76,17 +76,22 @@ const responseCors = (response, origin, allowed) => {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
 
+const publicBaseUrl = (env) => {
+  const base = new URL(env.PUBLIC_BASE_URL);
+  if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw new Error('PUBLIC_BASE_URL must be a public HTTPS URL');
+  return base;
+};
+
 const noBodyForHead = (response) => new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
 
 const addConfiguredTemplateBase = (catalog, env) => {
   if (!env.PUBLIC_BASE_URL) return catalog;
   let base;
   try {
-    base = new URL(env.PUBLIC_BASE_URL);
+    base = publicBaseUrl(env);
   } catch {
     throw new Error('PUBLIC_BASE_URL is invalid');
   }
-  if (base.protocol !== 'https:' || base.username || base.password || base.search || base.hash) throw new Error('PUBLIC_BASE_URL must be a public HTTPS URL');
   const prefix = `${base.origin}${base.pathname.replace(/\/$/, '')}`;
   for (const frame of catalog.frames || []) {
     for (const parameter of frame.parameters || []) {
@@ -133,7 +138,7 @@ const getObjectResponse = async (request, env, route, now) => {
       headers.set('X-Mesoscale-Stale', String(stale));
       if (env.PUBLIC_BASE_URL) {
         try {
-          const base = new URL(env.PUBLIC_BASE_URL);
+          const base = publicBaseUrl(env);
           const compactCycle = compactCycleFromIso(value.cycleTime);
           value.catalogUrl = `${base.origin}${base.pathname.replace(/\/$/, '')}/catalog/${route.model}/${compactCycle}.json`;
         } catch {
