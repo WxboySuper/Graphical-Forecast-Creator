@@ -61,7 +61,7 @@ const getCurrentForecastWorkspace = (
 
 const isDiscussionRoute = (pathname: string, search: string): boolean =>
   pathname === '/discussion' || pathname.startsWith('/discussion/')
-  || (pathname === '/forecast/severe' && new URLSearchParams(search).get('surface') === 'discussion');
+  || (pathname.startsWith('/forecast/') && new URLSearchParams(search).get('surface') === 'discussion');
 
 const getOtherDestinationLabel = (item: AppNavigationItemWithId): string =>
   item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;

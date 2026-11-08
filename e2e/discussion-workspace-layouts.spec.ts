@@ -30,7 +30,7 @@ test.describe('Severe discussion workspace layouts', () => {
   }
 
   test('legacy discussion links preserve query, group, and hash while opening Discussion', async ({ page }) => {
-    await page.goto('/discussion?workspace=severe&group=day1&keep=1#editor');
+    await page.goto('/discussion/thread/42?workspace=severe&group=day1&keep=1#editor');
     await expect(page).toHaveURL(/\/forecast\/severe\?workspace=severe&group=day1&keep=1&surface=discussion#editor/);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
   });

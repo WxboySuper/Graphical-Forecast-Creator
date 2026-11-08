@@ -199,7 +199,7 @@ const AppRoutes: React.FC = () => {
             />
           ))}
         </Route>
-        <Route path="discussion" element={<DiscussionLegacyRedirect />} />
+        <Route path="discussion/*" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
         {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
