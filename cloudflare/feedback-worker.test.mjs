@@ -484,6 +484,11 @@ test('admin token failures are throttled by salted client IP', async () => {
 });
 
 
-test('null optional fields are accepted and stored as empty', () => {
-  assert.ok(validate({ category: 'bug', message: 'Something is wrong here', page: '/forecast', appVersion: '1.0.0', buildTarget: 'beta', contactOk: false, viewport: null, plan: null }));
+test('null optional fields are accepted and stored as empty', async () => {
+  const { env, ctx, db } = harness();
+  const response = await post(env, ctx, { auth: await token({ sub: 'null-fields' }), body: validBody({ viewport: null, plan: null }) });
+  assert.equal(response.status, 201);
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].viewport, null);
+  assert.equal(db.rows[0].plan, null);
 });
