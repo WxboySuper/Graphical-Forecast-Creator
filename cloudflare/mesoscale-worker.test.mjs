@@ -38,7 +38,7 @@ const withNow = async (timestamp, run) => {
   }
 };
 
-// These helpers patch shared globals; node:test runs this file's top-level tests serially by default.
+// These helpers patch shared globals; run this file in node:test's default serial mode (do not pass --test-concurrency >1).
 const withCache = async (run) => {
   const originalCaches = globalThis.caches;
   const entries = new Map();
@@ -485,8 +485,11 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { method: 'HEAD' }), env)).status, 502);
-  const malformedEtag = `W/"${Buffer.from('"bad"|https://mesoscale.example.test').toString('base64url')}"`;
-  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': malformedEtag } }), env)).status, 502);
+  const path = '/catalog/hrrr/20261108T1200Z.json';
+  const validWithSameObjectEtag = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ size: 16, json: async () => makeCatalog(), httpEtag: '"bad"' }) } });
+  const matchingEtag = (await worker.fetch(request(path), validWithSameObjectEtag)).headers.get('ETag');
+  assert.ok(matchingEtag);
+  assert.equal((await worker.fetch(request(path, { headers: { 'If-None-Match': matchingEtag } }), env)).status, 502);
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 502);
   let parsedOversized = false;
   const oversized = { size: 5 * 1024 * 1024, json: async () => { parsedOversized = true; throw new Error('must reject before parsing'); } };
