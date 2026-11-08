@@ -97,6 +97,7 @@ test('rejects cached offsets when an immutable archive key changes', async () =>
     },
   };
   await assert.rejects(() => read(combined, { zoom: 4 }), /archive changed/);
+  assert.equal((await read(combined)).state, 'found');
 });
 
 test('requires R2 identity metadata before caching an archive', async () => {

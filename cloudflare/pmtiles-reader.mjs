@@ -84,15 +84,20 @@ const rangeBytes = async (options) => {
 };
 
 const assertArchiveEtag = ({ state, range }) => {
-  if (!state.etag || !range.etag) throw new PmtilesError('PMTiles archive identity is unavailable');
-  if (state.etag !== range.etag) throw new PmtilesError('PMTiles archive changed during request');
+  if (!state.etag || !range.etag) invalidateArchive(state, 'PMTiles archive identity is unavailable');
+  if (state.etag !== range.etag) invalidateArchive(state, 'PMTiles archive changed during request');
 };
 
 const assertArchiveSize = ({ state, range }) => {
   if (!Number.isSafeInteger(state.size) || !Number.isSafeInteger(range.size)) {
-    throw new PmtilesError('PMTiles archive identity is unavailable');
+    invalidateArchive(state, 'PMTiles archive identity is unavailable');
   }
-  if (state.size !== range.size) throw new PmtilesError('PMTiles archive changed during request');
+  if (state.size !== range.size) invalidateArchive(state, 'PMTiles archive changed during request');
+};
+
+const invalidateArchive = (state, message) => {
+  archives.delete(state.key);
+  throw new PmtilesError(message);
 };
 
 const assertArchiveIdentity = (identity) => {
@@ -108,7 +113,7 @@ const archiveState = async (bucket, key) => {
   if (!result.etag) throw new PmtilesError('PMTiles archive identity is unavailable');
   const header = parseHeader(result.bytes);
   validateArchiveRanges(header, result.size);
-  const state = { header, etag: result.etag, size: result.size, directories: new Map() };
+  const state = { key, header, etag: result.etag, size: result.size, directories: new Map() };
   cacheArchive(key, state);
   return state;
 };

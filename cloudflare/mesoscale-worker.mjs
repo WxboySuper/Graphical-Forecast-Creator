@@ -330,9 +330,8 @@ const cacheControlForRoute = (route) => {
   return `public, max-age=${POINTER_TTL}`;
 };
 
-const missingObjectResponse = (route) => {
-  const ttl = route.kind === 'tile' ? TILE_MISS_TTL : POINTER_TTL;
-  return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${ttl}` } });
+const missingObjectResponse = () => {
+  return new Response(null, { status: 404, headers: { 'Cache-Control': `public, max-age=${POINTER_TTL}` } });
 };
 
 const conditionalResponse = (request, etag, headers) => {
@@ -355,67 +354,26 @@ const jsonWithEtag = async (value, request, cacheControl) => {
   return conditionalResponse(request, headers.get('ETag'), headers) || new Response(body, { headers });
 };
 
-const contentTypeForObject = (route) => {
-  if (route.kind === 'tile') return 'image/png';
-  return 'application/json; charset=utf-8';
-};
-
-const setTileLength = (headers, route, object) => {
-  if (route.kind !== 'tile') return;
-  if (!Number.isSafeInteger(object.size)) return;
-  headers.set('Content-Length', String(object.size));
-};
-
 const headersForObject = (route, object) => {
-  const contentType = contentTypeForObject(route);
-  const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
-  setTileLength(headers, route, object);
+  const headers = new Headers({ 'Content-Type': 'application/json; charset=utf-8' });
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', cacheControlForRoute(route));
   return { headers, etag };
 };
 
-const objectConditionalResponse = ({ request, route, headers, etag }) => {
-  if (route.kind === 'tile') return conditionalResponse(request, etag, headers);
-  return null;
-};
-
-const objectBodyResponse = ({ request, env, route, object, now, headers, etag }) => {
-  if (route.kind === 'tile') return new Response(request.method === 'HEAD' ? null : object.body, { headers });
-  return storedJsonResponse({ request, env, route, object, now, headers, etag });
-};
-
-const responseForObject = (context) => {
+const responseForObject = async (context) => {
   const { headers, etag } = headersForObject(context.route, context.object);
-  const conditional = objectConditionalResponse({ ...context, headers, etag });
-  if (conditional) return conditional;
-  return objectBodyResponse({ ...context, headers, etag });
+  return storedJsonResponse({ ...context, headers, etag });
 };
-
-const isTileHead = (context) => {
-  if (context.request.method !== 'HEAD') return false;
-  if (context.route.kind !== 'tile') return false;
-  return typeof context.env.MESOSCALE_BUCKET?.head === 'function';
-};
-
-const canReadMesoscaleObject = (bucket, headOnly) => {
-  if (headOnly) return typeof bucket.head === 'function';
-  return typeof bucket.get === 'function';
-};
-
-const readMesoscaleObject = (bucket, route, headOnly) =>
-  headOnly ? bucket.head(route.key) : bucket.get(route.key);
 
 const getObjectResponse = async (context) => {
   const bucket = context.env.MESOSCALE_BUCKET;
   if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   if (context.route.kind === 'tile') return getTileResponse(context, bucket);
-  const headOnly = isTileHead(context);
-  if (!canReadMesoscaleObject(bucket, headOnly)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  // Tile HEAD can use metadata; JSON HEAD follows the validated GET path before its body is stripped.
-  const object = await readMesoscaleObject(bucket, context.route, headOnly);
-  if (!object) return missingObjectResponse(context.route);
+  if (typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const object = await bucket.get(context.route.key);
+  if (!object) return missingObjectResponse();
   return responseForObject({ ...context, object });
 };
 
@@ -449,8 +407,8 @@ const loadTileCatalog = async (bucket, catalogRoute) => {
       if (!object) return { state: 'missing' };
       if (invalidJsonObjectSize(object)) return { state: 'invalid' };
       catalog = await object.json();
-    } catch {
-      throw new Error('Stored tile catalog cannot be read');
+    } catch (error) {
+      throw new Error('Stored tile catalog cannot be read', { cause: error });
     }
     if (!isJsonObject(catalog) || !validCatalog(catalog, catalogRoute)) return { state: 'invalid' };
     storeTileCatalog(catalogKey, catalog);
