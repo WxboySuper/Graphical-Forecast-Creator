@@ -1,0 +1,244 @@
+"""Mesoscale ingest render responsibilities."""
+
+from __future__ import annotations
+
+import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request, ctypes
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Protocol
+
+from inventory import IndexRecord, parse_idx, resolve_ranges
+
+from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, TILE_SIZE, WEB_MERCATOR_LIMIT, Model, source_metadata
+from .discovery import request
+
+
+@dataclass(frozen=True)
+class TileRenderRequest:
+    values: object
+    latitudes: object
+    longitudes: object
+    root: Path
+    stops: list[tuple[float, str]]
+
+
+@dataclass(frozen=True)
+class RasterRequest:
+    x: object
+    y: object
+    values: object
+    width: int
+    height: int
+    stops: list[tuple[float, str]]
+
+
+@dataclass(frozen=True)
+class DecodeRequest:
+    content: bytes
+    field_ids: list[str]
+    offset: int
+    ranged: list
+    digest: str
+    numpy: object
+
+
+@dataclass(frozen=True)
+class GridData:
+    values: object
+    latitudes: object
+    longitudes: object
+def hex_rgb(value: str) -> tuple[int, int, int]:
+    return tuple(int(value[i:i+2], 16) for i in (1, 3, 5))
+
+def colorize(value: float, stops: list[tuple[float, str]]) -> tuple[int, int, int, int]:
+    if not math.isfinite(value):
+        return (0, 0, 0, 0)
+    if value <= stops[0][0]:
+        return (*hex_rgb(stops[0][1]), 190)
+    for (lo, c0), (hi, c1) in zip(stops, stops[1:]):
+        if value <= hi:
+            ratio = (value - lo) / (hi - lo)
+            a, b = hex_rgb(c0), hex_rgb(c1)
+            return (*(round(a[i] + (b[i] - a[i]) * ratio) for i in range(3)), 190)
+    return (*hex_rgb(stops[-1][1]), 190)
+
+def render_tiles(request: TileRenderRequest) -> tuple[int, int]:
+    """Reproject and interpolate a field on a bounded Web Mercator pixel grid."""
+    import numpy as np
+    from PIL import Image
+    from pyproj import Transformer
+    values, latitudes, longitudes, root, stops = request.values, request.latitudes, request.longitudes, request.root, request.stops
+    transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    x, y = transformer.transform(longitudes, latitudes)
+    x, y = np.asarray(x), np.asarray(y)
+    valid = valid_data(values) & np.isfinite(x) & np.isfinite(y) & (np.abs(latitudes) <= WEB_MERCATOR_LIMIT)
+    stride = max(1, math.ceil(math.sqrt(np.count_nonzero(valid) / 30_000)))
+    values, x, y, valid = (np.asarray(array)[::stride, ::stride] for array in (values, x, y, valid))
+    if not valid.any():
+        raise ValueError("decoded field has no projectable values")
+    extent = (-20037508.342789244, -20037508.342789244, 20037508.342789244, 20037508.342789244)
+    span = extent[2] - extent[0]
+    px = ((x - extent[0]) / span * (TILE_SIZE * 2**ZOOM_MAX)).astype(np.int64)
+    py = ((extent[3] - y) / span * (TILE_SIZE * 2**ZOOM_MAX)).astype(np.int64)
+    width = TILE_SIZE * 2**ZOOM_MAX
+    height = width
+    inside = valid & (px >= 0) & (px < width) & (py >= 0) & (py < height)
+    rgba = resampled_rgba(RasterRequest(px[inside], py[inside], values[inside], width, height, stops))
+    image = Image.fromarray(rgba, "RGBA")
+    root.mkdir(parents=True, exist_ok=True)
+    count, total = save_tiles(image, root)
+    return count, total
+
+
+def valid_data(values):
+    import numpy as np
+    array = np.asarray(values, dtype=float)
+    valid = np.isfinite(array) & (np.abs(array) < 9e19)
+    return valid & (array != 9999) & (array != -9999) & (array != 1e20)
+
+
+def resampled_rgba(request: RasterRequest):
+    import numpy as np
+    from scipy.interpolate import griddata
+    px, py, values = request.x, request.y, request.values
+    width, height, stops = request.width, request.height, request.stops
+    rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    x0, x1 = max(0, int(px.min())), min(width - 1, int(px.max()))
+    y0, y1 = max(0, int(py.min())), min(height - 1, int(py.max()))
+    grid_x, grid_y = np.meshgrid(np.arange(x0, x1 + 1), np.arange(y0, y1 + 1))
+    samples = griddata(np.column_stack((px, py)), values, (grid_x, grid_y), method="linear")
+    mask = np.isfinite(samples)
+    colors = interpolate_colors(samples, stops)
+    rgba[y0:y1 + 1, x0:x1 + 1][mask, :3] = colors[mask, :3]
+    rgba[y0:y1 + 1, x0:x1 + 1, 3][mask] = 190
+    return rgba
+
+
+def interpolate_colors(sample, stops):
+    import numpy as np
+    stop_values = np.asarray([stop[0] for stop in stops], dtype=float)
+    stop_colors = np.asarray([hex_rgb(stop[1]) for stop in stops], dtype=float)
+    sample = np.nan_to_num(sample, nan=stop_values[0])
+    index = np.clip(np.searchsorted(stop_values, sample, side="right") - 1, 0, len(stops) - 2)
+    fraction = np.clip((sample - stop_values[index]) / (stop_values[index + 1] - stop_values[index]), 0, 1)
+    colors = np.rint(stop_colors[index] + (stop_colors[index + 1] - stop_colors[index]) * fraction[..., None]).astype(np.uint8)
+    return np.concatenate((colors, np.full(sample.shape + (1,), 190, dtype=np.uint8)), axis=-1)
+
+
+def save_tiles(image, root):
+    from PIL import Image
+    count, total = 0, 0
+    for zoom in range(ZOOM_MIN, ZOOM_MAX + 1):
+        scale = 2 ** (ZOOM_MAX - zoom)
+        level = image.resize((TILE_SIZE * 2**zoom, TILE_SIZE * 2**zoom), Image.Resampling.BOX) if scale > 1 else image
+        for tx in range(2**zoom):
+            for ty in range(2**zoom):
+                tile = level.crop((tx*TILE_SIZE, ty*TILE_SIZE, (tx+1)*TILE_SIZE, (ty+1)*TILE_SIZE))
+                if tile.getbbox() is None:
+                    continue
+                path = root / str(zoom) / str(tx) / f"{ty}.png"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tile.save(path, format="PNG", optimize=True)
+                count += 1
+                total += path.stat().st_size
+    return count, total
+
+def handle_latlon(handle):
+    import numpy as np
+    from eccodes import codes_get_array
+    return np.asarray(codes_get_array(handle, "latitudes")), np.asarray(codes_get_array(handle, "longitudes"))
+
+@dataclass(frozen=True)
+class CycleContext:
+    model: Model
+    cycle: datetime
+    source_url: str
+    modified: str
+    output: Path
+
+
+def process_f00(context: CycleContext) -> dict:
+    """Run the isolated f00 stages and return the completed render result."""
+    from . import render_steps
+    result = render_steps.process(context, decode_range, render_tiles, combine_wind)
+    return {"catalog": result.catalog, "tiles": result.tiles, "metrics": result.metrics}
+
+
+
+def combine_wind(field_outputs, np):
+    components = field_outputs.pop("wind-speed-10m", [])
+    u = next((part for part in components if part["record"].get("parameter") == "UGRD"), None)
+    v = next((part for part in components if part["record"].get("parameter") == "VGRD"), None)
+    if u is None or v is None:
+        return field_outputs
+    u["values"] = np.hypot(u["values"], v["values"])
+    sources = [u, v]
+    u["sourceInputs"] = [{"parameter": part["record"].get("parameter"), "message": part["record"], "sha256": part["sourceHash"], "bytes": part["sourceBytes"]} for part in sources]
+    u["sourceHash"] = hashlib.sha256("".join(part["sourceHash"] for part in sources).encode("ascii")).hexdigest()
+    u["sourceBytes"] = sum(part["sourceBytes"] for part in sources)
+    field_outputs["wind-speed-10m"] = [u]
+    return field_outputs
+
+
+def decode_range(request: DecodeRequest):
+    content, field_ids, offset, ranged, digest = request.content, request.field_ids, request.offset, request.ranged, request.digest
+    from eccodes import codes_get, codes_get_values, codes_grib_new_from_file, codes_grib_multi_support_off, codes_grib_multi_support_on, codes_release
+    from gribapi.bindings import ffi
+    with tempfile.NamedTemporaryFile(delete=False) as temporary:
+        temporary.write(content)
+        path = temporary.name
+    library = ctypes.CDLL("ucrtbase.dll" if os.name == "nt" else None)
+    library.fopen.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    library.fopen.restype = ctypes.c_void_p
+    library.fclose.argtypes = [ctypes.c_void_p]
+    file_pointer = library.fopen(os.fsencode(path), b"rb")
+    if not file_pointer:
+        os.unlink(path)
+        raise OSError(f"could not open temporary GRIB range at {offset}")
+    codes_grib_multi_support_on()
+    decoded = []
+    try:
+        stream = ffi.cast("FILE *", file_pointer)
+        while handle := codes_grib_new_from_file(stream):
+            try:
+                decoded.extend(decode_handle(handle, request))
+            finally:
+                codes_release(handle)
+    finally:
+        codes_grib_multi_support_off()
+        library.fclose(file_pointer)
+        os.unlink(path)
+    if not decoded:
+        raise ValueError(f"no selected fields decoded from GRIB range at {offset}")
+    return decoded
+
+
+def decode_handle(handle, request: DecodeRequest):
+    from eccodes import codes_get, codes_get_values
+    np = request.numpy
+    values = np.asarray(codes_get_values(handle), dtype=float)
+    values = np.where(valid_data(values) & (values != codes_get(handle, "missingValue")), values, np.nan)
+    ni, nj = int(codes_get(handle, "Ni")), int(codes_get(handle, "Nj"))
+    if values.size != ni * nj:
+        raise ValueError(f"decoded grid shape mismatch: {values.size} values, {ni}x{nj}")
+    lats, lons = handle_latlon(handle)
+    values, lats, lons = values.reshape((nj, ni)), lats.reshape((nj, ni)), lons.reshape((nj, ni))
+    parameter = codes_get(handle, "shortName")
+    param_id = codes_get(handle, "paramId")
+    native_parameter = {"10u": "UGRD", "u10": "UGRD", "10v": "VGRD", "v10": "VGRD"}.get(parameter, parameter)
+    native_parameter = {165: "UGRD", 166: "VGRD"}.get(param_id, native_parameter)
+    matching = [fid for fid in request.field_ids if fid.rsplit(":", 1)[-1] == native_parameter]
+    if not matching and len(request.field_ids) == 1:
+        matching = request.field_ids
+    record_parameter = matching[0].rsplit(":", 1)[-1] if len(matching) == 1 else native_parameter
+    record = next((asdict(row) for row, _ in request.ranged if row.offset == request.offset and row.parameter == record_parameter), {})
+    grid = GridData(values, lats, lons)
+    return [decoded_field(fid.split(":", 1)[0], request, grid, record) for fid in matching]
+
+
+def decoded_field(field_id: str, request: DecodeRequest, grid: GridData, record: dict) -> tuple[str, dict]:
+    operation = FIELDS[field_id][5]
+    converted = {"temperature": grid.values - 273.15, "pressure": grid.values / 100}.get(operation, grid.values)
+    item = {"values": converted, "lats": grid.latitudes, "lons": grid.longitudes, "sourceHash": request.digest, "sourceBytes": len(request.content), "record": record}
+    return field_id, item

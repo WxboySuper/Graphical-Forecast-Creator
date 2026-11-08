@@ -23,6 +23,20 @@ cycle tile and catalog keys, moves the model latest pointer only after a
 complete cycle validates, then deletes cycles older than the six-cycle default.
 Partial runs are recorded in daily feed health and do not replace latest.
 
+## Upload verification and failure handling
+
+Each tile's MD5 is computed before upload and compared with the single-part S3
+ETag when the backend returns one. Before catalog creation, the publisher makes
+a bounded-retry, batched object listing for the cycle's tile prefix and checks
+that every referenced key exists with its expected byte size. It does not read
+tile bodies back from R2. Only after this verification and catalog validation
+does it write the immutable cycle catalog and then replace the latest pointer.
+An upload or verification failure therefore leaves latest unchanged. A failed
+pipeline stage writes a `failed` health report with the exception class and
+message; the report write does not modify latest. A complete cycle already in
+the store is checked immediately after discovery so a rerun skips GRIB ranges,
+decoding, and rendering, while still retrying a missing/stale latest pointer.
+
 Install the pinned Python dependencies from `scripts/mesoscale/requirements.txt`.
 Run parser and publisher tests with:
 
