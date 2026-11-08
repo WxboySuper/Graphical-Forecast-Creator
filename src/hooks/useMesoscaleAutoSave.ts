@@ -6,7 +6,7 @@ import { getMesoscaleStorageKey, loadMesoscaleAutosave, saveMesoscaleAutosave } 
 
 const DEBOUNCE_MS = 5000;
 interface Scope { userId?: string | null; enabled: boolean }
-const RESTORED_SCOPES = new Set<string>();
+let activeRestoredScope: string | null = null;
 const shouldFlushScope = (previous: Scope, userId: string | null | undefined, enabled: boolean): boolean =>
   previous.enabled && (previous.userId !== userId || !enabled);
 
@@ -30,12 +30,12 @@ export const useMesoscaleAutoSave = (userId?: string | null, enabled = true): vo
   useEffect(() => {
     if (!enabled) return;
     const scopeKey = getMesoscaleStorageKey(userId);
-    if (RESTORED_SCOPES.has(scopeKey)) {
+    if (activeRestoredScope === scopeKey) {
       restoredScope.current = scopeKey;
       return;
     }
     dispatch(replaceMesoscaleProduct(loadMesoscaleAutosave(userId)));
-    RESTORED_SCOPES.add(scopeKey);
+    activeRestoredScope = scopeKey;
     restoredScope.current = scopeKey;
   }, [dispatch, enabled, userId]);
 

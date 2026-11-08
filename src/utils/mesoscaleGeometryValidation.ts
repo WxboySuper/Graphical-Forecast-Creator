@@ -24,7 +24,8 @@ const isClosedRing = (ring: unknown): boolean => {
 export const isMesoscalePolygon = (value: unknown): value is Polygon => {
   if (!isRecord(value)) return false;
   if (!hasOnlyKeys(value, ['type', 'coordinates'])) return false;
-  if (value.type !== 'Polygon' || !Array.isArray(value.coordinates) || value.coordinates.length === 0) return false;
+  if (value.type !== 'Polygon') return false;
+  if (!Array.isArray(value.coordinates) || value.coordinates.length === 0) return false;
   if (!value.coordinates.every(isClosedRing)) return false;
   const vertices = value.coordinates.reduce((total, ring) => total + (ring as unknown[]).length, 0);
   return vertices <= MAX_MESOSCALE_POLYGON_VERTICES;

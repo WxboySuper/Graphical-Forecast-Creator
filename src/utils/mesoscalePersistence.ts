@@ -3,6 +3,7 @@ import type { MesoscaleState } from '../store/mesoscaleSlice';
 import { createInitialMesoscaleState } from '../store/mesoscaleSlice';
 import { getScopedStorageKey, getStorageScope } from './storageScope';
 import { getMesoscaleValidationError } from './mesoscaleValidation';
+import { isRecord } from './forecastWorkspaceEnvelope';
 
 export const MESOSCALE_SAVE_SCHEMA_VERSION = 1 as const;
 export interface MesoscaleSaveEnvelope {
@@ -31,8 +32,8 @@ export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvel
 };
 
 export const classifyMesoscaleSave = (value: unknown): MesoscaleClassification => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return { ok: false, reason: 'Mesoscale save must be an object.' };
-  const record = value as Record<string, unknown>;
+  if (!isRecord(value)) return { ok: false, reason: 'Mesoscale save must be an object.' };
+  const record = value;
   const error = getEnvelopeError(record);
   return error ? { ok: false, reason: error } : { ok: true, payload: record as unknown as MesoscaleSaveEnvelope };
 };
