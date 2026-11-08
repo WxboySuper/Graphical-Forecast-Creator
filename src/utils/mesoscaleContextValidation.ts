@@ -21,13 +21,18 @@ const isLayer = (value: unknown): boolean => {
   return isLayerId(value.id) && isOpacity(value.opacity);
 };
 const isLayers = (value: unknown): boolean => {
-  if (!Array.isArray(value) || value.length > 100 || !value.every(isLayer)) return false;
+  if (!Array.isArray(value)) return false;
+  if (value.length > 100) return false;
+  if (!value.every(isLayer)) return false;
   const ids = value.map((layer) => (layer as { id: string }).id);
   return new Set(ids).size === ids.length;
 };
 
 export const isMesoscaleModelContext = (value: unknown): value is MesoscaleModelContext => {
-  if (!isRecord(value) || !hasOnlyContextKeys(value)) return false;
-  return isModelId(value.modelId) && isCycle(value.cycle)
-    && isForecastHour(value.forecastHour) && isLayers(value.activeLayers);
+  if (!isRecord(value)) return false;
+  if (!hasOnlyContextKeys(value)) return false;
+  if (!isModelId(value.modelId)) return false;
+  if (!isCycle(value.cycle)) return false;
+  if (!isForecastHour(value.forecastHour)) return false;
+  return isLayers(value.activeLayers);
 };

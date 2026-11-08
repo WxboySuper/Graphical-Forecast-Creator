@@ -8,7 +8,9 @@ export { MAX_MESOSCALE_AREAS, MAX_MESOSCALE_DISCUSSION_LENGTH, MAX_MESOSCALE_POL
 const hasOnlyProductKeys = (value: Record<string, unknown>): boolean =>
   Object.keys(value).every((key) => ['areas', 'discussion', 'modelContext'].includes(key));
 const isAreaCollection = (value: unknown): boolean => {
-  if (!Array.isArray(value) || value.length > MAX_MESOSCALE_AREAS || !value.every(isMesoscaleArea)) return false;
+  if (!Array.isArray(value)) return false;
+  if (value.length > MAX_MESOSCALE_AREAS) return false;
+  if (!value.every(isMesoscaleArea)) return false;
   const ids = value.map((area) => (area as { id: string }).id);
   return new Set(ids).size === ids.length;
 };

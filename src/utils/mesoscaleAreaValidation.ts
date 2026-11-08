@@ -9,11 +9,14 @@ const isIsoTime = (value: unknown): value is string =>
   typeof value === 'string' && ISO_TIME.test(value) && Number.isFinite(Date.parse(value));
 const isOptionalConfidence = (value: unknown): boolean => value === undefined
   || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100);
+const isAreaId = (value: unknown): boolean => typeof value === 'string'
+  && value.trim().length > 0 && value.length <= 128;
+const isAreaTitle = (value: unknown): boolean => typeof value === 'string'
+  && value.trim().length > 0 && value.length <= 200;
+const isHazardLabel = (value: unknown): boolean => typeof value === 'string'
+  && value.trim().length > 0 && value.length <= 120;
 const isAreaIdentity = (value: Record<string, unknown>): boolean => {
-  const id = typeof value.id === 'string' && value.id.trim().length > 0 && value.id.length <= 128;
-  const title = typeof value.title === 'string' && value.title.trim().length > 0 && value.title.length <= 200;
-  const hazard = typeof value.hazard === 'string' && value.hazard.trim().length > 0 && value.hazard.length <= 120;
-  return id && title && hazard;
+  return [isAreaId(value.id), isAreaTitle(value.title), isHazardLabel(value.hazard)].every(Boolean);
 };
 const isAreaTimeWindow = (value: Record<string, unknown>): boolean => {
   if (!isIsoTime(value.validStart) || !isIsoTime(value.validEnd)) return false;
@@ -24,6 +27,8 @@ const isAreaTimeWindow = (value: Record<string, unknown>): boolean => {
 export const isMesoscaleArea = (value: unknown): value is MesoscaleArea => {
   if (!isRecord(value)) return false;
   if (!hasOnlyKeys(value)) return false;
-  const fieldsValid = isAreaIdentity(value) && isOptionalConfidence(value.confidence) && isAreaTimeWindow(value);
-  return fieldsValid && isMesoscalePolygon(value.geometry);
+  if (!isAreaIdentity(value)) return false;
+  if (!isOptionalConfidence(value.confidence)) return false;
+  if (!isAreaTimeWindow(value)) return false;
+  return isMesoscalePolygon(value.geometry);
 };
