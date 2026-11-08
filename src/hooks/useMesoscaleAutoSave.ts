@@ -40,7 +40,11 @@ export const useMesoscaleAutoSave = (userId?: string | null, enabled = true): vo
     const timeout = setTimeout(() => {
       try { saveMesoscaleAutosave(snapshot, userId); } catch { /* local storage may be unavailable */ }
     }, DEBOUNCE_MS);
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      if (latestProduct.current !== snapshot) return;
+      try { saveMesoscaleAutosave(snapshot, userId); } catch { /* local storage may be unavailable */ }
+    };
   }, [enabled, product, userId]);
 };
 

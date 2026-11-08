@@ -17,6 +17,13 @@ const hasSupportedSchema = (record: Record<string, unknown>): boolean => record.
 const hasOnlyEnvelopeFields = (record: Record<string, unknown>): boolean =>
   Object.keys(record).every((key) => ['schemaVersion', 'workspaceId', 'product'].includes(key));
 
+const getEnvelopeError = (record: Record<string, unknown>): string | null => {
+  if (!hasOnlyEnvelopeFields(record)) return 'Mesoscale save contains unsupported fields.';
+  if (!hasValidEnvelopeOwner(record)) return 'This save belongs to a different forecast workspace.';
+  if (!hasSupportedSchema(record)) return 'Unsupported Mesoscale save version.';
+  return getMesoscaleValidationError(record.product);
+};
+
 export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvelope => {
   const error = getMesoscaleValidationError(product);
   if (error) throw new Error(error);
@@ -26,10 +33,7 @@ export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvel
 export const classifyMesoscaleSave = (value: unknown): MesoscaleClassification => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return { ok: false, reason: 'Mesoscale save must be an object.' };
   const record = value as Record<string, unknown>;
-  if (!hasOnlyEnvelopeFields(record)) return { ok: false, reason: 'Mesoscale save contains unsupported fields.' };
-  if (!hasValidEnvelopeOwner(record)) return { ok: false, reason: 'This save belongs to a different forecast workspace.' };
-  if (!hasSupportedSchema(record)) return { ok: false, reason: 'Unsupported Mesoscale save version.' };
-  const error = getMesoscaleValidationError(record.product);
+  const error = getEnvelopeError(record);
   return error ? { ok: false, reason: error } : { ok: true, payload: record as unknown as MesoscaleSaveEnvelope };
 };
 

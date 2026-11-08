@@ -414,6 +414,10 @@ const restoreCloudSession = ({
   workspaceId,
 }: RestoreCloudSessionOptions): boolean => {
   if (workspaceId === 'mesoscale') {
+    const cloudScope = { userId, workspaceId };
+    const payloadKey = getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_PAYLOAD_KEY, scope: cloudScope });
+    const metaKey = getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_META_KEY, scope: cloudScope });
+    if (!sessionStorage.getItem(payloadKey) && !sessionStorage.getItem(metaKey)) return false;
     addToast('Cloud storage is not supported for Mesoscale forecasts.', 'error');
     return false;
   }
