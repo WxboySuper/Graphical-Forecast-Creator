@@ -23,6 +23,12 @@ const readVarint = (bytes, cursor) => {
   throw new PmtilesError('Invalid PMTiles directory varint');
 };
 
+const readVarintColumn = (bytes, cursor, count) => {
+  const values = [];
+  for (let index = 0; index < count; index += 1) values.push(readVarint(bytes, cursor));
+  return values;
+};
+
 const readDirectoryColumns = (bytes, cursor, count) => {
   const tileIds = [];
   let lastId = 0;
@@ -30,9 +36,15 @@ const readDirectoryColumns = (bytes, cursor, count) => {
     lastId += readVarint(bytes, cursor);
     tileIds.push(lastId);
   }
-  const runs = Array.from({ length: count }, () => readVarint(bytes, cursor));
-  const lengths = Array.from({ length: count }, () => readVarint(bytes, cursor));
+  const runs = readVarintColumn(bytes, cursor, count);
+  const lengths = readVarintColumn(bytes, cursor, count);
   return { tileIds, runs, lengths };
+};
+
+const validateDirectoryEntry = ({ offset, length, tileId, runLength }) => {
+  if (length <= 0) throw new PmtilesError('Invalid PMTiles directory entry length');
+  if (!Number.isSafeInteger(offset + length)) throw new PmtilesError('Invalid PMTiles directory byte range');
+  if (!Number.isSafeInteger(tileId + runLength)) throw new PmtilesError('Invalid PMTiles tile id range');
 };
 
 const directoryEntries = (bytes, cursor, columns) => {
@@ -43,9 +55,7 @@ const directoryEntries = (bytes, cursor, columns) => {
     const encodedOffset = readVarint(bytes, cursor);
     const offset = encodedOffset === 0 ? lastOffset + lastLength : encodedOffset - 1;
     const length = columns.lengths[index];
-    if (length <= 0) throw new PmtilesError('Invalid PMTiles directory entry length');
-    if (!Number.isSafeInteger(offset + length)) throw new PmtilesError('Invalid PMTiles directory byte range');
-    if (!Number.isSafeInteger(columns.tileIds[index] + columns.runs[index])) throw new PmtilesError('Invalid PMTiles tile id range');
+    validateDirectoryEntry({ offset, length, tileId: columns.tileIds[index], runLength: columns.runs[index] });
     entries.push({ tileId: columns.tileIds[index], runLength: columns.runs[index], offset, length });
     lastOffset = offset;
     lastLength = length;
@@ -53,12 +63,15 @@ const directoryEntries = (bytes, cursor, columns) => {
   return entries;
 };
 
+const validDirectoryCount = (count) => Number.isSafeInteger(count) && count <= MAX_DIRECTORY_ENTRIES;
+const hasTrailingBytes = (cursor, bytes) => cursor.offset !== bytes.length;
+
 export const decodeDirectory = (bytes) => {
   const cursor = { offset: 0 };
   const count = readVarint(bytes, cursor);
-  if (!Number.isSafeInteger(count) || count > MAX_DIRECTORY_ENTRIES) throw new PmtilesError('Invalid PMTiles directory entry count');
+  if (!validDirectoryCount(count)) throw new PmtilesError('Invalid PMTiles directory entry count');
   const entries = directoryEntries(bytes, cursor, readDirectoryColumns(bytes, cursor, count));
-  if (cursor.offset !== bytes.length) throw new PmtilesError('Trailing PMTiles directory data');
+  if (hasTrailingBytes(cursor, bytes)) throw new PmtilesError('Trailing PMTiles directory data');
   return entries;
 };
 

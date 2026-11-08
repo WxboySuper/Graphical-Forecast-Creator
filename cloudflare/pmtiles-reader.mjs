@@ -12,11 +12,15 @@ const MAX_DIRECTORIES = 4;
 const MAX_TILE_BYTES = 8 * 1024 * 1024;
 const archives = new Map();
 
+const integerCoordinate = (value) => Number.isInteger(value);
+const inTileBounds = (value, zoom) => {
+  if (value < 0) return false;
+  return value < 2 ** zoom;
+};
 const validTileCoordinate = ({ zoom, x, y }) => {
-  if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-  if (x < 0 || y < 0) return false;
-  if (x >= 2 ** zoom) return false;
-  return y < 2 ** zoom;
+  if (!integerCoordinate(x) || !integerCoordinate(y)) return false;
+  if (!inTileBounds(x, zoom)) return false;
+  return inTileBounds(y, zoom);
 };
 
 const cacheArchive = (key, state) => {
@@ -54,15 +58,22 @@ const fetchRangeObject = async ({ bucket, key, offset, length, missingAllowed })
   return object;
 };
 
-const rangeBody = async ({ object, offset, length }) => {
-  let bytes;
+const readRangeBody = async (object) => {
   try {
-    bytes = new Uint8Array(await object.arrayBuffer());
+    return new Uint8Array(await object.arrayBuffer());
   } catch {
     throw new PmtilesError('PMTiles range body is unreadable');
   }
+};
+
+const validateRangeBody = ({ object, bytes, offset, length }) => {
   if (bytes.byteLength !== length) throw new PmtilesError('Truncated PMTiles range');
   if (Number.isSafeInteger(object.size) && safeEnd(offset, length, 'Invalid PMTiles range') > object.size) throw new PmtilesError('PMTiles range exceeds archive size');
+};
+
+const rangeBody = async ({ object, offset, length }) => {
+  const bytes = await readRangeBody(object);
+  validateRangeBody({ object, bytes, offset, length });
   return { bytes, etag: object.httpEtag || object.etag || null, size: object.size };
 };
 
@@ -109,18 +120,22 @@ const directoryEntry = (entries, tileId) => {
   return found && (found.runLength === 0 || tileId < found.tileId + found.runLength) ? found : null;
 };
 
-const tileEntry = async ({ bucket, key, state, tileId }) => {
+const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
   const header = state.header;
-  let entry = directoryEntry(await directoryAt({ bucket, key, state, offset: header.rootOffset, length: header.rootLength }), tileId);
-  if (entry?.runLength === 0) {
-    const leafEnd = safeEnd(entry.offset, entry.length, 'Invalid PMTiles leaf directory range');
-    safeEnd(header.leafOffset, entry.offset, 'Invalid PMTiles leaf range');
-    if (leafEnd > header.leafLength) throw new PmtilesError('PMTiles leaf directory entry exceeds its section');
-    if (entry.length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles leaf directory entry is too large');
-    const leaf = await directoryAt({ bucket, key, state, offset: header.leafOffset + entry.offset, length: entry.length });
-    entry = directoryEntry(leaf, tileId);
-  }
-  return entry;
+  const end = safeEnd(entry.offset, entry.length, 'Invalid PMTiles leaf directory range');
+  const offset = safeEnd(header.leafOffset, entry.offset, 'Invalid PMTiles leaf range');
+  if (end > header.leafLength) throw new PmtilesError('PMTiles leaf directory entry exceeds its section');
+  if (entry.length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles leaf directory entry is too large');
+  const leaf = await directoryAt({ bucket, key, state, offset, length: entry.length });
+  return directoryEntry(leaf, tileId);
+};
+
+const tileEntry = async ({ bucket, key, state, tileId }) => {
+  const { header } = state;
+  const root = await directoryAt({ bucket, key, state, offset: header.rootOffset, length: header.rootLength });
+  const entry = directoryEntry(root, tileId);
+  if (entry?.runLength !== 0) return entry;
+  return leafEntry({ bucket, key, state, tileId, entry });
 };
 
 const tileRange = (header, entry) => {

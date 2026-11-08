@@ -5,6 +5,8 @@ const PNG_TILE_TYPE = 2;
 const NO_COMPRESSION = 1;
 const GZIP_COMPRESSION = 2;
 
+const headerError = (message) => { throw new PmtilesError(message); };
+
 const uint64 = (view, offset) => {
   const value = view.getBigUint64(offset, true);
   if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new PmtilesError('PMTiles offset exceeds safe range');
@@ -14,7 +16,7 @@ const uint64 = (view, offset) => {
 const headerFromBytes = (bytes) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const hasSignature = new TextDecoder().decode(bytes.slice(0, 7)) === 'PMTiles';
-  if (!hasSignature || bytes[7] !== 3) throw new PmtilesError('Unsupported PMTiles archive');
+  if (!hasSignature || bytes[7] !== 3) headerError('Unsupported PMTiles archive');
   return {
     rootOffset: uint64(view, 8), rootLength: uint64(view, 16), metadataOffset: uint64(view, 24), metadataLength: uint64(view, 32),
     leafOffset: uint64(view, 40), leafLength: uint64(view, 48),
@@ -25,27 +27,27 @@ const headerFromBytes = (bytes) => {
 };
 
 const validateFormat = (header) => {
-  if (header.tileType !== PNG_TILE_TYPE || header.tileCompression !== NO_COMPRESSION) throw new PmtilesError('PMTiles archive is not uncompressed PNG');
+  if (header.tileType !== PNG_TILE_TYPE || header.tileCompression !== NO_COMPRESSION) headerError('PMTiles archive is not uncompressed PNG');
 };
 
 const validateCompression = (header) => {
-  if (![NO_COMPRESSION, GZIP_COMPRESSION].includes(header.internalCompression)) throw new PmtilesError('Unsupported PMTiles directory compression');
+  if (![NO_COMPRESSION, GZIP_COMPRESSION].includes(header.internalCompression)) headerError('Unsupported PMTiles directory compression');
 };
 
 const validateZoom = (header) => {
-  if (header.minZoom !== 3 || header.maxZoom !== 4) throw new PmtilesError('PMTiles zoom interval does not match the published contract');
+  if (header.minZoom !== 3 || header.maxZoom !== 4) headerError('PMTiles zoom interval does not match the published contract');
 };
 
 const validateBounds = (header) => {
-  if (header.minLon !== -1300000000) throw new PmtilesError('PMTiles bounds do not match the published contract');
-  if (header.minLat !== 200000000) throw new PmtilesError('PMTiles bounds do not match the published contract');
-  if (header.maxLon !== -600000000) throw new PmtilesError('PMTiles bounds do not match the published contract');
-  if (header.maxLat !== 550000000) throw new PmtilesError('PMTiles bounds do not match the published contract');
+  if (header.minLon !== -1300000000) headerError('PMTiles bounds do not match the published contract');
+  if (header.minLat !== 200000000) headerError('PMTiles bounds do not match the published contract');
+  if (header.maxLon !== -600000000) headerError('PMTiles bounds do not match the published contract');
+  if (header.maxLat !== 550000000) headerError('PMTiles bounds do not match the published contract');
 };
 
 const validateRootLength = (header) => {
-  if (!header.rootLength) throw new PmtilesError('Invalid PMTiles root directory range');
-  if (header.rootLength > MAX_DIRECTORY_BYTES) throw new PmtilesError('Invalid PMTiles root directory range');
+  if (!header.rootLength) headerError('Invalid PMTiles root directory range');
+  if (header.rootLength > MAX_DIRECTORY_BYTES) headerError('Invalid PMTiles root directory range');
 };
 
 const HEADER_VALIDATORS = [validateFormat, validateCompression, validateZoom, validateBounds, validateRootLength];
@@ -55,7 +57,7 @@ const validateHeader = (header) => {
 };
 
 export const parseHeader = (bytes) => {
-  if (bytes.byteLength !== HEADER_BYTES) throw new PmtilesError('Invalid PMTiles header length');
+  if (bytes.byteLength !== HEADER_BYTES) headerError('Invalid PMTiles header length');
   const header = headerFromBytes(bytes);
   validateHeader(header);
   return header;
