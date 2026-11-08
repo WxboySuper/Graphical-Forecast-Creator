@@ -525,21 +525,30 @@ const cacheKeyFor = (request, env, route) => {
   return new Request(url.toString(), { method: 'GET' });
 };
 
-const refreshDynamicCacheHit = async (context, response) => {
-  if (context.route.kind !== 'latest' && context.route.kind !== 'status') return response;
+const cachedJsonValue = async (response) => {
   let value;
   try {
     value = await response.clone().json();
   } catch {
-    return response;
+    return null;
   }
+  return isJsonObject(value) ? value : null;
+};
+
+const refreshedLatestCacheHit = async (context, response) => {
+  const value = await cachedJsonValue(response);
+  if (!value) return response;
   const headers = new Headers(response.headers);
-  if (context.route.kind === 'latest') {
-    const age = ageMinutes(value.cycleTime, context.now);
-    headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
-    headers.set('X-Mesoscale-Stale', String(age === null || age > staleThresholdMinutes(context.env)));
-    return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(JSON.stringify(value), { headers });
-  }
+  const age = ageMinutes(value.cycleTime, context.now);
+  headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
+  headers.set('X-Mesoscale-Stale', String(age === null || age > staleThresholdMinutes(context.env)));
+  return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(JSON.stringify(value), { headers });
+};
+
+const refreshedStatusCacheHit = async (context, response) => {
+  const value = await cachedJsonValue(response);
+  if (!value || !Array.isArray(value.models)) return response;
+  const headers = new Headers(response.headers);
   for (const model of value.models) {
     const age = ageMinutes(model.latestCycleTime, context.now);
     model.ageMinutes = age;
@@ -550,6 +559,12 @@ const refreshDynamicCacheHit = async (context, response) => {
   const etag = await etagForText(body);
   headers.set('ETag', etag);
   return conditionalResponse(context.request, etag, headers) || new Response(body, { headers });
+};
+
+const refreshDynamicCacheHit = (context, response) => {
+  if (context.route.kind === 'latest') return refreshedLatestCacheHit(context, response);
+  if (context.route.kind === 'status') return refreshedStatusCacheHit(context, response);
+  return Promise.resolve(response);
 };
 
 const cacheHitResponse = async (context, response) => {
