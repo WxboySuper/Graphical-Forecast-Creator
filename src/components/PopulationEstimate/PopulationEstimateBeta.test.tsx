@@ -88,6 +88,36 @@ describe('PopulationEstimateBeta', () => {
     expect(screen.queryByText('Faraway, XX')).not.toBeInTheDocument();
   });
 
+  test('shows cities that finish loading after the population estimate', async () => {
+    const user = userEvent.setup();
+    const store = createStore();
+    store.dispatch(addFeature({ feature: tornadoFeature }));
+    estimatePopulationMock.mockResolvedValue({ totalPopulation: 1234, dataYear: 2025, resolution: '100m' });
+    let resolvePlaces: (places: Parameters<typeof loadPlacesMock.mockResolvedValue>[0]) => void = () => undefined;
+    loadPlacesMock.mockReturnValue(new Promise((resolve) => { resolvePlaces = resolve; }));
+
+    renderEstimate(store);
+    await user.click(screen.getByRole('button', { name: /Estimate affected population/i }));
+    expect(await screen.findByText('1,234')).toBeInTheDocument();
+    await act(async () => { resolvePlaces([{ name: 'Lateville', state: 'XX', lon: 0.5, lat: 0.5, population: 9000 }]); });
+
+    expect(await screen.findByText('Lateville, XX')).toBeInTheDocument();
+  });
+
+  test('reports a city download failure instead of an empty list', async () => {
+    const user = userEvent.setup();
+    const store = createStore();
+    store.dispatch(addFeature({ feature: tornadoFeature }));
+    estimatePopulationMock.mockResolvedValue({ totalPopulation: 1234, dataYear: 2025, resolution: '100m' });
+    loadPlacesMock.mockRejectedValue(new Error('offline'));
+
+    renderEstimate(store);
+    await user.click(screen.getByRole('button', { name: /Estimate affected population/i }));
+
+    expect(await screen.findByText('Cities could not be loaded. Try again.')).toBeInTheDocument();
+    expect(screen.queryByText(/No tracked cities/)).not.toBeInTheDocument();
+  });
+
   test('allows dismissing the dialog while loading and aborts the request', async () => {
     const user = userEvent.setup();
     const store = createStore();

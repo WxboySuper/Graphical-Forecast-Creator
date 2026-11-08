@@ -51,12 +51,15 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
   const [error, setError] = React.useState<string | null>(null);
   const [cities, setCities] = React.useState<Place[] | null>(null);
   const [requestContext, setRequestContext] = React.useState<EstimateRequestContext | null>(null);
+  const [citiesFailed, setCitiesFailed] = React.useState(false);
   const requestController = React.useRef<AbortController | null>(null);
+  const cityRequestId = React.useRef(0);
 
   const cancelActiveRequest = React.useCallback((message?: string) => {
     const controller = requestController.current;
     if (!controller) return;
     requestController.current = null;
+    cityRequestId.current += 1;
     controller.abort();
     setIsLoading(false);
     if (message) {
@@ -65,6 +68,7 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
   }, []);
 
   React.useEffect(() => () => {
+    cityRequestId.current += 1;
     requestController.current?.abort();
     requestController.current = null;
   }, []);
@@ -108,6 +112,7 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
     setOpen(true);
     setEstimate(null);
     setCities(null);
+    setCitiesFailed(false);
     setError(null);
     if (!geometry) {
       setError(getGeometryError(polygonCount, capturedContext));
@@ -115,12 +120,13 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
       return;
     }
 
+    const cityRequest = cityRequestId.current;
     loadPlaces()
       .then((places) => {
-        if (requestController.current === controller) setCities(findPlacesInGeometry(geometry, places));
+        if (cityRequestId.current === cityRequest) setCities(findPlacesInGeometry(geometry, places));
       })
       .catch(() => {
-        if (requestController.current === controller) setCities([]);
+        if (cityRequestId.current === cityRequest) setCitiesFailed(true);
       });
     setIsLoading(true);
     await runEstimate(geometry, controller);
@@ -137,12 +143,13 @@ const usePopulationEstimate = ({ currentDay, activeOutlookType, currentDayData }
     handleOpenChange(false);
   }, [handleOpenChange]);
 
-  return { open, setOpen, isLoading, estimate, error, cities, requestContext, handleEstimate, handleOpenChange, handleCancel };
+  return { open, setOpen, isLoading, estimate, error, cities, citiesFailed, requestContext, handleEstimate, handleOpenChange, handleCancel };
 };
 
 const MAX_CITIES_SHOWN = 15;
 
-const CitiesList: React.FC<{ cities: Place[] | null }> = ({ cities }) => {
+const CitiesList: React.FC<{ cities: Place[] | null; failed: boolean }> = ({ cities, failed }) => {
+  if (failed) return <p className="text-sm text-muted-foreground">Cities could not be loaded. Try again.</p>;
   if (!cities) return null;
   if (cities.length === 0) return <p className="text-sm text-muted-foreground">No tracked cities (5,000+ residents) fall inside the outlook.</p>;
   const shown = cities.slice(0, MAX_CITIES_SHOWN);
@@ -160,11 +167,12 @@ const CitiesList: React.FC<{ cities: Place[] | null }> = ({ cities }) => {
   );
 };
 
-const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, 'isLoading' | 'estimate' | 'error' | 'cities'>> = ({
+const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, 'isLoading' | 'estimate' | 'error' | 'cities' | 'citiesFailed'>> = ({
   isLoading,
   estimate,
   error,
   cities,
+  citiesFailed,
 }) => {
   if (isLoading) {
     return (
@@ -192,7 +200,7 @@ const EstimateContent: React.FC<Pick<ReturnType<typeof usePopulationEstimate>, '
         <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Data year</dt><dd className="font-medium">{estimate.dataYear}</dd></div>
         {estimate.areaKm2 !== undefined ? <div className="rounded border border-border p-2"><dt className="text-muted-foreground">Outlook area</dt><dd className="font-medium">{estimate.areaKm2.toFixed(1)} km²</dd></div> : null}
       </dl>
-      <CitiesList cities={cities} />
+      <CitiesList cities={cities} failed={citiesFailed} />
       <p className="text-xs text-muted-foreground">
         WorldPop is a modeled estimate, not an official impact or warning product. This beta uses the public WorldPop API at {estimate.resolution} resolution.{' '}
         <a href="https://www.worldpop.org/" target="_blank" rel="noreferrer" className="underline hover:text-foreground">Source and attribution</a>.
@@ -206,7 +214,7 @@ const PopulationEstimateBeta: React.FC = () => {
   const currentDay = useSelector((state: RootState) => state.forecast.forecastCycle.currentDay);
   const activeOutlookType = useSelector((state: RootState) => state.forecast.drawingState.activeOutlookType);
   const currentDayData = useSelector((state: RootState) => state.forecast.forecastCycle.days[currentDay]?.data);
-  const { open, isLoading, estimate, error, cities, requestContext, handleEstimate, handleOpenChange, handleCancel } = usePopulationEstimate({
+  const { open, isLoading, estimate, error, cities, citiesFailed, requestContext, handleEstimate, handleOpenChange, handleCancel } = usePopulationEstimate({
     currentDay,
     activeOutlookType,
     currentDayData,
@@ -245,7 +253,7 @@ const PopulationEstimateBeta: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <EstimateContent isLoading={isLoading} estimate={estimate} error={error} cities={cities} />
+          <EstimateContent isLoading={isLoading} estimate={estimate} error={error} cities={cities} citiesFailed={citiesFailed} />
           {isLoading ? (
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCancel}>
