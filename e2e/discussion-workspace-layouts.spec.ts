@@ -35,6 +35,12 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
   });
 
+  test('preserves the custom workspace hint on a legacy Discussion link', async ({ page }) => {
+    await page.goto('/discussion?workspace=custom&group=day1&keep=1#editor');
+    await expect(page).toHaveURL(/\/forecast\/custom\?workspace=custom&group=day1&keep=1&surface=discussion#editor/);
+    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+  });
+
   test('persists the layout choice and allows a query override', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/forecast/severe');

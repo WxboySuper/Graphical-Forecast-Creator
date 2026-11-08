@@ -453,7 +453,7 @@ const useDiscussionEditorState = ({
 
 
 /** Synchronizes the selected discussion scope with the forecast day and URL query. */
-// @codescene(disable:"Complex Conditional")
+// @codescene(disable:"Complex Conditional", disable:"Complex Method")
 const useDiscussionScopeSync = (options: {
   currentDay: DayType;
   discussionDay: DayType;

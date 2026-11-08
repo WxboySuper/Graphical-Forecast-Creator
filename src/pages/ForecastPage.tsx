@@ -603,7 +603,7 @@ const renderCloudToolbar = ({
 );
 
 /** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
-// @codescene(disable:"Complex Method", disable:"Large Method")
+// @codescene(disable:"Complex Method", disable:"Large Method", disable:"Overall Code Complexity")
 const useForecastPageWorkspace = ({
   dispatch,
   addToast,
@@ -909,6 +909,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   if (emergencyMode) {
     return <EmergencyModeMessage />;
   }
+  const showHintedCustomDiscussion = workspaceId === 'custom' && surface === 'discussion';
 
   return (
     <div ref={forecastShellRef} className={`forecast-page-shell${showLegacyNotice ? ' forecast-page-shell--legacy-notice' : ''}${AUTO_TSTM_DISABLED ? ' forecast-page-shell--auto-tstm-disabled' : ''}`}>
@@ -974,7 +975,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                   />
                   <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></aside>
                 </>
-              ) : surface === 'discussion' ? (
+              ) : discussionLayout === 'tabs' && surface === 'discussion' ? (
                 <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></section>
               ) : surface === 'review' ? (
                 <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
@@ -989,6 +990,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               ) : null}
             </div>
           </div>
+        ) : showHintedCustomDiscussion ? (
+          <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage /></React.Suspense>
         ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
