@@ -1,5 +1,5 @@
 import { fetchMesoscaleCatalog, fetchMesoscaleLatest, fetchMesoscaleStatus, normalizeCatalogFrame, normalizeMesoscaleCatalog, resolveCycleId, type RequestOptions } from './client';
-import { getFixtureCatalog } from './fixtures/catalogs';
+import { getFixtureCatalog, getFixtureLatest } from './fixtures/catalogs';
 
 const fixtures: RequestOptions = { config: { baseUrl: '/mesoscale-fixtures', fixtures: true, enabled: true } };
 
@@ -51,6 +51,12 @@ describe('mesoscale client', () => {
     const unavailable = jest.fn().mockResolvedValue({ ok: false, status: 503, headers: new Headers() });
     const failure = await fetchMesoscaleLatest('hrrr', { fetcher: unavailable, retries: 0, config: { ...fixtures.config!, fixtures: false } });
     expect(failure).toMatchObject({ state: 'upstream-failure', retryable: true });
+  });
+
+  it('keeps missing worker age headers unknown', async () => {
+    const fetcher = jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: async () => getFixtureLatest('hrrr') });
+    const result = await fetchMesoscaleLatest('hrrr', { fetcher, config: { ...fixtures.config!, fixtures: false } });
+    expect(result).toMatchObject({ state: 'ready', ageMinutes: null });
   });
 
   it('caps retries and rejects a catalog whose cycle differs from the request', async () => {

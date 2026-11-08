@@ -14,17 +14,16 @@ const getWorkerUrls = (): Record<BuildTarget, string> => typeof __MESOSCALE_WORK
   ? { local: '', beta: '', staging: '', production: '' }
   : __MESOSCALE_WORKER_URLS__;
 
+const isAllowedProtocol = (url: URL): boolean => url.protocol === 'https:'
+  || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname));
+
+const hasNoPathOptionsOrCredentials = (url: URL): boolean => url.pathname === '/'
+  && !url.search && !url.hash && !url.username && !url.password;
+
 const isValidWorkerUrl = (value: string): boolean => {
   try {
     const url = new URL(value);
-    const secure = url.protocol === 'https:';
-    const localDevelopment = url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname);
-    if (!secure && !localDevelopment) return false;
-    if (url.pathname !== '/') return false;
-    if (url.search) return false;
-    if (url.hash) return false;
-    if (url.username || url.password) return false;
-    return true;
+    return isAllowedProtocol(url) && hasNoPathOptionsOrCredentials(url);
   } catch {
     return false;
   }

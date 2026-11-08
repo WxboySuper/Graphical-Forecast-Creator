@@ -69,6 +69,7 @@ export const syncMesoscaleLayers = ({ map, specs, registry }: SyncMesoscaleLayer
   registry.layers.forEach((layer, id) => {
     if (!nextIds.includes(id)) {
       collection.remove(layer);
+      layer.dispose();
       registry.layers.delete(id);
     }
   });
@@ -80,7 +81,10 @@ export const syncMesoscaleLayers = ({ map, specs, registry }: SyncMesoscaleLayer
     layer.setOpacity(spec.opacity);
     layer.setVisible(spec.visible ?? true);
     layer.setZIndex(index);
-    if (existing && layer !== existing) collection.remove(existing);
+    if (existing && layer !== existing) {
+      collection.remove(existing);
+      existing.dispose();
+    }
     if (!collection.getArray().includes(layer)) collection.push(layer);
     registry.layers.set(spec.id, layer);
   });

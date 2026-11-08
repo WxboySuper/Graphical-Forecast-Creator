@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { useMesoscaleLatest, selectMesoscaleFrames } from './hooks';
+import { useMesoscaleLatest, useMesoscaleStatus, selectMesoscaleFrames } from './hooks';
 import { getFixtureCatalog } from './fixtures/catalogs';
 
 describe('mesoscale hooks', () => {
@@ -25,5 +25,17 @@ describe('mesoscale hooks', () => {
     const mixed = { ...catalog, frames: [forecast, analysis] };
     expect(selectMesoscaleFrames(mixed, 'analysis').map(frame => frame.forecastHour)).toEqual([0]);
     expect(selectMesoscaleFrames(mixed, 'forecast').map(frame => frame.forecastHour)).toEqual([1]);
+  });
+
+  it('marks an invalid status cycle age as unknown and stale', async () => {
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ status: 'healthy', models: [{ modelId: 'hrrr', latestCycleTime: 'invalid', health: 'complete' }] }),
+    });
+    const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
+    const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
+    await waitFor(() => expect(result.current).toMatchObject({ state: 'stale', data: { models: [{ ageMinutes: null, stale: true }] } }));
   });
 });

@@ -43,46 +43,70 @@ async function fetchAttempt(url: string, options: RequestOptions): Promise<{ res
   }
 }
 
-async function fetchResponse(url: string, options: RequestOptions): Promise<{ response: Response; cleanup: () => void }> {
-  const attempts = Math.max(0, Math.min(options.retries ?? DEFAULT_RETRIES, 3));
-  let failure: unknown;
-  for (let attempt = 0; attempt <= attempts; attempt += 1) {
-    try {
-      const request = await fetchAttempt(url, options);
-      if (request.response.ok || request.response.status < 500 || attempt === attempts) return request;
-      request.cleanup();
-    } catch (error) {
-      failure = error;
-      if (isAbort(error) || attempt === attempts) throw error;
-    }
-    await new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
+const retryCount = (options: RequestOptions): number => Math.max(0, Math.min(options.retries ?? DEFAULT_RETRIES, 3));
+
+const pauseBeforeRetry = (attempt: number): Promise<void> => new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
+
+async function attemptWithRetry(url: string, options: RequestOptions, attempt: number, attempts: number) {
+  try {
+    const request = await fetchAttempt(url, options);
+    if (request.response.ok || request.response.status < 500 || attempt === attempts) return request;
+    request.cleanup();
+  } catch (error) {
+    if (isAbort(error) || attempt === attempts) throw error;
   }
-  throw failure ?? new Error('Mesoscale request failed.');
+  return undefined;
+}
+
+async function fetchResponse(url: string, options: RequestOptions): Promise<{ response: Response; cleanup: () => void }> {
+  const attempts = retryCount(options);
+  for (let attempt = 0; attempt <= attempts; attempt += 1) {
+    const request = await attemptWithRetry(url, options, attempt, attempts);
+    if (request) return request;
+    await pauseBeforeRetry(attempt);
+  }
+  throw new Error('Mesoscale request failed.');
 }
 
 const endpoint = (config: MesoscaleClientConfig, path: string): string => `${config.baseUrl.replace(/\/$/, '')}/${path}`;
 
-async function readJson<T>(path: string, options: RequestOptions = {}): Promise<MesoscaleRequestResult<T>> {
+const readHttpJson = async <T,>(url: string, options: RequestOptions): Promise<MesoscaleRequestResult<T>> => {
+  const request = await fetchResponse(url, options);
+  const { response } = request;
+  try {
+    if (!response.ok) return { state: 'upstream-failure', message: `Mesoscale request failed (${response.status}).`, retryable: response.status >= 500 };
+    const data = await response.json() as T;
+    if (!isRecord(data)) return { state: 'malformed', message: 'Mesoscale response must be a JSON object.' };
+    return readResponseMetadata(data, response.headers);
+  } finally {
+    request.cleanup();
+  }
+};
+
+const readResponseMetadata = <T,>(data: T, headers: Headers): MesoscaleRequestResult<T> => {
+  const rawAge = headers.get('X-Mesoscale-Age-Minutes');
+  const age = rawAge === null ? Number.NaN : Number(rawAge);
+  return {
+    state: 'ready', data,
+    stale: headers.get('X-Mesoscale-Stale') === 'true',
+    ageMinutes: Number.isFinite(age) ? age : null,
+  };
+};
+
+const getReadConfigFailure = (options: RequestOptions): MesoscaleRequestResult<never> | undefined => {
   if (options.signal?.aborted) return { state: 'upstream-failure', message: 'Request was cancelled.', retryable: false };
   const config = options.config ?? getMesoscaleClientConfig();
   if (!config.enabled) return { state: 'upstream-failure', message: 'Mesoscale is disabled for this build target.', retryable: false };
+  return undefined;
+};
+
+async function readJson<T>(path: string, options: RequestOptions = {}): Promise<MesoscaleRequestResult<T>> {
+  const failure = getReadConfigFailure(options);
+  if (failure) return failure;
+  const config = options.config ?? getMesoscaleClientConfig();
   if (config.fixtures) return readFixture<T>(path);
   try {
-    const request = await fetchResponse(endpoint(config, path), options);
-    const { response } = request;
-    try {
-      if (!response.ok) return { state: 'upstream-failure', message: `Mesoscale request failed (${response.status}).`, retryable: response.status >= 500 };
-      const data = await response.json() as T;
-      if (!isRecord(data)) return { state: 'malformed', message: 'Mesoscale response must be a JSON object.' };
-      const age = Number(response.headers.get('X-Mesoscale-Age-Minutes'));
-      return {
-        state: 'ready', data,
-        stale: response.headers.get('X-Mesoscale-Stale') === 'true',
-        ageMinutes: Number.isFinite(age) ? age : null,
-      };
-    } finally {
-      request.cleanup();
-    }
+    return await readHttpJson<T>(endpoint(config, path), options);
   } catch (error) {
     if (isAbort(error)) return { state: 'upstream-failure', message: 'Mesoscale request timed out or was cancelled.', retryable: false };
     if (error instanceof SyntaxError) return { state: 'malformed', message: 'Mesoscale response is not valid JSON.' };
@@ -90,21 +114,28 @@ async function readJson<T>(path: string, options: RequestOptions = {}): Promise<
   }
 }
 
+const fixtureFailure = (message: string): MesoscaleRequestResult<never> => ({ state: 'upstream-failure', message, retryable: false });
+
+function readFixtureLatest<T>(model: MesoscaleModelId): MesoscaleRequestResult<T> {
+  const data = getFixtureLatest(model);
+  return data ? { state: 'stale', data: data as T, stale: true, ageMinutes: null } : fixtureFailure('No fixture exists for this model.');
+}
+
+function readFixtureCatalog<T>(model: MesoscaleModelId, cycle: string): MesoscaleRequestResult<T> {
+  const data = getFixtureCatalog(model, cycle);
+  if (!data) return fixtureFailure('Fixture catalog was not found.');
+  const ageMinutes = Math.floor((Date.now() - Date.parse(data.cycleTime)) / 60000);
+  const stale = Date.now() - Date.parse(data.cycleTime) > 180 * 60000;
+  const state = stale ? 'stale' : data.status === 'partial' ? 'partial' : 'ready';
+  return { state, data: data as T, stale, ageMinutes };
+}
+
 function readFixture<T>(path: string): MesoscaleRequestResult<T> {
   if (path === 'status') return { state: 'partial', data: FIXTURE_STATUS as T, stale: true, ageMinutes: null };
   const latest = path.match(/^latest\/(hrrr|rap|rrfs)\.json$/);
-  if (latest) {
-    const data = getFixtureLatest(latest[1] as MesoscaleModelId);
-    return data ? { state: 'stale', data: data as T, stale: true, ageMinutes: null } : { state: 'upstream-failure', message: 'No fixture exists for this model.', retryable: false };
-  }
+  if (latest) return readFixtureLatest<T>(latest[1] as MesoscaleModelId);
   const catalog = path.match(/^catalog\/(hrrr|rap|rrfs)\/([\wTZ]+)\.json$/);
-  if (catalog) {
-    const data = getFixtureCatalog(catalog[1] as MesoscaleModelId, catalog[2]);
-    const ageMinutes = Math.floor((Date.now() - Date.parse(data?.cycleTime ?? '')) / 60000);
-    if (!data) return { state: 'upstream-failure', message: 'Fixture catalog was not found.', retryable: false };
-    const stale = Date.now() - Date.parse(data.cycleTime) > 180 * 60000;
-    return { state: stale ? 'stale' : data.status === 'partial' ? 'partial' : 'ready', data: data as T, stale, ageMinutes };
-  }
+  if (catalog) return readFixtureCatalog<T>(catalog[1] as MesoscaleModelId, catalog[2]);
   return { state: 'malformed', message: 'Unknown mesoscale fixture route.' };
 }
 
@@ -118,23 +149,38 @@ export const fetchMesoscaleLatest = (model: MesoscaleModelId, options?: RequestO
     return result.stale ? { ...result, state: 'stale' as const } : result;
   });
 
+const malformed = (message: string): MesoscaleRequestResult<never> => ({ state: 'malformed', message });
+
+const normalizedFailure = (values: MesoscaleParameterResponse[]): MesoscaleRequestResult<never> | undefined => {
+  const invalid = values.find(value => value.state === 'malformed');
+  if (invalid?.state === 'malformed') return malformed(invalid.message);
+  const failed = values.find(value => value.state === 'upstream-failure');
+  return failed?.state === 'upstream-failure' ? failed : undefined;
+};
+
+const catalogState = (catalog: MesoscaleCatalog, result: Extract<MesoscaleRequestResult<MesoscaleCatalog>, { data: MesoscaleCatalog }>): MesoscaleRequestResult<MesoscaleCatalog> => {
+  if (catalog.status === 'failed') return { state: 'upstream-failure', message: 'Catalog cycle is marked failed.', retryable: false };
+  const normalized = normalizeMesoscaleCatalog(catalog);
+  const failure = normalizedFailure(normalized);
+  if (failure) return failure;
+  const stale = result.stale || Date.now() - Date.parse(catalog.cycleTime) > 180 * 60_000;
+  if (stale) return { ...result, state: 'stale', stale: true };
+  const partial = catalog.status === 'partial' || normalized.some(value => value.state === 'partial');
+  return partial ? { ...result, state: 'partial' } : result;
+};
+
+const validateCatalogResult = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycleId: string): MesoscaleRequestResult<never> | undefined => {
+  const error = getCatalogError(catalog, model, cycleId);
+  return error ? malformed(error) : undefined;
+};
+
 export const fetchMesoscaleCatalog = (model: MesoscaleModelId, cycle: string, options?: RequestOptions) => {
   const cycleId = resolveCycleId(cycle);
-  if (!cycleId) return Promise.resolve({ state: 'malformed' as const, message: 'Requested catalog cycle is invalid.' });
+  if (!cycleId) return Promise.resolve(malformed('Requested catalog cycle is invalid.'));
   return readJson<MesoscaleCatalog>(`catalog/${model}/${cycleId}.json`, options).then(result => {
     if (!hasData(result)) return result;
-    const catalog = result.data;
-    const validationError = getCatalogError(catalog, model, cycleId);
-    if (validationError) return { state: 'malformed' as const, message: validationError };
-    const normalized = normalizeMesoscaleCatalog(catalog);
-    const malformed = normalized.find(value => value.state === 'malformed');
-    if (malformed?.state === 'malformed') return { state: 'malformed' as const, message: malformed.message };
-    if (catalog.status === 'failed') return { state: 'upstream-failure' as const, message: 'Catalog cycle is marked failed.', retryable: false };
-    const failedFrame = normalized.find(value => value.state === 'upstream-failure');
-    if (failedFrame?.state === 'upstream-failure') return failedFrame;
-    if (result.stale || Date.now() - Date.parse(catalog.cycleTime) > 180 * 60_000) return { ...result, state: 'stale' as const, stale: true };
-    if (catalog.status === 'partial' || normalized.some(value => value.state === 'partial')) return { ...result, state: 'partial' as const };
-    return result;
+    const validation = validateCatalogResult(result.data, model, cycleId);
+    return validation ?? catalogState(result.data, result);
   });
 };
 
@@ -200,15 +246,22 @@ const isCatalogFrame = (value: unknown): boolean => {
   return value.parameters.every(isCatalogParameter);
 };
 
-const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined => {
+const validateCatalogIdentity = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined => {
   if (catalog.schemaVersion !== 1) return 'Catalog schema version is unsupported.';
   if (catalog.model?.id !== model) return 'Catalog model does not match the request.';
   if (!Number.isFinite(Date.parse(catalog.cycleTime))) return 'Catalog cycle time is invalid.';
   if (resolveCycleId(catalog.cycleTime) !== cycle) return 'Catalog cycle does not match the request.';
+  return undefined;
+};
+
+const validateCatalogFrames = (catalog: MesoscaleCatalog): string | undefined => {
   if (!Array.isArray(catalog.frames) || catalog.frames.length === 0) return 'Catalog has no frames.';
   if (!catalog.frames.every(isCatalogFrame)) return 'Catalog frame or tile metadata is malformed.';
   return undefined;
 };
+
+const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined =>
+  validateCatalogIdentity(catalog, model, cycle) ?? validateCatalogFrames(catalog);
 
 export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
   const frame = catalog.frames[frameIndex];

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from './catalogContracts';
+import type { MesoscaleCatalog, MesoscaleLatestPointer } from './catalogContracts';
 import type { MesoscaleFrameType, MesoscaleModelId } from './contracts';
 import { fetchMesoscaleCatalog, fetchMesoscaleLatest, fetchMesoscaleStatus, normalizeMesoscaleCatalog, resolveCycleId, type MesoscaleRequestResult, type RequestOptions } from './client';
 
@@ -21,22 +21,37 @@ const useStableRequestOptions = (options: MesoscaleHookOptions) => useMemo(() =>
   timeoutMs: options.timeoutMs,
 }), [options.config, options.fetcher, options.retries, options.timeoutMs]);
 
-export const useMesoscaleLatest = (model: MesoscaleModelId, options: MesoscaleHookOptions = {}): MesoscaleLatestState => {
-  const [result, setResult] = useState<MesoscaleRequestResult<MesoscaleLatestPointer>>({ state: 'loading' });
+const useNow = () => {
   const [now, setNow] = useState(Date.now());
-  const requestOptions = useStableRequestOptions(options);
-  useEffect(() => {
-    const controller = new AbortController();
-    setResult({ state: 'loading' });
-    void fetchMesoscaleLatest(model, { ...requestOptions, signal: controller.signal }).then(value => {
-      if (!controller.signal.aborted) setResult(value);
-    });
-    return () => controller.abort();
-  }, [model, requestOptions]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), AGE_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);
+  return now;
+};
+
+const useRequest = <T,>(load: (signal: AbortSignal) => Promise<MesoscaleRequestResult<T>>) => {
+  const [result, setResult] = useState<MesoscaleRequestResult<T>>({ state: 'loading' });
+  useEffect(() => {
+    const controller = new AbortController();
+    setResult({ state: 'loading' });
+    void load(controller.signal).then(value => {
+      if (!controller.signal.aborted) setResult(value);
+    });
+    return () => controller.abort();
+  }, [load]);
+  return [result, setResult] as const;
+};
+
+const useTimedRequest = <T,>(load: (signal: AbortSignal) => Promise<MesoscaleRequestResult<T>>) => {
+  const [result] = useRequest(load);
+  return { result, now: useNow() };
+};
+
+export const useMesoscaleLatest = (model: MesoscaleModelId, options: MesoscaleHookOptions = {}): MesoscaleLatestState => {
+  const requestOptions = useStableRequestOptions(options);
+  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleLatest(model, { ...requestOptions, signal }), [model, requestOptions]);
+  const { result, now } = useTimedRequest(load);
   const cycle = hasData(result) ? Date.parse(result.data.cycleTime) : Number.NaN;
   const ageMinutes = Number.isFinite(cycle) ? Math.max(0, Math.floor((now - cycle) / 60_000)) : null;
   const stale = hasData(result) && (result.stale || now - cycle > STALE_AFTER_MS);
@@ -45,23 +60,13 @@ export const useMesoscaleLatest = (model: MesoscaleModelId, options: MesoscaleHo
 };
 
 export const useMesoscaleStatus = (options: MesoscaleHookOptions = {}) => {
-  const [result, setResult] = useState<MesoscaleRequestResult<MesoscaleStatus>>({ state: 'loading' });
-  const [now, setNow] = useState(Date.now());
   const requestOptions = useStableRequestOptions(options);
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchMesoscaleStatus({ ...requestOptions, signal: controller.signal }).then(value => {
-      if (!controller.signal.aborted) setResult(value);
-    });
-    return () => controller.abort();
-  }, [requestOptions]);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), AGE_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, []);
+  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleStatus({ ...requestOptions, signal }), [requestOptions]);
+  const { result, now } = useTimedRequest(load);
   if (!hasData(result)) return result;
   const models = result.data.models.map(model => {
-    const age = model.latestCycleTime ? Math.max(0, Math.floor((now - Date.parse(model.latestCycleTime)) / 60_000)) : null;
+    const parsed = model.latestCycleTime ? Date.parse(model.latestCycleTime) : Number.NaN;
+    const age = Number.isFinite(parsed) ? Math.max(0, Math.floor((now - parsed) / 60_000)) : null;
     return { ...model, ageMinutes: age, stale: age === null || age > STALE_AFTER_MS / 60_000 };
   });
   const stale = models.some(model => model.stale);
@@ -81,21 +86,9 @@ export interface MesoscaleFramesState {
 }
 
 export const useMesoscaleFrames = (model: MesoscaleModelId, cycle: string, options: MesoscaleHookOptions = {}): MesoscaleFramesState => {
-  const [result, setResult] = useState<MesoscaleRequestResult<MesoscaleCatalog>>({ state: 'loading' });
-  const [now, setNow] = useState(Date.now());
   const requestOptions = useStableRequestOptions(options);
-  useEffect(() => {
-    const controller = new AbortController();
-    setResult({ state: 'loading' });
-    void fetchMesoscaleCatalog(model, resolveCycleId(cycle), { ...requestOptions, signal: controller.signal }).then(value => {
-      if (!controller.signal.aborted) setResult(value);
-    });
-    return () => controller.abort();
-  }, [model, cycle, requestOptions]);
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), AGE_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, []);
+  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleCatalog(model, resolveCycleId(cycle), { ...requestOptions, signal }), [model, cycle, requestOptions]);
+  const { result, now } = useTimedRequest(load);
   const data = hasData(result) ? result.data : null;
   const ageMinutes = data ? Math.max(0, Math.floor((now - Date.parse(data.cycleTime)) / 60_000)) : null;
   const staleFromResponse = hasData(result) ? result.stale : false;
