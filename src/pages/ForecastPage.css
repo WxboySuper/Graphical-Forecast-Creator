@@ -121,7 +121,8 @@
 .severe-workspace__discussion {
   display: flex;
   flex: 0 0 auto;
-  min-width: 22rem;
+  min-width: 20rem;
+  max-width: 100%;
   min-height: 0;
   overflow: hidden;
   border-left: 1px solid var(--border);

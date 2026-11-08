@@ -95,8 +95,11 @@ const useDiscussionScopeDrafts = (options: {
 
   useEffect(() => {
     if (previousResetTokenRef.current !== resetToken) {
+      const previousKey = previousKeyRef.current;
+      if (previousKey !== discussionKey && hasUnsavedChanges) draftsRef.current.set(previousKey, fields);
       resetDiscussionScopeDraft({ drafts: draftsRef.current, discussionKey, existingDiscussion, defaultForecasterName, applyFields });
       previousResetTokenRef.current = resetToken;
+      previousKeyRef.current = discussionKey;
       scopeChangedRef.current = true;
       return;
     }

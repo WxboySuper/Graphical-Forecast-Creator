@@ -63,6 +63,34 @@ describe('useDiscussionFormState', () => {
     expect(result.current.hasUnsavedChanges).toBe(false);
   });
 
+  test('keeps the active key in sync when an import also changes discussion scope', () => {
+    const importedDiscussion = { ...loadedDiscussion, diyContent: 'Imported scope text' };
+    const initialProps: { discussionKey: string; existingDiscussion?: DiscussionData; resetToken: number } = {
+      discussionKey: 'group-a',
+      existingDiscussion: undefined,
+      resetToken: 0,
+    };
+    const { result, rerender } = renderHook(
+      ({ discussionKey, existingDiscussion, resetToken }: { discussionKey: string; existingDiscussion?: DiscussionData; resetToken: number }) =>
+        useDiscussionFormState({
+          discussionKey,
+          existingDiscussion,
+          defaultForecasterName: 'Default forecaster',
+          dispatch: jest.fn(),
+          resetToken,
+        }),
+      { initialProps },
+    );
+
+    act(() => result.current.handleDiy('Unsaved original scope text'));
+    rerender({ discussionKey: 'group-b', existingDiscussion: importedDiscussion, resetToken: 1 });
+    expect(result.current.diyContent).toBe('Imported scope text');
+
+    act(() => result.current.handleDiy('Edited imported scope text'));
+    rerender({ discussionKey: 'group-a', existingDiscussion: undefined, resetToken: 1 });
+    expect(result.current.diyContent).toBe('Unsaved original scope text');
+  });
+
   test('new discussions default to local wall-clock times with a 24-hour window', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date(2026, 6, 13, 9, 5));

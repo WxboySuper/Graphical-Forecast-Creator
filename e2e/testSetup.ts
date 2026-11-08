@@ -18,7 +18,7 @@ export const navigateToSevereForecast = async (page: Page): Promise<void> => {
 /** Opens the compatibility Discussion destination from the Forecast menu. */
 export const navigateToDiscussion = async (page: Page): Promise<void> => {
   await navigateToSevereForecast(page);
-  await page.waitForURL(/\/forecast\/severe(?:\?.*)?$/);
+  await page.waitForURL((url) => url.pathname === '/forecast/severe' && url.searchParams.get('surface') !== 'discussion');
   await page.getByRole('tab', { name: 'Discussion' }).click();
   await page.waitForURL(/\/forecast\/severe\?.*surface=discussion/);
   await page.getByRole('heading', { name: 'Forecast Discussion' }).waitFor();
