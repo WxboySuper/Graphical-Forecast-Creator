@@ -106,13 +106,13 @@ function confirmDelete(i,btn){if(btn.getAttribute('data-armed')!=='1'){btn.setAt
 function select(id){state.selected=id;renderList();renderDetail();let r=Array.prototype.find.call(document.querySelectorAll('#list .row'),function(x){return x.getAttribute('data-id')===id;});if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'});}
 function move(delta){let rows=visible();if(!rows.length)return;let at=rows.map(function(x){return x.id;}).indexOf(state.selected);select(rows[Math.max(0,Math.min(rows.length-1,at+delta))].id);}
 function render(){renderList();renderDetail();}
-function syncUrl(){let p=new URLSearchParams();Object.keys(state.filters).forEach(function(k){if(state.filters[k])p.set(k,state.filters[k]);});history.replaceState(null,'',p.toString()?'?'+p.toString():location.pathname);}
+function syncUrl(){let p=new URLSearchParams();['status','target','category'].forEach(function(k){if(state.filters[k])p.set(k,state.filters[k]);});history.replaceState(null,'',p.toString()?'?'+p.toString():location.pathname);}
 function bind(){['status','target','category'].forEach(function(k){$('f-'+k).addEventListener('change',function(e){state.filters[k]=e.target.value;state.selected=null;syncUrl();loadList(true);});});
   $('f-q').addEventListener('input',function(e){state.filters.q=e.target.value;syncUrl();render();});
   $('refresh').addEventListener('click',function(){loadSummary();loadList(true);});
   document.addEventListener('keydown',onKey);}
 function onKey(e){let t=e.target?e.target.tagName:'';if(['INPUT','SELECT','TEXTAREA'].indexOf(t)>=0)return;if(e.target?.isContentEditable)return;if([e.metaKey,e.ctrlKey,e.altKey].some(Boolean))return;if(e.key==='j')move(1);else if(e.key==='k')move(-1);}
-function init(){let p=new URLSearchParams(location.search);Object.keys(state.filters).forEach(function(k){let v=p.get(k)||'';state.filters[k]=v;let n=$('f-'+k);if(n)n.value=v;});bind();loadSummary();loadList(true);}
+function init(){let p=new URLSearchParams(location.search);['status','target','category'].forEach(function(k){let v=p.get(k)||'';state.filters[k]=v;let n=$('f-'+k);if(n)n.value=v;});bind();loadSummary();loadList(true);}
 init();
 })();
 `;

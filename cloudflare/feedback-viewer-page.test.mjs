@@ -51,3 +51,10 @@ test('the renderer refuses a nonce that could break out of an attribute or heade
   for (const bad of ['', 'a"b', "a'b", 'a b', 'a;b', '<x>']) assert.throws(() => renderViewerPage(bad), /nonce/i, JSON.stringify(bad));
   assert.doesNotThrow(() => renderViewerPage('aB3-_x'));
 });
+
+test('the search text is never written to the URL', () => {
+  const start = html.indexOf('function syncUrl');
+  const body = html.slice(start, html.indexOf('}', html.indexOf('replaceState', start)));
+  assert.ok(body.includes("'status','target','category'"), 'only the three filters are persisted');
+  assert.equal(body.includes("'q'") || body.includes('Object.keys(state.filters)'), false, 'the search box is not persisted');
+});
