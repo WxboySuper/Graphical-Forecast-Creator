@@ -2,9 +2,9 @@ import { verifyToken } from './auth.mjs';
 import { handleAdmin } from './admin.mjs';
 import { notifyDiscord } from './discord.mjs';
 import { applyUserRateLimit, createRecord, readLimitedBody } from './store.mjs';
+import { json } from './response.mjs';
 import { validate } from './validate.mjs';
 
-const json = (body, status = 200, headers = {}) => Response.json(body, { status, headers });
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('origin');

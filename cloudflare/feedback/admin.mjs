@@ -1,10 +1,10 @@
 import { constantTimeEqual, digest } from './auth.mjs';
+import { json } from './response.mjs';
 import { isCategory, isTarget, validateCursor, validatePageLimit, validateSince } from './validate.mjs';
 
 // Explicit columns: the salted user hash is never exposed; email is present only when the user consented to contact.
 const PUBLIC_COLUMNS = 'id, created_at, email, category, message, page, app_version, build_target, plan, viewport, status, discord_status, user_agent';
 const STATUSES = new Set(['new', 'triaged', 'resolved', 'wontfix']);
-const json = (body, status = 200, headers = {}) => Response.json(body, { status, headers });
 const unauthorized = () => json({ error: 'Authentication required' }, 401);
 const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 

@@ -6,11 +6,13 @@ export const clean = (value) => value.replace(CONTROL_CHARS, ' ').replace(/\s+/g
 
 const isText = (value) => typeof value === 'string';
 const hasLength = (value, min, max) => value.length >= min && value.length <= max;
+// Stored pages are router paths only: a leading slash and URL-path characters, so they are never usable as links or markup.
+const SAFE_PAGE = /^\/(?!\/)[A-Za-z0-9\-._~!$&'()*+,;=:@%/]*$/;
 const cleanPage = (value) => clean(value.split(/[?#]/, 1)[0]);
 const fields = {
   category: (value) => typeof value === 'string' && CATEGORIES.has(value),
   message: (value) => isText(value) && hasLength(clean(value), 10, 4000),
-  page: (value) => isText(value) && hasLength(cleanPage(value), 1, 200),
+  page: (value) => isText(value) && hasLength(cleanPage(value), 1, 200) && SAFE_PAGE.test(cleanPage(value)),
   appVersion: (value) => isText(value) && hasLength(clean(value), 1, 40),
   buildTarget: (value) => typeof value === 'string' && TARGETS.has(value),
   contactOk: (value) => typeof value === 'boolean',

@@ -23,7 +23,9 @@ async function token(overrides = {}, key = privateKey, kid = 'test-key') {
 
 /** Mirrors the SQL column list so tests see exactly the columns the Worker selects. */
 function selectColumns(row, sql) {
-  const columns = sql.match(/^SELECT (.*?) FROM feedback/)[1].split(', ');
+  const match = sql.match(/^SELECT (.*?) FROM feedback/);
+  assert.ok(match, `selectColumns: unsupported SQL: ${sql}`);
+  const columns = match[1].split(', ');
   return Object.fromEntries(columns.map((column) => [column, row[column]]));
 }
 
@@ -112,13 +114,16 @@ class FakeD1 {
     const statement = {
       bind(...values) { args = values; return statement; },
       async first() {
-        return firstHandler ? firstHandler.run(db, args, sql) : null;
+        assert.ok(firstHandler, `FakeD1.first: no handler for SQL: ${sql}`);
+        return firstHandler.run(db, args, sql);
       },
       async all() {
-        return allHandler ? allHandler.run(db, sql, args) : { results: [] };
+        assert.ok(allHandler, `FakeD1.all: no handler for SQL: ${sql}`);
+        return allHandler.run(db, sql, args);
       },
       async run() {
-        return runHandler ? runHandler.run(db, args) : { meta: { changes: 0 } };
+        assert.ok(runHandler, `FakeD1.run: no handler for SQL: ${sql}`);
+        return runHandler.run(db, args);
       },
     };
     return statement;
@@ -146,7 +151,7 @@ before(async () => {
 
 test('health and origin policy', async () => {
   const { env, ctx } = harness();
-  assert.deepEqual(await (await worker.fetch(new Request('https://feedback.gfcweather.com/health'), env, ctx)).json(), { ok: true });
+  assert.deepStrictEqual(await (await worker.fetch(new Request('https://feedback.gfcweather.com/health'), env, ctx)).json(), { ok: true });
   const preflight = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'OPTIONS', headers: { origin: 'https://beta.gfcweather.com' } }), env, ctx);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://beta.gfcweather.com');
@@ -221,7 +226,7 @@ test('concurrent submissions cannot exceed the rate limit or duplicate rule', as
 
   const twin = harness(); const twinAuth = await token({ sub: 'user-456' });
   const same = await Promise.all(Array.from({ length: 4 }, () => post(twin.env, twin.ctx, { body: validBody(), auth: twinAuth })));
-  assert.deepEqual(same.map((response) => response.status).sort(), [201, 429, 429, 429]);
+  assert.deepStrictEqual(same.map((response) => response.status).sort(), [201, 429, 429, 429]);
   assert.equal(twin.db.rows.length, 1);
 });
 
@@ -264,10 +269,10 @@ test('admin list validates filters and paginates filtered results', async () => 
     assert.equal((await request(path)).status, 400, path);
   }
   const first = await (await request('/v1/feedback?status=new&target=beta&category=bug&since=700&limit=1')).json();
-  assert.deepEqual(first.items.map((item) => item.id), [ids[0]]);
+  assert.deepStrictEqual(first.items.map((item) => item.id), [ids[0]]);
   assert.equal(typeof first.nextCursor, 'string');
   const second = await (await request(`/v1/feedback?status=new&target=beta&category=bug&since=700&limit=1&cursor=${encodeURIComponent(first.nextCursor)}`)).json();
-  assert.deepEqual(second.items.map((item) => item.id), [ids[2]]);
+  assert.deepStrictEqual(second.items.map((item) => item.id), [ids[2]]);
   assert.equal(second.nextCursor, null);
   assert.ok(first.items.every((item) => !('uid_hash' in item)), 'list never exposes the salted user hash');
   const detail = await (await request(`/v1/feedback/${ids[0]}`)).json();
@@ -296,7 +301,7 @@ test('infrastructure failures return controlled errors instead of Worker 500s', 
   const broken = harness({ db: brokenDb });
   const response = await post(broken.env, broken.ctx, { auth });
   assert.equal(response.status, 500);
-  assert.deepEqual(await response.json(), { error: 'Feedback service error' });
+  assert.deepStrictEqual(await response.json(), { error: 'Feedback service error' });
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://beta.gfcweather.com');
 });
 
@@ -360,7 +365,7 @@ test('a global cap stops floods from many accounts', async () => {
     statuses.push((await post(env, ctx, { auth: await token({ sub: `flood-user-${i}` }), body: validBody({ message: `Flood message number ${i}.` }) })).status);
   }
   assert.equal(statuses.filter((status) => status === 201).length, 120);
-  assert.deepEqual(statuses.slice(120), [429, 429]);
+  assert.deepStrictEqual(statuses.slice(120), [429, 429]);
   assert.equal(db.rows.length, 120);
 });
 
@@ -369,6 +374,17 @@ test('accepts tokens whose claims contain non-ASCII text', async () => {
   const response = await post(env, ctx, { auth: await token({ name: 'Zoë Müller ☃', email: 'zoe@example.com' }), body: validBody({ contactOk: true }) });
   assert.equal(response.status, 201);
   assert.equal(db.rows[0].email, 'zoe@example.com');
+});
+
+test('rejects pages that are not plain relative router paths', async () => {
+  const { db, env, ctx } = harness(); const auth = await token();
+  for (const [index, page] of ['javascript:alert(1)', 'https://evil.example/x', '//evil.example', '/a b', '/<script>', 'forecast'].entries()) {
+    const response = await post(env, ctx, { auth, body: validBody({ page, message: `Bad page attempt number ${index}.` }) });
+    assert.equal(response.status, 400, page);
+  }
+  assert.equal(db.rows.length, 0);
+  assert.equal((await post(env, ctx, { auth, body: validBody({ page: '/forecast/outlooks?x=1#y' }) })).status, 201);
+  assert.equal(db.rows[0].page, '/forecast/outlooks');
 });
 
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
