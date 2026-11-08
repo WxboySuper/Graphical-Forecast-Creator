@@ -58,6 +58,10 @@ Short guides live beside the code. Read the relevant one before moving a module 
 - [Server testing](../server/testing/README.md)
 - [Server weather](../server/weather/README.md)
 
+### Ingest guides
+
+- [Mesoscale model ingest](../scripts/mesoscale/README.md)
+
 When a change crosses a boundary, update the relevant doc in the same PR.
 
 ## Reference
@@ -71,6 +75,7 @@ When a change crosses a boundary, update the relevant doc in the same PR.
 - [Discussion wall-clock times](./architecture/discussion-wall-clock-times.md)
 - [Forecast map styling seam](./architecture/forecast-map-styling-seam.md)
 - [Mesoscale provider contract](./architecture/mesoscale-provider-contract.md)
+- [Mesoscale catalog contract](./architecture/mesoscale-catalog-contract.md) · [ingest operations](./architecture/mesoscale-ingest-operations.md)
 - [Precision polygon editing](./architecture/precision-polygon-editing-624.md)
 
 ### Product rules
