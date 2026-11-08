@@ -870,7 +870,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
   useEffect(() => {
-    if (workspaceId !== 'severe' || hideMapForDiscussion) return undefined;
+    if (workspaceId !== 'severe' || hideMapForDiscussion || resizingDiscussionPanel) return undefined;
     let nextFrame = 0;
     const frame = window.requestAnimationFrame(() => {
       nextFrame = window.requestAnimationFrame(() => mapRef.current?.getMap()?.updateSize());
@@ -879,7 +879,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
       window.cancelAnimationFrame(frame);
       if (nextFrame) window.cancelAnimationFrame(nextFrame);
     };
-  }, [discussionLayout, discussionPanelCollapsed, hideMapForDiscussion, surface, workspaceId]);
+  }, [discussionLayout, discussionPanelCollapsed, discussionPanelWidth, hideMapForDiscussion, resizingDiscussionPanel, surface, workspaceId]);
   const updateSurface = (next: 'map' | 'discussion' | 'review') => {
     setSurface(next);
     const nextParams = new URLSearchParams(searchParams);
