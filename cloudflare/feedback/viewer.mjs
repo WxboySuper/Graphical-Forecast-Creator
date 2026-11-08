@@ -78,7 +78,7 @@ async function runFeedbackRoute(request, url, env, id) {
 }
 
 async function dispatch(request, url, env) {
-  if (url.pathname === '/admin' && request.method === 'GET') return pageResponse();
+  if (['/admin', '/admin/'].includes(url.pathname) && request.method === 'GET') return pageResponse();
   if (url.pathname === '/admin/api/summary' && request.method === 'GET') return summary(env.FEEDBACK_DB);
   if (url.pathname === '/admin/api/feedback') return runFeedbackRoute(request, url, env, null);
   if (url.pathname.startsWith('/admin/api/feedback/')) {

@@ -70,8 +70,11 @@ async function submit(request, env, ctx, headers) {
   return json({ id: record.id }, 201, headers);
 }
 
+/** True for the viewer page and everything beneath it; never for look-alikes such as /administrator. */
+const isAdminPath = (url) => url.pathname === '/admin' || url.pathname.startsWith('/admin/');
+
 const routeTable = [
-  { match: (url) => url.pathname === '/admin' || url.pathname.startsWith('/admin/'), run: (request, env, url) => handleViewer(request, env, url) },
+  { match: (url) => isAdminPath(url), run: (request, env, url) => handleViewer(request, env, url) },
   { match: (url, method) => url.pathname === '/health' && method === 'GET', run: () => json({ ok: true }) },
   { match: (url, method) => url.pathname === '/v1/feedback' && method === 'OPTIONS', run: (request, env) => {
     const headers = corsHeaders(request, env);
@@ -93,7 +96,7 @@ export async function fetchFeedback(request, env, ctx) {
     return await route.run(request, env, url, ctx);
   } catch {
     // Never log request content; surface a stable error instead of an opaque Worker 500.
-    const headers = url.pathname === '/admin' || url.pathname.startsWith('/admin/') ? {} : corsHeaders(request, env);
+    const headers = isAdminPath(url) ? {} : corsHeaders(request, env);
     return json({ error: 'Feedback service error' }, 500, headers);
   }
 }

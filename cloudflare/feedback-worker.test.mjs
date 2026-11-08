@@ -547,6 +547,16 @@ test('expired or exp-less tokens are rejected without fetching signing keys', as
   assert.equal(fetches, 0, 'no JWKS fetch for tokens that fail the expiry pre-check');
 });
 
+test('the viewer page is served at /admin and /admin/ alike', async () => {
+  const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  const auth = await accessToken();
+  for (const path of ['/admin', '/admin/']) {
+    const response = await viewerRequest(env, ctx, path, { auth });
+    assert.equal(response.status, 200, path);
+    assert.ok((response.headers.get('content-type') ?? '').startsWith('text/html'), path);
+  }
+});
+
 test('the bearer-token API cannot delete feedback; deletion is viewer-only', async () => {
   const { db, env, ctx } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
   const id = '00000000-0000-4000-8000-0000000000aa';
