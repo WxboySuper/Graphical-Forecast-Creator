@@ -10,7 +10,7 @@
 
 export interface GeoBoundarySource {
   /** Unique key used to identify the dataset. */
-  key: 'usStates' | 'worldCountries' | 'lakes';
+  key: 'usStates' | 'worldCountries' | 'lakes' | 'usPlaces';
   /** URL resolved at runtime (a vendored, content-addressed public asset). */
   url: string;
   /** Path to the vendored file relative to the repository root. */
@@ -55,6 +55,15 @@ export const GEO_BOUNDARY_SOURCES: Record<GeoBoundarySource['key'], GeoBoundaryS
     origin: 'https://github.com/nvkelso/natural-earth-vector (geojson/ne_110m_lakes.geojson)',
     license: 'Public domain (Natural Earth data)',
     retrievedAt: RETRIEVED_AT,
+  },
+  usPlaces: {
+    key: 'usPlaces',
+    url: '/geodata/us-places.json',
+    vendoredPath: 'public/geodata/us-places.json',
+    sha256: '595A59F835A3E5FD935FB51F80F85632A29BA2D34E83A04046B6693E430DCE8F',
+    origin: 'https://github.com/nvkelso/natural-earth-vector (geojson/ne_10m_populated_places_simple.geojson), filtered to iso_a2=US and pop_max>=5000',
+    license: 'Public domain (Natural Earth data)',
+    retrievedAt: '2026-11-08',
   },
 };
 

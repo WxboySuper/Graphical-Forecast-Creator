@@ -48,11 +48,13 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
 - **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
+- **Cities in outlooks:** List the cities inside the active outlook in the beta population estimate dialog, using a bundled public-domain places dataset.
 - **KMZ/KML export:** Add a beta export prototype for forecast products.
 - **Send feedback:** Signed-in users can send bugs, ideas, and questions from a feedback dialog in the Resources menu, and the beta site shows a beta notice with an always-visible feedback button.
 
 #### Changed
 
+- **Forecast menu:** The header Forecast tab now opens a menu listing available forecast workspaces with their descriptions and focus points, marks the current workspace, and keeps Discussion under Other.
 - **Monitor NWS alerts:** Show when displayed alert polygons were last fetched after a refresh fails, and keep the retry action clear.
 - **Auto-TSTM:** Temporarily disable automatic thunderstorm guidance while the SPC HREF source is retired. The forecast page explains the planned replacement.
 - **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.

@@ -23,6 +23,15 @@ describe('forecast workspace product contract', () => {
     ]);
   });
 
+  test('provides a description and focused talking points for every workspace', () => {
+    for (const workspace of FORECAST_WORKSPACES) {
+      expect(workspace.description.trim().length).toBeGreaterThan(0);
+      expect(workspace.focus.length).toBeGreaterThanOrEqual(2);
+      expect(workspace.focus.length).toBeLessThanOrEqual(3);
+      expect(workspace.focus.every((point) => point.trim().length > 0)).toBe(true);
+    }
+  });
+
   test.each(BUILD_TARGETS)('exposes Severe and gates Custom on the %s target', (target: BuildTarget) => {
     const expected = target === 'production' || target === 'staging'
       ? ['severe']

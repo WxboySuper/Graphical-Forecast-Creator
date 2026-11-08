@@ -10,6 +10,8 @@ export interface ForecastWorkspaceDefinition {
   id: ForecastWorkspaceId;
   path: `/forecast/${ForecastWorkspaceId}`;
   label: string;
+  description: string;
+  focus: readonly string[];
   productType: ForecastWorkspaceProductType;
   status: ForecastWorkspaceStatus;
   exposureKey: FeatureKey | null;
@@ -25,6 +27,8 @@ export const FORECAST_WORKSPACES = [
     id: 'severe',
     path: '/forecast/severe',
     label: 'Severe',
+    description: 'Create outlooks for severe weather threats.',
+    focus: ['Categorical and probability outlooks', 'Tornado, wind, and hail risks'],
     productType: 'severe',
     status: 'available',
     exposureKey: null,
@@ -34,6 +38,8 @@ export const FORECAST_WORKSPACES = [
     id: 'mesoscale',
     path: '/forecast/mesoscale',
     label: 'Mesoscale',
+    description: 'Build short-range forecasts for focused weather events.',
+    focus: ['Storm-scale hazards', 'Short-term event evolution'],
     productType: 'mesoscale',
     status: 'future',
     exposureKey: null,
@@ -43,6 +49,8 @@ export const FORECAST_WORKSPACES = [
     id: 'tropical',
     path: '/forecast/tropical',
     label: 'Tropical',
+    description: 'Plan forecasts for tropical cyclones and their impacts.',
+    focus: ['Track and intensity outlooks', 'Wind, rain, and surge impacts'],
     productType: 'tropical',
     status: 'future',
     exposureKey: null,
@@ -52,6 +60,8 @@ export const FORECAST_WORKSPACES = [
     id: 'winter',
     path: '/forecast/winter',
     label: 'Winter',
+    description: 'Forecast winter weather types and expected impacts.',
+    focus: ['Snow, ice, and mixed precipitation', 'Accumulation and impact outlooks'],
     productType: 'winter',
     status: 'future',
     exposureKey: null,
@@ -61,6 +71,8 @@ export const FORECAST_WORKSPACES = [
     id: 'custom',
     path: '/forecast/custom',
     label: 'Custom',
+    description: 'Create forecasts with custom products and layers.',
+    focus: ['Custom forecast layers', 'Product-specific categories'],
     productType: 'custom',
     status: 'gated',
     // #914 ships the route contract only: the Custom workspace stays off release
