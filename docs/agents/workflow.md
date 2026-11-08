@@ -27,8 +27,8 @@ Actually exercise user-visible changes (browser/Playwright), not just static tes
 
 ## Local beta mode
 
-- `VITE_BETA_MODE=true pnpm run dev -- --port 3002` (PowerShell: `$env:VITE_BETA_MODE='true'; pnpm run dev -- --port 3002`).
-- Skip hosted sign-in locally: open `/?localBetaBypass=1` or `localStorage.setItem('gfc-local-beta-bypass','1')`.
+- `VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002` (PowerShell: `$env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002`). Beta is open to everyone; the target only adds the banner and feedback button.
+- On localhost, `/?localBetaBypass=1` skips the Terms and Privacy modals (E2E uses it). Feedback needs the Worker in `docs/operations/beta-feedback.md`; override with `VITE_FEEDBACK_API_URL`.
 - Hosted auth locally needs `VITE_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_APP_ID`.
 - `VITE_BUILD_TARGET` = `local|beta|staging|production`; defaults to `local`; invalid value fails the build.
 

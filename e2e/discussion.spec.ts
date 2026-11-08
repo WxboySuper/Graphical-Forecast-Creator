@@ -27,7 +27,7 @@ test.describe('Discussion workflow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ uid: 'e2e-user', email: 'e2e@example.test', displayName: 'E2E Forecaster', betaAccess: true }),
+        body: JSON.stringify({ uid: 'e2e-user', email: 'e2e@example.test', displayName: 'E2E Forecaster' }),
       });
     });
     await page.goto('/?localTestAccount=premium');

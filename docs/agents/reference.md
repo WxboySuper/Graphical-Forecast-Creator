@@ -6,8 +6,7 @@ Facts verified against the code on 2026-11-08 (v1.8.0-beta.6). Re-verify with gr
 
 | Path | Page | Notes |
 |------|------|-------|
-| `/` | `HomePage` | In beta mode `*` redirects to `/beta` |
-| `/beta`, `/beta-access/:invitePath?` | `BetaLandingPage`, `BetaInvitePage` | Beta gate |
+| `/` | `HomePage` | `*` redirects to `/`; retired `/beta` and `/beta-access/*` links also redirect to `/` |
 | `/forecast`, `/forecast/<workspace>` | `ForecastPage` | Workspaces from `src/routing/forecastWorkspaceRoutes.ts`; legacy `?workspace=` handled there. Contract: [workspace boundaries](../architecture/forecast-workspace-boundaries.md) |
 | `/discussion`, `/verification`, `/monitor` | lazy pages | `Suspense` + `RouteFallback` |
 | `/account`, `/pricing`, `/cloud`, `/admin`, `/updates` | account, pricing, cloud library, admin metrics, release notes | `/updates` has an nginx exact-match rule (`server/nginx.conf`) |
@@ -35,7 +34,6 @@ Facts verified against the code on 2026-11-08 (v1.8.0-beta.6). Re-verify with gr
 | `POST /api/account/delete` | Firebase token | `account-lifecycle.js` |
 | `POST /api/metrics/event` | device/account | `metricsRoutes.js` |
 | `GET /api/admin/metrics` | `ADMIN_UID_ALLOWLIST` | `metricsAdminReads.js` |
-| `POST /api/beta/claim` | invite token | `beta.js` |
 | `POST /api/sentry-tunnel` | none (validates DSN) | `sentry-tunnel.js` |
 | `GET /api/tstm/latest`, `/status` | none, capability-gated | `tstm.js` |
 
@@ -55,9 +53,9 @@ Python Auto-TSTM generator: `server/weather/` (tests: `python -m unittest discov
 
 ## Environment variables (names only)
 
-Client (build-time, `VITE_*`): `VITE_BUILD_TARGET`, `VITE_BETA_MODE`, `VITE_BETA_INVITE_PATH`, `VITE_MESOSCALE_WORKER_URL` or `VITE_MESOSCALE_WORKER_URL_{LOCAL,BETA,STAGING,PRODUCTION}`, `VITE_MESOSCALE_FIXTURES`, `VITE_MESOSCALE_DEMO` (local only), `VITE_FIREBASE_{API_KEY,AUTH_DOMAIN,PROJECT_ID,APP_ID}`, `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_UMAMI_{HOST,BETA_WEBSITE_ID,PRODUCTION_WEBSITE_ID}`. Anything `VITE_*` ships to the browser: never put secrets there.
+Client (build-time, `VITE_*`): `VITE_BUILD_TARGET`, `VITE_FEEDBACK_API_URL`, `VITE_MESOSCALE_WORKER_URL` or `VITE_MESOSCALE_WORKER_URL_{LOCAL,BETA,STAGING,PRODUCTION}`, `VITE_MESOSCALE_FIXTURES`, `VITE_MESOSCALE_DEMO` (local only), `VITE_FIREBASE_{API_KEY,AUTH_DOMAIN,PROJECT_ID,APP_ID}`, `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`, `VITE_UMAMI_{HOST,BETA_WEBSITE_ID,PRODUCTION_WEBSITE_ID}`. Anything `VITE_*` ships to the browser: never put secrets there.
 
-Server: `PORT`, `SERVER_TARGET`, `BETA_MODE`, `APP_BASE_URL`, `BETA_INVITE_{PATH,TOKEN}`, `BETA_WORKER_SHARED_SECRET`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `FIREBASE_ADMIN_{PROJECT_ID,CLIENT_EMAIL,PRIVATE_KEY}`, `STRIPE_{SECRET_KEY,WEBHOOK_SECRET,PRICE_MONTHLY,PRICE_ANNUAL_STANDARD,PRICE_ANNUAL_PROMO,PROMO_START,PROMO_END}`, `SENTRY_{DSN,BROWSER_DSN,ENVIRONMENT,RELEASE,TRACES_SAMPLE_RATE}`, plus capability switches `TSTM_GENERATION_ENABLED`, `TSTM_INGESTION_ENABLED`, `EMERGENCY_DISABLED_CAPABILITIES`. Loaded by `server/load-env.js`; deploy env written by `scripts/write-deployment-env.mjs`.
+Server: `PORT`, `SERVER_TARGET`, `APP_BASE_URL`, `BETA_WORKER_SHARED_SECRET`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `FIREBASE_ADMIN_{PROJECT_ID,CLIENT_EMAIL,PRIVATE_KEY}`, `STRIPE_{SECRET_KEY,WEBHOOK_SECRET,PRICE_MONTHLY,PRICE_ANNUAL_STANDARD,PRICE_ANNUAL_PROMO,PROMO_START,PROMO_END}`, `SENTRY_{DSN,BROWSER_DSN,ENVIRONMENT,RELEASE,TRACES_SAMPLE_RATE}`, plus capability switches `TSTM_GENERATION_ENABLED`, `TSTM_INGESTION_ENABLED`, `EMERGENCY_DISABLED_CAPABILITIES`. Loaded by `server/load-env.js`; deploy env written by `scripts/write-deployment-env.mjs`.
 
 ## GitHub
 

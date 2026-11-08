@@ -113,15 +113,15 @@ needs; `@typescript/native` provides the fast native `tsc` used by
 
 ### Build targets
 
-`VITE_BUILD_TARGET` is `local`, `beta`, `staging`, or `production` (default `local`; invalid values fail the build). It is separate from Vite's mode and from the beta access gate.
+`VITE_BUILD_TARGET` is `local`, `beta`, `staging`, or `production` (default `local`; invalid values fail the build). It is separate from Vite's mode. The beta target is an open beta: anyone can use it, existing subscriptions apply, and it adds a beta banner and a floating feedback button.
 
-### Local beta mode
+### Local beta build
 
 ```sh
-cross-env VITE_BETA_MODE=true pnpm run dev -- --port 3002
+cross-env VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002
 ```
 
-PowerShell: `$env:VITE_BETA_MODE='true'; pnpm run dev -- --port 3002`. To skip hosted sign-in locally, open `http://localhost:3002/?localBetaBypass=1`. Hosted auth locally needs the `VITE_FIREBASE_*` variables.
+PowerShell: `$env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002`. Point feedback at another Worker with `VITE_FEEDBACK_API_URL` (default `https://feedback.gfcweather.com`; see [beta feedback](docs/operations/beta-feedback.md)). On localhost, `?localBetaBypass=1` skips the Terms and Privacy modals (used by E2E). Hosted auth locally needs the `VITE_FIREBASE_*` variables.
 
 ### Error monitoring
 

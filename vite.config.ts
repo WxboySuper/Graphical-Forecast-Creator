@@ -55,6 +55,7 @@ export default defineConfig(({ mode }) => {
     define: {
       __GFC_APP_VERSION__: JSON.stringify(pkg.version),
       __GFC_BUILD_TARGET__: JSON.stringify(buildTarget),
+      __GFC_FEEDBACK_API_URL__: JSON.stringify(env.VITE_FEEDBACK_API_URL ?? 'https://feedback.gfcweather.com'),
       __MESOSCALE_WORKER_URLS__: JSON.stringify({
         local: env.VITE_MESOSCALE_WORKER_URL_LOCAL || env.VITE_MESOSCALE_WORKER_URL || '',
         beta: env.VITE_MESOSCALE_WORKER_URL_BETA || env.VITE_MESOSCALE_WORKER_URL || '',
@@ -64,8 +65,6 @@ export default defineConfig(({ mode }) => {
       __MESOSCALE_FIXTURES__: JSON.stringify(env.VITE_MESOSCALE_FIXTURES === 'true'),
       __MESOSCALE_DEMO__: JSON.stringify(env.VITE_MESOSCALE_DEMO === 'true' && buildTarget === 'local'),
       __GFC_DEV_MODE__: JSON.stringify(mode === 'development'),
-      __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
-      __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),
       __GFC_FIREBASE_API_KEY__: JSON.stringify(env.VITE_FIREBASE_API_KEY ?? ''),
       __GFC_FIREBASE_AUTH_DOMAIN__: JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN ?? ''),
       __GFC_FIREBASE_PROJECT_ID__: JSON.stringify(env.VITE_FIREBASE_PROJECT_ID ?? ''),

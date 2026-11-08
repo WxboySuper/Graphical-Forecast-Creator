@@ -57,7 +57,6 @@ import {
   type InFlightHostedSettingsWrite,
   type PendingHostedSettingsWrite,
 } from './hostedSettingsSync';
-import { refreshHostedBetaAccess } from './hostedBetaAccess';
 
 export type { UserSettingsDocument } from './userSettingsDocument';
 export {
@@ -66,7 +65,7 @@ export {
   readRemoteSettings,
 } from './userSettingsDocument';
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
-export { createProfilePayload, readProfileBetaAccess } from './authSettings';
+export { createProfilePayload } from './authSettings';
 export {
   applySettingsToState,
   areOverlaySettingsEqual,
@@ -98,7 +97,6 @@ export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from
 import { safeParseJson } from './authCommon';
 import {
   initLocalAuthState,
-  localRefreshBetaAccess,
   localSignInWithEmail,
   localSignOutUser,
   localSignUpWithEmail,
@@ -115,15 +113,12 @@ interface AuthContextValue {
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
   hostedAuthEnabled: boolean;
-  betaAccess: boolean;
-  betaAccessLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOutUser: () => Promise<void>;
   deleteAccount: (password?: string) => Promise<void>;
   updateSyncedSettings: (settings: Partial<UserSettingsDocument>) => Promise<void>;
-  refreshBetaAccess: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -247,7 +242,6 @@ export const createHostedAutosyncSnapshot = (args: {
 export {
   applyLocalAuthData,
   initLocalAuthState,
-  localRefreshBetaAccess,
   localSignInWithEmail,
   localSignOutUser,
   localSignUpWithEmail,
@@ -359,15 +353,12 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   syncedSettings: null,
   error: null,
   hostedAuthEnabled: false,
-  betaAccess: false,
-  betaAccessLoading: false,
   signInWithGoogle: disabledAuthAction,
   signInWithEmail: disabledAuthAction,
   signUpWithEmail: disabledAuthAction,
   signOutUser: disabledAuthAction,
   deleteAccount: disabledAuthAction,
   updateSyncedSettings: disabledAuthAction,
-  refreshBetaAccess: disabledAuthAction,
 });
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
@@ -383,8 +374,6 @@ interface LocalAuthDeps {
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
@@ -405,10 +394,7 @@ function buildLocalActions(deps: LocalAuthDeps) {
         setStatus: deps.setStatus,
         setSyncedSettings: deps.setSyncedSettings,
         setSettingsSyncStatus: deps.setSettingsSyncStatus,
-        setBetaAccess: deps.setBetaAccess,
       }),
-    refreshBetaAccess: (): Promise<void> =>
-      localRefreshBetaAccess({ setBetaAccess: deps.setBetaAccess, setBetaAccessLoading: deps.setBetaAccessLoading }),
     updateSyncedSettings: (settings: Partial<UserSettingsDocument>): Promise<void> =>
       localUpdateSyncedSettings(settings, {
         setError: deps.setError,
@@ -425,8 +411,8 @@ function buildLocalActions(deps: LocalAuthDeps) {
 /** useLocalAuthState: Hook that provides local-only auth state and actions (dev-only).
  *
  * Exposes the same AuthContextValue shape as the hosted implementation but operates
- * against the local /api/local/* endpoints. Intended to be used by development servers
- * to enable beta/local-only flows without requiring hosted auth.
+ * against the local /api/local/* endpoints. Intended for development servers
+ * that run without hosted auth.
  */
 const useLocalAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
@@ -440,8 +426,6 @@ const useLocalAuthState = (): AuthContextValue => {
   const [user, setUser] = useState<User | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [betaAccess, setBetaAccess] = useState(false);
-  const [betaAccessLoading, setBetaAccessLoading] = useState(false);
 
   useEffect(() => {
     currentDarkModeRef.current = darkMode;
@@ -464,8 +448,6 @@ const useLocalAuthState = (): AuthContextValue => {
       setStatus,
       setSettingsSyncStatus,
       setSyncedSettings,
-      setBetaAccess,
-      setBetaAccessLoading,
       setError,
       lastSyncedSettingsRef,
     });
@@ -484,8 +466,6 @@ const useLocalAuthState = (): AuthContextValue => {
     setSyncedSettings,
     setSettingsSyncStatus,
     lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
     setError,
   }), [
     dispatch,
@@ -496,12 +476,10 @@ const useLocalAuthState = (): AuthContextValue => {
     setSyncedSettings,
     setSettingsSyncStatus,
     lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
     setError,
   ]);
 
-  const { signInWithEmail, signUpWithEmail, signOutUser, refreshBetaAccess, updateSyncedSettings } = localActions;
+  const { signInWithEmail, signUpWithEmail, signOutUser, updateSyncedSettings } = localActions;
 
   const value = useMemo<AuthContextValue>(() => ({
     status,
@@ -510,28 +488,22 @@ const useLocalAuthState = (): AuthContextValue => {
     syncedSettings,
     error,
     hostedAuthEnabled: true,
-    betaAccess,
-    betaAccessLoading,
     signInWithGoogle: disabledAuthAction,
     signInWithEmail,
     signUpWithEmail,
     signOutUser,
     deleteAccount: disabledAuthAction,
     updateSyncedSettings,
-    refreshBetaAccess,
   }), [
     status,
     settingsSyncStatus,
     user,
     syncedSettings,
     error,
-    betaAccess,
-    betaAccessLoading,
     signInWithEmail,
     signUpWithEmail,
     signOutUser,
     updateSyncedSettings,
-    refreshBetaAccess,
   ]);
 
   return value;
@@ -539,7 +511,7 @@ const useLocalAuthState = (): AuthContextValue => {
 
 /**
  * Provides hosted-auth state and actions while syncing user documents with Firestore.
- * Handles auth state changes, settings synchronization, and beta access refresh.
+ * Handles auth state changes and settings synchronization.
  */
 const useHostedAuthState = (): AuthContextValue => {
   const dispatch = useDispatch();
@@ -559,14 +531,11 @@ const useHostedAuthState = (): AuthContextValue => {
   const hostedSyncUserUidRef = useRef<string | null>(null);
   const hostedSyncSessionGenerationRef = useRef(0);
   const hostedUserSyncActiveRef = useRef(false);
-  const betaAccessRequestIdRef = useRef(0);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [betaAccess, setBetaAccess] = useState(false);
-  const [betaAccessLoading, setBetaAccessLoading] = useState(Boolean(isHostedAuthEnabled));
 
   useEffect(() => {
     currentDarkModeRef.current = darkMode;
@@ -590,8 +559,6 @@ const useHostedAuthState = (): AuthContextValue => {
       setSettingsSyncStatus('disabled');
       setUser(null);
       setSyncedSettings(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
       hasInitializedSettingsRef.current = false;
       lastSyncedSettingsRef.current = null;
       setError(null);
@@ -606,8 +573,6 @@ const useHostedAuthState = (): AuthContextValue => {
         setSettingsSyncStatus('idle');
         if (!nextUser) {
           setSyncedSettings(null);
-          setBetaAccess(false);
-          setBetaAccessLoading(false);
         }
         setError(null);
       },
@@ -616,8 +581,6 @@ const useHostedAuthState = (): AuthContextValue => {
         setStatus('error');
         setSettingsSyncStatus('error');
         setSyncedSettings(null);
-        setBetaAccess(false);
-        setBetaAccessLoading(false);
         setError(nextError.message);
       }
     );
@@ -641,8 +604,6 @@ const useHostedAuthState = (): AuthContextValue => {
       );
       hostedUserSyncActiveRef.current = false;
       setSyncedSettings(null);
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
       if (status !== 'loading') {
         setSettingsSyncStatus(getDisabledSettingsStatus());
       }
@@ -717,41 +678,6 @@ const useHostedAuthState = (): AuthContextValue => {
       unsubscribeSettings?.();
     };
   }, [dispatch, status, user]);
-
-  /** Refreshes the signed-in user's beta-access flag from the hosted profile document. */
-  const refreshBetaAccess = useCallback(
-    () =>
-      refreshHostedBetaAccess({
-        user,
-        requestIdRef: betaAccessRequestIdRef,
-        setBetaAccess,
-        setBetaAccessLoading,
-      }),
-    [user],
-  );
-
-  useEffect(() => {
-    if (!isHostedAuthEnabled || !db) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    if (status === 'loading') {
-      setBetaAccessLoading(true);
-      return;
-    }
-
-    if (!user) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    refreshBetaAccess().catch(() => {
-      // Beta-access failures fall back to the locked beta gate.
-    });
-  }, [refreshBetaAccess, status, user]);
 
   useEffect(() => {
     const isSyncUnavailable =
@@ -863,8 +789,6 @@ const useHostedAuthState = (): AuthContextValue => {
       syncedSettings,
       error,
       hostedAuthEnabled: true,
-      betaAccess,
-      betaAccessLoading,
       signInWithGoogle: async () => {
         setError(null);
         const credential = await signInWithPopup(requireAuth(), googleAuthProvider);
@@ -895,16 +819,13 @@ const useHostedAuthState = (): AuthContextValue => {
           setStatus('signed_out');
           setSyncedSettings(null);
           setSettingsSyncStatus('idle');
-          setBetaAccess(false);
-          setBetaAccessLoading(false);
           hasInitializedSettingsRef.current = false;
           lastSyncedSettingsRef.current = null;
         });
       },
       updateSyncedSettings,
-      refreshBetaAccess,
     };
-  }, [betaAccess, betaAccessLoading, error, refreshBetaAccess, settingsSyncStatus, status, syncedSettings, updateSyncedSettings, user]);
+  }, [error, settingsSyncStatus, status, syncedSettings, updateSyncedSettings, user]);
 
   return value;
 };

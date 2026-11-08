@@ -27,14 +27,6 @@ jest.mock('./pages/PricingPage', () => ({
 jest.mock('./pages/UpdatesPage', () => ({
   UpdatesPage: () => <div>UpdatesPage Mock</div>,
 }));
-jest.mock('./pages/BetaLandingPage', () => ({
-  __esModule: true,
-  default: () => <div>BetaLandingPage Mock</div>,
-}));
-jest.mock('./pages/BetaInvitePage', () => ({
-  __esModule: true,
-  default: () => <div>BetaInvitePage Mock</div>,
-}));
 jest.mock('./pages/ForecastPage', () => ({
   __esModule: true,
   ForecastPage: () => <div>Forecast editor mock</div>,
@@ -50,10 +42,6 @@ jest.mock('./components/Layout', () => {
       </div>
     ),
   };
-});
-jest.mock('./components/Beta/BetaAccessGuard', () => {
-  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
-  return () => <Outlet />;
 });
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,

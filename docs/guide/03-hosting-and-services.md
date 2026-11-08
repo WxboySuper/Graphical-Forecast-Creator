@@ -5,13 +5,13 @@
 | Target | URL | Hosted on | Purpose |
 |--------|-----|-----------|---------|
 | `local` | localhost:3000 | your machine | Development. Works with no credentials. |
-| `beta` | beta.gfcweather.com | Cloudflare Worker `gfc-beta` + beta API on the VPS | Prerelease testing of `main`. Invite-gated. |
+| `beta` | beta.gfcweather.com | Cloudflare Worker `gfc-beta` + beta API on the VPS | Open beta: prerelease testing of `main`, open to everyone, existing subscriptions apply. |
 | `staging` | staging-gfc.weatherboysuper.com | VPS | Manual rehearsal of any ref before production. |
 | `production` | gfc.weatherboysuper.com | VPS | What users get. Runs a `stable/X.Y.x` release. |
 
 > Some older docs and code comments still mention `beta-gfc.weatherboysuper.com`. The Cloudflare config (`cloudflare/wrangler.beta.jsonc`) says `beta.gfcweather.com` is current.
 
-The target is chosen at build time with `VITE_BUILD_TARGET`. It is separate from Vite's mode and from the beta access gate.
+The target is chosen at build time with `VITE_BUILD_TARGET`. It is separate from Vite's mode. Beta is an open deployment, not an access gate.
 
 ## Who runs what
 
@@ -43,7 +43,7 @@ Each VPS app directory uses `releases/<version>/` plus a `current` symlink, so a
 | **Umami** (self-hosted) | Privacy-conscious usage analytics | One instance, separate website records for prod and beta. Never mix them. |
 | **NOAA / NWS / SPC / radar** | Monitor and verification data | Fetched from the browser, normalised before reaching UI. |
 | **WorldPop** | Beta population estimate | On-demand, informational only. |
-| **Cloudflare** | Beta site | Deployed only via GitHub Actions `wrangler deploy`. |
+| **Cloudflare** | Beta site and the feedback Worker (D1) at `feedback.gfcweather.com` | Deployed only via GitHub Actions `wrangler deploy`. See [beta feedback](../operations/beta-feedback.md). |
 
 ## One-time chores that are easy to forget
 

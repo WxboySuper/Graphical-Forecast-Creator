@@ -1,6 +1,6 @@
 # Beta release (Cloudflare Workers)
 
-Beta is a **release channel** on `main`, not a branch. The **Release | Beta** workflow (`release-beta.yml`) is the single supported path to cut a beta version, publish a GitHub prerelease, deploy `beta.gfcweather.com` on the `gfc-beta` Worker, deploy the beta API on the VPS, smoke-test the live site, and publish the release.
+Beta is a **release channel** on `main`, not a branch. It is an **open beta**: `beta.gfcweather.com` is open to any user, signs in against the same accounts and subscriptions as production, and has no invite step. Complimentary premium for chosen testers is still granted by hand on the user's entitlement document. User feedback is collected by the separate feedback Worker; see [operations/beta-feedback.md](operations/beta-feedback.md). The **Release | Beta** workflow (`release-beta.yml`) is the single supported path to cut a beta version, publish a GitHub prerelease, deploy `beta.gfcweather.com` on the `gfc-beta` Worker, deploy the beta API on the VPS, smoke-test the live site, and publish the release.
 
 The beta **API** (`/api/*` proxied by the Worker) runs on the existing VPS at `/opt/gfc-beta-analytics`. The workflow rsyncs `server/` there (excluding `.env`) and restarts `gfc-beta-analytics` when **`deploy_api`** is `true` (default). It does **not** rsync the retired static frontend to `/var/www/gfc-beta`.
 
@@ -63,13 +63,12 @@ The git tag is created **before** deploy (when the draft release is created), so
 | `GH_PAT` | Push release commit and tag; OpenCode changelog audit |
 | `OPENCODE_API_KEY` | Final changelog audit |
 | `VITE_FIREBASE_*` | Beta frontend build |
-| `BETA_INVITE_PATH` | Beta frontend build (`VITE_BETA_INVITE_PATH` in the build step) |
 | `VITE_SENTRY_DSN` | Beta frontend build |
 | `VITE_UMAMI_*` | Beta analytics build |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Deploy build source maps (not dry-run pre-build) |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Wrangler deploy |
 | `BETA_SSH_KEY`, `BETA_SSH_HOST`, `BETA_SSH_KNOWN_HOSTS` | VPS API deploy (`deploy_api`) |
-| `BETA_INVITE_TOKEN`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT` | VPS API env |
+| `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT` | VPS API env |
 | `BETA_WORKER_SHARED_SECRET` | Optional shared secret for trusted beta Worker client IP forwarding. Set the same high-entropy value as a GitHub Actions secret and a Cloudflare Worker secret. When unset on either side, rate limits use the proxy address as before. |
 | `STRIPE_*`, `FIREBASE_ADMIN_*`, `SENTRY_DSN` | VPS API env |
 

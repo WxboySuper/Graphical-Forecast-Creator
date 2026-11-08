@@ -50,6 +50,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
 - **Cities in outlooks:** List the cities inside the active outlook in the beta population estimate dialog, using a bundled public-domain places dataset.
 - **KMZ/KML export:** Add a beta export prototype for forecast products.
+- **Send feedback:** Signed-in users can send bugs, ideas, and questions from a feedback dialog in the Resources menu, and the beta site shows a beta notice with an always-visible feedback button.
 
 #### Changed
 
@@ -62,6 +63,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Auto-TSTM:** Temporarily disable automatic thunderstorm guidance while the SPC HREF source is retired. The forecast page explains the planned replacement.
 - **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.
 - **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
+- **Open beta:** `beta.gfcweather.com` is now open to everyone instead of requiring an invite. Sign in with your existing account and your current plan applies there. Old beta sign-in and invite links redirect to the home page.
 - **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
 - **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
 - **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).

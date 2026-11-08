@@ -17,7 +17,6 @@ import {
   extractLocalUserFromData,
   getDefaultContextValue,
   initLocalAuthState,
-  localRefreshBetaAccess,
   localSignInWithEmail,
   localSignOutUser,
   localSignUpWithEmail,
@@ -32,7 +31,6 @@ import {
   getSettingsSyncError as getProviderSettingsSyncError,
   getSettingsUpdateError as getProviderSettingsUpdateError,
   mergeUserSettingsDocument as mergeProviderUserSettingsDocument,
-  readProfileBetaAccess as readProviderProfileBetaAccess,
   readRemoteSettings as readProviderRemoteSettings,
   AuthProvider,
   useAuth,
@@ -106,7 +104,7 @@ const waitForAuthEffects = async (delay = 100) => {
 
 describe('AuthProvider Utils', () => {
   test('keeps the existing provider re-export for settings helpers', () => {
-    for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderProfileBetaAccess, readProviderRemoteSettings]) {
+    for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderRemoteSettings]) {
       expect(typeof helper).toBe('function');
     }
   });
@@ -221,15 +219,12 @@ describe('AuthProvider Utils', () => {
       setSyncedSettings: jest.fn(),
       setSettingsSyncStatus: jest.fn(),
       lastSyncedSettingsRef: { current: null },
-      setBetaAccess: jest.fn(),
-      setBetaAccessLoading: jest.fn(),
       setError: jest.fn(),
     };
 
     const localPayload = {
       uid: 'user-1',
       email: 'user@example.com',
-      betaAccess: true,
       settings: {
         darkMode: false,
         baseMapStyle: 'osm',
@@ -271,17 +266,6 @@ describe('AuthProvider Utils', () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ betaAccess: true }),
-    });
-    await localRefreshBetaAccess(deps);
-    expect(deps.setBetaAccess).toHaveBeenCalledWith(true);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false });
-    await localRefreshBetaAccess(deps);
-    expect(deps.setBetaAccess).toHaveBeenCalledWith(false);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
       json: () => Promise.resolve({ settings: localPayload.settings }),
     });
     await localUpdateSyncedSettings({ defaultForecasterName: 'Updated' }, deps);
@@ -309,14 +293,11 @@ describe('AuthProvider Utils', () => {
       setSyncedSettings: jest.fn(),
       lastSyncedSettingsRef: { current: null },
       setError: jest.fn(),
-      setBetaAccess: jest.fn(),
-      setBetaAccessLoading: jest.fn(),
     });
 
     const profile = {
       uid: 'local-user',
       email: 'local@example.com',
-      betaAccess: true,
       settings: {
         darkMode: false,
         baseMapStyle: 'osm',
@@ -338,7 +319,6 @@ describe('AuthProvider Utils', () => {
     expect(successDeps.setUser).toHaveBeenCalledWith(expect.objectContaining({ uid: 'local-user' }));
     expect(successDeps.setStatus).toHaveBeenCalledWith('signed_in');
     expect(successDeps.setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(successDeps.setBetaAccess).toHaveBeenCalledWith(true);
 
     const inactiveDeps = makeDeps(() => false);
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -353,7 +333,6 @@ describe('AuthProvider Utils', () => {
     await initLocalAuthState(signedOutDeps);
     expect(signedOutDeps.setStatus).toHaveBeenCalledWith('signed_out');
     expect(signedOutDeps.setSettingsSyncStatus).toHaveBeenCalledWith('idle');
-    expect(signedOutDeps.setBetaAccessLoading).toHaveBeenCalledWith(false);
 
     const errorDeps = makeDeps();
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
@@ -662,8 +641,6 @@ describe('AuthProvider local credential edge cases', () => {
     setSyncedSettings: jest.fn(),
     setSettingsSyncStatus: jest.fn(),
     lastSyncedSettingsRef: { current: null },
-    setBetaAccess: jest.fn(),
-    setBetaAccessLoading: jest.fn(),
     setError: jest.fn(),
   });
 
@@ -817,7 +794,6 @@ describe('AuthProvider Local Auth', () => {
         forecastUiVariant: 'workspace_dock',
         monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
-      betaAccess: true,
     };
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({

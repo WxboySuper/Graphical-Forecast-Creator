@@ -35,7 +35,6 @@ function trustBetaWorkerClientIp(req, _res, next) {
 /** Registers middleware and the hosted product routes. */
 function configureApp(app, express) {
   const rateLimit = require('express-rate-limit');
-  const { registerBetaRoutes } = require('./beta');
   const { registerAccountLifecycleRoutes } = require('./account-lifecycle');
   const { registerBillingRoutes } = require('./billing');
   const { registerCapabilityRoutes } = require('./capabilities');
@@ -50,7 +49,6 @@ function configureApp(app, express) {
   registerSentryTunnelRoutes(app, express, rateLimit);
   registerBillingRoutes(app, express);
   registerMetricsRoutes(app, express);
-  registerBetaRoutes(app, express);
   registerCapabilityRoutes(app);
   registerCloudCycleRoutes(app, express, rateLimit);
   registerTstmRoutes(app, express);

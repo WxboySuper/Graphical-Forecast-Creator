@@ -23,8 +23,6 @@ interface LocalAuthDeps {
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
@@ -37,8 +35,6 @@ type InitLocalAuthStateOpts = {
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
 };
@@ -52,8 +48,6 @@ const toLocalAuthDeps = (opts: InitLocalAuthStateOpts): LocalAuthDeps => ({
   setSyncedSettings: opts.setSyncedSettings,
   setSettingsSyncStatus: opts.setSettingsSyncStatus,
   lastSyncedSettingsRef: opts.lastSyncedSettingsRef,
-  setBetaAccess: opts.setBetaAccess,
-  setBetaAccessLoading: opts.setBetaAccessLoading,
   setError: opts.setError,
 });
 
@@ -66,7 +60,6 @@ const applyLocalTestAccountIfPresent = (opts: InitLocalAuthStateOpts): boolean =
   applyLocalAuthData(
     {
       ...createLocalTestUser(localTestAccount),
-      betaAccess: true,
     },
     toLocalAuthDeps(opts),
   );
@@ -78,8 +71,6 @@ const applySignedOutLocalAuthState = (opts: InitLocalAuthStateOpts): void => {
   opts.setSettingsSyncStatus('idle');
   opts.setUser(null);
   opts.setSyncedSettings(null);
-  opts.setBetaAccess(false);
-  opts.setBetaAccessLoading(false);
   opts.setError(null);
 };
 
@@ -88,8 +79,6 @@ const applyLocalAuthInitFailure = (opts: InitLocalAuthStateOpts, err: unknown): 
   opts.setError(err instanceof Error ? err.message : 'Local auth initialization failed');
   opts.setUser(null);
   opts.setSyncedSettings(null);
-  opts.setBetaAccess(false);
-  opts.setBetaAccessLoading(false);
 };
 
 /**
@@ -134,8 +123,6 @@ export function applyLocalAuthData(
     setSyncedSettings,
     setSettingsSyncStatus,
     lastSyncedSettingsRef,
-    setBetaAccess,
-    setBetaAccessLoading,
     setError,
   }: {
     dispatch: ReturnType<typeof useDispatch>;
@@ -146,8 +133,6 @@ export function applyLocalAuthData(
     setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
     setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
     lastSyncedSettingsRef: React.MutableRefObject<UserSettingsDocument | null>;
-    setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-    setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
 ) {
@@ -171,8 +156,6 @@ export function applyLocalAuthData(
     setSettingsSyncStatus('idle');
   }
 
-  setBetaAccess(Boolean(data.betaAccess));
-  setBetaAccessLoading(false);
   setError(null);
 }
 
@@ -226,9 +209,8 @@ export const localSignOutUser = async (deps: {
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
-  const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus, setBetaAccess } = deps;
+  const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus } = deps;
   const fixtureActive = Boolean(readLocalTestAccount());
   if (fixtureActive && auth) {
     try {
@@ -248,32 +230,6 @@ export const localSignOutUser = async (deps: {
   setStatus('signed_out');
   setSyncedSettings(null);
   setSettingsSyncStatus('idle');
-  setBetaAccess(false);
-};
-
-/** Refresh local-only beta access flag by querying /api/local/profile. */
-export const localRefreshBetaAccess = async (deps: {
-  setBetaAccess: React.Dispatch<React.SetStateAction<boolean>>;
-  setBetaAccessLoading: React.Dispatch<React.SetStateAction<boolean>>;
-}) => {
-  const { setBetaAccess, setBetaAccessLoading } = deps;
-  setBetaAccessLoading(true);
-
-  try {
-    const resp = await fetch('/api/local/profile', { method: 'GET', credentials: 'include' });
-    if (!resp.ok) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-    setBetaAccess(Boolean(data.betaAccess));
-  } catch {
-    setBetaAccess(false);
-  } finally {
-    setBetaAccessLoading(false);
-  }
 };
 
 /** Update remote synced settings for local-only auth. */

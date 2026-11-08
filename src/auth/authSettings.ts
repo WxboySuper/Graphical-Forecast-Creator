@@ -45,11 +45,6 @@ export interface UserSettingsDocument {
   monitorSettings: MonitorSettings;
 }
 
-/** The profile fields read by the auth provider. */
-export interface UserProfileDocument {
-  betaAccess?: boolean;
-}
-
 /** The local state needed to build a normalized settings document. */
 export interface BuildSettingsArgs {
   darkMode: boolean;
@@ -123,10 +118,6 @@ export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boo
   updatedAt: serverTimestamp(),
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
-
-/** Reads the current beta-access flag from one hosted profile document snapshot. */
-export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
-  Boolean(value?.betaAccess);
 
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
 
