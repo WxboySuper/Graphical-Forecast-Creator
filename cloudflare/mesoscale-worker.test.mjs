@@ -406,6 +406,7 @@ test('status aggregates latest pointers and current or previous daily health rec
     'mesoscale/v1/latest/hrrr.json': pointer('hrrr'),
     'mesoscale/v1/latest/rap.json': pointer('rap'),
     'mesoscale/v1/health/2026-11-08/hrrr.json': { schemaVersion: 1, modelId: 'hrrr', status: 'complete', generatedAt: '2026-11-08T12:10:00Z' },
+    'mesoscale/v1/health/2026-11-07/hrrr.json': { schemaVersion: 1, modelId: 'hrrr', status: 'unknown', generatedAt: '2026-11-07T23:10:00Z' },
     'mesoscale/v1/health/2026-11-07/rap.json': { schemaVersion: 1, modelId: 'rap', status: 'partial', generatedAt: '2026-11-07T23:10:00Z' },
   });
   await withNow('2026-11-08T15:01:00Z', async () => {

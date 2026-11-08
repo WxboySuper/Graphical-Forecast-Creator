@@ -488,9 +488,11 @@ const healthForModel = (today, yesterday) => {
 };
 
 const modelHealthState = (health, today, yesterday, pointer) => {
-  if ([today, yesterday, pointer].some((record) => record.state === 'invalid')) return 'invalid';
-  if ([today, yesterday, pointer].some((record) => record.state === 'error')) return 'unavailable';
+  if (pointer.state === 'invalid') return 'invalid';
+  if (pointer.state === 'error') return 'unavailable';
   if (health) return health.status;
+  if ([today, yesterday].some((record) => record.state === 'invalid')) return 'invalid';
+  if ([today, yesterday].some((record) => record.state === 'error')) return 'unavailable';
   return 'missing';
 };
 
