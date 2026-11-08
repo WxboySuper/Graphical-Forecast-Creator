@@ -280,9 +280,11 @@ class IngestTests(unittest.TestCase):
         cycle = datetime(2026, 11, 8, 12, tzinfo=UTC)
         parser = type("Parser", (), {"parse_args": lambda self: type("Args", (), {"model": "hrrr", "dry_run": False, "output": Path("out")})()})()
         result = {"catalog": sample_catalog(), "metrics": {}, "tiles": {}}
-        with patch.object(cli, "build_parser", return_value=parser), patch.object(cli, "create_store", return_value=MemoryStore(Path("out"))), patch.object(cli, "discover_cycle", return_value=(cycle, "source", "modified")), patch.object(cli, "process_f00", return_value=result), patch.object(cli, "write_health", side_effect=OSError("R2 unavailable")) as write_report:
-            with self.assertRaisesRegex(OSError, "R2 unavailable"):
-                cli.main()
+        with tempfile.TemporaryDirectory() as temporary:
+            store = MemoryStore(Path(temporary) / "store")
+            with patch.object(cli, "build_parser", return_value=parser), patch.object(cli, "create_store", return_value=store), patch.object(cli, "discover_cycle", return_value=(cycle, "source", "modified")), patch.object(cli, "process_f00", return_value=result), patch.object(cli, "write_health", side_effect=OSError("R2 unavailable")) as write_report:
+                with self.assertRaisesRegex(OSError, "R2 unavailable"):
+                    cli.main()
         write_report.assert_called_once()
 
     def test_complete_cycle_skips_decode_and_retries_pointer(self):
