@@ -95,7 +95,13 @@ test('rejects cached offsets when an immutable archive key changes', async () =>
       return changed.get(key, options);
     },
   };
-  await assert.rejects(() => read(combined), /archive changed/);
+  await assert.rejects(() => read(combined, { zoom: 4 }), /archive changed/);
+});
+
+test('requires R2 identity metadata before caching an archive', async () => {
+  clearPmtilesCacheForTests();
+  const bucket = rangeBucket(await createPmtilesFixture(), { etag: null });
+  await assert.rejects(() => read(bucket), /archive identity is unavailable/);
 });
 
 test('rejects unsupported directory compression values', async () => {

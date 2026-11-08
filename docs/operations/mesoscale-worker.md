@@ -70,7 +70,9 @@ records and eight archive headers in bounded isolate memory. It keeps at most
 four parsed directories for each cached archive. After those entries are warm,
 a tile `GET` costs one R2 range read for the PNG bytes. `HEAD` validates the
 cached archive identity with a one-byte range at the tile offset, without
-fetching the full payload. Each R2 range `get` counts as one
+fetching the full payload. A first missing-tile lookup probes one byte from the
+root directory to validate its cached identity; out-of-zoom requests need no
+archive range. Each R2 range `get` counts as one
 Class B operation regardless of its byte length. Catalog `HEAD` reads and
 validates the catalog like `GET`; latest `HEAD` reads its small pointer to
 compute live age headers. Each `/latest` request reads one pointer.

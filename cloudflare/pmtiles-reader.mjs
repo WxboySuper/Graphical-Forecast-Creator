@@ -84,12 +84,14 @@ const rangeBytes = async (options) => {
 };
 
 const assertArchiveEtag = ({ state, range }) => {
-  if (!state.etag || !range.etag) return;
+  if (!state.etag || !range.etag) throw new PmtilesError('PMTiles archive identity is unavailable');
   if (state.etag !== range.etag) throw new PmtilesError('PMTiles archive changed during request');
 };
 
 const assertArchiveSize = ({ state, range }) => {
-  if (!Number.isSafeInteger(state.size) || !Number.isSafeInteger(range.size)) return;
+  if (!Number.isSafeInteger(state.size) || !Number.isSafeInteger(range.size)) {
+    throw new PmtilesError('PMTiles archive identity is unavailable');
+  }
   if (state.size !== range.size) throw new PmtilesError('PMTiles archive changed during request');
 };
 
@@ -103,6 +105,7 @@ const archiveState = async (bucket, key) => {
   if (cached) return cached;
   const result = await rangeBytes({ bucket, key, offset: 0, length: HEADER_BYTES, missingAllowed: true });
   if (!result) return null;
+  if (!result.etag) throw new PmtilesError('PMTiles archive identity is unavailable');
   const header = parseHeader(result.bytes);
   validateArchiveRanges(header, result.size);
   const state = { header, etag: result.etag, size: result.size, directories: new Map() };
@@ -137,6 +140,7 @@ const directoryEntry = (entries, tileId) => {
 };
 
 const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
+  if (!entry) return null;
   const header = state.header;
   const end = safeEnd(entry.offset, entry.length, 'Invalid PMTiles leaf directory range');
   const offset = safeEnd(header.leafOffset, entry.offset, 'Invalid PMTiles leaf range');
@@ -171,7 +175,11 @@ const tileEtag = (etag, range) => {
 
 const tileResult = async ({ bucket, key, state, entry, headOnly }) => {
   const header = state.header;
-  if (!entry || entry.runLength === 0) return { state: 'missing-tile' };
+  if (!entry || entry.runLength === 0) {
+    const probe = await rangeBytes({ bucket, key, offset: header.rootOffset, length: 1 });
+    assertArchiveIdentity({ state, range: probe });
+    return { state: 'missing-tile' };
+  }
   const range = tileRange(header, entry);
   const etag = tileEtag(state.etag, range);
   const data = await rangeBytes({ bucket, key, ...range, ...(headOnly ? { length: 1 } : {}) });

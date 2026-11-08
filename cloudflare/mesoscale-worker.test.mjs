@@ -382,7 +382,7 @@ serialTest('Cache API stores tiles, serves hits, honors conditional hits, and ca
     const missingPath = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/1/1.png';
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
-    assert.equal(bucket.reads.length, 3);
+    assert.equal(bucket.reads.length, 4);
   });
 });
 
