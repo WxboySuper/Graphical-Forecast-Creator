@@ -6,7 +6,7 @@ const project = 'gfc-test';
 let privateKey;
 let jwk;
 
-const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+const b64 = (value) => Buffer.from(JSON.stringify(value), 'utf8').toString('base64url');
 function isDuplicateRow(row, args) {
   if (row.uid_hash !== args[0]) return false;
   if (row.message !== args[1]) return false;
@@ -362,6 +362,13 @@ test('a global cap stops floods from many accounts', async () => {
   assert.equal(statuses.filter((status) => status === 201).length, 120);
   assert.deepEqual(statuses.slice(120), [429, 429]);
   assert.equal(db.rows.length, 120);
+});
+
+test('accepts tokens whose claims contain non-ASCII text', async () => {
+  const { env, ctx, db } = harness();
+  const response = await post(env, ctx, { auth: await token({ name: 'Zoë Müller ☃', email: 'zoe@example.com' }), body: validBody({ contactOk: true }) });
+  assert.equal(response.status, 201);
+  assert.equal(db.rows[0].email, 'zoe@example.com');
 });
 
 test('whitespace-only viewport is stored as null and counted after cleaning', async () => {
