@@ -111,6 +111,7 @@ test('rejects unsupported directory compression values', async () => {
 });
 
 test('rejects a malformed directory varint', () => {
+  assert.throws(() => decodeDirectory(Uint8Array.from([0])), /entry count/);
   assert.throws(() => decodeDirectory(Uint8Array.from([1, ...encodeVarintForTest(21), 1, 3, ...Array(9).fill(0x80)])), PmtilesError);
   assert.throws(() => decodeDirectory(Uint8Array.from([2, 21, 0, 1, 1, 3, 3, 1, 0])), /not ordered/);
   assert.throws(() => validateDirectoryOrdering({ tileIds: [1, 2], runs: [Number.MAX_SAFE_INTEGER, 1] }), /tile id range/);

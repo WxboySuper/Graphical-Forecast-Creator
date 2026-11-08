@@ -180,7 +180,7 @@ const tileRange = (header, entry) => {
 
 const tileEtag = (etag, range) => {
   const clean = etag?.replaceAll('"', '').trim();
-  if (!clean || !/^[A-Za-z0-9_:.~-]+$/.test(clean)) return null;
+  if (!clean || !/^[\x21\x23-\x7E]+$/.test(clean)) return null;
   return `W/"${clean}-${range.offset}-${range.length}"`;
 };
 

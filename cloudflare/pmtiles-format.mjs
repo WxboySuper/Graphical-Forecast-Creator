@@ -67,7 +67,7 @@ const directoryEntries = (bytes, cursor, columns) => {
   return entries;
 };
 
-const validDirectoryCount = (count) => Number.isSafeInteger(count) && count <= MAX_DIRECTORY_ENTRIES;
+const validDirectoryCount = (count) => Number.isSafeInteger(count) && count > 0 && count <= MAX_DIRECTORY_ENTRIES;
 const hasTrailingBytes = (cursor, bytes) => cursor.offset !== bytes.length;
 
 export const decodeDirectory = (bytes) => {
