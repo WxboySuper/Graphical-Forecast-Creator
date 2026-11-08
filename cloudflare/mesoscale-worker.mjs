@@ -11,11 +11,15 @@ const json = (body, status = 200, headers = {}) =>
 
 const ageMinutes = (timestamp, now) => {
   const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? Math.max(0, Math.floor((now - parsed) / 60000)) : null;
+  if (!Number.isFinite(parsed)) return null;
+  if (parsed > now) return null;
+  return Math.floor((now - parsed) / 60000);
 };
 
 const staleThresholdMinutes = (env) => {
-  const configured = Number(env.STALE_AFTER_MINUTES ?? 180);
+  const value = env.STALE_AFTER_MINUTES?.trim();
+  if (!value) return 180;
+  const configured = Number(value);
   return Number.isFinite(configured) && configured >= 0 ? configured : 180;
 };
 
@@ -27,6 +31,7 @@ const matchesEtag = (header, etag) => {
 
 const cycleDate = (cycle) => {
   if (!/^\d{8}T\d{4}Z$/.test(cycle)) return null;
+  if (cycle.slice(11, 13) !== '00') return null;
   const value = `${cycle.slice(0, 4)}-${cycle.slice(4, 6)}-${cycle.slice(6, 8)}T${cycle.slice(9, 11)}:${cycle.slice(11, 13)}:00Z`;
   const parsed = new Date(value);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().replace('.000Z', 'Z') === value ? value : null;
@@ -124,22 +129,31 @@ const publicBaseUrl = (env) => {
 
 const publicRepresentationEtag = (etag, env) => {
   if (!etag || !env.PUBLIC_BASE_URL) return etag;
-  const encoded = btoa(`${etag}|${publicBaseUrl(env).origin}`).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const value = `${etag}|${publicBaseUrl(env).origin}`;
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encoded = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   return `W/"${encoded}"`;
 };
 
 const noBodyForHead = (response) => new Response(null, { status: response.status, statusText: response.statusText, headers: response.headers });
 
-const rewriteParameterTemplate = (parameter, base) => {
+const rewriteParameterTemplate = (parameter, base, route) => {
   if (parameter?.data?.type !== 'xyz-raster') return;
   if (typeof parameter.data.urlTemplate !== 'string') throw new Error('Catalog raster template is missing');
   const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
   if (!match) throw new Error('Catalog raster template does not match the tile route');
+  const [model, cycle, hour, parameterId] = match[1].split('/');
+  if (model !== route.model) throw new Error('Catalog raster template does not match its immutable key');
+  if (cycle !== route.cycle) throw new Error('Catalog raster template does not match its immutable key');
+  if (!/^f\d{2}$/.test(hour)) throw new Error('Catalog raster template does not match its immutable key');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parameterId)) throw new Error('Catalog raster template does not match its immutable key');
   parameter.data.urlTemplate = `${base.origin}/tiles/${match[1]}`;
 };
 
-const addConfiguredTemplateBase = (catalog, base) => {
-  for (const frame of catalog.frames) frame.parameters.forEach((parameter) => rewriteParameterTemplate(parameter, base));
+const addConfiguredTemplateBase = (catalog, base, route) => {
+  for (const frame of catalog.frames) frame.parameters.forEach((parameter) => rewriteParameterTemplate(parameter, base, route));
   return catalog;
 };
 
@@ -156,21 +170,43 @@ const isJsonObject = (value) => {
   return !Array.isArray(value);
 };
 
+const validCatalogParameter = (parameter, route, expectedHour) => {
+  if (!isJsonObject(parameter)) return false;
+  if (typeof parameter.id !== 'string') return false;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parameter.id)) return false;
+  if (!isJsonObject(parameter.data)) return false;
+  if (parameter.data.type !== 'xyz-raster') return false;
+  if (typeof parameter.data.urlTemplate !== 'string') return false;
+  const match = parameter.data.urlTemplate.match(/\/tiles\/([^/]+\/[^/]+\/f\d{2}\/[^/]+\/\{z\}\/\{x\}\/\{y\}\.png)$/);
+  if (!match) return false;
+  const [model, cycle, hour, parameterId] = match[1].split('/');
+  if (model !== route.model) return false;
+  if (cycle !== route.cycle) return false;
+  if (!cycleDate(cycle)) return false;
+  if (hour !== expectedHour) return false;
+  return parameterId === parameter.id;
+};
+
 const validCatalogIdentity = (value, route) => {
   if (value.model?.id !== route.model) return false;
   if (value.cycleTime !== cycleDate(route.cycle)) return false;
   return true;
 };
 
-const validCatalogFrame = (frame) => {
+const validCatalogFrame = (frame, route) => {
   if (!isJsonObject(frame)) return false;
-  return Array.isArray(frame.parameters);
+  if (!Number.isInteger(frame.forecastHour)) return false;
+  if (frame.forecastHour < 0) return false;
+  if (frame.forecastHour > 99) return false;
+  if (!Array.isArray(frame.parameters)) return false;
+  const expectedHour = `f${String(frame.forecastHour).padStart(2, '0')}`;
+  return frame.parameters.every((parameter) => validCatalogParameter(parameter, route, expectedHour));
 };
 
-const validCatalogFrames = (frames) => {
+const validCatalogFrames = (frames, route) => {
   if (!Array.isArray(frames)) return false;
   if (frames.length === 0) return false;
-  return frames.every(validCatalogFrame);
+  return frames.every((frame) => validCatalogFrame(frame, route));
 };
 
 const validCatalogDomain = (domain) => {
@@ -182,16 +218,16 @@ const validCatalogDomain = (domain) => {
   return domain.minZoom <= domain.maxZoom;
 };
 
-const validCatalogContent = (value) => {
+const validCatalogContent = (value, route) => {
   if (value.status !== 'complete') return false;
-  if (!validCatalogFrames(value.frames)) return false;
+  if (!validCatalogFrames(value.frames, route)) return false;
   return validCatalogDomain(value.domain);
 };
 
 const validCatalog = (value, route) => {
   if (value.schemaVersion !== 1) return false;
   if (!validCatalogIdentity(value, route)) return false;
-  return validCatalogContent(value);
+  return validCatalogContent(value, route);
 };
 
 const catalogResponse = ({ value, request, env, route, headers, etag }) => {
@@ -203,19 +239,25 @@ const catalogResponse = ({ value, request, env, route, headers, etag }) => {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   }
   try {
-    if (base) addConfiguredTemplateBase(value, base);
+    if (base) addConfiguredTemplateBase(value, base, route);
   } catch {
     return invalidCatalogResponse();
   }
-  headers.set('ETag', publicRepresentationEtag(etag, env));
+  const publicEtag = publicRepresentationEtag(etag, env);
+  if (publicEtag) headers.set('ETag', publicEtag);
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
+  if (publicEtag && matchesEtag(request.headers.get('If-None-Match'), publicEtag)) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify(value), { headers });
 };
 
 const validLatestPointer = (value, route, cycle) => {
-  if (value.schemaVersion !== 1 || value.modelId !== route.model || !cycle) return false;
-  return typeof value.publishedAt === 'string' && Number.isFinite(Date.parse(value.publishedAt));
+  if (value.schemaVersion !== 1) return false;
+  if (value.modelId !== route.model) return false;
+  if (!cycle) return false;
+  if (compactCycleFromIso(value.cycleTime) !== cycle) return false;
+  if (typeof value.catalogUrl !== 'string') return false;
+  if (typeof value.publishedAt !== 'string') return false;
+  return Number.isFinite(Date.parse(value.publishedAt));
 };
 
 const addLatestCatalogUrl = (value, env, route, cycle) => {
@@ -236,9 +278,10 @@ const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
   headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
   headers.set('X-Mesoscale-Stale', String(stale));
   if (!addLatestCatalogUrl(value, env, route, cycle)) return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-  headers.set('ETag', publicRepresentationEtag(etag, env));
+  const publicEtag = publicRepresentationEtag(etag, env);
+  if (publicEtag) headers.set('ETag', publicEtag);
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (matchesEtag(request.headers.get('If-None-Match'), headers.get('ETag'))) return new Response(null, { status: 304, headers });
+  if (publicEtag && matchesEtag(request.headers.get('If-None-Match'), publicEtag)) return new Response(null, { status: 304, headers });
   return new Response(JSON.stringify(value), { headers });
 };
 
@@ -282,7 +325,7 @@ const jsonWithEtag = async (value, request, cacheControl) => {
 const catalogConditionalResponse = (request, etag, env, headers) => {
   try {
     const publicEtag = publicRepresentationEtag(etag, env);
-    headers.set('ETag', publicEtag);
+    if (publicEtag) headers.set('ETag', publicEtag);
     return conditionalResponse(request, publicEtag, headers);
   } catch {
     return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
@@ -290,8 +333,10 @@ const catalogConditionalResponse = (request, etag, env, headers) => {
 };
 
 const headersForObject = (route, object) => {
-  const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType;
+  const jsonType = route.kind === 'catalog' || route.kind === 'latest' ? 'application/json; charset=utf-8' : null;
+  const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType || jsonType;
   const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
+  if (route.kind === 'tile' && Number.isSafeInteger(object.size)) headers.set('Content-Length', String(object.size));
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', cacheControlForRoute(route));
@@ -306,6 +351,7 @@ const objectConditionalResponse = ({ request, env, route, headers, etag }) => {
 
 const objectBodyResponse = ({ request, env, route, object, now, headers, etag }) => {
   if (route.kind === 'tile') return new Response(request.method === 'HEAD' ? null : object.body, { headers });
+  if (request.method === 'HEAD' && route.kind === 'catalog') return new Response(null, { headers });
   return storedJsonResponse({ request, env, route, object, now, headers, etag });
 };
 
@@ -318,8 +364,11 @@ const responseForObject = (context) => {
 
 const getObjectResponse = async (request, env, route, now) => {
   const bucket = env.MESOSCALE_BUCKET;
-  if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const object = await bucket.get(route.key);
+  const headTile = request.method === 'HEAD' && route.kind === 'tile' && typeof bucket?.head === 'function';
+  if (!bucket || (!headTile && typeof bucket.get !== 'function')) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const object = headTile
+    ? await bucket.head(route.key)
+    : await bucket.get(route.key);
   if (!object) return missingObjectResponse(route);
   return responseForObject({ request, env, route, object, now });
 };
@@ -334,7 +383,9 @@ const readJson = async (bucket, key) => {
   if (!object) return { state: 'missing', value: null };
   try {
     const value = await object.json();
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return { state: 'invalid', value: null };
+    if (!value) return { state: 'invalid', value: null };
+    if (typeof value !== 'object') return { state: 'invalid', value: null };
+    if (Array.isArray(value)) return { state: 'invalid', value: null };
     return { state: 'ok', value };
   } catch {
     return { state: 'invalid', value: null };
@@ -356,9 +407,11 @@ const validStatusPointerValue = (value, modelId) => {
 };
 
 const validHealthValue = (value, modelId) => {
-  if (value.schemaVersion !== 1 || value.modelId !== modelId) return false;
+  if (value.schemaVersion !== 1) return false;
+  if (value.modelId !== modelId) return false;
   if (!['complete', 'partial', 'failed'].includes(value.status)) return false;
-  return typeof value.generatedAt === 'string' && Number.isFinite(Date.parse(value.generatedAt));
+  if (typeof value.generatedAt !== 'string') return false;
+  return Number.isFinite(Date.parse(value.generatedAt));
 };
 
 const healthForModel = (today, yesterday) => {
@@ -399,7 +452,7 @@ const statusResponse = async (request, env, now) => {
   const staleAfter = staleThresholdMinutes(env);
   const models = await Promise.all([...MODELS].map((modelId) => modelStatus({ bucket, modelId, day, previousDay, now, staleAfter })));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
-  return jsonWithEtag({ generatedAt: new Date(now).toISOString(), status: healthy ? 'healthy' : 'degraded', models }, request, `public, max-age=${STATUS_TTL}`);
+  return jsonWithEtag({ status: healthy ? 'healthy' : 'degraded', models }, request, `public, max-age=${STATUS_TTL}`);
 };
 
 const fetchUncached = (request, route, env, now) => route.kind === 'status' ? statusResponse(request, env, now) : getObjectResponse(request, env, route, now);
@@ -420,29 +473,31 @@ const cacheHitResponse = (request, response) => {
 
 const applyHeadMethod = (request, response) => request.method === 'HEAD' ? noBodyForHead(response) : response;
 
-const cacheStoreResponse = async (cache, key, response) => {
+const cacheStoreResponse = async (cache, key, response, context) => {
   if (![200, 404].includes(response.status) || !response.headers.get('Cache-Control')?.includes('max-age=')) return;
-  try {
-    await cache.put(key, response.clone());
-  } catch {
-    // Cache API availability does not affect the R2 response.
-  }
+  const put = cache.put(key, response.clone()).catch(() => {});
+  if (context?.waitUntil) context.waitUntil(put);
+  else await put;
 };
 
-const cachedFetch = async (request, route, env, now) => {
+const cachedFetch = async (request, route, env, now, context) => {
   const cache = globalThis.caches?.default;
   if (!['GET', 'HEAD'].includes(request.method) || !cache) return fetchUncached(request, route, env, now);
   const key = cacheKeyFor(request, env, route);
-  const hit = await cache.match(key);
+  let hit;
+  try {
+    hit = await cache.match(key);
+  } catch {
+    return fetchUncached(request, route, env, now);
+  }
   if (hit) return applyHeadMethod(request, cacheHitResponse(request, hit));
-  const getRequest = request.method === 'HEAD' ? new Request(request.url, { method: 'GET', headers: request.headers }) : request;
-  const response = await fetchUncached(getRequest, route, env, now);
-  await cacheStoreResponse(cache, key, response);
+  const response = await fetchUncached(request, route, env, now);
+  if (request.method === 'GET') await cacheStoreResponse(cache, key, response, context);
   return applyHeadMethod(request, response);
 };
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, context) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
     const allowed = allowedOrigins(env);
@@ -456,7 +511,7 @@ export default {
     if (!route) return responseCors(json({ error: 'Not found.' }, 404, { 'Cache-Control': 'no-store' }), origin, allowed);
     try {
       const now = Date.now();
-      let response = await cachedFetch(request, route, env, now);
+      let response = await cachedFetch(request, route, env, now, context);
       if (request.method === 'HEAD') response = noBodyForHead(response);
       return responseCors(response, origin, allowed);
     } catch {

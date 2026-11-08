@@ -101,7 +101,7 @@ test('CORS allows configured origins and omits permission for other origins', as
 
 test('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
   const cycleTime = '2026-11-08T12:00:00Z';
-  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime, status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ parameters: [{ data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
+  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime, status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
   const env = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
   const response = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env);
   assert.equal(response.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
@@ -114,6 +114,8 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   const notModified = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag } }), env);
   assert.equal(notModified.status, 304);
   assert.equal(notModified.headers.get('ETag'), etag);
+  const etagList = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': `"other", ${etag}` } }), env);
+  assert.equal(etagList.status, 304);
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': etag.replace(/^W\//, '') } }), env)).status, 304);
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { headers: { 'If-None-Match': '*' } }), env)).status, 304);
   const pathBaseEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog }, { PUBLIC_BASE_URL: 'https://mesoscale.example.test/catalog' });
@@ -121,6 +123,10 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   const malformedFrame = { ...catalog, frames: [null] };
   const malformedFrameEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': malformedFrame });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), malformedFrameEnv)).status, 502);
+  const mismatchedTemplate = structuredClone(catalog);
+  mismatchedTemplate.frames[0].parameters[0].data.urlTemplate = 'https://old.example/tiles/rap/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png';
+  const mismatchedTemplateEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedTemplate });
+  assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedTemplateEnv)).status, 502);
   const mismatchedCatalog = { ...catalog, model: { id: 'rap' } };
   const mismatchedCatalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': mismatchedCatalog });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), mismatchedCatalogEnv)).status, 502);
@@ -130,7 +136,7 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
 
 test('Cache API separates rewritten catalog representations by public base URL', async () => {
   await withCache(async () => {
-    const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ parameters: [{ data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
+    const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] };
     const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
     let reads = 0;
     const bucket = { get: async () => { reads += 1; return { json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
@@ -145,6 +151,19 @@ test('Cache API separates rewritten catalog representations by public base URL',
   });
 });
 
+test('catalog and latest do not emit an ETag when R2 omits one', async () => {
+  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [] }] };
+  const pointerValue = pointer('hrrr');
+  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
+    const value = key.includes('/catalog/') ? catalog : pointerValue;
+    return { json: async () => structuredClone(value) };
+  } } });
+  const catalogResult = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env);
+  const latestResult = await worker.fetch(request('/latest/hrrr.json'), env);
+  assert.equal(catalogResult.headers.get('ETag'), null);
+  assert.equal(latestResult.headers.get('ETag'), null);
+});
+
 test('missing tile is a short-cache 404 and missing latest pointer is also a 404', async () => {
   const env = envFor();
   const tile = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
@@ -154,9 +173,25 @@ test('missing tile is a short-cache 404 and missing latest pointer is also a 404
 });
 
 test('tile response defaults to PNG content type when R2 metadata is absent', async () => {
-  const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ body: new Blob(['png']).stream(), httpEtag: '"tile"' }) } });
+  const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ body: new Blob(['png']).stream(), size: 3, httpEtag: '"tile"' }) } });
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
   assert.equal(response.headers.get('Content-Type'), 'image/png');
+  assert.equal(response.headers.get('Content-Length'), '3');
+});
+
+test('tile HEAD uses R2 metadata without reading the tile body', async () => {
+  let heads = 0;
+  let gets = 0;
+  const env = envFor({}, { MESOSCALE_BUCKET: {
+    head: async () => { heads += 1; return { size: 3, httpEtag: '"tile"' }; },
+    get: async () => { gets += 1; throw new Error('HEAD must not read the object body'); },
+  } });
+  const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png', { method: 'HEAD' }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.body, null);
+  assert.equal(response.headers.get('Content-Length'), '3');
+  assert.equal(heads, 1);
+  assert.equal(gets, 0);
 });
 
 test('Cache API stores tiles, serves hits, honors conditional hits, and caches missing tiles', async () => {
@@ -177,6 +212,8 @@ test('Cache API stores tiles, serves hits, honors conditional hits, and caches m
     const hit = await worker.fetch(request(path), env);
     assert.equal(hit.status, 200);
     assert.equal(reads, 1);
+    assert.equal((await worker.fetch(request(`${path}?cacheBust=1`), env)).status, 200);
+    assert.equal(reads, 1);
     const conditionalHit = await worker.fetch(request(path, { headers: { 'If-None-Match': etag } }), env);
     assert.equal(conditionalHit.status, 304);
     assert.equal(reads, 1);
@@ -189,6 +226,28 @@ test('Cache API stores tiles, serves hits, honors conditional hits, and caches m
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
     assert.equal(reads, 2);
+  });
+});
+
+test('cache read failure falls back to R2 and put uses waitUntil when available', async () => {
+  await withCache(async (cache) => {
+    cache.match = async () => { throw new Error('cache unavailable'); };
+    const tileKey = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
+    let reads = 0;
+    const env = envFor({ [tileKey]: { pixels: 'tile' } });
+    const get = env.MESOSCALE_BUCKET.get;
+    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const tasks = [];
+    const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env, { waitUntil: (task) => tasks.push(task) });
+    assert.equal(response.status, 200);
+    assert.equal(reads, 1);
+    assert.equal(tasks.length, 0);
+    cache.match = async () => undefined;
+    const cachedWriteResponse = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png?miss=1'), env, { waitUntil: (task) => tasks.push(task) });
+    assert.equal(cachedWriteResponse.status, 200);
+    assert.equal(reads, 2);
+    assert.equal(tasks.length, 1);
+    await Promise.all(tasks);
   });
 });
 
@@ -208,6 +267,12 @@ test('latest pointer reports live age and stale state without changing its cycle
     const invalidThreshold = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: 'abc' });
     const invalidConfigResponse = await worker.fetch(request('/latest/hrrr.json'), invalidThreshold);
     assert.equal(invalidConfigResponse.headers.get('X-Mesoscale-Stale'), 'true');
+    const emptyThreshold = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: '' });
+    assert.equal((await worker.fetch(request('/latest/hrrr.json'), emptyThreshold)).headers.get('X-Mesoscale-Stale'), 'true');
+    const future = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T16:00:00Z') });
+    const futureResponse = await worker.fetch(request('/latest/hrrr.json'), future);
+    assert.equal(futureResponse.headers.get('X-Mesoscale-Age-Minutes'), 'unknown');
+    assert.equal(futureResponse.headers.get('X-Mesoscale-Stale'), 'true');
     const fresh = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T15:00:00Z') }, { STALE_AFTER_MINUTES: '60' });
     const freshResponse = await worker.fetch(request('/latest/hrrr.json'), fresh);
     assert.equal(freshResponse.headers.get('X-Mesoscale-Stale'), 'false');
@@ -289,6 +354,19 @@ test('HEAD returns headers without a body, and unsupported methods return 405', 
     assert.equal(head.body, null);
     assert.equal(head.headers.get('X-Mesoscale-Stale'), 'true');
   });
+  const catalog = { schemaVersion: 1, model: { id: 'hrrr' }, cycleTime: '2026-11-08T12:00:00Z', status: 'complete', domain: { minZoom: 3, maxZoom: 6 }, frames: [{ forecastHour: 0, parameters: [] }] };
+  const catalogEnv = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
+  const catalogHead = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json', { method: 'HEAD' }), catalogEnv);
+  assert.equal(catalogHead.status, 200);
+  assert.equal(catalogHead.body, null);
+  assert.ok(catalogHead.headers.get('ETag'));
+  assert.equal(catalogHead.headers.get('Content-Type'), 'application/json');
+  const tileEnv = envFor({}, { MESOSCALE_BUCKET: { head: async () => ({ size: 3, httpEtag: '"tile"' }) } });
+  const tileHead = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png', { method: 'HEAD' }), tileEnv);
+  assert.equal(tileHead.status, 200);
+  assert.equal(tileHead.body, null);
+  assert.equal(tileHead.headers.get('ETag'), '"tile"');
+  assert.equal(tileHead.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
   const rejected = await worker.fetch(request('/status', { method: 'POST' }), env);
   assert.equal(rejected.status, 405);
   assert.equal(rejected.headers.get('Allow'), 'GET, HEAD, OPTIONS');

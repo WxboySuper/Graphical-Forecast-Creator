@@ -40,11 +40,22 @@ Set the app's catalog base to `PUBLIC_BASE_URL`, then use
 `urlTemplate` values in catalogs to that base and returns a matching
 `catalogUrl` from latest pointers. The app should use the catalog's
 `data.urlTemplate` directly. It must not build R2 URLs.
+The Worker Cache API keys rewritten catalog/latest responses by the configured
+base URL. When rotating `PUBLIC_BASE_URL`, clear any external CDN or client
+caches because catalogs use long immutable HTTP caching.
+
+`GET /status` returns `status` (`healthy` or `degraded`) and one entry per
+model with `latestCycleTime`, recomputed `ageMinutes`, `stale`, `health`, and
+`healthGeneratedAt`. Health values include the publisher's `complete`,
+`partial`, and `failed` states plus `missing` or `invalid` for absent or broken
+records. A broken current-day health record remains `invalid` rather than being
+masked by yesterday's summary.
 
 ## Cache and usage budget
 
 The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-cache miss. A status cache miss reads up to nine objects: three latest pointers
+cache miss. Tile `HEAD` uses R2 object metadata when the binding supports it.
+A status cache miss reads up to nine objects: three latest pointers
 and today's and yesterday's health object for each of the three models. The
 Worker uses Cloudflare's Cache API when available, and also sets HTTP cache
 headers: immutable catalogs and tiles get one year, latest and status get 30
