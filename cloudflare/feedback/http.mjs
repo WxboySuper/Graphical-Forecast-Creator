@@ -21,7 +21,7 @@ function corsHeaders(request, env) {
 
 function requestError(request, headers) {
   if (request.headers.has('origin') && !headers['access-control-allow-origin']) return json({ error: 'Origin not allowed' }, 403);
-  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')) return json({ error: 'Content-Type must be application/json' }, 400, headers);
+  if (!/^application\/json\s*(?:;|$)/i.test((request.headers.get('content-type') ?? '').trim())) return json({ error: 'Content-Type must be application/json' }, 400, headers);
   return null;
 }
 

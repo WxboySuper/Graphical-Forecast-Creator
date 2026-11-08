@@ -117,6 +117,7 @@ export async function verifyToken(token, env) {
 }
 
 export function constantTimeEqual(left, right) {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
   const a = new TextEncoder().encode(left);
   const b = new TextEncoder().encode(right);
   let diff = a.length ^ b.length;
