@@ -152,6 +152,65 @@ const getCurrentForecastWorkspace = (
 const isDiscussionRoute = (pathname: string): boolean =>
   pathname === '/discussion' || pathname.startsWith('/discussion/');
 
+const ForecastWorkspaceMenuItems: FC<{
+  workspaces: ReturnType<typeof getExposedForecastWorkspaces>;
+  currentWorkspaceId?: ReturnType<typeof getExposedForecastWorkspaces>[number]['id'];
+}> = ({ workspaces, currentWorkspaceId }) => (
+  <>
+    {workspaces.map((workspace) => (
+      <DropdownMenuItem key={workspace.id} asChild>
+        <NavLink
+          to={workspace.path}
+          aria-label={`${workspace.label} forecast workspace`}
+          aria-describedby={`forecast-workspace-${workspace.id}-description forecast-workspace-${workspace.id}-focus`}
+          aria-current={currentWorkspaceId === workspace.id ? 'page' : undefined}
+          className="flex flex-col items-start gap-1 whitespace-normal px-3 py-3"
+        >
+          <span className="font-medium">{workspace.label}</span>
+          <span id={`forecast-workspace-${workspace.id}-description`} className="text-sm text-muted-foreground">
+            {workspace.description}
+          </span>
+          <ul
+            id={`forecast-workspace-${workspace.id}-focus`}
+            className="list-disc pl-5 text-xs text-muted-foreground"
+          >
+            {workspace.focus.map((focus) => <li key={focus}>{focus}</li>)}
+          </ul>
+        </NavLink>
+      </DropdownMenuItem>
+    ))}
+  </>
+);
+
+const getOtherDestinationLabel = (item: AppNavigationItemWithId): string =>
+  item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
+
+const OtherDestinationMenuItems: FC<{
+  items: AppNavigationItemWithId[];
+  pathname: string;
+}> = ({ items, pathname }) => (
+  <>
+    {items.map((item) => {
+      const Icon = NAV_ITEM_ICONS[item.id];
+      const isCurrent = isNavigationItemActive(pathname, item.to, item.end);
+
+      return (
+        <DropdownMenuItem key={item.id} asChild>
+          <NavLink
+            to={item.to}
+            end={item.end}
+            aria-label={getOtherDestinationLabel(item)}
+            aria-current={isCurrent ? 'page' : undefined}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {getOtherDestinationLabel(item)}
+          </NavLink>
+        </DropdownMenuItem>
+      );
+    })}
+  </>
+);
+
 const ForecastNavigationMenu: FC<{
   item: AppNavigationItemWithId;
   pathname: string;
@@ -185,49 +244,13 @@ const ForecastNavigationMenu: FC<{
         className="w-[min(24rem,calc(100vw-1rem))] max-h-[min(80vh,38rem)] overflow-y-auto p-2"
       >
         <DropdownMenuLabel className="px-2 py-1.5">Forecast workspaces</DropdownMenuLabel>
-        {workspaces.map((workspace) => (
-          <DropdownMenuItem key={workspace.id} asChild>
-            <NavLink
-              to={workspace.path}
-              aria-label={`${workspace.label} forecast workspace`}
-              aria-describedby={`forecast-workspace-${workspace.id}-description forecast-workspace-${workspace.id}-focus`}
-              aria-current={currentWorkspace?.id === workspace.id ? 'page' : undefined}
-              className="flex flex-col items-start gap-1 whitespace-normal px-3 py-3"
-            >
-              <span className="font-medium">{workspace.label}</span>
-              <span id={`forecast-workspace-${workspace.id}-description`} className="text-sm text-muted-foreground">
-                {workspace.description}
-              </span>
-              <ul
-                id={`forecast-workspace-${workspace.id}-focus`}
-                className="list-disc pl-5 text-xs text-muted-foreground"
-              >
-                {workspace.focus.map((focus) => <li key={focus}>{focus}</li>)}
-              </ul>
-            </NavLink>
-          </DropdownMenuItem>
-        ))}
+        <ForecastWorkspaceMenuItems
+          workspaces={workspaces}
+          currentWorkspaceId={currentWorkspace?.id}
+        />
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="px-2 py-1.5">Other destinations</DropdownMenuLabel>
-        {otherItems.map((otherItem) => {
-          const OtherIcon = NAV_ITEM_ICONS[otherItem.id];
-          const label = otherItem.id === 'tropical-workspace' ? 'Tropical tools' : otherItem.label;
-          const isCurrent = isNavigationItemActive(pathname, otherItem.to, otherItem.end);
-
-          return (
-            <DropdownMenuItem key={otherItem.id} asChild>
-              <NavLink
-                to={otherItem.to}
-                end={otherItem.end}
-                aria-label={label}
-                aria-current={isCurrent ? 'page' : undefined}
-              >
-                <OtherIcon className="h-4 w-4" aria-hidden="true" />
-                {label}
-              </NavLink>
-            </DropdownMenuItem>
-          );
-        })}
+        <OtherDestinationMenuItems items={otherItems} pathname={pathname} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
