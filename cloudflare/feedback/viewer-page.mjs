@@ -60,10 +60,11 @@ var $=function(id){return document.getElementById(id);};
 function el(tag,props,kids){var n=document.createElement(tag);Object.keys(props||{}).forEach(function(k){if(k==='text')n.textContent=props[k];else if(k==='class')n.className=props[k];else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),props[k]);else n.setAttribute(k,props[k]);});(kids||[]).forEach(function(c){if(c)n.appendChild(c);});return n;}
 function when(ms){var d=new Date(ms),s=Math.round((Date.now()-ms)/1000);if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';if(s<604800)return Math.floor(s/86400)+'d ago';return d.toLocaleDateString();}
 function full(ms){return new Date(ms).toLocaleString();}
-function api(path,opts){opts=opts||{};opts.credentials='same-origin';opts.headers=Object.assign({'accept':'application/json'},opts.headers||{});
-  if(opts.method&&opts.method!=='GET'){opts.headers['x-gfc-viewer']='1';}
-  return fetch(path,opts).then(function(r){if(r.status===401||r.status===403){throw new Error('Your Access session ended or you are not allowed here. Reload the page to sign in again.');}
-    return r.json().catch(function(){return {};}).then(function(b){if(!r.ok)throw new Error(b.error||('Request failed ('+r.status+')'));return b;});});}
+function request(opts){opts=opts||{};opts.credentials='same-origin';opts.headers=Object.assign({'accept':'application/json'},opts.headers||{});
+  if((opts.method||'GET')!=='GET'){opts.headers['x-gfc-viewer']='1';}return opts;}
+function failure(r,b){if([401,403].indexOf(r.status)>=0){return new Error('Your Access session ended or you are not allowed here. Reload the page to sign in again.');}
+  return new Error(b.error||('Request failed ('+r.status+')'));}
+function api(path,opts){return fetch(path,request(opts)).then(function(r){return r.json().catch(function(){return {};}).then(function(b){if(!r.ok)throw failure(r,b);return b;});});}
 function setError(m){var e=$('err');e.textContent=m||'';e.hidden=!m;}
 function query(){var f=state.filters,p=[];['status','target','category'].forEach(function(k){if(f[k])p.push(k+'='+encodeURIComponent(f[k]));});if(state.cursor)p.push('cursor='+encodeURIComponent(state.cursor));p.push('limit=50');return '?'+p.join('&');}
 function visible(){var q=state.filters.q.trim().toLowerCase();if(!q)return state.items;return state.items.filter(function(i){return (i.message+' '+i.page+' '+(i.email||'')+' '+i.category).toLowerCase().indexOf(q)>=0;});}
@@ -80,7 +81,7 @@ function renderList(){var list=$('list');list.textContent='';var rows=visible();
     el('div',{class:'preview',text:i.message})]);list.appendChild(b);});
   if(state.cursor){list.appendChild(el('button',{id:'more',class:'btn',type:'button',onclick:function(){loadList(false);}},[document.createTextNode(state.loading?'Loading…':'Load more')]));}}
 function renderMore(){var m=$('more');if(m){m.textContent=state.loading?'Loading…':'Load more';m.disabled=state.loading;}}
-function field(dl,k,v){if(v===null||v===undefined||v==='')return;dl.appendChild(el('dt',{text:k}));dl.appendChild(el('dd',{text:String(v)}));}
+function field(dl,k,v){if(!String(v==null?'':v).length)return;dl.appendChild(el('dt',{text:k}));dl.appendChild(el('dd',{text:String(v)}));}
 function markdown(i){return ['### Feedback '+i.id,'','- **Type:** '+i.category,'- **Build:** '+i.build_target+' v'+i.app_version,'- **Page:** '+i.page,'- **Status:** '+i.status,'- **Received:** '+full(i.created_at),'','> '+i.message.split('\\n').join('\\n> ')].join('\\n');}
 function renderDetail(){var d=$('detail');d.textContent='';var i=state.items.filter(function(x){return x.id===state.selected;})[0];
   if(!i){d.appendChild(el('p',{class:'empty',text:'Select feedback to read it.'}));return;}
@@ -105,7 +106,8 @@ function syncUrl(){var p=new URLSearchParams();Object.keys(state.filters).forEac
 function bind(){['status','target','category'].forEach(function(k){$('f-'+k).addEventListener('change',function(e){state.filters[k]=e.target.value;state.selected=null;syncUrl();loadList(true);});});
   $('f-q').addEventListener('input',function(e){state.filters.q=e.target.value;syncUrl();render();});
   $('refresh').addEventListener('click',function(){loadSummary();loadList(true);});
-  document.addEventListener('keydown',function(e){var t=e.target&&e.target.tagName;if(t==='INPUT'||t==='SELECT'||e.metaKey||e.ctrlKey||e.altKey)return;if(e.key==='j')move(1);else if(e.key==='k')move(-1);});}
+  document.addEventListener('keydown',onKey);}
+function onKey(e){var t=e.target?e.target.tagName:'';if(['INPUT','SELECT'].indexOf(t)>=0)return;if([e.metaKey,e.ctrlKey,e.altKey].some(Boolean))return;if(e.key==='j')move(1);else if(e.key==='k')move(-1);}
 function init(){var p=new URLSearchParams(location.search);Object.keys(state.filters).forEach(function(k){var v=p.get(k)||'';state.filters[k]=v;var n=$('f-'+k);if(n)n.value=v;});bind();loadSummary();loadList(true);}
 init();
 })();

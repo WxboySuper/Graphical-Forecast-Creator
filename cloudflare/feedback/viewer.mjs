@@ -60,19 +60,18 @@ function feedbackId(pathname) {
   try { return decodeURIComponent(match[1]); } catch { return null; }
 }
 
+const feedbackRoutes = [
+  { method: 'GET', withId: false, mutating: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
+  { method: 'GET', withId: true, mutating: false, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
+  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+  { method: 'DELETE', withId: true, mutating: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
+];
+
 async function runFeedbackRoute(request, url, env, id) {
-  const method = request.method;
-  if (method === 'GET' && id === null) return listFeedback(url, env.FEEDBACK_DB);
-  if (method === 'GET' && id !== null) return getFeedback(id, env.FEEDBACK_DB);
-  if (method === 'PATCH' && id !== null) {
-    if (!isMutationAllowed(request, url)) return json({ error: 'Same-origin request required' }, 403);
-    return patchFeedback(request, id, env.FEEDBACK_DB);
-  }
-  if (method === 'DELETE' && id !== null) {
-    if (!isMutationAllowed(request, url)) return json({ error: 'Same-origin request required' }, 403);
-    return deleteFeedback(id, env.FEEDBACK_DB);
-  }
-  return json({ error: 'Not found' }, 404);
+  const route = feedbackRoutes.find((item) => item.method === request.method && item.withId === (id !== null));
+  if (!route) return json({ error: 'Not found' }, 404);
+  if (route.mutating && !isMutationAllowed(request, url)) return json({ error: 'Same-origin request required' }, 403);
+  return route.run({ request, url, env, id });
 }
 
 async function dispatch(request, url, env) {

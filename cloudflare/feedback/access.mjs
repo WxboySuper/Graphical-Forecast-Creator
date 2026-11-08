@@ -18,11 +18,17 @@ function audienceMatches(aud, expected) {
   return Array.isArray(aud) && aud.includes(expected);
 }
 
+const timeChecks = [
+  (claims) => Number.isFinite(claims.exp),
+  (claims, now) => claims.exp + leeway > now,
+  (claims) => Number.isFinite(claims.iat),
+  (claims, now) => claims.iat - leeway <= now,
+  (claims) => claims.nbf === undefined || Number.isFinite(claims.nbf),
+  (claims, now) => claims.nbf === undefined || claims.nbf - leeway <= now,
+];
+
 function timeClaimsAreValid(claims, now) {
-  if (!Number.isFinite(claims.exp) || claims.exp + leeway <= now) return false;
-  if (!Number.isFinite(claims.iat) || claims.iat - leeway > now) return false;
-  if (claims.nbf !== undefined && (!Number.isFinite(claims.nbf) || claims.nbf - leeway > now)) return false;
-  return true;
+  return timeChecks.every((check) => check(claims, now));
 }
 
 function identityExists(claims) {

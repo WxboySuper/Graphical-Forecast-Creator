@@ -42,9 +42,15 @@ function cacheFor(url) {
   return jwksCache.get(url);
 }
 
+function freshKeys(cache, now) {
+  if (!cache.keys) return null;
+  return cache.expiresAt > now ? cache.keys : null;
+}
+
 async function loadKeys(env, now, url, force = false) {
   const cache = cacheFor(url);
-  if (!force && cache.keys && cache.expiresAt > now) return cache.keys;
+  const cached = force ? null : freshKeys(cache, now);
+  if (cached) return cached;
   const response = await (env.JWKS_FETCH ?? fetch)(url);
   if (!response.ok) return null;
   const data = await response.json();
