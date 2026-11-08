@@ -51,7 +51,9 @@ async function parsePayload(request, headers) {
 
 /** Explains an atomic-insert rejection as a duplicate or rate-limit 429. */
 async function rejection({ env, uidHash, message, now, headers }) {
-  const result = (await applyUserRateLimit(env.FEEDBACK_DB, uidHash, message, now)) ?? { retry: 60, duplicate: false };
+  const result = await applyUserRateLimit(env.FEEDBACK_DB, uidHash, message, now);
+  // No per-user limit applies, so the service-wide flood cap rejected the insert.
+  if (!result) return json({ error: 'Feedback service is busy' }, 429, { ...headers, 'retry-after': '60' });
   return json({ error: result.duplicate ? 'Duplicate feedback' : 'Rate limit exceeded' }, 429, { ...headers, 'retry-after': String(result.retry) });
 }
 
