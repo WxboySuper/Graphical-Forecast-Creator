@@ -99,10 +99,17 @@ def _validate_allowlist(allowlist: object) -> None:
 def _validate_identity(field: str, identity: object) -> None:
     if not isinstance(identity, dict):
         raise ValueError(f"allowlist entry {field!r} must be an identity object")
+    _reject_unknown_identity_keys(field, identity)
     _required_string(identity, field, "parameter")
     _required_string(identity, field, "level")
     if "step" in identity:
         _required_string(identity, field, "step")
+
+
+def _reject_unknown_identity_keys(field: str, identity: dict) -> None:
+    unknown = set(identity).difference({"parameter", "level", "step"})
+    if unknown:
+        raise ValueError(f"allowlist entry {field!r} has unknown keys: {sorted(unknown)}")
 
 
 def _required_string(identity: dict, field: str, key: str) -> str:

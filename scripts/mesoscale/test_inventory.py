@@ -29,7 +29,7 @@ class InventoryTests(unittest.TestCase):
 
     def test_rejects_malformed_allowlists_with_clear_errors(self):
         rows = parse_idx(FIXTURE_PATH.read_text(encoding="ascii"))
-        for allowlist in ([], {"t2m": {"parameter": "TMP"}}, {"t2m": None}):
+        for allowlist in ([], {"t2m": {"parameter": "TMP"}}, {"t2m": None}, {"t2m": {"parameter": "TMP", "level": "2 m above ground", "steps": "anl"}}):
             with self.subTest(allowlist=allowlist), self.assertRaises(ValueError):
                 resolve_allowlist(rows, 136859480, allowlist)
 
