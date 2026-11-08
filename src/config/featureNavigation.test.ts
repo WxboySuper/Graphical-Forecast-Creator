@@ -52,6 +52,16 @@ describe('featureNavigation', () => {
     expect(shortcuts['6']).toBeUndefined();
   });
 
+  test('keeps the existing Forecast and Discussion shortcuts reachable', () => {
+    const navigate = jest.fn();
+    const shortcuts = getNavigationKeyboardShortcuts(navigate, 'production');
+
+    shortcuts['1']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/discussion');
+  });
+
   test('declares every navigation item with a stable id', () => {
     const ids = APP_NAVIGATION_ITEMS.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);

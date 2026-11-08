@@ -4,7 +4,7 @@
  * This file defines browser-level checks for the discussion.spec workflow and its user-visible behavior.
  */
 import { test, expect } from '@playwright/test';
-import { prepareAppState } from './testSetup';
+import { navigateToDiscussion, prepareAppState } from './testSetup';
 
 test.describe('Discussion workflow', () => {
   test.beforeEach(async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('Discussion workflow', () => {
     await startWorkflow.click();
     await expect(page).toHaveURL('/forecast/severe');
 
-    await page.getByRole('link', { name: 'Discussion' }).click();
+    await navigateToDiscussion(page);
     await expect(page).toHaveURL('/discussion');
     const scope = page.getByRole('combobox', { name: 'Discussion scope' });
     const editor = page.locator('textarea.diy-textarea');
