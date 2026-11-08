@@ -118,6 +118,25 @@ describe('FeedbackDialog sessions', () => {
     expect(await screen.findByLabelText(/what happened/i)).toHaveValue('');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
+
+  test('an unsent draft is discarded when the dialog is closed and reopened', async () => {
+    mockUseAuth.mockReturnValue(signedIn);
+    const Harness = () => {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <MemoryRouter>
+          <button type="button" onClick={() => setOpen(true)}>reopen</button>
+          <FeedbackDialog open={open} onOpenChange={setOpen} />
+        </MemoryRouter>
+      );
+    };
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText(/what happened/i), { target: { value: 'A draft I never sent.' } });
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    fireEvent.click(screen.getByText('reopen'));
+    expect(await screen.findByLabelText(/what happened/i)).toHaveValue('');
+  });
 });
 
 describe('beta chrome', () => {

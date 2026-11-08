@@ -4,6 +4,7 @@
  * and local interaction state; legal text and account persistence are kept in
  * their separate content and policy boundaries.
  */
+import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './ToSModal.css';
@@ -134,7 +135,7 @@ const ToSTermsContent: React.FC = () => (
     <p>
       If you have any questions regarding these Terms, please reach out via the{' '}
       <a href="https://discord.gg/SGk37rg8sz" target="_blank" rel="noopener noreferrer">official GFC Support Discord</a>
-      .
+      {' '}or email <ContactEmailLink />.
     </p>
 
     <h3>11. Accounts, Premium Subscriptions, and Billing</h3>

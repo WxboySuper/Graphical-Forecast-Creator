@@ -1,4 +1,4 @@
-import { verifyToken } from './auth.mjs';
+import { KeysUnavailableError, verifyToken } from './auth.mjs';
 import { handleAdmin } from './admin.mjs';
 import { notifyDiscord } from './discord.mjs';
 import { applyUserRateLimit, createRecord, readLimitedBody } from './store.mjs';
@@ -22,14 +22,18 @@ function corsHeaders(request, env) {
 
 function requestError(request, headers) {
   if (request.headers.has('origin') && !headers['access-control-allow-origin']) return json({ error: 'Origin not allowed' }, 403);
-  if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get('content-type') ?? '')) return json({ error: 'Content-Type must be application/json' }, 400, headers);
+  if (!/^application\/json\s*(?:;|$)/i.test((request.headers.get('content-type') ?? '').trim())) return json({ error: 'Content-Type must be application/json' }, 400, headers);
   return null;
 }
 
 async function authenticateSubmission(request, env, headers) {
   const authorization = request.headers.get('authorization') ?? '';
   if (!authorization.startsWith('Bearer ')) return { response: json({ error: 'Authentication required' }, 401, headers) };
-  const claims = await verifyToken(authorization.slice(7), env);
+  let claims;
+  try { claims = await verifyToken(authorization.slice(7), env); } catch (error) {
+    if (!(error instanceof KeysUnavailableError)) throw error;
+    return { response: json({ error: 'Authentication is temporarily unavailable' }, 503, { ...headers, 'retry-after': '30' }) };
+  }
   return claims ? { claims } : { response: json({ error: 'Invalid authentication token' }, 401, headers) };
 }
 
@@ -48,7 +52,9 @@ async function parsePayload(request, headers) {
 
 /** Explains an atomic-insert rejection as a duplicate or rate-limit 429. */
 async function rejection({ env, uidHash, message, now, headers }) {
-  const result = (await applyUserRateLimit(env.FEEDBACK_DB, uidHash, message, now)) ?? { retry: 60, duplicate: false };
+  const result = await applyUserRateLimit(env.FEEDBACK_DB, uidHash, message, now);
+  // No per-user limit applies, so the service-wide flood cap rejected the insert.
+  if (!result) return json({ error: 'Feedback service is busy' }, 429, { ...headers, 'retry-after': '60' });
   return json({ error: result.duplicate ? 'Duplicate feedback' : 'Rate limit exceeded' }, 429, { ...headers, 'retry-after': String(result.retry) });
 }
 

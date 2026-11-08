@@ -52,6 +52,7 @@ describe('forecast workspace route contract', () => {
     // remains exercisable where the workspace is switched on.
     expect(getExposedForecastWorkspacePaths('local')).toEqual([
       '/forecast/severe',
+      '/forecast/mesoscale',
       '/forecast/custom',
     ]);
   });
@@ -65,8 +66,10 @@ describe('forecast workspace route contract', () => {
     expect(exposedPaths).not.toContain('/forecast/winter');
     if (target === 'production' || target === 'staging') {
       expect(exposedPaths).toEqual(['/forecast/severe']);
-    } else {
+    } else if (target === 'beta') {
       expect(exposedPaths).toEqual(['/forecast/severe', '/forecast/custom']);
+    } else {
+      expect(exposedPaths).toEqual(['/forecast/severe', '/forecast/mesoscale', '/forecast/custom']);
     }
   });
 

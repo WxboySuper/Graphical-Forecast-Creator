@@ -29,6 +29,12 @@ describe('ToSModal', () => {
     expect(hasAcceptedToS()).toBe(true);
   });
 
+  test('lists the Discord and the contact email in the Contact Us section', () => {
+    render(<ToSModal onAccept={jest.fn()} />);
+    expect(screen.getByRole('link', { name: 'official GFC Support Discord' })).toHaveAttribute('href', 'https://discord.gg/SGk37rg8sz');
+    expect(screen.getByRole('link', { name: 'contact@gfcweather.com' })).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
+  });
+
   test('supports view-only close controls', () => {
     const onClose = jest.fn();
     render(<ToSModal onAccept={jest.fn()} viewOnly onClose={onClose} />);

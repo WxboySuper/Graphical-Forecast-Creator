@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .catalog import validate_catalog
-from .store import Store
+from .store import ObjectCheck, Store
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class PublishRequest:
     model_id: str
     cycle: datetime
     catalog: dict
-    tile_files: dict[str, Path]
+    archives: dict[str, Path]
     keep: int = 6
 
 
@@ -62,23 +62,23 @@ def object_status(payload: bytes | None) -> str | None:
         return None
 
 
-def upload_tiles(store: Store, request: PublishRequest) -> None:
-    expected = {}
-    for key, path in request.tile_files.items():
+def upload_archives(store: Store, request: PublishRequest) -> None:
+    expected: dict[str, ObjectCheck] = {}
+    for key, path in request.archives.items():
         content = path.read_bytes()
         checksum = hashlib.md5(content, usedforsecurity=False).hexdigest()
-        receipt = store.put(key, content, "image/png")
+        receipt = store.put_immutable(key, content, "application/vnd.pmtiles")
         if receipt and receipt != checksum:
-            raise IOError(f"published tile checksum mismatch: {key}")
-        expected[key] = len(content)
+            raise IOError(f"published archive checksum mismatch: {key}")
+        expected[key] = ObjectCheck(len(content), checksum)
     _verify_with_retries(store, expected)
 
 
-def _verify_with_retries(store: Store, expected: dict[str, int]) -> None:
+def _verify_with_retries(store: Store, expected: dict[str, ObjectCheck]) -> None:
     error = None
     for attempt in range(3):
         try:
-            store.verify_sizes(expected)
+            store.verify_archives(expected)
             return
         except (IOError, OSError) as exc:
             error = exc
@@ -92,13 +92,13 @@ def publish_pointer(store: Store, model_id: str, cycle: datetime, catalog: dict)
     pointer = {"schemaVersion": 1, "modelId": model_id, "cycleTime": catalog["cycleTime"], "catalogUrl": f"/api/mesoscale/catalog/{model_id}/{cycle_name}.json", "publishedAt": catalog["processedAt"]}
     store.put(f"mesoscale/v1/latest/{model_id}.json", json.dumps(pointer, separators=(",", ":")).encode(), "application/json")
 def publish_cycle(store: Store, request: PublishRequest) -> None:
-    """Verify all tile objects before publishing catalog and latest pointer."""
+    """Verify all immutable field archives before publishing catalog and pointer."""
     validate_catalog(request.catalog)
     if not complete_catalog(request.catalog):
         raise ValueError("partial or failed cycles cannot be published as latest")
     if skip_publication(store, request):
         return
-    upload_tiles(store, request)
+    upload_archives(store, request)
     store.put(catalog_key(request.model_id, request.cycle), json.dumps(request.catalog, separators=(",", ":")).encode(), "application/json")
     publish_pointer(store, request.model_id, request.cycle, request.catalog)
     retain_cycles(store, request)
@@ -135,11 +135,11 @@ def prune_old_cycles(store: Store, request: PublishRequest) -> None:
 
 def remove_cycle(store: Store, model_id: str, catalog_key_name: str) -> None:
     old_id = Path(catalog_key_name).stem
-    delete_old_tiles(store, model_id, old_id)
+    delete_old_archives(store, model_id, old_id)
     store.delete(catalog_key_name)
 
 
-def delete_old_tiles(store: Store, model_id: str, cycle_name: str) -> None:
-    prefix = f"mesoscale/v1/tiles/{model_id}/{cycle_name}"
+def delete_old_archives(store: Store, model_id: str, cycle_name: str) -> None:
+    prefix = f"mesoscale/v1/archives/{model_id}/{cycle_name}"
     for key in store.list(prefix):
         store.delete(key)

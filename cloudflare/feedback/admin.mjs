@@ -51,13 +51,7 @@ function queryValue(url, key) {
 }
 
 function decodeCursor(url) {
-  const raw = url.search.slice(1).split('&').find((part) => part.startsWith('cursor='));
-  if (!raw) return validateCursor(null);
-  try {
-    return validateCursor(decodeURIComponent(raw.slice(7).replace(/\+/g, ' ')));
-  } catch {
-    return null;
-  }
+  return validateCursor(url.searchParams.get('cursor'));
 }
 
 function parseListQuery(url) {

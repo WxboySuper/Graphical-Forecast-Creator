@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
+import { resetKeyCache } from './feedback/auth.mjs';
 
 const project = 'gfc-test';
 const accessDomain = 'test.cloudflareaccess.com';
@@ -50,7 +51,9 @@ class FakeD1 {
       const mine = db.rows.filter((row) => row.uid_hash === uid);
       const recent = mine.filter((row) => row.created_at > recentSince);
       const daily = mine.filter((row) => row.created_at > dailySince);
-      return { recent: recent.length, daily: daily.length, recent_at: Math.max(0, ...mine.filter((row) => row.created_at > recentAtSince).map((row) => row.created_at)), daily_at: Math.max(0, ...mine.filter((row) => row.created_at > dailyAtSince).map((row) => row.created_at)) };
+      // Real D1 returns NULL for SUM and MAX over no rows.
+      const latest = (since) => { const times = mine.filter((row) => row.created_at > since).map((row) => row.created_at); return times.length ? Math.max(...times) : null; };
+      return { recent: recent.length || null, daily: daily.length || null, recent_at: latest(recentAtSince), daily_at: latest(dailyAtSince) };
     } },
     { matches: (sql) => sql.includes('AND message = ?'), run: (db, args) => db.rows.find((row) => isDuplicateRow(row, args)) ?? null },
     { matches: (sql) => sql.includes('FROM feedback_admin_attempts'), run: (db, args) => db.adminAttempts.get(args[0]) ?? null },
@@ -394,6 +397,36 @@ test('refetches signing keys once after a key rotation, rate-limited against for
   assert.ok(fetches - afterRotation <= 1, 'forged key ids must not trigger a refetch per request');
 });
 
+test('keeps accepting tokens from cached keys while the key endpoint is down', async () => {
+  let down = false; let clock = 1950000000000 + 12 * 3600 * 1000;
+  const jwksFetch = async () => { if (down) throw new Error('offline'); return Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }); };
+  const { env, ctx } = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-a' }) })).status, 201);
+  down = true; clock += 3600 * 1000;
+  assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-b' }), body: validBody({ message: 'Sent while the key endpoint is down.' }) })).status, 201);
+});
+
+test('reports 503 instead of 401 when signing keys cannot be loaded at all', async () => {
+  resetKeyCache();
+  const { env, ctx } = harness({ env: { JWKS_FETCH: async () => { throw new Error('offline'); }, NOW: () => 1950000000000 + 40 * 3600 * 1000 } });
+  const response = await post(env, ctx, { auth: await token({ sub: 'outage-user' }) });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '30');
+});
+
+test('unknown key ids do not trigger a refetch per request while the key endpoint is down', async () => {
+  const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  let down = false; let fetches = 0; let clock = 1950000000000 + 80 * 3600 * 1000;
+  const jwksFetch = async () => { fetches += 1; if (down) throw new Error('offline'); return Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }); };
+  const { env, ctx } = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  resetKeyCache();
+  await post(env, ctx, { auth: await token({ sub: 'down-a' }) });
+  down = true; clock += 3600 * 1000;
+  const before = fetches;
+  for (let i = 0; i < 5; i += 1) await post(env, ctx, { auth: await token({ sub: `down-${i}` }, pair.privateKey, `unknown-${i}`) });
+  assert.ok(fetches - before <= 2, `expected at most 2 fetches while down, saw ${fetches - before}`);
+});
+
 test('a global cap stops floods from many accounts', async () => {
   const { db, env, ctx } = harness();
   const statuses = [];
@@ -624,3 +657,12 @@ test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', a
   assert.ok(responses.every((response) => ![...response.headers.keys()].some((name) => name.startsWith('access-control-'))));
 });
 
+
+test('null optional fields are accepted and stored as empty', async () => {
+  const { env, ctx, db } = harness();
+  const response = await post(env, ctx, { auth: await token({ sub: 'null-fields' }), body: validBody({ viewport: null, plan: null }) });
+  assert.equal(response.status, 201);
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].viewport, null);
+  assert.equal(db.rows[0].plan, null);
+});

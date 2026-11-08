@@ -54,6 +54,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Contact:** GFC now has one contact address, contact@gfcweather.com, for questions, billing issues, privacy requests, and any concerns. It appears in the menu on every page, on the home, account, and pricing pages, and in the Terms of Service and Privacy Policy.
+- **Privacy policy v1.8.0:** Added a section describing the optional Send feedback form (what it collects, where it is stored, how long it is kept), noted that feedback is not removed automatically when an account is deleted, and listed Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
 - **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher, and choose whether Discussion opens full width or in a resizable side panel beside the map. The layout choice is remembered, and narrow panels stack the fields and switch between Edit and Preview.
 - **Discussion links:** Existing `/discussion` links now open the discussion inside the severe forecast workspace with query parameters and the URL hash preserved.
 - **Forecast menu:** The header Forecast tab now opens a workspace showcase with an icon, description, and focus chips for each available workspace, marks the current one, previews upcoming workspaces as not yet available, and keeps Discussion one click away.
