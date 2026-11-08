@@ -28,24 +28,36 @@ def main() -> None:
     cycle = datetime.now(UTC).replace(minute=0, second=0, microsecond=0)
     received_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     metrics = {}
+    result = None
     try:
         cycle, url, modified = discover_cycle(model)
         if store and already_published(store, model.id, cycle):
             publish_pointer_if_missing(store, model.id, cycle)
-            report = HealthReport(model.id, cycle, "complete", metrics, received_at, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
-            write_health(store, report)
-            return
-        result = process_f00(CycleContext(model, cycle, url, modified, args.output))
-        metrics = result["metrics"]
-        if store:
-            if result["catalog"]["status"] == "complete":
+        else:
+            result = process_f00(CycleContext(model, cycle, url, modified, args.output))
+            metrics = result["metrics"]
+            if store and result["catalog"]["status"] == "complete":
                 publish_cycle(store, PublishRequest(model.id, cycle, result["catalog"], result["tiles"]))
-            write_health(store, HealthReport(model.id, cycle, result["catalog"]["status"], metrics, result["catalog"]["receivedAt"], result["catalog"]["processedAt"]))
     except Exception as error:
         if store:
-            now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            write_health(store, HealthReport(model.id, cycle, "failed", metrics, received_at, now, f"{type(error).__name__}: {error}"))
+            write_failed_health(store, model.id, cycle, metrics, received_at, error)
         raise
+    if store:
+        if result is None:
+            report = HealthReport(model.id, cycle, "complete", metrics, received_at, datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        else:
+            catalog = result["catalog"]
+            report = HealthReport(model.id, cycle, catalog["status"], metrics, catalog["receivedAt"], catalog["processedAt"])
+        write_health(store, report)
+
+
+def write_failed_health(store: R2Store, model_id: str, cycle: datetime, metrics: dict, received_at: str, error: Exception) -> None:
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    report = HealthReport(model_id, cycle, "failed", metrics, received_at, now, f"{type(error).__name__}: {error}")
+    try:
+        write_health(store, report)
+    except Exception as health_error:
+        error.add_note(f"Failed to write failure health report: {type(health_error).__name__}: {health_error}")
 
 
 def create_store() -> R2Store:
