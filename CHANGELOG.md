@@ -54,7 +54,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
-- **Forecast menu:** The header Forecast tab now opens a menu listing available forecast workspaces with their descriptions and focus points, marks the current workspace, and keeps Discussion under Other.
+- **Forecast menu:** The header Forecast tab now opens a workspace showcase with an icon, description, and focus chips for each available workspace, marks the current one, previews upcoming workspaces as not yet available, and keeps Discussion one click away.
 - **Monitor NWS alerts:** Show when displayed alert polygons were last fetched after a refresh fails, and keep the retry action clear.
 - **Auto-TSTM:** Temporarily disable automatic thunderstorm guidance while the SPC HREF source is retired. The forecast page explains the planned replacement.
 - **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.

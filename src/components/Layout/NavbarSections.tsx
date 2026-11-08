@@ -24,7 +24,6 @@ import {
   Crown,
   Sparkles,
   MessageSquarePlus,
-  ChevronDown,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -49,7 +48,7 @@ import {
   type AppNavigationItemId,
   type AppNavigationItemWithId,
 } from '../../config/featureNavigation';
-import { getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
+import { ForecastNavigationMenu } from './ForecastMenu';
 import type { LucideIcon } from 'lucide-react';
 declare const __GFC_APP_VERSION__: string;
 
@@ -145,120 +144,6 @@ const isNavigationItemActive = (
   end?: boolean,
 ): boolean => end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
 
-const getCurrentForecastWorkspace = (
-  pathname: string,
-  workspaces: ReturnType<typeof getExposedForecastWorkspaces>,
-) => workspaces.find((workspace) =>
-    pathname === workspace.path || pathname.startsWith(`${workspace.path}/`)
-  );
-
-const isDiscussionRoute = (pathname: string): boolean =>
-  pathname === '/discussion' || pathname.startsWith('/discussion/');
-
-const ForecastWorkspaceMenuItems: FC<{
-  workspaces: ReturnType<typeof getExposedForecastWorkspaces>;
-  currentWorkspaceId?: ReturnType<typeof getExposedForecastWorkspaces>[number]['id'];
-}> = ({ workspaces, currentWorkspaceId }) => (
-  <>
-    {workspaces.map((workspace) => (
-      <DropdownMenuItem key={workspace.id} asChild>
-        <NavLink
-          to={workspace.path}
-          aria-label={`${workspace.label} forecast workspace`}
-          aria-describedby={`forecast-workspace-${workspace.id}-description forecast-workspace-${workspace.id}-focus`}
-          aria-current={currentWorkspaceId === workspace.id ? 'page' : undefined}
-          className="flex flex-col items-start gap-1 whitespace-normal px-3 py-3"
-        >
-          <span className="font-medium">{workspace.label}</span>
-          <span id={`forecast-workspace-${workspace.id}-description`} className="text-sm text-muted-foreground">
-            {workspace.description}
-          </span>
-          <ul
-            id={`forecast-workspace-${workspace.id}-focus`}
-            className="list-disc pl-5 text-xs text-muted-foreground"
-          >
-            {workspace.focus.map((focus) => <li key={focus}>{focus}</li>)}
-          </ul>
-        </NavLink>
-      </DropdownMenuItem>
-    ))}
-  </>
-);
-
-const getOtherDestinationLabel = (item: AppNavigationItemWithId): string =>
-  item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
-
-const OtherDestinationMenuItems: FC<{
-  items: AppNavigationItemWithId[];
-  pathname: string;
-}> = ({ items, pathname }) => (
-  <>
-    {items.map((item) => {
-      const Icon = NAV_ITEM_ICONS[item.id];
-      const isCurrent = isNavigationItemActive(pathname, item.to, item.end);
-
-      return (
-        <DropdownMenuItem key={item.id} asChild>
-          <NavLink
-            to={item.to}
-            end={item.end}
-            aria-label={getOtherDestinationLabel(item)}
-            aria-current={isCurrent ? 'page' : undefined}
-          >
-            <Icon className="h-4 w-4" aria-hidden="true" />
-            {getOtherDestinationLabel(item)}
-          </NavLink>
-        </DropdownMenuItem>
-      );
-    })}
-  </>
-);
-
-const ForecastNavigationMenu: FC<{
-  item: AppNavigationItemWithId;
-  pathname: string;
-  otherItems: AppNavigationItemWithId[];
-}> = ({ item, pathname, otherItems }) => {
-  const workspaces = getExposedForecastWorkspaces();
-  const currentWorkspace = getCurrentForecastWorkspace(pathname, workspaces);
-  const currentDiscussion = isDiscussionRoute(pathname);
-  const isActive = isNavigationItemActive(pathname, item.to, item.end) || currentDiscussion;
-  const Icon = NAV_ITEM_ICONS[item.id];
-  const currentPageLabel = currentWorkspace?.label ?? (currentDiscussion ? 'Discussion' : undefined);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className={cn('app-navbar__tab app-navbar__forecastTrigger', isActive && 'is-active')}
-          aria-label={`Forecast menu${currentPageLabel ? `, current page ${currentPageLabel}` : ''}`}
-          aria-current={isNavigationItemActive(pathname, item.to, item.end) ? 'page' : undefined}
-          aria-haspopup="menu"
-          title={`Forecast workspaces${item.shortcutLabel ? ` (${item.shortcutLabel})` : ''}`}
-        >
-          <Icon className="app-navbar__tabIcon h-4 w-4" aria-hidden="true" />
-          <span className="app-navbar__tabLabel">{item.label}</span>
-          <ChevronDown className="app-navbar__forecastChevron h-3.5 w-3.5" aria-hidden="true" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="w-[min(24rem,calc(100vw-1rem))] max-h-[min(80vh,38rem)] overflow-y-auto p-2"
-      >
-        <DropdownMenuLabel className="px-2 py-1.5">Forecast workspaces</DropdownMenuLabel>
-        <ForecastWorkspaceMenuItems
-          workspaces={workspaces}
-          currentWorkspaceId={currentWorkspace?.id}
-        />
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="px-2 py-1.5">Other destinations</DropdownMenuLabel>
-        <OtherDestinationMenuItems items={otherItems} pathname={pathname} />
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-};
-
 const MainNavigationLink: FC<{
   item: AppNavigationItemWithId;
   pathname: string;
@@ -291,7 +176,7 @@ export const MainTabs: FC = () => {
   return (
     <div className="app-navbar__tabs">
       {navItems.map((item) => item.id === 'forecast'
-        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} otherItems={otherItems} />
+        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} otherItems={otherItems} icons={NAV_ITEM_ICONS} />
         : <MainNavigationLink key={item.id} item={item} pathname={pathname} />)}
     </div>
   );
