@@ -34,6 +34,7 @@ import {
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../../config/forecastWorkspaces';
+import { OPEN_DISCUSSION_EVENT } from '../ForecastWorkspace/useWorkspaceSurface';
 import './ForecastMenu.css';
 
 type WorkspaceVisual = { icon: LucideIcon; accent: string };
@@ -140,7 +141,7 @@ const OtherDestinationRow: FC<{
         to={item.to}
         end={item.end}
         onClick={() => {
-          if (item.id === 'discussion') window.dispatchEvent(new Event('gfc-open-severe-discussion'));
+          if (item.id === 'discussion') window.dispatchEvent(new Event(OPEN_DISCUSSION_EVENT));
         }}
         aria-label={getOtherDestinationLabel(item)}
         aria-current={isNavigationItemActive(pathname, item.to, item.end) ? 'page' : undefined}
