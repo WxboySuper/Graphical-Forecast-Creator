@@ -1,6 +1,6 @@
 {
   "measuredAt": "2026-11-08",
-  "method": "Anonymous HTTPS .idx inventory; selected-message GRIB metadata decoded from HTTP byte ranges with ecCodes 2.41.0. Parameter/level/step index identities are copied exactly from NOAA indexes; selected messages record GRIB2 codes, units and step metadata where resolved. CAPE/CIN parcel semantics remain unverified.",
+  "method": "Anonymous HTTPS .idx inventory; selected and CAPE/CIN candidate messages decoded from HTTP byte ranges with ecCodes 2.41.0. Parameter/level/step index identities are copied exactly from NOAA indexes; GRIB2 codes, units, level types and step metadata are stored where resolved. Parcel semantics remain unverified.",
   "models": {
     "HRRR": {
       "cycle": "2026-11-08T12:00:00Z",
@@ -123,7 +123,7 @@
         "MLCAPE": {
           "parameter": "CAPE",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -147,7 +147,7 @@
         "MLCIN": {
           "parameter": "CIN",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -530,7 +530,216 @@
         "pyprojVersion": "3.7.1",
         "reprojectToEPSG3857Seconds": 0.295,
         "note": "Decode plus lat/lon array generation; projection timing transforms coordinates only, not value resampling or tiling."
-      }
+      },
+      "capeCinCandidateMessages": [
+        {
+          "recordNumber": "105",
+          "parameter": "CAPE",
+          "level": "surface",
+          "step": "anl",
+          "offset": 65877665,
+          "rangeEnd": 66165470,
+          "bytes": 287806,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "106",
+          "parameter": "CIN",
+          "level": "surface",
+          "step": "anl",
+          "offset": 66165471,
+          "rangeEnd": 66493217,
+          "bytes": 327747,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "148",
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 110147555,
+          "rangeEnd": 110456937,
+          "bytes": 309383,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "149",
+          "parameter": "CIN",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 110456938,
+          "rangeEnd": 110759993,
+          "bytes": 303056,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "152",
+          "parameter": "CAPE",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 116457855,
+          "rangeEnd": 116685684,
+          "bytes": 227830,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "153",
+          "parameter": "CIN",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 116685685,
+          "rangeEnd": 116947316,
+          "bytes": 261632,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "154",
+          "parameter": "CAPE",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 116947317,
+          "rangeEnd": 117256056,
+          "bytes": 308740,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "155",
+          "parameter": "CIN",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 117256057,
+          "rangeEnd": 117572430,
+          "bytes": 316374,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "158",
+          "parameter": "CAPE",
+          "level": "0-3000 m above ground",
+          "step": "anl",
+          "offset": 120722613,
+          "rangeEnd": 121372508,
+          "bytes": 649896,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "heightAboveGroundLayer",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        }
+      ]
     },
     "RAP": {
       "cycle": "2026-11-08T06:00:00Z",
@@ -647,7 +856,7 @@
         "MLCAPE": {
           "parameter": "CAPE",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -671,7 +880,7 @@
         "MLCIN": {
           "parameter": "CIN",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -1045,7 +1254,216 @@
         ],
         "uniqueBytes": 561337
       },
-      "f00ObjectLastModified": "2026-11-08T06:48:05Z"
+      "f00ObjectLastModified": "2026-11-08T06:48:05Z",
+      "capeCinCandidateMessages": [
+        {
+          "recordNumber": "476",
+          "parameter": "CAPE",
+          "level": "surface",
+          "step": "anl",
+          "offset": 15212567,
+          "rangeEnd": 15248895,
+          "bytes": 36329,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "477",
+          "parameter": "CIN",
+          "level": "surface",
+          "step": "anl",
+          "offset": 15248896,
+          "rangeEnd": 15261287,
+          "bytes": 12392,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "525",
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 18365435,
+          "rangeEnd": 18403557,
+          "bytes": 38123,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "526",
+          "parameter": "CIN",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 18403558,
+          "rangeEnd": 18415129,
+          "bytes": 11572,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "528",
+          "parameter": "CAPE",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 18568401,
+          "rangeEnd": 18602014,
+          "bytes": 33614,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "529",
+          "parameter": "CIN",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 18602015,
+          "rangeEnd": 18637704,
+          "bytes": 35690,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "530",
+          "parameter": "CAPE",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 18637705,
+          "rangeEnd": 18674806,
+          "bytes": 37102,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "531",
+          "parameter": "CIN",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 18674807,
+          "rangeEnd": 18687321,
+          "bytes": 12515,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "534",
+          "parameter": "CAPE",
+          "level": "0-3000 m above ground",
+          "step": "anl",
+          "offset": 18744977,
+          "rangeEnd": 18829276,
+          "bytes": 84300,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "heightAboveGroundLayer",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        }
+      ]
     },
     "RRFS": {
       "cycle": "2026-11-08T06:00:00Z",
@@ -1162,7 +1580,7 @@
         "MLCAPE": {
           "parameter": "CAPE",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -1186,7 +1604,7 @@
         "MLCIN": {
           "parameter": "CIN",
           "level": "180-0 mb above ground candidate",
-          "units": "unknown; .idx omits units and no decoder was installed",
+          "units": "J kg**-1 (ecCodes decoded; parcel identity unverified)",
           "step": "anl",
           "present": false,
           "candidateRecordPresent": true,
@@ -1609,7 +2027,216 @@
         ],
         "uniqueBytes": 14103011
       },
-      "f00ObjectLastModified": "2026-11-08T07:15:26Z"
+      "f00ObjectLastModified": "2026-11-08T07:15:26Z",
+      "capeCinCandidateMessages": [
+        {
+          "recordNumber": "95",
+          "parameter": "CAPE",
+          "level": "surface",
+          "step": "anl",
+          "offset": 96513536,
+          "rangeEnd": 97136649,
+          "bytes": 623114,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "96",
+          "parameter": "CIN",
+          "level": "surface",
+          "step": "anl",
+          "offset": 97136650,
+          "rangeEnd": 97463957,
+          "bytes": 327308,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "surface",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "213",
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 242451854,
+          "rangeEnd": 243044125,
+          "bytes": 592272,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "214",
+          "parameter": "CIN",
+          "level": "180-0 mb above ground",
+          "step": "anl",
+          "offset": 243044126,
+          "rangeEnd": 243437652,
+          "bytes": 393527,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 18000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "218",
+          "parameter": "CAPE",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 251614239,
+          "rangeEnd": 252089511,
+          "bytes": 475273,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "219",
+          "parameter": "CIN",
+          "level": "90-0 mb above ground",
+          "step": "anl",
+          "offset": 252089512,
+          "rangeEnd": 252431793,
+          "bytes": 342282,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 9000,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "220",
+          "parameter": "CAPE",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 252431794,
+          "rangeEnd": 253078188,
+          "bytes": 646395,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "221",
+          "parameter": "CIN",
+          "level": "255-0 mb above ground",
+          "step": "anl",
+          "offset": 253078189,
+          "rangeEnd": 253444502,
+          "bytes": 366314,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 7,
+            "shortName": "cin",
+            "name": "Convective inhibition",
+            "units": "J kg**-1",
+            "typeOfLevel": "pressureFromGroundLayer",
+            "level": 25500,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        },
+        {
+          "recordNumber": "225",
+          "parameter": "CAPE",
+          "level": "0-3000 m above ground",
+          "step": "anl",
+          "offset": 257154176,
+          "rangeEnd": 257816726,
+          "bytes": 662551,
+          "gribMetadata": {
+            "discipline": 0,
+            "parameterCategory": 7,
+            "parameterNumber": 6,
+            "shortName": "cape",
+            "name": "Convective available potential energy",
+            "units": "J kg**-1",
+            "typeOfLevel": "heightAboveGroundLayer",
+            "level": 0,
+            "stepType": "instant",
+            "startStep": 0,
+            "endStep": 0
+          },
+          "parcelIdentity": "unverified"
+        }
+      ]
     }
   },
   "selectedMessageBytes": {
