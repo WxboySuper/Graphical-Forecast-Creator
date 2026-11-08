@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
 import worker from './mesoscale-worker.mjs';
+import { clearPmtilesCacheForTests } from './pmtiles-reader.mjs';
+import { createPmtilesFixture, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
 const serialTest = (name, run) => test(name, { concurrency: false }, run);
 const ORIGIN = 'https://gfc.weatherboysuper.com';
@@ -47,6 +49,24 @@ const makeCatalog = (overrides = {}) => ({
   frames: [{ forecastHour: 0, parameters: [] }],
   ...overrides,
 });
+const tileCatalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{
+  id: 'temperature-2m', data: {
+    type: 'xyz-raster', urlTemplate: 'https://mesoscale.example.test/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png',
+    format: 'image/png', tileCompression: 'none',
+    archiveKey: 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles', minZoom: 3, maxZoom: 4,
+  },
+}] }] });
+const tileEnvFor = (bucket) => {
+  const get = bucket.get.bind(bucket);
+  bucket.get = async (key, options) => {
+    if (key === 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json') {
+      const serialized = JSON.stringify(tileCatalog);
+      return { size: new TextEncoder().encode(serialized).length, json: async () => structuredClone(tileCatalog) };
+    }
+    return get(key, options);
+  };
+  return envFor({}, { MESOSCALE_BUCKET: bucket });
+};
 const withNow = async (timestamp, run) => {
   const originalNow = Date.now;
   Date.now = () => new Date(timestamp).getTime();
@@ -102,11 +122,11 @@ serialTest('strictly whitelists route segments and rejects traversal attempts wi
   assert.equal(reads, 0);
 });
 
-serialTest('valid tile requests map only to the fixed v1 key namespace', async () => {
+serialTest('valid tile requests resolve catalog keys only inside the v1 namespace', async () => {
   let key;
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (requestedKey) => { key = requestedKey; return null; } } });
   assert.equal((await worker.fetch(request('/tiles/rrfs/20261108T1200Z/f03/temperature-2m/6/2/1.png'), env)).status, 404);
-  assert.equal(key, 'mesoscale/v1/tiles/rrfs/20261108T1200Z/f03/temperature-2m/6/2/1.png');
+  assert.equal(key, 'mesoscale/v1/catalog/rrfs/20261108T1200Z.json');
 });
 
 serialTest('CORS allows configured origins and omits permission for other origins', async () => {
@@ -249,25 +269,34 @@ serialTest('missing tile is a short-cache 404 and missing latest pointer is also
 });
 
 serialTest('tile response defaults to PNG content type when R2 metadata is absent', async () => {
-  const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ body: new Blob(['png']).stream(), size: 3, httpEtag: '"tile"' }) } });
+  clearPmtilesCacheForTests();
+  const env = tileEnvFor(rangeBucket(await createPmtilesFixture()));
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
   assert.equal(response.headers.get('Content-Type'), 'image/png');
   assert.equal(response.headers.get('Content-Length'), '3');
 });
 
-serialTest('tile HEAD uses R2 metadata without reading the tile body', async () => {
-  let heads = 0;
-  let gets = 0;
-  const env = envFor({}, { MESOSCALE_BUCKET: {
-    head: async () => { heads += 1; return { size: 3, httpEtag: '"tile"' }; },
-    get: async () => { gets += 1; throw new Error('HEAD must not read the object body'); },
-  } });
+serialTest('tile HEAD reads directory ranges but skips the tile payload', async () => {
+  clearPmtilesCacheForTests();
+  const bucket = rangeBucket(await createPmtilesFixture());
+  const env = tileEnvFor(bucket);
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png', { method: 'HEAD' }), env);
   assert.equal(response.status, 200);
   assert.equal(response.body, null);
   assert.equal(response.headers.get('Content-Length'), '3');
-  assert.equal(heads, 1);
-  assert.equal(gets, 0);
+  assert.equal(bucket.reads.length, 2);
+});
+
+serialTest('malformed archives return a safe gateway error', async () => {
+  clearPmtilesCacheForTests();
+  const archive = await createPmtilesFixture();
+  archive[0] = 0;
+  const env = tileEnvFor(rangeBucket(archive));
+  const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
+  assert.equal(response.status, 502);
+  const body = await response.text();
+  assert.match(body, /temporarily unavailable/);
+  assert.doesNotMatch(body, /PMTiles|offset|range failed/i);
 });
 
 serialTest('catalog HEAD validates the stored catalog and matches GET status and validators', async () => {
@@ -295,53 +324,53 @@ serialTest('catalog HEAD validates the stored catalog and matches GET status and
   assert.equal(gets, 3);
 });
 
-serialTest('tile HEAD falls back to get when head is unavailable and does not populate cache', async () => {
+serialTest('tile HEAD warms metadata and the following GET reads only the tile bytes', async () => {
   await withCache(async () => {
-    const key = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
-    const env = envFor({ [key]: { pixels: 'tile' } });
-    const reads = countBucketReads(env.MESOSCALE_BUCKET);
+    clearPmtilesCacheForTests();
+    const bucket = rangeBucket(await createPmtilesFixture());
+    const env = tileEnvFor(bucket);
     const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 2);
     assert.equal((await worker.fetch(request(path), env)).status, 200);
-    assert.equal(reads(), 2);
+    assert.equal(bucket.reads.length, 3);
   });
 });
 
 serialTest('Cache API stores tiles, serves hits, honors conditional hits, and caches missing tiles', async () => {
   await withCache(async () => {
-    const tileKey = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
-    const env = envFor({ [tileKey]: { pixels: 'tile' } });
-    const reads = countBucketReads(env.MESOSCALE_BUCKET);
+    clearPmtilesCacheForTests();
+    const bucket = rangeBucket(await createPmtilesFixture());
+    const env = tileEnvFor(bucket);
     const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const first = await worker.fetch(request(path), env);
     assert.equal(first.status, 200);
-    assert.equal(await first.text(), '{"pixels":"tile"}');
+    assert.deepEqual([...new Uint8Array(await first.arrayBuffer())], [137, 80, 78]);
     const etag = first.headers.get('ETag');
     assert.equal(first.headers.get('Content-Type'), 'image/png');
     assertLongImmutableCache(first);
     assert.equal(first.headers.get('X-Content-Type-Options'), 'nosniff');
     const hit = await worker.fetch(request(path), env);
     assert.equal(hit.status, 200);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 3);
     assert.equal((await worker.fetch(request(`${path}?cacheBust=1`), env)).status, 200);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 3);
     const conditionalHit = await worker.fetch(request(path, { headers: { 'If-None-Match': etag } }), env);
     assert.equal(conditionalHit.status, 304);
     assert.equal(conditionalHit.headers.has('Content-Type'), false);
     assert.equal(conditionalHit.headers.has('Content-Length'), false);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 3);
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 3);
 
     const missingPath = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/1/1.png';
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
-    assert.equal(reads(), 2);
+    assert.equal(bucket.reads.length, 3);
   });
 });
 
@@ -362,18 +391,18 @@ serialTest('catalog HEAD warms the validated GET Cache API representation', asyn
 serialTest('cache read failure falls back to R2 and put uses waitUntil when available', async () => {
   await withCache(async (cache) => {
     cache.match = async () => { throw new Error('cache unavailable'); };
-    const tileKey = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
-    const env = envFor({ [tileKey]: { pixels: 'tile' } });
-    const reads = countBucketReads(env.MESOSCALE_BUCKET);
+    clearPmtilesCacheForTests();
+    const bucket = rangeBucket(await createPmtilesFixture());
+    const env = tileEnvFor(bucket);
     const tasks = [];
     const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env, { waitUntil: (task) => tasks.push(task) });
     assert.equal(response.status, 200);
-    assert.equal(reads(), 1);
+    assert.equal(bucket.reads.length, 3);
     assert.equal(tasks.length, 0);
     cache.match = async () => undefined;
     const cachedWriteResponse = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png?miss=1'), env, { waitUntil: (task) => tasks.push(task) });
     assert.equal(cachedWriteResponse.status, 200);
-    assert.equal(reads(), 2);
+    assert.equal(bucket.reads.length, 4);
     assert.equal(tasks.length, 1);
     await Promise.all(tasks);
   });
@@ -586,11 +615,12 @@ serialTest('HEAD returns headers without a body, and unsupported methods return 
   assert.equal(catalogHead.body, null);
   assert.ok(catalogHead.headers.get('ETag'));
   assert.equal(catalogHead.headers.get('Content-Type'), 'application/json; charset=utf-8');
-  const tileEnv = envFor({}, { MESOSCALE_BUCKET: { head: async () => ({ size: 3, httpEtag: '"tile"' }) } });
+  clearPmtilesCacheForTests();
+  const tileEnv = tileEnvFor(rangeBucket(await createPmtilesFixture()));
   const tileHead = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png', { method: 'HEAD' }), tileEnv);
   assert.equal(tileHead.status, 200);
   assert.equal(tileHead.body, null);
-  assert.equal(tileHead.headers.get('ETag'), '"tile"');
+  assert.ok(tileHead.headers.get('ETag'));
   assertLongImmutableCache(tileHead);
   const rejected = await worker.fetch(request('/status', { method: 'POST' }), env);
   assert.equal(rejected.status, 405);
