@@ -61,4 +61,13 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.goto('/forecast/severe?discussionLayout=tabs');
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--tabs/);
   });
+
+  test('keeps export available in Review when no workflow is active', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/forecast/severe?surface=review');
+    await expect(page.getByRole('heading', { name: 'Review and export' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save forecast' })).toBeVisible();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Export Forecast Image' })).toBeVisible();
+  });
 });

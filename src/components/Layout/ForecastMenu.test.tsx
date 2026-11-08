@@ -40,7 +40,7 @@ const icons = { forecast: MapIcon, discussion: MessageSquare } as unknown as Rec
 
 const renderMenu = (pathname: string) => render(
   <MemoryRouter initialEntries={[pathname]}>
-    <ForecastNavigationMenu item={forecastItem} pathname={pathname} search="" otherItems={[discussionItem]} icons={icons} />
+    <ForecastNavigationMenu item={forecastItem} pathname={pathname} search="" otherItems={pathname === '/discussion' ? [] : [discussionItem]} icons={icons} />
   </MemoryRouter>,
 );
 
@@ -69,10 +69,11 @@ describe('ForecastNavigationMenu', () => {
     }
   });
 
-  test('keeps secondary destinations reachable and reports Discussion as the current page', () => {
+  test('routes legacy Discussion through the Forecast workspace menu context', () => {
     renderMenu('/discussion');
 
-    expect(screen.getByRole('link', { name: 'Discussion' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Discussion' })).not.toBeInTheDocument();
     expect(screen.queryByText('Current')).not.toBeInTheDocument();
   });
 });

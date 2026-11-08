@@ -168,7 +168,9 @@ export const MainTabs: FC = () => {
   const { pathname, search } = useLocation();
   const visibleItems = getVisibleNavigationItems();
   const navItems = visibleItems.filter(({ id }) => MAIN_NAVIGATION_IDS.has(id));
-  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id));
+  // Discussion now lives inside the Severe workspace; keep its keyboard
+  // shortcut metadata while removing the duplicate destination from this menu.
+  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id) && id !== 'discussion');
 
   return (
     <div className="app-navbar__tabs">

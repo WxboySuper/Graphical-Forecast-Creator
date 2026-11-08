@@ -73,6 +73,7 @@
 .severe-workspace__layout-choice button { min-height: 1.9rem; padding: 0.25rem 0.6rem; }
 
 .severe-workspace__content {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
@@ -89,6 +90,7 @@
 
 .severe-workspace__map > * { width: 100%; min-width: 0; }
 .severe-workspace--tabs .severe-workspace__map.is-hidden { display: none; }
+.severe-workspace__map.is-offscreen { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
 
 .severe-workspace__splitter {
   z-index: 1;
@@ -127,6 +129,7 @@
 .discussion-page--embedded { width: 100%; }
 .severe-workspace__review { flex: 1 1 100%; min-width: 0; min-height: 0; overflow: auto; padding: 1rem; }
 .severe-workspace__review > section { max-width: 72rem; margin-inline: auto; }
+.severe-workspace__review-heading { margin-right: auto; }
 
 @media (max-width: 900px) {
   .severe-workspace__splitter { display: none; }

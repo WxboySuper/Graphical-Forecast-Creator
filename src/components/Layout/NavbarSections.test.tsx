@@ -69,7 +69,7 @@ describe('NavbarSections', () => {
     );
     expect(screen.getByRole('link', { name: 'Severe forecast workspace' })).toHaveAttribute('aria-current', 'page');
     const otherItems = getVisibleNavigationItems().filter(
-      ({ id }) => !['home', 'forecast', 'verification', 'monitor'].includes(id)
+      ({ id }) => !['home', 'forecast', 'discussion', 'verification', 'monitor'].includes(id)
     );
     for (const item of otherItems) {
       const label = item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
@@ -101,7 +101,7 @@ describe('NavbarSections', () => {
 
     expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' }))
       .toHaveClass('is-active');
-    expect(screen.getByRole('link', { name: 'Discussion' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('link', { name: 'Discussion' })).not.toBeInTheDocument();
   });
 
   test('wires account state, theme toggle, legal/docs actions, and external links', () => {

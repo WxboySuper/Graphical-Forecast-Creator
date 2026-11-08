@@ -66,8 +66,9 @@ import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForeca
 import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
+import { lazyWithReload } from '../routing/lazyWithReload';
 
-const EmbeddedDiscussionPage = React.lazy(() =>
+const EmbeddedDiscussionPage = lazyWithReload('discussion', () =>
   import('./DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
 );
 
@@ -608,6 +609,7 @@ const useForecastPageWorkspace = ({
   navigate,
   mapRef,
   onSaveForecast,
+  onImportSucceeded,
   workspaceId,
 }: {
   dispatch: ShortcutDispatch;
@@ -615,6 +617,7 @@ const useForecastPageWorkspace = ({
   navigate: ReturnType<typeof useNavigate>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   onSaveForecast: () => void;
+  onImportSucceeded: () => void;
   workspaceId: ForecastWorkspaceId;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
@@ -657,11 +660,12 @@ const useForecastPageWorkspace = ({
       addToast(workspaceError, 'error');
       return;
     }
+    onImportSucceeded();
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';
     addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  }, [addToast, dispatch, mapRef, workspaceId]);
+  }, [addToast, dispatch, mapRef, onImportSucceeded, workspaceId]);
 
   const handleExportComplete = useCallback((format: ForecastTransferFormat, scope: ForecastTransferScope) => {
     if (format === 'json') {
@@ -758,15 +762,18 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const [discussionLayout, setDiscussionLayout] = useState<'tabs' | 'panel'>(() => {
-    const forced = new URLSearchParams(window.location.search).get('discussionLayout');
-    if (forced === 'tabs' || forced === 'panel') return forced;
+  const [savedDiscussionLayout, setSavedDiscussionLayout] = useState<'tabs' | 'panel'>(() => {
     try {
       return localStorage.getItem('gfc-severe-discussion-layout') === 'panel' ? 'panel' : 'tabs';
     } catch {
       return 'tabs';
     }
   });
+  const forcedDiscussionLayout = searchParams.get('discussionLayout');
+  const hasForcedDiscussionLayout = forcedDiscussionLayout === 'tabs' || forcedDiscussionLayout === 'panel';
+  const discussionLayout = forcedDiscussionLayout === 'tabs' || forcedDiscussionLayout === 'panel'
+    ? forcedDiscussionLayout
+    : savedDiscussionLayout;
   const [discussionPanelWidth, setDiscussionPanelWidth] = useState(() => {
     try {
       const savedWidth = Number(localStorage.getItem('gfc-severe-discussion-panel-width'));
@@ -776,6 +783,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     }
   });
   const [discussionPanelCollapsed, setDiscussionPanelCollapsed] = useState(false);
+  const [discussionImportRevision, setDiscussionImportRevision] = useState(0);
   const [resizingDiscussionPanel, setResizingDiscussionPanel] = useState(false);
   const discussionPanelResizeRef = useRef({ pointerX: 0, width: discussionPanelWidth });
   const requestedSurface = searchParams.get('surface');
@@ -861,7 +869,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     navigate({ pathname: location.pathname, search: nextParams.toString() ? `?${nextParams.toString()}` : '', hash: location.hash });
   };
   const updateDiscussionLayout = (next: 'tabs' | 'panel') => {
-    setDiscussionLayout(next);
+    setSavedDiscussionLayout(next);
     try { localStorage.setItem('gfc-severe-discussion-layout', next); } catch { /* Keep this preference optional when storage is unavailable. */ }
   };
   const forecastCycle = useSelector(selectForecastCycle);
@@ -888,6 +896,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     navigate,
     mapRef,
     onSaveForecast: handleSave,
+    onImportSucceeded: () => setDiscussionImportRevision((revision) => revision + 1),
     workspaceId,
   });
 
@@ -916,6 +925,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                   : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
               if (nextIndex < 0) return;
               event.preventDefault();
+              event.stopPropagation();
               tabs[nextIndex]?.focus();
               tabs[nextIndex]?.click();
             }}>
@@ -923,17 +933,15 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               <button role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
               <button role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
               <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
-                <button type="button" aria-pressed={discussionLayout === 'tabs'} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
-                <button type="button" aria-pressed={discussionLayout === 'panel'} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
+                <button type="button" aria-pressed={discussionLayout === 'tabs'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
+                <button type="button" aria-pressed={discussionLayout === 'panel'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
                 {discussionLayout === 'panel' ? <button type="button" aria-expanded={!discussionPanelCollapsed} onClick={() => setDiscussionPanelCollapsed((collapsed) => !collapsed)}>{discussionPanelCollapsed ? 'Show panel' : 'Hide panel'}</button> : null}
               </div>
             </div>
             <div className="severe-workspace__content">
-              {surface !== 'review' ? (
-                <div className={`severe-workspace__map${discussionLayout === 'tabs' && surface === 'discussion' ? ' is-hidden' : ''}`}>
+              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : (discussionLayout === 'tabs' && surface === 'discussion') ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion')}>
                   <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
-                </div>
-              ) : null}
+              </div>
               {discussionLayout === 'panel' && surface !== 'review' && !discussionPanelCollapsed ? (
                 <>
                   <div
@@ -955,13 +963,19 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                       setDiscussionPanelWidth((width) => Math.max(320, Math.min(800, width + (event.key === 'ArrowLeft' ? 24 : -24))));
                     }}
                   />
-                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></aside>
+                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></aside>
                 </>
               ) : surface === 'discussion' ? (
-                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></section>
+                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></section>
               ) : surface === 'review' ? (
                 <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
-                  <ForecastWorkflowPanel controller={workspaceController} />
+                  {workflowMetadata ? <ForecastWorkflowPanel controller={workspaceController} /> : (
+                    <section aria-label="Forecast export actions" className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+                      <div className="severe-workspace__review-heading"><h2 className="font-semibold">Review and export</h2><p className="text-sm text-muted-foreground">Save your forecast or export the current cycle.</p></div>
+                      <Button type="button" onClick={handleSave}>Save forecast</Button>
+                      <Button type="button" variant="outline" onClick={workspaceController.onInitiateExport}>Export</Button>
+                    </section>
+                  )}
                 </section>
               ) : null}
             </div>

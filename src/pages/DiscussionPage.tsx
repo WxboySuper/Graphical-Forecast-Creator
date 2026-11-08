@@ -458,21 +458,31 @@ const useDiscussionScopeSync = (options: {
   discussionDay: DayType;
   dispatch: ReturnType<typeof useDispatch>;
   hasActiveWorkflow: boolean;
+  embedded: boolean;
+  mapSelectedGroupingId: string;
   selectedGroupingId: string;
   searchParams: URLSearchParams;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
 }) => {
-  const { currentDay, discussionDay, dispatch, hasActiveWorkflow, selectedGroupingId, searchParams, setSearchParams } = options;
+  const { currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, selectedGroupingId, searchParams, setSearchParams } = options;
   useEffect(() => {
-    if (currentDay !== discussionDay) dispatch(setForecastDay(discussionDay));
-  }, [currentDay, discussionDay, dispatch]);
+    if (currentDay === discussionDay) return;
+    if (embedded && hasActiveWorkflow) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', mapSelectedGroupingId);
+      setSearchParams(nextParams, { replace: true });
+      return;
+    }
+    dispatch(setForecastDay(discussionDay));
+  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, setSearchParams]);
   useEffect(() => {
+    if (embedded && hasActiveWorkflow && currentDay !== discussionDay) return;
     if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
       const nextParams = new URLSearchParams(searchParams);
       nextParams.set('group', selectedGroupingId);
       setSearchParams(nextParams, { replace: true });
     }
-  }, [hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
+  }, [currentDay, discussionDay, embedded, hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
 };
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
@@ -499,6 +509,10 @@ export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = fa
     () => resolveDiscussionGrouping(groupings, searchParams.get('group'), currentDay),
     [groupings, searchParams, currentDay],
   );
+  const mapSelectedGrouping = useMemo(
+    () => resolveDiscussionGrouping(groupings, null, currentDay),
+    [groupings, currentDay],
+  );
   const discussionDay = getDiscussionOwnerDay(forecastCycle, selectedGrouping);
   const outlookDay = forecastCycle.days[discussionDay];
   const discussionDraft = useSelector((state: RootState) => selectDiscussionDraftForScope(state, selectedGrouping.id));
@@ -510,6 +524,8 @@ export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = fa
     discussionDay,
     dispatch,
     hasActiveWorkflow,
+    embedded,
+    mapSelectedGroupingId: mapSelectedGrouping.id,
     selectedGroupingId: selectedGrouping.id,
     searchParams,
     setSearchParams,

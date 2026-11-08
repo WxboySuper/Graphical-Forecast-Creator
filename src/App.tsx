@@ -42,6 +42,7 @@ import { lazyWithReload } from './routing/lazyWithReload';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
+  getForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
   getUnavailableForecastWorkspaceRoutes,
   resolveRouteForecastWorkspaceContext,
@@ -100,7 +101,9 @@ export const DiscussionLegacyRedirect = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   params.set('surface', 'discussion');
-  return <Navigate to={{ pathname: '/forecast/severe', search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
+  const hintedWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
+  const pathname = hintedWorkspace ? getForecastWorkspacePath(hintedWorkspace.id) : '/forecast/severe';
+  return <Navigate to={{ pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
 };
 
 const BETA_MODE = __GFC_BETA_MODE__;
