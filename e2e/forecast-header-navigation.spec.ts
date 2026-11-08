@@ -10,7 +10,7 @@ test.describe('Forecast header navigation', () => {
 
   test('supports keyboard navigation, dismissal, and a narrow viewport', async ({ page }, testInfo) => {
     const trigger = page.getByRole('button', {
-      name: 'Forecast menu, current workspace Severe',
+      name: 'Forecast menu, current page Severe',
     });
     await expect(trigger).toBeVisible();
     await trigger.focus();
@@ -36,9 +36,22 @@ test.describe('Forecast header navigation', () => {
     await page.mouse.click(1300, 800);
     await expect(menu).toBeHidden();
 
-    await page.setViewportSize({ width: 375, height: 812 });
-    await expect(trigger).toBeVisible();
     await trigger.click();
+    await page.getByRole('menuitem', { name: 'Discussion' }).click();
+    await expect(page).toHaveURL(/\/discussion/);
+    const discussionTrigger = page.getByRole('button', {
+      name: 'Forecast menu, current page Discussion',
+    });
+    await expect(discussionTrigger).toHaveClass(/is-active/);
+
+    await page.goto('/forecast/severe');
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    const narrowTrigger = page.getByRole('button', {
+      name: 'Forecast menu, current page Severe',
+    });
+    await expect(narrowTrigger).toBeVisible();
+    await narrowTrigger.click();
     await expect(menu).toBeVisible();
     const menuBounds = await menu.boundingBox();
     expect(menuBounds).not.toBeNull();

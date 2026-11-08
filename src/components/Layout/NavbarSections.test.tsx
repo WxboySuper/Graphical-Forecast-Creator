@@ -6,6 +6,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
 import { getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
+import { getVisibleNavigationItems } from '../../config/featureNavigation';
 
 const mockUseAuth = jest.fn();
 
@@ -52,12 +53,12 @@ describe('NavbarSections', () => {
 
     expect(screen.getByText('Graphical Forecast Creator')).toBeInTheDocument();
     expect(screen.getByText('GFC')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Forecast menu, current workspace Severe/i }))
+    expect(screen.getByRole('button', { name: /Forecast menu, current page Severe/i }))
       .toHaveClass('is-active');
     expect(screen.getByRole('link', { name: 'Monitor' })).toHaveAttribute('href', '/monitor');
-    expect(screen.queryByRole('link', { name: 'Tropical' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tropical forecast workspace' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Winter' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Forecast menu, current workspace Severe/i }))
+    expect(screen.getByRole('button', { name: /Forecast menu, current page Severe/i }))
       .toBeInTheDocument();
 
     const workspaceLinks = getExposedForecastWorkspaces().map((workspace) =>
@@ -67,7 +68,13 @@ describe('NavbarSections', () => {
       getExposedForecastWorkspaces().map((workspace) => workspace.path)
     );
     expect(screen.getByRole('link', { name: 'Severe forecast workspace' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Discussion' })).toHaveAttribute('href', '/discussion');
+    const otherItems = getVisibleNavigationItems().filter(
+      ({ id }) => !['home', 'forecast', 'verification', 'monitor'].includes(id)
+    );
+    for (const item of otherItems) {
+      const label = item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', item.to);
+    }
     for (const workspace of getExposedForecastWorkspaces()) {
       const workspaceLink = screen.getByRole('link', {
         name: `${workspace.label} forecast workspace`,
@@ -83,6 +90,18 @@ describe('NavbarSections', () => {
         expect(screen.getByText(focusPoint)).toBeInTheDocument();
       }
     }
+  });
+
+  test('marks the Discussion compatibility route as the current Forecast menu context', () => {
+    render(
+      <MemoryRouter initialEntries={['/discussion/thread/42']}>
+        <MainTabs />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' }))
+      .toHaveClass('is-active');
+    expect(screen.getByRole('link', { name: 'Discussion' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('wires account state, theme toggle, legal/docs actions, and external links', () => {

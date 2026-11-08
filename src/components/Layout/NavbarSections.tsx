@@ -149,14 +149,20 @@ const getCurrentForecastWorkspace = (
     pathname === workspace.path || pathname.startsWith(`${workspace.path}/`)
   );
 
+const isDiscussionRoute = (pathname: string): boolean =>
+  pathname === '/discussion' || pathname.startsWith('/discussion/');
+
 const ForecastNavigationMenu: FC<{
   item: AppNavigationItemWithId;
   pathname: string;
-}> = ({ item, pathname }) => {
+  otherItems: AppNavigationItemWithId[];
+}> = ({ item, pathname, otherItems }) => {
   const workspaces = getExposedForecastWorkspaces();
   const currentWorkspace = getCurrentForecastWorkspace(pathname, workspaces);
-  const isActive = isNavigationItemActive(pathname, item.to, item.end);
+  const currentDiscussion = isDiscussionRoute(pathname);
+  const isActive = isNavigationItemActive(pathname, item.to, item.end) || currentDiscussion;
   const Icon = NAV_ITEM_ICONS[item.id];
+  const currentPageLabel = currentWorkspace?.label ?? (currentDiscussion ? 'Discussion' : undefined);
 
   return (
     <DropdownMenu>
@@ -164,8 +170,8 @@ const ForecastNavigationMenu: FC<{
         <Button
           variant="ghost"
           className={cn('app-navbar__tab app-navbar__forecastTrigger', isActive && 'is-active')}
-          aria-label={`Forecast menu${currentWorkspace ? `, current workspace ${currentWorkspace.label}` : ''}`}
-          aria-current={isActive ? 'page' : undefined}
+          aria-label={`Forecast menu${currentPageLabel ? `, current page ${currentPageLabel}` : ''}`}
+          aria-current={isNavigationItemActive(pathname, item.to, item.end) ? 'page' : undefined}
           aria-haspopup="menu"
           title={`Forecast workspaces${item.shortcutLabel ? ` (${item.shortcutLabel})` : ''}`}
         >
@@ -202,13 +208,26 @@ const ForecastNavigationMenu: FC<{
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="px-2 py-1.5">Other</DropdownMenuLabel>
-        <DropdownMenuItem asChild>
-          <NavLink to="/discussion" aria-label="Discussion">
-            <MessageSquare className="h-4 w-4" aria-hidden="true" />
-            Discussion
-          </NavLink>
-        </DropdownMenuItem>
+        <DropdownMenuLabel className="px-2 py-1.5">Other destinations</DropdownMenuLabel>
+        {otherItems.map((otherItem) => {
+          const OtherIcon = NAV_ITEM_ICONS[otherItem.id];
+          const label = otherItem.id === 'tropical-workspace' ? 'Tropical tools' : otherItem.label;
+          const isCurrent = isNavigationItemActive(pathname, otherItem.to, otherItem.end);
+
+          return (
+            <DropdownMenuItem key={otherItem.id} asChild>
+              <NavLink
+                to={otherItem.to}
+                end={otherItem.end}
+                aria-label={label}
+                aria-current={isCurrent ? 'page' : undefined}
+              >
+                <OtherIcon className="h-4 w-4" aria-hidden="true" />
+                {label}
+              </NavLink>
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -239,12 +258,14 @@ const MainNavigationLink: FC<{
 // The MainTabs component keeps primary navigation next to the brand so the header reads left-to-right instead of as separate islands.
 export const MainTabs: FC = () => {
   const { pathname } = useLocation();
-  const navItems = getVisibleNavigationItems().filter(({ id }) => MAIN_NAVIGATION_IDS.has(id));
+  const visibleItems = getVisibleNavigationItems();
+  const navItems = visibleItems.filter(({ id }) => MAIN_NAVIGATION_IDS.has(id));
+  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id));
 
   return (
     <div className="app-navbar__tabs">
       {navItems.map((item) => item.id === 'forecast'
-        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} />
+        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} otherItems={otherItems} />
         : <MainNavigationLink key={item.id} item={item} pathname={pathname} />)}
     </div>
   );
