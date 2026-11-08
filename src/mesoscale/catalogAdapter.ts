@@ -33,15 +33,22 @@ const hasValidSource = (value: unknown): boolean => {
   return typeof value.attribution === 'string';
 };
 
+const hasValidParameterStatus = (value: unknown): boolean => ['complete', 'partial', 'failed'].includes(String(value));
+
+const isValidRasterDescriptor = (value: Record<string, unknown>): boolean => {
+  if (value.type !== 'xyz-raster') return false;
+  if (!hasValidTileUrl(value) || !hasValidTileFormat(value)) return false;
+  if (!hasValidTileZoom(value)) return false;
+  return hasBounds(value.bounds);
+};
+
 const isCatalogParameter = (value: unknown): boolean => {
-  if (!isRecord(value) || !isRecord(value.data)) return false;
-  if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
-  const tile = value.data;
-  if (tile.type !== 'xyz-raster') return false;
-  if (!hasValidTileUrl(tile) || !hasValidTileFormat(tile)) return false;
-  if (!hasValidTileZoom(tile)) return false;
+  if (!isRecord(value)) return false;
+  if (!isRecord(value.data)) return false;
+  if (!hasValidParameterStatus(value.status)) return false;
+  if (!isValidRasterDescriptor(value.data)) return false;
   if (!hasValidSource(value.source)) return false;
-  return hasBounds(tile.bounds);
+  return true;
 };
 
 const isValidFrameType = (frameType: unknown, forecastHour: unknown): boolean => {
@@ -50,7 +57,8 @@ const isValidFrameType = (frameType: unknown, forecastHour: unknown): boolean =>
 };
 
 const isCatalogFrame = (value: unknown): boolean => {
-  if (!isRecord(value) || !Array.isArray(value.parameters)) return false;
+  if (!isRecord(value)) return false;
+  if (!Array.isArray(value.parameters)) return false;
   if (!isValidFrameType(value.frameType, value.forecastHour)) return false;
   if (!Number.isInteger(value.forecastHour)) return false;
   if (!Number.isFinite(Date.parse(String(value.validTime)))) return false;

@@ -30,7 +30,10 @@ export interface CatalogRequestOptions { model: MesoscaleModelId; cycle: string;
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_RETRIES = 2;
-const isAbort = (error: unknown): boolean => error instanceof DOMException && error.name === 'AbortError';
+const isAbort = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object' || !('name' in error)) return false;
+  return error.name === 'AbortError' || error.name === 'TimeoutError';
+};
 
 const combineSignal = ({ parent, timeoutMs }: { parent?: AbortSignal; timeoutMs: number }) => {
   const controller = new AbortController();
@@ -54,7 +57,17 @@ async function fetchAttempt({ url, options }: UrlRequestOptions): Promise<{ resp
 
 const retryCount = (options: RequestOptions): number => Math.max(0, Math.min(options.retries ?? DEFAULT_RETRIES, 3));
 
-const pauseBeforeRetry = ({ attempt }: { attempt: number }): Promise<void> => new Promise(resolve => setTimeout(resolve, 150 * (2 ** attempt)));
+const pauseBeforeRetry = ({ attempt, signal }: { attempt: number; signal?: AbortSignal }): Promise<void> => new Promise((resolve, reject) => {
+  const cleanup = () => signal?.removeEventListener('abort', abort);
+  const timer = setTimeout(() => { cleanup(); resolve(); }, 150 * (2 ** attempt));
+  const abort = () => {
+    clearTimeout(timer);
+    cleanup();
+    reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+  };
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
+});
 
 const shouldKeepResponse = ({ response, attempt, attempts }: { response: Response; attempt: number; attempts: number }): boolean => {
   if (response.ok) return true;
@@ -83,7 +96,7 @@ async function fetchResponse({ url, options }: UrlRequestOptions): Promise<{ res
   for (let attempt = 0; attempt <= attempts; attempt += 1) {
     const request = await attemptWithRetry({ url, options, attempt, attempts });
     if (request) return request;
-    await pauseBeforeRetry({ attempt });
+    await pauseBeforeRetry({ attempt, signal: options.signal });
   }
   throw new Error('Mesoscale request failed.');
 }
@@ -179,9 +192,26 @@ export const fetchMesoscaleCatalog = ({ model, cycle, options = {} }: CatalogReq
   });
 };
 
+const isStatusModel = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
+  if (!['hrrr', 'rap', 'rrfs'].includes(String(value.modelId))) return false;
+  if (typeof value.latestCycleTime === 'string' && !Number.isFinite(Date.parse(value.latestCycleTime))) return false;
+  if (value.latestCycleTime !== null && typeof value.latestCycleTime !== 'string') return false;
+  if (value.ageMinutes !== null && !Number.isFinite(value.ageMinutes)) return false;
+  if (typeof value.stale !== 'boolean') return false;
+  if (!['complete', 'partial', 'failed', 'missing', 'invalid', 'unavailable'].includes(String(value.health))) return false;
+  return value.healthGeneratedAt === null || Number.isFinite(Date.parse(String(value.healthGeneratedAt)));
+};
+
+const isValidStatus = (value: MesoscaleStatus): boolean => {
+  if (!['healthy', 'degraded'].includes(value.status)) return false;
+  if (!Array.isArray(value.models)) return false;
+  return value.models.every(isStatusModel);
+};
+
 export const fetchMesoscaleStatus = (options: RequestOptions = {}) => readJson<MesoscaleStatus>({ path: 'status', options }).then(result => {
   if (!hasData(result)) return result;
-  if (!['healthy', 'degraded'].includes(result.data.status) || !Array.isArray(result.data.models)) {
+  if (!isValidStatus(result.data)) {
     return { state: 'malformed' as const, message: 'Status response does not match the catalog contract.' };
   }
   return result.data.status === 'degraded' ? { ...result, state: 'partial' as const } : result;

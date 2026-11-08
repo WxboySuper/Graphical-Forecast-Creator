@@ -59,6 +59,17 @@ describe('mesoscale client', () => {
     expect(result).toMatchObject({ state: 'ready', ageMinutes: null });
   });
 
+  it('rejects malformed status model entries before exposing them to hooks', async () => {
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({ status: 'healthy', models: [null] }),
+    });
+    const result = await fetchMesoscaleStatus({ fetcher, config: { ...fixtures.config!, fixtures: false } });
+    expect(result).toMatchObject({ state: 'malformed' });
+  });
+
   it('caps retries and rejects a catalog whose cycle differs from the request', async () => {
     const failed = jest.fn().mockRejectedValue(new TypeError('offline'));
     const result = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher: failed, retries: 20, config: { ...fixtures.config!, fixtures: false } } });

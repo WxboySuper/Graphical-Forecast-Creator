@@ -27,7 +27,7 @@ describe('mesoscale hooks', () => {
     expect(selectMesoscaleFrames(mixed, 'forecast').map(frame => frame.forecastHour)).toEqual([1]);
   });
 
-  it('marks an invalid status cycle age as unknown and stale', async () => {
+  it('rejects invalid status cycle timestamps before hooks consume them', async () => {
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -36,6 +36,6 @@ describe('mesoscale hooks', () => {
     });
     const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
     const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
-    await waitFor(() => expect(result.current).toMatchObject({ state: 'stale', data: { models: [{ ageMinutes: null, stale: true }] } }));
+    await waitFor(() => expect(result.current).toMatchObject({ state: 'malformed' }));
   });
 });
