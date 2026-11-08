@@ -36,6 +36,9 @@ pipeline stage writes a `failed` health report with the exception class and
 message; the report write does not modify latest. A complete cycle already in
 the store is checked immediately after discovery so a rerun skips GRIB ranges,
 decoding, and rendering, while still retrying a missing/stale latest pointer.
+Retention runs after the latest pointer flips. A cleanup error is reported as a
+warning and does not turn a successfully published cycle into a failed health
+report; the next successful run retries cleanup.
 
 Install the pinned Python dependencies from `scripts/mesoscale/requirements.txt`.
 Run parser and publisher tests with:

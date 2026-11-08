@@ -130,19 +130,39 @@ def save_tiles(image, root):
     from PIL import Image
     count, total = 0, 0
     for zoom in range(ZOOM_MIN, ZOOM_MAX + 1):
-        scale = 2 ** (ZOOM_MAX - zoom)
-        level = image.resize((TILE_SIZE * 2**zoom, TILE_SIZE * 2**zoom), Image.Resampling.BOX) if scale > 1 else image
-        for tx in range(2**zoom):
-            for ty in range(2**zoom):
-                tile = level.crop((tx*TILE_SIZE, ty*TILE_SIZE, (tx+1)*TILE_SIZE, (ty+1)*TILE_SIZE))
-                if tile.getbbox() is None:
-                    continue
-                path = root / str(zoom) / str(tx) / f"{ty}.png"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                tile.save(path, format="PNG", optimize=True)
-                count += 1
-                total += path.stat().st_size
+        count_zoom, bytes_zoom = save_zoom_tiles(image, root, zoom, Image)
+        count += count_zoom
+        total += bytes_zoom
     return count, total
+
+
+def save_zoom_tiles(image, root: Path, zoom: int, image_module) -> tuple[int, int]:
+    scale = 2 ** (ZOOM_MAX - zoom)
+    level = resized_level(image, zoom, scale, image_module)
+    count, total = 0, 0
+    for tx in range(2**zoom):
+        for ty in range(2**zoom):
+            size = save_tile(level, root, zoom, tx, ty)
+            if size:
+                count += 1
+                total += size
+    return count, total
+
+
+def resized_level(image, zoom: int, scale: int, image_module):
+    if scale <= 1:
+        return image
+    return image.resize((TILE_SIZE * 2**zoom, TILE_SIZE * 2**zoom), image_module.Resampling.BOX)
+
+
+def save_tile(level, root: Path, zoom: int, tx: int, ty: int) -> int:
+    tile = level.crop((tx*TILE_SIZE, ty*TILE_SIZE, (tx+1)*TILE_SIZE, (ty+1)*TILE_SIZE))
+    if tile.getbbox() is None:
+        return 0
+    path = root / str(zoom) / str(tx) / f"{ty}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tile.save(path, format="PNG", optimize=True)
+    return path.stat().st_size
 
 def handle_latlon(handle):
     import numpy as np
@@ -226,15 +246,30 @@ def decode_handle(handle, request: DecodeRequest):
     values, lats, lons = values.reshape((nj, ni)), lats.reshape((nj, ni)), lons.reshape((nj, ni))
     parameter = codes_get(handle, "shortName")
     param_id = codes_get(handle, "paramId")
-    native_parameter = {"10u": "UGRD", "u10": "UGRD", "10v": "VGRD", "v10": "VGRD"}.get(parameter, parameter)
-    native_parameter = {165: "UGRD", 166: "VGRD"}.get(param_id, native_parameter)
-    matching = [fid for fid in request.field_ids if fid.rsplit(":", 1)[-1] == native_parameter]
-    if not matching and len(request.field_ids) == 1:
-        matching = request.field_ids
-    record_parameter = matching[0].rsplit(":", 1)[-1] if len(matching) == 1 else native_parameter
-    record = next((asdict(row) for row, _ in request.ranged if row.offset == request.offset and row.parameter == record_parameter), {})
+    native_parameter = native_identity(parameter, param_id)
+    matching = matched_field_ids(request.field_ids, native_parameter)
+    record_parameter = resolved_record_parameter(matching, native_parameter)
+    record = source_record(request, record_parameter)
     grid = GridData(values, lats, lons)
     return [decoded_field(fid.split(":", 1)[0], request, grid, record) for fid in matching]
+
+
+def native_identity(parameter: str, param_id: int) -> str:
+    short_names = {"10u": "UGRD", "u10": "UGRD", "10v": "VGRD", "v10": "VGRD"}
+    return {165: "UGRD", 166: "VGRD"}.get(param_id, short_names.get(parameter, parameter))
+
+
+def matched_field_ids(field_ids: list[str], parameter: str) -> list[str]:
+    matches = [field_id for field_id in field_ids if field_id.rsplit(":", 1)[-1] == parameter]
+    return matches or field_ids if len(field_ids) == 1 else matches
+
+
+def resolved_record_parameter(matches: list[str], parameter: str) -> str:
+    return matches[0].rsplit(":", 1)[-1] if len(matches) == 1 else parameter
+
+
+def source_record(request: DecodeRequest, parameter: str) -> dict:
+    return next((asdict(row) for row, _ in request.ranged if row.offset == request.offset and row.parameter == parameter), {})
 
 
 def decoded_field(field_id: str, request: DecodeRequest, grid: GridData, record: dict) -> tuple[str, dict]:

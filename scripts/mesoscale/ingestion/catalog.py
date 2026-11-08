@@ -27,13 +27,33 @@ def validate_catalog(catalog: dict) -> None:
 
 
 def validate_catalog_minimum(catalog: dict) -> None:
-    required = {"schemaVersion", "model", "cycleTime", "status", "receivedAt", "processedAt", "ageMinutes", "processingVersion", "domain", "frames"}
-    if not isinstance(catalog, dict) or not required.issubset(catalog):
+    required_types = {"schemaVersion": int, "model": dict, "cycleTime": str, "status": str, "receivedAt": str, "processedAt": str, "ageMinutes": int, "processingVersion": str, "domain": dict, "frames": list}
+    if not isinstance(catalog, dict):
         raise ValueError("catalog missing required v1 fields")
-    if catalog["schemaVersion"] != 1 or catalog["status"] not in {"complete", "partial", "failed"}:
-        raise ValueError("invalid catalog schema version or status")
-    if not isinstance(catalog["frames"], list) or not catalog["frames"]:
+    validate_required_types(catalog, required_types)
+    validate_catalog_version(catalog["schemaVersion"])
+    validate_catalog_status(catalog["status"])
+    if not catalog["frames"]:
         raise ValueError("catalog frames must be a non-empty array")
+
+
+def validate_required_types(catalog: dict, required_types: dict[str, type]) -> None:
+    missing = required_types.keys() - catalog.keys()
+    if missing:
+        raise ValueError(f"catalog missing required v1 fields: {sorted(missing)}")
+    invalid = [key for key, value_type in required_types.items() if type(catalog[key]) is not value_type]
+    if invalid:
+        raise ValueError(f"catalog fields have invalid types: {invalid}")
+
+
+def validate_catalog_version(version: int) -> None:
+    if version != 1:
+        raise ValueError("invalid catalog schema version")
+
+
+def validate_catalog_status(status: str) -> None:
+    if status not in {"complete", "partial", "failed"}:
+        raise ValueError("invalid catalog status")
 
 
 def validate_frame_types(catalog: dict) -> None:

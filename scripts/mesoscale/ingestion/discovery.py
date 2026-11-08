@@ -17,11 +17,24 @@ def request(url: str, headers: dict[str, str] | None = None, attempts: int = RET
         try:
             return request_once(url, headers)
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
-            fail_permanent_http_error(exc, url)
+            check_retryable(exc, url)
             error = exc
-            if attempt + 1 < attempts:
-                time.sleep(RETRY_BASE_SECONDS * 2**attempt)
+            wait_before_retry(attempt, attempts)
     raise RuntimeError(f"request failed after {attempts} attempts: {url}: {error}")
+
+
+def wait_before_retry(attempt: int, attempts: int) -> None:
+    if attempt + 1 < attempts:
+        time.sleep(RETRY_BASE_SECONDS * 2**attempt)
+
+
+def check_retryable(error: Exception, url: str) -> None:
+    if is_permanent_http_error(error):
+        raise RuntimeError(f"NOAA object unavailable ({error.code}): {url}") from error
+
+
+def is_permanent_http_error(error: Exception) -> bool:
+    return isinstance(error, urllib.error.HTTPError) and 400 <= error.code < 500 and error.code != 429
 
 
 def request_once(url: str, headers: dict[str, str] | None) -> tuple[bytes, object]:
@@ -31,8 +44,7 @@ def request_once(url: str, headers: dict[str, str] | None) -> tuple[bytes, objec
 
 
 def fail_permanent_http_error(error: Exception, url: str) -> None:
-    if isinstance(error, urllib.error.HTTPError) and 400 <= error.code < 500 and error.code != 429:
-        raise RuntimeError(f"NOAA object unavailable ({error.code}): {url}") from error
+    check_retryable(error, url)
 
 def discover_cycle(model: Model, now: datetime | None = None, lookback_hours: int = 30) -> tuple[datetime, str, str]:
     """Return newest f00 whose GRIB and index exist and whose index resolves all required fields."""
@@ -40,15 +52,19 @@ def discover_cycle(model: Model, now: datetime | None = None, lookback_hours: in
     base = now.replace(minute=0, second=0, microsecond=0)
     for age in range(lookback_hours):
         cycle = base - timedelta(hours=age)
-        if cycle.hour % model.cadence:
-            continue
-        try:
-            candidate = discover_candidate(model, cycle)
-            if candidate:
-                return candidate
-        except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, KeyError, ValueError):
-            continue
+        candidate = discover_cycle_candidate(model, cycle)
+        if candidate is not None:
+            return candidate
     raise RuntimeError(f"No complete {model.id} f00 cycle found in the last {lookback_hours} hours")
+
+
+def discover_cycle_candidate(model: Model, cycle: datetime):
+    if cycle.hour % model.cadence:
+        return None
+    try:
+        return discover_candidate(model, cycle)
+    except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, KeyError, ValueError):
+        return None
 
 
 def discover_candidate(model: Model, cycle: datetime) -> tuple[datetime, str, str] | None:

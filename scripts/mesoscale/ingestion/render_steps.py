@@ -116,9 +116,13 @@ def decode_source(context, source: SourceBundle, decode_range, np) -> tuple[dict
 def fetch_range(url: str, offset: int, end: int, size: int) -> bytes:
     data, response = request(url, {"Range": f"bytes={offset}-{end}"})
     expected = f"bytes {offset}-{end}/{size}"
-    if response.status != 206 or response.headers.get("Content-Range") != expected or len(data) != end-offset+1:
+    if not valid_range_response(response, data, expected, end - offset + 1):
         raise IOError(f"invalid HTTP range response for bytes {offset}-{end}")
     return data
+
+
+def valid_range_response(response, data: bytes, expected_range: str, expected_bytes: int) -> bool:
+    return response.status == 206 and response.headers.get("Content-Range") == expected_range and len(data) == expected_bytes
 
 
 def render_fields(context, source: SourceBundle, fields: dict, render_tiles) -> tuple[list, dict, int, int]:

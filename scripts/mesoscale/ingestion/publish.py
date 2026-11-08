@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import argparse, hashlib, json, math, os, re, tempfile, time, urllib.error, urllib.request
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime, timedelta
@@ -77,20 +79,52 @@ def publish_pointer(store: Store, model_id: str, cycle: datetime, catalog: dict)
 def publish_cycle(store: Store, request: PublishRequest) -> None:
     """Verify all tile objects before publishing catalog and latest pointer."""
     validate_catalog(request.catalog)
-    if request.catalog["status"] != "complete":
+    if not complete_catalog(request.catalog):
         raise ValueError("partial or failed cycles cannot be published as latest")
-    if already_published(store, request.model_id, request.cycle):
-        if not latest_is_newer(store, request.model_id, request.cycle):
-            publish_pointer(store, request.model_id, request.cycle, request.catalog)
-        return
-    if latest_is_newer(store, request.model_id, request.cycle):
+    if skip_publication(store, request):
         return
     upload_tiles(store, request)
     store.put(catalog_key(request.model_id, request.cycle), json.dumps(request.catalog, separators=(",", ":")).encode(), "application/json")
     publish_pointer(store, request.model_id, request.cycle, request.catalog)
+    retain_cycles(store, request)
+
+
+def complete_catalog(catalog: dict) -> bool:
+    return catalog["status"] == "complete"
+
+
+def skip_publication(store: Store, request: PublishRequest) -> bool:
+    if already_published(store, request.model_id, request.cycle):
+        restore_pointer(store, request)
+        return True
+    return latest_is_newer(store, request.model_id, request.cycle)
+
+
+def restore_pointer(store: Store, request: PublishRequest) -> None:
+    if not latest_is_newer(store, request.model_id, request.cycle):
+        publish_pointer(store, request.model_id, request.cycle, request.catalog)
+
+
+def retain_cycles(store: Store, request: PublishRequest) -> None:
+    try:
+        prune_old_cycles(store, request)
+    except Exception as error:
+        warnings.warn(f"cycle published but retention cleanup failed: {error}", RuntimeWarning)
+
+
+def prune_old_cycles(store: Store, request: PublishRequest) -> None:
     catalogs = sorted((key for key in store.list(f"mesoscale/v1/catalog/{request.model_id}") if key.endswith(".json")), reverse=True)
     for old_catalog in catalogs[request.keep:]:
-        old_id = Path(old_catalog).stem
-        for key in store.list(f"mesoscale/v1/tiles/{request.model_id}/{old_id}"):
-            store.delete(key)
-        store.delete(old_catalog)
+        remove_cycle(store, request.model_id, old_catalog)
+
+
+def remove_cycle(store: Store, model_id: str, catalog_key_name: str) -> None:
+    old_id = Path(catalog_key_name).stem
+    delete_old_tiles(store, model_id, old_id)
+    store.delete(catalog_key_name)
+
+
+def delete_old_tiles(store: Store, model_id: str, cycle_name: str) -> None:
+    prefix = f"mesoscale/v1/tiles/{model_id}/{cycle_name}"
+    for key in store.list(prefix):
+        store.delete(key)

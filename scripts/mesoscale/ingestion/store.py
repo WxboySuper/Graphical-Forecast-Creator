@@ -97,13 +97,26 @@ class R2Store:
     def verify_sizes(self, expected: dict[str, int]) -> None:
         if not expected:
             return
-        prefixes = {"/".join(key.split("/")[:6]) + "/" for key in expected}
-        if len(prefixes) != 1:
-            raise ValueError("tile verification requires a shared cycle prefix")
-        found = {}
-        paginator = self.client.get_paginator("list_objects_v2")
-        for page in paginator.paginate(Bucket=self.bucket, Prefix=next(iter(prefixes))):
-            found.update({obj["Key"]: obj["Size"] for obj in page.get("Contents", [])})
-        missing = [key for key, size in expected.items() if found.get(key) != size]
+        prefix = shared_tile_prefix(expected)
+        found = self.list_sizes(prefix)
+        missing = missing_size_keys(expected, found)
         if missing:
             raise IOError(f"stored object verification failed: {missing[0]}")
+
+    def list_sizes(self, prefix: str) -> dict[str, int]:
+        paginator = self.client.get_paginator("list_objects_v2")
+        found = {}
+        for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
+            found.update({obj["Key"]: obj["Size"] for obj in page.get("Contents", [])})
+        return found
+
+
+def shared_tile_prefix(expected: dict[str, int]) -> str:
+    prefixes = {"/".join(key.split("/")[:6]) + "/" for key in expected}
+    if len(prefixes) != 1:
+        raise ValueError("tile verification requires a shared cycle prefix")
+    return next(iter(prefixes))
+
+
+def missing_size_keys(expected: dict[str, int], found: dict[str, int]) -> list[str]:
+    return [key for key, size in expected.items() if found.get(key) != size]
