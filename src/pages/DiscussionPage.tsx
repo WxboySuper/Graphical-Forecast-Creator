@@ -4,7 +4,7 @@
  * preview, export, and workflow handoff. It composes editors and shared state
  * helpers; discussion formatting and storage rules remain in utility modules.
  */
-import React, { useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useOutletContext, useSearchParams } from 'react-router';
 import { 
@@ -79,7 +79,8 @@ const DiscussionHeaderBar: React.FC<{
   hasUnsavedChanges: boolean;
   onExport: () => void;
   onSave: () => void;
-}> = ({ currentDay, groupingLabel, hasUnsavedChanges, onExport, onSave }) => (
+  previewToggle?: { open: boolean; onToggle: () => void };
+}> = ({ currentDay, groupingLabel, hasUnsavedChanges, onExport, onSave, previewToggle }) => (
   <div className="discussion-header-bar flex-shrink-0 border-b border-border bg-card px-6 py-4">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -94,6 +95,17 @@ const DiscussionHeaderBar: React.FC<{
       </div>
 
       <div className="flex items-center gap-2">
+        {previewToggle ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="discussion-preview-toggle"
+            onClick={previewToggle.onToggle}
+          >
+            {previewToggle.open ? <Edit3 className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+            {previewToggle.open ? 'Edit' : 'Preview'}
+          </Button>
+        ) : null}
         <Button variant="outline" size="sm" onClick={onExport}>
           <Download className="h-4 w-4 mr-2" />
           Export
@@ -503,6 +515,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number 
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { addToast } = useOutletContext<PageContext>();
   const { syncedSettings, user } = useAuth();
   const forecastCycle = useSelector(selectForecastCycle);
@@ -586,6 +599,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number 
         hasUnsavedChanges={editorState.hasUnsavedChanges}
         onExport={editorState.handleExport}
         onSave={editorState.handleSave}
+        previewToggle={embedded ? { open: previewOpen, onToggle: () => setPreviewOpen((open) => !open) } : undefined}
       />
       <DiscussionScopeSection
         groupings={groupings}
@@ -595,7 +609,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number 
         onReset={handleResetGroupings}
       />
 
-      <div className="discussion-layout flex-1 flex overflow-hidden">
+      <div className={`discussion-layout flex-1 flex overflow-hidden${previewOpen ? ' discussion-layout--preview' : ''}`}>
         <div className="discussion-editor-pane flex flex-col overflow-hidden border-r border-border">
           <MetadataSection
             validStart={editorState.validStart}

@@ -1,9 +1,9 @@
-import { mkdir } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+/** Verifies the Severe workspace surfaces: Discussion in full-width and side-panel layouts, the legacy /discussion handoff, Review, and focus handling. */
+import { expect, test, type Page } from '@playwright/test';
 import { prepareAppState } from './testSetup';
 
-const screenshots = resolve(process.cwd(), 'artifacts/issue-916');
+const horizontalOverflow = (page: Page) =>
+  page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
 test.describe('Severe discussion workspace layouts', () => {
   test.beforeEach(async ({ page }) => {
@@ -16,18 +16,14 @@ test.describe('Severe discussion workspace layouts', () => {
     { name: 'phone-390x844', width: 390, height: 844 },
   ]) {
     for (const layout of ['tabs', 'panel'] as const) {
-      test(`captures ${layout} at ${viewport.name}`, async ({ page }) => {
+      test(`shows Discussion without horizontal overflow: ${layout} at ${viewport.name}`, async ({ page }) => {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await page.goto(`/forecast/severe?surface=discussion&discussionLayout=${layout}`);
         const tabList = page.getByRole('tablist', { name: 'Severe forecast workspace' });
         await expect(tabList.getByRole('tab')).toHaveCount(3);
-        await expect(tabList.locator('button:not([role="tab"])')).toHaveCount(0);
         await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
         await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toBeVisible();
-        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-        expect(overflow).toBeLessThanOrEqual(1);
-        await mkdir(screenshots, { recursive: true });
-        await page.screenshot({ path: resolve(screenshots, `discussion-${layout}-${viewport.name}.png`), fullPage: false });
+        expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
       });
     }
   }
@@ -60,42 +56,67 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('button', { name: 'Pan map' })).toBeVisible();
   });
 
-  test('persists the layout choice and allows a query override', async ({ page }) => {
+  test('opens Discussion beside the map, resizes it, and remembers the layout', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/forecast/severe');
     await page.getByRole('button', { name: 'Side panel' }).click();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
     await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toHaveCount(0);
+
     await page.getByRole('tab', { name: 'Discussion' }).click();
     await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pan map' })).toBeVisible();
+
     const splitter = page.getByRole('separator', { name: 'Resize discussion panel' });
     await splitter.focus();
     await page.keyboard.press('ArrowLeft');
-    await expect(splitter).toHaveAttribute('aria-valuenow', '664');
+    await expect(splitter).toHaveAttribute('aria-valuenow', '584');
     const bounds = await splitter.boundingBox();
     expect(bounds).not.toBeNull();
     await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
     await page.mouse.down();
     await page.mouse.move(bounds!.x + bounds!.width / 2 - 80, bounds!.y + bounds!.height / 2);
     await page.mouse.up();
-    await expect(splitter).toHaveAttribute('aria-valuenow', '744');
-    await page.getByRole('button', { name: 'Hide panel' }).click();
+    await expect(splitter).toHaveAttribute('aria-valuenow', '664');
+
+    await page.getByRole('tab', { name: 'Map' }).click();
     await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Show panel' }).click();
-    await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toBeVisible();
+
     await page.reload();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
-    await expect(page.getByRole('separator', { name: 'Resize discussion panel' })).toHaveAttribute('aria-valuenow', '744');
+    await page.getByRole('tab', { name: 'Discussion' }).click();
+    await expect(page.getByRole('separator', { name: 'Resize discussion panel' })).toHaveAttribute('aria-valuenow', '664');
+  });
+
+  test('stacks the Discussion fields in a narrow side panel and switches between Edit and Preview', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/forecast/severe?surface=discussion&discussionLayout=panel');
+    const preview = page.getByRole('button', { name: 'Preview' });
+    await expect(preview).toBeVisible();
+    await expect(page.getByText('Live Preview')).toBeHidden();
+    const validFrom = page.getByLabel('Valid From');
+    const box = await validFrom.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThan(200);
+
+    await preview.click();
+    await expect(page.getByText('Live Preview')).toBeVisible();
+    await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toBeHidden();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toBeVisible();
+  });
+
+  test('falls back to full width on a phone and hides the layout choice', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/forecast/severe?discussionLayout=panel&surface=discussion');
-    const narrowOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(narrowOverflow).toBeLessThanOrEqual(1);
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
-    await page.getByRole('button', { name: 'Hide panel' }).click();
-    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
-    await expect(page.locator('.severe-workspace__map')).not.toBeVisible();
-    await page.goto('/forecast/severe?discussionLayout=tabs');
-    await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--tabs/);
+    await expect(page.getByRole('group', { name: 'Discussion layout' })).toHaveCount(0);
+    const map = page.locator('.severe-workspace__map');
+    await expect(map).not.toBeVisible();
+    await expect(map).toHaveAttribute('aria-hidden', 'true');
+    await page.getByRole('tab', { name: 'Map' }).click();
+    await expect(map).toBeVisible();
   });
 
   test('keeps export available in Review when no workflow is active', async ({ page }) => {
@@ -114,17 +135,5 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('gfc-open-severe-discussion')));
     await expect(page.getByRole('tab', { name: 'Discussion' })).toBeFocused();
     await expect(page).toHaveURL(/surface=discussion/);
-  });
-
-  test('keeps Discussion open on a phone when the side panel is collapsed', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/forecast/severe?surface=discussion&discussionLayout=panel');
-    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
-    const map = page.locator('.severe-workspace__map');
-    await expect(map).not.toBeVisible();
-    await expect(map).toHaveAttribute('aria-hidden', 'true');
-    await page.getByRole('button', { name: 'Hide panel' }).click();
-    await expect(map).not.toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
   });
 });

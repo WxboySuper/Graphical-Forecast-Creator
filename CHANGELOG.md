@@ -53,7 +53,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
-- **Severe discussion workspace:** Edit the severe forecast map and discussion together using Map, Discussion, and Review / Export tabs or a resizable, collapsible Side panel layout that remembers the selected layout.
+- **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher, and choose whether Discussion opens full width or in a resizable side panel beside the map. The layout choice is remembered, and narrow panels stack the fields and switch between Edit and Preview.
 - **Discussion links:** Existing `/discussion` links now open the discussion inside the severe forecast workspace with query parameters and the URL hash preserved.
 - **Forecast menu:** The header Forecast tab now opens a workspace showcase with an icon, description, and focus chips for each available workspace, marks the current one, previews upcoming workspaces as not yet available, and keeps Discussion one click away.
 - **Monitor NWS alerts:** Show when displayed alert polygons were last fetched after a refresh fails, and keep the retry action clear.

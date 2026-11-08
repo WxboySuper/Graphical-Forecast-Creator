@@ -1,0 +1,233 @@
+/*
+ * Severe workspace shell: a slim control bar (surface switcher + layout choice)
+ * above the active surface. The switcher is a segmented control; the layout
+ * choice is a small labeled pair. Both use theme tokens so they follow light and
+ * dark themes, and both stay at least 36px tall for touch.
+ */
+.severe-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.severe-workspace__bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.severe-workspace__tabs,
+.severe-workspace__segments {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.severe-workspace__tab,
+.severe-workspace__segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.severe-workspace__tab:hover,
+.severe-workspace__segment:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.severe-workspace__tab[aria-selected='true'],
+.severe-workspace__segment[aria-pressed='true'] {
+  border-color: var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.severe-workspace__tab:focus-visible,
+.severe-workspace__segment:focus-visible {
+  outline: 2px solid rgb(37, 99, 235);
+  outline-offset: 2px;
+}
+
+.severe-workspace__segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.severe-workspace__tabIcon {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.severe-workspace__layout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.severe-workspace__layoutLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.severe-workspace__content {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.severe-workspace__map {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.severe-workspace__map > * {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The map stays mounted while another surface shows, so it keeps its state. */
+.severe-workspace__map.is-offscreen {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.severe-workspace__splitter {
+  z-index: 1;
+  flex: 0 0 10px;
+  margin-inline: -5px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.severe-workspace__splitter::after {
+  display: block;
+  width: 2px;
+  height: 100%;
+  margin-inline: auto;
+  background: transparent;
+  content: '';
+  transition: background-color 0.16s ease;
+}
+
+.severe-workspace__splitter:hover::after,
+.severe-workspace__splitter:focus-visible::after {
+  background: rgb(37, 99, 235);
+}
+
+.severe-workspace__splitter:focus-visible {
+  outline: none;
+}
+
+.severe-workspace:has(.severe-workspace__splitter:active) {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.severe-workspace__discussion {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--border-color);
+}
+
+.severe-workspace__discussion--full {
+  flex: 1 1 100%;
+  border-left: 0;
+}
+
+.severe-workspace__review {
+  flex: 1 1 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.severe-workspace__review > section {
+  max-width: 72rem;
+  margin-inline: auto;
+}
+
+@media (max-width: 1100px) {
+  .severe-workspace__layoutLabel {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .severe-workspace__bar {
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .severe-workspace__tabs {
+    width: 100%;
+  }
+
+  .severe-workspace__tab {
+    flex: 1 1 0;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .severe-workspace__tabIcon {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .severe-workspace__tab,
+  .severe-workspace__segment,
+  .severe-workspace__splitter::after {
+    transition: none;
+  }
+}
+
+.dark-mode .severe-workspace__tab:focus-visible,
+.dark-mode .severe-workspace__segment:focus-visible {
+  outline-color: rgb(96, 165, 250);
+}
+
+.dark-mode .severe-workspace__splitter:hover::after,
+.dark-mode .severe-workspace__splitter:focus-visible::after {
+  background: rgb(96, 165, 250);
+}

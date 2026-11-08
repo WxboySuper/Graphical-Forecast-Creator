@@ -8,7 +8,7 @@
  */
 import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate, useOutletContext } from 'react-router';
+import { useNavigate, useOutletContext } from 'react-router';
 import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { Dispatch, UnknownAction } from 'redux';
 import { ForecastMapHandle } from '../components/Map/ForecastMap';
@@ -66,15 +66,8 @@ import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForeca
 import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
-import { lazyWithReload } from '../routing/lazyWithReload';
-import { makeSubtreeUntabbable } from './forecastWorkspaceFocus';
-
-const EmbeddedDiscussionPage = lazyWithReload('discussion', () =>
-  import('./DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
-);
-const DISCUSSION_WORKSPACE_SURFACES = new Set(['discussion', 'review']);
-const getWorkspaceSurface = (value: string | null): 'map' | 'discussion' | 'review' =>
-  DISCUSSION_WORKSPACE_SURFACES.has(value ?? '') ? value as 'discussion' | 'review' : 'map';
+import { ForecastWorkspaceSurfaces } from '../components/ForecastWorkspace/ForecastWorkspaceSurfaces';
+import { useWorkspaceSurface } from '../components/ForecastWorkspace/useWorkspaceSurface';
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -606,7 +599,7 @@ const renderCloudToolbar = ({
 );
 
 /** Composes the forecast page's cloud, file, and shortcut hooks into a single workspace model. */
-// @codescene(disable:"Complex Method", disable:"Large Method", disable:"Overall Code Complexity")
+// @codescene(disable:"Complex Method", disable:"Large Method")
 const useForecastPageWorkspace = ({
   dispatch,
   addToast,
@@ -757,7 +750,6 @@ const useForecastPageWorkspace = ({
 };
 
 /** Root forecast page: mounts the full-screen map with the integrated toolbar and wires all hooks. */
-// @codescene(disable:"Complex Method", disable:"Large Method", disable:"Overall Code Complexity")
 const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ workspaceId }) => {
   const dispatch = useDispatch();
   // The route owns workspace identity: publish it to Redux so saveCurrentCycle tags new cycles.
@@ -765,96 +757,11 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     dispatch(setForecastWorkspace(workspaceId));
   }, [dispatch, workspaceId]);
   const navigate = useNavigate();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const [savedDiscussionLayout, setSavedDiscussionLayout] = useState<'tabs' | 'panel'>(() => {
-    try {
-      return localStorage.getItem('gfc-severe-discussion-layout') === 'panel' ? 'panel' : 'tabs';
-    } catch {
-      return 'tabs';
-    }
-  });
-  const forcedDiscussionLayout = searchParams.get('discussionLayout');
-  const hasForcedDiscussionLayout = forcedDiscussionLayout === 'tabs' || forcedDiscussionLayout === 'panel';
-  const discussionLayout = forcedDiscussionLayout === 'tabs' || forcedDiscussionLayout === 'panel'
-    ? forcedDiscussionLayout
-    : savedDiscussionLayout;
-  const [discussionPanelWidth, setDiscussionPanelWidth] = useState(() => {
-    try {
-      const savedWidth = Number(localStorage.getItem('gfc-severe-discussion-panel-width'));
-      return Number.isFinite(savedWidth) && savedWidth >= 320 && savedWidth <= 800 ? savedWidth : 640;
-    } catch {
-      return 640;
-    }
-  });
-  const [discussionPanelCollapsed, setDiscussionPanelCollapsed] = useState(false);
+  const { surface, selectSurface } = useWorkspaceSurface();
   const [discussionImportRevision, setDiscussionImportRevision] = useState(0);
-  const [resizingDiscussionPanel, setResizingDiscussionPanel] = useState(false);
-  const discussionPanelResizeRef = useRef({ pointerX: 0, width: discussionPanelWidth });
-  const requestedSurface = searchParams.get('surface');
-  const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(() => getWorkspaceSurface(requestedSurface));
-  const [isCompactWorkspace, setIsCompactWorkspace] = useState(() =>
-    typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 900px)').matches,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return undefined;
-    const mediaQuery = window.matchMedia('(max-width: 900px)');
-    const updateCompactLayout = () => setIsCompactWorkspace(mediaQuery.matches);
-    mediaQuery.addEventListener?.('change', updateCompactLayout);
-    return () => mediaQuery.removeEventListener?.('change', updateCompactLayout);
-  }, []);
-  const showHintedCustomDiscussion = workspaceId === 'custom' && surface === 'discussion';
-  const hideMapForDiscussion = surface === 'discussion'
-    && (discussionLayout === 'tabs' || (discussionLayout === 'panel' && (discussionPanelCollapsed || isCompactWorkspace)));
-  useEffect(() => {
-    setSurface(getWorkspaceSurface(requestedSurface));
-  }, [requestedSurface]);
-  useEffect(() => {
-    const openDiscussion = () => {
-      const nextParams = new URLSearchParams(location.search);
-      nextParams.set('surface', 'discussion');
-      navigate({ pathname: location.pathname, search: `?${nextParams.toString()}`, hash: location.hash }, { replace: true });
-      setSurface('discussion');
-    };
-    window.addEventListener('gfc-open-severe-discussion', openDiscussion);
-    return () => window.removeEventListener('gfc-open-severe-discussion', openDiscussion);
-  }, [location.hash, location.pathname, location.search, navigate]);
-  useEffect(() => {
-    try { localStorage.setItem('gfc-severe-discussion-panel-width', String(discussionPanelWidth)); } catch { /* Keep this preference optional when storage is unavailable. */ }
-  }, [discussionPanelWidth]);
-  useEffect(() => {
-    if (!resizingDiscussionPanel) return undefined;
-    const handlePointerMove = (event: PointerEvent) => {
-      const nextWidth = Math.max(320, Math.min(800, discussionPanelResizeRef.current.width + discussionPanelResizeRef.current.pointerX - event.clientX));
-      discussionPanelResizeRef.current = { pointerX: event.clientX, width: nextWidth };
-      setDiscussionPanelWidth(nextWidth);
-    };
-    const stopResizing = () => setResizingDiscussionPanel(false);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', stopResizing, { once: true });
-    window.addEventListener('pointercancel', stopResizing, { once: true });
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', stopResizing);
-      window.removeEventListener('pointercancel', stopResizing);
-    };
-  }, [resizingDiscussionPanel]);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
-  const mapIsHidden = (workspaceId === 'severe' && surface === 'review') || hideMapForDiscussion || showHintedCustomDiscussion;
-  useEffect(() => {
-    const map = workspaceRef.current?.querySelector('.severe-workspace__map, .custom-workspace__map');
-    if (!mapIsHidden) return;
-    if (!map?.contains(document.activeElement)) return;
-    workspaceRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"], [data-workspace-return-map]')?.focus();
-  }, [mapIsHidden, surface]);
-  useEffect(() => {
-    if (!mapIsHidden) return undefined;
-    const map = workspaceRef.current?.querySelector<HTMLElement>('.severe-workspace__map, .custom-workspace__map');
-    if (!map || 'inert' in map) return undefined;
-    return makeSubtreeUntabbable(map);
-  }, [mapIsHidden]);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
   useLayoutEffect(
@@ -894,30 +801,6 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
-  useEffect(() => {
-    if (workspaceId !== 'severe') return undefined;
-    if (hideMapForDiscussion) return undefined;
-    if (resizingDiscussionPanel) return undefined;
-    let nextFrame = 0;
-    const frame = window.requestAnimationFrame(() => {
-      nextFrame = window.requestAnimationFrame(() => mapRef.current?.getMap()?.updateSize());
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      if (nextFrame) window.cancelAnimationFrame(nextFrame);
-    };
-  }, [discussionLayout, discussionPanelCollapsed, discussionPanelWidth, hideMapForDiscussion, resizingDiscussionPanel, surface, workspaceId]);
-  const updateSurface = (next: 'map' | 'discussion' | 'review') => {
-    setSurface(next);
-    const nextParams = new URLSearchParams(searchParams);
-    if (next === 'map') nextParams.delete('surface');
-    else nextParams.set('surface', next);
-    navigate({ pathname: location.pathname, search: nextParams.toString() ? `?${nextParams.toString()}` : '', hash: location.hash }, { replace: true });
-  };
-  const updateDiscussionLayout = (next: 'tabs' | 'panel') => {
-    setSavedDiscussionLayout(next);
-    try { localStorage.setItem('gfc-severe-discussion-layout', next); } catch { /* Keep this preference optional when storage is unavailable. */ }
-  };
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { handleSave } = useForecastFileActions(
@@ -960,104 +843,32 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
         </div>
       ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
-        {workspaceId === 'severe' ? (
-            <div className={`severe-workspace severe-workspace--${discussionLayout}`} data-surface={surface} data-panel-collapsed={discussionPanelCollapsed} data-testid="severe-workspace">
-            <div className="severe-workspace__navigation">
-              <div className="severe-workspace__tabs" role="tablist" aria-label="Severe forecast workspace" onKeyDown={(event) => {
-              if (!(event.target instanceof HTMLElement) || !event.target.matches('[role="tab"]')) return;
-              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-              const selectedIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
-              const focusIndex = tabs.findIndex((tab) => tab === document.activeElement);
-              const activeIndex = focusIndex >= 0 ? focusIndex : selectedIndex;
-              const nextIndexByKey: Record<string, number> = {
-                ArrowRight: (activeIndex + 1) % tabs.length,
-                ArrowLeft: (activeIndex - 1 + tabs.length) % tabs.length,
-                Home: 0,
-                End: tabs.length - 1,
-              };
-              const nextIndex = nextIndexByKey[event.key] ?? -1;
-              if (nextIndex < 0) return;
-              event.preventDefault();
-              event.stopPropagation();
-              tabs[nextIndex]?.focus();
-              tabs[nextIndex]?.click();
-            }}>
-              <button type="button" role="tab" tabIndex={surface === 'map' ? 0 : -1} aria-selected={surface === 'map'} onClick={() => updateSurface('map')}>Map</button>
-              <button type="button" role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
-              <button type="button" role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
+        <ForecastWorkspaceSurfaces
+          workspaceId={workspaceId}
+          surface={surface}
+          onSurfaceChange={selectSurface}
+          mapRef={mapRef}
+          discussionRevision={discussionImportRevision}
+          map={(
+            <ForecastTabbedToolbarLayout
+              mapRef={mapRef}
+              controller={workspaceController}
+              autoTstmTools={autoTstmTools}
+              tstmPreviewFeatures={tstmPreviewFeatures}
+              workspaceId={workspaceId}
+            />
+          )}
+          review={workflowMetadata ? <ForecastWorkflowPanel controller={workspaceController} /> : (
+            <section aria-label="Forecast export actions" className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+              <div className="mr-auto">
+                <h2 className="font-semibold">Review and export</h2>
+                <p className="text-sm text-muted-foreground">Save your forecast or export the current cycle.</p>
               </div>
-              <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
-                <button type="button" aria-pressed={discussionLayout === 'tabs'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
-                <button type="button" aria-pressed={discussionLayout === 'panel'} disabled={hasForcedDiscussionLayout} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
-                {discussionLayout === 'panel' ? <button type="button" aria-expanded={!discussionPanelCollapsed} onClick={() => setDiscussionPanelCollapsed((collapsed) => !collapsed)}>{discussionPanelCollapsed ? 'Show panel' : 'Hide panel'}</button> : null}
-              </div>
-            </div>
-            <div className="severe-workspace__content">
-              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : hideMapForDiscussion ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || hideMapForDiscussion} inert={surface === 'review' || hideMapForDiscussion ? true : undefined}>
-                  <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
-              </div>
-              {discussionLayout === 'panel' && surface === 'discussion' && !discussionPanelCollapsed ? (
-                <>
-                  <div
-                    className="severe-workspace__splitter"
-                    role="separator"
-                    aria-label="Resize discussion panel"
-                    aria-orientation="vertical"
-                    aria-valuemin={320}
-                    aria-valuemax={800}
-                    aria-valuenow={discussionPanelWidth}
-                    tabIndex={0}
-                    onPointerDown={(event) => {
-                      discussionPanelResizeRef.current = { pointerX: event.clientX, width: discussionPanelWidth };
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                      setResizingDiscussionPanel(true);
-                    }}
-                    onPointerUp={() => setResizingDiscussionPanel(false)}
-                    onPointerCancel={() => setResizingDiscussionPanel(false)}
-                    onLostPointerCapture={() => setResizingDiscussionPanel(false)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setDiscussionPanelWidth((width) => Math.max(320, Math.min(800, width + (event.key === 'ArrowLeft' ? 24 : -24))));
-                    }}
-                  />
-                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense></aside>
-                </>
-              ) : surface === 'discussion' ? (
-                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense></section>
-              ) : surface === 'review' ? (
-                <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
-                  {workflowMetadata ? <ForecastWorkflowPanel controller={workspaceController} /> : (
-                    <section aria-label="Forecast export actions" className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
-                      <div className="severe-workspace__review-heading"><h2 className="font-semibold">Review and export</h2><p className="text-sm text-muted-foreground">Save your forecast or export the current cycle.</p></div>
-                      <Button type="button" onClick={handleSave}>Save forecast</Button>
-                      <Button type="button" variant="outline" onClick={workspaceController.onInitiateExport}>Export</Button>
-                    </section>
-                  )}
-                </section>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="custom-forecast-workspace">
-            <div
-              className={`custom-workspace__map${showHintedCustomDiscussion ? ' is-offscreen' : ''}`}
-              aria-hidden={showHintedCustomDiscussion}
-              inert={showHintedCustomDiscussion ? true : undefined}
-            >
-              <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
-            </div>
-            {showHintedCustomDiscussion ? (
-              <div className="custom-workspace-discussion">
-                <div className="custom-workspace-discussion__navigation">
-                  <Button type="button" variant="outline" data-workspace-return-map onClick={() => updateSurface('map')}>Return to Custom map</Button>
-                </div>
-                <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded resetToken={discussionImportRevision} /></React.Suspense>
-              </div>
-            ) : null}
-          </div>
-        )}
+              <Button type="button" onClick={handleSave}>Save forecast</Button>
+              <Button type="button" variant="outline" onClick={workspaceController.onInitiateExport}>Export</Button>
+            </section>
+          )}
+        />
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog
