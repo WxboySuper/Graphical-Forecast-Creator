@@ -4,6 +4,8 @@ import worker from './feedback-worker.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
 
 const project = 'gfc-test';
+const accessDomain = 'test.cloudflareaccess.com';
+const accessAud = 'access-aud';
 let privateKey;
 let jwk;
 
@@ -22,6 +24,14 @@ async function token(overrides = {}, key = privateKey, kid = 'test-key') {
   return `${message}.${Buffer.from(signature).toString('base64url')}`;
 }
 
+async function accessToken(overrides = {}, key = privateKey, kid = 'test-key') {
+  const header = b64({ alg: 'RS256', kid });
+  const payload = b64({ iss: `https://${accessDomain}`, aud: [accessAud], exp: 2000000000, iat: 1900000000, sub: 'owner-123', email: 'owner@example.com', ...overrides });
+  const message = `${header}.${payload}`;
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(message));
+  return `${message}.${Buffer.from(signature).toString('base64url')}`;
+}
+
 /** Mirrors the SQL column list so tests see exactly the columns the Worker selects. */
 function selectColumns(row, sql) {
   const match = sql.match(/^SELECT (.*?) FROM feedback/);
@@ -34,6 +44,7 @@ class FakeD1 {
   rows = [];
   adminAttempts = new Map();
   firstHandlers = [
+    { matches: (sql) => sql === 'SELECT COUNT(*) AS total FROM feedback', run: (db) => ({ total: db.rows.length }) },
     { matches: (sql) => sql.startsWith('SELECT SUM'), run: (db, args) => {
       const [recentSince, dailySince, recentAtSince, dailyAtSince, uid] = args;
       const mine = db.rows.filter((row) => row.uid_hash === uid);
@@ -49,6 +60,12 @@ class FakeD1 {
     } },
   ];
   runHandlers = [
+    { matches: (sql) => sql === 'DELETE FROM feedback WHERE id = ?', run: (db, args) => {
+      const index = db.rows.findIndex((row) => row.id === args[0]);
+      if (index < 0) return { meta: { changes: 0 } };
+      db.rows.splice(index, 1);
+      return { meta: { changes: 1 } };
+    } },
     { matches: (sql) => sql.startsWith('INSERT INTO feedback_admin_attempts'), run: (db, args) => {
       const [key, now] = args;
       const current = db.adminAttempts.get(key);
@@ -85,6 +102,9 @@ class FakeD1 {
     } },
   ];
   allHandlers = [
+    { matches: (sql) => sql.startsWith('SELECT status AS value, COUNT(*) AS count FROM feedback GROUP BY status'), run: (db) => groupedRows(db.rows, 'status') },
+    { matches: (sql) => sql.startsWith('SELECT build_target AS value, COUNT(*) AS count FROM feedback GROUP BY build_target'), run: (db) => groupedRows(db.rows, 'build_target') },
+    { matches: (sql) => sql.startsWith('SELECT category AS value, COUNT(*) AS count FROM feedback GROUP BY category'), run: (db) => groupedRows(db.rows, 'category') },
     { matches: (sql) => sql.startsWith('SELECT id, created_at') && sql.includes('FROM feedback'), run: (db, sql, args) => {
       const predicates = sql.match(/WHERE (.*?) ORDER BY/)?.[1]?.split(' AND ') ?? [];
       const filters = [
@@ -131,6 +151,12 @@ class FakeD1 {
   }
 }
 
+function groupedRows(rows, key) {
+  const counts = new Map();
+  for (const row of rows) counts.set(row[key], (counts.get(row[key]) ?? 0) + 1);
+  return { results: [...counts].map(([value, count]) => ({ value, count })) };
+}
+
 const validBody = (overrides = {}) => ({ category: 'bug', message: 'This is a detailed report.', page: '/forecast?secret=1#map', appVersion: '1.2.3', buildTarget: 'beta', contactOk: false, ...overrides });
 function harness(options = {}) {
   const db = options.db ?? new FakeD1();
@@ -138,6 +164,15 @@ function harness(options = {}) {
   const env = { FIREBASE_PROJECT_ID: project, FEEDBACK_HASH_SALT: 'pepper', FEEDBACK_ALLOWED_ORIGINS: 'https://beta.gfcweather.com,http://localhost:3000', FEEDBACK_DB: db, NOW: () => 1950000000000, JWKS_FETCH: async () => Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }), ...options.env };
   const ctx = { waitUntil(promise) { waits.push(promise); } };
   return { db, env, ctx, waits };
+}
+async function viewerRequest(env, ctx, path, { method = 'GET', auth, headers = {}, body } = {}) {
+  const response = await worker.fetch(new Request(`https://feedback.gfcweather.com${path}`, {
+    method,
+    headers: { ...(auth ? { 'cf-access-jwt-assertion': auth } : {}), ...headers, ...(body ? { 'content-type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  }), env, ctx);
+  assert.ok(![...response.headers.keys()].some((name) => name.startsWith('access-control-')), `admin response must omit CORS headers: ${path}`);
+  return response;
 }
 async function post(env, ctx, { body = validBody(), auth = null, origin = 'https://beta.gfcweather.com' } = {}) {
   return worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'POST', headers: { ...(origin ? { origin } : {}), ...(auth ? { authorization: `Bearer ${auth}` } : {}), 'content-type': 'application/json' }, body: JSON.stringify(body) }), env, ctx);
@@ -447,5 +482,95 @@ test('admin token failures are throttled by salted client IP', async () => {
   assert.equal((await attempt('admin-secret', '192.0.2.11')).status, 200);
   assert.equal((await attempt('wrong', '192.0.2.10')).status, 429);
   assert.equal(db.adminAttempts.size, 1);
+});
+
+test('Access viewer serves a nonce-protected page and has no CORS headers', async () => {
+  const accessUrl = `https://${accessDomain}/cdn-cgi/access/certs`;
+  const { env, ctx } = harness({ env: {
+    CF_ACCESS_TEAM_DOMAIN: accessDomain,
+    CF_ACCESS_AUD: accessAud,
+    JWKS_FETCH: async (url) => {
+      assert.equal(url, accessUrl);
+      return Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } });
+    },
+  } });
+  const response = await viewerRequest(env, ctx, '/admin', { auth: await accessToken() });
+  const html = await response.text();
+  const nonce = response.headers.get('content-security-policy').match(/script-src 'nonce-([^']+)'/)[1];
+  assert.equal(response.status, 200);
+  assert.match(html, new RegExp(`<style nonce="${nonce}">`));
+  assert.match(html, new RegExp(`<script nonce="${nonce}">`));
+  assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(response.headers.has('access-control-allow-origin'), false);
+});
+
+test('Access viewer rejects missing, expired, wrong-audience, wrong-issuer, and invalid signatures', async () => {
+  const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  const badPair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
+  const responses = [
+    await viewerRequest(env, ctx, '/admin'),
+    await viewerRequest(env, ctx, '/admin', { auth: await accessToken({ exp: 1 }) }),
+    await viewerRequest(env, ctx, '/admin', { auth: await accessToken({ aud: 'wrong-aud' }) }),
+    await viewerRequest(env, ctx, '/admin', { auth: await accessToken({ iss: 'https://wrong.cloudflareaccess.com' }) }),
+    await viewerRequest(env, ctx, '/admin', { auth: await accessToken({}, badPair.privateKey) }),
+  ];
+  assert.deepStrictEqual(responses.map((response) => response.status), [401, 401, 401, 401, 401]);
+  assert.ok(responses.every((response) => ![...response.headers.keys()].some((name) => name.startsWith('access-control-'))));
+});
+
+test('Access viewer fails closed without config and can restrict allowed emails', async () => {
+  const missing = harness();
+  assert.equal((await viewerRequest(missing.env, missing.ctx, '/admin')).status, 503);
+  const denied = harness({ env: {
+    CF_ACCESS_TEAM_DOMAIN: accessDomain,
+    CF_ACCESS_AUD: accessAud,
+    CF_ACCESS_ALLOWED_EMAILS: 'someone@example.com',
+  } });
+  const response = await viewerRequest(denied.env, denied.ctx, '/admin', { auth: await accessToken() });
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.has('access-control-allow-origin'), false);
+});
+
+test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', async () => {
+  const { db, env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  const auth = await accessToken();
+  const ids = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'];
+  db.rows = ids.map((id, index) => ({
+    id, created_at: 2000 - index * 100, uid_hash: 'private-hash', email: index ? null : 'opted-in@example.com',
+    category: index ? 'idea' : 'bug', message: `viewer feedback ${index}`, page: '/forecast', app_version: '1.2.3',
+    build_target: index ? 'production' : 'beta', plan: null, viewport: null, user_agent: 'test-agent', status: index ? 'triaged' : 'new', discord_status: 'disabled',
+  }));
+  const summaryResponse = await viewerRequest(env, ctx, '/admin/api/summary', { auth });
+  assert.deepStrictEqual(await summaryResponse.json(), {
+    total: 2,
+    byStatus: { new: 1, triaged: 1, resolved: 0, wontfix: 0 },
+    byTarget: { beta: 1, production: 1 },
+    byCategory: { bug: 1, idea: 1, praise: 0, question: 0, other: 0 },
+  });
+  const listResponse = await viewerRequest(env, ctx, '/admin/api/feedback?limit=1', { auth });
+  const list = await listResponse.json();
+  assert.equal(list.items.length, 1);
+  assert.equal(list.nextCursor, '2000:00000000-0000-4000-8000-000000000001');
+  assert.equal('uid_hash' in list.items[0], false);
+  assert.equal((await (await viewerRequest(env, ctx, `/admin/api/feedback/${ids[0]}`, { auth })).json()).email, 'opted-in@example.com');
+  assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/no-such-id', { auth })).status, 404);
+  assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/%E0%A4%A', { auth })).status, 404);
+  const updatePath = `/admin/api/feedback/${ids[0]}`;
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, body: { status: 'resolved' } })).status, 403);
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: { origin: 'https://feedback.gfcweather.com' }, body: { status: 'resolved' } })).status, 403);
+  const csrfHeaders = { origin: 'https://feedback.gfcweather.com', 'x-gfc-viewer': '1' };
+  assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/missing', { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'resolved' } })).status, 404);
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'resolved' } })).status, 200);
+  assert.equal(db.rows[0].status, 'resolved');
+  const deleted = await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders });
+  assert.deepStrictEqual(await deleted.json(), { id: ids[0], deleted: true });
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders })).status, 404);
+  const unknown = await viewerRequest(env, ctx, '/admin/nope', { auth, headers: { origin: 'https://feedback.gfcweather.com' } });
+  assert.equal(unknown.status, 404);
+  const responses = [summaryResponse, listResponse, deleted, unknown];
+  assert.ok(responses.every((response) => ![...response.headers.keys()].some((name) => name.startsWith('access-control-'))));
 });
 

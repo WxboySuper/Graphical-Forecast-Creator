@@ -3,7 +3,7 @@ const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken
 const CLOCK_LEEWAY_SECONDS = 60;
 /** An unknown key id may trigger a JWKS refetch (key rotation), but at most this often. */
 const KEY_REFRESH_MIN_SECONDS = 60;
-let jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 };
+const jwksCache = new Map();
 
 /** Decodes unpadded base64url to bytes, restoring the padding atob may require. */
 const base64UrlToBytes = (part) => {
@@ -37,28 +37,35 @@ function claimsAreValid(claims, project, now) {
   return checks.every((check) => check());
 }
 
-const isCacheFresh = (now) => Boolean(jwksCache.keys) && jwksCache.expiresAt > now;
+function cacheFor(url) {
+  if (!jwksCache.has(url)) jwksCache.set(url, { keys: null, expiresAt: 0, fetchedAt: 0 });
+  return jwksCache.get(url);
+}
 
-async function loadKeys(env, now, force = false) {
-  if (!force && isCacheFresh(now)) return jwksCache.keys;
-  const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
+async function loadKeys(env, now, url, force = false) {
+  const cache = cacheFor(url);
+  if (!force && cache.keys && cache.expiresAt > now) return cache.keys;
+  const response = await (env.JWKS_FETCH ?? fetch)(url);
   if (!response.ok) return null;
   const data = await response.json();
   if (!Array.isArray(data.keys)) return null;
   const cacheControl = response.headers.get('cache-control') ?? '';
   const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] ?? 300);
-  jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)), fetchedAt: now };
-  return jwksCache.keys;
+  cache.keys = data.keys;
+  cache.expiresAt = now + Math.max(60, Math.min(maxAge, 3600));
+  cache.fetchedAt = now;
+  return cache.keys;
 }
 
 const hasSigningKey = (keys, kid) => keys.some((key) => key.kid === kid && key.kty === 'RSA');
 
 /** Loads cached keys, refetching once (rate-limited) when the token's key id is unknown after a rotation. */
-async function keysFor(env, now, kid) {
-  const keys = await loadKeys(env, now);
+async function keysFor(env, now, url, kid) {
+  const cache = cacheFor(url);
+  const keys = await loadKeys(env, now, url);
   if (!keys || hasSigningKey(keys, kid)) return keys;
-  if (now - jwksCache.fetchedAt < KEY_REFRESH_MIN_SECONDS) return keys;
-  return loadKeys(env, now, true);
+  if (now - cache.fetchedAt < KEY_REFRESH_MIN_SECONDS) return keys;
+  return loadKeys(env, now, url, true);
 }
 
 async function verifySignature(parts, header, keys) {
@@ -73,22 +80,30 @@ async function verifySignature(parts, header, keys) {
 const validHeader = (header) => header.alg === 'RS256' && typeof header.kid === 'string';
 const currentSeconds = (env) => Math.floor((env.NOW?.() ?? Date.now()) / 1000);
 
-async function verifyTokenSafe(token, env) {
-  const project = env.FIREBASE_PROJECT_ID;
-  if (!project || !token) return null;
+async function verifySignatureSafe(token, env, url) {
+  if (!token) return null;
   const parsed = parseToken(token);
   if (!parsed) return null;
   if (!validHeader(parsed.header)) return null;
   const now = currentSeconds(env);
-  if (!claimsAreValid(parsed.claims, project, now)) return null;
-  const keys = await keysFor(env, now, parsed.header.kid);
+  const keys = await keysFor(env, now, url, parsed.header.kid);
   if (!keys) return null;
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;
-  return parsed.claims;
+  return { claims: parsed.claims, now };
+}
+
+export async function verifyRs256Token(token, env, url) {
+  try { return await verifySignatureSafe(token, env, url); }
+  catch { return null; }
 }
 
 export async function verifyToken(token, env) {
-  try { return await verifyTokenSafe(token, env); }
+  const project = env.FIREBASE_PROJECT_ID;
+  if (!project) return null;
+  try {
+    const verified = await verifySignatureSafe(token, env, JWKS_URL);
+    return verified && claimsAreValid(verified.claims, project, verified.now) ? verified.claims : null;
+  }
   catch { return null; }
 }
 

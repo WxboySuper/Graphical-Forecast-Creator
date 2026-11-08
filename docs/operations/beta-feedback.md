@@ -35,6 +35,17 @@ curl -X PATCH -H "Authorization: Bearer $FEEDBACK_ADMIN_TOKEN" \
 
 List filters are `status`, `target`, `category`, `since` (Unix milliseconds), `limit` (1–100), and `cursor` (the previous response's `nextCursor`). Agents can use the same API over server-side HTTPS with the admin token. Admin endpoints intentionally omit CORS headers.
 
+## Feedback viewer (Cloudflare Access)
+
+The Worker also provides a browser viewer at `https://feedback.gfcweather.com/admin`. It verifies each Cloudflare Access JWT itself and rejects requests without a valid issuer, audience, signature, and identity. Set `CF_ACCESS_ALLOWED_EMAILS` to enforce an additional email allowlist in the Worker.
+
+1. In Cloudflare Zero Trust, create a self-hosted Access application for `feedback.gfcweather.com` with the application path set to `/admin*` only. Do not include `/v1/*`.
+2. Add an allow policy for the owner's email address.
+3. Copy the Access application's AUD tag and the Zero Trust team domain into `CF_ACCESS_AUD` and `CF_ACCESS_TEAM_DOMAIN` in `cloudflare/wrangler.feedback.jsonc`, then deploy the feedback Worker.
+4. Visit `https://feedback.gfcweather.com/admin` and sign in through Access. Optionally set `CF_ACCESS_ALLOWED_EMAILS` to a comma-separated email allowlist for an additional Worker-side check.
+
+The viewer lists and filters feedback, shows summary counts, opens individual items, changes status, and deletes items. Its API lives under `/admin/api/summary` and `/admin/api/feedback`; mutations require a same-origin request. Email appears only when a submitter opted in to contact. Deleting an item is permanent.
+
 ## Retention
 
 Abuse limits: each user may submit 5 per 10 minutes and 20 per day, and the whole service accepts at most 120 submissions per 10 minutes (a flood from many throwaway accounts hits that cap and receives 429). Firebase sign-up is the only friction on account creation, so for stronger protection add a Cloudflare rate limiting rule on `POST feedback.gfcweather.com/v1/feedback` (for example 20 requests per minute per IP). Admin brute-force attempts are throttled per `CF-Connecting-IP`; requests that reach the Worker through Cloudflare always carry it, and any request without it is throttled per presented token. The admin API refuses any request carrying an `Origin` header (browsers), so it can only be driven from curl or server-side agents.

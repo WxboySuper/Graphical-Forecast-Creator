@@ -108,7 +108,7 @@ function listSql(query) {
   return { sql: `SELECT ${PUBLIC_COLUMNS} FROM feedback ${where} ORDER BY created_at DESC, id DESC LIMIT ?`, values };
 }
 
-async function listFeedback(requestUrl, db) {
+export async function listFeedback(requestUrl, db) {
   const query = parseListQuery(requestUrl);
   if (!query) return badQuery();
   const statement = listSql(query);
@@ -119,12 +119,12 @@ async function listFeedback(requestUrl, db) {
   return json({ items, nextCursor: hasMore && last ? `${last.created_at}:${last.id}` : null });
 }
 
-async function getFeedback(id, db) {
+export async function getFeedback(id, db) {
   const item = await db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM feedback WHERE id = ?`).bind(id).first();
   return item ? json(item) : json({ error: 'Feedback not found' }, 404);
 }
 
-async function patchFeedback(request, id, db) {
+export async function patchFeedback(request, id, db) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
   if (!body) return json({ error: 'Invalid status' }, 400);
@@ -134,6 +134,11 @@ async function patchFeedback(request, id, db) {
   return result.meta?.changes ? json({ id, status: body.status }) : json({ error: 'Feedback not found' }, 404);
 }
 
+export async function deleteFeedback(id, db) {
+  const result = await db.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
+  return result.meta?.changes ? json({ id, deleted: true }) : json({ error: 'Feedback not found' }, 404);
+}
+
 const ADMIN_BINDINGS = ['FEEDBACK_ADMIN_TOKEN', 'FEEDBACK_HASH_SALT', 'FEEDBACK_DB'];
 const isAdminConfigured = (env) => ADMIN_BINDINGS.every((name) => Boolean(env[name]));
 
@@ -141,6 +146,7 @@ const adminRoutes = [
   { method: 'GET', hasId: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', hasId: true, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
   { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+  { method: 'DELETE', hasId: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 
 export async function handleAdmin(request, env, url, id) {
