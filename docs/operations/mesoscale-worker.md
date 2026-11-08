@@ -40,9 +40,11 @@ Set the app's catalog base to `PUBLIC_BASE_URL`, then use
 `urlTemplate` values in catalogs to that base and returns a matching
 `catalogUrl` from latest pointers. The app should use the catalog's
 `data.urlTemplate` directly. It must not build R2 URLs.
-The Worker Cache API keys rewritten catalog/latest responses by the configured
-base URL. When rotating `PUBLIC_BASE_URL`, clear any external CDN or client
-caches because catalogs use long immutable HTTP caching.
+The Worker Cache API stores immutable catalogs and tile responses. It bypasses
+`/latest` and `/status` so their age and stale fields are recalculated on every
+Worker request. Those dynamic endpoints use a five-second HTTP cache lifetime.
+When rotating `PUBLIC_BASE_URL`, clear any external CDN or client caches because
+catalogs use long immutable HTTP caching.
 
 `GET /status` returns `status` (`healthy` or `degraded`) and one entry per
 model with `latestCycleTime`, recomputed `ageMinutes`, `stale`, `health`, and
@@ -54,21 +56,25 @@ masked by yesterday's summary.
 ## Cache and usage budget
 
 The Worker reads at most one R2 object for a catalog, latest pointer, or tile
-cache miss. Tile `HEAD` uses R2 object metadata when the binding supports it;
-uncached HEAD requests still count as Class B operations. A status cache miss
-reads up to nine objects: three latest pointers
-and today's and yesterday's health object for each of the three models. The
-Worker uses Cloudflare's Cache API when available, and also sets HTTP cache
-headers: immutable catalogs and tiles get one year, latest and status get 30
-seconds, and missing tiles get 60 seconds. R2 misses after edge cache expiry
-still count as Class B reads.
+request. Tile `HEAD` uses R2 object metadata when the binding supports it;
+uncached HEAD requests still count as Class B operations. Each `/latest` request
+reads one pointer. Each `/status` request reads up to nine objects: three latest
+pointers and today's and yesterday's health object for each of the three models.
+The Worker Cache API stores immutable catalogs, tiles, and short-lived missing
+tiles. It bypasses the Cache API for latest/status so age and stale fields stay
+current. HTTP cache headers give catalogs and tiles one year, latest/status five
+seconds, and missing tiles 60 seconds. R2 reads for dynamic endpoints and cache
+misses count as Class B operations.
 
 For an example load of 100,000 tile requests, 1,000 catalog requests, 10,000
 latest requests, and 1,000 status requests per month, an entirely cold cache
-would require about 120,000 R2 reads (status accounts for at most 9,000).
-With a 90% edge hit rate, that is about 12,000 R2 reads. Ten million cold
-tile misses alone would use the full 10 million included R2 Class B reads, so
-cache hit rate and traffic spikes matter.
+would require about 120,000 R2 reads (status accounts for at most 9,000). With
+a 90% Cache API hit rate for tiles and catalogs, while latest/status always read
+R2, the estimate is about 29,100 reads. Ten million cold tile misses alone use
+the full 10 million included R2 Class B reads. A status-heavy workload can use
+up to nine Class B reads per Worker request; about 1.1 million status requests
+would reach the 10 million included reads. Estimate traffic mix and cache rates
+before broad rollout.
 
 The existing $5 Workers Paid plan includes 10 million requests and 30 million
 CPU milliseconds per month. The R2 free allocation includes 10 million Class B

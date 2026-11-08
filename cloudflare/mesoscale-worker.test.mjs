@@ -182,10 +182,12 @@ test('catalog and latest do not emit an ETag when R2 omits one', async () => {
   const pointerValue = pointer('hrrr');
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
     const value = key.includes('/catalog/') ? catalog : pointerValue;
-    return { json: async () => structuredClone(value) };
+    return { size: new TextEncoder().encode(JSON.stringify(value)).byteLength, json: async () => structuredClone(value) };
   } } });
   const catalogResult = await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env);
   const latestResult = await worker.fetch(request('/latest/hrrr.json'), env);
+  assert.equal(catalogResult.status, 200);
+  assert.equal(latestResult.status, 200);
   assert.equal(catalogResult.headers.get('ETag'), null);
   assert.equal(latestResult.headers.get('ETag'), null);
 });
@@ -259,6 +261,8 @@ test('Cache API stores tiles, serves hits, honors conditional hits, and caches m
     assert.equal(reads, 1);
     const conditionalHit = await worker.fetch(request(path, { headers: { 'If-None-Match': etag } }), env);
     assert.equal(conditionalHit.status, 304);
+    assert.equal(conditionalHit.headers.has('Content-Type'), false);
+    assert.equal(conditionalHit.headers.has('Content-Length'), false);
     assert.equal(reads, 1);
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
@@ -303,7 +307,7 @@ test('latest pointer reports live age and stale state without changing its cycle
     assert.equal(value.catalogUrl, 'https://mesoscale.example.test/catalog/hrrr/20261108T1200Z.json');
     assert.equal(response.headers.get('X-Mesoscale-Stale'), 'true');
     assert.equal(Number(response.headers.get('X-Mesoscale-Age-Minutes')) > 60, true);
-    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=30');
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=5');
     const notModified = await worker.fetch(request('/latest/hrrr.json', { headers: { 'If-None-Match': response.headers.get('ETag') } }), env);
     assert.equal(notModified.status, 304);
     assert.equal(notModified.headers.get('X-Mesoscale-Stale'), 'true');
@@ -328,6 +332,37 @@ test('latest pointer reports live age and stale state without changing its cycle
   });
 });
 
+test('latest bypasses Worker Cache API so age is recalculated for each request', async () => {
+  await withCache(async () => {
+    let reads = 0;
+    const value = pointer('hrrr');
+    const serialized = JSON.stringify(value);
+    const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => {
+      reads += 1;
+      return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value), httpEtag: '"latest"' };
+    } } });
+    await withNow('2026-11-08T15:01:00Z', async () => {
+      const first = await worker.fetch(request('/latest/hrrr.json'), env);
+      assert.equal(first.headers.get('X-Mesoscale-Age-Minutes'), '181');
+      await withNow('2026-11-08T15:02:00Z', async () => {
+        const second = await worker.fetch(request('/latest/hrrr.json'), env);
+        assert.equal(second.headers.get('X-Mesoscale-Age-Minutes'), '182');
+      });
+    });
+    assert.equal(reads, 2);
+  });
+});
+
+test('status bypasses Worker Cache API to refresh pointers and health records', async () => {
+  await withCache(async () => {
+    let reads = 0;
+    const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => { reads += 1; return null; } } });
+    await worker.fetch(request('/status'), env);
+    await worker.fetch(request('/status'), env);
+    assert.equal(reads, 18);
+  });
+});
+
 test('status aggregates latest pointers and current or previous daily health records', async () => {
   const env = envFor({
     'mesoscale/v1/latest/hrrr.json': pointer('hrrr'),
@@ -338,7 +373,7 @@ test('status aggregates latest pointers and current or previous daily health rec
   await withNow('2026-11-08T15:01:00Z', async () => {
     const response = await worker.fetch(request('/status'), env);
     const body = await response.json();
-    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=30');
+    assert.equal(response.headers.get('Cache-Control'), 'public, max-age=5');
     assert.equal(body.models.length, 3);
     assert.equal(body.models.find((item) => item.modelId === 'hrrr').health, 'complete');
     assert.equal(body.models.find((item) => item.modelId === 'rap').health, 'partial');
@@ -351,7 +386,7 @@ test('status aggregates latest pointers and current or previous daily health rec
 });
 
 test('malformed catalog and pointer JSON produce explicit gateway errors', async () => {
-  const malformed = { json: async () => { throw new SyntaxError('invalid'); }, httpEtag: '"bad"' };
+  const malformed = { size: 8, json: async () => { throw new SyntaxError('invalid'); }, httpEtag: '"bad"' };
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 502);

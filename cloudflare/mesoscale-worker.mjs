@@ -1,8 +1,8 @@
 const MODELS = new Set(['hrrr', 'rap', 'rrfs']);
 const MAX_ZOOM = 24;
 const TILE_MISS_TTL = 60;
-const POINTER_TTL = 30;
-const STATUS_TTL = 30;
+const POINTER_TTL = 5;
+const STATUS_TTL = 5;
 const CATALOG_TTL = 31536000;
 const TILE_TTL = 31536000;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
@@ -260,7 +260,8 @@ const catalogResponse = ({ value, request, env, route, headers, etag }) => {
   const publicEtag = publicRepresentationEtag(etag, env);
   if (publicEtag) headers.set('ETag', publicEtag);
   headers.set('Content-Type', 'application/json; charset=utf-8');
-  if (publicEtag && matchesEtag(request.headers.get('If-None-Match'), publicEtag)) return new Response(null, { status: 304, headers });
+  const notModified = conditionalResponse(request, publicEtag, headers);
+  if (notModified) return notModified;
   return new Response(JSON.stringify(value), { headers });
 };
 
@@ -522,9 +523,7 @@ const cacheKeyFor = (request, env, route) => {
 
 const cacheHitResponse = (request, response) => {
   const etag = response.headers.get('ETag');
-  return matchesEtag(request.headers.get('If-None-Match'), etag)
-    ? new Response(null, { status: 304, headers: response.headers })
-    : response;
+  return conditionalResponse(request, etag, response.headers) || response;
 };
 
 const applyHeadMethod = (request, response) => request.method === 'HEAD' ? noBodyForHead(response) : response;
@@ -539,6 +538,7 @@ const cacheStoreResponse = async (cache, key, response, context) => {
 const cachedFetch = async (context) => {
   const cache = globalThis.caches?.default;
   if (!['GET', 'HEAD'].includes(context.request.method)) return fetchUncached(context.request, context.route, context.env, context.now);
+  if (context.route.kind === 'latest' || context.route.kind === 'status') return fetchUncached(context.request, context.route, context.env, context.now);
   if (!cache) return fetchUncached(context.request, context.route, context.env, context.now);
   const key = cacheKeyFor(context.request, context.env, context.route);
   let hit;
