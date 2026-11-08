@@ -64,6 +64,9 @@ describe('featureNavigation', () => {
     window.history.replaceState({}, '', '/forecast/custom?group=day2&workspace=severe&unused=1');
     shortcuts['2']();
     expect(navigate).toHaveBeenLastCalledWith('/discussion?group=day2&workspace=custom&surface=discussion');
+    window.history.replaceState({}, '', '/forecast/tropical?group=day2&workspace=tropical&unused=1');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/discussion?surface=discussion');
   });
 
   test('declares every navigation item with a stable id', () => {

@@ -70,10 +70,11 @@ export const getNavigationKeyboardShortcuts = (
           const currentParams = new URLSearchParams(window.location.search);
           const params = new URLSearchParams();
           const currentWorkspace = window.location.pathname.match(/^\/forecast\/(severe|custom)(?:\/|$)/)?.[1];
-          const legacyWorkspaceHint = window.location.pathname.startsWith('/discussion')
+          const isLegacyDiscussionPath = window.location.pathname.startsWith('/discussion');
+          const legacyWorkspaceHint = isLegacyDiscussionPath
             ? currentParams.get('workspace')
             : null;
-          const group = currentParams.get('group');
+          const group = currentWorkspace || isLegacyDiscussionPath ? currentParams.get('group') : null;
           if (group) params.set('group', group);
           if (currentWorkspace === 'custom' || (!currentWorkspace && legacyWorkspaceHint === 'custom')) {
             params.set('workspace', 'custom');
