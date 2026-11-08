@@ -38,4 +38,27 @@ describe('mesoscale hooks', () => {
     const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
     await waitFor(() => expect(result.current).toMatchObject({ state: 'malformed' }));
   });
+
+  it('keeps the result stale flag aligned with model freshness', async () => {
+    const generatedAt = new Date().toISOString();
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'X-Mesoscale-Stale': 'false', 'X-Mesoscale-Age-Minutes': '0' }),
+      json: async () => ({
+        status: 'healthy',
+        models: [{
+          modelId: 'hrrr',
+          latestCycleTime: '2020-01-01T00:00:00Z',
+          ageMinutes: 0,
+          stale: false,
+          health: 'complete',
+          healthGeneratedAt: generatedAt,
+        }],
+      }),
+    });
+    const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
+    const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
+    await waitFor(() => expect(result.current).toMatchObject({ state: 'stale', stale: true, data: { models: [{ stale: true }] } }));
+  });
 });

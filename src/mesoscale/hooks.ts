@@ -74,7 +74,7 @@ export const useMesoscaleStatus = (options: MesoscaleHookOptions = {}) => {
     return { ...model, ageMinutes: age, stale: age === null || age > STALE_AFTER_MS / 60_000 };
   });
   const stale = models.some(model => model.stale);
-  return { ...result, state: stale ? 'stale' as const : result.state, data: { ...result.data, models } };
+  return { ...result, state: stale ? 'stale' as const : result.state, stale: stale || result.stale, data: { ...result.data, models } };
 };
 
 export const selectMesoscaleFrames = (catalog: MesoscaleCatalog, type: MesoscaleFrameType) =>
