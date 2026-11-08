@@ -792,6 +792,8 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(
     requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map',
   );
+  const hideMapForDiscussion = surface === 'discussion'
+    && (discussionLayout === 'tabs' || (discussionLayout === 'panel' && discussionPanelCollapsed));
   useEffect(() => {
     setSurface(requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map');
   }, [requestedSurface]);
@@ -867,6 +869,17 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
+  useEffect(() => {
+    if (workspaceId !== 'severe' || hideMapForDiscussion) return undefined;
+    let nextFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      nextFrame = window.requestAnimationFrame(() => mapRef.current?.getMap()?.updateSize());
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (nextFrame) window.cancelAnimationFrame(nextFrame);
+    };
+  }, [discussionLayout, discussionPanelCollapsed, hideMapForDiscussion, surface, workspaceId]);
   const updateSurface = (next: 'map' | 'discussion' | 'review') => {
     setSurface(next);
     const nextParams = new URLSearchParams(searchParams);
@@ -949,7 +962,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               </div>
             </div>
             <div className="severe-workspace__content">
-              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : (discussionLayout === 'tabs' && surface === 'discussion') ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion')} inert={surface === 'review' || (discussionLayout === 'tabs' && surface === 'discussion') ? true : undefined}>
+              <div className={`severe-workspace__map${surface === 'review' ? ' is-offscreen' : hideMapForDiscussion ? ' is-hidden' : ''}`} aria-hidden={surface === 'review' || hideMapForDiscussion} inert={surface === 'review' || hideMapForDiscussion ? true : undefined}>
                   <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
               </div>
               {discussionLayout === 'panel' && surface === 'discussion' && !discussionPanelCollapsed ? (
@@ -975,7 +988,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                   />
                   <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></aside>
                 </>
-              ) : discussionLayout === 'tabs' && surface === 'discussion' ? (
+              ) : surface === 'discussion' ? (
                 <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage key={discussionImportRevision} embedded /></React.Suspense></section>
               ) : surface === 'review' ? (
                 <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
@@ -991,7 +1004,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
             </div>
           </div>
         ) : showHintedCustomDiscussion ? (
-          <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage /></React.Suspense>
+          <React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense>
         ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />

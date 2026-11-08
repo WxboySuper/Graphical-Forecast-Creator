@@ -89,7 +89,7 @@
 }
 
 .severe-workspace__map > * { width: 100%; min-width: 0; }
-.severe-workspace--tabs .severe-workspace__map.is-hidden { display: none; }
+.severe-workspace__map.is-hidden { display: none; }
 .severe-workspace__map.is-offscreen { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
 
 .severe-workspace__splitter {
@@ -134,10 +134,12 @@
 @media (max-width: 900px) {
   .severe-workspace__splitter { display: none; }
   .severe-workspace__discussion { min-width: 0; border-left: 0; }
+  .severe-workspace--panel .severe-workspace__discussion { width: 100% !important; max-width: 100%; flex: 1 1 100% !important; }
   .severe-workspace--panel .severe-workspace__discussion { display: none; }
   .severe-workspace--panel .severe-workspace__map { flex: 1 1 100%; }
   .severe-workspace--panel[data-surface='discussion'][data-panel-collapsed='false'] .severe-workspace__discussion { display: flex; flex: 1 1 100%; }
   .severe-workspace--panel[data-surface='discussion'][data-panel-collapsed='false'] .severe-workspace__map { display: none; }
+  .severe-workspace--panel[data-surface='discussion'][data-panel-collapsed='true'] .severe-workspace__discussion--tab { display: flex; flex: 1 1 100%; }
 }
 
 @media (max-width: 520px) {

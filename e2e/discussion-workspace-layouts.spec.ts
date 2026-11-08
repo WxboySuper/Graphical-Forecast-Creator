@@ -67,6 +67,14 @@ test.describe('Severe discussion workspace layouts', () => {
     await page.reload();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
     await expect(page.getByRole('separator', { name: 'Resize discussion panel' })).toHaveAttribute('aria-valuenow', '744');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/forecast/severe?discussionLayout=panel&surface=discussion');
+    const narrowOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(narrowOverflow).toBeLessThanOrEqual(1);
+    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+    await page.getByRole('button', { name: 'Hide panel' }).click();
+    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
+    await expect(page.locator('.severe-workspace__map')).not.toBeVisible();
     await page.goto('/forecast/severe?discussionLayout=tabs');
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--tabs/);
   });
@@ -80,13 +88,14 @@ test.describe('Severe discussion workspace layouts', () => {
     await expect(page.getByRole('heading', { name: 'Export Forecast Image' })).toBeVisible();
   });
 
-  test('uses the map as the phone fallback when the side panel is collapsed', async ({ page }) => {
+  test('keeps Discussion open on a phone when the side panel is collapsed', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/forecast/severe?surface=discussion&discussionLayout=panel');
     await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
     const map = page.locator('.severe-workspace__map');
     await expect(map).not.toBeVisible();
     await page.getByRole('button', { name: 'Hide panel' }).click();
-    await expect(map).toBeVisible();
+    await expect(map).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Forecast Discussion' })).toBeVisible();
   });
 });
