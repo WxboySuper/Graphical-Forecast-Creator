@@ -33,35 +33,6 @@
           "step": "anl",
           "present": true
         },
-        "wind10m": {
-          "parameter": "UGRD/VGRD",
-          "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "CAPE": {
-          "parameter": "CAPE",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true,
-          "note": "Surface-based and layer CAPE records exist; parcel identity not fully resolved from index text alone."
-        },
-        "CIN": {
-          "parameter": "CIN",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "SRH": {
-          "parameter": "HLCY",
-          "level": "1000-0 and 3000-0 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
         "bulkShear0-6km": {
           "parameter": "",
           "level": "",
@@ -93,7 +64,7 @@
         },
         "updraftHelicity": {
           "parameter": "MXUPHL/MNUPHL",
-          "level": "0-2000, 0-3000, 2000-5000 m above ground",
+          "level": "5000-2000, 2000-0, and 3000-0 m above ground",
           "units": "unknown; .idx omits units and no decoder was installed",
           "step": "0-0 day max/min fcst",
           "present": true
@@ -119,57 +90,6 @@
           "step": "anl",
           "present": true
         },
-        "capeCandidates": {
-          "SBCAPE": {
-            "parameter": "CAPE",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCAPE": {
-            "parameter": "CAPE",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "MUCAPE": {
-            "parameter": "CAPE",
-            "level": "90-0 mb above ground candidate only",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": false,
-            "note": "No message can be verified as most-unstable CAPE from the index alone."
-          },
-          "otherCAPERecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground",
-            "0-3000 m above ground"
-          ]
-        },
-        "cinCandidates": {
-          "SBCIN": {
-            "parameter": "CIN",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCIN": {
-            "parameter": "CIN",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "otherCINRecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground"
-          ]
-        },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
@@ -191,25 +111,204 @@
           "step": "",
           "present": false,
           "note": "No surface pressure record found in the inspected index."
+        },
+        "SBCAPE": {
+          "parameter": "CAPE",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCAPE": {
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CAPE."
+        },
+        "MUCAPE": {
+          "parameter": "CAPE",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No message was verified as most-unstable CAPE."
+        },
+        "SBCIN": {
+          "parameter": "CIN",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCIN": {
+          "parameter": "CIN",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CIN."
+        },
+        "MLLCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "shear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No precomputed 0-6 km bulk-shear message in wrfsfc or wrfprs."
         }
       },
       "fixedLayerSCP": {
+        "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
           "MUCAPE": false,
           "SRH0-3km": true,
-          "shear0-6km": false
-        }
+          "BRN_shear_denominator": false
+        },
+        "note": "The formula denominator is BRN shear (40 m2 s-2). The GRIB messages contain neither that diagnostic nor precomputed 0-6 km bulk shear; pressure/native-level winds could support a later derivation."
       },
       "fixedLayerSTP": {
+        "formula": "STP_fixed_CIN = (MLCAPE / 1000) * (bulk_shear_0-6km / 20) * (SRH_0-1km / 100) * ((2000 m - MLLCL) / 1500 m) * ((150 J kg-1 - MLCIN) / 125 J kg-1)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fixed-layer CIN-limited variant, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
-          "MLCAPE": true,
-          "shear0-6km": false,
+          "MLCAPE": false,
+          "bulkShear0-6km": false,
           "SRH0-1km": true,
           "MLLCL": false,
-          "MLCIN": true
-        }
+          "MLCIN": false
+        },
+        "note": "The research report defines the base fixed-layer STP and a separately named CIN-limited variant. This inventory evaluates the CIN-limited version requested by issue #1759; layer CAPE/CIN candidate records exist but exact parcel identities are unverified."
+      },
+      "selectedMessages": {
+        "sourceUrl": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2.idx",
+        "objectUrl": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2",
+        "objectSizeBytes": 136859480,
+        "messages": [
+          {
+            "field": "reflectivity",
+            "parameter": "REFC",
+            "level": "entire atmosphere",
+            "step": "anl",
+            "offset": 0,
+            "rangeStart": 0,
+            "rangeEnd": 292348,
+            "bytes": 292349
+          },
+          {
+            "field": "seaLevelPressure",
+            "parameter": "MSLMA",
+            "level": "mean sea level",
+            "step": "anl",
+            "offset": 24864321,
+            "rangeStart": 24864321,
+            "rangeEnd": 25490920,
+            "bytes": 626600
+          },
+          {
+            "field": "T2m",
+            "parameter": "TMP",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 35958451,
+            "rangeStart": 35958451,
+            "rangeEnd": 37196037,
+            "bytes": 1237587
+          },
+          {
+            "field": "Td2m",
+            "parameter": "DPT",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 39902767,
+            "rangeStart": 39902767,
+            "rangeEnd": 41099131,
+            "bytes": 1196365
+          },
+          {
+            "field": "wind10mU",
+            "parameter": "UGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 44127882,
+            "rangeStart": 44127882,
+            "rangeEnd": 46509496,
+            "bytes": 2381615
+          },
+          {
+            "field": "wind10mV",
+            "parameter": "VGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 46509497,
+            "rangeStart": 46509497,
+            "rangeEnd": 48652968,
+            "bytes": 2143472
+          },
+          {
+            "field": "SBCAPE",
+            "parameter": "CAPE",
+            "level": "surface",
+            "step": "anl",
+            "offset": 65877665,
+            "rangeStart": 65877665,
+            "rangeEnd": 66165470,
+            "bytes": 287806
+          },
+          {
+            "field": "SBCIN",
+            "parameter": "CIN",
+            "level": "surface",
+            "step": "anl",
+            "offset": 66165471,
+            "rangeStart": 66165471,
+            "rangeEnd": 66493217,
+            "bytes": 327747
+          },
+          {
+            "field": "SRH0-3km",
+            "parameter": "HLCY",
+            "level": "3000-0 m above ground",
+            "step": "anl",
+            "offset": 86786072,
+            "rangeStart": 86786072,
+            "rangeEnd": 87995318,
+            "bytes": 1209247
+          },
+          {
+            "field": "SRH0-1km",
+            "parameter": "HLCY",
+            "level": "1000-0 m above ground",
+            "step": "anl",
+            "offset": 87995319,
+            "rangeStart": 87995319,
+            "rangeEnd": 89922963,
+            "bytes": 1927645
+          },
+          {
+            "field": "PWAT",
+            "parameter": "PWAT",
+            "level": "entire atmosphere (considered as a single layer)",
+            "step": "anl",
+            "offset": 66493218,
+            "rangeStart": 66493218,
+            "rangeEnd": 67413270,
+            "bytes": 920053
+          }
+        ],
+        "uniqueBytes": 12550486
       }
     },
     "RAP": {
@@ -234,35 +333,6 @@
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "wind10m": {
-          "parameter": "UGRD/VGRD",
-          "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "CAPE": {
-          "parameter": "CAPE",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true,
-          "note": "Parcel identity not fully resolved from index text alone."
-        },
-        "CIN": {
-          "parameter": "CIN",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "SRH": {
-          "parameter": "HLCY",
-          "level": "1000-0 and 3000-0 m above ground",
           "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
@@ -324,57 +394,6 @@
           "step": "anl",
           "present": true
         },
-        "capeCandidates": {
-          "SBCAPE": {
-            "parameter": "CAPE",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCAPE": {
-            "parameter": "CAPE",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "MUCAPE": {
-            "parameter": "CAPE",
-            "level": "90-0 mb above ground candidate only",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": false,
-            "note": "No message can be verified as most-unstable CAPE from the index alone."
-          },
-          "otherCAPERecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground",
-            "0-3000 m above ground"
-          ]
-        },
-        "cinCandidates": {
-          "SBCIN": {
-            "parameter": "CIN",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCIN": {
-            "parameter": "CIN",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "otherCINRecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground"
-          ]
-        },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
@@ -396,25 +415,194 @@
           "step": "",
           "present": false,
           "note": "No surface pressure record found in the inspected index."
+        },
+        "SBCAPE": {
+          "parameter": "CAPE",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCAPE": {
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CAPE."
+        },
+        "MUCAPE": {
+          "parameter": "CAPE",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No message was verified as most-unstable CAPE."
+        },
+        "SBCIN": {
+          "parameter": "CIN",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCIN": {
+          "parameter": "CIN",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CIN."
+        },
+        "MLLCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "shear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
         }
       },
       "fixedLayerSCP": {
+        "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
           "MUCAPE": false,
           "SRH0-3km": true,
-          "shear0-6km": false
-        }
+          "BRN_shear_denominator": false
+        },
+        "note": "The formula denominator is BRN shear (40 m2 s-2). The GRIB messages contain neither that diagnostic nor precomputed 0-6 km bulk shear; pressure/native-level winds could support a later derivation."
       },
       "fixedLayerSTP": {
+        "formula": "STP_fixed_CIN = (MLCAPE / 1000) * (bulk_shear_0-6km / 20) * (SRH_0-1km / 100) * ((2000 m - MLLCL) / 1500 m) * ((150 J kg-1 - MLCIN) / 125 J kg-1)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fixed-layer CIN-limited variant, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
-          "MLCAPE": true,
-          "shear0-6km": false,
+          "MLCAPE": false,
+          "bulkShear0-6km": false,
           "SRH0-1km": true,
           "MLLCL": false,
-          "MLCIN": true
-        }
+          "MLCIN": false
+        },
+        "note": "The research report defines the base fixed-layer STP and a separately named CIN-limited variant. This inventory evaluates the CIN-limited version requested by issue #1759; layer CAPE/CIN candidate records exist but exact parcel identities are unverified."
+      },
+      "selectedMessages": {
+        "sourceUrl": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2.idx",
+        "objectUrl": "https://noaa-rap-pds.s3.amazonaws.com/rap.20261108/rap.t06z.awip32f00.grib2",
+        "objectSizeBytes": 19614935,
+        "messages": [
+          {
+            "field": "reflectivity",
+            "parameter": "REFC",
+            "level": "entire atmosphere",
+            "step": "anl",
+            "offset": 425611,
+            "rangeStart": 425611,
+            "rangeEnd": 503972,
+            "bytes": 78362
+          },
+          {
+            "field": "seaLevelPressure",
+            "parameter": "MSLMA",
+            "level": "mean sea level",
+            "step": "anl",
+            "offset": 13508095,
+            "rangeStart": 13508095,
+            "rangeEnd": 13549664,
+            "bytes": 41570
+          },
+          {
+            "field": "T2m",
+            "parameter": "TMP",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 14557274,
+            "rangeStart": 14557274,
+            "rangeEnd": 14612428,
+            "bytes": 55155
+          },
+          {
+            "field": "Td2m",
+            "parameter": "DPT",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 14690468,
+            "rangeStart": 14690468,
+            "rangeEnd": 14751925,
+            "bytes": 61458
+          },
+          {
+            "field": "wind10mU",
+            "parameter": "UGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 14914225,
+            "rangeStart": 14914225,
+            "rangeEnd": 15041243,
+            "bytes": 127019
+          },
+          {
+            "field": "SBCAPE",
+            "parameter": "CAPE",
+            "level": "surface",
+            "step": "anl",
+            "offset": 15212567,
+            "rangeStart": 15212567,
+            "rangeEnd": 15248895,
+            "bytes": 36329
+          },
+          {
+            "field": "SBCIN",
+            "parameter": "CIN",
+            "level": "surface",
+            "step": "anl",
+            "offset": 15248896,
+            "rangeStart": 15248896,
+            "rangeEnd": 15261287,
+            "bytes": 12392
+          },
+          {
+            "field": "SRH0-3km",
+            "parameter": "HLCY",
+            "level": "3000-0 m above ground",
+            "step": "anl",
+            "offset": 15966586,
+            "rangeStart": 15966586,
+            "rangeEnd": 15999449,
+            "bytes": 32864
+          },
+          {
+            "field": "SRH0-1km",
+            "parameter": "HLCY",
+            "level": "1000-0 m above ground",
+            "step": "anl",
+            "offset": 15999450,
+            "rangeStart": 15999450,
+            "rangeEnd": 16062428,
+            "bytes": 62979
+          },
+          {
+            "field": "PWAT",
+            "parameter": "PWAT",
+            "level": "entire atmosphere (considered as a single layer)",
+            "step": "anl",
+            "offset": 15261288,
+            "rangeStart": 15261288,
+            "rangeEnd": 15314496,
+            "bytes": 53209
+          }
+        ],
+        "uniqueBytes": 561337
       }
     },
     "RRFS": {
@@ -439,35 +627,6 @@
         "Td2m": {
           "parameter": "DPT",
           "level": "2 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "wind10m": {
-          "parameter": "UGRD/VGRD",
-          "level": "10 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "CAPE": {
-          "parameter": "CAPE",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground; 0-3000 m above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true,
-          "note": "Parcel identity not fully resolved from index text alone."
-        },
-        "CIN": {
-          "parameter": "CIN",
-          "level": "surface; 180-0, 90-0, 255-0 mb above ground",
-          "units": "unknown; .idx omits units and no decoder was installed",
-          "step": "anl",
-          "present": true
-        },
-        "SRH": {
-          "parameter": "HLCY",
-          "level": "1000-0 and 3000-0 m above ground",
           "units": "unknown; .idx omits units and no decoder was installed",
           "step": "anl",
           "present": true
@@ -529,57 +688,6 @@
           "step": "anl",
           "present": true
         },
-        "capeCandidates": {
-          "SBCAPE": {
-            "parameter": "CAPE",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCAPE": {
-            "parameter": "CAPE",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "MUCAPE": {
-            "parameter": "CAPE",
-            "level": "90-0 mb above ground candidate only",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": false,
-            "note": "No message can be verified as most-unstable CAPE from the index alone."
-          },
-          "otherCAPERecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground",
-            "0-3000 m above ground"
-          ]
-        },
-        "cinCandidates": {
-          "SBCIN": {
-            "parameter": "CIN",
-            "level": "surface",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true
-          },
-          "MLCIN": {
-            "parameter": "CIN",
-            "level": "180-0 mb above ground",
-            "units": "unknown; .idx omits units and no decoder was installed",
-            "step": "anl",
-            "present": true,
-            "note": "Layer candidate; GRIB parcel metadata was not decoded."
-          },
-          "otherCINRecords": [
-            "90-0 mb above ground",
-            "255-0 mb above ground"
-          ]
-        },
         "SRH0-1km": {
           "parameter": "HLCY",
           "level": "1000-0 m above ground",
@@ -601,32 +709,220 @@
           "step": "",
           "present": false,
           "note": "No surface pressure record found in the inspected index."
+        },
+        "SBCAPE": {
+          "parameter": "CAPE",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCAPE": {
+          "parameter": "CAPE",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CAPE."
+        },
+        "MUCAPE": {
+          "parameter": "CAPE",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No message was verified as most-unstable CAPE."
+        },
+        "SBCIN": {
+          "parameter": "CIN",
+          "level": "surface",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": true
+        },
+        "MLCIN": {
+          "parameter": "CIN",
+          "level": "180-0 mb above ground candidate",
+          "units": "unknown; .idx omits units and no decoder was installed",
+          "step": "anl",
+          "present": false,
+          "candidateRecordPresent": true,
+          "note": "The layer record exists, but parcel semantics were not decoded. Not verified as mixed-layer CIN."
+        },
+        "MLLCL": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false
+        },
+        "shear0-6km": {
+          "parameter": "",
+          "level": "",
+          "units": "",
+          "step": "",
+          "present": false,
+          "note": "No precomputed 0-6 km bulk-shear message in inspected f00 product."
         }
       },
       "fixedLayerSCP": {
+        "formula": "SCP_fixed = (MUCAPE / 1000) * (SRH_0-3km / 150) * (BRN_shear_denominator / 40)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
           "MUCAPE": false,
           "SRH0-3km": true,
-          "shear0-6km": false
-        }
+          "BRN_shear_denominator": false
+        },
+        "note": "The formula denominator is BRN shear (40 m2 s-2). The GRIB messages contain neither that diagnostic nor precomputed 0-6 km bulk shear; pressure/native-level winds could support a later derivation."
       },
       "fixedLayerSTP": {
+        "formula": "STP_fixed_CIN = (MLCAPE / 1000) * (bulk_shear_0-6km / 20) * (SRH_0-1km / 100) * ((2000 m - MLLCL) / 1500 m) * ((150 J kg-1 - MLCIN) / 125 J kg-1)",
+        "formulaSource": "docs/research/mesoscale-pipeline-without-vps.md, fixed-layer CIN-limited variant, fetched from docs/mesoscale-research",
         "allNative": false,
         "inputs": {
-          "MLCAPE": true,
-          "shear0-6km": false,
+          "MLCAPE": false,
+          "bulkShear0-6km": false,
           "SRH0-1km": true,
           "MLLCL": false,
-          "MLCIN": true
-        }
+          "MLCIN": false
+        },
+        "note": "The research report defines the base fixed-layer STP and a separately named CIN-limited variant. This inventory evaluates the CIN-limited version requested by issue #1759; layer CAPE/CIN candidate records exist but exact parcel identities are unverified."
+      },
+      "selectedMessages": {
+        "sourceUrl": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2.idx",
+        "objectUrl": "https://noaa-rrfs-ops-pds.s3.amazonaws.com/rrfs.20261108/06/rrfs.t06z.2dfld.3km.f000.conus.grib2",
+        "objectSizeBytes": 302956136,
+        "messages": [
+          {
+            "field": "reflectivity",
+            "parameter": "REFC",
+            "level": "entire atmosphere (considered as a single layer)",
+            "step": "anl",
+            "offset": 0,
+            "rangeStart": 0,
+            "rangeEnd": 525576,
+            "bytes": 525577
+          },
+          {
+            "field": "seaLevelPressure",
+            "parameter": "MSLET",
+            "level": "mean sea level",
+            "step": "anl",
+            "offset": 9964508,
+            "rangeStart": 9964508,
+            "rangeEnd": 11844381,
+            "bytes": 1879874
+          },
+          {
+            "field": "T2m",
+            "parameter": "TMP",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 64830979,
+            "rangeStart": 64830979,
+            "rangeEnd": 66524993,
+            "bytes": 1694015
+          },
+          {
+            "field": "Td2m",
+            "parameter": "DPT",
+            "level": "2 m above ground",
+            "step": "anl",
+            "offset": 67988934,
+            "rangeStart": 67988934,
+            "rangeEnd": 69734825,
+            "bytes": 1745892
+          },
+          {
+            "field": "wind10mU",
+            "parameter": "UGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 73522539,
+            "rangeStart": 73522539,
+            "rangeEnd": 75435425,
+            "bytes": 1912887
+          },
+          {
+            "field": "wind10mV",
+            "parameter": "VGRD",
+            "level": "10 m above ground",
+            "step": "anl",
+            "offset": 75435426,
+            "rangeStart": 75435426,
+            "rangeEnd": 77284904,
+            "bytes": 1849479
+          },
+          {
+            "field": "SBCAPE",
+            "parameter": "CAPE",
+            "level": "surface",
+            "step": "anl",
+            "offset": 96513536,
+            "rangeStart": 96513536,
+            "rangeEnd": 97136649,
+            "bytes": 623114
+          },
+          {
+            "field": "SBCIN",
+            "parameter": "CIN",
+            "level": "surface",
+            "step": "anl",
+            "offset": 97136650,
+            "rangeStart": 97136650,
+            "rangeEnd": 97463957,
+            "bytes": 327308
+          },
+          {
+            "field": "SRH0-3km",
+            "parameter": "HLCY",
+            "level": "3000-0 m above ground",
+            "step": "anl",
+            "offset": 131382312,
+            "rangeStart": 131382312,
+            "rangeEnd": 132652905,
+            "bytes": 1270594
+          },
+          {
+            "field": "SRH0-1km",
+            "parameter": "HLCY",
+            "level": "1000-0 m above ground",
+            "step": "anl",
+            "offset": 132652906,
+            "rangeStart": 132652906,
+            "rangeEnd": 133873410,
+            "bytes": 1220505
+          },
+          {
+            "field": "PWAT",
+            "parameter": "PWAT",
+            "level": "entire atmosphere (considered as a single layer)",
+            "step": "anl",
+            "offset": 97463958,
+            "rangeStart": 97463958,
+            "rangeEnd": 98432611,
+            "bytes": 968654
+          },
+          {
+            "field": "updraftHelicity",
+            "parameter": "UPHL",
+            "level": "5000-2000 m above ground",
+            "step": "anl",
+            "offset": 137229153,
+            "rangeStart": 137229153,
+            "rangeEnd": 137314264,
+            "bytes": 85112
+          }
+        ],
+        "uniqueBytes": 14103011
       }
     }
   },
   "selectedMessageBytes": {
     "HRRR": 12550486,
-    "RAP": 688356,
-    "RRFS": 14103011,
-    "selection": "RECF, sea-level pressure, 2 m T/DPT, 10 m U/V, surface CAPE/CIN, HLCY 0-1/0-3 km, PWAT; RRFS UPHL included. Sum of unique message byte ranges; see report for product boundaries."
+    "RAP": 561337,
+    "RRFS": 14103011
   }
 }

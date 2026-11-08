@@ -7,7 +7,7 @@ Checked 8 November 2026. The companion [JSON manifest](../data/mesoscale-field-i
 | Model | Cycle | f00 index/object timestamp | Latency from cycle | Object bytes | Selected message bytes |
 |---|---|---|---:|---:|---:|
 | HRRR CONUS `wrfsfc` | 12Z | 12:51:20Z | 51 min | 136,859,480 | 12,550,486 |
-| RAP `awip32` | 06Z | 06:48:05Z | 48 min | 19,614,935 | 688,356 |
+| RAP `awip32` | 06Z | 06:48:05Z | 48 min | 19,614,935 | 561,337 |
 | RRFS 3 km CONUS `2dfld` | 06Z | 07:15:26Z | 75 min | 302,956,136 | 14,103,011 |
 
 Selected-message totals include one exact message for each available record in the shared sample allowlist: reflectivity, mean sea-level pressure, 2 m temperature/dewpoint, 10 m U/V wind, surface CAPE/CIN, 0-1 and 0-3 km HLCY, PWAT, and RRFS's 2-5 km UPHL. They are inclusive `.idx` byte ranges, with the final message ending at object size minus one. HRRR `wrfprs` was also indexed (382,358,670 bytes), but not added to the selected-byte total because it duplicates surface diagnostics and this spike's common allowlist uses `wrfsfc`.

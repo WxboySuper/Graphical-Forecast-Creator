@@ -4,24 +4,23 @@ from pathlib import Path
 from inventory import IndexRecord, parse_idx, resolve_allowlist, resolve_ranges
 
 
-FIXTURE = """1:0:d=2026110812:TMP:2 m above ground:anl:
-2:100:d=2026110812:CAPE:180-0 mb above ground:anl:
-3:250:d=2026110812:HLCY:3000-0 m above ground:0-0 hour fcst:
-"""
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "hrrr_t12_wrfscf00.idx"
 
 
 class InventoryTests(unittest.TestCase):
     def test_parse_preserves_index_identity(self):
-        rows = parse_idx(FIXTURE)
-        self.assertEqual(rows[1], IndexRecord("2", 100, "2026110812", "CAPE", "180-0 mb above ground", "anl"))
+        rows = parse_idx(FIXTURE_PATH.read_text(encoding="ascii"))
+        t2m = next(row for row in rows if row.parameter == "TMP" and row.level == "2 m above ground")
+        self.assertEqual(t2m, IndexRecord("71", 35958451, "2026110812", "TMP", "2 m above ground", "anl"))
 
     def test_ranges_are_inclusive_and_use_next_offset(self):
-        ranges = resolve_ranges(parse_idx(FIXTURE), 400)
-        self.assertEqual([(span.start, span.end, span.size) for _, span in ranges], [(0, 99, 100), (100, 249, 150), (250, 399, 150)])
+        ranges = resolve_ranges(parse_idx(FIXTURE_PATH.read_text(encoding="ascii")), 136859480)
+        t2m = next(span for row, span in ranges if row.parameter == "TMP" and row.level == "2 m above ground")
+        self.assertEqual((t2m.start, t2m.end, t2m.size), (35958451, 37196037, 1237587))
 
     def test_allowlist_requires_exact_level(self):
-        selected = resolve_allowlist(parse_idx(FIXTURE), 400, {"mlcape": {"parameter": "CAPE", "level": "180-0 mb above ground"}, "wrong": {"parameter": "CAPE", "level": "surface"}})
-        self.assertEqual(len(selected["mlcape"]), 1)
+        selected = resolve_allowlist(parse_idx(FIXTURE_PATH.read_text(encoding="ascii")), 136859480, {"t2m": {"parameter": "TMP", "level": "2 m above ground", "step": "anl"}, "wrong": {"parameter": "TMP", "level": "surface"}})
+        self.assertEqual(selected["t2m"][0]["range"], {"start": 35958451, "end": 37196037})
         self.assertEqual(selected["wrong"], [])
 
     def test_rejects_bad_offsets(self):
