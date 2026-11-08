@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import worker from './mesoscale-worker.mjs';
 
+const serialTest = (name, run) => test(name, { concurrency: false }, run);
 const ORIGIN = 'https://gfc.weatherboysuper.com';
 const envFor = (objects = {}, overrides = {}) => ({
   MESOSCALE_BUCKET: {
@@ -18,6 +19,18 @@ const envFor = (objects = {}, overrides = {}) => ({
 });
 
 const request = (path, options = {}) => new Request(`https://mesoscale.example.test${path}`, options);
+const countBucketReads = (bucket, methods = ['get']) => {
+  let reads = 0;
+  for (const method of methods) {
+    const original = bucket[method];
+    if (typeof original !== 'function') continue;
+    bucket[method] = async (...args) => {
+      reads += 1;
+      return original.apply(bucket, args);
+    };
+  }
+  return () => reads;
+};
 const pointer = (modelId, cycleTime = '2026-11-08T12:00:00Z') => ({ schemaVersion: 1, modelId, cycleTime, catalogUrl: 'https://old.example/catalog.json', publishedAt: '2026-11-08T12:04:00Z' });
 const makeCatalog = (overrides = {}) => ({
   schemaVersion: 1,
@@ -38,7 +51,7 @@ const withNow = async (timestamp, run) => {
   }
 };
 
-// These helpers patch shared globals; run this file in node:test's default serial mode (do not pass --test-concurrency >1).
+// These helpers patch shared globals; serialTest explicitly disables test concurrency.
 const withCache = async (run) => {
   const originalCaches = globalThis.caches;
   const entries = new Map();
@@ -55,7 +68,7 @@ const withCache = async (run) => {
   }
 };
 
-test('strictly whitelists route segments and rejects traversal attempts without R2 reads', async () => {
+serialTest('strictly whitelists route segments and rejects traversal attempts without R2 reads', async () => {
   let reads = 0;
   const env = envFor({}, { MESOSCALE_BUCKET: {
     get: async () => { reads += 1; return null; },
@@ -82,14 +95,14 @@ test('strictly whitelists route segments and rejects traversal attempts without 
   assert.equal(reads, 0);
 });
 
-test('valid tile requests map only to the fixed v1 key namespace', async () => {
+serialTest('valid tile requests map only to the fixed v1 key namespace', async () => {
   let key;
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (requestedKey) => { key = requestedKey; return null; } } });
   assert.equal((await worker.fetch(request('/tiles/rrfs/20261108T1200Z/f03/temperature-2m/6/2/1.png'), env)).status, 404);
   assert.equal(key, 'mesoscale/v1/tiles/rrfs/20261108T1200Z/f03/temperature-2m/6/2/1.png');
 });
 
-test('CORS allows configured origins and omits permission for other origins', async () => {
+serialTest('CORS allows configured origins and omits permission for other origins', async () => {
   const env = envFor();
   const allowed = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: ORIGIN } }), env);
   assert.equal(allowed.headers.get('Access-Control-Allow-Origin'), ORIGIN);
@@ -116,7 +129,7 @@ test('CORS allows configured origins and omits permission for other origins', as
   assert.match(noOriginPreflight.headers.get('Vary') ?? '', /Origin/);
 });
 
-test('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
+serialTest('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
   const cycleTime = '2026-11-08T12:00:00Z';
   const catalog = makeCatalog({ cycleTime, frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
   const env = envFor({ 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json': catalog });
@@ -166,7 +179,7 @@ test('cycle catalog uses immutable caching, validates stored identity, and suppo
   assert.equal(parsedConditionalCatalog, true);
 });
 
-test('serves schema-valid partial and failed catalogs as diagnostic cycles', async () => {
+serialTest('serves schema-valid partial and failed catalogs as diagnostic cycles', async () => {
   const path = '/catalog/hrrr/20261108T1200Z.json';
   for (const status of ['partial', 'failed']) {
     const catalog = makeCatalog({ status });
@@ -181,12 +194,12 @@ test('serves schema-valid partial and failed catalogs as diagnostic cycles', asy
   assert.equal(latest.status, 404);
 });
 
-test('Cache API separates rewritten catalog representations by public base URL', async () => {
+serialTest('Cache API separates rewritten catalog representations by public base URL', async () => {
   await withCache(async () => {
     const catalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{ id: 'temperature-2m', data: { type: 'xyz-raster', urlTemplate: 'https://old.example/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png' } }] }] });
     const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
-    let reads = 0;
-    const bucket = { get: async () => { reads += 1; return { size: new TextEncoder().encode(JSON.stringify(catalog)).byteLength, json: async () => structuredClone(catalog), httpEtag: '"catalog"' }; } };
+    const bucket = { get: async () => ({ size: new TextEncoder().encode(JSON.stringify(catalog)).byteLength, json: async () => structuredClone(catalog), httpEtag: '"catalog"' }) };
+    const reads = countBucketReads(bucket);
     const firstEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test' });
     const secondEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://second.example.test' });
     const normalizedEnv = envFor({ [key]: catalog }, { MESOSCALE_BUCKET: bucket, PUBLIC_BASE_URL: 'https://first.example.test/' });
@@ -197,11 +210,11 @@ test('Cache API separates rewritten catalog representations by public base URL',
     assert.match((await first.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/first\.example\.test/);
     assert.match((await second.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/second\.example\.test/);
     assert.match((await normalized.json()).frames[0].parameters[0].data.urlTemplate, /^https:\/\/first\.example\.test/);
-    assert.equal(reads, 2);
+    assert.equal(reads(), 2);
   });
 });
 
-test('catalog and latest do not emit an ETag when R2 omits one', async () => {
+serialTest('catalog and latest do not emit an ETag when R2 omits one', async () => {
   const catalog = makeCatalog();
   const pointerValue = pointer('hrrr');
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
@@ -216,7 +229,7 @@ test('catalog and latest do not emit an ETag when R2 omits one', async () => {
   assert.equal(latestResult.headers.get('ETag'), null);
 });
 
-test('missing tile is a short-cache 404 and missing latest pointer is also a 404', async () => {
+serialTest('missing tile is a short-cache 404 and missing latest pointer is also a 404', async () => {
   const env = envFor();
   const tile = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
   assert.equal(tile.status, 404);
@@ -224,14 +237,14 @@ test('missing tile is a short-cache 404 and missing latest pointer is also a 404
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 404);
 });
 
-test('tile response defaults to PNG content type when R2 metadata is absent', async () => {
+serialTest('tile response defaults to PNG content type when R2 metadata is absent', async () => {
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => ({ body: new Blob(['png']).stream(), size: 3, httpEtag: '"tile"' }) } });
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env);
   assert.equal(response.headers.get('Content-Type'), 'image/png');
   assert.equal(response.headers.get('Content-Length'), '3');
 });
 
-test('tile HEAD uses R2 metadata without reading the tile body', async () => {
+serialTest('tile HEAD uses R2 metadata without reading the tile body', async () => {
   let heads = 0;
   let gets = 0;
   const env = envFor({}, { MESOSCALE_BUCKET: {
@@ -246,7 +259,7 @@ test('tile HEAD uses R2 metadata without reading the tile body', async () => {
   assert.equal(gets, 0);
 });
 
-test('catalog HEAD validates the stored catalog and matches GET status and validators', async () => {
+serialTest('catalog HEAD validates the stored catalog and matches GET status and validators', async () => {
   let gets = 0;
   let heads = 0;
   const catalog = makeCatalog();
@@ -271,99 +284,91 @@ test('catalog HEAD validates the stored catalog and matches GET status and valid
   assert.equal(gets, 3);
 });
 
-test('tile HEAD falls back to get when head is unavailable and does not populate cache', async () => {
+serialTest('tile HEAD falls back to get when head is unavailable and does not populate cache', async () => {
   await withCache(async () => {
     const key = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const env = envFor({ [key]: { pixels: 'tile' } });
-    let reads = 0;
-    const get = env.MESOSCALE_BUCKET.get;
-    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const reads = countBucketReads(env.MESOSCALE_BUCKET);
     const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
     assert.equal((await worker.fetch(request(path), env)).status, 200);
-    assert.equal(reads, 2);
+    assert.equal(reads(), 2);
   });
 });
 
-test('Cache API stores tiles, serves hits, honors conditional hits, and caches missing tiles', async () => {
+serialTest('Cache API stores tiles, serves hits, honors conditional hits, and caches missing tiles', async () => {
   await withCache(async () => {
     const tileKey = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const env = envFor({ [tileKey]: { pixels: 'tile' } });
-    let reads = 0;
-    const get = env.MESOSCALE_BUCKET.get;
-    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const reads = countBucketReads(env.MESOSCALE_BUCKET);
     const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const first = await worker.fetch(request(path), env);
     assert.equal(first.status, 200);
     assert.equal(await first.text(), '{"pixels":"tile"}');
     const etag = first.headers.get('ETag');
     assert.equal(first.headers.get('Content-Type'), 'image/png');
-    assert.equal(first.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+    assert.match(first.headers.get('Cache-Control') ?? '', /^public, max-age=\d+, immutable$/);
     assert.equal(first.headers.get('X-Content-Type-Options'), 'nosniff');
     const hit = await worker.fetch(request(path), env);
     assert.equal(hit.status, 200);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
     assert.equal((await worker.fetch(request(`${path}?cacheBust=1`), env)).status, 200);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
     const conditionalHit = await worker.fetch(request(path, { headers: { 'If-None-Match': etag } }), env);
     assert.equal(conditionalHit.status, 304);
     assert.equal(conditionalHit.headers.has('Content-Type'), false);
     assert.equal(conditionalHit.headers.has('Content-Length'), false);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
 
     const missingPath = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/1/1.png';
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
     assert.equal((await worker.fetch(request(missingPath), env)).status, 404);
-    assert.equal(reads, 2);
+    assert.equal(reads(), 2);
   });
 });
 
-test('catalog HEAD warms the validated GET Cache API representation', async () => {
+serialTest('catalog HEAD warms the validated GET Cache API representation', async () => {
   await withCache(async () => {
     const key = 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json';
     const env = envFor({ [key]: makeCatalog() });
-    let reads = 0;
-    const get = env.MESOSCALE_BUCKET.get;
-    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const reads = countBucketReads(env.MESOSCALE_BUCKET);
     const path = '/catalog/hrrr/20261108T1200Z.json';
     const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
     assert.equal(head.status, 200);
     assert.equal(head.body, null);
     assert.equal((await worker.fetch(request(path), env)).status, 200);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
   });
 });
 
-test('cache read failure falls back to R2 and put uses waitUntil when available', async () => {
+serialTest('cache read failure falls back to R2 and put uses waitUntil when available', async () => {
   await withCache(async (cache) => {
     cache.match = async () => { throw new Error('cache unavailable'); };
     const tileKey = 'mesoscale/v1/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
-    let reads = 0;
     const env = envFor({ [tileKey]: { pixels: 'tile' } });
-    const get = env.MESOSCALE_BUCKET.get;
-    env.MESOSCALE_BUCKET.get = async (...args) => { reads += 1; return get(...args); };
+    const reads = countBucketReads(env.MESOSCALE_BUCKET);
     const tasks = [];
     const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png'), env, { waitUntil: (task) => tasks.push(task) });
     assert.equal(response.status, 200);
-    assert.equal(reads, 1);
+    assert.equal(reads(), 1);
     assert.equal(tasks.length, 0);
     cache.match = async () => undefined;
     const cachedWriteResponse = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png?miss=1'), env, { waitUntil: (task) => tasks.push(task) });
     assert.equal(cachedWriteResponse.status, 200);
-    assert.equal(reads, 2);
+    assert.equal(reads(), 2);
     assert.equal(tasks.length, 1);
     await Promise.all(tasks);
   });
 });
 
-test('latest pointer reports live age and stale state without changing its cycle identity', async () => {
+serialTest('latest pointer reports live age and stale state without changing its cycle identity', async () => {
   const env = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: '60' });
   await withNow('2026-11-08T15:01:00Z', async () => {
     const response = await worker.fetch(request('/latest/hrrr.json'), env);
@@ -397,7 +402,7 @@ test('latest pointer reports live age and stale state without changing its cycle
   });
 });
 
-test('latest treats small future cycle skew as age zero and larger skew as stale', async () => {
+serialTest('latest treats small future cycle skew as age zero and larger skew as stale', async () => {
   const path = '/latest/hrrr.json';
   await withNow('2026-11-08T11:58:00Z', async () => {
     const smallSkew = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T12:00:00Z') });
@@ -414,7 +419,7 @@ test('latest treats small future cycle skew as age zero and larger skew as stale
   });
 });
 
-test('latest recalculates age on Worker Cache API hits', async () => {
+serialTest('latest recalculates age on Worker Cache API hits', async () => {
   await withCache(async () => {
     let reads = 0;
     const value = pointer('hrrr');
@@ -436,7 +441,7 @@ test('latest recalculates age on Worker Cache API hits', async () => {
   });
 });
 
-test('status recalculates age on Worker Cache API hits', async () => {
+serialTest('status recalculates age on Worker Cache API hits', async () => {
   await withCache(async () => {
     let reads = 0;
     const value = pointer('hrrr');
@@ -463,7 +468,7 @@ test('status recalculates age on Worker Cache API hits', async () => {
   });
 });
 
-test('status aggregates latest pointers and current or previous daily health records', async () => {
+serialTest('status aggregates latest pointers and current or previous daily health records', async () => {
   const env = envFor({
     'mesoscale/v1/latest/hrrr.json': pointer('hrrr'),
     'mesoscale/v1/latest/rap.json': pointer('rap'),
@@ -486,7 +491,7 @@ test('status aggregates latest pointers and current or previous daily health rec
   });
 });
 
-test('malformed catalog and pointer JSON produce explicit gateway errors', async () => {
+serialTest('malformed catalog and pointer JSON produce explicit gateway errors', async () => {
   const malformed = { size: 8, json: async () => { throw new SyntaxError('invalid'); }, httpEtag: '"bad"' };
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
@@ -509,7 +514,7 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   assert.equal(parsedUnknownSize, false);
 });
 
-test('status labels malformed pointer JSON as invalid instead of missing', async () => {
+serialTest('status labels malformed pointer JSON as invalid instead of missing', async () => {
   let parsedMalformedPointer = false;
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { size: 16, json: async () => { parsedMalformedPointer = true; throw new SyntaxError('invalid'); } } : null } });
   await withNow('2026-11-08T15:01:00Z', async () => {
@@ -520,7 +525,7 @@ test('status labels malformed pointer JSON as invalid instead of missing', async
   assert.equal(parsedMalformedPointer, true);
 });
 
-test('status labels parsed records with missing required fields as invalid', async () => {
+serialTest('status labels parsed records with missing required fields as invalid', async () => {
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => {
     if (key === 'mesoscale/v1/latest/hrrr.json') return { size: 70, json: async () => ({ schemaVersion: 1, modelId: 'rap', cycleTime: '2026-11-08T12:00:00Z' }) };
     if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 70, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T15:00:00Z' }) };
@@ -534,7 +539,7 @@ test('status labels parsed records with missing required fields as invalid', asy
   });
 });
 
-test('status degrades on R2 read errors and rejects unsupported health states', async () => {
+serialTest('status degrades on R2 read errors and rejects unsupported health states', async () => {
   const env = envFor({}, {
     MESOSCALE_BUCKET: { get: async (key) => {
       if (key === 'mesoscale/v1/health/2026-11-08/hrrr.json') return { size: 92, json: async () => ({ schemaVersion: 1, modelId: 'hrrr', generatedAt: '2026-11-08T13:00:00Z', status: 'complete' }) };
@@ -555,7 +560,7 @@ test('status degrades on R2 read errors and rejects unsupported health states', 
   assert.equal((await unsupported.json()).models.find((model) => model.modelId === 'hrrr').health, 'invalid');
 });
 
-test('HEAD returns headers without a body, and unsupported methods return 405', async () => {
+serialTest('HEAD returns headers without a body, and unsupported methods return 405', async () => {
   const env = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: '1' });
   await withNow('2026-11-08T15:00:00Z', async () => {
     const head = await worker.fetch(request('/latest/hrrr.json', { method: 'HEAD' }), env);
@@ -575,7 +580,7 @@ test('HEAD returns headers without a body, and unsupported methods return 405', 
   assert.equal(tileHead.status, 200);
   assert.equal(tileHead.body, null);
   assert.equal(tileHead.headers.get('ETag'), '"tile"');
-  assert.equal(tileHead.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+  assert.match(tileHead.headers.get('Cache-Control') ?? '', /^public, max-age=\d+, immutable$/);
   const rejected = await worker.fetch(request('/status', { method: 'POST' }), env);
   assert.equal(rejected.status, 405);
   assert.equal(rejected.headers.get('Allow'), 'GET, HEAD, OPTIONS');

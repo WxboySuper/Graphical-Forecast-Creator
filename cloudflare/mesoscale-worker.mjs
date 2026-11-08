@@ -1,10 +1,10 @@
 const MODELS = new Set(['hrrr', 'rap', 'rrfs']);
+const V1_PREFIX = 'mesoscale/v1';
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 const MAX_ZOOM = 24;
 const TILE_MISS_TTL = 60;
 const POINTER_TTL = 5;
 const STATUS_TTL = 5;
-const CATALOG_TTL = 31536000;
-const TILE_TTL = 31536000;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 
 const json = (body, status = 200, headers = {}) =>
@@ -60,20 +60,20 @@ const parseCatalogRoute = (parts) => {
   if (parts[0] !== 'catalog' || !MODELS.has(parts[1])) return null;
   if (!/^\d{8}T\d{4}Z\.json$/.test(parts[2])) return null;
   const cycle = parts[2].slice(0, -5);
-  return cycleDate(cycle) ? { kind: 'catalog', model: parts[1], cycle, key: `mesoscale/v1/catalog/${parts[1]}/${cycle}.json` } : null;
+  return cycleDate(cycle) ? { kind: 'catalog', model: parts[1], cycle, key: `${V1_PREFIX}/catalog/${parts[1]}/${cycle}.json` } : null;
 };
 
 const parseLatestRoute = (parts) => {
   if (parts.length !== 2) return null;
   if (parts[0] !== 'latest' || !parts[1].endsWith('.json')) return null;
   const model = parts[1].slice(0, -5);
-  return MODELS.has(model) ? { kind: 'latest', model, key: `mesoscale/v1/latest/${model}.json` } : null;
+  return MODELS.has(model) ? { kind: 'latest', model, key: `${V1_PREFIX}/latest/${model}.json` } : null;
 };
 
 const validTileCoordinates = (zoom, x, y) => {
-  if (zoom > MAX_ZOOM) return false;
+  if (!Number.isSafeInteger(zoom) || zoom < 0 || zoom > MAX_ZOOM) return false;
   if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y)) return false;
-  return x < 2 ** zoom && y < 2 ** zoom;
+  return x >= 0 && y >= 0 && x < 2 ** zoom && y < 2 ** zoom;
 };
 
 const parseTileCoordinates = (parts) => {
@@ -97,7 +97,7 @@ const parseTileRoute = (parts) => {
   const coordinates = parseTileCoordinates(parts.slice(5));
   if (!coordinates) return null;
   const { zoom, x, y } = coordinates;
-  return { kind: 'tile', key: `mesoscale/v1/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${zoom}/${x}/${y}.png` };
+  return { kind: 'tile', key: `${V1_PREFIX}/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${zoom}/${x}/${y}.png` };
 };
 
 const parseRoute = (pathname) => {
@@ -319,8 +319,7 @@ const storedJsonResponse = async ({ request, env, route, object, now, headers, e
 };
 
 const cacheControlForRoute = (route) => {
-  if (route.kind === 'catalog') return `public, max-age=${CATALOG_TTL}, immutable`;
-  if (route.kind === 'tile') return `public, max-age=${TILE_TTL}, immutable`;
+  if (route.kind === 'catalog' || route.kind === 'tile') return IMMUTABLE_CACHE_CONTROL;
   return `public, max-age=${POINTER_TTL}`;
 };
 
@@ -468,9 +467,9 @@ const modelHealthState = (health, today, yesterday, pointer) => {
 
 const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter }) => {
   const [pointer, today, yesterday] = await Promise.all([
-    readJson(bucket, `mesoscale/v1/latest/${modelId}.json`),
-    readJson(bucket, `mesoscale/v1/health/${day}/${modelId}.json`),
-    readJson(bucket, `mesoscale/v1/health/${previousDay}/${modelId}.json`),
+    readJson(bucket, `${V1_PREFIX}/latest/${modelId}.json`),
+    readJson(bucket, `${V1_PREFIX}/health/${day}/${modelId}.json`),
+    readJson(bucket, `${V1_PREFIX}/health/${previousDay}/${modelId}.json`),
   ]);
   const validPointer = validateJsonRecord(pointer, (value) => validStatusPointerValue(value, modelId));
   const validToday = validateJsonRecord(today, (value) => validHealthValue(value, modelId));
