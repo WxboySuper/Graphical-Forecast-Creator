@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { describe } from 'node:test';
 import worker from './mesoscale-worker.mjs';
+import { clearTileCatalogCacheForTests } from './mesoscale-worker.mjs';
 import { clearPmtilesCacheForTests } from './pmtiles-reader.mjs';
 import { createPmtilesFixture, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
@@ -57,6 +58,8 @@ const tileCatalog = makeCatalog({ frames: [{ forecastHour: 0, parameters: [{
   },
 }] }] });
 const tileEnvFor = (bucket) => {
+  clearTileCatalogCacheForTests();
+  clearPmtilesCacheForTests();
   const get = bucket.get.bind(bucket);
   bucket.get = async (key, options) => {
     if (key === 'mesoscale/v1/catalog/hrrr/20261108T1200Z.json') {

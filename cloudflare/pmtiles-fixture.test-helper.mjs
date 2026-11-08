@@ -16,16 +16,16 @@ const gzipBytes = async (value) => new Uint8Array(await new Response(
   new Blob([value]).stream().pipeThrough(new CompressionStream('gzip')),
 ).arrayBuffer());
 
-const fixtureDirectories = async ({ bytes, leaf, gzip }) => {
+const fixtureLeaf = async ({ bytes, leaf, gzip }) => {
   let leafBytes = leaf ? directory({ length: bytes.length }) : null;
   if (gzip && leafBytes) leafBytes = await gzipBytes(leafBytes);
-  let root = leaf ? directory({ runLength: 0, length: leafBytes.length }) : directory({ length: bytes.length });
-  if (gzip) root = await gzipBytes(root);
-  return { root, leafBytes };
+  return leafBytes;
 };
 
-export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false } = {}) => {
-  const { root, leafBytes } = await fixtureDirectories({ bytes, leaf, gzip });
+export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length } = {}) => {
+  const leafBytes = await fixtureLeaf({ bytes, leaf, gzip });
+  let root = leaf ? directory({ runLength: 0, length: leafBytes.length }) : directory({ length: tileLength });
+  if (gzip) root = await gzipBytes(root);
   const rootOffset = 127;
   const leafOffset = rootOffset + root.length;
   const tileOffset = leaf ? leafOffset + leafBytes.length : rootOffset + root.length;
@@ -46,7 +46,7 @@ export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 7
   return archive;
 };
 
-export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1' } = {}) => {
+export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1', partialFirstRange = false } = {}) => {
   const reads = [];
   return {
     reads,
@@ -56,7 +56,8 @@ export const rangeBucket = (archive, { failAt = null, etag = 'archive-v1' } = {}
       if (key !== 'mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles') return null;
       if (!options.range) throw new Error('range required');
       const { offset, length } = options.range;
-      if (offset < 0 || offset > archive.length) return null;
+      if (offset < 0 || offset >= archive.length) return null;
+      if (offset + length > archive.length && !(partialFirstRange && offset === 0)) return null;
       const part = archive.slice(offset, offset + length);
       return { size: archive.length, httpEtag: etag, arrayBuffer: async () => part.buffer.slice(part.byteOffset, part.byteOffset + part.byteLength) };
     },

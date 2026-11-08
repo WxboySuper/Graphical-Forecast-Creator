@@ -104,8 +104,7 @@ const parseTileRoute = (parts) => {
   const coordinates = parseTileCoordinates(parts.slice(5));
   if (!coordinates) return null;
   const { zoom, x, y } = coordinates;
-  const key = `${V1_PREFIX}/archives/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}.pmtiles`;
-  return { kind: 'tile', key, model: parts[1], cycle: parts[2], hour: Number(parts[3].slice(1)), parameter: parts[4], zoom, x, y };
+  return { kind: 'tile', model: parts[1], cycle: parts[2], hour: Number(parts[3].slice(1)), parameter: parts[4], zoom, x, y };
 };
 
 const parseRoute = (pathname) => {
@@ -435,6 +434,8 @@ const storeTileCatalog = (key, value) => {
   tileCatalogs.set(key, value);
   while (tileCatalogs.size > MAX_TILE_CATALOGS) tileCatalogs.delete(tileCatalogs.keys().next().value);
 };
+
+export const clearTileCatalogCacheForTests = () => tileCatalogs.clear();
 
 const tileCatalogRoute = (route) => ({ kind: 'catalog', model: route.model, cycle: route.cycle, key: `${V1_PREFIX}/catalog/${route.model}/${route.cycle}.json` });
 

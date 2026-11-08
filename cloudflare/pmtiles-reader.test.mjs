@@ -28,11 +28,13 @@ test('returns missing tile and out of zoom without reading tile payload', async 
   const bucket = rangeBucket(archive);
   assert.equal((await read(bucket, { x: 1, y: 1 })).state, 'missing-tile');
   assert.equal((await read(bucket, { zoom: 5, x: 0, y: 0 })).state, 'out-of-zoom');
+  assert.equal((await read(bucket, { x: 8, y: 0 })).state, 'missing-tile');
+  assert.equal((await read(bucket, { x: -1, y: 0 })).state, 'missing-tile');
 });
 
 test('rejects truncated, corrupt, and unsupported archive data', async () => {
   clearPmtilesCacheForTests();
-  const truncated = rangeBucket(Uint8Array.from([1, 2, 3]));
+  const truncated = rangeBucket(Uint8Array.from([1, 2, 3]), { partialFirstRange: true });
   await assert.rejects(() => read(truncated), PmtilesError);
   clearPmtilesCacheForTests();
   const corrupt = await createPmtilesFixture();
@@ -45,6 +47,13 @@ test('turns range read failures into safe PMTiles errors', async () => {
   clearPmtilesCacheForTests();
   const bucket = rangeBucket(await createPmtilesFixture(), { failAt: 2 });
   await assert.rejects(() => read(bucket), PmtilesError);
+});
+
+test('rejects oversized tile ranges before reading tile bytes', async () => {
+  clearPmtilesCacheForTests();
+  const bucket = rangeBucket(await createPmtilesFixture({ tileLength: 9 * 1024 * 1024 }));
+  await assert.rejects(() => read(bucket), /tile entry is too large/);
+  assert.equal(bucket.reads.length, 2);
 });
 
 test('caches parsed archive data so warm tiles need one range read', async () => {

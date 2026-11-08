@@ -73,6 +73,14 @@ and directories but skips the tile payload. An R2 range `get` counts as one
 Class B operation regardless of its byte length. Catalog `HEAD` reads and
 validates the catalog like `GET`; latest `HEAD` reads its small pointer to
 compute live age headers. Each `/latest` request reads one pointer.
+The in-memory entries are keyed by immutable catalog/archive keys; publication
+uses create-only writes and never replaces a cycle catalog or archive. LRU
+eviction bounds isolate memory, and a new cycle uses new keys. This cache
+assumption depends on the immutability rule in the catalog contract.
+Directory range reads and decompressed directories are capped at 2 MiB, and an
+individual tile range is capped at 8 MiB before Worker memory is allocated.
+Oversized or malformed archive entries return the same safe 502 response as
+other invalid archive data.
 Each `/status` request reads up to nine objects: three latest
 pointers and today's and yesterday's health object for each of the three models.
 The Worker Cache API stores immutable catalogs, tiles, and short-lived missing
