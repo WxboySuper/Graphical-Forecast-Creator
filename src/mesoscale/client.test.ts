@@ -127,5 +127,6 @@ describe('mesoscale client', () => {
     }) })).resolves.toMatchObject({ state: 'malformed' });
     expect(normalizeCatalogFrame({ ...catalog, domain: null } as never, 0).state).toBe('malformed');
     expect(normalizeMesoscaleCatalog({ ...catalog, domain: null } as never)[0].state).toBe('malformed');
+    expect(normalizeCatalogFrame(badTemplate, 0).state).toBe('malformed');
   });
 });

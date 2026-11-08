@@ -1,7 +1,7 @@
 import { normalizeProviderPayload } from './normalizeProviderPayload';
 import type { MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog } from './catalogContracts';
-import { isValidCatalogDomain } from './catalogAdapter';
+import { isCatalogFrame, isValidCatalogDomain } from './catalogAdapter';
 import { isRecord } from './providerPayloadValidation';
 
 const isUnavailableParameter = (value: unknown): boolean => isRecord(value)
@@ -31,7 +31,7 @@ const getFrameError = (catalog: MesoscaleCatalog, frameIndex: number): string | 
   if (!Array.isArray(catalog.frames)) return 'Catalog frames are invalid.';
   const frame = catalog.frames[frameIndex];
   if (!frame) return 'Catalog frame is missing.';
-  if (!Array.isArray(frame.parameters)) return 'Catalog frame parameters are invalid.';
+  if (!isCatalogFrame(frame)) return 'Catalog frame or tile metadata is malformed.';
   if (!frame.parameters.every(hasParameterSource)) return 'Catalog parameter source metadata is invalid.';
   if (!validUnavailableLists(catalog, frameIndex)) return 'Catalog unavailable parameters are invalid.';
   return undefined;

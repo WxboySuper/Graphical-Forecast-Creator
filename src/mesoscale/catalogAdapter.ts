@@ -56,7 +56,7 @@ const isValidFrameType = (frameType: unknown, forecastHour: unknown): boolean =>
   return frameType === 'forecast' && Number(forecastHour) > 0;
 };
 
-const isCatalogFrame = (value: unknown): boolean => {
+export const isCatalogFrame = (value: unknown): boolean => {
   if (!isRecord(value)) return false;
   if (!Array.isArray(value.parameters)) return false;
   if (!isValidFrameType(value.frameType, value.forecastHour)) return false;
