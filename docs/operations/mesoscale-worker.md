@@ -1,11 +1,11 @@
 # Mesoscale catalog Worker operations
 
 The read-only `gfc-mesoscale` Worker serves catalog JSON and PNG tile objects
-from R2. The publisher and exact object formats are described in the
-[#1759 ingest operations](https://github.com/WxboySuper/Graphical-Forecast-Creator/pull/1768)
-and the [mesoscale catalog contract](https://github.com/WxboySuper/Graphical-Forecast-Creator/blob/feat/1759-mesoscale-ingest/docs/architecture/mesoscale-catalog-contract.md).
-The catalog contract is owned by the publisher change; keep this Worker aligned
-with it. The Worker does not download, inspect, decode, or calculate weather data.
+from R2. The publisher and object formats are described in the
+[mesoscale ingest operations](https://github.com/WxboySuper/Graphical-Forecast-Creator/blob/main/docs/architecture/mesoscale-ingest-operations.md)
+and [catalog contract](https://github.com/WxboySuper/Graphical-Forecast-Creator/blob/main/docs/architecture/mesoscale-catalog-contract.md).
+Keep this Worker aligned with that contract. The Worker does not download,
+inspect, decode, or calculate weather data.
 
 ## Deploy
 
