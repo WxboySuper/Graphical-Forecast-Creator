@@ -1,4 +1,4 @@
-import { verifyToken } from './auth.mjs';
+import { KeysUnavailableError, verifyToken } from './auth.mjs';
 import { handleAdmin } from './admin.mjs';
 import { notifyDiscord } from './discord.mjs';
 import { applyUserRateLimit, createRecord, readLimitedBody } from './store.mjs';
@@ -28,7 +28,11 @@ function requestError(request, headers) {
 async function authenticateSubmission(request, env, headers) {
   const authorization = request.headers.get('authorization') ?? '';
   if (!authorization.startsWith('Bearer ')) return { response: json({ error: 'Authentication required' }, 401, headers) };
-  const claims = await verifyToken(authorization.slice(7), env);
+  let claims;
+  try { claims = await verifyToken(authorization.slice(7), env); } catch (error) {
+    if (!(error instanceof KeysUnavailableError)) throw error;
+    return { response: json({ error: 'Authentication is temporarily unavailable' }, 503, { ...headers, 'retry-after': '30' }) };
+  }
   return claims ? { claims } : { response: json({ error: 'Invalid authentication token' }, 401, headers) };
 }
 

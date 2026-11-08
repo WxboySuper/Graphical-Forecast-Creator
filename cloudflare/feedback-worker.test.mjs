@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
+import { resetKeyCache } from './feedback/auth.mjs';
 import { validate } from './feedback/validate.mjs';
 
 const project = 'gfc-test';
@@ -367,6 +368,14 @@ test('keeps accepting tokens from cached keys while the key endpoint is down', a
   assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-a' }) })).status, 201);
   down = true; clock += 3600 * 1000;
   assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-b' }), body: validBody({ message: 'Sent while the key endpoint is down.' }) })).status, 201);
+});
+
+test('reports 503 instead of 401 when signing keys cannot be loaded at all', async () => {
+  resetKeyCache();
+  const { env, ctx } = harness({ env: { JWKS_FETCH: async () => { throw new Error('offline'); }, NOW: () => 1950000000000 + 40 * 3600 * 1000 } });
+  const response = await post(env, ctx, { auth: await token({ sub: 'outage-user' }) });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '30');
 });
 
 test('a global cap stops floods from many accounts', async () => {

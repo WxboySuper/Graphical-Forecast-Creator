@@ -20,6 +20,7 @@ const STATUS_MESSAGES: Record<number, string> = {
   401: 'Your sign-in expired. Please sign in again and retry.',
   403: 'Feedback could not be accepted from this site.',
   413: 'That message is too long.',
+  503: 'Feedback is temporarily unavailable. Please try again in a minute.',
   429: 'You have sent a lot of feedback recently. Please wait a few minutes and try again.',
 };
 

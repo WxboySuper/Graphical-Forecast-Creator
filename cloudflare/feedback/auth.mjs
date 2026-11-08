@@ -4,7 +4,11 @@ const CLOCK_LEEWAY_SECONDS = 60;
 /** An unknown key id may trigger a JWKS refetch (key rotation), but at most this often. */
 const KEY_REFRESH_MIN_SECONDS = 60;
 const STALE_RETRY_SECONDS = 30;
+/** Thrown when Google's signing keys cannot be loaded at all, so callers can report an outage instead of a bad token. */
+export class KeysUnavailableError extends Error {}
 let jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 };
+/** Test hook: forgets the cached signing keys. */
+export const resetKeyCache = () => { jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 }; };
 
 /** Decodes unpadded base64url to bytes, restoring the padding atob may require. */
 const base64UrlToBytes = (part) => {
@@ -99,14 +103,17 @@ async function verifyTokenSafe(token, env) {
   const now = currentSeconds(env);
   if (!claimsAreValid(parsed.claims, project, now)) return null;
   const keys = await keysFor(env, now, parsed.header.kid);
-  if (!keys) return null;
+  if (!keys) throw new KeysUnavailableError('signing keys unavailable');
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;
   return parsed.claims;
 }
 
 export async function verifyToken(token, env) {
   try { return await verifyTokenSafe(token, env); }
-  catch { return null; }
+  catch (error) {
+    if (error instanceof KeysUnavailableError) throw error;
+    return null;
+  }
 }
 
 export function constantTimeEqual(left, right) {
