@@ -2,7 +2,8 @@
  * Feedback UI tests. Cover the dialog states (signed out, form, success,
  * failure) and the beta-only banner and floating button.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import FeedbackDialog from './FeedbackDialog';
 import { BetaFeedbackBanner, BetaFeedbackButton } from './BetaFeedbackChrome';
@@ -84,6 +85,34 @@ describe('FeedbackDialog', () => {
   });
 });
 
+describe('FeedbackDialog sessions', () => {
+  test('a submission that finishes after the dialog closed does not show a stale confirmation on reopen', async () => {
+    mockUseAuth.mockReturnValue(signedIn);
+    let finish: (id: string) => void = () => undefined;
+    mockSubmit.mockReturnValue(new Promise<string>((resolve) => { finish = resolve; }));
+    const Harness = () => {
+      const [open, setOpen] = React.useState(true);
+      return (
+        <MemoryRouter>
+          <button type="button" onClick={() => setOpen(true)}>reopen</button>
+          <FeedbackDialog open={open} onOpenChange={setOpen} />
+        </MemoryRouter>
+      );
+    };
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText(/what happened/i), { target: { value: 'The map froze after loading.' } });
+    fireEvent.click(screen.getByRole('button', { name: /send feedback/i }));
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await act(async () => { finish('late'); });
+    fireEvent.click(screen.getByText('reopen'));
+
+    expect(await screen.findByLabelText(/what happened/i)).toHaveValue('');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
 describe('beta chrome', () => {
   test('renders nothing outside the beta build', () => {
     globals.__GFC_BUILD_TARGET__ = 'production';
@@ -109,6 +138,7 @@ describe('beta chrome', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss beta notice' }));
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Beta notice' })).not.toBeInTheDocument());
     expect(sessionStorage.getItem('gfc-beta-banner-dismissed')).toBe('1');
+    expect(document.documentElement.style.getPropertyValue('--beta-banner-height')).toBe('0px');
     expect(screen.getByRole('button', { name: 'Send beta feedback' })).toBeInTheDocument();
   });
 });

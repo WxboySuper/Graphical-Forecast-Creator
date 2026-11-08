@@ -2,7 +2,7 @@
  * Feedback dialog. Collects a category and message from a signed-in user and
  * submits it to the feedback service; signed-out users are routed to sign in or Discord.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { CheckCircle2, LoaderCircle, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
@@ -56,8 +56,54 @@ const SentNotice: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   </div>
 );
 
-/** The submit form for a signed-in user. */
-const FeedbackForm: React.FC<{ onSent: () => void }> = ({ onSent }) => {
+/** Pill-style category picker. */
+const CategoryPicker: React.FC<{ value: FeedbackCategory; onChange: (next: FeedbackCategory) => void }> = ({ value, onChange }) => (
+  <div role="radiogroup" aria-label="Feedback type" className="flex flex-wrap gap-2">
+    {FEEDBACK_CATEGORIES.map((option) => (
+      <button
+        key={option.id}
+        type="button"
+        role="radio"
+        aria-checked={value === option.id}
+        onClick={() => onChange(option.id)}
+        className={cn(
+          'rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          value === option.id ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background hover:bg-muted'
+        )}
+      >
+        {option.label}
+      </button>
+    ))}
+  </div>
+);
+
+/** Message textarea with a live length hint. */
+const MessageField: React.FC<{ value: string; onChange: (next: string) => void }> = ({ value, onChange }) => {
+  const trimmedLength = value.trim().length;
+  const hint = trimmedLength < FEEDBACK_MIN_LENGTH ? `At least ${FEEDBACK_MIN_LENGTH} characters` : 'Looks good';
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor="feedback-message" className="text-sm font-medium">
+        What happened, or what would you like to see?
+      </label>
+      <Textarea
+        id="feedback-message"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        maxLength={FEEDBACK_MAX_LENGTH}
+        rows={6}
+        placeholder="Steps, what you expected, what you saw. Please don't include passwords or personal info."
+      />
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>{hint}</span>
+        <span>{value.length}/{FEEDBACK_MAX_LENGTH}</span>
+      </div>
+    </div>
+  );
+};
+
+/** Draft state and submit action for the feedback form. */
+const useFeedbackDraft = (onSent: () => void) => {
   const { user } = useAuth();
   const location = useLocation();
   const [category, setCategory] = useState<FeedbackCategory>('bug');
@@ -65,12 +111,10 @@ const FeedbackForm: React.FC<{ onSent: () => void }> = ({ onSent }) => {
   const [contactOk, setContactOk] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trimmedLength = message.trim().length;
-  const canSend = Boolean(user) && !sending && trimmedLength >= FEEDBACK_MIN_LENGTH;
+  const canSend = Boolean(user) && !sending && message.trim().length >= FEEDBACK_MIN_LENGTH;
 
   /** Submits the entry and reports success or a friendly failure. */
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submit = async () => {
     if (!user || !canSend) return;
     setSending(true);
     setError(null);
@@ -84,70 +128,43 @@ const FeedbackForm: React.FC<{ onSent: () => void }> = ({ onSent }) => {
     }
   };
 
+  return { user, category, setCategory, message, setMessage, contactOk, setContactOk, sending, error, canSend, submit };
+};
+
+/** The submit form for a signed-in user. */
+const FeedbackForm: React.FC<{ onSent: () => void }> = ({ onSent }) => {
+  const draft = useFeedbackDraft(onSent);
+
   return (
     <form
       className="space-y-4"
       onSubmit={(event) => {
-        handleSubmit(event).catch(() => undefined);
+        event.preventDefault();
+        draft.submit().catch(() => undefined);
       }}
     >
-      <div role="radiogroup" aria-label="Feedback type" className="flex flex-wrap gap-2">
-        {FEEDBACK_CATEGORIES.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            role="radio"
-            aria-checked={category === option.id}
-            onClick={() => setCategory(option.id)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              category === option.id
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-background hover:bg-muted'
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="space-y-1.5">
-        <label htmlFor="feedback-message" className="text-sm font-medium">
-          What happened, or what would you like to see?
-        </label>
-        <Textarea
-          id="feedback-message"
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          maxLength={FEEDBACK_MAX_LENGTH}
-          rows={6}
-          placeholder="Steps, what you expected, what you saw. Please don't include passwords or personal info."
-        />
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{trimmedLength < FEEDBACK_MIN_LENGTH ? `At least ${FEEDBACK_MIN_LENGTH} characters` : 'Looks good'}</span>
-          <span>{message.length}/{FEEDBACK_MAX_LENGTH}</span>
-        </div>
-      </div>
+      <CategoryPicker value={draft.category} onChange={draft.setCategory} />
+      <MessageField value={draft.message} onChange={draft.setMessage} />
 
       <label className="flex items-start gap-2 text-sm">
         <input
           type="checkbox"
-          checked={contactOk}
-          onChange={(event) => setContactOk(event.target.checked)}
+          checked={draft.contactOk}
+          onChange={(event) => draft.setContactOk(event.target.checked)}
           className="mt-1"
         />
-        <span>You can email me about this feedback ({user?.email ?? 'your account email'}).</span>
+        <span>You can email me about this feedback ({draft.user?.email ?? 'your account email'}).</span>
       </label>
 
       <p className="text-xs text-muted-foreground">
         We attach the page you are on, app version, and screen size. Forecast contents are never sent.
       </p>
 
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {draft.error ? <p role="alert" className="text-sm text-destructive">{draft.error}</p> : null}
 
       <DialogFooter className="gap-2 sm:gap-0">
-        <Button type="submit" disabled={!canSend}>
-          {sending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
+        <Button type="submit" disabled={!draft.canSend}>
+          {draft.sending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Send aria-hidden="true" />}
           Send feedback
         </Button>
       </DialogFooter>
@@ -159,11 +176,16 @@ const FeedbackForm: React.FC<{ onSent: () => void }> = ({ onSent }) => {
 export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onOpenChange }) => {
   const { status, user } = useAuth();
   const [sent, setSent] = useState(false);
+  // Bumped on every close so a submission finishing after the dialog closed cannot mark a later session as sent.
+  const sessionRef = useRef(0);
   const signedIn = status === 'signed_in' && Boolean(user);
 
   /** Clears the success state when the dialog closes so it reopens as a fresh form. */
   const handleOpenChange = (next: boolean) => {
-    if (!next) setSent(false);
+    if (!next) {
+      sessionRef.current += 1;
+      setSent(false);
+    }
     onOpenChange(next);
   };
 
@@ -173,7 +195,8 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onOpenChan
   } else if (sent) {
     body = <SentNotice onClose={() => handleOpenChange(false)} />;
   } else {
-    body = <FeedbackForm onSent={() => setSent(true)} />;
+    const session = sessionRef.current;
+    body = <FeedbackForm onSent={() => { if (sessionRef.current === session) setSent(true); }} />;
   }
 
   return (

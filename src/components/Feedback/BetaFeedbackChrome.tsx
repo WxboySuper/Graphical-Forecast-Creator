@@ -2,13 +2,41 @@
  * Beta-only chrome. Renders the open-beta notice banner and the floating
  * feedback button so feedback stays front and center on beta.gfcweather.com.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlaskConical, MessageSquarePlus, X } from 'lucide-react';
 import { Button } from '../ui/button';
 import { DISCORD_INVITE_URL, isBetaBuild, isFeedbackEnabled } from '../../config/feedback';
 import { useFeedback } from './FeedbackContext';
 
 const BANNER_DISMISSED_KEY = 'gfc-beta-banner-dismissed';
+const BANNER_HEIGHT_VAR = '--beta-banner-height';
+
+/** Publishes the banner's rendered height so viewport-sized workspaces subtract it; resets to 0 on unmount. */
+const usePublishBannerHeight = (ref: React.RefObject<HTMLElement | null>, hidden: boolean) => {
+  useEffect(() => {
+    const element = ref.current;
+    const root = document.documentElement;
+    if (!element || hidden) {
+      root.style.setProperty(BANNER_HEIGHT_VAR, '0px');
+      return undefined;
+    }
+    const publish = () => root.style.setProperty(BANNER_HEIGHT_VAR, `${element.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', publish);
+      return () => {
+        window.removeEventListener('resize', publish);
+        root.style.setProperty(BANNER_HEIGHT_VAR, '0px');
+      };
+    }
+    const observer = new ResizeObserver(publish);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      root.style.setProperty(BANNER_HEIGHT_VAR, '0px');
+    };
+  }, [ref, hidden]);
+};
 
 /** Reads whether the banner was dismissed during this browser session. */
 const readDismissed = (): boolean => {
@@ -23,6 +51,8 @@ const readDismissed = (): boolean => {
 const BetaBanner: React.FC = () => {
   const { openFeedback } = useFeedback();
   const [dismissed, setDismissed] = useState(readDismissed);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  usePublishBannerHeight(bannerRef, dismissed);
 
   if (dismissed) return null;
 
@@ -38,6 +68,7 @@ const BetaBanner: React.FC = () => {
 
   return (
     <div
+      ref={bannerRef}
       role="region"
       aria-label="Beta notice"
       className="flex items-center gap-3 border-b border-border bg-primary/10 px-4 py-1.5 text-sm"

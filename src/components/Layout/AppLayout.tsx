@@ -188,7 +188,8 @@ export const AppLayout: React.FC = () => {
 
   // Expose the navbar height to CSS so layouts using var(--app-header-height) stay in sync
   useEffect(() => {
-    document.documentElement.style.setProperty('--app-header-height', NAVBAR_HEIGHT);
+    // The beta banner publishes its height in --beta-banner-height (0px when hidden) so workspaces keep fitting the viewport.
+    document.documentElement.style.setProperty('--app-header-height', `calc(${NAVBAR_HEIGHT} + var(--beta-banner-height, 0px))`);
   }, []);
 
   // Keyboard shortcuts for navigation
