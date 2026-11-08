@@ -100,7 +100,7 @@ def discover_cycle_candidate(model: Model, cycle: datetime, is_published=None):
     if cycle.hour % model.cadence:
         return None
     try:
-        analysis = discover_candidate(model, cycle)
+        analysis = discover_frame(model, cycle, 0)
         if analysis is None:
             return None
         if is_published and is_published(cycle):
@@ -109,17 +109,6 @@ def discover_cycle_candidate(model: Model, cycle: datetime, is_published=None):
         return CycleSource(cycle, analysis, frames.frames, frames.missing_hours)
     except (RuntimeError, urllib.error.HTTPError, urllib.error.URLError, KeyError, ValueError):
         return None
-
-
-def discover_candidate(model: Model, cycle: datetime) -> FrameSource | None:
-    date, hour = cycle.strftime("%Y%m%d"), cycle.strftime("%H")
-    object_key = model.path.format(date=date, hour=hour, fh=0)
-    root = f"https://{model.bucket}.s3.amazonaws.com/{object_key}"
-    idx, _ = request(f"{root}.idx")
-    _, head = request(root, {"User-Agent": "GFC-mesoscale-ingest/1.0"}, method="HEAD")
-    if complete_index(idx, int(head.headers["Content-Length"]), model.id):
-        return FrameSource(0, root, head.headers.get("Last-Modified") or "")
-    return None
 
 
 def complete_index(index: bytes, size: int, model_id: str) -> bool:
@@ -153,7 +142,8 @@ def discover_frame(model: Model, cycle: datetime, hour: int) -> FrameSource | No
     root = f"https://{model.bucket}.s3.amazonaws.com/{object_key}"
     try:
         index, _ = request(f"{root}.idx")
-        _, head = request(root, method="HEAD")
+        headers = {"User-Agent": "GFC-mesoscale-ingest/1.0"} if hour == 0 else None
+        _, head = request(root, headers, method="HEAD")
     except SourceNotReady:
         return None
     if not complete_index(index, int(head.headers["Content-Length"]), model.id):

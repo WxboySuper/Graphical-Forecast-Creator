@@ -87,12 +87,13 @@ class FakeS3Client:
         self.pages_returned = 0
         self.missing_code = None
 
-    def put_object(self, Bucket, Key, Body, ContentType, IfNoneMatch=None):
+    def put_object(self, **request):
         import hashlib
-        if IfNoneMatch == "*" and Key in self.objects:
+        key, body = request["Key"], request["Body"]
+        if request.get("IfNoneMatch") == "*" and key in self.objects:
             raise s3_error("PreconditionFailed", "PutObject", status=412)
-        self.objects[Key] = Body
-        return {"ETag": f'"{hashlib.md5(Body, usedforsecurity=False).hexdigest()}"'}
+        self.objects[key] = body
+        return {"ETag": f'"{hashlib.md5(body, usedforsecurity=False).hexdigest()}"'}
 
     def get_object(self, Bucket, Key):
         if self.missing_code or Key not in self.objects:
@@ -436,7 +437,7 @@ class IngestTests(unittest.TestCase):
     def test_published_cycle_check_precedes_forecast_index_requests(self):
         cycle = datetime(2026, 11, 8, 12, tzinfo=UTC)
         analysis = FrameSource(0, "source", "modified")
-        with patch("ingestion.discovery.discover_candidate", return_value=analysis), patch("ingestion.discovery.discover_frames", side_effect=AssertionError("published cycles skip frame discovery")):
+        with patch("ingestion.discovery.discover_frame", return_value=analysis), patch("ingestion.discovery.discover_frames", side_effect=AssertionError("published cycles skip frame discovery")):
             from ingestion.discovery import discover_cycle_candidate
             source = discover_cycle_candidate(MODELS["hrrr"], cycle, lambda candidate: candidate == cycle)
         self.assertTrue(source.already_published)
