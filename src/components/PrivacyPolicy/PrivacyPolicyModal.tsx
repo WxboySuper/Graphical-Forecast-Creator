@@ -4,6 +4,7 @@
  * modal presentation and local acknowledgment state; policy text and account
  * persistence are supplied by their respective boundaries.
  */
+import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
@@ -298,7 +299,7 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     <p>
       We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email.
       For privacy questions, or to request manual data deletion, contact us at{' '}
-      <a href="mailto:contact@gfcweather.com">contact@gfcweather.com</a>.
+      <ContactEmailLink />.
     </p>
   </>
 );

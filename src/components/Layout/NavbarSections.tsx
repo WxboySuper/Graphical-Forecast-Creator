@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Crown,
   Sparkles,
+  Mail,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -40,6 +41,7 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
+import { CONTACT_EMAIL, CONTACT_MAILTO } from '../../config/contact';
 import {
   getVisibleNavigationItems,
   type AppNavigationItemId,
@@ -273,6 +275,15 @@ const MoreActionsMenu: FC<{
             <Crown className="h-4 w-4" />
             Pricing
           </NavLink>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={CONTACT_MAILTO} title={`Email ${CONTACT_EMAIL}`}>
+            <Mail className="h-4 w-4" />
+            <span className="flex flex-col leading-tight">
+              Contact us
+              <span className="text-xs text-muted-foreground">{CONTACT_EMAIL}</span>
+            </span>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Community</DropdownMenuLabel>
