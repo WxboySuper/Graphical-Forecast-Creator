@@ -201,11 +201,21 @@ function isValidSource(value: unknown): boolean {
   return allChecks(value, [isRecord, hasSourceAttribution]);
 }
 
-function capabilitiesContainParameters(payload: Record<string, unknown>): boolean {
-  if (!isRecord(payload.model) || !isRecord(payload.model.capabilities) || !Array.isArray(payload.parameters)) return false;
-  const availableIds = payload.model.capabilities.availableParameterIds;
-  if (!Array.isArray(availableIds)) return false;
+function getAvailableParameterIds(payload: Record<string, unknown>): unknown[] | undefined {
+  if (!isRecord(payload.model)) return undefined;
+  if (!isRecord(payload.model.capabilities)) return undefined;
+  const ids = payload.model.capabilities.availableParameterIds;
+  return Array.isArray(ids) ? ids : undefined;
+}
+
+function arePayloadParametersListed(payload: Record<string, unknown>, availableIds: unknown[]): boolean {
+  if (!Array.isArray(payload.parameters)) return false;
   return payload.parameters.every(parameter => isRecord(parameter) && availableIds.includes(parameter.id));
+}
+
+function capabilitiesContainParameters(payload: Record<string, unknown>): boolean {
+  const availableIds = getAvailableParameterIds(payload);
+  return availableIds !== undefined && arePayloadParametersListed(payload, availableIds);
 }
 
 function unavailableIdsDoNotOverlap(payload: Record<string, unknown>): boolean {
