@@ -556,6 +556,15 @@ test('every viewer response, including auth failures, is marked no-store', async
   assert.equal(unauthenticated.headers.get('cache-control'), 'no-store');
 });
 
+test('an internal error on a viewer route returns a no-store JSON 500 without CORS', async () => {
+  const { db, env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  db.prepare = () => { throw new Error('D1 unavailable'); };
+  const response = await viewerRequest(env, ctx, '/admin/api/summary', { auth: await accessToken() });
+  assert.equal(response.status, 500);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.has('access-control-allow-origin'), false);
+});
+
 test('the viewer page is served at /admin and /admin/ alike', async () => {
   const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
   const auth = await accessToken();

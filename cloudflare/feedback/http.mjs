@@ -96,7 +96,7 @@ export async function fetchFeedback(request, env, ctx) {
     return await route.run(request, env, url, ctx);
   } catch {
     // Never log request content; surface a stable error instead of an opaque Worker 500.
-    const headers = isAdminPath(url) ? {} : corsHeaders(request, env);
+    const headers = isAdminPath(url) ? { 'cache-control': 'no-store' } : corsHeaders(request, env);
     return json({ error: 'Feedback service error' }, 500, headers);
   }
 }
