@@ -48,6 +48,15 @@ class GridData:
     values: object
     latitudes: object
     longitudes: object
+
+
+@dataclass(frozen=True)
+class TileWriteRequest:
+    level: object
+    root: Path
+    zoom: int
+    x: int
+    y: int
 def hex_rgb(value: str) -> tuple[int, int, int]:
     return tuple(int(value[i:i+2], 16) for i in (1, 3, 5))
 
@@ -142,7 +151,7 @@ def save_zoom_tiles(image, root: Path, zoom: int, image_module) -> tuple[int, in
     count, total = 0, 0
     for tx in range(2**zoom):
         for ty in range(2**zoom):
-            size = save_tile(level, root, zoom, tx, ty)
+            size = save_tile(TileWriteRequest(level, root, zoom, tx, ty))
             if size:
                 count += 1
                 total += size
@@ -155,7 +164,8 @@ def resized_level(image, zoom: int, scale: int, image_module):
     return image.resize((TILE_SIZE * 2**zoom, TILE_SIZE * 2**zoom), image_module.Resampling.BOX)
 
 
-def save_tile(level, root: Path, zoom: int, tx: int, ty: int) -> int:
+def save_tile(request: TileWriteRequest) -> int:
+    level, root, zoom, tx, ty = request.level, request.root, request.zoom, request.x, request.y
     tile = level.crop((tx*TILE_SIZE, ty*TILE_SIZE, (tx+1)*TILE_SIZE, (ty+1)*TILE_SIZE))
     if tile.getbbox() is None:
         return 0
