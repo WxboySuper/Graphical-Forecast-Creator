@@ -77,6 +77,12 @@ const resetDiscussionScopeDraft = ({
   applyFields({ ...getDiscussionFormDefaults(existingDiscussion), forecasterName: existingDiscussion?.forecasterName ?? defaultForecasterName }, false);
 };
 
+/**
+ * Resets the editor after a forecast import. An import replaces the whole cycle,
+ * including its discussions, so any unsaved fields for this scope describe data
+ * that no longer exists. Keeping them would let autosave overwrite the imported
+ * discussion with stale text. The scope being left keeps its unsaved draft.
+ */
 const resetDiscussionScopeAfterImport = (options: {
   drafts: Map<string, DiscussionFormDefaults>;
   previousKey: string;
