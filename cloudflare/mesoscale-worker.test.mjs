@@ -38,6 +38,7 @@ const withNow = async (timestamp, run) => {
   }
 };
 
+// These helpers patch shared globals; node:test runs this file's top-level tests serially by default.
 const withCache = async (run) => {
   const originalCaches = globalThis.caches;
   const entries = new Map();
@@ -106,11 +107,11 @@ test('CORS allows configured origins and omits permission for other origins', as
   assert.equal(preflight.headers.get('Access-Control-Allow-Methods'), 'GET, HEAD, OPTIONS');
   const deniedPreflight = await worker.fetch(request('/status', { method: 'OPTIONS', headers: { Origin: 'https://attacker.example' } }), env);
   assert.equal(deniedPreflight.status, 403);
-  assert.match(deniedPreflight.headers.get('Vary'), /Origin/);
+  assert.match(deniedPreflight.headers.get('Vary') ?? '', /Origin/);
   const noOriginPreflight = await worker.fetch(request('/status', { method: 'OPTIONS' }), env);
   assert.equal(noOriginPreflight.status, 204);
   assert.equal(noOriginPreflight.headers.has('Access-Control-Allow-Origin'), false);
-  assert.match(noOriginPreflight.headers.get('Vary'), /Origin/);
+  assert.match(noOriginPreflight.headers.get('Vary') ?? '', /Origin/);
 });
 
 test('cycle catalog uses immutable caching, validates stored identity, and supports ETag 304', async () => {
