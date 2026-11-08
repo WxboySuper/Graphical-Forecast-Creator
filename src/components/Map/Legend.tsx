@@ -46,11 +46,15 @@ const Legend: React.FC<LegendProps> = React.memo(({
   const reportFilters = useSelector((state: RootState) => showReportLegend
     ? state.stormReports?.filterByType ?? DEFAULT_REPORT_FILTERS
     : DEFAULT_REPORT_FILTERS);
-  const customEditor = useSelector((state: RootState) => state.forecast.customEditor) ?? { mode: 'severe' as const, activeLayerId: null, activeCategoryId: null };
+  const activeCustomLayerId = useSelector((state: RootState) => state.forecast.customEditor?.activeLayerId ?? null);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const customLayers = useSelector(selectCurrentCustomLayers);
   const activeOutlookType = activeOutlookTypeOverride || storeActiveOutlookType;
-  const customMode = !activeOutlookTypeOverride && isFeatureExposed('customProducts') && customEditor.mode === 'custom';
-  const activeCustomLayer = customLayers.layers.find(({ id }) => id === customEditor.activeLayerId) ?? customLayers.layers[0];
+  const customMode = !activeOutlookTypeOverride
+    && isFeatureExposed('customProducts')
+    && isFeatureExposed('customWorkspace')
+    && workspaceId === 'custom';
+  const activeCustomLayer = customLayers.layers.find(({ id }) => id === activeCustomLayerId) ?? customLayers.layers[0];
 
   /** Builds the fill and hatch styles for a custom category swatch. */
   const customSwatchBackground = (category: CustomCategoryTemplate): React.CSSProperties => {

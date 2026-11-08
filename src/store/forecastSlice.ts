@@ -113,7 +113,6 @@ export interface ForecastState {
   cycleGeneration: number;
   drawingState: DrawingState;
   customEditor: {
-    mode: 'severe' | 'custom';
     activeLayerId: string | null;
     activeCategoryId: string | null;
   };
@@ -187,7 +186,7 @@ const initialState: ForecastState = {
     currentDay: 1,
     cycleDate: INITIAL_CYCLE_DATE
   },
-  ...createWorkspaceEditorDefaults(DEFAULT_FORECAST_WORKSPACE),
+  ...createWorkspaceEditorDefaults(),
   currentMapView: {
     center: [39.8283, -98.5795],
     zoom: 4
@@ -766,7 +765,7 @@ export const forecastSlice = createSlice({
       // the new workspace's own defaults so the mount never starts Severe's
       // tools in another product.
       state.currentMapView = { center: [39.8283, -98.5795], zoom: 4 };
-      const editorDefaults = createWorkspaceEditorDefaults(nextWorkspace.id);
+      const editorDefaults = createWorkspaceEditorDefaults();
       state.drawingState = editorDefaults.drawingState;
       state.customEditor = editorDefaults.customEditor;
       state.completionValidation = { lastResult: null, showCompletionModal: false, omittedDays: {} };
@@ -1007,7 +1006,6 @@ export const {
   setActiveOutlookType,
   setActiveProbability,
   toggleSignificant,
-  setCustomEditorMode,
   selectCustomLayer,
   selectCustomCategory,
   addCustomLayer,

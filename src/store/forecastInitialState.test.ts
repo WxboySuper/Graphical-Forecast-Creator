@@ -30,7 +30,7 @@ describe('createInitialForecastState', () => {
         currentDay: 1,
         cycleDate: '2026-01-01',
       },
-      ...createWorkspaceEditorDefaults(DEFAULT_FORECAST_WORKSPACE),
+      ...createWorkspaceEditorDefaults(),
       currentMapView: {
         center: [39.8283, -98.5795],
         zoom: 4,
