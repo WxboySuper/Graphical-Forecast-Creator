@@ -13,7 +13,7 @@ billing, cloud-cycle, custom-product, and telemetry capabilities governed by
 the feature-exposure policy.
 
 The current architecture and ownership map live in
-[`docs/architecture/codebase-inventory.md`](docs/architecture/codebase-inventory.md).
+[`docs/guide/02-architecture.md`](docs/guide/02-architecture.md).
 The [workspace boundaries](docs/architecture/forecast-workspace-boundaries.md)
 and [feature-exposure workstreams](docs/operations/feature-exposure-workstreams.md)
 describe the active architecture work. Use the
