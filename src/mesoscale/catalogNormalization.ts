@@ -1,7 +1,8 @@
 import { normalizeProviderPayload } from './normalizeProviderPayload';
 import type { MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog } from './catalogContracts';
-import { isCatalogFrame, isValidCatalogDomain } from './catalogAdapter';
+import { isValidCatalogDomain } from './catalogAdapter';
+import { isCatalogFrame } from './catalogFrameValidation';
 import { isRecord } from './providerPayloadValidation';
 
 const isUnavailableParameter = (value: unknown): boolean => isRecord(value)
