@@ -70,6 +70,21 @@ describe('mesoscale client', () => {
     expect(result).toMatchObject({ state: 'malformed' });
   });
 
+  it('maps invalid frame and unavailable parameter lists to malformed', async () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const invalidFrame = { ...catalog, frames: [{ ...catalog.frames[0], parameters: null }] };
+    const invalidUnavailable = { ...catalog, unavailableParameters: 'invalid' };
+    const options = (payload: unknown): RequestOptions => ({
+      fetcher: jest.fn().mockResolvedValue({ ok: true, status: 200, headers: new Headers(), json: async () => payload }),
+      config: { ...fixtures.config!, fixtures: false },
+    });
+    const cycle = resolveCycleId(catalog.cycleTime);
+    await expect(fetchMesoscaleCatalog({ model: 'hrrr', cycle, options: options(invalidFrame) }))
+      .resolves.toMatchObject({ state: 'malformed' });
+    await expect(fetchMesoscaleCatalog({ model: 'hrrr', cycle, options: options(invalidUnavailable) }))
+      .resolves.toMatchObject({ state: 'malformed' });
+  });
+
   it('caps retries and rejects a catalog whose cycle differs from the request', async () => {
     const failed = jest.fn().mockRejectedValue(new TypeError('offline'));
     const result = await fetchMesoscaleLatest({ model: 'hrrr', options: { fetcher: failed, retries: 20, config: { ...fixtures.config!, fixtures: false } } });

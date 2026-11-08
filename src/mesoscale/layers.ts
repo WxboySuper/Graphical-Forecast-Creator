@@ -39,7 +39,7 @@ export const createMesoscaleTileLayer = (spec: MesoscaleLayerSpec): MesoscaleTil
     extent: toExtent(data.bounds),
     minZoom: data.minZoom,
     maxZoom: data.maxZoom,
-    properties: { mesoscaleLayerId: spec.id, parameter: spec.parameter.id, units: spec.parameter.units, legend: spec.parameter.legend, source: spec.parameter.source },
+    properties: { mesoscaleLayerId: spec.id, parameter: spec.parameter.id, units: spec.parameter.units, legend: spec.parameter.legend, sourceMetadata: spec.parameter.source },
   });
 };
 
@@ -49,12 +49,23 @@ const layerSignature = (spec: MesoscaleLayerSpec) => JSON.stringify({
   minZoom: spec.parameter.data.minZoom,
   maxZoom: spec.parameter.data.maxZoom,
   bounds: spec.parameter.data.bounds,
-  displayName: spec.parameter.displayName,
-  units: spec.parameter.units,
-  legend: spec.parameter.legend,
-  source: spec.parameter.source,
   attribution: spec.parameter.source?.attribution ?? '',
 });
+
+const updateLayerMetadata = (layer: MesoscaleTileLayer, spec: MesoscaleLayerSpec): void => {
+  layer.setProperties({
+    parameter: spec.parameter.id,
+    units: spec.parameter.units,
+    legend: spec.parameter.legend,
+    sourceMetadata: spec.parameter.source,
+  });
+};
+
+const removeLayer = (map: OLMap, layer: MesoscaleTileLayer): void => {
+  map.getLayers().remove(layer);
+  layer.getSource()?.dispose();
+  layer.dispose();
+};
 
 export interface SyncMesoscaleLayersOptions {
   map: OLMap;
@@ -68,8 +79,7 @@ export const syncMesoscaleLayers = ({ map, specs, registry }: SyncMesoscaleLayer
   const nextIds = specs.map(spec => spec.id);
   registry.layers.forEach((layer, id) => {
     if (!nextIds.includes(id)) {
-      collection.remove(layer);
-      layer.dispose();
+      removeLayer(map, layer);
       registry.layers.delete(id);
     }
   });
@@ -78,12 +88,12 @@ export const syncMesoscaleLayers = ({ map, specs, registry }: SyncMesoscaleLayer
     const previousSignature = existing?.get('mesoscaleSignature');
     const layer = existing && previousSignature === layerSignature(spec) ? existing : createMesoscaleTileLayer(spec);
     layer.set('mesoscaleSignature', layerSignature(spec));
+    updateLayerMetadata(layer, spec);
     layer.setOpacity(spec.opacity);
     layer.setVisible(spec.visible ?? true);
     layer.setZIndex(index);
     if (existing && layer !== existing) {
-      collection.remove(existing);
-      existing.dispose();
+      removeLayer(map, existing);
     }
     if (!collection.getArray().includes(layer)) collection.push(layer);
     registry.layers.set(spec.id, layer);

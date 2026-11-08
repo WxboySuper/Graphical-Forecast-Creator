@@ -2,11 +2,39 @@ import { normalizeProviderPayload } from './normalizeProviderPayload';
 import type { MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog } from './catalogContracts';
 import { isValidCatalogDomain } from './catalogAdapter';
+import { isRecord } from './providerPayloadValidation';
+
+const isUnavailableParameter = (value: unknown): boolean => isRecord(value)
+  && typeof value.id === 'string'
+  && (value.reason === undefined || typeof value.reason === 'string');
+
+const hasParameterSource = (value: unknown): boolean => {
+  if (!isRecord(value) || !isRecord(value.source)) return false;
+  if (typeof value.source.providerId !== 'string') return false;
+  if (typeof value.source.providerName !== 'string') return false;
+  if (typeof value.source.datasetId !== 'string') return false;
+  return typeof value.source.attribution === 'string';
+};
+
+const validUnavailableLists = (catalog: MesoscaleCatalog, frameIndex: number): boolean => {
+  const frame = catalog.frames[frameIndex];
+  if (!frame) return false;
+  const frameUnavailable = frame.unavailableParameters;
+  const catalogUnavailable = catalog.unavailableParameters;
+  if (frameUnavailable !== undefined && !Array.isArray(frameUnavailable)) return false;
+  if (catalogUnavailable !== undefined && !Array.isArray(catalogUnavailable)) return false;
+  return [...(frameUnavailable ?? []), ...(catalogUnavailable ?? [])].every(isUnavailableParameter);
+};
 
 const getFrameError = (catalog: MesoscaleCatalog, frameIndex: number): string | undefined => {
   if (!isValidCatalogDomain(catalog.domain)) return 'Catalog domain metadata is invalid.';
   if (!Array.isArray(catalog.frames)) return 'Catalog frames are invalid.';
-  return catalog.frames[frameIndex] ? undefined : 'Catalog frame is missing.';
+  const frame = catalog.frames[frameIndex];
+  if (!frame) return 'Catalog frame is missing.';
+  if (!Array.isArray(frame.parameters)) return 'Catalog frame parameters are invalid.';
+  if (!frame.parameters.every(hasParameterSource)) return 'Catalog parameter source metadata is invalid.';
+  if (!validUnavailableLists(catalog, frameIndex)) return 'Catalog unavailable parameters are invalid.';
+  return undefined;
 };
 
 const getUnavailableParameters = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['frames'][number]) => {
