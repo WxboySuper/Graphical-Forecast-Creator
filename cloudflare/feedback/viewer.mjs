@@ -89,10 +89,13 @@ async function dispatch(request, url, env) {
   return json({ error: 'Not found' }, 404, corsFreeHeaders);
 }
 
-export async function handleViewer(request, env, url) {
-  const auth = await authorizeViewer(request, env);
-  if (auth.response) return auth.response;
-  const response = await dispatch(request, url, env);
+function withViewerHeaders(response) {
   for (const [name, value] of Object.entries(corsFreeHeaders)) response.headers.set(name, value);
   return response;
+}
+
+export async function handleViewer(request, env, url) {
+  const auth = await authorizeViewer(request, env);
+  if (auth.response) return withViewerHeaders(auth.response);
+  return withViewerHeaders(await dispatch(request, url, env));
 }

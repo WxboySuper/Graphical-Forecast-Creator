@@ -547,6 +547,15 @@ test('expired or exp-less tokens are rejected without fetching signing keys', as
   assert.equal(fetches, 0, 'no JWKS fetch for tokens that fail the expiry pre-check');
 });
 
+test('every viewer response, including auth failures, is marked no-store', async () => {
+  const missing = harness();
+  assert.equal((await viewerRequest(missing.env, missing.ctx, '/admin')).headers.get('cache-control'), 'no-store');
+  const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  const unauthenticated = await viewerRequest(env, ctx, '/admin');
+  assert.equal(unauthenticated.status, 401);
+  assert.equal(unauthenticated.headers.get('cache-control'), 'no-store');
+});
+
 test('the viewer page is served at /admin and /admin/ alike', async () => {
   const { env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
   const auth = await accessToken();
