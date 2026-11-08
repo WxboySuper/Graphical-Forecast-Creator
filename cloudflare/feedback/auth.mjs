@@ -93,7 +93,7 @@ async function verifySignatureSafe(token, env, url) {
   if (!validHeader(parsed.header)) return null;
   const now = currentSeconds(env);
   // Reject tokens that are obviously expired before any JWKS fetch, so junk tokens never cost a network call.
-  if (!(parsed.claims?.exp + CLOCK_LEEWAY_SECONDS > now)) return null;
+  if (!(Number.isFinite(parsed.claims?.exp) && parsed.claims.exp + CLOCK_LEEWAY_SECONDS > now)) return null;
   const keys = await keysFor(env, now, url, parsed.header.kid);
   if (!keys) return null;
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;

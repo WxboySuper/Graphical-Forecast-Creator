@@ -74,7 +74,7 @@ async function submit(request, env, ctx, headers) {
 const isAdminPath = (url) => url.pathname === '/admin' || url.pathname.startsWith('/admin/');
 
 const routeTable = [
-  { match: (url) => isAdminPath(url), run: (request, env, url) => handleViewer(request, env, url) },
+  { match: (url) => isAdminPath(url), run: (request, env, url, ctx) => handleViewer(request, env, url, ctx) },
   { match: (url, method) => url.pathname === '/health' && method === 'GET', run: () => json({ ok: true }) },
   { match: (url, method) => url.pathname === '/v1/feedback' && method === 'OPTIONS', run: (request, env) => {
     const headers = corsHeaders(request, env);
