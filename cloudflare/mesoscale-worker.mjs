@@ -68,19 +68,26 @@ const validTileCoordinates = (zoom, x, y) => {
   return x < 2 ** zoom && y < 2 ** zoom;
 };
 
-const parseTileRoute = (parts) => {
-  if (parts.length !== 8) return null;
-  if (parts[0] !== 'tiles' || !MODELS.has(parts[1])) return null;
-  if (!cycleDate(parts[2]) || !/^f\d{2}$/.test(parts[3])) return null;
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[4])) return null;
-  const [zoomText, xText, yFile] = parts.slice(5);
+const parseTileCoordinates = (parts) => {
+  const [zoomText, xText, yFile] = parts;
   if (!/^(?:0|[1-9]\d?)$/.test(zoomText)) return null;
   if (!/^(?:0|[1-9]\d*)$/.test(xText)) return null;
   if (!/^(?:0|[1-9]\d*)\.png$/.test(yFile)) return null;
   const zoom = Number(zoomText);
   const x = Number(xText);
   const y = Number(yFile.slice(0, -4));
-  if (!validTileCoordinates(zoom, x, y)) return null;
+  return validTileCoordinates(zoom, x, y) ? { zoom, x, y } : null;
+};
+
+const parseTileRoute = (parts) => {
+  if (parts.length !== 8) return null;
+  if (parts[0] !== 'tiles' || !MODELS.has(parts[1])) return null;
+  if (!cycleDate(parts[2])) return null;
+  if (!/^f\d{2}$/.test(parts[3])) return null;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parts[4])) return null;
+  const coordinates = parseTileCoordinates(parts.slice(5));
+  if (!coordinates) return null;
+  const { zoom, x, y } = coordinates;
   return { kind: 'tile', key: `mesoscale/v1/tiles/${parts[1]}/${parts[2]}/${parts[3]}/${parts[4]}/${zoom}/${x}/${y}.png` };
 };
 
@@ -95,6 +102,7 @@ const allowedOrigins = (env) => new Set((env.CORS_ALLOWED_ORIGINS || '').split('
 
 const responseCors = (response, origin, allowed) => {
   const headers = new Headers(response.headers);
+  headers.set('X-Content-Type-Options', 'nosniff');
   if (origin && allowed.has(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Vary', 'Origin');
@@ -330,6 +338,8 @@ const cacheHitResponse = (request, response) => {
     : response;
 };
 
+const applyHeadMethod = (request, response) => request.method === 'HEAD' ? noBodyForHead(response) : response;
+
 const cacheStoreResponse = async (cache, key, response) => {
   if (![200, 404].includes(response.status) || !response.headers.get('Cache-Control')?.includes('max-age=')) return;
   try {
@@ -341,13 +351,14 @@ const cacheStoreResponse = async (cache, key, response) => {
 
 const cachedFetch = async (request, route, env, now) => {
   const cache = globalThis.caches?.default;
-  if (request.method !== 'GET' || !cache) return fetchUncached(request, route, env, now);
+  if (!['GET', 'HEAD'].includes(request.method) || !cache) return fetchUncached(request, route, env, now);
   const key = cacheKeyFor(request);
   const hit = await cache.match(key);
-  if (hit) return cacheHitResponse(request, hit);
-  const response = await fetchUncached(request, route, env, now);
+  if (hit) return applyHeadMethod(request, cacheHitResponse(request, hit));
+  const getRequest = request.method === 'HEAD' ? new Request(request.url, { method: 'GET', headers: request.headers }) : request;
+  const response = await fetchUncached(getRequest, route, env, now);
   await cacheStoreResponse(cache, key, response);
-  return response;
+  return applyHeadMethod(request, response);
 };
 
 export default {

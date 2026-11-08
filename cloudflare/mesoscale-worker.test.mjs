@@ -134,12 +134,20 @@ test('Cache API stores tiles, serves hits, honors conditional hits, and caches m
     const path = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/0/0.png';
     const first = await worker.fetch(request(path), env);
     assert.equal(first.status, 200);
+    assert.equal(await first.text(), '{"pixels":"tile"}');
     const etag = first.headers.get('ETag');
+    assert.equal(first.headers.get('Content-Type'), 'image/png');
+    assert.equal(first.headers.get('Cache-Control'), 'public, max-age=31536000, immutable');
+    assert.equal(first.headers.get('X-Content-Type-Options'), 'nosniff');
     const hit = await worker.fetch(request(path), env);
     assert.equal(hit.status, 200);
     assert.equal(reads, 1);
     const conditionalHit = await worker.fetch(request(path, { headers: { 'If-None-Match': etag } }), env);
     assert.equal(conditionalHit.status, 304);
+    assert.equal(reads, 1);
+    const head = await worker.fetch(request(path, { method: 'HEAD' }), env);
+    assert.equal(head.status, 200);
+    assert.equal(head.body, null);
     assert.equal(reads, 1);
 
     const missingPath = '/tiles/hrrr/20261108T1200Z/f00/temperature-2m/3/1/1.png';
