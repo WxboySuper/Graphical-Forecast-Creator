@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
+import { validate } from './feedback/validate.mjs';
 
 const project = 'gfc-test';
 let privateKey;
@@ -359,6 +360,15 @@ test('refetches signing keys once after a key rotation, rate-limited against for
   assert.ok(fetches - afterRotation <= 1, 'forged key ids must not trigger a refetch per request');
 });
 
+test('keeps accepting tokens from cached keys while the key endpoint is down', async () => {
+  let down = false; let clock = 1950000000000 + 12 * 3600 * 1000;
+  const jwksFetch = async () => { if (down) throw new Error('offline'); return Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }); };
+  const { env, ctx } = harness({ env: { JWKS_FETCH: jwksFetch, NOW: () => clock } });
+  assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-a' }) })).status, 201);
+  down = true; clock += 3600 * 1000;
+  assert.equal((await post(env, ctx, { auth: await token({ sub: 'stale-b' }), body: validBody({ message: 'Sent while the key endpoint is down.' }) })).status, 201);
+});
+
 test('a global cap stops floods from many accounts', async () => {
   const { db, env, ctx } = harness();
   const statuses = [];
@@ -449,3 +459,7 @@ test('admin token failures are throttled by salted client IP', async () => {
   assert.equal(db.adminAttempts.size, 1);
 });
 
+
+test('null optional fields are accepted and stored as empty', () => {
+  assert.ok(validate({ category: 'bug', message: 'Something is wrong here', page: '/forecast', appVersion: '1.0.0', buildTarget: 'beta', contactOk: false, viewport: null, plan: null }));
+});

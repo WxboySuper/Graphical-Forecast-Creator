@@ -1,3 +1,6 @@
+// Truncate by code point so an emoji at the boundary is never split into a lone surrogate.
+const truncate = (text, max) => Array.from(text).slice(0, max).join('');
+
 function createPayload(env, record) {
   const tag = record.build_target === 'beta' ? env.FEEDBACK_DISCORD_TAG_BETA : env.FEEDBACK_DISCORD_TAG_PROD;
   const trailer = `
@@ -6,9 +9,9 @@ function createPayload(env, record) {
 **Plan:** ${record.plan ?? 'unknown'}
 **ID:** ${record.id}`;
   // Truncate the message, never the trailer, so the ID needed to correlate a thread always survives.
-  const description = `**Feedback:** ${record.message.slice(0, Math.max(0, 4096 - 14 - trailer.length))}${trailer}`;
+  const description = `**Feedback:** ${truncate(record.message, Math.max(0, 4096 - 14 - trailer.length))}${trailer}`;
   return {
-    thread_name: `[${record.build_target === 'beta' ? 'BETA' : 'PROD'}] ${record.category}: ${record.message.slice(0, 80)}`.slice(0, 100),
+    thread_name: truncate(`[${record.build_target === 'beta' ? 'BETA' : 'PROD'}] ${record.category}: ${truncate(record.message, 80)}`, 100),
     content: `Feedback ${record.id}`,
     embeds: [{ description }],
     allowed_mentions: { parse: [] },

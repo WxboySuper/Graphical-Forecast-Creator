@@ -3,6 +3,7 @@ const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken
 const CLOCK_LEEWAY_SECONDS = 60;
 /** An unknown key id may trigger a JWKS refetch (key rotation), but at most this often. */
 const KEY_REFRESH_MIN_SECONDS = 60;
+const STALE_RETRY_SECONDS = 30;
 let jwksCache = { keys: null, expiresAt: 0, fetchedAt: 0 };
 
 /** Decodes unpadded base64url to bytes, restoring the padding atob may require. */
@@ -39,13 +40,29 @@ function claimsAreValid(claims, project, now) {
 
 const isCacheFresh = (now) => Boolean(jwksCache.keys) && jwksCache.expiresAt > now;
 
+/** Keeps serving the last-known keys when Google's endpoint is briefly unavailable, retrying soon instead of on every request. */
+function staleKeys(now) {
+  if (!jwksCache.keys) return null;
+  jwksCache = { ...jwksCache, expiresAt: now + STALE_RETRY_SECONDS };
+  return jwksCache.keys;
+}
+
+async function fetchJwks(env) {
+  try {
+    const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data.keys) ? { keys: data.keys, response } : null;
+  } catch {
+    return null;
+  }
+}
+
 async function loadKeys(env, now, force = false) {
   if (!force && isCacheFresh(now)) return jwksCache.keys;
-  const response = await (env.JWKS_FETCH ?? fetch)(JWKS_URL);
-  if (!response.ok) return null;
-  const data = await response.json();
-  if (!Array.isArray(data.keys)) return null;
-  const cacheControl = response.headers.get('cache-control') ?? '';
+  const data = await fetchJwks(env);
+  if (!data) return staleKeys(now);
+  const cacheControl = data.response.headers.get('cache-control') ?? '';
   const maxAge = Number(cacheControl.match(/max-age=(\d+)/i)?.[1] ?? 300);
   jwksCache = { keys: data.keys, expiresAt: now + Math.max(60, Math.min(maxAge, 3600)), fetchedAt: now };
   return jwksCache.keys;

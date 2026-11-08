@@ -16,8 +16,8 @@ const fields = {
   appVersion: (value) => isText(value) && hasLength(clean(value), 1, 40),
   buildTarget: (value) => typeof value === 'string' && TARGETS.has(value),
   contactOk: (value) => typeof value === 'boolean',
-  viewport: (value) => value === undefined || (isText(value) && clean(value).length <= 20),
-  plan: (value) => value === undefined || (typeof value === 'string' && PLANS.has(value)),
+  viewport: (value) => value == null || (isText(value) && clean(value).length <= 20),
+  plan: (value) => value == null || (typeof value === 'string' && PLANS.has(value)),
 };
 const allowedFields = new Set(Object.keys(fields));
 
