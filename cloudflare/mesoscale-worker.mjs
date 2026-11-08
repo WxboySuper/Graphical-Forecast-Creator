@@ -113,7 +113,8 @@ const responseCors = (response, origin, allowed) => {
 
 const publicBaseUrl = (env) => {
   const base = new URL(env.PUBLIC_BASE_URL);
-  if (base.protocol !== 'https:' || base.username || base.password || base.pathname !== '/' || base.search || base.hash) throw new Error('PUBLIC_BASE_URL must be an origin-only HTTPS URL');
+  if (base.protocol !== 'https:') throw new Error('PUBLIC_BASE_URL must use HTTPS');
+  if (base.origin !== env.PUBLIC_BASE_URL.replace(/\/$/, '')) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
   return base;
 };
 
@@ -142,6 +143,10 @@ const addConfiguredTemplateBase = (catalog, env) => {
 
 const malformedJsonResponse = () => json({ error: 'Stored mesoscale JSON is malformed.' }, 502, { 'Cache-Control': 'no-store' });
 const invalidCatalogResponse = () => json({ error: 'Stored catalog does not match its immutable key or schema.' }, 502, { 'Cache-Control': 'no-store' });
+const storedJsonForRoute = (context) => {
+  if (context.route.kind === 'catalog') return catalogResponse(context);
+  return latestResponse(context);
+};
 
 const validCatalog = (value, route) => {
   const domain = value.domain;
@@ -202,8 +207,7 @@ const storedJsonResponse = async ({ request, env, route, object, now, headers, e
     return malformedJsonResponse();
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return malformedJsonResponse();
-  const context = { value, request, env, route, now, headers, etag };
-  return route.kind === 'catalog' ? catalogResponse(context) : latestResponse(context);
+  return storedJsonForRoute({ value, request, env, route, now, headers, etag });
 };
 
 const cacheControlForRoute = (route) => {
@@ -279,25 +283,33 @@ const getObjectResponse = async (request, env, route, now) => {
 
 const readJson = async (bucket, key) => {
   const object = await bucket.get(key);
-  if (!object) return null;
+  if (!object) return { state: 'missing', value: null };
   try {
     const value = await object.json();
-    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return { state: 'invalid', value: null };
+    return { state: 'ok', value };
   } catch {
-    return null;
+    return { state: 'invalid', value: null };
   }
 };
 
 const healthForModel = (today, yesterday, modelId) => {
-  if (today?.modelId === modelId) return today;
-  if (yesterday?.modelId === modelId) return yesterday;
+  if (today.state === 'ok' && today.value.modelId === modelId) return today.value;
+  if (yesterday.state === 'ok' && yesterday.value.modelId === modelId) return yesterday.value;
   return null;
 };
 
 const validStatusPointer = (pointer, modelId) => {
-  if (!pointer || pointer.schemaVersion !== 1) return false;
-  if (pointer.modelId !== modelId || typeof pointer.cycleTime !== 'string') return false;
-  return Number.isFinite(Date.parse(pointer.cycleTime));
+  if (pointer.state !== 'ok') return false;
+  if (pointer.value.schemaVersion !== 1) return false;
+  if (pointer.value.modelId !== modelId || typeof pointer.value.cycleTime !== 'string') return false;
+  return Number.isFinite(Date.parse(pointer.value.cycleTime));
+};
+
+const modelHealthState = (health, today, yesterday, pointer) => {
+  if (health) return health.status;
+  if ([today, yesterday, pointer].some((record) => record.state === 'invalid')) return 'invalid';
+  return 'missing';
 };
 
 const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter }) => {
@@ -308,8 +320,10 @@ const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter 
   ]);
   const health = healthForModel(today, yesterday, modelId);
   const validPointer = validStatusPointer(pointer, modelId);
-  const age = validPointer ? ageMinutes(pointer.cycleTime, now) : null;
-  return { modelId, latestCycleTime: validPointer ? pointer.cycleTime : null, ageMinutes: age, stale: age === null || age > staleAfter, health: health?.status || (pointer ? 'invalid' : 'missing'), healthGeneratedAt: health?.generatedAt || null };
+  const pointerValue = validPointer ? pointer.value : null;
+  const age = pointerValue ? ageMinutes(pointerValue.cycleTime, now) : null;
+  const healthState = modelHealthState(health, today, yesterday, pointer);
+  return { modelId, latestCycleTime: pointerValue?.cycleTime || null, ageMinutes: age, stale: age === null || age > staleAfter, health: healthState, healthGeneratedAt: health?.generatedAt || null };
 };
 
 const statusResponse = async (request, env, now) => {

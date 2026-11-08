@@ -52,6 +52,7 @@ test('strictly whitelists route segments and rejects traversal attempts without 
     '/catalog/hrrr/20261108T1200Z.json/extra',
     '/catalog/hrrr/%2e%2e.json',
     '/latest/../secret.json',
+    '/latest/%2e%2e/secret.json',
     '/latest/hrrr%2Fsecret.json',
     '/tiles/hrrr/20261108T1200Z/f00/%2e%2e/3/0/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/8/0.png',
@@ -172,6 +173,9 @@ test('latest pointer reports live age and stale state without changing its cycle
     const invalidThreshold = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr') }, { STALE_AFTER_MINUTES: 'abc' });
     const invalidConfigResponse = await worker.fetch(request('/latest/hrrr.json'), invalidThreshold);
     assert.equal(invalidConfigResponse.headers.get('X-Mesoscale-Stale'), 'true');
+    const fresh = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T15:00:00Z') }, { STALE_AFTER_MINUTES: '60' });
+    const freshResponse = await worker.fetch(request('/latest/hrrr.json'), fresh);
+    assert.equal(freshResponse.headers.get('X-Mesoscale-Stale'), 'false');
   });
 });
 
@@ -202,6 +206,15 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
   const env = envFor({}, { MESOSCALE_BUCKET: { get: async () => malformed } });
   assert.equal((await worker.fetch(request('/catalog/hrrr/20261108T1200Z.json'), env)).status, 502);
   assert.equal((await worker.fetch(request('/latest/hrrr.json'), env)).status, 502);
+});
+
+test('status labels malformed pointer JSON as invalid instead of missing', async () => {
+  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { json: async () => { throw new SyntaxError('invalid'); } } : null } });
+  await withNow('2026-11-08T15:01:00Z', async () => {
+    const response = await worker.fetch(request('/status'), env);
+    const body = await response.json();
+    assert.equal(body.models.find((model) => model.modelId === 'hrrr').health, 'invalid');
+  });
 });
 
 test('HEAD returns headers without a body, and unsupported methods return 405', async () => {
