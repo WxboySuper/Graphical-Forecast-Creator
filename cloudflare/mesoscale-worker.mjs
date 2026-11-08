@@ -222,22 +222,39 @@ const catalogConditionalResponse = (request, etag, env, headers) => {
   }
 };
 
-const getObjectResponse = async (request, env, route, now) => {
-  const bucket = env.MESOSCALE_BUCKET;
-  if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  const object = await bucket.get(route.key);
-  if (!object) return missingObjectResponse(route);
+const headersForObject = (route, object) => {
   const contentType = route.kind === 'tile' ? 'image/png' : object.httpMetadata?.contentType;
   const headers = new Headers(contentType ? { 'Content-Type': contentType } : {});
   const etag = object.httpEtag || object.etag;
   if (etag) headers.set('ETag', etag);
   headers.set('Cache-Control', cacheControlForRoute(route));
-  if (route.kind === 'catalog') {
-    const notModified = catalogConditionalResponse(request, etag, env, headers);
-    if (notModified) return notModified;
-  }
-  if (route.kind === 'tile') return conditionalResponse(request, etag, headers) || new Response(request.method === 'HEAD' ? null : object.body, { headers });
+  return { headers, etag };
+};
+
+const objectConditionalResponse = ({ request, env, route, headers, etag }) => {
+  if (route.kind === 'catalog') return catalogConditionalResponse(request, etag, env, headers);
+  if (route.kind === 'tile') return conditionalResponse(request, etag, headers);
+  return null;
+};
+
+const objectBodyResponse = ({ request, env, route, object, now, headers, etag }) => {
+  if (route.kind === 'tile') return new Response(request.method === 'HEAD' ? null : object.body, { headers });
   return storedJsonResponse({ request, env, route, object, now, headers, etag });
+};
+
+const responseForObject = (context) => {
+  const { headers, etag } = headersForObject(context.route, context.object);
+  const conditional = objectConditionalResponse({ ...context, headers, etag });
+  if (conditional) return conditional;
+  return objectBodyResponse({ ...context, headers, etag });
+};
+
+const getObjectResponse = async (request, env, route, now) => {
+  const bucket = env.MESOSCALE_BUCKET;
+  if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
+  const object = await bucket.get(route.key);
+  if (!object) return missingObjectResponse(route);
+  return responseForObject({ request, env, route, object, now });
 };
 
 const readJson = async (bucket, key) => {
