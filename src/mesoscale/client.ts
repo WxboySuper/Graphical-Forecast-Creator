@@ -1,9 +1,9 @@
 import { getMesoscaleClientConfig, type MesoscaleClientConfig } from '../config/mesoscale';
-import { normalizeProviderPayload } from './normalizeProviderPayload';
 import type { MesoscaleModelId, MesoscaleParameterResponse } from './contracts';
 import type { MesoscaleCatalog, MesoscaleLatestPointer, MesoscaleStatus } from './catalogContracts';
 import { readMesoscaleFixture } from './fixtures/client';
 import { isRecord } from './providerPayloadValidation';
+import { getCatalogError, isLatestPointer, normalizeCatalogFrame, normalizeMesoscaleCatalog, resolveCycleId } from './catalogAdapter';
 
 export interface RequestOptions {
   signal?: AbortSignal;
@@ -174,136 +174,4 @@ function hasData<T>(result: MesoscaleRequestResult<T>): result is Extract<Mesosc
   return 'data' in result;
 }
 
-const hasBounds = (value: unknown): boolean => {
-  if (value === undefined) return true;
-  if (!Array.isArray(value) || value.length !== 4) return false;
-  return value.every(Number.isFinite);
-};
-
-const isLatestPointer = (value: MesoscaleLatestPointer, model: MesoscaleModelId): boolean => {
-  if (value.schemaVersion !== 1) return false;
-  if (value.modelId !== model) return false;
-  if (!Number.isFinite(Date.parse(value.cycleTime))) return false;
-  if (!Number.isFinite(Date.parse(value.publishedAt))) return false;
-  return typeof value.catalogUrl === 'string';
-};
-
-const TILE_TEMPLATE = /\{z\}.*\{x\}.*\{y\}/;
-const hasValidTileUrl = (tile: Record<string, unknown>): boolean => typeof tile.urlTemplate === 'string'
-  && TILE_TEMPLATE.test(tile.urlTemplate);
-
-const hasValidTileZoom = (tile: Record<string, unknown>): boolean => {
-  if (!Number.isInteger(tile.minZoom) || !Number.isInteger(tile.maxZoom)) return false;
-  return Number(tile.minZoom) <= Number(tile.maxZoom);
-};
-
-const hasValidTileFormat = (tile: Record<string, unknown>): boolean => tile.format === 'image/png'
-  && tile.projection === 'EPSG:3857';
-
-const isCatalogParameter = (value: unknown): boolean => {
-  if (!isRecord(value) || !isRecord(value.data)) return false;
-  if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
-  const tile = value.data;
-  if (tile.type !== 'xyz-raster') return false;
-  if (!hasValidTileUrl(tile)) return false;
-  if (!hasValidTileFormat(tile)) return false;
-  if (!hasValidTileZoom(tile)) return false;
-  return hasBounds(tile.bounds);
-};
-
-const isValidCatalogFrameType = (frameType: unknown, forecastHour: unknown): boolean => {
-  if (frameType === 'analysis') return forecastHour === 0;
-  return frameType === 'forecast' && Number(forecastHour) > 0;
-};
-
-const isCatalogFrame = (value: unknown): boolean => {
-  if (!isRecord(value) || !Array.isArray(value.parameters)) return false;
-  const forecastHour = value.forecastHour;
-  if (!isValidCatalogFrameType(value.frameType, forecastHour)) return false;
-  if (!Number.isInteger(forecastHour)) return false;
-  if (!Number.isFinite(Date.parse(String(value.validTime)))) return false;
-  if (!['complete', 'partial', 'failed'].includes(String(value.status))) return false;
-  return value.parameters.every(isCatalogParameter);
-};
-
-const validateCatalogIdentity = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined => {
-  if (catalog.schemaVersion !== 1) return 'Catalog schema version is unsupported.';
-  if (catalog.model?.id !== model) return 'Catalog model does not match the request.';
-  if (!Number.isFinite(Date.parse(catalog.cycleTime))) return 'Catalog cycle time is invalid.';
-  if (resolveCycleId(catalog.cycleTime) !== cycle) return 'Catalog cycle does not match the request.';
-  return undefined;
-};
-
-const isCatalogDomain = (value: unknown): boolean => {
-  if (!isRecord(value)) return false;
-  const boundsValid = Array.isArray(value.bounds) && value.bounds.length === 4 && value.bounds.every(Number.isFinite);
-  const zoomValid = Number.isInteger(value.minZoom) && Number.isInteger(value.maxZoom)
-    && Number(value.minZoom) <= Number(value.maxZoom);
-  return typeof value.id === 'string' && typeof value.name === 'string'
-    && value.projection === 'EPSG:3857' && boundsValid && zoomValid;
-};
-
-const validateCatalogDomain = (catalog: MesoscaleCatalog): string | undefined => isCatalogDomain(catalog.domain)
-  ? undefined
-  : 'Catalog domain metadata is invalid.';
-
-const validateCatalogFrames = (catalog: MesoscaleCatalog): string | undefined => {
-  if (!Array.isArray(catalog.frames) || catalog.frames.length === 0) return 'Catalog has no frames.';
-  if (!catalog.frames.every(isCatalogFrame)) return 'Catalog frame or tile metadata is malformed.';
-  return undefined;
-};
-
-const getCatalogError = (catalog: MesoscaleCatalog, model: MesoscaleModelId, cycle: string): string | undefined =>
-  validateCatalogIdentity(catalog, model, cycle)
-  ?? validateCatalogDomain(catalog)
-  ?? validateCatalogFrames(catalog);
-
-export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
-  const frame = catalog.frames[frameIndex];
-  if (!frame) return { state: 'malformed', message: 'Catalog frame is missing.' };
-  if (frame.status === 'failed') return { state: 'upstream-failure', message: 'Catalog frame is marked failed.', retryable: false };
-  const declaredUnavailable = frame.unavailableParameters ?? catalog.unavailableParameters ?? [];
-  const failedParameters = frame.parameters.filter(parameter => parameter.status === 'failed');
-  const failedIds = new Set(declaredUnavailable.map(parameter => parameter.id));
-  const unavailable = [...declaredUnavailable, ...failedParameters
-    .filter(parameter => !failedIds.has(parameter.id))
-    .map(parameter => ({ id: parameter.id, reason: 'Catalog parameter is marked failed.' }))];
-  let isPartial = frame.status === 'partial';
-  if (failedParameters.length > 0) isPartial = true;
-  if (frame.parameters.some(parameter => parameter.status === 'partial')) isPartial = true;
-  const payload = {
-    schemaVersion: 1,
-    model: {
-      ...catalog.model,
-      capabilities: {
-        availableParameterIds: catalog.frames.flatMap(item => item.parameters.map(value => value.id)).filter((id, index, ids) => ids.indexOf(id) === index),
-        maxForecastHour: Math.max(...catalog.frames.map(item => item.forecastHour)),
-      },
-    },
-    frameType: frame.frameType,
-    cycleTime: catalog.cycleTime,
-    forecastHour: frame.forecastHour,
-    validTime: frame.validTime,
-    domain: { id: catalog.domain.id, name: catalog.domain.name, bounds: catalog.domain.bounds },
-    source: catalog.source ?? frame.parameters[0]?.source,
-    parameters: frame.parameters.filter(parameter => parameter.status !== 'failed').map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data })),
-    requestedParameterIds: frame.requestedParameterIds ?? catalog.requestedParameterIds ?? frame.parameters.map(parameter => parameter.id),
-    unavailableParameters: unavailable,
-    stale: Math.max(now - Date.parse(catalog.cycleTime), now - Date.parse(frame.validTime)) > 180 * 60_000,
-  };
-  const normalized = normalizeProviderPayload(payload, { now, staleAfterMs: 180 * 60 * 1000 });
-  if (isPartial && normalized.state === 'ready') {
-    return { ...normalized, state: 'partial', completeness: 'partial' };
-  }
-  return normalized;
-};
-
-export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now()): MesoscaleParameterResponse[] =>
-  catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now));
-
-export const resolveCycleId = (cycleTime: string): string => {
-  if (/^\d{8}T\d{4}Z$/.test(cycleTime)) return cycleTime;
-  if (!Number.isFinite(Date.parse(cycleTime))) return '';
-  const utc = new Date(cycleTime).toISOString();
-  return utc.replace(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):\d{2}\.\d{3}Z$/, '$1$2$3T$4$5Z');
-};
+export { normalizeCatalogFrame, normalizeMesoscaleCatalog, resolveCycleId };
