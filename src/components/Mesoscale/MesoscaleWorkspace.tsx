@@ -105,16 +105,27 @@ const LoadedWorkspace: React.FC<{ selection: MesoscaleSelection; cycleTime: stri
   );
 };
 
-/** Resolves the latest cycle for the selected model, then shows the loaded workspace. */
+/** Looks up the selected model's latest cycle. Remounting it (via its key) re-runs the lookup. */
+const LatestResolver: React.FC<{ selection: MesoscaleSelection; onRetry: () => void; retryKey: number }> = ({ selection, onRetry, retryKey }) => {
+  const latest = useMesoscaleLatest(selection.modelId);
+  const cycleTime = 'data' in latest.result ? latest.result.data.cycleTime : null;
+
+  if (!cycleTime) {
+    return <StateMessage result={latest.result} subject={`the latest ${selection.modelId.toUpperCase()} run`} onRetry={onRetry} />;
+  }
+  return <LoadedWorkspace key={`${selection.modelId}-${retryKey}`} selection={selection} cycleTime={cycleTime} onRetry={onRetry} />;
+};
+
+/** Holds the selection and the retry counter; each retry remounts the lookup so it reloads. */
 export const MesoscaleWorkspace: React.FC = () => {
   const selection = useMesoscaleSelection();
   const [retryKey, setRetryKey] = useState(0);
-  const latest = useMesoscaleLatest(selection.modelId);
-  const cycleTime = 'data' in latest.result ? latest.result.data.cycleTime : null;
-  const retry = () => setRetryKey(key => key + 1);
-
-  if (!cycleTime) {
-    return <StateMessage result={latest.result} subject={`the latest ${selection.modelId.toUpperCase()} run`} onRetry={retry} />;
-  }
-  return <LoadedWorkspace key={`${selection.modelId}-${retryKey}`} selection={selection} cycleTime={cycleTime} onRetry={retry} />;
+  return (
+    <LatestResolver
+      key={`${selection.modelId}-${retryKey}`}
+      selection={selection}
+      retryKey={retryKey}
+      onRetry={() => setRetryKey(key => key + 1)}
+    />
+  );
 };

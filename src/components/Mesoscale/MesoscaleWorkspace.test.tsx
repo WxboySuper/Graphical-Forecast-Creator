@@ -4,6 +4,7 @@
  * readout says, how model, frame, and layer controls change the selection, and that
  * a stale or partial run is always called out.
  */
+import { useEffect } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -54,12 +55,18 @@ describe('MesoscaleWorkspace', () => {
     expect(mockFrames).not.toHaveBeenCalled();
   });
 
-  it('explains an unavailable source without showing old data, and retries on request', () => {
-    mockLatest.mockReturnValue({ result: { state: 'upstream-failure', message: 'down', retryable: true }, ageMinutes: null, stale: false });
+  it('explains an unavailable source without showing old data, and reloads the lookup on retry', () => {
+    let lookups = 0;
+    // A real hook loads on mount, so count mounts: a retry must start a fresh lookup.
+    mockLatest.mockImplementation(() => {
+      useEffect(() => { lookups += 1; }, []);
+      return { result: { state: 'upstream-failure', message: 'down', retryable: true }, ageMinutes: null, stale: false };
+    });
     renderWorkspace();
     expect(screen.getByRole('alert')).toHaveTextContent(/unavailable/i);
+    expect(lookups).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(mockLatest).toHaveBeenCalled();
+    expect(lookups).toBe(2);
   });
 
   it('shows the readout for the analysis frame and labels it as model initialization', () => {
