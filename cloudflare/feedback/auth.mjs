@@ -108,14 +108,18 @@ async function verifySignature(parts, header, keys) {
 const validHeader = (header) => typeof header === 'object' && header !== null && header.alg === 'RS256' && typeof header.kid === 'string';
 const currentSeconds = (env) => Math.floor((env.NOW?.() ?? Date.now()) / 1000);
 
+/** Parses the token and rejects malformed or already-expired ones before any JWKS fetch, so junk tokens never cost a network call. */
+function parseLiveToken(token, now) {
+  const parsed = token ? parseToken(token) : null;
+  if (!parsed || !validHeader(parsed.header)) return null;
+  const exp = parsed.claims?.exp;
+  return Number.isFinite(exp) && exp + CLOCK_LEEWAY_SECONDS > now ? parsed : null;
+}
+
 async function verifySignatureSafe(token, env, url) {
-  if (!token) return null;
-  const parsed = parseToken(token);
-  if (!parsed) return null;
-  if (!validHeader(parsed.header)) return null;
   const now = currentSeconds(env);
-  // Reject tokens that are obviously expired before any JWKS fetch, so junk tokens never cost a network call.
-  if (!(Number.isFinite(parsed.claims?.exp) && parsed.claims.exp + CLOCK_LEEWAY_SECONDS > now)) return null;
+  const parsed = parseLiveToken(token, now);
+  if (!parsed) return null;
   const keys = await keysFor(env, now, url, parsed.header.kid);
   if (!keys) throw new KeysUnavailableError('signing keys unavailable');
   if (!(await verifySignature(parsed.parts, parsed.header, keys))) return null;
