@@ -8,11 +8,10 @@ import os
 import tempfile
 import ctypes
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
-from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, TILE_SIZE, WEB_MERCATOR_LIMIT, Model, source_metadata
-from .discovery import request
+from .fields import FIELDS, ZOOM_MIN, ZOOM_MAX, TILE_SIZE, WEB_MERCATOR_LIMIT, Model
 
 VALUE_CONVERSIONS = {
     "temperature": lambda values: values - 273.15,
@@ -121,6 +120,10 @@ def resampled_rgba(request: RasterRequest):
     px, py, values = request.x, request.y, request.values
     width, height, stops = request.width, request.height, request.stops
     rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    inside = (px >= 0) & (px < width) & (py >= 0) & (py < height)
+    if not inside.any():
+        return rgba
+    px, py, values = px[inside], py[inside], values[inside]
     x0, x1 = max(0, int(px.min())), min(width - 1, int(px.max()))
     y0, y1 = max(0, int(py.min())), min(height - 1, int(py.max()))
     grid_x, grid_y = np.meshgrid(np.arange(x0, x1 + 1), np.arange(y0, y1 + 1))

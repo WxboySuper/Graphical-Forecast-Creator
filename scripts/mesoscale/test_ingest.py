@@ -366,6 +366,18 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(int(rgba[5, 5, 3]), 190)
         self.assertEqual(int(rgba[0, 0, 3]), 0)
 
+    def test_render_returns_transparent_image_when_grid_is_outside_extent(self):
+        import numpy as np
+        request = RasterRequest(np.array([20, 30]), np.array([20, 30]), np.array([1, 2]), 12, 12, [(0, "#000000"), (20, "#ffffff")])
+        rgba = resampled_rgba(request)
+        self.assertFalse(rgba.any())
+
+    def test_rap_field_selection_excludes_surface_lcl(self):
+        from ingestion.render_steps import select_fields
+        selected = select_fields(MODELS["rap"], [], 0)
+        self.assertNotIn("surface-lcl", selected)
+        self.assertIn("surface-lcl:HGT", select_fields(MODELS["hrrr"], [], 0))
+
     def test_missing_sentinels_are_excluded_from_render_samples(self):
         import numpy as np
         mask = valid_data(np.array([1.0, np.nan, 9999.0, -9999.0, 1e20]))

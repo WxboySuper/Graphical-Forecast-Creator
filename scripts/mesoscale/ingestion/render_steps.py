@@ -10,7 +10,7 @@ from pathlib import Path
 
 from inventory import parse_idx, resolve_ranges
 
-from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, Model, source_metadata
+from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, Model, identities_for_field, source_metadata
 from .discovery import request
 
 
@@ -73,14 +73,13 @@ def load_source(context) -> SourceBundle:
 
 def select_fields(model: Model, records: list, size: int) -> dict:
     from inventory import resolve_allowlist
-    identities = {f"{field_id}:{parameter}": {"parameter": parameter, "level": level_for_model(model, field_id, level)} for field_id, spec in FIELDS.items() for parameter, level in spec[0].items()}
+    identities = {
+        f"{field_id}:{identity['parameter']}": identity
+        for field_id, spec in FIELDS.items()
+        for group in identities_for_field(model.id, field_id, spec[0])
+        for identity in group
+    }
     return resolve_allowlist(records, size, identities)
-
-
-def level_for_model(model: Model, field_id: str, level: str) -> str:
-    if model.id == "rrfs" and field_id == "reflectivity":
-        return "entire atmosphere (considered as a single layer)"
-    return level
 
 
 def group_ranges(selected: dict) -> dict:
