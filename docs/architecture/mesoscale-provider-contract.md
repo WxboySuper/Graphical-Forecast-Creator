@@ -10,6 +10,10 @@ Those values are data, not assumptions baked into consumers. An adapter maps its
 response into schema version 1, then calls `normalizeProviderPayload` before
 handing data to a consumer.
 
+Adapters map vendor responses to the exported flat `MesoscaleProviderPayload`
+input type before calling the normalizer. Timestamps require an explicit timezone,
+and `validTime` must equal `cycleTime` plus `forecastHour`.
+
 Frames identify themselves as `analysis` or `forecast`. Analysis frames use f00;
 forecast frames use forecast hours after f00. `ageMs` is calculated from valid
 time against the supplied `now` (or the current clock). A caller may provide a

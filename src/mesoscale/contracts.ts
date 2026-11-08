@@ -43,6 +43,38 @@ export interface MesoscaleParameterDefinition {
   displayType: MesoscaleDisplayType;
 }
 
+/** Flat adapter input shape. Provider adapters map their response to this before normalization. */
+export interface MesoscaleProviderParameter<TData = unknown> {
+  id: string;
+  displayName: string;
+  units: string;
+  level: MesoscaleLevel;
+  legend: MesoscaleLegendStop[];
+  displayType: MesoscaleDisplayType;
+  data: TData;
+}
+
+/** Provider-neutral adapter payload. Timestamp strings must include an explicit timezone. */
+export interface MesoscaleProviderPayload<TData = unknown> {
+  schemaVersion: 1;
+  model: MesoscaleModelMetadata;
+  frameType: MesoscaleFrameType;
+  cycleTime: string;
+  forecastHour: number;
+  validTime: string;
+  domain: MesoscaleDomain;
+  source: MesoscaleSourceMetadata;
+  parameters: MesoscaleProviderParameter<TData>[];
+  requestedParameterIds?: string[];
+  unavailableParameters?: Array<{ id: string; reason?: string }>;
+  stale?: boolean;
+}
+
+export type MesoscaleProviderResult<TData = unknown> =
+  | MesoscaleProviderPayload<TData>
+  | { state: 'loading' }
+  | { state: 'upstream-failure'; message?: string; retryable?: boolean };
+
 /** Values stay provider supplied. Consumers must not derive meteorological fields here. */
 export interface MesoscaleParameter<TData = unknown> {
   definition: MesoscaleParameterDefinition;

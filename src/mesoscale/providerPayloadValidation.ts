@@ -20,7 +20,7 @@ function nonEmptyString(value: unknown): boolean {
 }
 
 function validTime(value: unknown): boolean {
-  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+  return typeof value === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/i.test(value) && Number.isFinite(Date.parse(value));
 }
 
 function hasModelId(value: unknown): boolean {
@@ -168,6 +168,11 @@ function isWithinModelForecastRange(payload: Record<string, unknown>): boolean {
   return (payload.forecastHour as number) <= (payload.model.capabilities.maxForecastHour as number);
 }
 
+function isValidFrameTime(payload: Record<string, unknown>): boolean {
+  const expectedValidTime = Date.parse(payload.cycleTime as string) + (payload.forecastHour as number) * 60 * 60 * 1000;
+  return Date.parse(payload.validTime as string) === expectedValidTime;
+}
+
 function hasValidDomain(value: unknown): boolean {
   return allChecks(value, [isRecord, candidate => isRecord(candidate) && nonEmptyString(candidate.id),
     candidate => isRecord(candidate) && nonEmptyString(candidate.name)]);
@@ -223,6 +228,7 @@ const rules: ValidationRule[] = [
   { valid: isValidFrameHour, message: 'Analysis frames must be f00 and forecast frames must be after f00.' },
   { valid: isWithinModelForecastRange, message: 'Forecast hour exceeds this model capability.' },
   { valid: payload => validTime(payload.validTime), message: 'Valid time must be a valid timestamp.' },
+  { valid: isValidFrameTime, message: 'Valid time must equal cycle time plus forecast hour.' },
   { valid: payload => hasValidDomain(payload.domain), message: 'Domain metadata is missing or invalid.' },
   { valid: payload => hasValidBounds(payload.domain), message: 'Domain bounds must contain four finite coordinates.' },
   { valid: payload => isValidSource(payload.source), message: 'Source metadata and attribution are required.' },

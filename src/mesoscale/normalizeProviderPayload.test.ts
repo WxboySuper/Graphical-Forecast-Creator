@@ -76,6 +76,30 @@ describe('normalizeProviderPayload', () => {
     });
   });
 
+  it('rejects timestamps without explicit timezones', () => {
+    const timezoneLess = {
+      ...(fixtures.complete as Record<string, unknown>),
+      cycleTime: '2026-05-20T12:00:00',
+    };
+
+    expect(normalizeProviderPayload(timezoneLess)).toMatchObject({
+      state: 'malformed',
+      message: 'Cycle time must be a valid timestamp.',
+    });
+  });
+
+  it('rejects a valid time that conflicts with the model cycle and forecast hour', () => {
+    const inconsistent = {
+      ...(fixtures.complete as Record<string, unknown>),
+      validTime: '2026-05-20T18:00:00Z',
+    };
+
+    expect(normalizeProviderPayload(inconsistent)).toMatchObject({
+      state: 'malformed',
+      message: 'Valid time must equal cycle time plus forecast hour.',
+    });
+  });
+
   it('preserves upstream failure details and exposes loading explicitly', () => {
     expect(normalizeProviderPayload(fixtures.upstreamFailure)).toEqual({
       state: 'upstream-failure',
