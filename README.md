@@ -113,26 +113,25 @@ needs; `@typescript/native` provides the fast native `tsc` used by
 
 ### Build targets
 
-Every frontend build resolves one deployment target through `VITE_BUILD_TARGET`: `local`, `beta`, `staging`, or `production`. Local development and builds default to `local`; hosted deployment workflows set their target explicitly and invalid values stop the build. This target identifies the deployment surface and is separate from Vite's bundling mode and the existing beta access gate.
+Every frontend build resolves one deployment target through `VITE_BUILD_TARGET`: `local`, `beta`, `staging`, or `production`. Local development and builds default to `local`; hosted deployment workflows set their target explicitly and invalid values stop the build. This target identifies the deployment surface and is separate from Vite's bundling mode and the open beta deployment.
 
-### Local Beta Mode (developer)
+### Previewing the beta build locally (developer)
 
-Run the app with beta-only features locally (useful for testing forecast redesigns, verification flows, and discussion changes).
+The public beta (beta.gfcweather.com) is an open deployment: anyone can use it, and existing subscriptions apply. A beta build differs only by its build target, which adds the beta banner and the floating feedback button.
 
-- Start a beta dev server on a different port with the Vite env flag:
+- Start a beta-target dev server on a different port:
   - Unix/mac:
     ```sh
-    cross-env VITE_BETA_MODE=true pnpm run dev -- --port 3002
+    cross-env VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002
     ```
   - Windows (PowerShell):
     ```ps1
-    $env:VITE_BETA_MODE='true'; pnpm run dev -- --port 3002
+    $env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002
     ```
 
-- Bypass hosted Firebase sign-in (local-only):
-  - Open: http://localhost:3002/?localBetaBypass=1
-  - Or set in browser console:
-    localStorage.setItem('gfc-local-beta-bypass','1')
+- Point feedback at a local or staging feedback Worker with `VITE_FEEDBACK_API_URL` (defaults to https://feedback.gfcweather.com). See `docs/operations/beta-feedback.md`.
+
+- Dev-only: `?localBetaBypass=1` on localhost skips the Terms/Privacy acceptance modals (used by the E2E suite).
 
 - To enable hosted auth locally, provide Firebase web config via env vars: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID and restart the dev server.
 

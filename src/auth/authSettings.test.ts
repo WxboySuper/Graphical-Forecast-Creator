@@ -7,7 +7,6 @@ import {
   getSettingsSyncError,
   getSettingsUpdateError,
   mergeUserSettingsDocument,
-  readProfileBetaAccess,
   readRemoteSettings,
   type UserSettingsDocument,
 } from './authSettings';
@@ -184,15 +183,6 @@ describe('createProfilePayload', () => {
     expect(createProfilePayload(user, { includeCreatedAt: true })).toEqual(
       expect.objectContaining({ updatedAt: expect.anything(), createdAt: expect.anything() }),
     );
-  });
-});
-
-describe('readProfileBetaAccess', () => {
-  test('reads the beta flag and defaults missing input to false', () => {
-    expect(readProfileBetaAccess({ betaAccess: true })).toBe(true);
-    expect(readProfileBetaAccess({ betaAccess: false })).toBe(false);
-    expect(readProfileBetaAccess({})).toBe(false);
-    expect(readProfileBetaAccess(undefined)).toBe(false);
   });
 });
 

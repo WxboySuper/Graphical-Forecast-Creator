@@ -17,6 +17,10 @@ import { cn } from '../../lib/utils';
 import { NAVBAR_HEIGHT } from '../../lib/uiConstants';
 import { keyboardShortcutKey } from '../../utils/keyboardShortcutKey';
 import { getNavigationKeyboardShortcuts } from '../../config/featureNavigation';
+import { isFeedbackEnabled } from '../../config/feedback';
+import FeedbackDialog from '../Feedback/FeedbackDialog';
+import { FeedbackProvider } from '../Feedback/FeedbackContext';
+import { BetaFeedbackBanner, BetaFeedbackButton } from '../Feedback/BetaFeedbackChrome';
 
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
@@ -115,6 +119,7 @@ export const AppLayout: React.FC = () => {
   const [showDocumentation, setShowDocumentation] = useState(false);
   const [showTermsViewer, setShowTermsViewer] = useState(false);
   const [showPrivacyViewer, setShowPrivacyViewer] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
@@ -134,6 +139,10 @@ export const AppLayout: React.FC = () => {
   // Handler to toggle the visibility of the documentation panel, which is triggered by a button in the navbar. It updates the showDocumentation state to show or hide the documentation side-panel when the button is clicked.
   const toggleDocumentation = useCallback(() => {
     setShowDocumentation(prev => !prev);
+  }, []);
+
+  const openFeedback = useCallback(() => {
+    if (isFeedbackEnabled()) setShowFeedback(true);
   }, []);
 
   // Handlers for ToS modal
@@ -196,6 +205,7 @@ export const AppLayout: React.FC = () => {
 
   return (
     <AppLayoutContext.Provider value={{ addToast }}>
+      <FeedbackProvider openFeedback={openFeedback}>
       <div className={cn('flex min-h-screen flex-col bg-background text-foreground', darkMode && 'dark-mode')}>
         <Navbar 
           onToggleDocumentation={toggleDocumentation}
@@ -204,6 +214,7 @@ export const AppLayout: React.FC = () => {
           onViewPrivacyPolicy={handleViewPrivacyPolicy}
         />
 
+        <BetaFeedbackBanner />
         <AlertBanner />
         
         {/* Documentation side-panel (right-side drawer) */}
@@ -216,10 +227,13 @@ export const AppLayout: React.FC = () => {
         </main>
         
         <ToastManager toasts={toasts} onDismiss={removeToast} />
+        <BetaFeedbackButton />
+        {isFeedbackEnabled() ? <FeedbackDialog open={showFeedback} onOpenChange={setShowFeedback} /> : null}
 
         <TermsViewer show={showTermsViewer} onClose={handleCloseTermsViewer} onAccept={handleViewOnlyToSAccept} />
         <PrivacyViewer show={showPrivacyViewer} onClose={handleClosePrivacyViewer} onAccept={handleViewOnlyPrivacyAccept} />
       </div>
+      </FeedbackProvider>
     </AppLayoutContext.Provider>
   );
 };

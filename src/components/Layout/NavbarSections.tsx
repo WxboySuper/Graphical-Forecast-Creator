@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Crown,
   Sparkles,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -40,6 +41,8 @@ import {
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../auth/AuthProvider';
+import { isFeedbackEnabled } from '../../config/feedback';
+import { useFeedback } from '../Feedback/FeedbackContext';
 import { getVisibleNavigationItems, type AppNavigationItemId } from '../../config/featureNavigation';
 import type { LucideIcon } from 'lucide-react';
 declare const __GFC_APP_VERSION__: string;
@@ -206,6 +209,7 @@ const MoreActionsMenu: FC<{
   const openExternalLink = (href: string) => {
     window.open(href, '_blank', 'noopener,noreferrer');
   };
+  const { openFeedback } = useFeedback();
 
   return (
     <DropdownMenu>
@@ -227,6 +231,12 @@ const MoreActionsMenu: FC<{
           <HelpCircle className="h-4 w-4" />
           Documentation
         </DropdownMenuItem>
+        {isFeedbackEnabled() ? (
+          <DropdownMenuItem onSelect={openFeedback}>
+            <MessageSquarePlus className="h-4 w-4" />
+            Send feedback
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
           <NavLink to="/updates">
             <Sparkles className="h-4 w-4" />

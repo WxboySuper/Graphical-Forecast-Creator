@@ -150,7 +150,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -201,7 +200,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "error",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -304,7 +302,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -379,7 +376,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "loading",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -509,7 +505,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",

@@ -22,14 +22,6 @@ jest.mock('./pages/PricingPage', () => ({
 jest.mock('./pages/UpdatesPage', () => ({
   UpdatesPage: () => <div>UpdatesPage Mock</div>,
 }));
-jest.mock('./pages/BetaLandingPage', () => ({
-  __esModule: true,
-  default: () => <div>BetaLandingPage Mock</div>,
-}));
-jest.mock('./pages/BetaInvitePage', () => ({
-  __esModule: true,
-  default: () => <div>BetaInvitePage Mock</div>,
-}));
 jest.mock('./pages/HomePage', () => ({
   __esModule: true,
   default: () => <div>HomePage Mock</div>,
@@ -47,7 +39,6 @@ jest.mock('./components/Layout', () => ({
 
 jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
-jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
   hasAcceptedToS: () => true,
@@ -67,6 +58,17 @@ describe('App Simple', () => {
     });
     expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
   });
+
+  test.each(['/beta', '/beta-access/private-path?t=old-invite-token'])(
+    'sends retired closed-beta link %s to the open home page',
+    (url) => {
+      window.history.pushState({}, '', url);
+      render(<App />);
+      expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
+      window.history.pushState({}, '', '/');
+    },
+  );
 
   test('legacy Forecast redirect preserves search, hash, and existing router state', async () => {
     const DestinationProbe = () => {

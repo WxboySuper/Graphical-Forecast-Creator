@@ -36,7 +36,7 @@ Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
 1. Run `scripts/setup-vps.sh` on the production VPS (creates dirs + cron).
 2. Point production nginx at `server/nginx.conf` (`root` = `/var/www/gfc/current`).
 3. Enable `server/nginx-staging.conf` for `staging-gfc.weatherboysuper.com`.
-4. Ensure GitHub secrets: `PROD_SSH_*`, `BETA_INVITE_PATH`, `BETA_INVITE_TOKEN` (staging uses same invite gate as beta).
+4. Ensure GitHub secrets: `PROD_SSH_*`.
 
 ## Optional timed rollout
 

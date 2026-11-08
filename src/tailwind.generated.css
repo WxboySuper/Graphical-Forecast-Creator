@@ -350,6 +350,9 @@
   .bottom-0 {
     bottom: 0px;
   }
+  .bottom-4 {
+    bottom: calc(var(--spacing) * 4);
+  }
   .bottom-\[100px\] {
     bottom: 100px;
   }
@@ -1929,6 +1932,9 @@
     .hover\:bg-gray-100:hover {
       background-color: var(--color-gray-100);
     }
+    .hover\:bg-muted:hover {
+      background-color: var(--bg-tertiary);
+    }
     .hover\:bg-muted\/40:hover {
       background-color: var(--bg-tertiary);
     }
@@ -2081,6 +2087,12 @@
     }
     .sm\:right-4 {
       right: calc(var(--spacing) * 4);
+    }
+    .sm\:inline {
+      display: inline;
+    }
+    .sm\:max-w-lg {
+      max-width: var(--container-lg);
     }
     .sm\:flex-row {
       flex-direction: row;

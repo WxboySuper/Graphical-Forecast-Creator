@@ -30,9 +30,6 @@ import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
 import PricingPage from './pages/PricingPage';
 import { UpdatesPage } from './pages/UpdatesPage';
-import BetaLandingPage from './pages/BetaLandingPage';
-import BetaInvitePage from './pages/BetaInvitePage';
-import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
@@ -98,8 +95,6 @@ export const ForecastLegacyRedirect = () => {
   );
 };
 
-const BETA_MODE = __GFC_BETA_MODE__;
-
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
   const dispatch = useDispatch();
@@ -164,11 +159,11 @@ const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="beta" element={<BetaLandingPage />} />
-      <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
+      {/* The closed-beta gate is gone; keep old bookmarks and invite links working. */}
+      <Route path="beta" element={<Navigate to="/" replace />} />
+      <Route path="beta-access/*" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
         <Route path="updates" element={<UpdatesPage />} />
-        <Route element={<BetaAccessGuard />}>
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
         <Route path="pricing" element={<PricingPage />} />
@@ -205,9 +200,8 @@ const AppRoutes: React.FC = () => {
           />
         ) : null}
         {buildFeatureGatedRoutes()}
-        </Route>
       </Route>
-      <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
