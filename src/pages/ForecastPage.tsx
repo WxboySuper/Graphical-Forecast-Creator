@@ -86,6 +86,7 @@ import {
 } from './forecastPageController';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../utils/forecastTransfer';
 import { queueProductMetric } from '../utils/productMetrics';
+import { useMesoscaleAutoSave } from '../hooks/useMesoscaleAutoSave';
 export {
   buildMapView,
   dayHasAnyFeatures,
@@ -630,6 +631,7 @@ const useForecastPageWorkspace = ({
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { user } = useAuth();
+  useMesoscaleAutoSave(user?.uid, workspaceId === 'mesoscale');
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
   const { currentCloud, saveCycle, markAsCurrent, clearCurrent } = cloudCycles;
