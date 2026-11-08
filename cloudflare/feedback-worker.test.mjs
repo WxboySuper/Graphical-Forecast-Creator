@@ -56,7 +56,7 @@ class FakeD1 {
     } },
     { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts WHERE window_started'), run: (db, args) => {
       let removed = 0;
-      for (const [key, value] of db.adminAttempts) if (value.window_started + 600000 <= args[0]) { db.adminAttempts.delete(key); removed += 1; }
+      for (const [key, value] of db.adminAttempts) if (value.window_started <= args[0]) { db.adminAttempts.delete(key); removed += 1; }
       return { meta: { changes: removed } };
     } },
     { matches: (sql) => sql.startsWith('DELETE FROM feedback_admin_attempts WHERE key_hash'), run: (db, args) => ({ meta: { changes: Number(db.adminAttempts.delete(args[0])) } }) },

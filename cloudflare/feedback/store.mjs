@@ -32,8 +32,12 @@ export async function readLimitedBody(request) {
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return { tooLarge: true };
   if (!request.body) return { text: '' };
   const reader = request.body.getReader();
-  const result = await readChunks(reader);
-  reader.releaseLock();
+  let result;
+  try {
+    result = await readChunks(reader);
+  } finally {
+    reader.releaseLock();
+  }
   if (result.tooLarge) return result;
   const { chunks, size } = result;
   const bytes = new Uint8Array(size);

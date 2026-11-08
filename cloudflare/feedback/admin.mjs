@@ -4,6 +4,7 @@ import { isCategory, isTarget, validateCursor, validatePageLimit, validateSince 
 
 // Explicit columns: the salted user hash is never exposed; email is present only when the user consented to contact.
 const PUBLIC_COLUMNS = 'id, created_at, email, category, message, page, app_version, build_target, plan, viewport, status, discord_status, user_agent';
+const ATTEMPT_WINDOW_MS = 600000;
 const STATUSES = new Set(['new', 'triaged', 'resolved', 'wontfix']);
 const unauthorized = () => json({ error: 'Authentication required' }, 401);
 const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
@@ -24,7 +25,7 @@ async function throttleRetry(db, key, now) {
 
 async function recordFailure(db, key, now) {
   // Expired windows from other keys are removed here so attacker-chosen addresses cannot accumulate.
-  await db.prepare('DELETE FROM feedback_admin_attempts WHERE window_started + 600000 <= ?').bind(now).run();
+  await db.prepare('DELETE FROM feedback_admin_attempts WHERE window_started <= ?').bind(now - ATTEMPT_WINDOW_MS).run();
   await db.prepare('INSERT INTO feedback_admin_attempts (key_hash, window_started, attempts) VALUES (?, ?, 1) ON CONFLICT(key_hash) DO UPDATE SET window_started = CASE WHEN window_started + 600000 <= excluded.window_started THEN excluded.window_started ELSE window_started END, attempts = CASE WHEN window_started + 600000 <= excluded.window_started THEN 1 ELSE attempts + 1 END').bind(key, now).run();
 }
 

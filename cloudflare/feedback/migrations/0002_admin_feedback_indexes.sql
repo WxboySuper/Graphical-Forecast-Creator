@@ -7,3 +7,4 @@ CREATE TABLE feedback_admin_attempts (
   window_started INTEGER NOT NULL,
   attempts INTEGER NOT NULL CHECK (attempts >= 0)
 );
+CREATE INDEX feedback_admin_attempts_window_idx ON feedback_admin_attempts(window_started);
