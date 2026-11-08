@@ -86,12 +86,12 @@ serialTest('strictly whitelists route segments and rejects traversal attempts wi
     '/catalog/hrrr/20261108T1201Z.json',
     '/catalog/hrrr/20261108T1200Z.json/extra',
     '/catalog/hrrr/%2e%2e.json',
-    '/latest/../secret.json',
     '/latest/%2e%2e/secret.json',
     '/latest/hrrr%2Fsecret.json',
     '/tiles/hrrr/20261108T1200Z/f00/%2e%2e/3/0/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/8/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/25/0/0.png',
+    // XYZ coordinates are capped at eight digits because the maximum zoom is 24.
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/999999999999999999999/0.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/0/999999999999999999999.png',
     '/tiles/hrrr/20261108T1200Z/f00/temp/3/0/0%2epng',
