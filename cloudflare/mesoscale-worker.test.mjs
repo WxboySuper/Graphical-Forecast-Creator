@@ -8,7 +8,6 @@ const envFor = (objects = {}, overrides = {}) => ({
     get: async (key) => {
       const value = objects[key];
       if (value === undefined) return null;
-      if (value instanceof Response) return { body: value.body, json: () => value.json(), httpEtag: '"obj-1"', httpMetadata: { contentType: 'application/json' } };
       return { json: async () => structuredClone(value), body: new Blob([JSON.stringify(value)]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
     },
   },
