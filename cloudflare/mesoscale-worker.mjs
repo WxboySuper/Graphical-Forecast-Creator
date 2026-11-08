@@ -409,28 +409,31 @@ const canReadMesoscaleObject = (bucket, headOnly) => {
   return typeof bucket.get === 'function';
 };
 
+const readMesoscaleObject = (bucket, route, headOnly) =>
+  headOnly ? bucket.head(route.key) : bucket.get(route.key);
+
+const catalogHeadResponse = (context, object) => {
+  const { headers, etag } = headersForObject(context.route, object);
+  try {
+    publicBaseUrl(context.env);
+    const publicEtag = publicRepresentationEtag(etag, context.env);
+    if (publicEtag) headers.set('ETag', publicEtag);
+  } catch {
+    return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
+  }
+  headers.set('Content-Type', 'application/json; charset=utf-8');
+  return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(null, { headers });
+};
+
 const getObjectResponse = async (context) => {
   const bucket = context.env.MESOSCALE_BUCKET;
   if (!bucket) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const headOnly = isTileHead(context) || isCatalogHead(context);
   if (!canReadMesoscaleObject(bucket, headOnly)) return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
-  let object;
   // R2 bindings provide head(); get() is a compatibility fallback for test/custom bindings that do not.
-  if (headOnly) object = await bucket.head(context.route.key);
-  else object = await bucket.get(context.route.key);
+  const object = await readMesoscaleObject(bucket, context.route, headOnly);
   if (!object) return missingObjectResponse(context.route);
-  if (context.route.kind === 'catalog' && isCatalogHead(context)) {
-    const { headers, etag } = headersForObject(context.route, object);
-    try {
-      publicBaseUrl(context.env);
-      const publicEtag = publicRepresentationEtag(etag, context.env);
-      if (publicEtag) headers.set('ETag', publicEtag);
-    } catch {
-      return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
-    }
-    headers.set('Content-Type', 'application/json; charset=utf-8');
-    return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(null, { headers });
-  }
+  if (isCatalogHead(context)) return catalogHeadResponse(context, object);
   return responseForObject({ ...context, object });
 };
 
