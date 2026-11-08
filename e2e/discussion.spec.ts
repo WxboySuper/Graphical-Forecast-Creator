@@ -11,7 +11,7 @@ test.describe('Discussion workflow', () => {
     await prepareAppState(page);
   });
 
-  test('keeps the standalone day discussion route usable on a portrait phone', async ({ page }) => {
+  test('opens the in-workspace discussion on a portrait phone through the legacy route', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/discussion');
 
@@ -38,7 +38,7 @@ test.describe('Discussion workflow', () => {
     await expect(page).toHaveURL('/forecast/severe');
 
     await navigateToDiscussion(page);
-    await expect(page).toHaveURL('/discussion');
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     const scope = page.getByRole('combobox', { name: 'Discussion scope' });
     const editor = page.locator('textarea.diy-textarea');
     await expect(scope).toBeVisible();

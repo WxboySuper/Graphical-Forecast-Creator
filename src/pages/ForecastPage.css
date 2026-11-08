@@ -18,6 +18,8 @@
   overflow: hidden;
 }
 
+.discussion-page--embedded { width: 100%; }
+
 .forecast-page-shell--auto-tstm-disabled [data-testid='auto-tstm-disabled-banner'] {
   flex: 0 0 auto;
 }

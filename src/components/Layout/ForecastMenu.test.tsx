@@ -38,9 +38,9 @@ const forecastItem = { id: 'forecast', to: '/forecast', label: 'Forecast', short
 const discussionItem = { id: 'discussion', to: '/discussion', label: 'Discussion' } as AppNavigationItemWithId;
 const icons = { forecast: MapIcon, discussion: MessageSquare } as unknown as Record<AppNavigationItemId, typeof MapIcon>;
 
-const renderMenu = (pathname: string) => render(
-  <MemoryRouter initialEntries={[pathname]}>
-    <ForecastNavigationMenu item={forecastItem} pathname={pathname} otherItems={[discussionItem]} icons={icons} />
+const renderMenu = (pathname: string, search = '') => render(
+  <MemoryRouter initialEntries={[`${pathname}${search}`]}>
+    <ForecastNavigationMenu item={forecastItem} pathname={pathname} search={search} otherItems={pathname === '/discussion' ? [] : [discussionItem]} icons={icons} />
   </MemoryRouter>,
 );
 
@@ -69,10 +69,17 @@ describe('ForecastNavigationMenu', () => {
     }
   });
 
-  test('keeps secondary destinations reachable and reports Discussion as the current page', () => {
+  test('routes legacy Discussion through the Forecast workspace menu context', () => {
     renderMenu('/discussion');
 
-    expect(screen.getByRole('link', { name: 'Discussion' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Discussion' })).not.toBeInTheDocument();
     expect(screen.queryByText('Current')).not.toBeInTheDocument();
+  });
+
+  test('recognizes a workspace hint after the legacy Discussion handoff', () => {
+    renderMenu('/forecast/custom', '?surface=discussion&workspace=custom');
+
+    expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' })).toBeInTheDocument();
   });
 });
