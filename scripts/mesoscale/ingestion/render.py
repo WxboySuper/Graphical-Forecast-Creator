@@ -256,7 +256,7 @@ def matching_coordinates(u: dict, v: dict, np) -> bool:
 
 def decode_range(request: DecodeRequest):
     content, field_ids, offset, ranged, digest = request.content, request.field_ids, request.offset, request.ranged, request.digest
-    from eccodes import codes_get, codes_get_values, codes_grib_new_from_file, codes_grib_multi_support_off, codes_grib_multi_support_on, codes_release
+    from eccodes import codes_grib_new_from_file, codes_grib_multi_support_off, codes_grib_multi_support_on, codes_release
     path = write_temp_content(content)
     codes_grib_multi_support_on()
     try:
