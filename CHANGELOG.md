@@ -48,6 +48,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 - **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
 - **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
+- **Cities in outlooks:** List the cities inside the active outlook in the beta population estimate dialog, using a bundled public-domain places dataset.
 - **KMZ/KML export:** Add a beta export prototype for forecast products.
 
 #### Changed
