@@ -78,3 +78,6 @@ night-watch.config.json
 
 # Ephemeral OpenCode CI review artifacts
 /.opencode-pr-review/
+# Python bytecode from the mesoscale ingestion tools
+__pycache__/
+*.py[cod]
