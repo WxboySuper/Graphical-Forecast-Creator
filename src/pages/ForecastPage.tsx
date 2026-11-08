@@ -767,6 +767,17 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
       return 'tabs';
     }
   });
+  const [discussionPanelWidth, setDiscussionPanelWidth] = useState(() => {
+    try {
+      const savedWidth = Number(localStorage.getItem('gfc-severe-discussion-panel-width'));
+      return Number.isFinite(savedWidth) && savedWidth >= 320 && savedWidth <= 800 ? savedWidth : 640;
+    } catch {
+      return 640;
+    }
+  });
+  const [discussionPanelCollapsed, setDiscussionPanelCollapsed] = useState(false);
+  const [resizingDiscussionPanel, setResizingDiscussionPanel] = useState(false);
+  const discussionPanelResizeRef = useRef({ pointerX: 0, width: discussionPanelWidth });
   const requestedSurface = searchParams.get('surface');
   const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(
     requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map',
@@ -780,6 +791,26 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     window.addEventListener('gfc-open-severe-discussion', openDiscussion);
     return () => window.removeEventListener('gfc-open-severe-discussion', openDiscussion);
   }, []);
+  useEffect(() => {
+    try { localStorage.setItem('gfc-severe-discussion-panel-width', String(discussionPanelWidth)); } catch { /* Keep this preference optional when storage is unavailable. */ }
+  }, [discussionPanelWidth]);
+  useEffect(() => {
+    if (!resizingDiscussionPanel) return undefined;
+    const handlePointerMove = (event: PointerEvent) => {
+      const nextWidth = Math.max(320, Math.min(800, discussionPanelResizeRef.current.width + discussionPanelResizeRef.current.pointerX - event.clientX));
+      discussionPanelResizeRef.current = { pointerX: event.clientX, width: nextWidth };
+      setDiscussionPanelWidth(nextWidth);
+    };
+    const stopResizing = () => setResizingDiscussionPanel(false);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', stopResizing, { once: true });
+    window.addEventListener('pointercancel', stopResizing, { once: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', stopResizing);
+      window.removeEventListener('pointercancel', stopResizing);
+    };
+  }, [resizingDiscussionPanel]);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
@@ -894,6 +925,7 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
               <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
                 <button type="button" aria-pressed={discussionLayout === 'tabs'} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
                 <button type="button" aria-pressed={discussionLayout === 'panel'} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
+                {discussionLayout === 'panel' ? <button type="button" aria-expanded={!discussionPanelCollapsed} onClick={() => setDiscussionPanelCollapsed((collapsed) => !collapsed)}>{discussionPanelCollapsed ? 'Show panel' : 'Hide panel'}</button> : null}
               </div>
             </div>
             <div className="severe-workspace__content">
@@ -902,8 +934,29 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
                   <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
                 </div>
               ) : null}
-              {discussionLayout === 'panel' && surface !== 'review' ? (
-                <aside className="severe-workspace__discussion" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></aside>
+              {discussionLayout === 'panel' && surface !== 'review' && !discussionPanelCollapsed ? (
+                <>
+                  <div
+                    className="severe-workspace__splitter"
+                    role="separator"
+                    aria-label="Resize discussion panel"
+                    aria-orientation="vertical"
+                    aria-valuemin={320}
+                    aria-valuemax={800}
+                    aria-valuenow={discussionPanelWidth}
+                    tabIndex={0}
+                    onPointerDown={(event) => {
+                      discussionPanelResizeRef.current = { pointerX: event.clientX, width: discussionPanelWidth };
+                      setResizingDiscussionPanel(true);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+                      event.preventDefault();
+                      setDiscussionPanelWidth((width) => Math.max(320, Math.min(800, width + (event.key === 'ArrowLeft' ? 24 : -24))));
+                    }}
+                  />
+                  <aside className="severe-workspace__discussion" style={{ width: discussionPanelWidth, flexBasis: discussionPanelWidth }} aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></aside>
+                </>
               ) : surface === 'discussion' ? (
                 <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></section>
               ) : surface === 'review' ? (

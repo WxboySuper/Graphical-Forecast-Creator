@@ -36,11 +36,28 @@ test.describe('Severe discussion workspace layouts', () => {
   });
 
   test('persists the layout choice and allows a query override', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/forecast/severe');
     await page.getByRole('button', { name: 'Side panel' }).click();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
+    const splitter = page.getByRole('separator', { name: 'Resize discussion panel' });
+    await splitter.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(splitter).toHaveAttribute('aria-valuenow', '664');
+    const bounds = await splitter.boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.mouse.move(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds!.x + bounds!.width / 2 - 80, bounds!.y + bounds!.height / 2);
+    await page.mouse.up();
+    await expect(splitter).toHaveAttribute('aria-valuenow', '744');
+    await page.getByRole('button', { name: 'Hide panel' }).click();
+    await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Show panel' }).click();
+    await expect(page.getByRole('complementary', { name: 'Forecast discussion' })).toBeVisible();
     await page.reload();
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--panel/);
+    await expect(page.getByRole('separator', { name: 'Resize discussion panel' })).toHaveAttribute('aria-valuenow', '744');
     await page.goto('/forecast/severe?discussionLayout=tabs');
     await expect(page.getByTestId('severe-workspace')).toHaveClass(/severe-workspace--tabs/);
   });

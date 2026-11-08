@@ -40,7 +40,7 @@ const icons = { forecast: MapIcon, discussion: MessageSquare } as unknown as Rec
 
 const renderMenu = (pathname: string) => render(
   <MemoryRouter initialEntries={[pathname]}>
-    <ForecastNavigationMenu item={forecastItem} pathname={pathname} otherItems={[discussionItem]} icons={icons} />
+    <ForecastNavigationMenu item={forecastItem} pathname={pathname} search="" otherItems={[discussionItem]} icons={icons} />
   </MemoryRouter>,
 );
 

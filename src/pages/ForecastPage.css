@@ -90,9 +90,33 @@
 .severe-workspace__map > * { width: 100%; min-width: 0; }
 .severe-workspace--tabs .severe-workspace__map.is-hidden { display: none; }
 
+.severe-workspace__splitter {
+  z-index: 1;
+  flex: 0 0 0.65rem;
+  margin-inline: -0.325rem;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.severe-workspace__splitter::after {
+  display: block;
+  width: 2px;
+  height: 100%;
+  margin-inline: auto;
+  background: transparent;
+  content: '';
+}
+
+.severe-workspace__splitter:hover::after,
+.severe-workspace__splitter:focus-visible::after { background: var(--ring); }
+.severe-workspace__splitter:focus-visible { outline: none; }
+.severe-workspace:has(.severe-workspace__splitter:active) { cursor: col-resize; user-select: none; }
+
 .severe-workspace__discussion {
   display: flex;
-  flex: 0 1 42rem;
+  flex: 0 0 auto;
   min-width: 22rem;
   min-height: 0;
   overflow: hidden;
@@ -105,6 +129,7 @@
 .severe-workspace__review > section { max-width: 72rem; margin-inline: auto; }
 
 @media (max-width: 900px) {
+  .severe-workspace__splitter { display: none; }
   .severe-workspace--panel .severe-workspace__discussion { display: none; }
   .severe-workspace--panel .severe-workspace__map { flex: 1 1 100%; }
   .severe-workspace--panel:has(.severe-workspace__navigation [aria-selected='true'][role='tab']:nth-child(2)) .severe-workspace__discussion { display: flex; flex: 1 1 100%; }
