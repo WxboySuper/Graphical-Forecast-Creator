@@ -19,7 +19,7 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual((t2m.start, t2m.end, t2m.size), (35958451, 37196037, 1237587))
 
     def test_allowlist_requires_exact_level(self):
-        selected = resolve_allowlist(parse_idx(FIXTURE_PATH.read_text(encoding="ascii")), 136859480, {"t2m": {"parameter": "TMP", "level": "2 m above ground", "step": "anl"}, "wrong": {"parameter": "TMP", "level": "surface"}})
+        selected = resolve_allowlist(parse_idx(FIXTURE_PATH.read_text(encoding="ascii")), 136859480, {"t2m": {"parameter": "TMP", "level": "2 m above ground", "step": "anl"}, "wrong": {"parameter": "TMP", "level": "3 m above ground"}})
         self.assertEqual(selected["t2m"][0]["range"], {"start": 35958451, "end": 37196037})
         self.assertEqual(selected["wrong"], [])
 
