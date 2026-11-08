@@ -125,8 +125,15 @@ const publicBaseUrl = (env) => {
   const value = typeof env.PUBLIC_BASE_URL === 'string' ? env.PUBLIC_BASE_URL.trim() : '';
   if (!value) throw new Error('PUBLIC_BASE_URL is required');
   const base = new URL(value);
-  if (base.protocol !== 'https:') throw new Error('PUBLIC_BASE_URL must use HTTPS');
-  if (base.pathname !== '/' || base.search || base.hash || base.username || base.password) throw new Error('PUBLIC_BASE_URL must be an origin without a path');
+  const originOnly = [
+    base.protocol === 'https:',
+    base.pathname === '/',
+    !base.search,
+    !base.hash,
+    !base.username,
+    !base.password,
+  ].every(Boolean);
+  if (!originOnly) throw new Error('PUBLIC_BASE_URL must be an HTTPS origin without credentials or a path');
   return base;
 };
 
