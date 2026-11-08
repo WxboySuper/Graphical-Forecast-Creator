@@ -23,4 +23,3 @@ export const isValidCatalogDomain = (value: unknown): boolean => {
   if (!isRecord(value)) return false;
   return validateCatalogDomainFields(value);
 };
-
