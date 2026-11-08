@@ -442,12 +442,14 @@ test('malformed catalog and pointer JSON produce explicit gateway errors', async
 });
 
 test('status labels malformed pointer JSON as invalid instead of missing', async () => {
-  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { size: 5 * 1024 * 1024, json: async () => { throw new SyntaxError('invalid'); } } : null } });
+  let parsedMalformedPointer = false;
+  const env = envFor({}, { MESOSCALE_BUCKET: { get: async (key) => key === 'mesoscale/v1/latest/hrrr.json' ? { size: 16, json: async () => { parsedMalformedPointer = true; throw new SyntaxError('invalid'); } } : null } });
   await withNow('2026-11-08T15:01:00Z', async () => {
     const response = await worker.fetch(request('/status'), env);
     const body = await response.json();
     assert.equal(body.models.find((model) => model.modelId === 'hrrr').health, 'invalid');
   });
+  assert.equal(parsedMalformedPointer, true);
 });
 
 test('status labels parsed records with missing required fields as invalid', async () => {
