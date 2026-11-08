@@ -232,6 +232,89 @@
   background: rgb(96, 165, 250);
 }
 
+/*
+ * Short viewports (landscape phones) have no spare height. While the map shows,
+ * the switcher floats over the map's top-right corner instead of taking a row, so
+ * the map keeps its full height. Other surfaces have no map to protect, so the bar
+ * stays in the page flow there.
+ */
+@media (max-height: 520px) {
+  .severe-workspace {
+    position: relative;
+  }
+
+  .severe-workspace[data-surface='map'] .severe-workspace__bar {
+    position: absolute;
+    z-index: 5;
+    top: 8px;
+    left: 56px;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .severe-workspace[data-surface='map'] .severe-workspace__tabs {
+    width: auto;
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+  }
+
+  /* Icon-only while floating; the labels stay available to assistive technology. */
+  .severe-workspace[data-surface='map'] .severe-workspace__tab {
+    flex: none;
+    padding: 0 8px;
+  }
+
+  .severe-workspace[data-surface='map'] .severe-workspace__tabIcon {
+    display: block;
+  }
+
+  .severe-workspace[data-surface='map'] .severe-workspace__tab span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .severe-workspace[data-surface='map'] .severe-workspace__layout {
+    display: none;
+  }
+
+  .severe-workspace__tabs,
+  .severe-workspace__segments {
+    padding: 2px;
+    border-radius: 10px;
+  }
+
+  .severe-workspace__tab,
+  .severe-workspace__segment {
+    min-height: 28px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .severe-workspace__tab,
+  .severe-workspace__segment,
+  .severe-workspace__splitter::after {
+    transition: none;
+  }
+}
+
+.dark-mode .severe-workspace__tab:focus-visible,
+.dark-mode .severe-workspace__segment:focus-visible {
+  outline-color: rgb(96, 165, 250);
+}
+
+.dark-mode .severe-workspace__splitter:hover::after,
+.dark-mode .severe-workspace__splitter:focus-visible::after {
+  background: rgb(96, 165, 250);
+}
+
 /* Short viewports (landscape phones): keep the control bar thin so the map keeps its height. */
 @media (max-height: 520px) {
   .severe-workspace__bar {

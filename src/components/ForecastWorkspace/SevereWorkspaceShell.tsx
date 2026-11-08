@@ -61,6 +61,7 @@ const SurfaceTabs: React.FC<{ surface: WorkspaceSurface; onChange: (next: Worksp
         type="button"
         role="tab"
         className="severe-workspace__tab"
+        title={label}
         tabIndex={surface === id ? 0 : -1}
         aria-selected={surface === id}
         onClick={() => onChange(id)}
