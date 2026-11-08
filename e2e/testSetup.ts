@@ -19,4 +19,6 @@ export const navigateToSevereForecast = async (page: Page): Promise<void> => {
 export const navigateToDiscussion = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: /^Forecast menu(?:,|$)/ }).click();
   await page.getByRole('menuitem', { name: 'Discussion', exact: true }).click();
+  await page.waitForURL(/\/forecast\/severe\?.*surface=discussion/);
+  await page.getByRole('heading', { name: 'Forecast Discussion' }).waitFor();
 };

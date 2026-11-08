@@ -59,8 +59,9 @@ const getCurrentForecastWorkspace = (
 ): ForecastWorkspaceDefinition | undefined =>
   workspaces.find((workspace) => pathname === workspace.path || pathname.startsWith(`${workspace.path}/`));
 
-const isDiscussionRoute = (pathname: string): boolean =>
-  pathname === '/discussion' || pathname.startsWith('/discussion/');
+const isDiscussionRoute = (pathname: string, search: string): boolean =>
+  pathname === '/discussion' || pathname.startsWith('/discussion/')
+  || (pathname === '/forecast/severe' && new URLSearchParams(search).get('surface') === 'discussion');
 
 const getOtherDestinationLabel = (item: AppNavigationItemWithId): string =>
   item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
@@ -138,6 +139,9 @@ const OtherDestinationRow: FC<{
       <NavLink
         to={item.to}
         end={item.end}
+        onClick={() => {
+          if (item.id === 'discussion') window.dispatchEvent(new Event('gfc-open-severe-discussion'));
+        }}
         aria-label={getOtherDestinationLabel(item)}
         aria-current={isNavigationItemActive(pathname, item.to, item.end) ? 'page' : undefined}
         className="forecast-menu__other"
@@ -157,18 +161,19 @@ const MenuHeading: FC<{ children: string }> = ({ children }) => (
 export const ForecastNavigationMenu: FC<{
   item: AppNavigationItemWithId;
   pathname: string;
+  search: string;
   otherItems: AppNavigationItemWithId[];
   icons: Record<AppNavigationItemId, LucideIcon>;
-}> = ({ item, pathname, otherItems, icons }) => {
+}> = ({ item, pathname, search, otherItems, icons }) => {
   const workspaces = getExposedForecastWorkspaces();
   const comingSoon = FORECAST_WORKSPACES.filter(
     (workspace) => workspace.status === 'future' && !isForecastWorkspaceExposed(workspace),
   );
   const currentWorkspace = getCurrentForecastWorkspace(pathname, workspaces);
-  const currentDiscussion = isDiscussionRoute(pathname);
+  const currentDiscussion = isDiscussionRoute(pathname, search);
   const isActive = isNavigationItemActive(pathname, item.to, item.end) || currentDiscussion;
   const TabIcon = icons[item.id];
-  const currentPageLabel = currentWorkspace?.label ?? (currentDiscussion ? 'Discussion' : undefined);
+  const currentPageLabel = currentDiscussion ? 'Discussion' : currentWorkspace?.label;
 
   return (
     <DropdownMenu>

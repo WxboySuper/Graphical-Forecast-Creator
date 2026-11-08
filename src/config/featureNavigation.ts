@@ -20,7 +20,7 @@ export type AppNavigationItem = {
 const RAW_APP_NAVIGATION_ITEMS = [
   { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
   { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },
-  { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
+  { id: 'discussion', to: '/forecast/severe?surface=discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
   { id: 'verification', to: '/verification', label: 'Verification', shortcutKey: '3', shortcutLabel: '⌃3' },
   { id: 'monitor', to: '/monitor', label: 'Monitor', shortcutKey: '4', shortcutLabel: '⌃4' },
   {

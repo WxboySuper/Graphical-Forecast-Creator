@@ -6,9 +6,9 @@
  * persistence services stay in their own modules; this page coordinates them
  * for the active forecast route and translates outcomes into UI feedback.
  */
-import React, { useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, useOutletContext } from 'react-router';
+import { useLocation, useNavigate, useOutletContext } from 'react-router';
 import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { Dispatch, UnknownAction } from 'redux';
 import { ForecastMapHandle } from '../components/Map/ForecastMap';
@@ -65,6 +65,11 @@ import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
+
+const EmbeddedDiscussionPage = React.lazy(() =>
+  import('./DiscussionPage').then((module) => ({ default: module.DiscussionPage })),
+);
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -751,6 +756,30 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     dispatch(setForecastWorkspace(workspaceId));
   }, [dispatch, workspaceId]);
   const navigate = useNavigate();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const [discussionLayout, setDiscussionLayout] = useState<'tabs' | 'panel'>(() => {
+    const forced = new URLSearchParams(window.location.search).get('discussionLayout');
+    if (forced === 'tabs' || forced === 'panel') return forced;
+    try {
+      return localStorage.getItem('gfc-severe-discussion-layout') === 'panel' ? 'panel' : 'tabs';
+    } catch {
+      return 'tabs';
+    }
+  });
+  const requestedSurface = searchParams.get('surface');
+  const [surface, setSurface] = useState<'map' | 'discussion' | 'review'>(
+    requestedSurface === 'discussion' || requestedSurface === 'review' ? requestedSurface : 'map',
+  );
+  useEffect(() => {
+    const nextSurface = new URLSearchParams(location.search).get('surface');
+    setSurface(nextSurface === 'discussion' || nextSurface === 'review' ? nextSurface : 'map');
+  }, [location.search]);
+  useEffect(() => {
+    const openDiscussion = () => setSurface('discussion');
+    window.addEventListener('gfc-open-severe-discussion', openDiscussion);
+    return () => window.removeEventListener('gfc-open-severe-discussion', openDiscussion);
+  }, []);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
@@ -793,6 +822,17 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
+  const updateSurface = (next: 'map' | 'discussion' | 'review') => {
+    setSurface(next);
+    const nextParams = new URLSearchParams(searchParams);
+    if (next === 'map') nextParams.delete('surface');
+    else nextParams.set('surface', next);
+    navigate({ pathname: location.pathname, search: nextParams.toString() ? `?${nextParams.toString()}` : '', hash: location.hash });
+  };
+  const updateDiscussionLayout = (next: 'tabs' | 'panel') => {
+    setDiscussionLayout(next);
+    try { localStorage.setItem('gfc-severe-discussion-layout', next); } catch { /* Keep this preference optional when storage is unavailable. */ }
+  };
   const forecastCycle = useSelector(selectForecastCycle);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { handleSave } = useForecastFileActions(
@@ -835,13 +875,45 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
         </div>
       ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
-        <ForecastTabbedToolbarLayout
-          mapRef={mapRef}
-          controller={workspaceController}
-          autoTstmTools={autoTstmTools}
-          tstmPreviewFeatures={tstmPreviewFeatures}
-          workspaceId={workspaceId}
-        />
+        {workspaceId === 'severe' ? (
+          <div className={`severe-workspace severe-workspace--${discussionLayout}`} data-testid="severe-workspace">
+            <div className="severe-workspace__navigation" role="tablist" aria-label="Severe forecast workspace" onKeyDown={(event) => {
+              const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+              const activeIndex = tabs.findIndex((tab) => tab.getAttribute('aria-selected') === 'true');
+              const nextIndex = event.key === 'ArrowRight' ? (activeIndex + 1) % tabs.length
+                : event.key === 'ArrowLeft' ? (activeIndex - 1 + tabs.length) % tabs.length
+                  : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+              if (nextIndex < 0) return;
+              event.preventDefault();
+              tabs[nextIndex]?.focus();
+              tabs[nextIndex]?.click();
+            }}>
+              <button role="tab" tabIndex={surface === 'map' ? 0 : -1} aria-selected={surface === 'map'} onClick={() => updateSurface('map')}>Map</button>
+              <button role="tab" tabIndex={surface === 'discussion' ? 0 : -1} aria-selected={surface === 'discussion'} onClick={() => updateSurface('discussion')}>Discussion</button>
+              <button role="tab" tabIndex={surface === 'review' ? 0 : -1} aria-selected={surface === 'review'} onClick={() => updateSurface('review')}>Review / Export</button>
+              <div className="severe-workspace__layout-choice" aria-label="Discussion layout">
+                <button type="button" aria-pressed={discussionLayout === 'tabs'} onClick={() => updateDiscussionLayout('tabs')}>Tabs</button>
+                <button type="button" aria-pressed={discussionLayout === 'panel'} onClick={() => updateDiscussionLayout('panel')}>Side panel</button>
+              </div>
+            </div>
+            <div className="severe-workspace__content">
+              {surface !== 'review' ? (
+                <div className={`severe-workspace__map${discussionLayout === 'tabs' && surface === 'discussion' ? ' is-hidden' : ''}`}>
+                  <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />
+                </div>
+              ) : null}
+              {discussionLayout === 'panel' && surface !== 'review' ? (
+                <aside className="severe-workspace__discussion" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></aside>
+              ) : surface === 'discussion' ? (
+                <section className="severe-workspace__discussion severe-workspace__discussion--tab" role="tabpanel" aria-label="Forecast discussion"><React.Suspense fallback={<div role="status">Loading discussion…</div>}><EmbeddedDiscussionPage embedded /></React.Suspense></section>
+              ) : surface === 'review' ? (
+                <section className="severe-workspace__review" role="tabpanel" aria-label="Review and export">
+                  <ForecastWorkflowPanel controller={workspaceController} />
+                </section>
+              ) : null}
+            </div>
+          </div>
+        ) : <ForecastTabbedToolbarLayout mapRef={mapRef} controller={workspaceController} autoTstmTools={autoTstmTools} tstmPreviewFeatures={tstmPreviewFeatures} workspaceId={workspaceId} />}
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />
       <DayRolloverDialog

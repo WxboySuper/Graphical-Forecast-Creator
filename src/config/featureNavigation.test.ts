@@ -59,7 +59,7 @@ describe('featureNavigation', () => {
     shortcuts['1']();
     expect(navigate).toHaveBeenLastCalledWith('/forecast');
     shortcuts['2']();
-    expect(navigate).toHaveBeenLastCalledWith('/discussion');
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?surface=discussion');
   });
 
   test('declares every navigation item with a stable id', () => {

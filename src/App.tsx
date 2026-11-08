@@ -54,9 +54,6 @@ import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWor
 const ForecastPage = lazyWithReload('forecast', () =>
   import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
 );
-const DiscussionPage = lazyWithReload('discussion', () =>
-  import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage }))
-);
 const VerificationPage = lazyWithReload('verification', () =>
   import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
 );
@@ -96,6 +93,14 @@ export const ForecastLegacyRedirect = () => {
       replace
     />
   );
+};
+
+/** Sends legacy Discussion links into Severe with their discussion scope and URL state intact. */
+export const DiscussionLegacyRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.set('surface', 'discussion');
+  return <Navigate to={{ pathname: '/forecast/severe', search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
 };
 
 const BETA_MODE = __GFC_BETA_MODE__;
@@ -191,7 +196,7 @@ const AppRoutes: React.FC = () => {
             />
           ))}
         </Route>
-        <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
+        <Route path="discussion" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
         {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (

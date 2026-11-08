@@ -468,13 +468,15 @@ const useDiscussionScopeSync = (options: {
   }, [currentDay, discussionDay, dispatch]);
   useEffect(() => {
     if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
-      setSearchParams({ group: selectedGroupingId }, { replace: true });
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', selectedGroupingId);
+      setSearchParams(nextParams, { replace: true });
     }
   }, [hasActiveWorkflow, searchParams, selectedGroupingId, setSearchParams]);
 };
 
 /** The DiscussionPage component is the main forecast discussion workflow surface. */
-export const DiscussionPage: React.FC = () => {
+export const DiscussionPage: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -521,7 +523,7 @@ export const DiscussionPage: React.FC = () => {
     dispatch,
     addToast,
     user,
-    onSaved: () => navigate('/forecast'),
+    onSaved: () => { if (!embedded) navigate('/forecast/severe?surface=map'); },
   });
 
   const { handleCombine: handleCombineGroupings, handleReset: handleResetGroupings } = useDiscussionGroupingActions({
@@ -538,11 +540,15 @@ export const DiscussionPage: React.FC = () => {
     if (!nextGrouping) return;
     editorState.persistDraft();
     dispatch(setForecastDay(getDiscussionOwnerDay(forecastCycle, nextGrouping)));
-    if (hasActiveWorkflow) setSearchParams({ group: groupingId });
-  }, [dispatch, editorState, forecastCycle, groupings, hasActiveWorkflow, setSearchParams]);
+    if (hasActiveWorkflow) {
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('group', groupingId);
+      setSearchParams(nextParams);
+    }
+  }, [dispatch, editorState, forecastCycle, groupings, hasActiveWorkflow, searchParams, setSearchParams]);
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className={`h-full min-h-0 flex flex-col bg-background${embedded ? ' discussion-page--embedded' : ''}`}>
       <ForecastWorkflowPanel context="discussion" />
       <DiscussionHeaderBar
         currentDay={discussionDay}
