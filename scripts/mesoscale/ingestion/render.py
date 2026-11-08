@@ -216,16 +216,34 @@ def combine_wind(field_outputs, np):
 
 
 def require_matching_wind_grids(u: dict, v: dict, np) -> None:
-    if np.shape(u["values"]) != np.shape(v["values"]):
+    if not matching_shapes(u, v, np):
         raise ValueError("10 m U/V wind grids have different shapes")
-    coordinates = ["lats" in item and "lons" in item for item in (u, v)]
-    if not any(coordinates):
+    if not any_wind_coordinates(u, v):
         return
-    if not all(coordinates):
+    if not complete_wind_coordinates(u, v):
         raise ValueError("10 m U/V wind grid coordinates are incomplete")
-    same_coordinates = np.allclose(u["lats"], v["lats"]) and np.allclose(u["lons"], v["lons"])
-    if not same_coordinates:
+    if not matching_coordinates(u, v, np):
         raise ValueError("10 m U/V wind grids are not aligned")
+
+
+def matching_shapes(u: dict, v: dict, np) -> bool:
+    return np.shape(u["values"]) == np.shape(v["values"])
+
+
+def any_wind_coordinates(u: dict, v: dict) -> bool:
+    return has_wind_coordinates(u) or has_wind_coordinates(v)
+
+
+def complete_wind_coordinates(u: dict, v: dict) -> bool:
+    return has_wind_coordinates(u) and has_wind_coordinates(v)
+
+
+def has_wind_coordinates(component: dict) -> bool:
+    return "lats" in component and "lons" in component
+
+
+def matching_coordinates(u: dict, v: dict, np) -> bool:
+    return np.allclose(u["lats"], v["lats"]) and np.allclose(u["lons"], v["lons"])
 
 
 def decode_range(request: DecodeRequest):

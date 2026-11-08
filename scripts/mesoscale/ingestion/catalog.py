@@ -57,11 +57,17 @@ def validate_frame_types(catalog: dict) -> None:
 
 
 def valid_frame_type(frame: dict) -> bool:
-    if not isinstance(frame, dict) or "frameType" not in frame or "forecastHour" not in frame:
+    if not has_frame_identity(frame):
         return False
-    if type(frame["forecastHour"]) is not int or not isinstance(frame["frameType"], str):
+    if type(frame["forecastHour"]) is not int:
+        return False
+    if not isinstance(frame["frameType"], str):
         return False
     return frame["frameType"] == frame_type(frame["forecastHour"])
+
+
+def has_frame_identity(frame: dict) -> bool:
+    return isinstance(frame, dict) and "frameType" in frame and "forecastHour" in frame
 
 
 def frame_type(forecast_hour: int) -> str:
