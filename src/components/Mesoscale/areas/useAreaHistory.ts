@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectMesoscaleAreas, setMesoscaleAreas, type MesoscaleArea } from '../../../store/mesoscaleSlice';
 
@@ -27,7 +27,23 @@ export const useAreaHistory = (): AreaHistory => {
   const areasRef = useRef(areas);
   areasRef.current = areas;
 
-  const apply = useCallback((next: MesoscaleArea[]) => { dispatch(setMesoscaleAreas(next)); setVersion(v => v + 1); }, [dispatch]);
+  // The areas this hook last wrote. A different array means something else replaced the product
+  // (an import, a reset, or restoring a saved session), which makes old undo steps meaningless.
+  const lastWritten = useRef(areas);
+  useEffect(() => {
+    if (areas === lastWritten.current) return;
+    lastWritten.current = areas;
+    past.current = [];
+    future.current = [];
+    lastEdit.current = null;
+    setVersion(v => v + 1);
+  }, [areas]);
+
+  const apply = useCallback((next: MesoscaleArea[]) => {
+    lastWritten.current = next;
+    dispatch(setMesoscaleAreas(next));
+    setVersion(v => v + 1);
+  }, [dispatch]);
 
   const commit = useCallback((next: MesoscaleArea[], coalesceKey?: string) => {
     const now = Date.now();

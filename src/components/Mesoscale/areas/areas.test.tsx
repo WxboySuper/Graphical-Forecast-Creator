@@ -2,7 +2,7 @@ import React from 'react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
-import mesoscaleReducer, { selectMesoscaleState } from '../../../store/mesoscaleSlice';
+import mesoscaleReducer, { createInitialMesoscaleState, replaceMesoscaleProduct, selectMesoscaleState } from '../../../store/mesoscaleSlice';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
 import { isMesoscaleArea } from '../../../utils/mesoscaleAreaValidation';
 import { createArea, isoToUtcInput, newAreaId, utcInputToIso, validateAreaFields } from './areaModel';
@@ -66,6 +66,18 @@ describe('useMesoscaleAreas history', () => {
     expect(result.current.selectedId).not.toBeNull();
     act(() => result.current.undo());
     expect(result.current.selectedId).toBeNull();
+  });
+});
+
+describe('history and external replacement', () => {
+  it('clears undo steps when the product is replaced from outside', () => {
+    const { store, wrapper } = setup();
+    const { result } = renderHook(() => useMesoscaleAreas(), { wrapper });
+    act(() => result.current.addPolygon(polygon));
+    expect(result.current.canUndo).toBe(true);
+    act(() => { store.dispatch(replaceMesoscaleProduct(createInitialMesoscaleState())); });
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.areas).toHaveLength(0);
   });
 });
 
