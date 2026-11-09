@@ -22,6 +22,8 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 | `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
 
+Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v1.8 changelog belongs to the stable release (`changelog-and-prs`).
+
 Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEASE-BETA -f dry_run=false -f deploy_api=true`. Concurrency group `beta-release`. Beta cuts only bump `package.json`; `CHANGELOG.md` is not rewritten.
 
 ### Beta sequence

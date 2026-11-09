@@ -152,7 +152,7 @@ const vertexMarkerStyle = new Style({
 const useActiveVertexMarker = ({ map, areas, selectedId, activeVertex }: Pick<Props, 'map' | 'areas' | 'selectedId'> & { activeVertex: number | null }): void => {
   useEffect(() => {
     const area = areas.find(item => item.id === selectedId);
-    const position = area && activeVertex !== null ? area.geometry.coordinates[0][activeVertex] : undefined;
+    const position = area && activeVertex !== null ? area.geometry.coordinates?.[0]?.[activeVertex] : undefined;
     if (!position) return undefined;
     const layer = new VectorLayer({ source: new VectorSource({ features: [new Feature(new Point(fromLonLat(position)))] }), style: vertexMarkerStyle, zIndex: VERTEX_LAYER_Z_INDEX });
     map.addLayer(layer);

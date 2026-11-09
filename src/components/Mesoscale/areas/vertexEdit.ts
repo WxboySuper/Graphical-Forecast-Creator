@@ -12,7 +12,7 @@ export const NUDGE_STEPS_DEGREES = [0.1, 0.5, 1, 2] as const;
 const MAX_LATITUDE = 90;
 const MAX_LONGITUDE = 180;
 
-const outerVertices = (polygon: Polygon): Position[] => polygon.coordinates[0].slice(0, -1);
+const outerVertices = (polygon: Polygon): Position[] => (polygon.coordinates?.[0] ?? []).slice(0, -1);
 
 const withOuterVertices = (polygon: Polygon, vertices: Position[]): Polygon | null => {
   const next: Polygon = { type: 'Polygon', coordinates: [[...vertices, vertices[0]], ...polygon.coordinates.slice(1)] };

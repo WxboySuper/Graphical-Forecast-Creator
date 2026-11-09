@@ -46,6 +46,14 @@ describe('vertex operations', () => {
     expect(removeVertex(square, 9)).toBeNull();
   });
 
+  it('treats a polygon with no outer ring as having no vertices instead of throwing', () => {
+    const broken = { type: 'Polygon', coordinates: [] } as unknown as Polygon;
+    expect(vertexCount(broken)).toBe(0);
+    expect(moveVertex(broken, 0, { lon: 1, lat: 1 })).toBeNull();
+    expect(removeVertex(broken, 0)).toBeNull();
+    expect(addVertexAfter(broken, 0)).toBeNull();
+  });
+
   it('wraps the active index in both directions', () => {
     expect(nextIndex(3, 4, 1)).toBe(0);
     expect(nextIndex(0, 4, -1)).toBe(3);
