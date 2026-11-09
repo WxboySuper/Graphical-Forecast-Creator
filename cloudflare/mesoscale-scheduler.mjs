@@ -22,6 +22,8 @@ const REQUEST_TIMEOUT_MS = 15000;
  */
 export const JOBS = {
   '12,42 * * * *': [{ workflow: 'mesoscale-ingest.yml' }],
+  // Well after the ingest at :12 has finished, so the check sees the freshly published cycle.
+  '32 * * * *': [{ workflow: 'mesoscale-health.yml' }],
   '23 3,9,15,21 * * *': [
     {
       workflow: 'release-beta.yml',

@@ -6,7 +6,7 @@
   "workers_dev": false,
   "preview_urls": false,
   "triggers": {
-    "crons": ["12,42 * * * *", "23 3,9,15,21 * * *"]
+    "crons": ["12,42 * * * *", "32 * * * *", "23 3,9,15,21 * * *"]
   },
   "vars": {
     "GITHUB_REPOSITORY": "WxboySuper/Graphical-Forecast-Creator",
