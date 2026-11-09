@@ -49,7 +49,13 @@ import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
 import { useMonitorStormReports } from '../monitor/useMonitorStormReports';
 import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { FeatureBoundary } from '../features/FeatureBoundary';
+import { isFeatureExposed } from '../config/featureExposure';
+import type { MesoscaleCatalogParameter, MesoscaleLayerSpec } from '../mesoscale';
+import { setMonitorMesoscaleSettings } from '../store/monitorSlice';
 import './MonitorPage.css';
+
+const MonitorMesoscaleIntegration = React.lazy(() => import('../monitor/components/MonitorMesoscaleIntegration').then((module) => ({ default: module.MonitorMesoscaleIntegration })));
 
 interface PageContext {
   addToast: AddToastFn;
@@ -248,8 +254,14 @@ interface MonitorPageWorkspaceProps {
   dispatch: AppDispatch;
 }
 
+interface MonitorPageWorkspaceViewProps extends MonitorPageWorkspaceProps {
+  mesoscalePanel?: React.ReactNode;
+  mesoscaleLayers?: MesoscaleLayerSpec[];
+  mesoscaleLegend?: MesoscaleCatalogParameter[];
+}
+
 /** Renders the monitor workspace after page-level data has been assembled. */
-const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
+const MonitorPageWorkspaceView: React.FC<MonitorPageWorkspaceViewProps> = ({
   settings,
   outlookOptions,
   selectedOutlook,
@@ -270,6 +282,9 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
   onOutlookSourceChange,
   onOutlookTypeChange,
   dispatch,
+  mesoscalePanel,
+  mesoscaleLayers,
+  mesoscaleLegend,
 }) => (
     <div className="monitor-page">
       <MonitorControls
@@ -310,6 +325,7 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
         }}
         onSpcReferenceLayerEnabledChange={(enabled) => dispatch(setReferenceLayerEnabled({ layer: 'spcMesoscaleDiscussionEnabled', enabled }))}
         onRefresh={onRefresh}
+        mesoscalePanel={mesoscalePanel}
       />
 
       <MonitorMap
@@ -325,9 +341,28 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
         alertsOpacity={settings.alertsOpacity}
         mesoscaleDiscussions={referenceLayers.mesoscaleDiscussions}
         referenceAttributions={referenceAttributions}
+        mesoscaleLayers={mesoscaleLayers}
+        mesoscaleLegend={mesoscaleLegend}
       />
     </div>
 );
+
+const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = (props) => {
+  const baseView = <MonitorPageWorkspaceView {...props} />;
+  if (!isFeatureExposed('mesoscaleWorkspace')) return baseView;
+  return (
+    <FeatureBoundary feature="mesoscaleWorkspace">
+      <React.Suspense fallback={baseView}>
+        <MonitorMesoscaleIntegration
+          settings={props.settings.mesoscale}
+          onSettingsChange={(settings) => props.dispatch(setMonitorMesoscaleSettings(settings))}
+        >
+          {(mesoscale) => <MonitorPageWorkspaceView {...props} {...mesoscale} />}
+        </MonitorMesoscaleIntegration>
+      </React.Suspense>
+    </FeatureBoundary>
+  );
+};
 
 /** Real-time monitor page for radar, satellite, and read-only personal outlook overlays. */
 export const MonitorPage: React.FC = () => {

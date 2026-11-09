@@ -88,4 +88,27 @@ describe('monitor settings', () => {
     localStorage.setItem(MONITOR_SETTINGS_STORAGE_KEY, 'not-json');
     expect(readStoredMonitorSettings()).toEqual(DEFAULT_MONITOR_SETTINGS);
   });
+
+  test('adds safe mesoscale defaults to older stored settings', () => {
+    const settings = normalizeMonitorSettings({ radarMode: 'site' });
+    expect(settings.mesoscale).toEqual({ model: 'hrrr', layers: [] });
+  });
+
+  test('normalizes mesoscale model, unique layer ids, and opacity bounds', () => {
+    const settings = normalizeMonitorSettings({ mesoscale: {
+      model: 'unknown',
+      layers: [{ id: ' cape ', opacity: 2 }, { id: 'cape', opacity: 0.2 }, { id: '', opacity: 0.5 }, { id: 'shear', opacity: -1 }],
+    } });
+    expect(settings.mesoscale).toEqual({
+      model: 'hrrr',
+      layers: [{ id: 'cape', opacity: 1 }, { id: 'shear', opacity: 0 }],
+    });
+  });
+
+  test('persists mesoscale display settings in the existing Monitor storage key', () => {
+    const settings = { ...DEFAULT_MONITOR_SETTINGS, mesoscale: { model: 'rap' as const, layers: [{ id: 'cape', opacity: 0.4 }] } };
+    writeStoredMonitorSettings(settings);
+    expect(JSON.parse(localStorage.getItem(MONITOR_SETTINGS_STORAGE_KEY) || '{}').mesoscale).toEqual(settings.mesoscale);
+    expect(readStoredMonitorSettings().mesoscale).toEqual(settings.mesoscale);
+  });
 });

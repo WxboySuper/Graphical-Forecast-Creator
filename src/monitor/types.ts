@@ -18,6 +18,16 @@ export interface MonitorReferenceLayerSettings {
   spcMesoscaleDiscussionEnabled: boolean;
 }
 
+export interface MonitorMesoscaleLayerSetting {
+  id: string;
+  opacity: number;
+}
+
+export interface MonitorMesoscaleSettings {
+  model: 'hrrr' | 'rap' | 'rrfs';
+  layers: MonitorMesoscaleLayerSetting[];
+}
+
 export interface MonitorOutlookSourceSelection {
   kind: MonitorOutlookSourceKind;
   id: string;
@@ -51,6 +61,7 @@ export interface MonitorSettings {
   alertsShowWarnings: boolean;
   alertsShowAdvisories: boolean;
   referenceLayers: MonitorReferenceLayerSettings;
+  mesoscale: MonitorMesoscaleSettings;
 }
 
 export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
@@ -83,6 +94,10 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
   alertsShowAdvisories: false,
   referenceLayers: {
     spcMesoscaleDiscussionEnabled: false,
+  },
+  mesoscale: {
+    model: 'hrrr',
+    layers: [],
   },
 };
 
