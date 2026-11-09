@@ -49,38 +49,51 @@ const isSafeSetting = (name, value) => CHECKS[name].test(value) && !value.includ
 
 const WORKFLOW_FILE = new RegExp(String.raw`^${SEGMENT}\.ya?ml$`);
 
+const isString = (value) => typeof value === 'string';
+const isFlatStringMap = (value) => value !== null && typeof value === 'object' && Object.values(value).every(isString);
+const hasSafeWorkflow = (job) => isString(job?.workflow) && WORKFLOW_FILE.test(job.workflow);
+const hasValidInputs = (job) => job.inputs === undefined || isFlatStringMap(job.inputs);
+
 /** A job must name a safe workflow file; its inputs, when present, must be a flat object of strings. */
 const assertJob = (job) => {
-  const inputs = job?.inputs;
-  const inputsOk = inputs === undefined
-    || (inputs !== null && typeof inputs === 'object' && Object.values(inputs).every((value) => typeof value === 'string'));
-  if (typeof job?.workflow !== 'string' || !WORKFLOW_FILE.test(job.workflow) || !inputsOk) {
-    throw new Error('Invalid scheduler job');
-  }
+  if (!hasSafeWorkflow(job) || !hasValidInputs(job)) throw new Error('Invalid scheduler job');
 };
+
+const readToken = (env) => {
+  const token = isString(env?.GITHUB_DISPATCH_TOKEN) ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
+  if (!token) throw new Error('GITHUB_DISPATCH_TOKEN is not set');
+  return token;
+};
+
+/** Repository and ref, each validated; an unusable value is a clear configuration error. */
+const readSettings = (env) => {
+  const values = Object.fromEntries(Object.keys(CHECKS).map((name) => [name, setting(env, name)]));
+  const invalid = Object.entries(values).find(([name, value]) => !isSafeSetting(name, value));
+  if (invalid) throw new Error(`Invalid scheduler configuration: ${invalid[0]}`);
+  return values;
+};
+
+const requestInit = (token, body) => ({
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': API_VERSION,
+    'User-Agent': 'gfc-scheduler',
+  },
+  body: JSON.stringify(body),
+});
 
 /** Builds the workflow dispatch request for one job, or throws when the configuration is unusable. */
 export const buildDispatchRequest = (env, job) => {
   assertJob(job);
-  const token = typeof env?.GITHUB_DISPATCH_TOKEN === 'string' ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
-  if (!token) throw new Error('GITHUB_DISPATCH_TOKEN is not set');
-  const values = Object.fromEntries(Object.keys(CHECKS).map((name) => [name, setting(env, name)]));
-  const invalid = Object.entries(values).find(([name, value]) => !isSafeSetting(name, value));
-  if (invalid) throw new Error(`Invalid scheduler configuration: ${invalid[0]}`);
-  const body = { ref: values.WORKFLOW_REF, ...(job.inputs ? { inputs: job.inputs } : {}) };
+  const token = readToken(env);
+  const settings = readSettings(env);
+  const body = { ref: settings.WORKFLOW_REF, ...(job.inputs ? { inputs: job.inputs } : {}) };
   return {
-    url: `${GITHUB_API}/repos/${values.GITHUB_REPOSITORY}/actions/workflows/${job.workflow}/dispatches`,
-    init: {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': API_VERSION,
-        'User-Agent': 'gfc-scheduler',
-      },
-      body: JSON.stringify(body),
-    },
+    url: `${GITHUB_API}/repos/${settings.GITHUB_REPOSITORY}/actions/workflows/${job.workflow}/dispatches`,
+    init: requestInit(token, body),
   };
 };
 
