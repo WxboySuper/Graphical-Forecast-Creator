@@ -50,7 +50,7 @@ const getUnavailableParameters = (catalog: MesoscaleCatalog, frame: MesoscaleCat
   return { unavailableParameters, partial };
 };
 
-const toProviderPayload = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['frames'][number], unavailableParameters: Array<{ id: string; reason?: string }>, now: number) => ({
+const toProviderPayload = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['frames'][number], unavailableParameters: Array<{ id: string; reason?: string }>, stale: boolean) => ({
     schemaVersion: 1,
     model: {
       ...catalog.model,
@@ -68,24 +68,24 @@ const toProviderPayload = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['f
     parameters: frame.parameters.filter(parameter => parameter.status !== 'failed').map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data })),
     requestedParameterIds: frame.requestedParameterIds ?? catalog.requestedParameterIds ?? frame.parameters.map(parameter => parameter.id),
     unavailableParameters,
-    stale: Math.max(now - Date.parse(catalog.cycleTime), now - Date.parse(frame.validTime)) > 180 * 60_000,
+    stale,
   });
 
-export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now()): MesoscaleParameterResponse => {
+export const normalizeCatalogFrame = (catalog: MesoscaleCatalog, frameIndex: number, now = Date.now(), stale = false): MesoscaleParameterResponse => {
   if (!isRecord(catalog)) return { state: 'malformed', message: 'Catalog response must be an object.' };
   const frameError = getFrameError(catalog, frameIndex);
   if (frameError) return { state: 'malformed', message: frameError };
   const frame = catalog.frames[frameIndex]!;
   if (frame.status === 'failed') return { state: 'upstream-failure', message: 'Catalog frame is marked failed.', retryable: false };
   const { unavailableParameters, partial } = getUnavailableParameters(catalog, frame);
-  const payload = toProviderPayload(catalog, frame, unavailableParameters, now);
-  const normalized = normalizeProviderPayload(payload, { now, staleAfterMs: 180 * 60 * 1000 });
+  const payload = toProviderPayload(catalog, frame, unavailableParameters, stale);
+  const normalized = normalizeProviderPayload(payload, { now });
   return partial && normalized.state === 'ready' ? { ...normalized, state: 'partial', completeness: 'partial' } : normalized;
 };
 
-export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now()): MesoscaleParameterResponse[] => {
+export const normalizeMesoscaleCatalog = (catalog: MesoscaleCatalog, now = Date.now(), stale = false): MesoscaleParameterResponse[] => {
   if (!isRecord(catalog)) return [{ state: 'malformed', message: 'Catalog response must be an object.' }];
   if (!isValidCatalogDomain(catalog.domain)) return [{ state: 'malformed', message: 'Catalog domain metadata is invalid.' }];
   if (!Array.isArray(catalog.frames)) return [{ state: 'malformed', message: 'Catalog frames are invalid.' }];
-  return catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now));
+  return catalog.frames.map((_frame, frameIndex) => normalizeCatalogFrame(catalog, frameIndex, now, stale));
 };

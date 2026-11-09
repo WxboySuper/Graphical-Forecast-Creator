@@ -36,7 +36,7 @@ export const formatAge = (minutes: number | null): string =>
 
 const hourLabel = (hour: number): string => (hour === 0 ? 'f00' : `+${hour} h`);
 
-const ModelSwitcher: React.FC<{ modelId: MesoscaleModelId; onSelect: (modelId: MesoscaleModelId) => void }> = ({ modelId, onSelect }) => (
+export const ModelSwitcher: React.FC<{ modelId: MesoscaleModelId; onSelect: (modelId: MesoscaleModelId) => void }> = ({ modelId, onSelect }) => (
   <div className="mesoscale-segments" role="group" aria-label="Model">
     {MODELS.map(({ id, label, note }) => (
       <button key={id} type="button" className="mesoscale-segment" aria-pressed={modelId === id} onClick={() => onSelect(id)}>

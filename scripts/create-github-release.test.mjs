@@ -9,6 +9,7 @@ import {
   buildGitHubReleaseCreateArgs,
   buildGitHubReleaseUploadArgs,
   publishGitHubRelease,
+  fallbackPrNotes,
   resolvePreviousTag,
   validateReleaseInputs,
 } from './create-github-release.mjs';
@@ -63,6 +64,25 @@ test('composes the final release body from curated and generated notes', () => {
   });
   assert.match(notes, /Stable fix/);
   assert.match(notes, /#123 Fix/);
+});
+
+test('beta notes are the pull requests since the previous beta, not the whole curated changelog', () => {
+  const fullChangelog = '## v1.8.0-beta.10\n\n- Every change from every earlier v1.8 beta.';
+  const notes = buildReleaseNotes({
+    mode: 'prs',
+    curatedNotes: fullChangelog,
+    generatedNotes: "## What's Changed\n\n- feat: only this beta (#123)",
+    changelogUrl: 'https://github.com/example/repo/blob/main/CHANGELOG.md',
+  });
+  assert.match(notes, /only this beta/);
+  assert.doesNotMatch(notes, /Every change from every earlier/);
+  assert.match(notes, /Full curated changelog:/);
+});
+
+test('falls back to a comparison link, never the full changelog, when PR notes cannot be generated', () => {
+  const notes = fallbackPrNotes({ repository: 'example/repo', tag: 'v1.8.0-beta.5', previousTag: 'v1.8.0-beta.4' });
+  assert.match(notes, /compare\/v1\.8\.0-beta\.4\.\.\.v1\.8\.0-beta\.5/);
+  assert.equal(fallbackPrNotes({ repository: 'example/repo', tag: 'v1.8.0-beta.1', previousTag: null }), '## v1.8.0-beta.1\n\nRelease notes could not be generated.');
 });
 
 test('publishes the generated Markdown notes with every GitHub release', () => {

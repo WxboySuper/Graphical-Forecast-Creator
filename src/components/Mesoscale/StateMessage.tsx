@@ -30,3 +30,15 @@ export const StateMessage: React.FC<StateMessageProps> = ({ result, subject, onR
     </div>
   );
 };
+
+/** A compact version for inside the rail, where the rest of the workspace stays usable. */
+export const InlineStateMessage: React.FC<StateMessageProps> = ({ result, subject, onRetry }) => {
+  const { title, body, retry } = describe(result, subject);
+  return (
+    <div className={`mesoscale-notice${result.state === 'loading' ? '' : ' mesoscale-notice--warn'}`} role={result.state === 'loading' ? 'status' : 'alert'}>
+      <strong>{title}</strong>
+      <span className="mesoscale-notice__body">{body}</span>
+      {retry ? <button type="button" className="mesoscale-state__action" onClick={onRetry}>Try again</button> : null}
+    </div>
+  );
+};
