@@ -51,10 +51,13 @@ export const addVertexAfter = (polygon: Polygon, index: number): Polygon | null 
   return withOuterVertices(polygon, [...vertices.slice(0, index + 1), midpoint, ...vertices.slice(index + 1)]);
 };
 
+const hasIndex = (vertices: Position[], index: number): boolean => index >= 0 && index < vertices.length;
+const canRemoveFrom = (vertices: Position[], index: number): boolean => vertices.length > MIN_VERTICES && hasIndex(vertices, index);
+
 /** Removes a vertex; a polygon keeps at least three. */
 export const removeVertex = (polygon: Polygon, index: number): Polygon | null => {
   const vertices = outerVertices(polygon);
-  if (vertices.length <= MIN_VERTICES || index < 0 || index >= vertices.length) return null;
+  if (!canRemoveFrom(vertices, index)) return null;
   return withOuterVertices(polygon, vertices.filter((_, i) => i !== index));
 };
 
