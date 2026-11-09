@@ -19,6 +19,16 @@ test('fills account, bucket, and public base URL', () => {
   assert.equal(config.vars.STALE_AFTER_MINUTES, '180');
 });
 
+test('keeps a custom domain attached as a Worker route', () => {
+  const config = JSON.parse(renderMesoscaleWranglerConfig(template, { ...env, MESOSCALE_PUBLIC_BASE_URL: 'https://mesoscale.gfcweather.com' }));
+  assert.deepEqual(config.routes, [{ pattern: 'mesoscale.gfcweather.com', custom_domain: true }]);
+});
+
+test('adds no route for a workers.dev address', () => {
+  const config = JSON.parse(renderMesoscaleWranglerConfig(template, env));
+  assert.equal(config.routes, undefined);
+});
+
 test('requires every deployment value', () => {
   assert.throws(() => renderMesoscaleWranglerConfig(template, { ...env, MESOSCALE_R2_BUCKET: '' }), /MESOSCALE_R2_BUCKET/);
 });

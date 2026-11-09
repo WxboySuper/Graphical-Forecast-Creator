@@ -26,7 +26,9 @@ To enable the job:
    the beta build as `VITE_MESOSCALE_WORKER_URL_BETA`.
 
 `scripts/render-mesoscale-wrangler.mjs` fills the account, bucket, and
-`PUBLIC_BASE_URL` placeholders in `cloudflare/wrangler.mesoscale.jsonc` at deploy
+`PUBLIC_BASE_URL` placeholders (and, for a custom domain such as
+`mesoscale.gfcweather.com`, adds the matching `custom_domain` route so every
+deploy keeps the domain attached) in `cloudflare/wrangler.mesoscale.jsonc` at deploy
 time, runs the Worker tests, deploys, and checks `GET /status`. Edit the other
 `vars` in the checked-in file:
 
