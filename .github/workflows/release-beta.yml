@@ -196,7 +196,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: next-major
-          RELEASE_NOTES_MODE: changelog
+          RELEASE_NOTES_MODE: prs
           NOTES_FILE: beta-release-notes.md
           DRY_RUN: true
         run: |
@@ -333,7 +333,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: next-major
-          RELEASE_NOTES_MODE: changelog-and-prs
+          RELEASE_NOTES_MODE: prs
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
           NOTES_FILE: beta-release-notes.md
           RELEASE_DRAFT: true
