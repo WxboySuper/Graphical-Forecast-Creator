@@ -77,6 +77,7 @@ describe('hazard colors', () => {
   it('keeps the suggested hazards visually distinct and stable', () => {
     const hues = HAZARD_SUGGESTIONS.map(hazardHue);
     expect(new Set(hues).size).toBe(hues.length);
+    expect(Number.isInteger(hazardHue('constructor'))).toBe(true);
     expect(hazardHue('Dust storm')).toBe(hazardHue('  dust STORM '));
   });
 });

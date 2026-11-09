@@ -85,7 +85,7 @@ const KNOWN_HAZARD_HUES: Record<string, number> = {
 
 export const hazardHue = (hazard: string): number => {
   const key = hazard.trim().toLowerCase();
-  if (key in KNOWN_HAZARD_HUES) return KNOWN_HAZARD_HUES[key];
+  if (Object.hasOwn(KNOWN_HAZARD_HUES, key)) return KNOWN_HAZARD_HUES[key];
   let hash = 2166136261;
   for (const char of key) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return Math.abs(hash) % 360;

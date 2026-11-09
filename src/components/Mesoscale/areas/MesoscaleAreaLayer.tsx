@@ -10,7 +10,7 @@ import Feature from 'ol/Feature';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import Collection from 'ol/Collection';
-import Draw from 'ol/interaction/Draw';
+import Draw, { type DrawEvent } from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Snap from 'ol/interaction/Snap';
 import type { Geometry } from 'ol/geom';
@@ -84,23 +84,31 @@ const createDraw = (tool: AreaTool): Draw => (isShapeTool(tool)
   ? new Draw({ source: new VectorSource(), type: 'Circle', freehand: true, geometryFunction: shapeGeometryFunction(tool) })
   : new Draw({ source: new VectorSource(), type: 'Polygon' }));
 
+const FORM_FIELD_SELECTOR = 'input, textarea, select, [contenteditable="true"]';
+
+/** Forwards a finished sketch as a polygon, ignoring clicks that drew no area. */
+const handleDrawEnd = (event: DrawEvent, onDrawn: (polygon: Polygon) => void): void => {
+  const geometry = event.feature.getGeometry();
+  if (!geometry || isDegenerate(geometry)) return;
+  const polygon = featureToPolygon(event.feature as Feature<Geometry>);
+  if (polygon) onDrawn(polygon);
+};
+
+/** Backspace and Escape edit the sketch, except while the user is typing in a form field. */
+const drawKeyHandler = (draw: Draw) => (event: KeyboardEvent): void => {
+  if ((event.target as HTMLElement | null)?.closest?.(FORM_FIELD_SELECTOR)) return;
+  if (event.key === 'Escape') draw.abortDrawing();
+  if (event.key === 'Backspace') draw.removeLastPoint();
+};
+
 const useDrawTool = (map: OLMap, source: VectorSource, tool: AreaTool, onDrawn: (polygon: Polygon) => void): void => {
   const active = tool !== 'select';
   useEffect(() => {
     if (!active) return undefined;
     const draw = createDraw(tool);
     const snap = new Snap({ source });
-    draw.on('drawend', (event) => {
-      const geometry = event.feature.getGeometry();
-      if (!geometry || isDegenerate(geometry)) return;
-      const polygon = featureToPolygon(event.feature as Feature<Geometry>);
-      if (polygon) onDrawn(polygon);
-    });
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
-      if (event.key === 'Escape') draw.abortDrawing();
-      if (event.key === 'Backspace') draw.removeLastPoint();
-    };
+    const onKeyDown = drawKeyHandler(draw);
+    draw.on('drawend', (event) => handleDrawEnd(event, onDrawn));
     map.addInteraction(draw);
     map.addInteraction(snap);
     document.addEventListener('keydown', onKeyDown);
