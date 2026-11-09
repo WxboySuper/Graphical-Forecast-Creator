@@ -6,15 +6,22 @@ import { fileURLToPath } from 'node:url';
 
 const REQUIRED = ['CLOUDFLARE_ACCOUNT_ID', 'MESOSCALE_R2_BUCKET', 'MESOSCALE_PUBLIC_BASE_URL'];
 
+const isBareOrigin = (url) => url.pathname === '/' && !url.search && !url.hash;
+
+function parseHttpsOrigin(value) {
+  const url = new URL(value.trim());
+  if (url.protocol !== 'https:' || !isBareOrigin(url)) {
+    throw new Error('MESOSCALE_PUBLIC_BASE_URL must be an https origin without a path.');
+  }
+  return url;
+}
+
 export function renderMesoscaleWranglerConfig(templateText, env) {
   const missing = REQUIRED.filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
     throw new Error(`Missing required environment values: ${missing.join(', ')}`);
   }
-  const baseUrl = new URL(env.MESOSCALE_PUBLIC_BASE_URL.trim());
-  if (baseUrl.protocol !== 'https:' || baseUrl.pathname !== '/' || baseUrl.search || baseUrl.hash) {
-    throw new Error('MESOSCALE_PUBLIC_BASE_URL must be an https origin without a path.');
-  }
+  const baseUrl = parseHttpsOrigin(env.MESOSCALE_PUBLIC_BASE_URL);
   const config = JSON.parse(templateText);
   const bucket = env.MESOSCALE_R2_BUCKET.trim();
   config.account_id = env.CLOUDFLARE_ACCOUNT_ID.trim();
