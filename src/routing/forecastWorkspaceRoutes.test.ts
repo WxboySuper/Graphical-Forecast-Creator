@@ -66,9 +66,8 @@ describe('forecast workspace route contract', () => {
     expect(exposedPaths).not.toContain('/forecast/winter');
     if (target === 'production' || target === 'staging') {
       expect(exposedPaths).toEqual(['/forecast/severe']);
-    } else if (target === 'beta') {
-      expect(exposedPaths).toEqual(['/forecast/severe', '/forecast/custom']);
     } else {
+      // Mesoscale is in beta early access (#1800); Custom is exercisable on beta and local.
       expect(exposedPaths).toEqual(['/forecast/severe', '/forecast/mesoscale', '/forecast/custom']);
     }
   });
@@ -94,7 +93,7 @@ describe('forecast workspace route contract', () => {
     const routes = getExposedForecastWorkspaceRoutes('production');
     expect(routes.map((route) => route.id)).toEqual(['severe']);
     const betaRoutes = getExposedForecastWorkspaceRoutes('beta');
-    expect(betaRoutes.map((route) => route.id)).toEqual(['severe', 'custom']);
+    expect(betaRoutes.map((route) => route.id)).toEqual(['severe', 'mesoscale', 'custom']);
     for (const route of betaRoutes) {
       expect(route.path).toBe(`/forecast/${route.routePath}`);
     }

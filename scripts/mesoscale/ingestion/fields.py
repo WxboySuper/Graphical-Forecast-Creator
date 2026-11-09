@@ -52,6 +52,33 @@ FIELDS = {
     "reflectivity": ({"REFC": "entire atmosphere"}, "dBZ", "model", "entire atmosphere", [(5, "#04e9e7"), (20, "#019ff4"), (35, "#0300f4"), (45, "#02fd02"), (55, "#fdf802"), (65, "#fd0100"), (75, "#a80000")], "native"),
 }
 
+DISPLAY_NAMES = {
+    "temperature-2m": "2 m temperature",
+    "dewpoint-2m": "2 m dew point",
+    "wind-speed-10m": "10 m wind speed",
+    "cape-surface": "CAPE (surface)",
+    "cin-surface": "CIN (surface)",
+    "cape-180-0mb-agl": "CAPE (180–0 mb above ground)",
+    "cape-90-0mb-agl": "CAPE (90–0 mb above ground)",
+    "cape-255-0mb-agl": "CAPE (255–0 mb above ground)",
+    "cape-0-3000m-agl": "CAPE (0–3000 m above ground)",
+    "cin-180-0mb-agl": "CIN (180–0 mb above ground)",
+    "cin-90-0mb-agl": "CIN (90–0 mb above ground)",
+    "cin-255-0mb-agl": "CIN (255–0 mb above ground)",
+    "srh-0-1km": "Storm-relative helicity, 0–1 km",
+    "srh-0-3km": "Storm-relative helicity, 0–3 km",
+    "surface-lcl": "LCL height (surface-based parcel)",
+    "pwat": "Precipitable water",
+    "mslp": "Mean sea level pressure",
+    "reflectivity": "Composite reflectivity",
+}
+
+
+def display_name(field_id: str) -> str:
+    """A forecaster-readable field name; unknown ids fall back to a title-cased id."""
+    return DISPLAY_NAMES.get(field_id) or field_id.replace("-", " ").title()
+
+
 def required_identities(model_id: str) -> list[list[dict[str, str]]]:
     return [identity for field_id, spec in FIELDS.items() for identity in identities_for_field(model_id, field_id, spec[0])]
 

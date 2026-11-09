@@ -7,7 +7,7 @@ import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 describe('Monitor mesoscale exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it.each(BUILD_TARGETS.filter((target) => target !== 'local'))('does not mount Monitor data hooks on %s', async (target) => {
+  it.each(BUILD_TARGETS.filter((target) => target === 'staging' || target === 'production'))('does not mount Monitor data hooks on %s', async (target) => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const intervalSpy = jest.spyOn(window, 'setInterval');
     await runWithBuildTarget(target, async () => {
@@ -22,5 +22,12 @@ describe('Monitor mesoscale exposure', () => {
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(intervalSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(BUILD_TARGETS.filter((target) => target === 'beta' || target === 'local'))('mounts the Monitor mesoscale slot on %s', async (target) => {
+    await runWithBuildTarget(target, async () => {
+      render(<FeatureBoundary feature="mesoscaleWorkspace"><p>Mesoscale slot</p></FeatureBoundary>);
+      expect(screen.getByText('Mesoscale slot')).toBeInTheDocument();
+    });
   });
 });

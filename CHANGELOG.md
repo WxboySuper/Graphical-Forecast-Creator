@@ -46,6 +46,9 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Mesoscale workspace on beta:** The Mesoscale forecast workspace and its Monitor panel are now available on beta for early-access testing.
+- **Reliable Mesoscale map display:** Model layers stay visible at the default map zoom with the standard basemap, so beta testers no longer see a blank map.
+- **Clearer Mesoscale field names:** Model fields show readable labels such as CAPE (surface), storm-relative helicity ranges, and composite reflectivity.
 - **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
 - **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
 - **Cities in outlooks:** List the cities inside the active outlook in the beta population estimate dialog, using a bundled public-domain places dataset.

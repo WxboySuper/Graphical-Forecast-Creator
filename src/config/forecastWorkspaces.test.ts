@@ -49,7 +49,7 @@ describe('forecast workspace product contract', () => {
   const EXPECTED_EXPOSED: Record<BuildTarget, string[]> = {
     production: ['severe'],
     staging: ['severe'],
-    beta: ['severe', 'custom'],
+    beta: ['severe', 'mesoscale', 'custom'],
     local: ['severe', 'mesoscale', 'custom'],
   };
 

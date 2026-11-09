@@ -37,8 +37,9 @@ export const createMesoscaleTileLayer = (spec: MesoscaleLayerSpec): MesoscaleTil
     opacity: spec.opacity,
     visible: spec.visible ?? true,
     extent: toExtent(data.bounds),
-    minZoom: data.minZoom,
-    maxZoom: data.maxZoom,
+    // The catalog's zoom range describes which tiles exist, so it belongs on the source only.
+    // A layer-level maxZoom would hide the raster once the map zooms past the last published
+    // level, instead of letting OpenLayers scale that level up.
     properties: { mesoscaleLayerId: spec.id, parameter: spec.parameter.id, units: spec.parameter.units, legend: spec.parameter.legend, sourceMetadata: spec.parameter.source },
   });
 };
