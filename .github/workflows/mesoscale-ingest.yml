@@ -2,7 +2,10 @@ name: Mesoscale ingest
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # Off the start of the hour (GitHub's busiest time, when queued runs are delayed or dropped), twice an
+    # hour so one dropped run does not leave a model cycle unpublished. A run that finds the newest
+    # cycle already published exits in seconds.
+    - cron: '22,52 * * * *'
   workflow_dispatch:
 
 concurrency:
