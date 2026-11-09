@@ -1,6 +1,8 @@
 import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
 import { assertZoomByte } from './pmtiles-zoom-byte.mjs';
 
+const DEFAULT_FIXTURE_MAX_ZOOM = 4; // preserves the legacy 3-4 fixture interval
+
 const varint = (value) => {
   const bytes = [];
   while (value > 0x7f) {
@@ -27,7 +29,7 @@ const fixtureLeaf = async ({ bytes, leaf, gzip }) => {
   return leafBytes;
 };
 
-export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, minZoom = PUBLISHED_TILE_CONTRACT.minZoom, maxZoom = 4 } = {}) => {
+export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, minZoom = PUBLISHED_TILE_CONTRACT.minZoom, maxZoom = DEFAULT_FIXTURE_MAX_ZOOM } = {}) => {
   assertZoomByte(minZoom, 'minZoom');
   assertZoomByte(maxZoom, 'maxZoom');
   const leafBytes = await fixtureLeaf({ bytes, leaf, gzip });
