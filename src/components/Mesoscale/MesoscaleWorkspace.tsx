@@ -70,7 +70,7 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
         <MesoscaleMap layers={layerSpecs} domainBounds={data.kind === 'ready' ? data.catalog.domain.bounds : undefined}>
           {(map) => (
             <>
-              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} />
+              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} activeVertex={areas.activeVertex} />
               <AreaToolbar map={map} areas={areas} />
             </>
           )}

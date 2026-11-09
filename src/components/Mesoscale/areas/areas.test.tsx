@@ -48,6 +48,23 @@ describe('window validation', () => {
   });
 });
 
+describe('vertex nudges', () => {
+  it('merges a run of coalesced nudges into one undo step and keeps other geometry edits separate', () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useMesoscaleAreas(), { wrapper });
+    act(() => result.current.addPolygon(polygon));
+    const id = result.current.areas[0].id;
+    const moved = (lon: number): typeof polygon => ({ type: 'Polygon', coordinates: [[[lon, 35], [-98, 35], [-98, 37], [lon, 35]]] });
+    for (const lon of [-99.9, -99.8, -99.7]) act(() => result.current.setGeometry(id, moved(lon), true));
+    act(() => result.current.undo());
+    expect(result.current.areas[0].geometry.coordinates[0][0][0]).toBe(-100);
+    act(() => result.current.setGeometry(id, moved(-99), false));
+    act(() => result.current.setGeometry(id, moved(-98.5), false));
+    act(() => result.current.undo());
+    expect(result.current.areas[0].geometry.coordinates[0][0][0]).toBe(-99);
+  });
+});
+
 describe('back-to-back edits', () => {
   it('keeps every area when several are added before a re-render', () => {
     const { wrapper } = setup();
