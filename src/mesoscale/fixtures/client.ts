@@ -20,7 +20,7 @@ const readCatalog = <T,>(model: MesoscaleModelId, cycle: string): MesoscaleReque
   const data = isMesoscaleDemoData() ? getDemoCatalogForCycle(model, cycle) : getFixtureCatalog(model, cycle);
   if (!data) return failure('Fixture catalog was not found.');
   const ageMinutes = Math.floor((Date.now() - Date.parse(data.cycleTime)) / 60000);
-  const stale = Date.now() - Date.parse(data.cycleTime) > 180 * 60000;
+  const stale = !isMesoscaleDemoData();
   const state = stale ? 'stale' : data.status === 'partial' ? 'partial' : 'ready';
   return { state, data: data as T, stale, ageMinutes };
 };
