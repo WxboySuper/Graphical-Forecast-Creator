@@ -25,28 +25,39 @@ const ageMinutes = (timestamp, now) => {
 const DEFAULT_STALE_AFTER_MINUTES = 180;
 const MAX_STALE_AFTER_MINUTES = 7 * 24 * 60;
 
-const validStaleThreshold = (value) => Number.isSafeInteger(value)
-  && value >= 0
-  && value <= MAX_STALE_AFTER_MINUTES;
+const validStaleThreshold = (value) => {
+  if (!Number.isSafeInteger(value)) return false;
+  if (value < 0) return false;
+  return value <= MAX_STALE_AFTER_MINUTES;
+};
 
 const fallbackStaleThreshold = (env) => {
   const raw = typeof env?.STALE_AFTER_MINUTES === 'string' ? env.STALE_AFTER_MINUTES.trim() : '';
-  if (!raw || !/^\d+$/.test(raw)) return DEFAULT_STALE_AFTER_MINUTES;
+  if (!raw) return DEFAULT_STALE_AFTER_MINUTES;
+  if (!/^\d+$/.test(raw)) return DEFAULT_STALE_AFTER_MINUTES;
   const configured = Number(raw);
   return validStaleThreshold(configured) ? configured : DEFAULT_STALE_AFTER_MINUTES;
 };
 
-const modelStaleThresholds = (env) => {
-  const raw = env?.STALE_AFTER_MINUTES_BY_MODEL;
-  if (typeof raw !== 'string' || !raw.trim()) return {};
+const isPlainJsonObject = (value) => {
+  if (value === null) return false;
+  if (typeof value !== 'object') return false;
+  return !Array.isArray(value);
+};
+
+const parseModelStaleThresholds = (raw) => {
+  if (typeof raw !== 'string') return {};
+  if (!raw.trim()) return {};
+  let parsed;
   try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return parsed;
+    parsed = JSON.parse(raw);
   } catch {
     return {};
   }
+  return isPlainJsonObject(parsed) ? parsed : {};
 };
+
+const modelStaleThresholds = (env) => parseModelStaleThresholds(env?.STALE_AFTER_MINUTES_BY_MODEL);
 
 const staleThresholdMinutes = (env, modelId) => {
   const configured = modelStaleThresholds(env)[modelId];
@@ -57,10 +68,11 @@ const staleThresholdCacheValue = (env, modelId) => modelId
   ? String(staleThresholdMinutes(env, modelId))
   : [...MODELS].map((id) => `${id}:${staleThresholdMinutes(env, id)}`).join(',');
 
-const setFreshnessHeaders = (headers, cycleTime, now, env, modelId) => {
+const setFreshnessHeaders = ({ headers, cycleTime, now, env, modelId }) => {
   const age = ageMinutes(cycleTime, now);
+  const stale = age === null || age > staleThresholdMinutes(env, modelId);
   headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
-  headers.set('X-Mesoscale-Stale', String(age === null || age > staleThresholdMinutes(env, modelId)));
+  headers.set('X-Mesoscale-Stale', String(stale));
 };
 
 const matchesEtag = (header, etag) => {
@@ -290,7 +302,7 @@ const validCatalog = (value, route) => {
 
 const catalogResponse = ({ value, request, env, route, now, headers, etag }) => {
   if (!validCatalog(value, route)) return invalidCatalogResponse();
-  setFreshnessHeaders(headers, value.cycleTime, now, env, route.model);
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now, env, modelId: route.model });
   let base;
   try {
     base = publicBaseUrl(env);
@@ -334,7 +346,7 @@ const addLatestCatalogUrl = (value, env, route, cycle) => {
 const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
   const cycle = compactCycleFromIso(value.cycleTime);
   if (!validLatestPointer(value, route, cycle)) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
-  setFreshnessHeaders(headers, value.cycleTime, now, env, route.model);
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now, env, modelId: route.model });
   if (!addLatestCatalogUrl(value, env, route, cycle)) return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   const publicEtag = publicRepresentationEtag(etag, env);
   if (publicEtag) headers.set('ETag', publicEtag);
@@ -611,7 +623,7 @@ const refreshedLatestCacheHit = async (context, response) => {
   const value = await cachedJsonValue(response);
   if (!value) return response;
   const headers = new Headers(response.headers);
-  setFreshnessHeaders(headers, value.cycleTime, context.now, context.env, context.route.model);
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now: context.now, env: context.env, modelId: context.route.model });
   return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(JSON.stringify(value), { headers });
 };
 
