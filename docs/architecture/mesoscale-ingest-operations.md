@@ -2,9 +2,13 @@
 
 Issue: [#1759](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/1759)
 
-The hourly workflow `.github/workflows/mesoscale-ingest.yml` is disabled until
-repository variable `MESOSCALE_INGEST_ENABLED` is the literal string `true`.
-Workflow dispatch can run a manual job. Use a public GitHub Actions runner.
+The workflow `.github/workflows/mesoscale-ingest.yml` is scheduled at minutes 22
+and 52 of every hour (off the start of the hour, when GitHub delays or drops
+queued scheduled runs, and twice so a dropped run does not skip a cycle). A run
+that finds the newest cycle already published exits in seconds. The schedule is
+disabled until repository variable `MESOSCALE_INGEST_ENABLED` is the literal
+string `true`. GitHub can still delay scheduled runs; see issue #1808 for the
+external trigger that makes timing reliable. Workflow dispatch can run a manual job. Use a public GitHub Actions runner.
 The workflow has a concurrency lock and a 45 minute timeout, with per-model
 retry limits in the Python client. It caches the ecCodes definitions directory;
 the GRIB fields and output objects are never cached between cycles.
