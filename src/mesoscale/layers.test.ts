@@ -11,8 +11,11 @@ describe('mesoscale OpenLayers layers', () => {
   it('builds a raster layer with catalog zooms, bounds, attribution, and opacity', () => {
     const layer = createMesoscaleTileLayer(spec('temperature'));
     expect(layer.getOpacity()).toBe(0.5);
-    expect(layer.getMinZoom()).toBe(3);
-    expect(layer.getMaxZoom()).toBe(6);
+    // Tile availability is a source property; the layer itself must never be hidden by zoom.
+    expect(layer.getMinZoom()).toBe(-Infinity);
+    expect(layer.getMaxZoom()).toBe(Infinity);
+    expect(layer.getSource()?.getTileGrid()?.getMinZoom()).toBe(3);
+    expect(layer.getSource()?.getTileGrid()?.getMaxZoom()).toBe(6);
     expect(layer.getExtent()).toBeDefined();
     expect(layer.getSource()?.getAttributions()?.({} as never)).toContain('Data provided by Example Provider');
   });

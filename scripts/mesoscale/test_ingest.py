@@ -549,5 +549,15 @@ class IngestTests(unittest.TestCase):
         self.assertEqual(float(speed["values"][0, 0]), 5.0)
 
 
+class DisplayNameTests(unittest.TestCase):
+    def test_every_field_has_a_readable_name(self):
+        from ingestion.fields import DISPLAY_NAMES, FIELDS, display_name
+
+        self.assertEqual(set(DISPLAY_NAMES), set(FIELDS))
+        self.assertEqual(display_name("cape-surface"), "CAPE (surface)")
+        self.assertEqual(display_name("srh-0-1km"), "Storm-relative helicity, 0–1 km")
+        self.assertEqual(display_name("new-field"), "New Field")
+
+
 if __name__ == "__main__":
     unittest.main()
