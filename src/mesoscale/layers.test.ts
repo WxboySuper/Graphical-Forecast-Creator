@@ -20,6 +20,15 @@ describe('mesoscale OpenLayers layers', () => {
     expect(layer.getSource()?.getAttributions()?.({} as never)).toContain('Data provided by Example Provider');
   });
 
+  it('keeps a model-specific max zoom on the XYZ source only', () => {
+    const initial = spec('temperature');
+    const parameter = { ...initial.parameter, data: { ...initial.parameter.data, maxZoom: 5 } };
+    const layer = createMesoscaleTileLayer({ ...initial, parameter });
+    expect(layer.getMinZoom()).toBe(-Infinity);
+    expect(layer.getMaxZoom()).toBe(Infinity);
+    expect(layer.getSource()?.getTileGrid()?.getMaxZoom()).toBe(5);
+  });
+
   it('handles a missing source attribution without crashing layer creation', () => {
     const parameter = { ...spec('broken').parameter, source: null } as unknown as MesoscaleLayerSpec['parameter'];
     expect(() => createMesoscaleTileLayer({ id: 'broken', parameter, opacity: 1 })).not.toThrow();

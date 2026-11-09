@@ -280,6 +280,18 @@ serialTest('tile response defaults to PNG content type when R2 metadata is absen
   assert.equal(response.headers.get('Content-Length'), '3');
 });
 
+serialTest('tile requests accept the zoom interval published by the field catalog', async () => {
+  clearPmtilesCacheForTests();
+  const catalog = structuredClone(tileCatalog);
+  catalog.domain.maxZoom = 5;
+  catalog.frames[0].parameters[0].data.maxZoom = 5;
+  const archive = await createPmtilesFixture({ maxZoom: 5 });
+  const env = tileEnvFor(rangeBucket(archive), catalog);
+  const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/5/0/0.png'), env);
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=60');
+});
+
 serialTest('invalid catalog archive data returns a controlled gateway response', async () => {
   const catalog = structuredClone(tileCatalog);
   delete catalog.frames[0].parameters[0].data;

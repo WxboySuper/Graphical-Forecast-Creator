@@ -16,10 +16,11 @@ from ingest import LocalStore, MODELS, colorize, discover_cycle, publish_cycle, 
 from ingestion.publish import PublishRequest, latest_is_newer
 from ingestion.discovery import CycleSource, FrameSource
 from ingestion.archives import ArchiveRequest, create_archive
-from ingestion.render_steps import FrameResult, cycle_metrics
+from ingestion.render_steps import FrameResult, CycleBuild, ParameterBuild, SourceBundle, build_catalog, cycle_metrics, parameter_metadata
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
 from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range, write_temp_content
+from ingestion.fields import FIELDS, zoom_range
 from ingestion.store import ObjectCheck, R2Credentials, R2Store
 from inventory import IndexRecord
 
@@ -37,6 +38,16 @@ def sample_catalog(cycle="2026-11-08T12:00:00Z", status="complete"):
         "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": [-130, 20, -60, 55], "minZoom": 3, "maxZoom": 4},
         "frames": [{"forecastHour": hour, "validTime": (datetime.fromisoformat(cycle.replace("Z", "+00:00")) + timedelta(hours=hour)).strftime("%Y-%m-%dT%H:%M:%SZ"), "frameType": "analysis" if hour == 0 else "forecast", "status": status, "parameters": []} for hour in range(7)],
     }
+
+
+def write_test_tiles(root, png, count):
+    coordinates = []
+    for zoom, limit in ((3, 64), (4, 64), (5, 4**5)):
+        coordinates.extend((zoom, *divmod(index, 2**zoom)) for index in range(limit))
+    for zoom, x, y in coordinates[:count]:
+        path = root / str(zoom) / str(x) / f"{y}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(png)
 
 
 class MemoryStore(LocalStore):
@@ -124,6 +135,34 @@ def s3_error(code, operation, status=404):
 
 
 class IngestTests(unittest.TestCase):
+    def test_model_zoom_ranges_match_native_grid_resolution_policy(self):
+        self.assertEqual(zoom_range("hrrr"), (3, 5))
+        self.assertEqual(zoom_range("rap"), (3, 4))
+        self.assertEqual(zoom_range("rrfs"), (3, 5))
+        with self.assertRaises(ValueError):
+            zoom_range("unknown")
+
+    def test_catalog_and_parameter_publish_the_model_zoom_range(self):
+        from types import SimpleNamespace
+
+        cycle = datetime(2026, 11, 9, 16, tzinfo=UTC)
+        context = SimpleNamespace(model=MODELS["hrrr"], cycle=cycle, forecast_hour=0)
+        catalog = build_catalog(CycleBuild(context, [], []))
+        self.assertEqual((catalog["domain"]["minZoom"], catalog["domain"]["maxZoom"]), (3, 5))
+
+        source = SourceBundle(0, [], {}, datetime(2026, 11, 9, 16, tzinfo=UTC))
+        item = {"record": {"level": "2 m above ground"}, "sourceHash": "abc", "sourceBytes": 1}
+        parameter = parameter_metadata(ParameterBuild(
+            context,
+            source,
+            datetime(2026, 11, 9, 16, tzinfo=UTC),
+            "temperature-2m",
+            item,
+            FIELDS["temperature-2m"],
+            [item],
+        ))
+        self.assertEqual((parameter["data"]["minZoom"], parameter["data"]["maxZoom"]), (3, 5))
+
     def make_r2_store(self, client):
         with patch("boto3.client", return_value=client):
             return R2Store(R2Credentials("account", "bucket", "access", "secret"))
@@ -251,19 +290,36 @@ class IngestTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             tiles = root / "tiles"
-            paths = (tiles / "3/0/0.png", tiles / "4/1/2.png")
+            paths = (tiles / "3/0/0.png", tiles / "4/1/2.png", tiles / "5/2/3.png")
             for path in paths:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(png)
-            archive = create_archive(ArchiveRequest(tiles, root / "field.pmtiles", 3, 4))
+            archive = create_archive(ArchiveRequest(tiles, root / "field.pmtiles", 3, 5))
             pmtiles = reader.Reader(reader.MemorySource(archive.path.read_bytes()))
             self.assertEqual(pmtiles.get(3, 0, 0), png)
             self.assertEqual(pmtiles.get(4, 1, 2), png)
+            self.assertEqual(pmtiles.get(5, 2, 3), png)
             header = pmtiles.header()
             self.assertEqual(header["tile_type"].name, "PNG")
             self.assertEqual(header["tile_compression"].name, "NONE")
-            self.assertEqual((header["min_zoom"], header["max_zoom"]), (3, 4))
+            self.assertEqual((header["min_zoom"], header["max_zoom"]), (3, 5))
+            self.assertLessEqual(header["root_length"], 16_257)
             self.assertEqual((header["min_lon_e7"], header["min_lat_e7"], header["max_lon_e7"], header["max_lat_e7"]), (-1300000000, 200000000, -600000000, 550000000))
+
+    def test_pmtiles_root_directory_budget_with_measured_tile_count(self):
+        import base64
+        from pmtiles import reader
+
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j0bkAAAAASUVORK5CYII=")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tiles = root / "tiles"
+            write_test_tiles(tiles, png, count=147)
+            archive = create_archive(ArchiveRequest(tiles, root / "field.pmtiles", 3, 5))
+            header = reader.Reader(reader.MemorySource(archive.path.read_bytes())).header()
+            self.assertEqual(header["max_zoom"], 5)
+            self.assertLessEqual(header["root_length"], 16_257)
+
 
     def test_partial_cycle_never_moves_latest_pointer(self):
         with tempfile.TemporaryDirectory() as temporary:

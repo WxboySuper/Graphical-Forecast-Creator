@@ -26,7 +26,7 @@ const fixtureLeaf = async ({ bytes, leaf, gzip }) => {
   return leafBytes;
 };
 
-export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length } = {}) => {
+export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, maxZoom = 4 } = {}) => {
   const leafBytes = await fixtureLeaf({ bytes, leaf, gzip });
   let root = leaf ? directory({ runLength: 0, length: leafBytes.length }) : directory({ length: tileLength });
   if (gzip) root = await gzipBytes(root);
@@ -46,7 +46,7 @@ export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 7
   put64(40, leaf ? leafOffset : 0); put64(48, leaf ? leafBytes.length : 0);
   put64(56, tileOffset); put64(64, bytes.length);
   archive[97] = gzip ? 2 : 1; archive[98] = 1; archive[99] = 2;
-  archive[100] = PUBLISHED_TILE_CONTRACT.minZoom; archive[101] = PUBLISHED_TILE_CONTRACT.maxZoom;
+  archive[100] = PUBLISHED_TILE_CONTRACT.minZoom; archive[101] = maxZoom;
   view.setInt32(102, PUBLISHED_TILE_CONTRACT.minLonE7, true); view.setInt32(106, PUBLISHED_TILE_CONTRACT.minLatE7, true);
   view.setInt32(110, PUBLISHED_TILE_CONTRACT.maxLonE7, true); view.setInt32(114, PUBLISHED_TILE_CONTRACT.maxLatE7, true);
   archive.set(root, rootOffset);
