@@ -476,20 +476,25 @@ const useDiscussionScopeSync = (options: {
   dispatch: ReturnType<typeof useDispatch>;
   hasActiveWorkflow: boolean;
   embedded: boolean;
+  selectedGroupingDays: DayType[];
   mapSelectedGroupingId: string;
   selectedGroupingId: string;
   searchParams: URLSearchParams;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
 }) => {
-  const { currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, selectedGroupingId, searchParams, setSearchParams } = options;
+  const { currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, selectedGroupingDays, selectedGroupingId, searchParams, setSearchParams } = options;
   const previousCurrentDayRef = useRef(currentDay);
+  const hasSyncedInitialScopeRef = useRef(false);
   useEffect(() => {
     const mapDayChanged = previousCurrentDayRef.current !== currentDay;
     previousCurrentDayRef.current = currentDay;
+    const isInitialSync = !hasSyncedInitialScopeRef.current;
+    hasSyncedInitialScopeRef.current = true;
     if (currentDay === discussionDay) return;
+    if (embedded && selectedGroupingDays.includes(currentDay)) return;
     if (embedded && hasActiveWorkflow) {
       if (!mapDayChanged) {
-        dispatch(setForecastDay(discussionDay));
+        if (isInitialSync) dispatch(setForecastDay(discussionDay));
         return;
       }
       if (mapSelectedGroupingId === selectedGroupingId || searchParams.get('group') === mapSelectedGroupingId) return;
@@ -499,7 +504,7 @@ const useDiscussionScopeSync = (options: {
       return;
     }
     dispatch(setForecastDay(discussionDay));
-  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, selectedGroupingId, setSearchParams]);
+  }, [currentDay, discussionDay, dispatch, embedded, hasActiveWorkflow, mapSelectedGroupingId, searchParams, selectedGroupingDays, selectedGroupingId, setSearchParams]);
   useEffect(() => {
     if (embedded && hasActiveWorkflow && currentDay !== discussionDay) return;
     if (hasActiveWorkflow && searchParams.get('group') !== selectedGroupingId) {
@@ -552,6 +557,7 @@ export const DiscussionPage: React.FC<{ embedded?: boolean; resetToken?: number 
     dispatch,
     hasActiveWorkflow,
     embedded,
+    selectedGroupingDays: selectedGrouping.days,
     mapSelectedGroupingId: mapSelectedGrouping.id,
     selectedGroupingId: selectedGrouping.id,
     searchParams,

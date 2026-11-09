@@ -4,7 +4,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { MemoryRouter } from 'react-router';
+import { MemoryRouter, useSearchParams } from 'react-router';
 import { DiscussionPage } from './DiscussionPage';
 import forecastReducer, { setDiscussionGroupings, setForecastDay, setWorkflowActive } from '../store/forecastSlice';
 import overlaysReducer from '../store/overlaysSlice';
@@ -42,6 +42,16 @@ const createStore = () =>
         immutableCheck: false,
       }),
   });
+
+const ChangeUrlAfterMount = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const changeUrl = () => {
+    const params = new URLSearchParams(searchParams);
+    params.set('layout', 'panel');
+    setSearchParams(params);
+  };
+  return <button type="button" onClick={changeUrl}>Change URL</button>;
+};
 
 describe('DiscussionPage', () => {
   test('uses the synced default forecaster name when no discussion exists yet', () => {
@@ -118,6 +128,33 @@ describe('DiscussionPage', () => {
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(2));
     expect(screen.getByRole('combobox', { name: 'Discussion scope' })).toHaveValue('day-2');
+  });
+
+  test('keeps a selected map day when the embedded discussion URL changes within a multi-day grouping', async () => {
+    mockUseAuth.mockReturnValue({
+      syncedSettings: { defaultForecasterName: '' },
+      user: { displayName: '' },
+    });
+
+    const store = createStore();
+    store.dispatch(setDiscussionGroupings([
+      { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
+    ]));
+    store.dispatch(setWorkflowActive(true));
+    store.dispatch(setForecastDay(6));
+
+    render(
+      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day4-8']}>
+        <Provider store={store}>
+          <DiscussionPage embedded />
+          <ChangeUrlAfterMount />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change URL' }));
+    await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(6));
+    expect(screen.getByText('Days 4–8')).toBeInTheDocument();
   });
 
   test('keeps unsaved drafts across unmounts without mixing forecast days', () => {
