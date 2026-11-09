@@ -34,11 +34,13 @@ idempotent and the workflow has a concurrency lock.
 
 - Deploy: `release-beta.yml` deploys it with the catalog Worker (`wrangler.mesoscale-scheduler.jsonc`;
   account from `CLOUDFLARE_ACCOUNT_ID`).
-- Secret: a Worker secret named `GITHUB_DISPATCH_TOKEN`, a fine-grained token limited to this
-  repository with only **Actions: Read and write**. Set it once with
+- Secret: the repository secret `MESOSCALE_DISPATCH_TOKEN`, a fine-grained token limited to this
+  repository with only **Actions: Read and write**. The release deploy pipes it to the Worker as the
+  secret `GITHUB_DISPATCH_TOKEN` right after deploying (it never touches a file or the log). To set
+  it by hand instead, run
   `pnpm dlx wrangler@4 secret put GITHUB_DISPATCH_TOKEN --config cloudflare/wrangler.mesoscale-scheduler.jsonc`
-  (after the first deploy creates the Worker) or in the Cloudflare dashboard. Deploys keep it.
-  Rotate it before it expires.
+  after the first deploy has created the Worker. Rotate it before it expires (the current token
+  expires 2027-11-09); update the repository secret and run a release to push the new value.
 - Failure is visible: with a missing or rejected token the cron invocation fails in the Worker's
   Cloudflare logs, and `/status` goes `degraded` once a model cycle is stale.
 - The Worker serves no requests (`workers_dev` off, no routes).
