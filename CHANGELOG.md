@@ -78,6 +78,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Embedded discussions:** Keep the selected map day when the Discussion URL changes inside a multi-day grouping.
+- **Mesoscale workspace without model data:** The map, area tools, and Areas and Discussion tabs stay usable with an explanation, retry action, and model switcher when model data is loading or unavailable instead of replacing the workspace with an error screen.
+- **Phone area toolbar overlap:** The area toolbar now sits below the Data toggle on narrow screens instead of overlapping it.
 - **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
 - **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
 - **Beta release checks:** Invalid retry settings now fall back to defaults so post-deploy smoke checks run as intended.
