@@ -47,8 +47,21 @@ const CHECKS = {
 
 const isSafeSetting = (name, value) => CHECKS[name].test(value) && !value.includes('..');
 
+const WORKFLOW_FILE = new RegExp(String.raw`^${SEGMENT}\.ya?ml$`);
+
+/** A job must name a safe workflow file; its inputs, when present, must be a flat object of strings. */
+const assertJob = (job) => {
+  const inputs = job?.inputs;
+  const inputsOk = inputs === undefined
+    || (inputs !== null && typeof inputs === 'object' && Object.values(inputs).every((value) => typeof value === 'string'));
+  if (typeof job?.workflow !== 'string' || !WORKFLOW_FILE.test(job.workflow) || !inputsOk) {
+    throw new Error('Invalid scheduler job');
+  }
+};
+
 /** Builds the workflow dispatch request for one job, or throws when the configuration is unusable. */
 export const buildDispatchRequest = (env, job) => {
+  assertJob(job);
   const token = typeof env?.GITHUB_DISPATCH_TOKEN === 'string' ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
   if (!token) throw new Error('GITHUB_DISPATCH_TOKEN is not set');
   const values = Object.fromEntries(Object.keys(CHECKS).map((name) => [name, setting(env, name)]));
@@ -101,7 +114,7 @@ export const jobsForCron = (cron) => {
 export default {
   async scheduled(event, env) {
     // Awaited so a missing token or a rejected dispatch fails the cron invocation visibly in Cloudflare.
-    for (const job of jobsForCron(event.cron)) await dispatchJob(env, job);
+    for (const job of jobsForCron(event?.cron)) await dispatchJob(env, job);
   },
   async fetch() {
     return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });

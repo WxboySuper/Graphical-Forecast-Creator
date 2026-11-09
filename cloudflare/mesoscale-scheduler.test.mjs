@@ -55,6 +55,19 @@ test('treats HTTP 204 as success and any other status as an error without leakin
   );
 });
 
+test('rejects a malformed job before building a request', () => {
+  assert.throws(() => buildDispatchRequest(env, undefined), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, {}), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, { workflow: '../x.yml' }), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml/../b.yml' }), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml', inputs: { dry_run: false } }), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml', inputs: null }), /Invalid scheduler job/);
+});
+
+test('a cron event without an expression is an error', async () => {
+  await assert.rejects(worker.scheduled(undefined, env), /No scheduler job/);
+});
+
 test('an unknown cron expression is an error, not a silent no-op', () => {
   assert.equal(jobsForCron('12,42 * * * *')[0].workflow, 'mesoscale-ingest.yml');
   assert.throws(() => jobsForCron('0 0 * * *'), /No scheduler job/);
