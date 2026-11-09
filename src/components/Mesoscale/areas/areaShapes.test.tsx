@@ -4,7 +4,7 @@ import type { Polygon } from 'geojson';
 import { isMesoscalePolygon } from '../../../utils/mesoscaleGeometryValidation';
 import { AreaLegend } from './AreaLegend';
 import { HAZARD_SUGGESTIONS, createArea, geometryToPolygon, hazardHue } from './areaModel';
-import { rotatePolygon, scalePolygon, shapeGeometryFunction, isShapeTool } from './areaShapes';
+import { rotatePolygon, scalePolygon, shapeGeometryFunction, isDegenerate, isShapeTool } from './areaShapes';
 import { windowLabel } from './areaStyle';
 import { ShapeControls } from './ShapeControls';
 
@@ -25,6 +25,13 @@ describe('shape tools', () => {
     const circle = shapeGeometryFunction('circle')([[0, 0], [150000, 0]], undefined, undefined as never);
     expect(circle).toBeInstanceOf(OlPolygon);
     expect(isMesoscalePolygon(geometryToPolygon(circle))).toBe(true);
+  });
+
+  it('tolerates an incomplete drag and flags zero-area shapes', () => {
+    const ellipse = shapeGeometryFunction('ellipse')([[10, 10]], undefined, undefined as never);
+    expect(isDegenerate(ellipse)).toBe(true);
+    const real = shapeGeometryFunction('ellipse')([[0, 0], [100, 50]], undefined, undefined as never);
+    expect(isDegenerate(real)).toBe(false);
   });
 
   it('knows which tools are shape tools', () => {

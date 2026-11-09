@@ -21,7 +21,7 @@ const MAX_SCALE_RATIO = 20;
 
 /** An ellipse inscribed in the box dragged between two corners. */
 const ellipseFromCorners: GeometryFunction = (coordinates, geometry) => {
-  const [start, end] = coordinates as Coordinate[];
+  const [start, end = start] = coordinates as Coordinate[];
   const [cx, cy] = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
   const [rx, ry] = [Math.abs(end[0] - start[0]) / 2, Math.abs(end[1] - start[1]) / 2];
   const ring: Coordinate[] = [];
@@ -40,6 +40,12 @@ export const shapeGeometryFunction = (tool: AreaShapeTool): GeometryFunction => 
   if (tool === 'ellipse') return ellipseFromCorners;
   if (tool === 'rectangle') return createBox();
   return createRegularPolygon(SHAPE_SEGMENTS);
+};
+
+/** True when a drawn geometry has no area (a click without a drag), so it should be discarded. */
+export const isDegenerate = (geometry: Geometry): boolean => {
+  const [minX, minY, maxX, maxY] = geometry.getExtent();
+  return !(maxX > minX && maxY > minY);
 };
 
 export const isShapeTool = (tool: string): tool is AreaShapeTool => tool === 'ellipse' || tool === 'circle' || tool === 'rectangle';

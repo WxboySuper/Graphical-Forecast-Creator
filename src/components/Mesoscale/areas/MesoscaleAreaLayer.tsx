@@ -19,7 +19,7 @@ import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
 import { removeDrawInteraction } from '../../Map/openLayersForecastUtilityHelpers';
 import { featureToPolygon, polygonToGeometry } from './areaModel';
 import { areaStyle } from './areaStyle';
-import { isShapeTool, shapeGeometryFunction, type AreaShapeTool } from './areaShapes';
+import { isDegenerate, isShapeTool, shapeGeometryFunction, type AreaShapeTool } from './areaShapes';
 
 export type AreaTool = 'select' | 'draw' | AreaShapeTool;
 
@@ -91,6 +91,8 @@ const useDrawTool = (map: OLMap, source: VectorSource, tool: AreaTool, onDrawn: 
     const draw = createDraw(tool);
     const snap = new Snap({ source });
     draw.on('drawend', (event) => {
+      const geometry = event.feature.getGeometry();
+      if (!geometry || isDegenerate(geometry)) return;
       const polygon = featureToPolygon(event.feature as Feature<Geometry>);
       if (polygon) onDrawn(polygon);
     });
