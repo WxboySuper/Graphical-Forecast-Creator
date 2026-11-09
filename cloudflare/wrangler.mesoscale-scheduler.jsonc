@@ -1,14 +1,11 @@
 {
   "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
   "name": "gfc-mesoscale-scheduler",
-  // No account_id here: wrangler uses CLOUDFLARE_ACCOUNT_ID from the environment.
   "main": "./mesoscale-scheduler.mjs",
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
   "preview_urls": false,
   "triggers": {
-    // Minutes 12 and 42: off the start of the hour (busy for GitHub's queue) and after HRRR's
-    // forecast hours for the previous cycle are normally on NOAA's bucket. The ingest is idempotent.
     "crons": ["12,42 * * * *"]
   },
   "vars": {

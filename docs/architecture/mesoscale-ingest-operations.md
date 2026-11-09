@@ -28,7 +28,7 @@ daily feed health and do not replace latest.
 
 GitHub's `schedule` event is delayed or dropped under load, so the primary trigger is the
 `gfc-mesoscale-scheduler` Worker (`cloudflare/mesoscale-scheduler.mjs`). Its cron runs at minutes 12
-and 42 and calls the GitHub `workflow_dispatch` API for `mesoscale-ingest.yml` on `main`. The
+and 42 (off the start of the hour, when GitHub's queue is busy, and after HRRR's forecast hours for the previous cycle are normally on NOAA's bucket) and calls the GitHub `workflow_dispatch` API for `mesoscale-ingest.yml` on `main`. The
 workflow's own `22,52` schedule stays as a backup; both are safe together because publishing is
 idempotent and the workflow has a concurrency lock.
 

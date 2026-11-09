@@ -61,43 +61,8 @@ test('the cron handler dispatches, fails loudly on a rejected token, and the fet
   assert.equal(response.status, 404);
 });
 
-/** Removes // and block comments and trailing commas, leaving string contents (URLs) alone. */
-const stripJsonc = (text) => {
-  let out = '';
-  let inString = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    const next = text[i + 1];
-    if (inString) {
-      out += char;
-      if (char === '\\') {
-        out += next;
-        i += 1;
-      } else if (char === '"') {
-        inString = false;
-      }
-    } else if (char === '"') {
-      inString = true;
-      out += char;
-    } else if (char === '/' && next === '/') {
-      while (i < text.length && text[i] !== '\n') i += 1;
-      out += '\n';
-    } else if (char === '/' && next === '*') {
-      i = text.indexOf('*/', i + 2) + 1;
-    } else {
-      out += char;
-    }
-  }
-  return out.replace(/,(\s*[}\]])/g, '$1');
-};
-
-test('stripJsonc keeps URLs and removes comments and trailing commas', () => {
-  const parsed = JSON.parse(stripJsonc('{ "u": "https://x.example/a", // note\n /* block */ "a": [1, 2,], }'));
-  assert.deepEqual(parsed, { u: 'https://x.example/a', a: [1, 2] });
-});
-
 test('the checked-in config has a cron off the start of the hour and no public routes', () => {
-  const config = JSON.parse(stripJsonc(readFileSync(new URL('./wrangler.mesoscale-scheduler.jsonc', import.meta.url), 'utf8')));
+  const config = JSON.parse(readFileSync(new URL('./wrangler.mesoscale-scheduler.jsonc', import.meta.url), 'utf8'));
   assert.deepEqual(config.triggers.crons, ['12,42 * * * *']);
   assert.equal(config.workers_dev, false);
   assert.equal(config.routes, undefined);
