@@ -9,6 +9,8 @@ import { LayerPanel } from './LayerPanel';
 import { InlineStateMessage } from './StateMessage';
 import { AreasPanel } from './areas/AreasPanel';
 import { DiscussionPanel } from './areas/DiscussionPanel';
+import { ContextLayerPanel } from './context/ContextLayerPanel';
+import type { ContextLayerView } from './context/useContextLayerView';
 import type { MesoscaleAreasController } from './areas/useMesoscaleAreas';
 import type { MesoscaleSelection } from './useMesoscaleSelection';
 import type { Frame, ReadyWorkspaceData, UnavailableWorkspaceData, WorkspaceData } from './useWorkspaceData';
@@ -78,14 +80,20 @@ interface RailProps {
   areas: MesoscaleAreasController;
   selection: MesoscaleSelection;
   data: WorkspaceData;
+  context: ContextLayerView;
   onRetry: () => void;
 }
 
-export const WorkspaceRail: React.FC<RailProps> = ({ tab, onTabChange, areas, selection, data, onRetry }) => (
+const ContextSection: React.FC<{ context: ContextLayerView }> = ({ context }) => (
+  <ContextLayerPanel controller={context.controller} radarTime={context.radar.time} satelliteTime={context.satellite.time} />
+);
+
+export const WorkspaceRail: React.FC<RailProps> = ({ tab, onTabChange, areas, selection, data, context, onRetry }) => (
   <div className="mesoscale-rail__scroll">
     <RailTabs tab={tab} areaCount={areas.areas.length} onChange={onTabChange} />
     {tab === 'data' && data.kind === 'ready' ? <ReadyDataTab selection={selection} data={data} /> : null}
     {tab === 'data' && data.kind === 'unavailable' ? <UnavailableDataTab selection={selection} data={data} onRetry={onRetry} /> : null}
+    {tab === 'data' ? <ContextSection context={context} /> : null}
     {tab === 'areas' ? <AreasPanel areas={areas} /> : null}
     {tab === 'discussion' ? <DiscussionPanel /> : null}
   </div>
