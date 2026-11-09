@@ -38,6 +38,29 @@ export type LayerTimeState =
   | { status: 'ready'; time: string }
   | { status: 'unavailable' };
 
+const stateForTimes = (times: string[]): LayerTimeState => {
+  const latest = times[times.length - 1];
+  return latest ? { status: 'ready', time: latest } : { status: 'unavailable' };
+};
+
+/** Loads the layer's newest time now and every few minutes; the returned function stops it. */
+const pollLayerTime = (config: WmsLayerConfig, publish: (state: LayerTimeState) => void): (() => void) => {
+  let cancelled = false;
+  const publishIfCurrent = (state: LayerTimeState): void => {
+    if (!cancelled) publish(state);
+  };
+  const load = (): void => {
+    fetchLayerTimeValues(config).then(times => publishIfCurrent(stateForTimes(times))).catch(() => publishIfCurrent({ status: 'unavailable' }));
+  };
+  publishIfCurrent({ status: 'loading' });
+  load();
+  const timer = window.setInterval(load, REFRESH_MS);
+  return () => {
+    cancelled = true;
+    window.clearInterval(timer);
+  };
+};
+
 /** The newest valid time of a WMS layer, refreshed every few minutes; `off` when no layer is chosen. */
 export const useLayerTime = (config: WmsLayerConfig | null): LayerTimeState => {
   const [result, setResult] = useState<LayerTimeState>({ status: config ? 'loading' : 'off' });
@@ -48,23 +71,7 @@ export const useLayerTime = (config: WmsLayerConfig | null): LayerTimeState => {
       setResult({ status: 'off' });
       return undefined;
     }
-    let cancelled = false;
-    const load = (): void => {
-      fetchLayerTimeValues({ url, layer }).then((times) => {
-        if (cancelled) return;
-        const latest = times[times.length - 1];
-        setResult(latest ? { status: 'ready', time: latest } : { status: 'unavailable' });
-      }).catch(() => {
-        if (!cancelled) setResult({ status: 'unavailable' });
-      });
-    };
-    setResult({ status: 'loading' });
-    load();
-    const timer = window.setInterval(load, REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+    return pollLayerTime({ url, layer }, setResult);
   }, [url, layer]);
   return result;
 };
