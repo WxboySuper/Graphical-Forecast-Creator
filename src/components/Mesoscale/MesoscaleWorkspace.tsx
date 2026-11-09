@@ -4,7 +4,7 @@
  * stale, partial, and failed data are always shown explicitly; an old cycle is
  * never presented as current.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
   useMesoscaleFrames,
@@ -20,6 +20,11 @@ import { MesoscaleLegend } from './MesoscaleLegend';
 import { MesoscaleMap } from './MesoscaleMap';
 import { SourcePanel, formatDuration } from './SourcePanel';
 import { StateMessage } from './StateMessage';
+import { AreaToolbar } from './areas/AreaToolbar';
+import { AreasPanel } from './areas/AreasPanel';
+import { DiscussionPanel } from './areas/DiscussionPanel';
+import { MesoscaleAreaLayer } from './areas/MesoscaleAreaLayer';
+import { useMesoscaleAreas, type MesoscaleAreasController } from './areas/useMesoscaleAreas';
 import { useMesoscaleSelection, type MesoscaleSelection } from './useMesoscaleSelection';
 import './Mesoscale.css';
 
@@ -51,7 +56,25 @@ const FrameNotices: React.FC<{ frame: Frame; stale: boolean; ageMinutes: number 
   </>
 );
 
-interface RailProps {
+type RailTab = 'data' | 'areas' | 'discussion';
+
+const RAIL_TABS: Array<{ id: RailTab; label: string }> = [
+  { id: 'data', label: 'Data' },
+  { id: 'areas', label: 'Areas' },
+  { id: 'discussion', label: 'Discussion' },
+];
+
+const RailTabs: React.FC<{ tab: RailTab; areaCount: number; onChange: (tab: RailTab) => void }> = ({ tab, areaCount, onChange }) => (
+  <div className="mesoscale-segments mesoscale-rail__tabs" role="group" aria-label="Workspace sections">
+    {RAIL_TABS.map(item => (
+      <button key={item.id} type="button" className="mesoscale-segment" aria-pressed={tab === item.id} onClick={() => onChange(item.id)}>
+        {item.label}{item.id === 'areas' && areaCount > 0 ? ` (${areaCount})` : ''}
+      </button>
+    ))}
+  </div>
+);
+
+interface DataTabProps {
   selection: MesoscaleSelection;
   catalog: MesoscaleCatalog;
   frame: Frame;
@@ -60,8 +83,14 @@ interface RailProps {
   stale: boolean;
 }
 
-const DataRail: React.FC<RailProps> = ({ selection, catalog, frame, parameters, ageMinutes, stale }) => (
-  <div className="mesoscale-rail__scroll">
+interface RailProps extends DataTabProps {
+  tab: RailTab;
+  onTabChange: (tab: RailTab) => void;
+  areas: MesoscaleAreasController;
+}
+
+const DataTab: React.FC<DataTabProps> = ({ selection, catalog, frame, parameters, ageMinutes, stale }) => (
+  <>
     <FrameNotices frame={frame} stale={stale} ageMinutes={ageMinutes} />
     <SourcePanel
       modelId={selection.modelId}
@@ -74,6 +103,15 @@ const DataRail: React.FC<RailProps> = ({ selection, catalog, frame, parameters, 
       onSelectHour={selection.selectHour}
     />
     <LayerPanel parameters={parameters} layers={selection.activeLayers} onChange={selection.setLayers} />
+  </>
+);
+
+const DataRail: React.FC<RailProps> = ({ tab, onTabChange, areas, ...data }) => (
+  <div className="mesoscale-rail__scroll">
+    <RailTabs tab={tab} areaCount={areas.areas.length} onChange={onTabChange} />
+    {tab === 'data' ? <DataTab {...data} /> : null}
+    {tab === 'areas' ? <AreasPanel areas={areas} /> : null}
+    {tab === 'discussion' ? <DiscussionPanel /> : null}
   </div>
 );
 
@@ -87,6 +125,15 @@ const RailToggle: React.FC<{ open: boolean; onToggle: () => void }> = ({ open, o
 const LoadedWorkspace: React.FC<{ selection: MesoscaleSelection; cycleTime: string; onRetry: () => void }> = ({ selection, cycleTime, onRetry }) => {
   const frames = useMesoscaleFrames(selection.modelId, cycleTime);
   const [railOpen, setRailOpen] = useState(true);
+  const [tab, setTab] = useState<RailTab>('data');
+  const areas = useMesoscaleAreas();
+  const { selectedId } = areas;
+  // Picking an area on the map brings up its editor.
+  useEffect(() => {
+    if (!selectedId) return;
+    setTab('areas');
+    setRailOpen(true);
+  }, [selectedId]);
   const catalog = 'data' in frames.result ? frames.result.data : null;
   const frame = catalog ? (catalog.frames.find(item => item.forecastHour === selection.forecastHour) ?? catalog.frames[0]) : undefined;
   const parameters = useMemo(() => (frame ? usableParameters(frame) : []), [frame]);
@@ -99,10 +146,17 @@ const LoadedWorkspace: React.FC<{ selection: MesoscaleSelection; cycleTime: stri
   return (
     <div className={`mesoscale-workspace${railOpen ? '' : ' is-rail-closed'}`} data-testid="mesoscale-workspace">
       <aside id="mesoscale-rail" className="mesoscale-rail" aria-label="Model data" hidden={!railOpen}>
-        <DataRail selection={selection} catalog={catalog} frame={frame} parameters={parameters} ageMinutes={frames.ageMinutes} stale={frames.stale} />
+        <DataRail tab={tab} onTabChange={setTab} areas={areas} selection={selection} catalog={catalog} frame={frame} parameters={parameters} ageMinutes={frames.ageMinutes} stale={frames.stale} />
       </aside>
       <div className="mesoscale-stage">
-        <MesoscaleMap layers={layerSpecs} domainBounds={catalog.domain.bounds} />
+        <MesoscaleMap layers={layerSpecs} domainBounds={catalog.domain.bounds}>
+          {(map) => (
+            <>
+              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} />
+              <AreaToolbar map={map} areas={areas} />
+            </>
+          )}
+        </MesoscaleMap>
         <RailToggle open={railOpen} onToggle={() => setRailOpen(open => !open)} />
         <MesoscaleLegend parameters={legendParameters} />
         <div className="mesoscale-unofficial"><UnofficialBadge /></div>

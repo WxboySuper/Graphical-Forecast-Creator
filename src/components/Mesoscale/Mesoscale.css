@@ -569,6 +569,13 @@
     bottom: 40px;
     max-height: 34%;
   }
+
+  /* Sit below the Data toggle instead of colliding with it. */
+  .mesoscale-toolbar {
+    top: 56px;
+    left: 12px;
+    transform: none;
+  }
 }
 
 /* Short screens (landscape phones): keep the map large. */
@@ -614,3 +621,244 @@
     transition: none;
   }
 }
+
+/* Rail tabs */
+.mesoscale-rail__tabs {
+  flex: 0 0 auto;
+}
+
+/* Area tools on the map */
+.mesoscale-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-md, 0 4px 14px rgba(0, 0, 0, 0.18));
+}
+
+.mesoscale-tool {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mesoscale-tool svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mesoscale-tool:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.mesoscale-tool[aria-pressed='true'] {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mesoscale-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mesoscale-tool:focus-visible,
+.mesoscale-area:focus-visible,
+.mesoscale-form__delete:focus-visible,
+.mesoscale-form__field input:focus-visible,
+.mesoscale-discussion:focus-visible {
+  outline: 2px solid rgb(37, 99, 235);
+  outline-offset: 2px;
+}
+
+.dark-mode .mesoscale-tool:focus-visible,
+.dark-mode .mesoscale-area:focus-visible,
+.dark-mode .mesoscale-form__delete:focus-visible,
+.dark-mode .mesoscale-form__field input:focus-visible,
+.dark-mode .mesoscale-discussion:focus-visible {
+  outline-color: rgb(96, 165, 250);
+}
+
+.mesoscale-toolbar__divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 4px;
+  background: var(--border-color);
+}
+
+/* Area list */
+.mesoscale-area-list {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mesoscale-area {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mesoscale-area:hover {
+  background: var(--bg-tertiary);
+}
+
+.mesoscale-area[aria-pressed='true'] {
+  border-color: var(--text-secondary);
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.mesoscale-area__swatch {
+  flex: 0 0 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.mesoscale-area__text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mesoscale-area__title {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mesoscale-area__meta {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Area editor and discussion */
+.mesoscale-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.mesoscale-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mesoscale-form__field em {
+  font-weight: 500;
+  font-style: normal;
+  color: var(--text-tertiary);
+}
+
+.mesoscale-form__field input,
+.mesoscale-discussion {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 500;
+}
+
+.mesoscale-form__field input[aria-invalid='true'] {
+  border-color: rgb(220, 38, 38);
+}
+
+.mesoscale-form__error {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(185, 28, 28);
+}
+
+.dark-mode .mesoscale-form__error {
+  color: rgb(252, 165, 165);
+}
+
+.mesoscale-form__window {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mesoscale-form__window legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mesoscale-form__delete {
+  align-self: flex-start;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  border-radius: 8px;
+  background: transparent;
+  color: rgb(185, 28, 28);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dark-mode .mesoscale-form__delete {
+  color: rgb(252, 165, 165);
+}
+
+.mesoscale-discussion {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.mesoscale-discussion__count {
+  margin: 0;
+  font-size: 11.5px;
+  text-align: right;
+  color: var(--text-tertiary);
+}
+
