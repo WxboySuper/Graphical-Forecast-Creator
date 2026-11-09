@@ -27,7 +27,7 @@ export const nextAreaTitle = (titles: string[]): string => {
   return `Area ${n}`;
 };
 
-export const createArea = (geometry: Polygon, now = new Date(), id = crypto.randomUUID(), title = 'Area 1'): MesoscaleArea => {
+export const createArea = (geometry: Polygon, now = new Date(), id: string = crypto.randomUUID(), title = 'Area 1'): MesoscaleArea => {
   const start = new Date(Math.floor(now.getTime() / HOUR_MS) * HOUR_MS);
   const timestamp = now.toISOString();
   return {
