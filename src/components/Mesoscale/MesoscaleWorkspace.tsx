@@ -153,7 +153,7 @@ const LoadedWorkspace: React.FC<{ selection: MesoscaleSelection; cycleTime: stri
         <MesoscaleMap layers={layerSpecs} domainBounds={catalog.domain.bounds}>
           {(map) => (
             <>
-              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} />
+              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} activeVertex={areas.activeVertex} />
               <AreaToolbar map={map} areas={areas} />
             </>
           )}

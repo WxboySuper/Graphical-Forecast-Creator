@@ -13,7 +13,10 @@ import Collection from 'ol/Collection';
 import Draw, { type DrawEvent } from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Snap from 'ol/interaction/Snap';
-import type { Geometry } from 'ol/geom';
+import { Point, type Geometry } from 'ol/geom';
+import { fromLonLat } from 'ol/proj';
+import CircleStyle from 'ol/style/Circle';
+import { Fill, Stroke, Style } from 'ol/style';
 import type { Polygon } from 'geojson';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
 import { removeDrawInteraction } from '../../Map/openLayersForecastUtilityHelpers';
@@ -31,6 +34,8 @@ interface Props {
   onDrawn: (polygon: Polygon) => void;
   onModified: (id: string, polygon: Polygon) => void;
   onSelect: (id: string | null) => void;
+  /** The vertex being edited from the keyboard, if any. */
+  activeVertex?: number | null;
 }
 
 const AREA_LAYER_Z_INDEX = 1000;
@@ -138,10 +143,28 @@ const useModifySelected = (props: Pick<Props, 'map' | 'areas' | 'selectedId' | '
   }, [map, source, areas, selectedId, tool, onModified]);
 };
 
-export const MesoscaleAreaLayer = ({ map, areas, selectedId, tool, onDrawn, onModified, onSelect }: Props): null => {
+const VERTEX_LAYER_Z_INDEX = 1100;
+const vertexMarkerStyle = new Style({
+  image: new CircleStyle({ radius: 8, fill: new Fill({ color: '#ffffff' }), stroke: new Stroke({ color: '#1d4ed8', width: 4 }) }),
+});
+
+/** Marks the vertex being edited from the keyboard so the active position is visible on the map. */
+const useActiveVertexMarker = ({ map, areas, selectedId, activeVertex }: Pick<Props, 'map' | 'areas' | 'selectedId'> & { activeVertex: number | null }): void => {
+  useEffect(() => {
+    const area = areas.find(item => item.id === selectedId);
+    const position = area && activeVertex !== null ? area.geometry.coordinates[0][activeVertex] : undefined;
+    if (!position) return undefined;
+    const layer = new VectorLayer({ source: new VectorSource({ features: [new Feature(new Point(fromLonLat(position)))] }), style: vertexMarkerStyle, zIndex: VERTEX_LAYER_Z_INDEX });
+    map.addLayer(layer);
+    return () => { map.removeLayer(layer); };
+  }, [map, areas, selectedId, activeVertex]);
+};
+
+export const MesoscaleAreaLayer = ({ map, areas, selectedId, tool, onDrawn, onModified, onSelect, activeVertex = null }: Props): null => {
   const source = useAreaSource(map, areas, selectedId);
   useSelectOnClick(map, tool === 'select', onSelect);
   useDrawTool(map, source, tool, onDrawn);
   useModifySelected({ map, source, areas, selectedId, tool, onModified });
+  useActiveVertexMarker({ map, areas, selectedId, activeVertex });
   return null;
 };

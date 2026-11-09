@@ -4,12 +4,16 @@ import { HAZARD_SUGGESTIONS, isoToUtcInput, utcInputToIso, validateAreaFields } 
 import type { Polygon } from 'geojson';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
 import { ShapeControls } from './ShapeControls';
+import { VertexEditor } from './VertexEditor';
 
 interface Props {
   area: MesoscaleArea;
   onChange: (changes: Partial<MesoscaleArea>) => void;
   onDelete: () => void;
   onGeometry: (geometry: Polygon) => void;
+  /** Vertex nudges; `coalesce` merges a run of them into one undo step. */
+  onVertexChange: (geometry: Polygon, coalesce: boolean) => void;
+  onActiveVertex: (index: number | null) => void;
 }
 
 const FieldError: React.FC<{ message?: string }> = ({ message }) =>
@@ -65,7 +69,7 @@ const WindowFields: React.FC<{ area: MesoscaleArea; error?: string; onChange: Pr
   </fieldset>
 );
 
-export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeometry }) => {
+export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeometry, onVertexChange, onActiveVertex }) => {
   const errors = validateAreaFields(area);
   return (
     <form className="mesoscale-form" aria-label={`Edit ${area.title}`} onSubmit={(event) => event.preventDefault()}>
@@ -78,6 +82,7 @@ export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeomet
         <FieldError message={errors.confidence} />
       </label>
       <ShapeControls geometry={area.geometry} onChange={onGeometry} />
+      <VertexEditor areaId={area.id} geometry={area.geometry} onChange={onVertexChange} onActiveVertex={onActiveVertex} />
       <WindowFields area={area} error={errors.window} onChange={onChange} />
       <button type="button" className="mesoscale-form__delete" onClick={onDelete}>Delete area</button>
     </form>
