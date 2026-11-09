@@ -6,6 +6,13 @@ from dataclasses import dataclass
 VERSION = "gfc-mesoscale-ingest/1.0.0"
 
 ZOOM_MIN, ZOOM_MAX = 3, 4
+MODEL_ZOOM_MAX = {"hrrr": 5, "rap": 4, "rrfs": 5}
+
+
+def zoom_range(model_id: str) -> tuple[int, int]:
+    if model_id not in MODEL_ZOOM_MAX:
+        raise ValueError(f"unsupported mesoscale model: {model_id}")
+    return ZOOM_MIN, MODEL_ZOOM_MAX[model_id]
 
 RETRIES = 4
 

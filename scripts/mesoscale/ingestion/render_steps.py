@@ -12,7 +12,7 @@ from inventory import parse_idx, resolve_ranges
 
 from .archives import ArchiveRequest, create_archive
 from .discovery import FrameSource, request
-from .fields import FIELDS, VERSION, ZOOM_MIN, ZOOM_MAX, Model, display_name, identities_for_field, source_metadata
+from .fields import FIELDS, VERSION, Model, display_name, identities_for_field, source_metadata, zoom_range
 
 BOUNDS = [-130, 20, -60, 55]
 
@@ -163,15 +163,16 @@ def valid_range_response(response, data: bytes, expected_range: str, expected_by
 
 def render_fields(context, source: SourceBundle, fields: dict, render_tiles) -> tuple[list, dict, int, int, int]:
     params, archives, count, tile_size, archive_size = [], {}, 0, 0, 0
+    min_zoom, max_zoom = zoom_range(context.model.id)
     root = context.output / context.model.id / context.cycle.strftime("%Y%m%dT%H00Z") / f"f{context.forecast_hour:02d}"
     processed = datetime.now(UTC)
     for field_id, descriptors in fields.items():
         item, spec = descriptors[0], FIELDS[field_id]
         field_dir = root / field_id
         from .render import TileRenderRequest
-        tile_count, bytes_written = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4]))
+        tile_count, bytes_written = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4], max_zoom))
         key = archive_key(context, field_id)
-        archive = create_archive(ArchiveRequest(field_dir, root / f"{field_id}.pmtiles", ZOOM_MIN, ZOOM_MAX))
+        archive = create_archive(ArchiveRequest(field_dir, root / f"{field_id}.pmtiles", min_zoom, max_zoom))
         parameter = parameter_metadata(ParameterBuild(context, source, processed, field_id, item, spec, descriptors))
         parameter["data"].update({"archiveKey": key, "archiveSha256": archive.sha256, "archiveBytes": archive.size, "tileCompression": "none"})
         params.append(parameter)
@@ -193,7 +194,8 @@ def parameter_metadata(request: ParameterBuild) -> dict:
     cycle_id = context.cycle.strftime("%Y%m%dT%H00Z")
     hour = context.forecast_hour
     level = next((entry["record"].get("level") for entry in descriptors if entry["record"].get("level")), spec[3])
-    return {"id": field_id, "displayName": display_name(field_id), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
+    min_zoom, max_zoom = zoom_range(context.model.id)
+    return {"id": field_id, "displayName": display_name(field_id), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": min_zoom, "maxZoom": max_zoom, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
 
 
 def frame_record(context, result: FrameResult) -> dict:
@@ -213,7 +215,8 @@ def build_catalog(request: CycleBuild) -> dict:
     cycle_text = context.cycle.strftime("%Y-%m-%dT%H:%M:%SZ")
     received = min((result.received for result in request.results), default=processed)
     age = max(0, int((processed-context.cycle).total_seconds() // 60))
-    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": ZOOM_MIN, "maxZoom": ZOOM_MAX}, "source": source_metadata(context.model), "requestedParameterIds": sorted(set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())), "frames": frames}
+    min_zoom, max_zoom = zoom_range(context.model.id)
+    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": min_zoom, "maxZoom": max_zoom}, "source": source_metadata(context.model), "requestedParameterIds": sorted(set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())), "frames": frames}
 
 
 def cycle_metrics(frames: list[dict], results: list[FrameResult]) -> dict:
