@@ -290,6 +290,12 @@ serialTest('tile requests accept the zoom interval published by the field catalo
   const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/5/0/0.png'), env);
   assert.equal(response.status, 404);
   assert.equal(response.headers.get('Cache-Control'), 'public, max-age=60');
+
+  clearPmtilesCacheForTests();
+  const mismatchedArchive = await createPmtilesFixture({ maxZoom: 6 });
+  const mismatchedEnv = tileEnvFor(rangeBucket(mismatchedArchive), catalog);
+  const mismatchedResponse = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/5/0/0.png'), mismatchedEnv);
+  assert.equal(mismatchedResponse.status, 502);
 });
 
 serialTest('invalid catalog archive data returns a controlled gateway response', async () => {

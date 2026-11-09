@@ -18,6 +18,11 @@ test('parses the v3 header and delta encoded root directory', async () => {
   assert.throws(() => parseHeader(oversizedRootHeader), /root directory range/);
 });
 
+test('PMTiles fixture rejects zoom values outside the header byte range', async () => {
+  await assert.rejects(createPmtilesFixture({ maxZoom: 256 }), /maxZoom must be a byte value/);
+  await assert.rejects(createPmtilesFixture({ minZoom: -1 }), /minZoom must be a byte value/);
+});
+
 test('reads leaf directories and gzip compressed directory bytes', async () => {
   for (const options of [{ leaf: true }, { gzip: true }, { leaf: true, gzip: true }]) {
     clearPmtilesCacheForTests();

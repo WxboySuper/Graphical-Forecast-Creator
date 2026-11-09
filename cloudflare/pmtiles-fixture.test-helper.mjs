@@ -26,7 +26,15 @@ const fixtureLeaf = async ({ bytes, leaf, gzip }) => {
   return leafBytes;
 };
 
-export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, maxZoom = 4 } = {}) => {
+const assertZoomByte = (zoom, label) => {
+  if (!Number.isInteger(zoom)) throw new TypeError(`${label} must be an integer`);
+  if (zoom < 0) throw new RangeError(`${label} must be a byte value`);
+  if (zoom > 255) throw new RangeError(`${label} must be a byte value`);
+};
+
+export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, minZoom = PUBLISHED_TILE_CONTRACT.minZoom, maxZoom = 4 } = {}) => {
+  assertZoomByte(minZoom, 'minZoom');
+  assertZoomByte(maxZoom, 'maxZoom');
   const leafBytes = await fixtureLeaf({ bytes, leaf, gzip });
   let root = leaf ? directory({ runLength: 0, length: leafBytes.length }) : directory({ length: tileLength });
   if (gzip) root = await gzipBytes(root);
@@ -46,7 +54,7 @@ export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 7
   put64(40, leaf ? leafOffset : 0); put64(48, leaf ? leafBytes.length : 0);
   put64(56, tileOffset); put64(64, bytes.length);
   archive[97] = gzip ? 2 : 1; archive[98] = 1; archive[99] = 2;
-  archive[100] = PUBLISHED_TILE_CONTRACT.minZoom; archive[101] = maxZoom;
+  archive[100] = minZoom; archive[101] = maxZoom;
   view.setInt32(102, PUBLISHED_TILE_CONTRACT.minLonE7, true); view.setInt32(106, PUBLISHED_TILE_CONTRACT.minLatE7, true);
   view.setInt32(110, PUBLISHED_TILE_CONTRACT.maxLonE7, true); view.setInt32(114, PUBLISHED_TILE_CONTRACT.maxLatE7, true);
   archive.set(root, rootOffset);
