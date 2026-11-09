@@ -40,8 +40,6 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  max-height: 40vh;
-  overflow: auto;
   padding: 10px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -105,33 +103,14 @@
   background: var(--bg-primary);
 }
 
-@media (max-width: 760px) {
-  .monitor-page {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(150px, 38vh) minmax(0, 1fr);
-  }
-
-  .monitor-controls {
-    grid-row: 1;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-color);
-  }
-
-  .monitor-map {
-    grid-row: 2;
-    min-height: 0;
-  }
-}
-
-@media (max-height: 520px) and (orientation: landscape) {
-  .monitor-page {
-    grid-template-columns: minmax(250px, 34vw) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .monitor-mesoscale {
-    max-height: 28vh;
-  }
+.monitor-mesoscale__loading,
+.monitor-mesoscale__legend-toggle {
+  padding: 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  font-size: 12px;
 }
 
 .monitor-controls__header {

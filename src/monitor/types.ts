@@ -103,3 +103,9 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
 
 export const areMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
+
+export const areSyncedMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean => {
+  const { mesoscale: _leftMesoscale, ...leftSynced } = left;
+  const { mesoscale: _rightMesoscale, ...rightSynced } = right;
+  return JSON.stringify(leftSynced) === JSON.stringify(rightSynced);
+};

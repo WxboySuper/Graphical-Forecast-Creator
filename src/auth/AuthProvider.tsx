@@ -42,6 +42,8 @@ import type { UserSettingsDocument } from './userSettingsDocument';
 import {
   areUserSettingsEqual,
   mergeUserSettingsDocument,
+  toRemoteMonitorSettings,
+  toRemoteUserSettingsDocument,
 } from './userSettingsDocument';
 import { getSettingsUpdateError } from './authSyncErrors';
 import {
@@ -212,7 +214,7 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
     ghostOutlooks: overlays.ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
-    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
+    monitorSettings: toRemoteMonitorSettings(monitorSettings ?? DEFAULT_MONITOR_SETTINGS) as MonitorSettings,
   };
 };
 
@@ -255,7 +257,7 @@ const writeHostedSettingsDocument = async (
   await setDoc(
     settingsRef,
     {
-      ...nextSettings,
+      ...toRemoteUserSettingsDocument(nextSettings),
       updatedAt: serverTimestamp(),
     },
     { merge: true },

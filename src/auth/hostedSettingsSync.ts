@@ -21,9 +21,11 @@ import { writeStoredForecastUiVariant } from '../utils/forecastUiVariant';
 import {
   areUserSettingsEqual,
   readRemoteSettings,
+  toRemoteUserSettingsDocument,
   type UserSettingsDocument,
 } from './userSettingsDocument';
-import { areMonitorSettingsEqual } from '../monitor/types';
+import { areSyncedMonitorSettingsEqual } from '../monitor/types';
+import { readStoredMonitorSettings } from '../monitor/storage';
 import { getSettingsSyncError } from './authSyncErrors';
 
 export type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
@@ -70,7 +72,7 @@ export const isUserSettingsDocumentFieldEqual = (
     return JSON.stringify(left) === JSON.stringify(right);
   }
   if (key === 'monitorSettings') {
-    return areMonitorSettingsEqual(
+    return areSyncedMonitorSettingsEqual(
       left as UserSettingsDocument['monitorSettings'],
       right as UserSettingsDocument['monitorSettings'],
     );
@@ -392,7 +394,7 @@ const executeDebouncedHostedSettingsWrite = (
   setDoc(
     execution.settingsRef,
     {
-      ...execution.targetSettings,
+      ...toRemoteUserSettingsDocument(execution.targetSettings),
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -541,7 +543,11 @@ export const applySettingsToState = (
   }
 
   writeStoredForecastUiVariant(settings.forecastUiVariant);
-  dispatch(applyMonitorSettings(settings.monitorSettings));
+  const localMonitorSettings = readStoredMonitorSettings();
+  dispatch(applyMonitorSettings({
+    ...settings.monitorSettings,
+    mesoscale: localMonitorSettings.mesoscale,
+  }));
   lastSyncedSettingsRef.current = nextLastSynced;
   setSyncedSettings(settings);
 };
@@ -603,7 +609,7 @@ export const getRemoteSeedPayload = (
   settings: UserSettingsDocument,
   opts?: { includeCreatedAt?: boolean },
 ) => ({
-  ...settings,
+  ...toRemoteUserSettingsDocument(settings),
   updatedAt: serverTimestamp(),
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });

@@ -20,6 +20,16 @@ export interface MonitorMesoscaleIntegrationProps {
 }
 
 const modelLabel: Record<MesoscaleModelId, string> = { hrrr: 'HRRR', rap: 'RAP', rrfs: 'RRFS' };
+const EMPTY_LAYERS: MesoscaleLayerSpec[] = [];
+const EMPTY_PARAMETERS: MesoscaleCatalogParameter[] = [];
+
+export const currentCatalogDisplay = (
+  status: string | null,
+  layers: MesoscaleLayerSpec[],
+  legend: MesoscaleCatalogParameter[],
+): Pick<MonitorMesoscaleView, 'layers' | 'legend'> => status === null
+  ? { layers, legend }
+  : { layers: EMPTY_LAYERS, legend: EMPTY_PARAMETERS };
 
 const isCatalogResult = (result: ReturnType<typeof useMesoscaleFrames>['result']): result is Extract<typeof result, { data: MesoscaleCatalog }> => 'data' in result;
 
@@ -71,7 +81,7 @@ const AnalysisReadout: React.FC<{ model: MesoscaleModelId; catalog: MesoscaleCat
       <span>{modelLabel[model]} analysis (f00)</span>
       <span>Cycle {formatUtc(catalog.cycleTime)}</span>
       <span>Valid {formatUtc(analysis.validTime)}</span>
-      <span>{ageMinutes ?? 0} min old{stale ? ' · stale' : ''}</span>
+      <span>{ageMinutes === null ? 'Age unknown' : `${ageMinutes} min old`}{stale ? ' · stale' : ''}</span>
       {source ? <a href={source.url} target="_blank" rel="noreferrer">{source.attribution}</a> : <span>Source attribution unavailable</span>}
       {isMesoscaleDemoData() ? <span role="note">Demo data: placeholder imagery, not real model output.</span> : null}
       {hasUnavailableFields ? <span role="status">Unavailable parameters: {unavailableParameterIds(catalog, analysis)}</span> : null}
@@ -96,20 +106,20 @@ const MesoscaleCatalogPanel: React.FC<MonitorMesoscaleIntegrationProps & { cycle
   const analysis = findAnalysisFrame(catalog);
   const parameters = useMemo(() => availableParameters(analysis), [analysis]);
   const layers = useMemo(() => selectedLayerSpecs(settings, parameters), [parameters, settings]);
-  const selectedParameters = layers.map((layer) => layer.parameter);
+  const selectedParameters = useMemo(() => layers.map((layer) => layer.parameter), [layers]);
   const status = catalogState(frames, catalog, analysis);
   const content = catalog && analysis && status === null
     ? <AnalysisReadout model={settings.model} catalog={catalog} analysis={analysis} ageMinutes={frames.ageMinutes} stale={frames.stale} />
     : stateMessage(status ?? 'missing', retry);
   const panel = integrationPanel(settings, onSettingsChange, parameters, content);
-  return <>{children({ panel, layers, legend: selectedParameters })}</>;
+  return <>{children({ panel, ...currentCatalogDisplay(status, layers, selectedParameters) })}</>;
 };
 
 const MesoscaleLatestPanel: React.FC<MonitorMesoscaleIntegrationProps & { retry: () => void }> = ({ settings, onSettingsChange, children, retry }) => {
   const latest = useMesoscaleLatest(settings.model);
   if (!('data' in latest.result)) {
     const panel = integrationPanel(settings, onSettingsChange, [], stateMessage(latest.result.state, retry));
-    return <>{children({ panel, layers: [], legend: [] })}</>;
+    return <>{children({ panel, layers: EMPTY_LAYERS, legend: EMPTY_PARAMETERS })}</>;
   }
   return <MesoscaleCatalogPanel settings={settings} onSettingsChange={onSettingsChange} cycle={latest.result.data.cycleTime} retry={retry}>{children}</MesoscaleCatalogPanel>;
 };

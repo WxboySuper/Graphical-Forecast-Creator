@@ -86,10 +86,15 @@ describe('readRemoteSettings', () => {
     ).toBeNull();
   });
 
-  test('round-trips a valid document', () => {
+  test('normalizes remote documents without local mesoscale preferences', () => {
     const baseSettings = buildBaseSettings();
+    const { mesoscale: _localOnly, ...remoteMonitorSettings } = baseSettings.monitorSettings;
 
-    expect(readRemoteSettings({ ...baseSettings })).toEqual(baseSettings);
+    expect(readRemoteSettings({ ...baseSettings, monitorSettings: remoteMonitorSettings })).toEqual(
+      expect.objectContaining({
+        monitorSettings: expect.objectContaining({ mesoscale: DEFAULT_MONITOR_SETTINGS.mesoscale }),
+      }),
+    );
   });
 
   test('unknown variant falls back to the default variant', () => {
@@ -124,6 +129,7 @@ describe('readRemoteSettings', () => {
 
 describe('createSettingsSnapshot', () => {
   test('builds the normalized document from local state', () => {
+    const { mesoscale: _localOnly, ...remoteMonitorSettings } = DEFAULT_MONITOR_SETTINGS;
     expect(buildBaseSettings()).toEqual({
       darkMode: false,
       baseMapStyle: 'osm',
@@ -132,11 +138,11 @@ describe('createSettingsSnapshot', () => {
       ghostOutlooks: TEST_OVERLAY_STATE.ghostOutlooks,
       defaultForecasterName: 'Forecaster',
       forecastUiVariant: 'workspace_dock',
-      monitorSettings: DEFAULT_MONITOR_SETTINGS,
+      monitorSettings: remoteMonitorSettings,
     });
   });
 
-  test('keeps provided monitor settings instead of defaults', () => {
+  test('builds a normalized Monitor settings snapshot', () => {
     const monitorSettings = { ...DEFAULT_MONITOR_SETTINGS, radarMode: 'site' as const };
     const snapshot = createSettingsSnapshot({
       darkMode: true,
@@ -146,7 +152,8 @@ describe('createSettingsSnapshot', () => {
       monitorSettings,
     });
 
-    expect(snapshot.monitorSettings).toEqual(monitorSettings);
+    expect(snapshot.monitorSettings.radarMode).toBe('site');
+    expect(snapshot.monitorSettings).not.toHaveProperty('mesoscale');
   });
 });
 
@@ -201,6 +208,7 @@ describe('getRemoteSeedPayload', () => {
 
     expect(seedWithoutCreatedAt).toEqual(expect.objectContaining({ updatedAt: expect.anything() }));
     expect(seedWithoutCreatedAt).not.toHaveProperty('createdAt');
+    expect(seedWithoutCreatedAt.monitorSettings).not.toHaveProperty('mesoscale');
   });
 
   test('includes a creation marker when requested', () => {
