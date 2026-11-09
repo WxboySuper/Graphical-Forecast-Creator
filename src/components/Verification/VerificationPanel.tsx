@@ -17,7 +17,7 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../../utils/stormReportParser';
+import { fetchFilteredStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../../utils/stormReportParser';
 import {
   getCurrentSpcReportDate,
   isTodayReportDate,
@@ -51,7 +51,7 @@ const fetchReportsForSource = (
   if (source === 'yesterday') {
     return fetchYesterdayStormReports();
   }
-  return fetchStormReports(reportDate);
+  return fetchFilteredStormReports(reportDate);
 };
 
 const isCurrentReportRequest = (

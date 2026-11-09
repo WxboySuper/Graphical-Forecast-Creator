@@ -232,6 +232,27 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
   return raw.reports;
 }
 
+/** Fetches only the filtered SPC archive for verification, with no raw fallback. */
+export async function fetchFilteredStormReports(date: string): Promise<StormReport[]> {
+  const url = archiveUrlForDate({ date, format: 'filtered' });
+  const unavailableMessage = `Filtered SPC storm reports are unavailable for ${date}.`;
+  const { response, text } = await fetchResponseText({ url, context: `filtered SPC storm reports for ${date}` });
+  if (!response.ok) {
+    throw new Error(unavailableMessage);
+  }
+  if (!text) {
+    throw new Error(unavailableMessage);
+  }
+  if (!hasFilteredArchiveHeaders({ csvText: text })) {
+    throw new Error(unavailableMessage);
+  }
+  try {
+    return parseTodayStormReportCsv(text);
+  } catch {
+    throw new Error(unavailableMessage);
+  }
+}
+
 /** Reuses a short-lived raw-archive probe result and bounds session memory. */
 function shouldUseRawArchive(date: string): boolean {
   const expiresAt = RAW_ONLY_ARCHIVE_DATES.get(date);
