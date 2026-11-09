@@ -19,7 +19,7 @@ flowchart LR
 | **Forecast** | Draw/edit/cut polygons for tornado, wind, hail, categorical and Day 4-8 outlooks. Categorical is derived automatically. CIG hatching for significant areas. Days 1-8, named cycles, undo/redo. | `src/pages/ForecastPage.tsx` |
 | **Discussion** | Write a text discussion (free-form "DIY" or a guided question flow), preview it, export as `.txt`. | `src/pages/DiscussionPage.tsx` |
 | **Monitor** | Radar, satellite, live storm reports, NWS alerts and SPC mesoscale discussions next to your forecast. | `src/pages/MonitorPage.tsx`, `src/monitor/` |
-| **Verification** | Load NOAA storm reports for a date, plot them over your outlook, see hit/miss stats per risk level. Isolated from your active cycle. | `src/pages/VerificationPage.tsx` |
+| **Verification** | Compare an outlook with filtered SPC storm reports, plot them on the map, and see hit/miss stats per risk level. GFC reports when filtered reports are unavailable for a date. Isolated from your active cycle. | `src/pages/VerificationPage.tsx` |
 
 There is also an account page (`AccountPage`) for sign-in, billing and cloud cycles.
 
