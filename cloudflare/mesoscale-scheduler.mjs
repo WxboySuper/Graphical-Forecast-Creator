@@ -50,7 +50,8 @@ const isSafeSetting = (name, value) => CHECKS[name].test(value) && !value.includ
 const WORKFLOW_FILE = new RegExp(String.raw`^${SEGMENT}\.ya?ml$`);
 
 const isString = (value) => typeof value === 'string';
-const isFlatStringMap = (value) => value !== null && typeof value === 'object' && Object.values(value).every(isString);
+const isFlatStringMap = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && Object.values(value).every(isString);
 const hasSafeWorkflow = (job) => isString(job?.workflow) && WORKFLOW_FILE.test(job.workflow);
 const hasValidInputs = (job) => job.inputs === undefined || isFlatStringMap(job.inputs);
 

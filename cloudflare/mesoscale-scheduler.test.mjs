@@ -62,6 +62,7 @@ test('rejects a malformed job before building a request', () => {
   assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml/../b.yml' }), /Invalid scheduler job/);
   assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml', inputs: { dry_run: false } }), /Invalid scheduler job/);
   assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml', inputs: null }), /Invalid scheduler job/);
+  assert.throws(() => buildDispatchRequest(env, { workflow: 'a.yml', inputs: [] }), /Invalid scheduler job/);
 });
 
 test('a cron event without an expression is an error', async () => {
