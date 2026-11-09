@@ -1,12 +1,15 @@
 /** Editor for the selected area: title, hazard or theme, optional confidence, and the valid window in UTC. */
 import React, { useEffect, useState } from 'react';
 import { HAZARD_SUGGESTIONS, isoToUtcInput, utcInputToIso, validateAreaFields } from './areaModel';
+import type { Polygon } from 'geojson';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
+import { ShapeControls } from './ShapeControls';
 
 interface Props {
   area: MesoscaleArea;
   onChange: (changes: Partial<MesoscaleArea>) => void;
   onDelete: () => void;
+  onGeometry: (geometry: Polygon) => void;
 }
 
 const FieldError: React.FC<{ message?: string }> = ({ message }) =>
@@ -62,7 +65,7 @@ const WindowFields: React.FC<{ area: MesoscaleArea; error?: string; onChange: Pr
   </fieldset>
 );
 
-export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete }) => {
+export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeometry }) => {
   const errors = validateAreaFields(area);
   return (
     <form className="mesoscale-form" aria-label={`Edit ${area.title}`} onSubmit={(event) => event.preventDefault()}>
@@ -74,6 +77,7 @@ export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete }) => {
         <input type="number" min={0} max={100} step={5} inputMode="numeric" value={area.confidence ?? ''} aria-invalid={Boolean(errors.confidence)} onChange={confidenceChange(onChange)} />
         <FieldError message={errors.confidence} />
       </label>
+      <ShapeControls geometry={area.geometry} onChange={onGeometry} />
       <WindowFields area={area} error={errors.window} onChange={onChange} />
       <button type="button" className="mesoscale-form__delete" onClick={onDelete}>Delete area</button>
     </form>

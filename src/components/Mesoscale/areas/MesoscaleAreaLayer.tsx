@@ -10,17 +10,18 @@ import Feature from 'ol/Feature';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import Collection from 'ol/Collection';
-import Draw from 'ol/interaction/Draw';
+import Draw, { type DrawEvent } from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Snap from 'ol/interaction/Snap';
-import { Fill, Stroke, Style, Text } from 'ol/style';
 import type { Geometry } from 'ol/geom';
 import type { Polygon } from 'geojson';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
 import { removeDrawInteraction } from '../../Map/openLayersForecastUtilityHelpers';
-import { featureToPolygon, hazardHue, polygonToGeometry } from './areaModel';
+import { featureToPolygon, polygonToGeometry } from './areaModel';
+import { areaStyle } from './areaStyle';
+import { isDegenerate, isShapeTool, shapeGeometryFunction, type AreaShapeTool } from './areaShapes';
 
-export type AreaTool = 'select' | 'draw';
+export type AreaTool = 'select' | 'draw' | AreaShapeTool;
 
 interface Props {
   map: OLMap;
@@ -33,21 +34,6 @@ interface Props {
 }
 
 const AREA_LAYER_Z_INDEX = 1000;
-
-const areaStyle = (feature: Feature<Geometry>, selected: boolean): Style => {
-  const hue = hazardHue(String(feature.get('hazard') ?? ''));
-  return new Style({
-    stroke: new Stroke({ color: `hsl(${hue} 80% ${selected ? 38 : 45}%)`, width: selected ? 4 : 2.5 }),
-    fill: new Fill({ color: `hsl(${hue} 80% 50% / ${selected ? 0.28 : 0.16})` }),
-    text: new Text({
-      text: String(feature.get('title') ?? ''),
-      font: '600 13px system-ui, sans-serif',
-      fill: new Fill({ color: '#111' }),
-      stroke: new Stroke({ color: '#fff', width: 3 }),
-      overflow: true,
-    }),
-  });
-};
 
 /** Creates the vector layer once and mirrors the stored areas into it. */
 const useAreaSource = (map: OLMap, areas: MesoscaleArea[], selectedId: string | null): VectorSource => {
@@ -71,7 +57,7 @@ const useAreaSource = (map: OLMap, areas: MesoscaleArea[], selectedId: string | 
     source.addFeatures(areas.flatMap((area) => {
       const geometry = polygonToGeometry(area.geometry);
       if (!geometry) return [];
-      const feature = new Feature({ geometry, title: area.title, hazard: area.hazard });
+      const feature = new Feature({ geometry, title: area.title, hazard: area.hazard, validStart: area.validStart, validEnd: area.validEnd });
       feature.setId(area.id);
       return [feature];
     }));
@@ -94,20 +80,35 @@ const useSelectOnClick = (map: OLMap, active: boolean, onSelect: (id: string | n
   }, [map, active, onSelect]);
 };
 
-const useDrawTool = (map: OLMap, source: VectorSource, active: boolean, onDrawn: (polygon: Polygon) => void): void => {
+const createDraw = (tool: AreaTool): Draw => (isShapeTool(tool)
+  ? new Draw({ source: new VectorSource(), type: 'Circle', freehand: true, geometryFunction: shapeGeometryFunction(tool) })
+  : new Draw({ source: new VectorSource(), type: 'Polygon' }));
+
+const FORM_FIELD_SELECTOR = 'input, textarea, select, [contenteditable="true"]';
+
+/** Forwards a finished sketch as a polygon, ignoring clicks that drew no area. */
+const handleDrawEnd = (event: DrawEvent, onDrawn: (polygon: Polygon) => void): void => {
+  const geometry = event.feature.getGeometry();
+  if (!geometry || isDegenerate(geometry)) return;
+  const polygon = featureToPolygon(event.feature as Feature<Geometry>);
+  if (polygon) onDrawn(polygon);
+};
+
+/** Backspace and Escape edit the sketch, except while the user is typing in a form field. */
+const drawKeyHandler = (draw: Draw) => (event: KeyboardEvent): void => {
+  if ((event.target as HTMLElement | null)?.closest?.(FORM_FIELD_SELECTOR)) return;
+  if (event.key === 'Escape') draw.abortDrawing();
+  if (event.key === 'Backspace') draw.removeLastPoint();
+};
+
+const useDrawTool = (map: OLMap, source: VectorSource, tool: AreaTool, onDrawn: (polygon: Polygon) => void): void => {
+  const active = tool !== 'select';
   useEffect(() => {
     if (!active) return undefined;
-    const draw = new Draw({ source: new VectorSource(), type: 'Polygon' });
+    const draw = createDraw(tool);
     const snap = new Snap({ source });
-    draw.on('drawend', (event) => {
-      const polygon = featureToPolygon(event.feature as Feature<Geometry>);
-      if (polygon) onDrawn(polygon);
-    });
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
-      if (event.key === 'Escape') draw.abortDrawing();
-      if (event.key === 'Backspace') draw.removeLastPoint();
-    };
+    const onKeyDown = drawKeyHandler(draw);
+    draw.on('drawend', (event) => handleDrawEnd(event, onDrawn));
     map.addInteraction(draw);
     map.addInteraction(snap);
     document.addEventListener('keydown', onKeyDown);
@@ -116,7 +117,7 @@ const useDrawTool = (map: OLMap, source: VectorSource, active: boolean, onDrawn:
       removeDrawInteraction(map, draw);
       map.removeInteraction(snap);
     };
-  }, [map, source, active, onDrawn]);
+  }, [map, source, tool, active, onDrawn]);
 };
 
 /** Lets the forecaster drag the vertices of the selected area only. */
@@ -140,7 +141,7 @@ const useModifySelected = (props: Pick<Props, 'map' | 'areas' | 'selectedId' | '
 export const MesoscaleAreaLayer = ({ map, areas, selectedId, tool, onDrawn, onModified, onSelect }: Props): null => {
   const source = useAreaSource(map, areas, selectedId);
   useSelectOnClick(map, tool === 'select', onSelect);
-  useDrawTool(map, source, tool === 'draw', onDrawn);
+  useDrawTool(map, source, tool, onDrawn);
   useModifySelected({ map, source, areas, selectedId, tool, onModified });
   return null;
 };

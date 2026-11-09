@@ -20,6 +20,7 @@ import { MesoscaleLegend } from './MesoscaleLegend';
 import { MesoscaleMap } from './MesoscaleMap';
 import { SourcePanel, formatDuration } from './SourcePanel';
 import { StateMessage } from './StateMessage';
+import { AreaLegend } from './areas/AreaLegend';
 import { AreaToolbar } from './areas/AreaToolbar';
 import { AreasPanel } from './areas/AreasPanel';
 import { DiscussionPanel } from './areas/DiscussionPanel';
@@ -157,6 +158,7 @@ const LoadedWorkspace: React.FC<{ selection: MesoscaleSelection; cycleTime: stri
             </>
           )}
         </MesoscaleMap>
+        <AreaLegend areas={areas.areas} />
         <RailToggle open={railOpen} onToggle={() => setRailOpen(open => !open)} />
         <MesoscaleLegend parameters={legendParameters} />
         <div className="mesoscale-unofficial"><UnofficialBadge /></div>
