@@ -41,6 +41,13 @@ describe('area model', () => {
   });
 });
 
+describe('window validation', () => {
+  it('reports an unparsable time as a window error', () => {
+    const area = createArea(polygon, { id: 'a1' });
+    expect(validateAreaFields({ ...area, validEnd: 'not a time' }).window).toBeDefined();
+  });
+});
+
 describe('useMesoscaleAreas history', () => {
   it('merges typing into one undo step and keeps geometry edits separate', () => {
     const { wrapper } = setup();

@@ -1,5 +1,5 @@
 /** Editor for the selected area: title, hazard or theme, optional confidence, and the valid window in UTC. */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { HAZARD_SUGGESTIONS, isoToUtcInput, utcInputToIso, validateAreaFields } from './areaModel';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
 
@@ -12,10 +12,25 @@ interface Props {
 const FieldError: React.FC<{ message?: string }> = ({ message }) =>
   message ? <span className="mesoscale-form__error" role="alert">{message}</span> : null;
 
-/** Keeps the previous value when a time input is cleared or incomplete. */
-const timeChange = (key: 'validStart' | 'validEnd', onChange: Props['onChange']) => (event: React.ChangeEvent<HTMLInputElement>): void => {
-  const iso = utcInputToIso(event.target.value);
-  if (iso) onChange({ [key]: iso });
+/**
+ * A UTC date-time input. It keeps what the user is typing in local state, so a half-typed
+ * value is not overwritten, and only commits a complete, valid time.
+ */
+const UtcTimeInput: React.FC<{ label: string; iso: string; invalid?: boolean; onCommit: (iso: string) => void }> = ({ label, iso, invalid, onCommit }) => {
+  const [draft, setDraft] = useState(isoToUtcInput(iso));
+  // Follow outside changes such as undo.
+  useEffect(() => setDraft(isoToUtcInput(iso)), [iso]);
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    setDraft(event.target.value);
+    const next = utcInputToIso(event.target.value);
+    if (next) onCommit(next);
+  };
+  return (
+    <label className="mesoscale-form__field">
+      <span>{label}</span>
+      <input type="datetime-local" value={draft} aria-invalid={invalid} onChange={handleChange} />
+    </label>
+  );
 };
 
 const confidenceChange = (onChange: Props['onChange']) => (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -41,8 +56,8 @@ const TextField: React.FC<{ label: string; value: string; max: number; list?: st
 const WindowFields: React.FC<{ area: MesoscaleArea; error?: string; onChange: Props['onChange'] }> = ({ area, error, onChange }) => (
   <fieldset className="mesoscale-form__window">
     <legend>Valid window (UTC)</legend>
-    <label className="mesoscale-form__field"><span>From</span><input type="datetime-local" value={isoToUtcInput(area.validStart)} onChange={timeChange('validStart', onChange)} /></label>
-    <label className="mesoscale-form__field"><span>Until</span><input type="datetime-local" value={isoToUtcInput(area.validEnd)} aria-invalid={Boolean(error)} onChange={timeChange('validEnd', onChange)} /></label>
+    <UtcTimeInput label="From" iso={area.validStart} onCommit={(validStart) => onChange({ validStart })} />
+    <UtcTimeInput label="Until" iso={area.validEnd} invalid={Boolean(error)} onCommit={(validEnd) => onChange({ validEnd })} />
     <FieldError message={error} />
   </fieldset>
 );

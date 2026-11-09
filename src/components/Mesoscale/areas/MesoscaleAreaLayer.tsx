@@ -68,10 +68,12 @@ const useAreaSource = (map: OLMap, areas: MesoscaleArea[], selectedId: string | 
 
   useEffect(() => {
     source.clear(true);
-    source.addFeatures(areas.map((area) => {
-      const feature = new Feature({ geometry: polygonToGeometry(area.geometry), title: area.title, hazard: area.hazard });
+    source.addFeatures(areas.flatMap((area) => {
+      const geometry = polygonToGeometry(area.geometry);
+      if (!geometry) return [];
+      const feature = new Feature({ geometry, title: area.title, hazard: area.hazard });
       feature.setId(area.id);
-      return feature;
+      return [feature];
     }));
   }, [areas, source]);
 

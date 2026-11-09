@@ -57,7 +57,14 @@ export const featureToPolygon = (feature: Feature<Geometry>): Polygon | null => 
   return isMesoscalePolygon(polygon) ? polygon : null;
 };
 
-export const polygonToGeometry = (polygon: Polygon): Geometry => geoJson.readGeometry(polygon) as Geometry;
+/** Reads a stored polygon for display; returns null instead of throwing so one bad area cannot blank the map. */
+export const polygonToGeometry = (polygon: Polygon): Geometry | null => {
+  try {
+    return geoJson.readGeometry(polygon) as Geometry;
+  } catch {
+    return null;
+  }
+};
 
 /** A stable color per hazard label, so any weather type gets a consistent hue. */
 export const hazardHue = (hazard: string): number => {
@@ -85,7 +92,8 @@ export type AreaFieldErrors = Partial<Record<'title' | 'hazard' | 'window' | 'co
 type EditableFields = Pick<MesoscaleArea, 'title' | 'hazard' | 'confidence' | 'validStart' | 'validEnd'>;
 
 const isBlank = (value: string): boolean => value.trim().length === 0;
-const isReversedWindow = (area: EditableFields): boolean => Date.parse(area.validStart) > Date.parse(area.validEnd);
+// Written as a negated <= so an unparsable time (NaN) is reported too.
+const isReversedWindow = (area: EditableFields): boolean => !(Date.parse(area.validStart) <= Date.parse(area.validEnd));
 const isBadConfidence = (value: number | undefined): boolean => value !== undefined && !(value >= 0 && value <= 100);
 
 const FIELD_RULES: Array<[keyof AreaFieldErrors, (area: EditableFields) => boolean, string]> = [
