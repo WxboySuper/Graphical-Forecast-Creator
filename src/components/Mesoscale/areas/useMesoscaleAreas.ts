@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import type { Polygon } from 'geojson';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
-import { createArea, nextAreaTitle } from './areaModel';
+import { createArea, newAreaId, nextAreaTitle } from './areaModel';
 import type { AreaTool } from './MesoscaleAreaLayer';
 import { useAreaHistory, type AreaHistory } from './useAreaHistory';
 
@@ -29,25 +29,27 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
   const atLimit = areas.length >= MAX_MESOSCALE_AREAS;
 
   const addPolygon = useCallback((polygon: Polygon) => {
-    if (areas.length >= MAX_MESOSCALE_AREAS) return;
-    const area = createArea(polygon, { title: nextAreaTitle(areas.map(item => item.title)) });
-    commit([...areas, area]);
-    setSelectedId(area.id);
+    const id = newAreaId();
+    commit((current) => (current.length >= MAX_MESOSCALE_AREAS
+      ? current
+      : [...current, createArea(polygon, { id, title: nextAreaTitle(current.map(item => item.title)) })]));
+    setSelectedId(id);
     setTool('select');
-  }, [areas, commit]);
+  }, [commit]);
 
   const updateArea = useCallback((id: string, changes: Partial<MesoscaleArea>) => {
-    const next = areas.map(area => (area.id === id ? { ...area, ...changes, updatedAt: new Date().toISOString() } : area));
+    const updatedAt = new Date().toISOString();
     // Typing in one field is one undo step; geometry changes always get their own.
-    commit(next, 'geometry' in changes ? undefined : `${id}:${Object.keys(changes).join(',')}`);
-  }, [areas, commit]);
+    const key = 'geometry' in changes ? undefined : `${id}:${Object.keys(changes).join(',')}`;
+    commit((current) => current.map(area => (area.id === id ? { ...area, ...changes, updatedAt } : area)), key);
+  }, [commit]);
 
   const setGeometry = useCallback((id: string, geometry: Polygon) => updateArea(id, { geometry }), [updateArea]);
 
   const removeArea = useCallback((id: string) => {
-    commit(areas.filter(area => area.id !== id));
+    commit((current) => current.filter(area => area.id !== id));
     setSelectedId(current => (current === id ? null : current));
-  }, [areas, commit]);
+  }, [commit]);
 
   const select = useCallback((id: string | null) => setSelectedId(id), []);
   return { ...history, tool, setTool, selectedId, select, atLimit, addPolygon, updateArea, setGeometry, removeArea };

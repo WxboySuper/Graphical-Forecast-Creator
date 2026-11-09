@@ -78,6 +78,7 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 /** Formats an ISO time for a `datetime-local` input, shown in UTC. */
 export const isoToUtcInput = (iso: string): string => {
   const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '';
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
 };
 
@@ -99,7 +100,7 @@ const isBadConfidence = (value: number | undefined): boolean => value !== undefi
 const FIELD_RULES: Array<[keyof AreaFieldErrors, (area: EditableFields) => boolean, string]> = [
   ['title', (area) => isBlank(area.title), 'Give the area a title.'],
   ['hazard', (area) => isBlank(area.hazard), 'Describe the hazard or theme.'],
-  ['window', isReversedWindow, 'The end must be after the start.'],
+  ['window', isReversedWindow, 'The end cannot be before the start.'],
   ['confidence', (area) => isBadConfidence(area.confidence), 'Use a value from 0 to 100.'],
 ];
 

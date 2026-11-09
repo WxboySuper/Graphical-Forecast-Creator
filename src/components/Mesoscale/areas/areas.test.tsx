@@ -48,6 +48,19 @@ describe('window validation', () => {
   });
 });
 
+describe('back-to-back edits', () => {
+  it('keeps every area when several are added before a re-render', () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useMesoscaleAreas(), { wrapper });
+    act(() => {
+      result.current.addPolygon(polygon);
+      result.current.addPolygon(polygon);
+      result.current.addPolygon(polygon);
+    });
+    expect(result.current.areas.map(area => area.title)).toEqual(['Area 1', 'Area 2', 'Area 3']);
+  });
+});
+
 describe('useMesoscaleAreas history', () => {
   it('merges typing into one undo step and keeps geometry edits separate', () => {
     const { wrapper } = setup();
