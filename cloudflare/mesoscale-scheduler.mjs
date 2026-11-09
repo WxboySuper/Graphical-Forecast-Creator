@@ -16,7 +16,10 @@ const GITHUB_API = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 const REQUEST_TIMEOUT_MS = 15000;
 
-/** Cron expression to the workflows it starts. Inputs are always strings for workflow_dispatch. */
+/**
+ * Cron expression to the workflows it starts. workflow_dispatch takes every input as a string, even
+ * ones the workflow declares as `type: boolean` (this is what `gh workflow run -f` sends too).
+ */
 export const JOBS = {
   '12,42 * * * *': [{ workflow: 'mesoscale-ingest.yml' }],
   '23 3,9,15,21 * * *': [
