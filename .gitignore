@@ -81,3 +81,4 @@ night-watch.config.json
 # Python bytecode from the mesoscale ingestion tools
 __pycache__/
 *.py[cod]
+cloudflare/wrangler.mesoscale.rendered.json
