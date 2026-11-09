@@ -9,28 +9,38 @@ inspect, decode, or calculate weather data.
 
 ## Deploy
 
-The beta asset deployment workflow targets a different Worker. No automated
-deployment is configured for `gfc-mesoscale`; deploy it manually after filling
-the placeholders in `cloudflare/wrangler.mesoscale.jsonc`:
+The `Release | Beta` workflow (`release-beta.yml`) deploys `gfc-mesoscale` after
+every beta cut. It runs when an owner dispatches it and on a daily schedule that
+skips itself unless `main` has new commits since the latest beta tag. The Worker
+is separate from the beta site Worker (`deploy-beta-workers.yml`).
 
-1. Create or select the dedicated R2 bucket used by the ingest publisher.
-2. Replace the account, bucket, and preview bucket placeholders. Add the
-   production Worker route or custom domain in the
-   Cloudflare dashboard after the hostname is ready.
-3. Set `PUBLIC_BASE_URL` to that public HTTPS origin, without a path. The Worker
-   uses it when building catalog tile templates and latest catalog links.
-4. Set `CORS_ALLOWED_ORIGINS` to a comma-separated exact origin list. The
-   default covers production (`https://gfc.weatherboysuper.com`), staging
-   (`https://staging-gfc.weatherboysuper.com`), beta
-   (`https://beta.gfcweather.com`), and local Vite development
-   (`http://localhost:3000` and `http://localhost:3002`). Add another local
-   port only when needed.
-5. Set `STALE_AFTER_MINUTES` to the operational age limit. It defaults to 180.
-6. Deploy with `pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale.jsonc`.
+To enable the job:
 
-Use a Wrangler API token with permission to deploy Workers and bind the target
-R2 bucket. Do not use the ingest writer credentials in this Worker. Runtime
-access is read-only through the R2 binding.
+1. Create the dedicated R2 bucket used by the ingest publisher and add its name
+   as the `R2_BUCKET` secret. `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
+   are the same secrets the beta site deploy uses; the token needs permission to
+   deploy Workers and bind R2. It must not be the ingest writer credential.
+2. Set the `MESOSCALE_WORKER_URL` repository variable to the Worker's public
+   https origin, without a path (for example the `workers.dev` URL or a custom
+   domain). While it is empty the job is skipped. The workflow also passes it to
+   the beta build as `VITE_MESOSCALE_WORKER_URL_BETA`.
+
+`scripts/render-mesoscale-wrangler.mjs` fills the account, bucket, and
+`PUBLIC_BASE_URL` placeholders in `cloudflare/wrangler.mesoscale.jsonc` at deploy
+time, runs the Worker tests, deploys, and checks `GET /status`. Edit the other
+`vars` in the checked-in file:
+
+- `CORS_ALLOWED_ORIGINS`: a comma-separated exact origin list. The default covers
+  production (`https://gfc.weatherboysuper.com`), staging
+  (`https://staging-gfc.weatherboysuper.com`), beta
+  (`https://beta.gfcweather.com`), and local Vite development
+  (`http://localhost:3000` and `http://localhost:3002`).
+- `STALE_AFTER_MINUTES`: the operational age limit; it defaults to 180.
+
+To deploy by hand, run the render script with `CLOUDFLARE_ACCOUNT_ID`,
+`MESOSCALE_R2_BUCKET`, and `MESOSCALE_PUBLIC_BASE_URL` set, then
+`pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale.rendered.json`.
+Runtime access is read-only through the R2 binding.
 
 ## App URL configuration
 

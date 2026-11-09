@@ -12,7 +12,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
-| `release-beta.yml` | Full beta cut, run on `main` | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
+| `release-beta.yml` | Full beta cut, run on `main`; also runs daily and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
 | `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
 | `bootstrap-stable-release.yml` | Create `stable/X.Y.x` at the approved main commit | |
