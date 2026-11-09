@@ -113,9 +113,12 @@ const useFrameState = (result: MesoscaleRequestResult<MesoscaleCatalog>, now: nu
   return { result: currentFrameResult(result, stale), analysis, forecast, normalizedParameters, ageMinutes, stale };
 };
 
-export const useMesoscaleFrames = (model: MesoscaleModelId, cycle: string, options: MesoscaleHookOptions = {}): MesoscaleFramesState => {
+/** `cycle` is null until the latest cycle is known; the frames then stay in the loading state without a request. */
+export const useMesoscaleFrames = (model: MesoscaleModelId, cycle: string | null, options: MesoscaleHookOptions = {}): MesoscaleFramesState => {
   const requestOptions = useStableRequestOptions(options);
-  const load = useMemo(() => (signal: AbortSignal) => fetchMesoscaleCatalog({ model, cycle: resolveCycleId(cycle), options: { ...requestOptions, signal } }), [model, cycle, requestOptions]);
+  const load = useMemo(() => (signal: AbortSignal) => (cycle === null
+    ? Promise.resolve<MesoscaleRequestResult<MesoscaleCatalog>>({ state: 'loading' })
+    : fetchMesoscaleCatalog({ model, cycle: resolveCycleId(cycle), options: { ...requestOptions, signal } })), [model, cycle, requestOptions]);
   const { result, now } = useTimedRequest(load);
   return useFrameState(result, now);
 };
