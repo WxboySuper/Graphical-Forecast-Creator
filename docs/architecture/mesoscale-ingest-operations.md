@@ -28,6 +28,27 @@ It moves the model latest pointer only after a complete cycle validates, then
 deletes cycles older than the six-cycle default. Partial runs are recorded in
 daily feed health and do not replace latest.
 
+## Ingest trigger (Cloudflare cron)
+
+GitHub's `schedule` event is delayed or dropped under load, so the primary trigger is the
+`gfc-mesoscale-scheduler` Worker (`cloudflare/mesoscale-scheduler.mjs`). Its cron runs at minutes 12
+and 42 (off the start of the hour, when GitHub's queue is busy, and after HRRR's forecast hours for the previous cycle are normally on NOAA's bucket) and calls the GitHub `workflow_dispatch` API for `mesoscale-ingest.yml` on `main`. The
+workflow's own `22,52` schedule stays as a backup; both are safe together because publishing is
+idempotent and the workflow has a concurrency lock.
+
+- Deploy: `release-beta.yml` deploys it with the catalog Worker (`wrangler.mesoscale-scheduler.jsonc`;
+  account from `CLOUDFLARE_ACCOUNT_ID`).
+- Secret: the repository secret `MESOSCALE_DISPATCH_TOKEN`, a fine-grained token limited to this
+  repository with only **Actions: Read and write**. The release deploy pipes it to the Worker as the
+  secret `GITHUB_DISPATCH_TOKEN` right after deploying (it never touches a file or the log). To set
+  it by hand instead, run
+  `pnpm dlx wrangler@4 secret put GITHUB_DISPATCH_TOKEN --config cloudflare/wrangler.mesoscale-scheduler.jsonc`
+  after the first deploy has created the Worker. Rotate it before it expires (the current token
+  expires 2027-11-09); update the repository secret and run a release to push the new value.
+- Failure is visible: with a missing or rejected token the cron invocation fails in the Worker's
+  Cloudflare logs, and `/status` goes `degraded` once a model cycle is stale.
+- The Worker serves no requests (`workers_dev` off, no routes).
+
 ## Upload verification and failure handling
 
 Each archive's MD5 is compared with the single-part S3 ETag returned by R2.

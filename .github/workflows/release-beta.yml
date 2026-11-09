@@ -458,6 +458,23 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Deploy mesoscale ingest scheduler
+        # Cloudflare cron that starts the ingest workflow (GitHub's own schedule is unreliable).
+        # The Worker's GITHUB_DISPATCH_TOKEN secret comes from the MESOSCALE_DISPATCH_TOKEN repository
+        # secret (a fine-grained token with only Actions: read and write on this repository). It is
+        # piped to wrangler, never written to a file or the log. Without the repository secret the
+        # existing Worker secret is left as it is.
+        run: |
+          set -euo pipefail
+          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale-scheduler.jsonc
+          if [ -n "$MESOSCALE_DISPATCH_TOKEN" ]; then
+            printf '%s' "$MESOSCALE_DISPATCH_TOKEN" | pnpm dlx wrangler@4 secret put GITHUB_DISPATCH_TOKEN --config cloudflare/wrangler.mesoscale-scheduler.jsonc
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MESOSCALE_DISPATCH_TOKEN: ${{ secrets.MESOSCALE_DISPATCH_TOKEN }}
+
       - name: Smoke test mesoscale Worker
         env:
           MESOSCALE_WORKER_URL: ${{ vars.MESOSCALE_WORKER_URL }}
