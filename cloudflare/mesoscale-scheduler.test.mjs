@@ -69,6 +69,10 @@ test('a cron event without an expression is an error', async () => {
   await assert.rejects(worker.scheduled(undefined, env), /No scheduler job/);
 });
 
+test('the hourly cron starts the feed health check', () => {
+  assert.deepEqual(jobsForCron('32 * * * *'), [{ workflow: 'mesoscale-health.yml' }]);
+});
+
 test('an unknown cron expression is an error, not a silent no-op', () => {
   assert.equal(jobsForCron('12,42 * * * *')[0].workflow, 'mesoscale-ingest.yml');
   assert.throws(() => jobsForCron('0 0 * * *'), /No scheduler job/);

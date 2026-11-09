@@ -28,6 +28,16 @@ It moves the model latest pointer only after a complete cycle validates, then
 deletes cycles older than the six-cycle default. Partial runs are recorded in
 daily feed health and do not replace latest.
 
+## Feed health alerting
+
+`.github/workflows/mesoscale-health.yml` runs `scripts/check-mesoscale-health.mjs` every hour (started by
+the Cloudflare scheduler at minute 32, with a GitHub `47 * * * *` backup). It reads the catalog Worker's
+`/status` and fails when any model is stale by the Worker's per-model limit, or its feed health is
+`missing`, `invalid`, `failed`, or `unavailable`, or `/status` cannot be read. A failed run is the alert:
+GitHub emails failed workflow runs to the repository owner (Settings, Notifications, Actions). A `partial`
+feed is not an alert. The check needs the `MESOSCALE_WORKER_URL` repository variable and adds no thresholds
+of its own, so changing a model's stale limit in the Worker changes the alert too.
+
 ## Cron trigger (Cloudflare Worker)
 
 GitHub's `schedule` event is delayed or dropped under load, so the repository's primary cron is the
