@@ -149,18 +149,18 @@ def interpolate_colors(sample, stops):
 
 
 def save_tiles(image, root, max_zoom=ZOOM_MAX):
-    from PIL import Image
     count, total = 0, 0
     for zoom in range(ZOOM_MIN, max_zoom + 1):
-        count_zoom, bytes_zoom = save_zoom_tiles(image, root, zoom, max_zoom, Image)
+        count_zoom, bytes_zoom = save_zoom_tiles(image, root, zoom, max_zoom)
         count += count_zoom
         total += bytes_zoom
     return count, total
 
 
-def save_zoom_tiles(image, root: Path, zoom: int, max_zoom: int, image_module) -> tuple[int, int]:
+def save_zoom_tiles(image, root: Path, zoom: int, max_zoom: int) -> tuple[int, int]:
+    from PIL import Image
     scale = 2 ** (max_zoom - zoom)
-    level = resized_level(image, zoom, scale, image_module)
+    level = resized_level(image, zoom, scale, Image)
     count, total = 0, 0
     for tx in range(2**zoom):
         for ty in range(2**zoom):

@@ -36,9 +36,9 @@ const validateCompression = (header) => {
 };
 
 const validateZoom = (header) => {
-  if (header.minZoom < 0 || header.maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom || header.minZoom > header.maxZoom) {
-    headerError('Invalid PMTiles zoom interval');
-  }
+  if (header.minZoom < 0) headerError('Invalid PMTiles zoom interval');
+  if (header.maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles zoom interval');
+  if (header.minZoom > header.maxZoom) headerError('Invalid PMTiles zoom interval');
 };
 
 const validateBounds = (header) => {
