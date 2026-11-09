@@ -26,7 +26,7 @@ Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEA
 
 ### Beta sequence
 
-lint+test -> (non-dry-run) changelog audit must be clean -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `vX.Y.Z-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
+lint+test -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `vX.Y.Z-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
 
 ### Beta failure recovery
 
