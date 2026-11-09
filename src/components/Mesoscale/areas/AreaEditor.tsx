@@ -28,7 +28,7 @@ const UtcTimeInput: React.FC<{ label: string; iso: string; invalid?: boolean; on
   return (
     <label className="mesoscale-form__field">
       <span>{label}</span>
-      <input type="datetime-local" value={draft} aria-invalid={invalid} onChange={handleChange} />
+      <input type="datetime-local" value={draft} aria-invalid={invalid} onChange={handleChange} onBlur={() => setDraft(isoToUtcInput(iso))} />
     </label>
   );
 };

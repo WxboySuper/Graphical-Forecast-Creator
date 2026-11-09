@@ -30,9 +30,10 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
 
   const addPolygon = useCallback((polygon: Polygon) => {
     const id = newAreaId();
-    commit((current) => (current.length >= MAX_MESOSCALE_AREAS
+    const added = commit((current) => (current.length >= MAX_MESOSCALE_AREAS
       ? current
       : [...current, createArea(polygon, { id, title: nextAreaTitle(current.map(item => item.title)) })]));
+    if (!added) return;
     setSelectedId(id);
     setTool('select');
   }, [commit]);

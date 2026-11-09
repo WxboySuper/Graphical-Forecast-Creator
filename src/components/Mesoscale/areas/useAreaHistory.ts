@@ -56,10 +56,10 @@ class AreaHistoryStacks {
 export interface AreaHistory {
   areas: Areas;
   /**
-   * Applies a change. An updater function receives the latest areas, so back-to-back edits never
+   * Applies a change and returns whether anything changed. An updater function receives the latest areas, so back-to-back edits never
    * build on a stale copy. `coalesceKey` merges rapid edits of the same field into one undo step.
    */
-  commit: (update: Areas | ((current: Areas) => Areas), coalesceKey?: string) => void;
+  commit: (update: Areas | ((current: Areas) => Areas), coalesceKey?: string) => boolean;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -94,10 +94,11 @@ export const useAreaHistory = (): AreaHistory => {
   const commit = useCallback((update: Areas | ((current: Areas) => Areas), coalesceKey?: string) => {
     const current = areasRef.current;
     const next = typeof update === 'function' ? update(current) : update;
-    if (next === current) return;
+    if (next === current) return false;
     stacks.current.record(current, coalesceKey, Date.now());
     areasRef.current = next;
     apply(next);
+    return true;
   }, [apply]);
 
   const undo = useCallback(() => {
