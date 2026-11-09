@@ -53,6 +53,34 @@ const ChangeUrlButton: React.FC<{ label: string; parameter: string; value: strin
   return <button type="button" onClick={changeUrl}>{label}</button>;
 };
 
+const renderEmbeddedDiscussion = (options: {
+  groupings: Parameters<typeof setDiscussionGroupings>[0];
+  initialGroup: string;
+  currentDay?: Parameters<typeof setForecastDay>[0];
+  urlChange?: { label: string; parameter: string; value: string };
+}) => {
+  mockUseAuth.mockReturnValue({
+    syncedSettings: { defaultForecasterName: '' },
+    user: { displayName: '' },
+  });
+
+  const store = createStore();
+  store.dispatch(setDiscussionGroupings(options.groupings));
+  store.dispatch(setWorkflowActive(true));
+  if (options.currentDay !== undefined) store.dispatch(setForecastDay(options.currentDay));
+
+  const rendered = render(
+    <MemoryRouter initialEntries={[`/forecast/severe?surface=discussion&group=${options.initialGroup}`]}>
+      <Provider store={store}>
+        <DiscussionPage embedded />
+        {options.urlChange && <ChangeUrlButton {...options.urlChange} />}
+      </Provider>
+    </MemoryRouter>,
+  );
+
+  return { store, ...rendered };
+};
+
 describe('DiscussionPage', () => {
   test('uses the synced default forecaster name when no discussion exists yet', () => {
     mockUseAuth.mockReturnValue({
@@ -106,51 +134,27 @@ describe('DiscussionPage', () => {
   });
 
   test('honors the requested discussion day when opening a workflow link', async () => {
-    mockUseAuth.mockReturnValue({
-      syncedSettings: { defaultForecasterName: '' },
-      user: { displayName: '' },
+    const { store } = renderEmbeddedDiscussion({
+      groupings: [
+        { id: 'day-1', label: 'Day 1', days: [1], discussionDay: 1 },
+        { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
+      ],
+      initialGroup: 'day-2',
     });
-
-    const store = createStore();
-    store.dispatch(setDiscussionGroupings([
-      { id: 'day-1', label: 'Day 1', days: [1], discussionDay: 1 },
-      { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
-    ]));
-    store.dispatch(setWorkflowActive(true));
-
-    render(
-      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day-2']}>
-        <Provider store={store}>
-          <DiscussionPage embedded />
-        </Provider>
-      </MemoryRouter>,
-    );
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(2));
     expect(screen.getByRole('combobox', { name: 'Discussion scope' })).toHaveValue('day-2');
   });
 
   test('keeps a selected map day when the embedded discussion URL changes within a multi-day grouping', async () => {
-    mockUseAuth.mockReturnValue({
-      syncedSettings: { defaultForecasterName: '' },
-      user: { displayName: '' },
+    const { store } = renderEmbeddedDiscussion({
+      groupings: [
+        { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
+      ],
+      initialGroup: 'day4-8',
+      currentDay: 6,
+      urlChange: { label: 'Change layout', parameter: 'layout', value: 'panel' },
     });
-
-    const store = createStore();
-    store.dispatch(setDiscussionGroupings([
-      { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
-    ]));
-    store.dispatch(setWorkflowActive(true));
-    store.dispatch(setForecastDay(6));
-
-    render(
-      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day4-8']}>
-        <Provider store={store}>
-          <DiscussionPage embedded />
-          <ChangeUrlButton label="Change layout" parameter="layout" value="panel" />
-        </Provider>
-      </MemoryRouter>,
-    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Change layout' }));
     await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(6));
@@ -158,27 +162,15 @@ describe('DiscussionPage', () => {
   });
 
   test('syncs the map day when the embedded discussion grouping changes without a map-day change', async () => {
-    mockUseAuth.mockReturnValue({
-      syncedSettings: { defaultForecasterName: '' },
-      user: { displayName: '' },
+    const { store } = renderEmbeddedDiscussion({
+      groupings: [
+        { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
+        { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
+      ],
+      initialGroup: 'day4-8',
+      currentDay: 6,
+      urlChange: { label: 'Select Day 2 discussion', parameter: 'group', value: 'day-2' },
     });
-
-    const store = createStore();
-    store.dispatch(setDiscussionGroupings([
-      { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
-      { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
-    ]));
-    store.dispatch(setWorkflowActive(true));
-    store.dispatch(setForecastDay(6));
-
-    render(
-      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day4-8']}>
-        <Provider store={store}>
-          <DiscussionPage embedded />
-          <ChangeUrlButton label="Select Day 2 discussion" parameter="group" value="day-2" />
-        </Provider>
-      </MemoryRouter>,
-    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Select Day 2 discussion' }));
 
