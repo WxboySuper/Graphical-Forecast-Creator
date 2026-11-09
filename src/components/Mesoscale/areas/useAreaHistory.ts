@@ -5,11 +5,58 @@ import { selectMesoscaleAreas, setMesoscaleAreas, type MesoscaleArea } from '../
 const MAX_HISTORY = 50;
 const COALESCE_WINDOW_MS = 1500;
 
+type Areas = MesoscaleArea[];
+
+/** Undo and redo stacks plus the last keyed edit, kept together so they reset as one. */
+class AreaHistoryStacks {
+  past: Areas[] = [];
+  future: Areas[] = [];
+  private lastEdit: { key: string; at: number } | null = null;
+
+  reset(): void {
+    this.past = [];
+    this.future = [];
+    this.lastEdit = null;
+  }
+
+  /** Records `current` as an undo step, unless this edit continues the previous keyed edit. */
+  record(current: Areas, coalesceKey: string | undefined, now: number): void {
+    const merges = this.continuesLastEdit(coalesceKey, now);
+    this.lastEdit = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
+    if (!merges) this.past = [...this.past, current].slice(-MAX_HISTORY);
+    this.future = [];
+  }
+
+  /** Moves one step back and returns the areas to restore, or null when there is nothing to undo. */
+  undo(current: Areas): Areas | null {
+    const previous = this.past[this.past.length - 1];
+    if (!previous) return null;
+    this.lastEdit = null;
+    this.past = this.past.slice(0, -1);
+    this.future = [...this.future, current];
+    return previous;
+  }
+
+  redo(current: Areas): Areas | null {
+    const next = this.future[this.future.length - 1];
+    if (!next) return null;
+    this.lastEdit = null;
+    this.future = this.future.slice(0, -1);
+    this.past = [...this.past, current];
+    return next;
+  }
+
+  private continuesLastEdit(coalesceKey: string | undefined, now: number): boolean {
+    const previous = this.lastEdit;
+    if (coalesceKey === undefined || !previous) return false;
+    return previous.key === coalesceKey && now - previous.at < COALESCE_WINDOW_MS;
+  }
+}
+
 export interface AreaHistory {
-  areas: MesoscaleArea[];
-  /** Applies a change and records the previous areas for undo. */
+  areas: Areas;
   /** `coalesceKey` merges rapid edits of the same field into one undo step. */
-  commit: (next: MesoscaleArea[], coalesceKey?: string) => void;
+  commit: (next: Areas, coalesceKey?: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -20,10 +67,8 @@ export interface AreaHistory {
 export const useAreaHistory = (): AreaHistory => {
   const dispatch = useDispatch();
   const areas = useSelector(selectMesoscaleAreas);
-  const past = useRef<MesoscaleArea[][]>([]);
-  const future = useRef<MesoscaleArea[][]>([]);
+  const stacks = useRef(new AreaHistoryStacks());
   const [, setVersion] = useState(0);
-  const lastEdit = useRef<{ key: string; at: number } | null>(null);
   const areasRef = useRef(areas);
   areasRef.current = areas;
 
@@ -33,45 +78,31 @@ export const useAreaHistory = (): AreaHistory => {
   useEffect(() => {
     if (areas === lastWritten.current) return;
     lastWritten.current = areas;
-    past.current = [];
-    future.current = [];
-    lastEdit.current = null;
+    stacks.current.reset();
     setVersion(v => v + 1);
   }, [areas]);
 
-  const apply = useCallback((next: MesoscaleArea[]) => {
+  const apply = useCallback((next: Areas) => {
     lastWritten.current = next;
     dispatch(setMesoscaleAreas(next));
     setVersion(v => v + 1);
   }, [dispatch]);
 
-  const commit = useCallback((next: MesoscaleArea[], coalesceKey?: string) => {
-    const now = Date.now();
-    const previous = lastEdit.current;
-    const merges = coalesceKey !== undefined && previous?.key === coalesceKey && now - previous.at < COALESCE_WINDOW_MS;
-    lastEdit.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
-    if (!merges) past.current = [...past.current, areasRef.current].slice(-MAX_HISTORY);
-    future.current = [];
+  const commit = useCallback((next: Areas, coalesceKey?: string) => {
+    stacks.current.record(areasRef.current, coalesceKey, Date.now());
     apply(next);
   }, [apply]);
 
   const undo = useCallback(() => {
-    const previous = past.current[past.current.length - 1];
-    if (!previous) return;
-    lastEdit.current = null;
-    past.current = past.current.slice(0, -1);
-    future.current = [...future.current, areasRef.current];
-    apply(previous);
+    const restored = stacks.current.undo(areasRef.current);
+    if (restored) apply(restored);
   }, [apply]);
 
   const redo = useCallback(() => {
-    const next = future.current[future.current.length - 1];
-    if (!next) return;
-    lastEdit.current = null;
-    future.current = future.current.slice(0, -1);
-    past.current = [...past.current, areasRef.current];
-    apply(next);
+    const restored = stacks.current.redo(areasRef.current);
+    if (restored) apply(restored);
   }, [apply]);
 
-  return { areas, commit, undo, redo, canUndo: past.current.length > 0, canRedo: future.current.length > 0 };
+  const { past, future } = stacks.current;
+  return { areas, commit, undo, redo, canUndo: past.length > 0, canRedo: future.length > 0 };
 };
