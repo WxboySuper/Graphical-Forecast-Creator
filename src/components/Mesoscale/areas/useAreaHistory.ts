@@ -3,11 +3,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import { selectMesoscaleAreas, setMesoscaleAreas, type MesoscaleArea } from '../../../store/mesoscaleSlice';
 
 const MAX_HISTORY = 50;
+const COALESCE_WINDOW_MS = 1500;
 
 export interface AreaHistory {
   areas: MesoscaleArea[];
   /** Applies a change and records the previous areas for undo. */
-  commit: (next: MesoscaleArea[]) => void;
+  /** `coalesceKey` merges rapid edits of the same field into one undo step. */
+  commit: (next: MesoscaleArea[], coalesceKey?: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -21,13 +23,18 @@ export const useAreaHistory = (): AreaHistory => {
   const past = useRef<MesoscaleArea[][]>([]);
   const future = useRef<MesoscaleArea[][]>([]);
   const [, setVersion] = useState(0);
+  const lastEdit = useRef<{ key: string; at: number } | null>(null);
   const areasRef = useRef(areas);
   areasRef.current = areas;
 
   const apply = useCallback((next: MesoscaleArea[]) => { dispatch(setMesoscaleAreas(next)); setVersion(v => v + 1); }, [dispatch]);
 
-  const commit = useCallback((next: MesoscaleArea[]) => {
-    past.current = [...past.current, areasRef.current].slice(-MAX_HISTORY);
+  const commit = useCallback((next: MesoscaleArea[], coalesceKey?: string) => {
+    const now = Date.now();
+    const previous = lastEdit.current;
+    const merges = coalesceKey !== undefined && previous?.key === coalesceKey && now - previous.at < COALESCE_WINDOW_MS;
+    lastEdit.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
+    if (!merges) past.current = [...past.current, areasRef.current].slice(-MAX_HISTORY);
     future.current = [];
     apply(next);
   }, [apply]);
@@ -35,6 +42,7 @@ export const useAreaHistory = (): AreaHistory => {
   const undo = useCallback(() => {
     const previous = past.current[past.current.length - 1];
     if (!previous) return;
+    lastEdit.current = null;
     past.current = past.current.slice(0, -1);
     future.current = [...future.current, areasRef.current];
     apply(previous);
@@ -43,6 +51,7 @@ export const useAreaHistory = (): AreaHistory => {
   const redo = useCallback(() => {
     const next = future.current[future.current.length - 1];
     if (!next) return;
+    lastEdit.current = null;
     future.current = future.current.slice(0, -1);
     past.current = [...past.current, areasRef.current];
     apply(next);

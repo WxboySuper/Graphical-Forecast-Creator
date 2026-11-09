@@ -27,7 +27,14 @@ export const nextAreaTitle = (titles: string[]): string => {
   return `Area ${n}`;
 };
 
-export const createArea = (geometry: Polygon, now = new Date(), id: string = crypto.randomUUID(), title = 'Area 1'): MesoscaleArea => {
+/** Uses WebCrypto when available (it is missing on insecure origins and older browsers). */
+export const newAreaId = (): string =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+interface CreateAreaOptions { now?: Date; id?: string; title?: string }
+
+export const createArea = (geometry: Polygon, options: CreateAreaOptions = {}): MesoscaleArea => {
+  const { now = new Date(), id = newAreaId(), title = 'Area 1' } = options;
   const start = new Date(Math.floor(now.getTime() / HOUR_MS) * HOUR_MS);
   const timestamp = now.toISOString();
   return {
@@ -75,13 +82,19 @@ export const utcInputToIso = (value: string): string | null => {
 };
 
 export type AreaFieldErrors = Partial<Record<'title' | 'hazard' | 'window' | 'confidence', string>>;
+type EditableFields = Pick<MesoscaleArea, 'title' | 'hazard' | 'confidence' | 'validStart' | 'validEnd'>;
+
+const isBlank = (value: string): boolean => value.trim().length === 0;
+const isReversedWindow = (area: EditableFields): boolean => Date.parse(area.validStart) > Date.parse(area.validEnd);
+const isBadConfidence = (value: number | undefined): boolean => value !== undefined && !(value >= 0 && value <= 100);
+
+const FIELD_RULES: Array<[keyof AreaFieldErrors, (area: EditableFields) => boolean, string]> = [
+  ['title', (area) => isBlank(area.title), 'Give the area a title.'],
+  ['hazard', (area) => isBlank(area.hazard), 'Describe the hazard or theme.'],
+  ['window', isReversedWindow, 'The end must be after the start.'],
+  ['confidence', (area) => isBadConfidence(area.confidence), 'Use a value from 0 to 100.'],
+];
 
 /** Validates editable area fields with messages worded for the form. */
-export const validateAreaFields = (area: Pick<MesoscaleArea, 'title' | 'hazard' | 'confidence' | 'validStart' | 'validEnd'>): AreaFieldErrors => {
-  const errors: AreaFieldErrors = {};
-  if (!area.title.trim()) errors.title = 'Give the area a title.';
-  if (!area.hazard.trim()) errors.hazard = 'Describe the hazard or theme.';
-  if (Date.parse(area.validStart) > Date.parse(area.validEnd)) errors.window = 'The end must be after the start.';
-  if (area.confidence !== undefined && !(area.confidence >= 0 && area.confidence <= 100)) errors.confidence = 'Use a value from 0 to 100.';
-  return errors;
-};
+export const validateAreaFields = (area: EditableFields): AreaFieldErrors =>
+  Object.fromEntries(FIELD_RULES.filter(([, failed]) => failed(area)).map(([field, , message]) => [field, message]));

@@ -20,7 +20,12 @@ const timeChange = (key: 'validStart' | 'validEnd', onChange: Props['onChange'])
 
 const confidenceChange = (onChange: Props['onChange']) => (event: React.ChangeEvent<HTMLInputElement>): void => {
   const raw = event.target.value;
-  onChange({ confidence: raw === '' ? undefined : Number(raw) });
+  if (raw === '') {
+    onChange({ confidence: undefined });
+    return;
+  }
+  const value = Number(raw);
+  if (Number.isFinite(value)) onChange({ confidence: value });
 };
 
 const TextField: React.FC<{ label: string; value: string; max: number; list?: string; error?: string; onChange: (value: string) => void }> = (

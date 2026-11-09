@@ -5,7 +5,7 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import mesoscaleReducer, { selectMesoscaleState } from '../../../store/mesoscaleSlice';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
 import { isMesoscaleArea } from '../../../utils/mesoscaleAreaValidation';
-import { createArea, isoToUtcInput, utcInputToIso, validateAreaFields } from './areaModel';
+import { createArea, isoToUtcInput, newAreaId, utcInputToIso, validateAreaFields } from './areaModel';
 import { AreasPanel } from './AreasPanel';
 import { DiscussionPanel } from './DiscussionPanel';
 import { useMesoscaleAreas } from './useMesoscaleAreas';
@@ -22,7 +22,7 @@ const setup = () => {
 
 describe('area model', () => {
   it('creates a valid area with a three hour window starting at the hour', () => {
-    const area = createArea(polygon, new Date('2026-11-09T14:42:10Z'), 'a1');
+    const area = createArea(polygon, { now: new Date('2026-11-09T14:42:10Z'), id: 'a1' });
     expect(isMesoscaleArea(area)).toBe(true);
     expect(area.validStart).toBe('2026-11-09T14:00:00.000Z');
     expect(area.validEnd).toBe('2026-11-09T17:00:00.000Z');
@@ -35,9 +35,42 @@ describe('area model', () => {
   });
 
   it('flags missing text, a reversed window, and out-of-range confidence', () => {
-    const area = { ...createArea(polygon, new Date('2026-11-09T14:00:00Z'), 'a1'), title: ' ', hazard: '', confidence: 120 };
+    const area = { ...createArea(polygon, { now: new Date('2026-11-09T14:00:00Z'), id: 'a1' }), title: ' ', hazard: '', confidence: 120 };
     const reversed = { ...area, validEnd: '2026-11-09T10:00:00.000Z' };
     expect(Object.keys(validateAreaFields(reversed)).sort()).toEqual(['confidence', 'hazard', 'title', 'window']);
+  });
+});
+
+describe('useMesoscaleAreas history', () => {
+  it('merges typing into one undo step and keeps geometry edits separate', () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useMesoscaleAreas(), { wrapper });
+    act(() => result.current.addPolygon(polygon));
+    const id = result.current.areas[0].id;
+    for (const title of ['D', 'Dr', 'Dry']) act(() => result.current.updateArea(id, { title }));
+    act(() => result.current.undo());
+    expect(result.current.areas[0].title).toBe('Area 1');
+  });
+
+  it('drops the selection when undo removes the selected area', () => {
+    const { wrapper } = setup();
+    const { result } = renderHook(() => useMesoscaleAreas(), { wrapper });
+    act(() => result.current.addPolygon(polygon));
+    expect(result.current.selectedId).not.toBeNull();
+    act(() => result.current.undo());
+    expect(result.current.selectedId).toBeNull();
+  });
+});
+
+describe('newAreaId', () => {
+  it('falls back when WebCrypto is unavailable', () => {
+    const original = globalThis.crypto;
+    Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+    try {
+      expect(newAreaId()).toMatch(/\w+-\w+/);
+    } finally {
+      Object.defineProperty(globalThis, 'crypto', { value: original, configurable: true });
+    }
   });
 });
 

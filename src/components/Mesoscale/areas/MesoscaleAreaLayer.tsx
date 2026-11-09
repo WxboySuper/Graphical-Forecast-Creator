@@ -102,6 +102,7 @@ const useDrawTool = (map: OLMap, source: VectorSource, active: boolean, onDrawn:
       if (polygon) onDrawn(polygon);
     });
     const onKeyDown = (event: KeyboardEvent): void => {
+      if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
       if (event.key === 'Escape') draw.abortDrawing();
       if (event.key === 'Backspace') draw.removeLastPoint();
     };

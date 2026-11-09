@@ -23,19 +23,23 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
   const history = useAreaHistory();
   const { areas, commit } = history;
   const [tool, setTool] = useState<AreaTool>('select');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pickedId, setSelectedId] = useState<string | null>(null);
+  // Undo or redo can remove the picked area; never expose an id that no longer exists.
+  const selectedId = areas.some(area => area.id === pickedId) ? pickedId : null;
   const atLimit = areas.length >= MAX_MESOSCALE_AREAS;
 
   const addPolygon = useCallback((polygon: Polygon) => {
     if (areas.length >= MAX_MESOSCALE_AREAS) return;
-    const area = createArea(polygon, new Date(), crypto.randomUUID(), nextAreaTitle(areas.map(item => item.title)));
+    const area = createArea(polygon, { title: nextAreaTitle(areas.map(item => item.title)) });
     commit([...areas, area]);
     setSelectedId(area.id);
     setTool('select');
   }, [areas, commit]);
 
   const updateArea = useCallback((id: string, changes: Partial<MesoscaleArea>) => {
-    commit(areas.map(area => (area.id === id ? { ...area, ...changes, updatedAt: new Date().toISOString() } : area)));
+    const next = areas.map(area => (area.id === id ? { ...area, ...changes, updatedAt: new Date().toISOString() } : area));
+    // Typing in one field is one undo step; geometry changes always get their own.
+    commit(next, 'geometry' in changes ? undefined : `${id}:${Object.keys(changes).join(',')}`);
   }, [areas, commit]);
 
   const setGeometry = useCallback((id: string, geometry: Polygon) => updateArea(id, { geometry }), [updateArea]);
