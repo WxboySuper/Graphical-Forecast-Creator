@@ -1,4 +1,5 @@
 import { PUBLISHED_TILE_CONTRACT } from './pmtiles-contract.mjs';
+import { assertZoomByte } from './pmtiles-zoom-byte.mjs';
 
 const varint = (value) => {
   const bytes = [];
@@ -24,12 +25,6 @@ const fixtureLeaf = async ({ bytes, leaf, gzip }) => {
   let leafBytes = leaf ? directory({ length: bytes.length }) : null;
   if (gzip && leafBytes) leafBytes = await gzipBytes(leafBytes);
   return leafBytes;
-};
-
-const assertZoomByte = (zoom, label) => {
-  if (!Number.isInteger(zoom)) throw new TypeError(`${label} must be an integer`);
-  if (zoom < 0) throw new RangeError(`${label} must be a byte value`);
-  if (zoom > 255) throw new RangeError(`${label} must be a byte value`);
 };
 
 export const createPmtilesFixture = async ({ bytes = Uint8Array.from([137, 80, 78]), leaf = false, gzip = false, tileLength = bytes.length, minZoom = PUBLISHED_TILE_CONTRACT.minZoom, maxZoom = 4 } = {}) => {
