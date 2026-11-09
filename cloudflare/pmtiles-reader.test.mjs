@@ -28,10 +28,10 @@ test('PMTiles header enforces supported zoom intervals', async () => {
   assert.equal(parseHeader(zoomFive.slice(0, 127)).maxZoom, 5);
 
   const overMaximum = await createPmtilesFixture({ minZoom: 3, maxZoom: 25 });
-  assert.throws(() => parseHeader(overMaximum.slice(0, 127)), /maximum zoom/);
+  assert.throws(() => parseHeader(overMaximum.slice(0, 127)), /max zoom/);
 
   const overMinimum = await createPmtilesFixture({ minZoom: 25, maxZoom: 25 });
-  assert.throws(() => parseHeader(overMinimum.slice(0, 127)), /minimum zoom/);
+  assert.throws(() => parseHeader(overMinimum.slice(0, 127)), /min zoom/);
 
   const inverted = await createPmtilesFixture({ minZoom: 5, maxZoom: 3 });
   assert.throws(() => parseHeader(inverted.slice(0, 127)), /zoom interval/);

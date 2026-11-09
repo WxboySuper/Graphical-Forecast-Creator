@@ -36,11 +36,11 @@ const validateCompression = (header) => {
 };
 
 const validateMinimumZoom = ({ minZoom }) => {
-  if (minZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles minimum zoom');
+  if (minZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles min zoom');
 };
 
 const validateMaximumZoom = ({ maxZoom }) => {
-  if (maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles maximum zoom');
+  if (maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles max zoom');
 };
 
 const validateZoomOrder = ({ minZoom, maxZoom }) => {
