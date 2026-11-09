@@ -35,10 +35,22 @@ const validateCompression = (header) => {
   if (![NO_COMPRESSION, GZIP_COMPRESSION].includes(header.internalCompression)) headerError('Unsupported PMTiles directory compression');
 };
 
+const validateMinimumZoom = ({ minZoom }) => {
+  if (minZoom < 0) headerError('Invalid PMTiles zoom interval');
+};
+
+const validateMaximumZoom = ({ maxZoom }) => {
+  if (maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles zoom interval');
+};
+
+const validateZoomOrder = ({ minZoom, maxZoom }) => {
+  if (minZoom > maxZoom) headerError('Invalid PMTiles zoom interval');
+};
+
 const validateZoom = (header) => {
-  if (header.minZoom < 0) headerError('Invalid PMTiles zoom interval');
-  if (header.maxZoom > PUBLISHED_TILE_CONTRACT.maxSupportedZoom) headerError('Invalid PMTiles zoom interval');
-  if (header.minZoom > header.maxZoom) headerError('Invalid PMTiles zoom interval');
+  validateMinimumZoom(header);
+  validateMaximumZoom(header);
+  validateZoomOrder(header);
 };
 
 const validateBounds = (header) => {
