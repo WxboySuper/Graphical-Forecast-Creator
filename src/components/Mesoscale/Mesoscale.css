@@ -1037,6 +1037,8 @@
 .mesoscale-shape-action:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
 /* Map notice while model data is unavailable */
 .mesoscale-map-notice {
   position: absolute;
