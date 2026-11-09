@@ -491,10 +491,12 @@ const useDiscussionScopeSync = (options: {
     const isInitialSync = !hasSyncedInitialScopeRef.current;
     hasSyncedInitialScopeRef.current = true;
     if (currentDay === discussionDay) return;
-    if (embedded && selectedGroupingDays.includes(currentDay)) return;
+    if (embedded && selectedGroupingDays.includes(currentDay) && mapSelectedGroupingId === selectedGroupingId) return;
     if (embedded && hasActiveWorkflow) {
       if (!mapDayChanged) {
-        if (isInitialSync) dispatch(setForecastDay(discussionDay));
+        if (isInitialSync || mapSelectedGroupingId !== selectedGroupingId) {
+          dispatch(setForecastDay(discussionDay));
+        }
         return;
       }
       if (mapSelectedGroupingId === selectedGroupingId || searchParams.get('group') === mapSelectedGroupingId) return;

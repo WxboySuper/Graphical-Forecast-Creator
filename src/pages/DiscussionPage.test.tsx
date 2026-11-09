@@ -43,14 +43,14 @@ const createStore = () =>
       }),
   });
 
-const ChangeUrlAfterMount = () => {
+const ChangeUrlButton: React.FC<{ label: string; parameter: string; value: string }> = ({ label, parameter, value }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const changeUrl = () => {
     const params = new URLSearchParams(searchParams);
-    params.set('layout', 'panel');
+    params.set(parameter, value);
     setSearchParams(params);
   };
-  return <button type="button" onClick={changeUrl}>Change URL</button>;
+  return <button type="button" onClick={changeUrl}>{label}</button>;
 };
 
 describe('DiscussionPage', () => {
@@ -147,14 +147,43 @@ describe('DiscussionPage', () => {
       <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day4-8']}>
         <Provider store={store}>
           <DiscussionPage embedded />
-          <ChangeUrlAfterMount />
+          <ChangeUrlButton label="Change layout" parameter="layout" value="panel" />
         </Provider>
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change URL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Change layout' }));
     await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(6));
     expect(screen.getByText('Days 4–8')).toBeInTheDocument();
+  });
+
+  test('syncs the map day when the embedded discussion grouping changes without a map-day change', async () => {
+    mockUseAuth.mockReturnValue({
+      syncedSettings: { defaultForecasterName: '' },
+      user: { displayName: '' },
+    });
+
+    const store = createStore();
+    store.dispatch(setDiscussionGroupings([
+      { id: 'day4-8', label: 'Days 4–8', days: [4, 5, 6, 7, 8], discussionDay: 4 },
+      { id: 'day-2', label: 'Day 2', days: [2], discussionDay: 2 },
+    ]));
+    store.dispatch(setWorkflowActive(true));
+    store.dispatch(setForecastDay(6));
+
+    render(
+      <MemoryRouter initialEntries={['/forecast/severe?surface=discussion&group=day4-8']}>
+        <Provider store={store}>
+          <DiscussionPage embedded />
+          <ChangeUrlButton label="Select Day 2 discussion" parameter="group" value="day-2" />
+        </Provider>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select Day 2 discussion' }));
+
+    await waitFor(() => expect(store.getState().forecast.forecastCycle.currentDay).toBe(2));
+    expect(screen.getByRole('combobox', { name: 'Discussion scope' })).toHaveValue('day-2');
   });
 
   test('keeps unsaved drafts across unmounts without mixing forecast days', () => {
