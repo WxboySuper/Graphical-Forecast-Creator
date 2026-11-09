@@ -15,6 +15,8 @@ import { AreaLegend } from './areas/AreaLegend';
 import { AreaToolbar } from './areas/AreaToolbar';
 import { MesoscaleAreaLayer } from './areas/MesoscaleAreaLayer';
 import { useMesoscaleAreas } from './areas/useMesoscaleAreas';
+import { MesoscaleContextLayers } from './context/MesoscaleContextLayers';
+import { useContextLayerView } from './context/useContextLayerView';
 import { useMesoscaleSelection, type MesoscaleSelection } from './useMesoscaleSelection';
 import { useWorkspaceData, type WorkspaceData } from './useWorkspaceData';
 import './Mesoscale.css';
@@ -50,6 +52,7 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
   const [railOpen, setRailOpen] = useState(true);
   const [tab, setTab] = useState<RailTab>('data');
   const areas = useMesoscaleAreas();
+  const context = useContextLayerView();
   const { selectedId } = areas;
   // Picking an area on the map brings up its editor.
   useEffect(() => {
@@ -64,12 +67,13 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
   return (
     <div className={`mesoscale-workspace${railOpen ? '' : ' is-rail-closed'}`} data-testid="mesoscale-workspace">
       <aside id="mesoscale-rail" className="mesoscale-rail" aria-label="Model data" hidden={!railOpen}>
-        <WorkspaceRail tab={tab} onTabChange={setTab} areas={areas} selection={selection} data={data} onRetry={onRetry} />
+        <WorkspaceRail tab={tab} onTabChange={setTab} areas={areas} selection={selection} data={data} context={context} onRetry={onRetry} />
       </aside>
       <div className="mesoscale-stage">
         <MesoscaleMap layers={layerSpecs} domainBounds={data.kind === 'ready' ? data.catalog.domain.bounds : undefined}>
           {(map) => (
             <>
+              <MesoscaleContextLayers map={map} radar={context.radar} satellite={context.satellite} />
               <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} activeVertex={areas.activeVertex} />
               <AreaToolbar map={map} areas={areas} />
             </>

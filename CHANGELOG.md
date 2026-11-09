@@ -46,6 +46,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Mesoscale radar and satellite context:** Mesoscale Data tab can now overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
 - **Keyboard vertex editing:** Mesoscale areas can now be reshaped vertex by vertex from the keyboard with vertex stepping, arrow-key nudging in selectable steps, and add or delete controls.
 - **Mesoscale workspace on beta:** The Mesoscale forecast workspace and its Monitor panel are now available on beta for early-access testing.
 - **Reliable Mesoscale map display:** Model layers stay visible at the default map zoom with the standard basemap, so beta testers no longer see a blank map.
