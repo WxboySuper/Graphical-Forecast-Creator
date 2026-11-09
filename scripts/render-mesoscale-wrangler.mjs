@@ -16,6 +16,9 @@ function parseHttpsOrigin(value) {
   return url;
 }
 
+/** workers.dev hosts are served by the Worker itself; any other host is a custom domain to keep attached. */
+const isWorkersDev = (url) => url.hostname.endsWith('.workers.dev');
+
 export function renderMesoscaleWranglerConfig(templateText, env) {
   const missing = REQUIRED.filter((name) => !env[name]?.trim());
   if (missing.length > 0) {
@@ -31,6 +34,7 @@ export function renderMesoscaleWranglerConfig(templateText, env) {
     preview_bucket_name: bucket,
   }));
   config.vars = { ...config.vars, PUBLIC_BASE_URL: baseUrl.origin };
+  if (!isWorkersDev(baseUrl)) config.routes = [{ pattern: baseUrl.hostname, custom_domain: true }];
   return `${JSON.stringify(config, null, 2)}\n`;
 }
 
