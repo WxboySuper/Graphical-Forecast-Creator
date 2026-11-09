@@ -24,7 +24,16 @@ test('refuses to run without a token or with unsafe configuration', () => {
   assert.throws(() => buildDispatchRequest({ GITHUB_DISPATCH_TOKEN: '   ' }), /GITHUB_DISPATCH_TOKEN/);
   assert.throws(() => buildDispatchRequest({ ...env, GITHUB_REPOSITORY: 'a/b/../c' }), /Invalid/);
   assert.throws(() => buildDispatchRequest({ ...env, WORKFLOW_FILE: '../evil.yml' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest({ ...env, WORKFLOW_FILE: 'xyaml' }), /Invalid/);
   assert.throws(() => buildDispatchRequest({ ...env, WORKFLOW_REF: 'main; rm' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest({ ...env, GITHUB_REPOSITORY: '../repo' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest({ ...env, GITHUB_REPOSITORY: './repo' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest({ ...env, WORKFLOW_REF: '..' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest({ ...env, WORKFLOW_REF: '-main' }), /Invalid/);
+  assert.throws(() => buildDispatchRequest(undefined), /GITHUB_DISPATCH_TOKEN/);
+  assert.throws(() => buildDispatchRequest({ GITHUB_DISPATCH_TOKEN: 42 }), /GITHUB_DISPATCH_TOKEN/);
+  // A non-string var falls back to the default instead of crashing.
+  assert.equal(JSON.parse(buildDispatchRequest({ ...env, WORKFLOW_REF: 7 }).init.body).ref, 'main');
 });
 
 test('treats HTTP 204 as success and any other status as an error without leaking the token', async () => {
@@ -32,7 +41,7 @@ test('treats HTTP 204 as success and any other status as an error without leakin
   assert.ok(Date.parse(ok.dispatchedAt));
   await assert.rejects(
     dispatchIngest(env, async () => new Response('{"message":"Bad credentials"}', { status: 401 })),
-    (error) => /HTTP 401/.test(error.message) && !error.message.includes('github_pat_example'),
+    (error) => /HTTP 401: Bad credentials/.test(error.message) && !error.message.includes('github_pat_example'),
   );
 });
 
@@ -52,10 +61,43 @@ test('the cron handler dispatches, fails loudly on a rejected token, and the fet
   assert.equal(response.status, 404);
 });
 
+/** Removes // and block comments and trailing commas, leaving string contents (URLs) alone. */
+const stripJsonc = (text) => {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const next = text[i + 1];
+    if (inString) {
+      out += char;
+      if (char === '\\') {
+        out += next;
+        i += 1;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else if (char === '"') {
+      inString = true;
+      out += char;
+    } else if (char === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      out += '\n';
+    } else if (char === '/' && next === '*') {
+      i = text.indexOf('*/', i + 2) + 1;
+    } else {
+      out += char;
+    }
+  }
+  return out.replace(/,(\s*[}\]])/g, '$1');
+};
+
+test('stripJsonc keeps URLs and removes comments and trailing commas', () => {
+  const parsed = JSON.parse(stripJsonc('{ "u": "https://x.example/a", // note\n /* block */ "a": [1, 2,], }'));
+  assert.deepEqual(parsed, { u: 'https://x.example/a', a: [1, 2] });
+});
+
 test('the checked-in config has a cron off the start of the hour and no public routes', () => {
-  const text = readFileSync(new URL('./wrangler.mesoscale-scheduler.jsonc', import.meta.url), 'utf8')
-    .split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
-  const config = JSON.parse(text);
+  const config = JSON.parse(stripJsonc(readFileSync(new URL('./wrangler.mesoscale-scheduler.jsonc', import.meta.url), 'utf8')));
   assert.deepEqual(config.triggers.crons, ['12,42 * * * *']);
   assert.equal(config.workers_dev, false);
   assert.equal(config.routes, undefined);

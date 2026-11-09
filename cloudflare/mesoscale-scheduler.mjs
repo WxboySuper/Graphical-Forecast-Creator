@@ -19,22 +19,32 @@ const DEFAULTS = {
   WORKFLOW_REF: 'main',
 };
 
-const setting = (env, name) => (env[name]?.trim() ? env[name].trim() : DEFAULTS[name]);
+/** A trimmed string var, or the default when it is absent, empty, or not a string. */
+const setting = (env, name) => {
+  const value = typeof env?.[name] === 'string' ? env[name].trim() : '';
+  return value || DEFAULTS[name];
+};
 
-const REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const WORKFLOW_PATTERN = /^[A-Za-z0-9_.-]+\.ya?ml$/;
-const REF_PATTERN = /^[A-Za-z0-9_./-]+$/;
+// Segments start with a letter or digit, so `.`, `..`, and leading dashes can never reach the URL.
+const SEGMENT = '[A-Za-z0-9][A-Za-z0-9_.-]*';
+const CHECKS = {
+  GITHUB_REPOSITORY: new RegExp(`^${SEGMENT}/${SEGMENT}$`),
+  WORKFLOW_FILE: new RegExp(String.raw`^${SEGMENT}\.ya?ml$`),
+  WORKFLOW_REF: new RegExp(`^${SEGMENT}(/${SEGMENT})*$`),
+};
+
+const isSafeSetting = (name, value) => CHECKS[name].test(value) && !value.includes('..');
 
 /** Builds the workflow dispatch request, or throws when the configuration is unusable. */
 export const buildDispatchRequest = (env) => {
-  const token = env.GITHUB_DISPATCH_TOKEN?.trim();
+  const token = typeof env?.GITHUB_DISPATCH_TOKEN === 'string' ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
   if (!token) throw new Error('GITHUB_DISPATCH_TOKEN is not set');
-  const repository = setting(env, 'GITHUB_REPOSITORY');
-  const workflow = setting(env, 'WORKFLOW_FILE');
-  const ref = setting(env, 'WORKFLOW_REF');
-  if (!REPOSITORY_PATTERN.test(repository) || !WORKFLOW_PATTERN.test(workflow) || !REF_PATTERN.test(ref)) {
-    throw new Error('Invalid scheduler configuration');
-  }
+  const values = Object.fromEntries(Object.keys(CHECKS).map((name) => [name, setting(env, name)]));
+  const invalid = Object.entries(values).find(([name, value]) => !isSafeSetting(name, value));
+  if (invalid) throw new Error(`Invalid scheduler configuration: ${invalid[0]}`);
+  const repository = values.GITHUB_REPOSITORY;
+  const workflow = values.WORKFLOW_FILE;
+  const ref = values.WORKFLOW_REF;
   return {
     url: `${GITHUB_API}/repos/${repository}/actions/workflows/${workflow}/dispatches`,
     init: {
@@ -51,12 +61,22 @@ export const buildDispatchRequest = (env) => {
   };
 };
 
+/** GitHub's short error message (for example "Bad credentials" or a wrong ref), never the token. */
+const errorDetail = async (response) => {
+  try {
+    const { message } = await response.json();
+    return typeof message === 'string' ? `: ${message.slice(0, 160)}` : '';
+  } catch {
+    return '';
+  }
+};
+
 /** Dispatches the workflow once. Never logs the token or the response body beyond a short status. */
 export const dispatchIngest = async (env, fetcher = fetch) => {
   const { url, init } = buildDispatchRequest(env);
   const response = await fetcher(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (response.status !== 204) {
-    throw new Error(`GitHub workflow dispatch failed with HTTP ${response.status}`);
+    throw new Error(`GitHub workflow dispatch failed with HTTP ${response.status}${await errorDetail(response)}`);
   }
   return { dispatchedAt: new Date().toISOString() };
 };
