@@ -37,11 +37,15 @@ payloads. PMTiles directory/metadata compression is independent of tile
 compression. Header `min_zoom` and `max_zoom` are the inclusive published zoom
 limits, and header `min_lon_e7`, `min_lat_e7`, `max_lon_e7`, and `max_lat_e7`
 match the catalog domain bounds. For the current CONUS domain these are
-`[-130, 20, -60, 55]` and zooms 3 through 4. Clients must not request outside
-that domain or zoom interval. Archives and cycle catalogs are immutable once
-published. Archive writes use R2's atomic `If-None-Match: *` create-only
-condition. If a retry finds an existing archive, it reuses it only when its
-ETag matches the expected PNG archive bytes; it never replaces the object.
+`[-130, 20, -60, 55]`. Zooms are model-specific: HRRR and RRFS publish 3
+through 5, while RAP publishes 3 through 4. The Worker accepts archive zooms
+from 0 through 24, then requires each archive header to match the range in its
+catalog parameter. Clients place those limits on the OpenLayers XYZ source,
+not the layer, so the last available level can scale up above its native zoom.
+Archives and cycle catalogs are immutable once published. Archive writes use
+R2's atomic `If-None-Match: *` create-only condition. If a retry finds an
+existing archive, it reuses it only when its ETag matches the expected PNG
+archive bytes; it never replaces the object.
 
 Write all archives first, then make one batched size and ETag/MD5 verification
 of every referenced archive. Each parameter also records the local archive's
@@ -82,7 +86,7 @@ The top-level object is schema version 1:
     "projection": "EPSG:3857",
     "bounds": [-130, 20, -60, 55],
     "minZoom": 3,
-    "maxZoom": 6
+    "maxZoom": 5
   },
   "frames": [
     {
@@ -128,7 +132,7 @@ be passed to `normalizeProviderPayload` unchanged:
     "format": "image/png",
     "projection": "EPSG:3857",
     "minZoom": 3,
-    "maxZoom": 6,
+    "maxZoom": 5,
     "bounds": [-130, 20, -60, 55]
   },
   "source": {
@@ -164,6 +168,11 @@ pointer. A missing/unmatched native field is omitted from `parameters` and
 listed in `unavailableParameters` with an exact reason. Do not substitute a
 field from another level, model, or cycle. `source` uses the NOAA dataset URL
 and attribution above, with the dataset ID matching its actual source bucket.
+
+The domain range and every parameter's range must agree with each PMTiles
+header. The Worker reads at most 16,257 bytes for the root directory, so the
+writer must keep that directory within the PMTiles v3 root limit. Leaf and
+other directories use the separate 2 MiB range cap.
 
 The remaining cycle catalog fields are:
 

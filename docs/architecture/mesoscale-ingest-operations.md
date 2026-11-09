@@ -89,13 +89,12 @@ field/frame plus catalog, latest pointer, and health objects:
 | RRFS f00 | 18 | 3 | 21 |
 
 At 24 completed hourly cycles per day for each model and a 30-day month, that
-is about 122,400 Class A writes per month. The live run below counted 270 PNG
-tiles across each HRRR frame, or 15 tiles per field on average. Packing those
-tiles into 18 field archives reduces archive PUTs from 270 to 18 per frame
-(15x for this measured zoom/domain), and yields 126 archive objects per
-seven-frame cycle. The requested roughly 100x reduction is not present in this
-live tile distribution; the per-field archive boundary and current zoom range
-produce about 15x. At seven ingest-side Class B operations per new cycle in
+is about 122,400 Class A writes per month. The 2026-11-08 baseline run at zooms
+3-4 counted 270 PNG tiles across each HRRR frame, or 15 tiles per field. The
+2026-11-09 run at zooms 3-5 counted 846 tiles, or 47 per field. Packing them
+into 18 field archives reduces archive PUTs from 846 to 18 per frame, about
+47x, and yields 126 archive objects per seven-frame cycle. Packing remains
+below the requested roughly 100x reduction. At seven ingest-side Class B operations per new cycle in
 steady state (catalog checks, pointer check, verification listing, and
 retention listings), the same schedule is about 15,120 Class B operations per
 month. These estimates exclude Worker tile reads and retries while NOAA
@@ -105,11 +104,70 @@ Live HRRR dry run, 2026-11-08: cycle `2026-11-08T18:00:00Z` completed all
 seven frames and 18 fields per frame. It generated 126 archives totaling
 29,384,874 bytes (about 28.0 MiB), from 132,803,194 downloaded bytes. It
 rendered 1,890 PNG tiles and took 445.13 seconds (7m 25s). Dry-run mode made
-no R2 writes. The corresponding complete publish is estimated at 129 Class A
-writes per cycle: 126 archive objects and 3 catalog, latest, and health
-objects. Across HRRR f00-f06, RAP f00, and RRFS f00 on the hourly schedule,
-the estimates are 122,400 Class A and 15,120 Class B operations per 30-day
-month.
+no R2 writes.
+
+## Zoom measurement and model limits
+
+A Windows dry run used the pinned dependencies and NOAA HRRR cycle
+`2026-11-09T16:00:00Z`, f00, with local temporary output and no R2 writes.
+The renderer produced 47 tiles per field at zooms 3-5 and 147 at zooms 3-6.
+The table reports bytes and render seconds per field. The z6 cumulative run
+used about 2.0 GB peak working memory and took 323.84 seconds end to end for
+f00. Scaling that f00 elapsed time across seven frames projects about 38
+minutes, before frame-to-frame variation. That misses the under-20-minute
+target and leaves little margin in the 45-minute job. Zoom 7 was not run
+because z6 already misses the target.
+
+| Field | z5 PNG bytes | z5 PMTiles bytes | z5 render s | z6 PNG bytes | z6 PMTiles bytes | z6 render s |
+|---|---:|---:|---:|---:|---:|---:|
+| temperature-2m | 1,002,692 | 1,003,057 | 6.846 | 2,685,774 | 2,686,426 | 18.461 |
+| dewpoint-2m | 1,297,345 | 1,297,713 | 5.939 | 3,613,434 | 3,614,094 | 17.042 |
+| cape-surface | 339,225 | 339,571 | 4.485 | 892,356 | 882,342 | 13.491 |
+| cin-surface | 295,536 | 295,218 | 4.857 | 815,009 | 801,698 | 12.044 |
+| cape-180-0mb-agl | 357,117 | 357,467 | 6.683 | 947,073 | 935,739 | 12.838 |
+| cape-90-0mb-agl | 254,290 | 253,312 | 6.051 | 669,942 | 652,597 | 16.346 |
+| cape-255-0mb-agl | 369,070 | 369,421 | 5.168 | 987,670 | 977,674 | 17.894 |
+| cape-0-3000m-agl | 185,981 | 185,002 | 5.461 | 484,232 | 468,220 | 17.584 |
+| cin-180-0mb-agl | 331,228 | 331,577 | 6.922 | 911,990 | 901,641 | 13.008 |
+| cin-90-0mb-agl | 260,102 | 259,120 | 9.588 | 725,641 | 707,959 | 13.627 |
+| cin-255-0mb-agl | 354,069 | 354,418 | 6.201 | 977,486 | 966,204 | 13.431 |
+| srh-0-1km | 1,209,694 | 1,210,062 | 6.823 | 3,354,277 | 3,354,933 | 16.900 |
+| srh-0-3km | 1,405,406 | 1,405,775 | 10.094 | 3,923,557 | 3,924,217 | 16.600 |
+| surface-lcl | 1,563,320 | 1,563,689 | 9.168 | 4,452,931 | 4,453,592 | 17.534 |
+| pwat | 892,660 | 893,015 | 6.460 | 2,342,992 | 2,343,637 | 19.075 |
+| mslp | 450,782 | 451,116 | 6.082 | 1,085,502 | 1,086,081 | 17.391 |
+| reflectivity | 167,839 | 166,125 | 4.601 | 449,956 | 423,965 | 13.289 |
+| wind-speed-10m | 1,343,723 | 1,344,096 | 5.843 | 3,716,950 | 3,717,609 | 18.717 |
+| **Total** | **12,080,079** | **12,079,754** | **117.272** | **33,036,772** | **32,898,628** | **285.272** |
+
+We publish HRRR and RRFS through zoom 5 and keep RAP at zoom 4. HRRR and
+RRFS have 3 km native grid spacing; RAP is 13 km. At CONUS latitudes, zoom 5
+Web Mercator pixels are roughly 3.8 km on the ground, so zoom 5 stays at or
+coarser than the 3 km model grids. Zoom 6 is roughly 1.9 km and adds pixels
+finer than those grids. NOAA documents the [HRRR 3 km grid spacing](https://rapidrefresh.noaa.gov/hrrr/),
+the [RAP 13 km grid spacing](https://www.ncei.noaa.gov/products/weather-climate-models/rapid-refresh-update),
+and the [RRFS 3 km grid spacing](https://gsl.noaa.gov/rrfs/).
+
+At z5, one HRRR f00 uses 12,079,754 archive bytes. Multiplying by seven
+frames gives 84,558,278 bytes per HRRR cycle, or 507,349,668 bytes for six
+retained cycles. Applying the measured HRRR f00 archive size as a conservative
+upper estimate for each of RAP f00 and RRFS f00 gives 652,306,716 bytes across
+six cycles of all three models, about 6.5% of R2's 10 GB free storage
+allowance. RAP publishes only through z4, so its actual archives should be
+smaller. This estimate excludes catalogs and health objects, which are small.
+
+Scaling the measured z5 f00 end-to-end time across seven frames estimates
+about 16.5 minutes for an HRRR cycle. This stays below the 20-minute target.
+The z6 render time alone scales to about 33.3 minutes across seven frames,
+before downloads and archive writing, so z6 does not meet the target. Zoom 7
+is not a viable next step under this renderer and timeout.
+
+The added zoom does not change object counts or R2 request counts. HRRR still
+publishes 126 archives plus 3 other objects per cycle; RAP and RRFS retain 17
+and 18 archives respectively. The current schedule remains about 122,400
+Class A and 15,120 Class B operations per 30-day month. That is 12.2% of the
+1 million Class A allowance and 0.15% of the 10 million Class B allowance.
+R2 delete operations for retention are free.
 
 Recheck actual `archives`, `bytesPublished`, frame count, and elapsed runtime
 when NOAA source coverage, requested fields, or zoom levels change. Dry runs
