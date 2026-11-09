@@ -1,8 +1,11 @@
 /**
- * Starts the mesoscale ingest workflow on a Cloudflare cron schedule. GitHub's own `schedule`
- * trigger is delayed or dropped under load, so this is the primary trigger and the workflow's
- * schedule is only a backup. The workflow is idempotent: a run that finds the newest model cycle
- * already published exits in seconds, so an extra dispatch is harmless.
+ * The repository's reliable cron. GitHub's own `schedule` trigger is delayed or dropped under
+ * load, so Cloudflare cron triggers start the scheduled workflows through the GitHub
+ * `workflow_dispatch` API, and the workflows' own schedules are only backups. Each cron expression
+ * in `wrangler.mesoscale-scheduler.jsonc` must have an entry in JOBS below.
+ *
+ * Both jobs are safe to start extra times: the ingest exits in seconds when the newest model cycle
+ * is already published, and the beta release exits early when `main` has nothing new.
  *
  * The GitHub token is a Worker secret (GITHUB_DISPATCH_TOKEN): a fine-grained token limited to
  * this repository with only the "Actions: read and write" permission. This Worker serves no
@@ -13,9 +16,22 @@ const GITHUB_API = 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 const REQUEST_TIMEOUT_MS = 15000;
 
+/**
+ * Cron expression to the workflows it starts. workflow_dispatch takes every input as a string, even
+ * ones the workflow declares as `type: boolean` (this is what `gh workflow run -f` sends too).
+ */
+export const JOBS = {
+  '12,42 * * * *': [{ workflow: 'mesoscale-ingest.yml' }],
+  '23 3,9,15,21 * * *': [
+    {
+      workflow: 'release-beta.yml',
+      inputs: { confirmation: 'RELEASE-BETA', dry_run: 'false', deploy_api: 'true', only_if_changed: 'true' },
+    },
+  ],
+};
+
 const DEFAULTS = {
   GITHUB_REPOSITORY: 'WxboySuper/Graphical-Forecast-Creator',
-  WORKFLOW_FILE: 'mesoscale-ingest.yml',
   WORKFLOW_REF: 'main',
 };
 
@@ -29,35 +45,59 @@ const setting = (env, name) => {
 const SEGMENT = '[A-Za-z0-9][A-Za-z0-9_.-]*';
 const CHECKS = {
   GITHUB_REPOSITORY: new RegExp(`^${SEGMENT}/${SEGMENT}$`),
-  WORKFLOW_FILE: new RegExp(String.raw`^${SEGMENT}\.ya?ml$`),
   WORKFLOW_REF: new RegExp(`^${SEGMENT}(/${SEGMENT})*$`),
 };
 
 const isSafeSetting = (name, value) => CHECKS[name].test(value) && !value.includes('..');
 
-/** Builds the workflow dispatch request, or throws when the configuration is unusable. */
-export const buildDispatchRequest = (env) => {
-  const token = typeof env?.GITHUB_DISPATCH_TOKEN === 'string' ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
+const WORKFLOW_FILE = new RegExp(String.raw`^${SEGMENT}\.ya?ml$`);
+
+const isString = (value) => typeof value === 'string';
+const isFlatStringMap = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+  && Object.values(value).every(isString);
+const hasSafeWorkflow = (job) => isString(job?.workflow) && WORKFLOW_FILE.test(job.workflow);
+const hasValidInputs = (job) => job.inputs === undefined || isFlatStringMap(job.inputs);
+
+/** A job must name a safe workflow file; its inputs, when present, must be a flat object of strings. */
+const assertJob = (job) => {
+  if (!hasSafeWorkflow(job) || !hasValidInputs(job)) throw new Error('Invalid scheduler job');
+};
+
+const readToken = (env) => {
+  const token = isString(env?.GITHUB_DISPATCH_TOKEN) ? env.GITHUB_DISPATCH_TOKEN.trim() : '';
   if (!token) throw new Error('GITHUB_DISPATCH_TOKEN is not set');
+  return token;
+};
+
+/** Repository and ref, each validated; an unusable value is a clear configuration error. */
+const readSettings = (env) => {
   const values = Object.fromEntries(Object.keys(CHECKS).map((name) => [name, setting(env, name)]));
   const invalid = Object.entries(values).find(([name, value]) => !isSafeSetting(name, value));
   if (invalid) throw new Error(`Invalid scheduler configuration: ${invalid[0]}`);
-  const repository = values.GITHUB_REPOSITORY;
-  const workflow = values.WORKFLOW_FILE;
-  const ref = values.WORKFLOW_REF;
+  return values;
+};
+
+const requestInit = (token, body) => ({
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': API_VERSION,
+    'User-Agent': 'gfc-scheduler',
+  },
+  body: JSON.stringify(body),
+});
+
+/** Builds the workflow dispatch request for one job, or throws when the configuration is unusable. */
+export const buildDispatchRequest = (env, job) => {
+  assertJob(job);
+  const token = readToken(env);
+  const settings = readSettings(env);
+  const body = { ref: settings.WORKFLOW_REF, ...(job.inputs ? { inputs: job.inputs } : {}) };
   return {
-    url: `${GITHUB_API}/repos/${repository}/actions/workflows/${workflow}/dispatches`,
-    init: {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': API_VERSION,
-        'User-Agent': 'gfc-mesoscale-scheduler',
-      },
-      body: JSON.stringify({ ref }),
-    },
+    url: `${GITHUB_API}/repos/${settings.GITHUB_REPOSITORY}/actions/workflows/${job.workflow}/dispatches`,
+    init: requestInit(token, body),
   };
 };
 
@@ -71,20 +111,27 @@ const errorDetail = async (response) => {
   }
 };
 
-/** Dispatches the workflow once. Never logs the token or the response body beyond a short status. */
-export const dispatchIngest = async (env, fetcher = fetch) => {
-  const { url, init } = buildDispatchRequest(env);
+/** Starts one workflow. Never logs the token or the response body beyond a short message. */
+export const dispatchJob = async (env, job, fetcher = fetch) => {
+  const { url, init } = buildDispatchRequest(env, job);
   const response = await fetcher(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (response.status !== 204) {
-    throw new Error(`GitHub workflow dispatch failed with HTTP ${response.status}${await errorDetail(response)}`);
+    throw new Error(`Dispatching ${job.workflow} failed with HTTP ${response.status}${await errorDetail(response)}`);
   }
-  return { dispatchedAt: new Date().toISOString() };
+  return { workflow: job.workflow, dispatchedAt: new Date().toISOString() };
+};
+
+/** The jobs for a cron expression; an unknown expression is a configuration error, not a no-op. */
+export const jobsForCron = (cron) => {
+  const jobs = JOBS[cron];
+  if (!jobs) throw new Error(`No scheduler job is defined for cron "${cron}"`);
+  return jobs;
 };
 
 export default {
-  async scheduled(_event, env) {
-    // Awaited so a missing or rejected token fails the cron invocation visibly in Cloudflare.
-    await dispatchIngest(env);
+  async scheduled(event, env) {
+    // Awaited so a missing token or a rejected dispatch fails the cron invocation visibly in Cloudflare.
+    for (const job of jobsForCron(event?.cron)) await dispatchJob(env, job);
   },
   async fetch() {
     return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });

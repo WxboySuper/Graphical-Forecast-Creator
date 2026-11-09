@@ -28,10 +28,15 @@ It moves the model latest pointer only after a complete cycle validates, then
 deletes cycles older than the six-cycle default. Partial runs are recorded in
 daily feed health and do not replace latest.
 
-## Ingest trigger (Cloudflare cron)
+## Cron trigger (Cloudflare Worker)
 
-GitHub's `schedule` event is delayed or dropped under load, so the primary trigger is the
-`gfc-mesoscale-scheduler` Worker (`cloudflare/mesoscale-scheduler.mjs`). Its cron runs at minutes 12
+GitHub's `schedule` event is delayed or dropped under load, so the repository's primary cron is the
+`gfc-mesoscale-scheduler` Worker (`cloudflare/mesoscale-scheduler.mjs`). It starts two workflows
+through `workflow_dispatch`: the ingest (below) and the beta release (`release-beta.yml` at 03:23,
+09:23, 15:23, and 21:23 UTC with `only_if_changed`, so it skips when `main` has no new commits since the
+latest beta tag). Each cron expression needs an entry in the job table in the Worker and in
+`wrangler.mesoscale-scheduler.jsonc`; a test keeps them in sync, and an unknown expression fails
+loudly. The ingest cron runs at minutes 12
 and 42 (off the start of the hour, when GitHub's queue is busy, and after HRRR's forecast hours for the previous cycle are normally on NOAA's bucket) and calls the GitHub `workflow_dispatch` API for `mesoscale-ingest.yml` on `main`. The
 workflow's own `22,52` schedule stays as a backup; both are safe together because publishing is
 idempotent and the workflow has a concurrency lock.
