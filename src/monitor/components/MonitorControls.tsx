@@ -74,6 +74,7 @@ interface MonitorControlsProps {
   };
   onSpcReferenceLayerEnabledChange: (enabled: boolean) => void;
   onRefresh: () => void;
+  mesoscalePanel?: React.ReactNode;
 }
 
 /** Composes all monitor layer, source, and playback controls. */
@@ -113,6 +114,7 @@ const MonitorControls: React.FC<MonitorControlsProps> = ({
   referenceLayerMeta,
   onSpcReferenceLayerEnabledChange,
   onRefresh,
+  mesoscalePanel,
 }) => (
   <aside className="monitor-controls" aria-label="Monitor controls">
     <div className="monitor-controls__header">
@@ -143,6 +145,8 @@ const MonitorControls: React.FC<MonitorControlsProps> = ({
       onSatelliteProductChange={onSatelliteProductChange}
       onSatelliteOpacityChange={onSatelliteOpacityChange}
     />
+
+    {mesoscalePanel}
 
     <MonitorAlertsSection
       settings={settings}

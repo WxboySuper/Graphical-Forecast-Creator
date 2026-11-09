@@ -6,6 +6,7 @@ import {
   DEFAULT_MONITOR_SETTINGS,
   MONITOR_OUTLOOK_LAYER_TYPES,
   type MonitorMapView,
+  type MonitorMesoscaleSettings,
   type MonitorOutlookLayerType,
   type MonitorOutlookSourceKind,
   type MonitorOutlookSourceSelection,
@@ -102,6 +103,37 @@ const readReferenceLayers = (value: unknown): MonitorSettings['referenceLayers']
   };
 };
 
+const isStoredMesoscaleLayer = (value: unknown): value is Record<string, unknown> =>
+  isRecord(value) && typeof value.id === 'string' && Boolean(value.id.trim());
+
+const normalizeStoredMesoscaleLayer = (value: Record<string, unknown>) => ({
+  id: (value.id as string).trim(),
+  opacity: readNumber(value.opacity, 0.75, 0, 1),
+});
+
+const uniqueMesoscaleLayers = (layers: MonitorMesoscaleSettings['layers']): MonitorMesoscaleSettings['layers'] => {
+  const seen = new Set<string>();
+  return layers.filter((layer) => {
+    if (seen.has(layer.id)) return false;
+    seen.add(layer.id);
+    return true;
+  });
+};
+
+const readMesoscaleModel = (value: unknown): MonitorMesoscaleSettings['model'] =>
+  readEnum(value, ['hrrr', 'rap', 'rrfs'] as const, DEFAULT_MONITOR_SETTINGS.mesoscale.model);
+
+const readMesoscaleLayers = (value: unknown): MonitorMesoscaleSettings['layers'] => {
+  if (!Array.isArray(value)) return [];
+  const layers = value.filter(isStoredMesoscaleLayer).map(normalizeStoredMesoscaleLayer);
+  return uniqueMesoscaleLayers(layers);
+};
+
+const readMesoscale = (value: unknown): MonitorMesoscaleSettings => {
+  if (!isRecord(value)) return DEFAULT_MONITOR_SETTINGS.mesoscale;
+  return { model: readMesoscaleModel(value.model), layers: readMesoscaleLayers(value.layers) };
+};
+
 export const normalizeMonitorSettings = (value: unknown): MonitorSettings => {
   if (!isRecord(value)) {
     return DEFAULT_MONITOR_SETTINGS;
@@ -142,5 +174,6 @@ export const normalizeMonitorSettings = (value: unknown): MonitorSettings => {
     alertsShowWarnings: readBooleanSetting(value.alertsShowWarnings, DEFAULT_MONITOR_SETTINGS.alertsShowWarnings),
     alertsShowAdvisories: readBooleanSetting(value.alertsShowAdvisories, DEFAULT_MONITOR_SETTINGS.alertsShowAdvisories),
     referenceLayers: readReferenceLayers(value.referenceLayers),
+    mesoscale: readMesoscale(value.mesoscale),
   };
 };

@@ -194,7 +194,9 @@ describe('AuthProvider Utils', () => {
       monitorSettings: liveMonitorSettings,
     });
 
-    expect(snapshot.monitorSettings).toEqual(liveMonitorSettings);
+    expect(snapshot.monitorSettings.radarMode).toBe('none');
+    expect(snapshot.monitorSettings.animationEnabled).toBe(true);
+    expect(snapshot.monitorSettings).not.toHaveProperty('mesoscale');
     // A changed monitor setting must not compare equal to the last synced
     // document, otherwise the debounced write is skipped.
     expect(areProviderUserSettingsEqual(syncedSettings, snapshot)).toBe(false);

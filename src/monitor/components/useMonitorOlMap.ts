@@ -21,6 +21,8 @@ import {
   clearMonitorAlertPopup,
   renderMonitorAlertPopup,
 } from './renderMonitorAlertPopup';
+import type { MesoscaleLayerSpec } from '../../mesoscale';
+import { useMonitorMesoscaleLayerSync } from './useMonitorMesoscaleLayerSync';
 
 interface UseMonitorOlMapArgs {
   mapView: MonitorMapView;
@@ -34,6 +36,7 @@ interface UseMonitorOlMapArgs {
   alertsOpacity: number;
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   mapElementRef: RefObject<HTMLDivElement | null>;
+  mesoscaleLayers?: MesoscaleLayerSpec[];
 }
 
 /** Wires Monitor OpenLayers map bootstrap, layers, and imperative alert popups. */
@@ -96,5 +99,6 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     selectedAlertDetailUrl,
     onClearSelectedAlert: clearSelectedAlert,
   });
+  useMonitorMesoscaleLayerSync(args.mesoscaleLayers ?? [], refs);
 
 };

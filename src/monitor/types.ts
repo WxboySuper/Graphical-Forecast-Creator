@@ -18,6 +18,16 @@ export interface MonitorReferenceLayerSettings {
   spcMesoscaleDiscussionEnabled: boolean;
 }
 
+export interface MonitorMesoscaleLayerSetting {
+  id: string;
+  opacity: number;
+}
+
+export interface MonitorMesoscaleSettings {
+  model: 'hrrr' | 'rap' | 'rrfs';
+  layers: MonitorMesoscaleLayerSetting[];
+}
+
 export interface MonitorOutlookSourceSelection {
   kind: MonitorOutlookSourceKind;
   id: string;
@@ -51,6 +61,7 @@ export interface MonitorSettings {
   alertsShowWarnings: boolean;
   alertsShowAdvisories: boolean;
   referenceLayers: MonitorReferenceLayerSettings;
+  mesoscale: MonitorMesoscaleSettings;
 }
 
 export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
@@ -84,7 +95,17 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
   referenceLayers: {
     spcMesoscaleDiscussionEnabled: false,
   },
+  mesoscale: {
+    model: 'hrrr',
+    layers: [],
+  },
 };
 
 export const areMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
+
+export const areSyncedMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean => {
+  const { mesoscale: _leftMesoscale, ...leftSynced } = left;
+  const { mesoscale: _rightMesoscale, ...rightSynced } = right;
+  return JSON.stringify(leftSynced) === JSON.stringify(rightSynced);
+};

@@ -63,6 +63,8 @@ test('uploads a monitor change after the hosted settings document has synced', a
       expect.objectContaining({ monitorSettings: expect.objectContaining({ radarSite: 'KOUN' }) }),
       { merge: true },
     );
+    const writtenSettings = jest.mocked(setDoc).mock.calls.at(-1)?.[1] as Record<string, unknown> | undefined;
+    expect(writtenSettings?.monitorSettings).not.toHaveProperty('mesoscale');
   } finally {
     unmount();
     jest.useRealTimers();

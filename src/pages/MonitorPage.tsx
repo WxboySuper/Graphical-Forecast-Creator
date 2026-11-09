@@ -49,7 +49,14 @@ import { useMonitorNwsAlerts } from '../monitor/useMonitorNwsAlerts';
 import { useMonitorStormReports } from '../monitor/useMonitorStormReports';
 import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { getLocalCalendarDate } from '../utils/localDate';
+import { FeatureBoundary } from '../features/FeatureBoundary';
+import { isFeatureExposed } from '../config/featureExposure';
+import type { MesoscaleCatalogParameter, MesoscaleLayerSpec } from '../mesoscale';
+import type { MonitorMesoscaleView } from '../monitor/components/MonitorMesoscaleIntegration';
+import { setMonitorMesoscaleSettings } from '../store/monitorSlice';
 import './MonitorPage.css';
+
+const MonitorMesoscaleIntegration = React.lazy(() => import('../monitor/components/MonitorMesoscaleIntegration').then((module) => ({ default: module.MonitorMesoscaleIntegration })));
 
 interface PageContext {
   addToast: AddToastFn;
@@ -248,8 +255,57 @@ interface MonitorPageWorkspaceProps {
   dispatch: AppDispatch;
 }
 
+interface MonitorPageWorkspaceViewProps extends MonitorPageWorkspaceProps {
+  mesoscalePanel?: React.ReactNode;
+  mesoscaleLayers?: MesoscaleLayerSpec[];
+  mesoscaleLegend?: MesoscaleCatalogParameter[];
+}
+
+const EMPTY_MESOSCALE_LAYERS: MesoscaleLayerSpec[] = [];
+const EMPTY_MESOSCALE_LEGEND: MesoscaleCatalogParameter[] = [];
+const EMPTY_MESOSCALE_DISPLAY = {
+  layers: EMPTY_MESOSCALE_LAYERS,
+  legend: EMPTY_MESOSCALE_LEGEND,
+};
+
+const MonitorMesoscaleViewBridge: React.FC<{
+  view: MonitorMesoscaleView;
+  onViewChange: (view: Pick<MonitorMesoscaleView, 'layers' | 'legend'>) => void;
+}> = ({ view, onViewChange }) => {
+  useEffect(() => onViewChange({ layers: view.layers, legend: view.legend }), [onViewChange, view.layers, view.legend]);
+  return <>{view.panel}</>;
+};
+
+interface MonitorMesoscaleErrorBoundaryProps {
+  children: React.ReactNode;
+  onError: () => void;
+}
+
+interface MonitorMesoscaleErrorBoundaryState {
+  hasError: boolean;
+}
+
+class MonitorMesoscaleErrorBoundary extends React.Component<
+  MonitorMesoscaleErrorBoundaryProps,
+  MonitorMesoscaleErrorBoundaryState
+> {
+  state: MonitorMesoscaleErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): MonitorMesoscaleErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(): void {
+    this.props.onError();
+  }
+
+  render(): React.ReactNode {
+    return this.state.hasError ? null : this.props.children;
+  }
+}
+
 /** Renders the monitor workspace after page-level data has been assembled. */
-const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
+const MonitorPageWorkspaceView: React.FC<MonitorPageWorkspaceViewProps> = ({
   settings,
   outlookOptions,
   selectedOutlook,
@@ -270,6 +326,9 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
   onOutlookSourceChange,
   onOutlookTypeChange,
   dispatch,
+  mesoscalePanel,
+  mesoscaleLayers,
+  mesoscaleLegend,
 }) => (
     <div className="monitor-page">
       <MonitorControls
@@ -310,6 +369,7 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
         }}
         onSpcReferenceLayerEnabledChange={(enabled) => dispatch(setReferenceLayerEnabled({ layer: 'spcMesoscaleDiscussionEnabled', enabled }))}
         onRefresh={onRefresh}
+        mesoscalePanel={mesoscalePanel}
       />
 
       <MonitorMap
@@ -325,9 +385,50 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = ({
         alertsOpacity={settings.alertsOpacity}
         mesoscaleDiscussions={referenceLayers.mesoscaleDiscussions}
         referenceAttributions={referenceAttributions}
+        mesoscaleLayers={mesoscaleLayers}
+        mesoscaleLegend={mesoscaleLegend}
       />
     </div>
 );
+
+const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = (props) => {
+  const [mesoscaleDisplay, setMesoscaleDisplay] = useState({
+    model: props.settings.mesoscale.model,
+    layers: EMPTY_MESOSCALE_LAYERS,
+    legend: EMPTY_MESOSCALE_LEGEND,
+  });
+  const onMesoscaleViewChange = useCallback((view: Pick<MonitorMesoscaleView, 'layers' | 'legend'>) => {
+    setMesoscaleDisplay((current) => current.model === props.settings.mesoscale.model
+      && current.layers === view.layers && current.legend === view.legend
+      ? current
+      : { ...view, model: props.settings.mesoscale.model });
+  }, [props.settings.mesoscale.model]);
+  const clearMesoscaleDisplay = useCallback(() => {
+    setMesoscaleDisplay({ ...EMPTY_MESOSCALE_DISPLAY, model: props.settings.mesoscale.model });
+  }, [props.settings.mesoscale.model]);
+  const mesoscalePanel = isFeatureExposed('mesoscaleWorkspace') ? (
+    <FeatureBoundary feature="mesoscaleWorkspace">
+      <MonitorMesoscaleErrorBoundary key={props.settings.mesoscale.model} onError={clearMesoscaleDisplay}>
+        <React.Suspense fallback={<div className="monitor-mesoscale__loading" role="status">Loading mesoscale parameters…</div>}>
+          <MonitorMesoscaleIntegration
+            settings={props.settings.mesoscale}
+            onSettingsChange={(settings) => props.dispatch(setMonitorMesoscaleSettings(settings))}
+          >
+            {(view) => <MonitorMesoscaleViewBridge view={view} onViewChange={onMesoscaleViewChange} />}
+          </MonitorMesoscaleIntegration>
+        </React.Suspense>
+      </MonitorMesoscaleErrorBoundary>
+    </FeatureBoundary>
+  ) : undefined;
+  return (
+    <MonitorPageWorkspaceView
+      {...props}
+      mesoscalePanel={mesoscalePanel}
+      mesoscaleLayers={mesoscaleDisplay.model === props.settings.mesoscale.model ? mesoscaleDisplay.layers : EMPTY_MESOSCALE_LAYERS}
+      mesoscaleLegend={mesoscaleDisplay.model === props.settings.mesoscale.model ? mesoscaleDisplay.legend : EMPTY_MESOSCALE_LEGEND}
+    />
+  );
+};
 
 /** Real-time monitor page for radar, satellite, and read-only personal outlook overlays. */
 export const MonitorPage: React.FC = () => {
