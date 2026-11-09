@@ -77,6 +77,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Verification reports:** Grade archived dates against filtered SPC reports only and show an unavailable message when the filtered archive cannot be used.
 - **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
 - **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
 - **Beta release checks:** Invalid retry settings now fall back to defaults so post-deploy smoke checks run as intended.
