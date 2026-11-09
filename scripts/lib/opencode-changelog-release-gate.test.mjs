@@ -25,20 +25,18 @@ test('release gate accepts only a clean audit for a valid audited target revisio
   }).ready, false);
 });
 
-test('beta and stable release jobs require a clean final audit before creating releases', () => {
-  for (const filename of ['../../.github/workflows/release-beta.yml', '../../.github/workflows/release-stable.yml']) {
-    const workflow = readFileSync(new URL(filename, import.meta.url), 'utf8');
-    assert.match(workflow, /final_changelog_audit:[\s\S]*?uses: \.\/\.github\/workflows\/opencode-changelog-audit\.yml/);
-    assert.match(workflow, /changelog_gate:[\s\S]*?require-opencode-changelog-clean\.mjs/);
-    assert.match(workflow, /AUDITED_HEAD:[\s\S]*?needs\.final_changelog_audit\.outputs\.head_sha/);
-    assert.doesNotMatch(workflow, /Dispatch post-release changelog audit/);
-    assert.match(workflow, /RELEASE_NOTES_MODE: changelog-and-prs/);
-  }
+test('stable release requires a clean final audit; beta does not run one', () => {
+  const stableWf = readFileSync(new URL('../../.github/workflows/release-stable.yml', import.meta.url), 'utf8');
+  assert.match(stableWf, /final_changelog_audit:[\s\S]*?uses: \.\/\.github\/workflows\/opencode-changelog-audit\.yml/);
+  assert.match(stableWf, /changelog_gate:[\s\S]*?require-opencode-changelog-clean\.mjs/);
+  assert.match(stableWf, /AUDITED_HEAD:[\s\S]*?needs\.final_changelog_audit\.outputs\.head_sha/);
+  assert.doesNotMatch(stableWf, /Dispatch post-release changelog audit/);
+  assert.match(stableWf, /RELEASE_NOTES_MODE: changelog-and-prs/);
+  assert.match(stableWf, /needs: \[final_changelog_audit, changelog_gate\]/);
   const beta = readFileSync(new URL('../../.github/workflows/release-beta.yml', import.meta.url), 'utf8');
-  assert.match(beta, /needs: \[quality, final_changelog_audit, changelog_gate\]/);
+  assert.doesNotMatch(beta, /final_changelog_audit|changelog_gate|opencode-changelog-audit/);
+  assert.match(beta, /RELEASE_NOTES_MODE: changelog-and-prs/);
   assert.match(beta, /needs: \[version_gate, pre_build\]/);
-  const stable = readFileSync(new URL('../../.github/workflows/release-stable.yml', import.meta.url), 'utf8');
-  assert.match(stable, /needs: \[final_changelog_audit, changelog_gate\]/);
 });
 
 test('beta release deploys the Worker and VPS API without rsyncing the retired frontend', () => {

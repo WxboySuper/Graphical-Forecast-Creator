@@ -112,67 +112,20 @@ jobs:
       - name: Test
         run: pnpm run test
 
-  final_changelog_audit:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') && !inputs.dry_run
-    needs: quality
-    name: Final changelog audit
-    uses: ./.github/workflows/opencode-changelog-audit.yml
-    with:
-      target_ref: main
-      force: true
-      trigger_reason: beta-pre-release
-    secrets:
-      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-      GH_PAT: ${{ secrets.GH_PAT }}
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: read
-
-  changelog_gate:
-    name: Require clean changelog
-    needs: final_changelog_audit
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') && !inputs.dry_run
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Check out trusted release tooling
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-
-      - name: Block release unless the final audit is clean
-        env:
-          AUDIT_RESULT: ${{ needs.final_changelog_audit.result }}
-          AUDIT_STATUS: ${{ needs.final_changelog_audit.outputs.status }}
-          TARGET_REF: main
-          AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
-        run: node scripts/require-opencode-changelog-clean.mjs
-
   version_gate:
     name: Resolve beta version
-    needs: [quality, final_changelog_audit, changelog_gate]
+    needs: quality
     if: >-
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
-      needs.quality.result == 'success' &&
-      (
-        inputs.dry_run ||
-        (
-          needs.final_changelog_audit.result == 'success' &&
-          needs.changelog_gate.result == 'success'
-        )
-      )
+      needs.quality.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
       CONFIRMATION: ${{ inputs.confirmation }}
-      AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
       DRY_RUN: ${{ inputs.dry_run }}
       EXPLICIT_VERSION: ${{ inputs.version }}
     steps:
@@ -200,10 +153,6 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          if [ "$DRY_RUN" != "true" ] && [ -n "$AUDITED_HEAD" ] && [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
-            echo "::error::main moved after the final changelog audit; rerun the release workflow." >&2
-            exit 1
-          fi
           node --input-type=module - <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           import { execFileSync } from 'node:child_process';
