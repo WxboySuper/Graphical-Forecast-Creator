@@ -52,7 +52,11 @@ export const createArea = (geometry: Polygon, options: CreateAreaOptions = {}): 
 /** Reads a drawn or modified feature back as a stored polygon, or null when it is not a valid polygon. */
 export const featureToPolygon = (feature: Feature<Geometry>): Polygon | null => {
   const geometry = feature.getGeometry();
-  if (!geometry) return null;
+  return geometry ? geometryToPolygon(geometry) : null;
+};
+
+/** Writes an OpenLayers geometry as a stored polygon, or null when it is not a valid polygon. */
+export const geometryToPolygon = (geometry: Geometry): Polygon | null => {
   const polygon = JSON.parse(geoJson.writeGeometry(geometry)) as unknown;
   return isMesoscalePolygon(polygon) ? polygon : null;
 };
@@ -66,11 +70,25 @@ export const polygonToGeometry = (polygon: Polygon): Geometry | null => {
   }
 };
 
-/** A stable color per hazard label, so any weather type gets a consistent hue. */
+/** Fixed, well-separated hues for the suggested hazards; anything else gets a stable hash hue. */
+const KNOWN_HAZARD_HUES: Record<string, number> = {
+  'severe thunderstorms': 32,
+  'tornado potential': 350,
+  'flash flooding': 215,
+  'heavy snow': 190,
+  'freezing rain': 275,
+  'wildfire weather': 12,
+  'high wind': 135,
+  'dense fog': 255,
+  'area of interest': 160,
+};
+
 export const hazardHue = (hazard: string): number => {
-  let hash = 0;
-  for (const char of hazard.trim().toLowerCase()) hash = (hash * 31 + char.charCodeAt(0)) % 360;
-  return hash;
+  const key = hazard.trim().toLowerCase();
+  if (key in KNOWN_HAZARD_HUES) return KNOWN_HAZARD_HUES[key];
+  let hash = 2166136261;
+  for (const char of key) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return Math.abs(hash) % 360;
 };
 
 const pad = (value: number): string => String(value).padStart(2, '0');

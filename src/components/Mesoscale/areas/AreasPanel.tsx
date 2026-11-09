@@ -4,7 +4,14 @@ import { hazardHue } from './areaModel';
 import { AreaEditor } from './AreaEditor';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
+import type { AreaShapeTool } from './areaShapes';
 import type { MesoscaleAreasController } from './useMesoscaleAreas';
+
+const SHAPE_HINTS: Record<AreaShapeTool, string> = {
+  ellipse: 'Press where one corner should be, drag to the opposite corner, and release.',
+  circle: 'Press at the center, drag out to the radius, and release.',
+  rectangle: 'Press at one corner, drag to the opposite corner, and release.',
+};
 
 const short = (iso: string): string => `${iso.slice(5, 10)} ${iso.slice(11, 16)}Z`;
 
@@ -31,6 +38,7 @@ const AreaNotices: React.FC<{ areas: MesoscaleAreasController }> = ({ areas }) =
   <>
     {areas.atLimit ? <p className="mesoscale-notice" role="status">You have reached the limit of {MAX_MESOSCALE_AREAS} areas. Delete one to add another.</p> : null}
     {areas.tool === 'draw' ? <p className="mesoscale-notice" role="status">Click to place points, double-click to finish. Backspace removes the last point and Escape cancels.</p> : null}
+    {areas.tool !== 'draw' && areas.tool !== 'select' ? <p className="mesoscale-notice" role="status">{SHAPE_HINTS[areas.tool]}</p> : null}
   </>
 );
 
@@ -47,7 +55,7 @@ export const AreasPanel: React.FC<{ areas: MesoscaleAreasController }> = ({ area
         </ul>
       )}
       <AreaNotices areas={areas} />
-      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} /> : null}
+      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} onGeometry={geometry => areas.setGeometry(selected.id, geometry)} /> : null}
     </section>
   );
 };

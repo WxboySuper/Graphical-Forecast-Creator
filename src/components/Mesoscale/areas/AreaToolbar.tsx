@@ -1,7 +1,7 @@
 /** Floating map toolbar: pick or draw areas, add one from the current view, undo/redo, delete. */
 import React from 'react';
 import type OLMap from 'ol/Map';
-import { Hand, PenLine, Redo2, Square, Trash2, Undo2 } from 'lucide-react';
+import { Circle, Ellipse, Hand, Pentagon, RectangleHorizontal, Redo2, Square, Trash2, Undo2 } from 'lucide-react';
 import { transformExtent } from 'ol/proj';
 import type { Polygon } from 'geojson';
 import type { MesoscaleAreasController } from './useMesoscaleAreas';
@@ -42,7 +42,10 @@ export const AreaToolbar: React.FC<{ map: OLMap; areas: MesoscaleAreasController
   return (
     <div className="mesoscale-toolbar" role="toolbar" aria-label="Area tools">
       <ToolButton label="Select and edit areas" pressed={areas.tool === 'select'} onClick={() => areas.setTool('select')}><Hand aria-hidden="true" /></ToolButton>
-      <ToolButton label={areas.atLimit ? 'Area limit reached' : 'Draw an area'} pressed={areas.tool === 'draw'} disabled={areas.atLimit} onClick={() => areas.setTool('draw')}><PenLine aria-hidden="true" /></ToolButton>
+      <ToolButton label={areas.atLimit ? 'Area limit reached' : 'Draw a polygon'} pressed={areas.tool === 'draw'} disabled={areas.atLimit} onClick={() => areas.setTool('draw')}><Pentagon aria-hidden="true" /></ToolButton>
+      <ToolButton label="Draw an ellipse (drag corner to corner)" pressed={areas.tool === 'ellipse'} disabled={areas.atLimit} onClick={() => areas.setTool('ellipse')}><Ellipse aria-hidden="true" /></ToolButton>
+      <ToolButton label="Draw a circle (drag from the center)" pressed={areas.tool === 'circle'} disabled={areas.atLimit} onClick={() => areas.setTool('circle')}><Circle aria-hidden="true" /></ToolButton>
+      <ToolButton label="Draw a rectangle (drag corner to corner)" pressed={areas.tool === 'rectangle'} disabled={areas.atLimit} onClick={() => areas.setTool('rectangle')}><RectangleHorizontal aria-hidden="true" /></ToolButton>
       <ToolButton label="Add a box in the middle of the view" disabled={areas.atLimit} onClick={addFromView}><Square aria-hidden="true" /></ToolButton>
       <span className="mesoscale-toolbar__divider" aria-hidden="true" />
       <ToolButton label="Undo" disabled={!areas.canUndo} onClick={areas.undo}><Undo2 aria-hidden="true" /></ToolButton>
