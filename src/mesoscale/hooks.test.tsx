@@ -50,7 +50,7 @@ describe('mesoscale hooks', () => {
     await waitFor(() => expect(result.current).toMatchObject({ state: 'malformed' }));
   });
 
-  it('keeps the result stale flag aligned with model freshness', async () => {
+  it('uses the Worker stale flag for model freshness', async () => {
     const generatedAt = new Date().toISOString();
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
@@ -70,6 +70,6 @@ describe('mesoscale hooks', () => {
     });
     const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
     const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
-    await waitFor(() => expect(result.current).toMatchObject({ state: 'stale', stale: true, data: { models: [{ stale: true }] } }));
+    await waitFor(() => expect(result.current).toMatchObject({ state: 'ready', stale: false, data: { models: [{ stale: false }] } }));
   });
 });

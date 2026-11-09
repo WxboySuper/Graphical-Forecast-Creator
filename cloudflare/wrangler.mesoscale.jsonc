@@ -15,7 +15,8 @@
   "vars": {
     "PUBLIC_BASE_URL": "https://mesoscale-worker.example.invalid",
     "CORS_ALLOWED_ORIGINS": "https://gfc.weatherboysuper.com,https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002",
-    "STALE_AFTER_MINUTES": "180"
+    "STALE_AFTER_MINUTES": "180",
+    "STALE_AFTER_MINUTES_BY_MODEL": "{\"hrrr\":180,\"rap\":180,\"rrfs\":540}"
   },
   "observability": {
     "enabled": true,

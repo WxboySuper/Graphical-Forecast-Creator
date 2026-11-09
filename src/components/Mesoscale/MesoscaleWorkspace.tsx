@@ -74,7 +74,7 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
           {(map) => (
             <>
               <MesoscaleContextLayers map={map} radar={context.radar} satellite={context.satellite} />
-              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} />
+              <MesoscaleAreaLayer map={map} areas={areas.areas} selectedId={areas.selectedId} tool={areas.tool} onDrawn={areas.addPolygon} onModified={areas.setGeometry} onSelect={areas.select} activeVertex={areas.activeVertex} />
               <AreaToolbar map={map} areas={areas} />
             </>
           )}

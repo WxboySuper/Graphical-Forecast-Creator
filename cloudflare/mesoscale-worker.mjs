@@ -22,11 +22,57 @@ const ageMinutes = (timestamp, now) => {
   return Math.floor((now - parsed) / 60000);
 };
 
-const staleThresholdMinutes = (env) => {
-  const value = String(env.STALE_AFTER_MINUTES ?? '').trim();
-  if (!value) return 180;
-  const configured = Number(value);
-  return Number.isFinite(configured) && configured >= 0 ? configured : 180;
+const DEFAULT_STALE_AFTER_MINUTES = 180;
+const MAX_STALE_AFTER_MINUTES = 7 * 24 * 60;
+
+const validStaleThreshold = (value) => {
+  if (!Number.isSafeInteger(value)) return false;
+  if (value < 0) return false;
+  return value <= MAX_STALE_AFTER_MINUTES;
+};
+
+const fallbackStaleThreshold = (env) => {
+  const raw = typeof env?.STALE_AFTER_MINUTES === 'string' ? env.STALE_AFTER_MINUTES.trim() : '';
+  if (!raw) return DEFAULT_STALE_AFTER_MINUTES;
+  if (!/^\d+$/.test(raw)) return DEFAULT_STALE_AFTER_MINUTES;
+  const configured = Number(raw);
+  return validStaleThreshold(configured) ? configured : DEFAULT_STALE_AFTER_MINUTES;
+};
+
+const isPlainJsonObject = (value) => {
+  if (value === null) return false;
+  if (typeof value !== 'object') return false;
+  return !Array.isArray(value);
+};
+
+const parseModelStaleThresholds = (raw) => {
+  if (typeof raw !== 'string') return {};
+  if (!raw.trim()) return {};
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  return isPlainJsonObject(parsed) ? parsed : {};
+};
+
+const modelStaleThresholds = (env) => parseModelStaleThresholds(env?.STALE_AFTER_MINUTES_BY_MODEL);
+
+const staleThresholdMinutes = (env, modelId) => {
+  const configured = modelStaleThresholds(env)[modelId];
+  return validStaleThreshold(configured) ? configured : fallbackStaleThreshold(env);
+};
+
+const staleThresholdCacheValue = (env, modelId) => modelId
+  ? String(staleThresholdMinutes(env, modelId))
+  : [...MODELS].map((id) => `${id}:${staleThresholdMinutes(env, id)}`).join(',');
+
+const setFreshnessHeaders = ({ headers, cycleTime, now, env, modelId }) => {
+  const age = ageMinutes(cycleTime, now);
+  const stale = age === null || age > staleThresholdMinutes(env, modelId);
+  headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
+  headers.set('X-Mesoscale-Stale', String(stale));
 };
 
 const matchesEtag = (header, etag) => {
@@ -254,8 +300,9 @@ const validCatalog = (value, route) => {
   return validCatalogContent(value, route);
 };
 
-const catalogResponse = ({ value, request, env, route, headers, etag }) => {
+const catalogResponse = ({ value, request, env, route, now, headers, etag }) => {
   if (!validCatalog(value, route)) return invalidCatalogResponse();
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now, env, modelId: route.model });
   let base;
   try {
     base = publicBaseUrl(env);
@@ -299,10 +346,7 @@ const addLatestCatalogUrl = (value, env, route, cycle) => {
 const latestResponse = ({ value, request, env, route, now, headers, etag }) => {
   const cycle = compactCycleFromIso(value.cycleTime);
   if (!validLatestPointer(value, route, cycle)) return json({ error: 'Stored latest pointer is malformed.' }, 502, { 'Cache-Control': 'no-store' });
-  const age = ageMinutes(value.cycleTime, now);
-  const stale = age === null || age > staleThresholdMinutes(env);
-  headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
-  headers.set('X-Mesoscale-Stale', String(stale));
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now, env, modelId: route.model });
   if (!addLatestCatalogUrl(value, env, route, cycle)) return json({ error: 'Mesoscale public URL is not configured correctly.' }, 503, { 'Cache-Control': 'no-store' });
   const publicEtag = publicRepresentationEtag(etag, env);
   if (publicEtag) headers.set('ETag', publicEtag);
@@ -514,7 +558,7 @@ const modelHealthState = (health, today, yesterday, pointer) => {
   return 'missing';
 };
 
-const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter }) => {
+const modelStatus = async ({ bucket, modelId, day, previousDay, now, env }) => {
   const [pointer, today, yesterday] = await Promise.all([
     readJson(bucket, `${V1_PREFIX}/latest/${modelId}.json`),
     readJson(bucket, `${V1_PREFIX}/health/${day}/${modelId}.json`),
@@ -527,7 +571,7 @@ const modelStatus = async ({ bucket, modelId, day, previousDay, now, staleAfter 
   const pointerValue = validPointer.state === 'ok' ? validPointer.value : null;
   const age = pointerValue ? ageMinutes(pointerValue.cycleTime, now) : null;
   const healthState = modelHealthState(health, validToday, validYesterday, validPointer);
-  return { modelId, latestCycleTime: pointerValue?.cycleTime || null, ageMinutes: age, stale: age === null || age > staleAfter, health: healthState, healthGeneratedAt: health?.generatedAt || null };
+  return { modelId, latestCycleTime: pointerValue?.cycleTime || null, ageMinutes: age, stale: age === null || age > staleThresholdMinutes(env, modelId), health: healthState, healthGeneratedAt: health?.generatedAt || null };
 };
 
 const statusResponse = async (request, env, now) => {
@@ -535,8 +579,7 @@ const statusResponse = async (request, env, now) => {
   if (!bucket || typeof bucket.get !== 'function') return json({ error: 'Mesoscale storage is not configured.' }, 503, { 'Cache-Control': 'no-store' });
   const day = new Date(now).toISOString().slice(0, 10);
   const previousDay = new Date(now - 86400000).toISOString().slice(0, 10);
-  const staleAfter = staleThresholdMinutes(env);
-  const models = await Promise.all([...MODELS].map((modelId) => modelStatus({ bucket, modelId, day, previousDay, now, staleAfter })));
+  const models = await Promise.all([...MODELS].map((modelId) => modelStatus({ bucket, modelId, day, previousDay, now, env })));
   const healthy = models.every((model) => model.health === 'complete' && !model.stale);
   return jsonWithEtag({ status: healthy ? 'healthy' : 'degraded', models }, request, `public, max-age=${STATUS_TTL}`);
 };
@@ -557,8 +600,11 @@ const cacheKeyFor = (request, env, route) => {
     }
     url.searchParams.set('__public_base', base);
   }
-  if (route.kind === 'latest' || route.kind === 'status') {
-    url.searchParams.set('__stale_after', String(staleThresholdMinutes(env)));
+  if (route.kind === 'catalog' || route.kind === 'latest') {
+    url.searchParams.set('__stale_after', staleThresholdCacheValue(env, route.model));
+  }
+  if (route.kind === 'status') {
+    url.searchParams.set('__stale_after', staleThresholdCacheValue(env));
   }
   return new Request(url.toString(), { method: 'GET' });
 };
@@ -577,9 +623,7 @@ const refreshedLatestCacheHit = async (context, response) => {
   const value = await cachedJsonValue(response);
   if (!value) return response;
   const headers = new Headers(response.headers);
-  const age = ageMinutes(value.cycleTime, context.now);
-  headers.set('X-Mesoscale-Age-Minutes', age === null ? 'unknown' : String(age));
-  headers.set('X-Mesoscale-Stale', String(age === null || age > staleThresholdMinutes(context.env)));
+  setFreshnessHeaders({ headers, cycleTime: value.cycleTime, now: context.now, env: context.env, modelId: context.route.model });
   return conditionalResponse(context.request, headers.get('ETag'), headers) || new Response(JSON.stringify(value), { headers });
 };
 
@@ -590,7 +634,7 @@ const refreshedStatusCacheHit = async (context, response) => {
   for (const model of value.models) {
     const age = ageMinutes(model.latestCycleTime, context.now);
     model.ageMinutes = age;
-    model.stale = age === null || age > staleThresholdMinutes(context.env);
+    model.stale = age === null || age > staleThresholdMinutes(context.env, model.modelId);
   }
   value.status = value.models.every((model) => model.health === 'complete' && !model.stale) ? 'healthy' : 'degraded';
   const body = JSON.stringify(value);
@@ -602,6 +646,7 @@ const refreshedStatusCacheHit = async (context, response) => {
 const refreshDynamicCacheHit = (context, response) => {
   if (context.route.kind === 'latest') return refreshedLatestCacheHit(context, response);
   if (context.route.kind === 'status') return refreshedStatusCacheHit(context, response);
+  if (context.route.kind === 'catalog') return refreshedLatestCacheHit(context, response);
   return Promise.resolve(response);
 };
 
