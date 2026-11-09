@@ -44,6 +44,9 @@ const mesoscaleSlice = createSlice({
       const index = state.areas.findIndex((area) => area.id === action.payload.id);
       if (index >= 0) state.areas[index] = action.payload;
     },
+    setMesoscaleAreas(state, action: PayloadAction<MesoscaleArea[]>) {
+      state.areas = action.payload;
+    },
     removeMesoscaleArea(state, action: PayloadAction<string>) {
       state.areas = state.areas.filter((area) => area.id !== action.payload);
     },
@@ -63,7 +66,7 @@ const mesoscaleSlice = createSlice({
 });
 
 export const {
-  addMesoscaleArea, updateMesoscaleArea, removeMesoscaleArea,
+  addMesoscaleArea, updateMesoscaleArea, removeMesoscaleArea, setMesoscaleAreas,
   setMesoscaleDiscussion, setMesoscaleModelContext,
   replaceMesoscaleProduct, resetMesoscaleProduct,
 } = mesoscaleSlice.actions;

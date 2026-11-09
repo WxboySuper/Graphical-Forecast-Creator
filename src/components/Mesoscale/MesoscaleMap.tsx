@@ -3,7 +3,7 @@
  * layers. Layer instances are owned by the shared layer sync helper, so toggling
  * visibility or opacity never recreates tiles that did not change.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import 'ol/ol.css';
 import OLMap from 'ol/Map';
 import View from 'ol/View';
@@ -19,6 +19,8 @@ interface MesoscaleMapProps {
   layers: MesoscaleLayerSpec[];
   /** Data domain as [west, south, east, north] in degrees; the map frames it on first load. */
   domainBounds?: [number, number, number, number];
+  /** Renders map-bound overlays (such as the area layer) once the map exists. */
+  children?: (map: OLMap) => React.ReactNode;
 }
 
 const FIT_PADDING = [24, 24, 24, 24];
@@ -38,15 +40,17 @@ const createMap = (target: HTMLElement): OLMap =>
     controls: [],
   });
 
-export const MesoscaleMap: React.FC<MesoscaleMapProps> = ({ layers, domainBounds }) => {
+export const MesoscaleMap: React.FC<MesoscaleMapProps> = ({ layers, domainBounds, children }) => {
   const targetRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<OLMap | null>(null);
+  const [readyMap, setReadyMap] = useState<OLMap | null>(null);
   const registryRef = useRef(createMesoscaleLayerRegistry());
 
   useEffect(() => {
     if (!targetRef.current) return undefined;
     const map = createMap(targetRef.current);
     mapRef.current = map;
+    setReadyMap(map);
     map.updateSize();
     fitToDomain(map, domainBounds);
     // The data rail opening or closing, and window resizes, change the container's size.
@@ -58,6 +62,7 @@ export const MesoscaleMap: React.FC<MesoscaleMapProps> = ({ layers, domainBounds
       syncMesoscaleLayers({ map, specs: [], registry });
       map.setTarget(undefined);
       mapRef.current = null;
+      setReadyMap(null);
     };
     // The map frames the domain once on creation; later bound changes must not reset the user's view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,5 +73,10 @@ export const MesoscaleMap: React.FC<MesoscaleMapProps> = ({ layers, domainBounds
     syncMesoscaleLayers({ map: mapRef.current, specs: layers, registry: registryRef.current });
   }, [layers]);
 
-  return <div ref={targetRef} className="mesoscale-map" data-testid="mesoscale-map" role="application" aria-label="Mesoscale map" />;
+  return (
+    <>
+      <div ref={targetRef} className="mesoscale-map" data-testid="mesoscale-map" role="application" aria-label="Mesoscale map" />
+      {readyMap ? children?.(readyMap) : null}
+    </>
+  );
 };
