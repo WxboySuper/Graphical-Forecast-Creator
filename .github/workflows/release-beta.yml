@@ -4,13 +4,13 @@ name: Release | Beta
 # into main never creates a release automatically; this workflow versions main,
 # publishes a draft GitHub prerelease, deploys beta.gfcweather.com on Cloudflare
 # Workers, deploys the mesoscale catalog Worker and the beta API on the VPS,
-# smoke-tests, then publishes the release. A daily schedule runs the same pipeline
+# smoke-tests, then publishes the release. A schedule every six hours runs the same pipeline
 # when main has changed since the last beta tag.
 on:
   schedule:
-    # Daily beta cut. The `changes` job skips the run when main has nothing new
+    # Beta cut every six hours (03:23, 09:23, 15:23, 21:23 UTC). The `changes` job skips the run when main has nothing new
     # since the latest beta tag (release-metadata commits do not count).
-    - cron: '23 9 * * *'
+    - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
     inputs:
       confirmation:

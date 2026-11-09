@@ -10,7 +10,7 @@ inspect, decode, or calculate weather data.
 ## Deploy
 
 The `Release | Beta` workflow (`release-beta.yml`) deploys `gfc-mesoscale` after
-every beta cut. It runs when an owner dispatches it and on a daily schedule that
+every beta cut. It runs when an owner dispatches it and on a six-hourly schedule that
 skips itself unless `main` has new commits since the latest beta tag. The Worker
 is separate from the beta site Worker (`deploy-beta-workers.yml`).
 
