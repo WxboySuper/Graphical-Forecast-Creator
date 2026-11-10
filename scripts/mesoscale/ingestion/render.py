@@ -26,6 +26,7 @@ class TileRenderRequest:
     longitudes: object
     root: Path
     stops: list[tuple[float, str]]
+    max_zoom: int = ZOOM_MAX
 
 
 @dataclass(frozen=True)
@@ -93,9 +94,10 @@ def render_tiles(request: TileRenderRequest) -> tuple[int, int]:
         raise ValueError("decoded field has no projectable values")
     extent = (-20037508.342789244, -20037508.342789244, 20037508.342789244, 20037508.342789244)
     span = extent[2] - extent[0]
-    px = ((x - extent[0]) / span * (TILE_SIZE * 2**ZOOM_MAX)).astype(np.int64)
-    py = ((extent[3] - y) / span * (TILE_SIZE * 2**ZOOM_MAX)).astype(np.int64)
-    width = TILE_SIZE * 2**ZOOM_MAX
+    max_zoom = request.max_zoom
+    px = ((x - extent[0]) / span * (TILE_SIZE * 2**max_zoom)).astype(np.int64)
+    py = ((extent[3] - y) / span * (TILE_SIZE * 2**max_zoom)).astype(np.int64)
+    width = TILE_SIZE * 2**max_zoom
     height = width
     inside = valid & (px >= 0) & (px < width) & (py >= 0) & (py < height)
     if not inside.any():
@@ -103,7 +105,7 @@ def render_tiles(request: TileRenderRequest) -> tuple[int, int]:
     rgba = resampled_rgba(RasterRequest(px[inside], py[inside], values[inside], width, height, stops))
     image = Image.fromarray(rgba, "RGBA")
     root.mkdir(parents=True, exist_ok=True)
-    count, total = save_tiles(image, root)
+    count, total = save_tiles(image, root, max_zoom)
     return count, total
 
 
@@ -146,19 +148,19 @@ def interpolate_colors(sample, stops):
     return np.concatenate((colors, np.full(sample.shape + (1,), 190, dtype=np.uint8)), axis=-1)
 
 
-def save_tiles(image, root):
-    from PIL import Image
+def save_tiles(image, root, max_zoom=ZOOM_MAX):
     count, total = 0, 0
-    for zoom in range(ZOOM_MIN, ZOOM_MAX + 1):
-        count_zoom, bytes_zoom = save_zoom_tiles(image, root, zoom, Image)
+    for zoom in range(ZOOM_MIN, max_zoom + 1):
+        count_zoom, bytes_zoom = save_zoom_tiles(image, root, zoom, max_zoom)
         count += count_zoom
         total += bytes_zoom
     return count, total
 
 
-def save_zoom_tiles(image, root: Path, zoom: int, image_module) -> tuple[int, int]:
-    scale = 2 ** (ZOOM_MAX - zoom)
-    level = resized_level(image, zoom, scale, image_module)
+def save_zoom_tiles(image, root: Path, zoom: int, max_zoom: int) -> tuple[int, int]:
+    from PIL import Image
+    scale = 2 ** (max_zoom - zoom)
+    level = resized_level(image, zoom, scale, Image)
     count, total = 0, 0
     for tx in range(2**zoom):
         for ty in range(2**zoom):

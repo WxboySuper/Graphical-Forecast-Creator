@@ -28,11 +28,10 @@ const normalizedFailure = (values: MesoscaleParameterResponse[]): MesoscaleReque
 
 const catalogState = (catalog: MesoscaleCatalog, result: Extract<MesoscaleRequestResult<MesoscaleCatalog>, { data: MesoscaleCatalog }>): MesoscaleRequestResult<MesoscaleCatalog> => {
   if (catalog.status === 'failed') return { state: 'upstream-failure', message: 'Catalog cycle is marked failed.', retryable: false };
-  const normalized = normalizeMesoscaleCatalog(catalog);
+  const normalized = normalizeMesoscaleCatalog(catalog, Date.now(), result.stale);
   const failure = normalizedFailure(normalized);
   if (failure) return failure;
-  const stale = result.stale || Date.now() - Date.parse(catalog.cycleTime) > 180 * 60_000;
-  if (stale) return { ...result, state: 'stale', stale: true };
+  if (result.stale) return { ...result, state: 'stale', stale: true };
   const partial = catalog.status === 'partial' || normalized.some(value => value.state === 'partial');
   return partial ? { ...result, state: 'partial' } : result;
 };

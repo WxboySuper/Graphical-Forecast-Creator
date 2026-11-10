@@ -87,6 +87,7 @@ const withCache = async (run) => {
   const cache = {
     match: async (key) => entries.get(`${key.method}:${key.url}`)?.clone(),
     put: async (key, value) => { entries.set(`${key.method}:${key.url}`, value.clone()); },
+    size: () => entries.size,
   };
   globalThis.caches = { default: cache };
   try {
@@ -279,6 +280,24 @@ serialTest('tile response defaults to PNG content type when R2 metadata is absen
   assert.equal(response.headers.get('Content-Length'), '3');
 });
 
+serialTest('tile requests accept the zoom interval published by the field catalog', async () => {
+  clearPmtilesCacheForTests();
+  const catalog = structuredClone(tileCatalog);
+  catalog.domain.maxZoom = 5;
+  catalog.frames[0].parameters[0].data.maxZoom = 5;
+  const archive = await createPmtilesFixture({ maxZoom: 5 });
+  const env = tileEnvFor(rangeBucket(archive), catalog);
+  const response = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/5/0/0.png'), env);
+  assert.equal(response.status, 404);
+  assert.equal(response.headers.get('Cache-Control'), 'public, max-age=60');
+
+  clearPmtilesCacheForTests();
+  const mismatchedArchive = await createPmtilesFixture({ maxZoom: 6 });
+  const mismatchedEnv = tileEnvFor(rangeBucket(mismatchedArchive), catalog);
+  const mismatchedResponse = await worker.fetch(request('/tiles/hrrr/20261108T1200Z/f00/temperature-2m/5/0/0.png'), mismatchedEnv);
+  assert.equal(mismatchedResponse.status, 502);
+});
+
 serialTest('invalid catalog archive data returns a controlled gateway response', async () => {
   const catalog = structuredClone(tileCatalog);
   delete catalog.frames[0].parameters[0].data;
@@ -451,6 +470,80 @@ serialTest('latest pointer reports live age and stale state without changing its
     const fresh = envFor({ 'mesoscale/v1/latest/hrrr.json': pointer('hrrr', '2026-11-08T15:00:00Z') }, { STALE_AFTER_MINUTES: '60' });
     const freshResponse = await worker.fetch(request('/latest/hrrr.json'), fresh);
     assert.equal(freshResponse.headers.get('X-Mesoscale-Stale'), 'false');
+  });
+});
+
+serialTest('per-model thresholds drive latest, catalog, status, and malformed-config fallbacks', async () => {
+  const byModel = JSON.stringify({ hrrr: 180, rap: 180, rrfs: 540 });
+  const overrides = { STALE_AFTER_MINUTES: '180', STALE_AFTER_MINUTES_BY_MODEL: byModel };
+  await withNow('2026-11-08T15:15:00Z', async () => {
+    const latestObjects = {
+      'mesoscale/v1/latest/hrrr.json': pointer('hrrr'),
+      'mesoscale/v1/latest/rrfs.json': pointer('rrfs'),
+    };
+    const hrrrLatest = await worker.fetch(request('/latest/hrrr.json'), envFor(latestObjects, overrides));
+    const rrfsLatest = await worker.fetch(request('/latest/rrfs.json'), envFor(latestObjects, overrides));
+    assert.equal(hrrrLatest.headers.get('X-Mesoscale-Stale'), 'true');
+    assert.equal(rrfsLatest.headers.get('X-Mesoscale-Stale'), 'false');
+    assert.equal(rrfsLatest.headers.get('X-Mesoscale-Age-Minutes'), '195');
+
+    const rrfsCatalog = makeCatalog({ model: { id: 'rrfs' } });
+    const catalog = await worker.fetch(request('/catalog/rrfs/20261108T1200Z.json'), envFor({
+      'mesoscale/v1/catalog/rrfs/20261108T1200Z.json': rrfsCatalog,
+    }, overrides));
+    assert.equal(catalog.headers.get('X-Mesoscale-Stale'), 'false');
+    assert.equal(catalog.headers.get('X-Mesoscale-Age-Minutes'), '195');
+    assert.equal((await catalog.json()).model.id, 'rrfs');
+
+    const statusObjects = { ...latestObjects };
+    for (const modelId of ['hrrr', 'rap', 'rrfs']) {
+      statusObjects[`mesoscale/v1/latest/${modelId}.json`] = pointer(modelId);
+      statusObjects[`mesoscale/v1/health/2026-11-08/${modelId}.json`] = {
+        schemaVersion: 1, modelId, status: 'complete', generatedAt: '2026-11-08T15:10:00Z',
+      };
+    }
+    const status = await worker.fetch(request('/status'), envFor(statusObjects, overrides));
+    const statusBody = await status.json();
+    assert.deepEqual(Object.keys(statusBody).sort(), ['models', 'status']);
+    assert.deepEqual(statusBody.models.map(({ modelId, stale }) => [modelId, stale]), [
+      ['hrrr', true], ['rap', true], ['rrfs', false],
+    ]);
+
+    for (const invalid of ['null', '[]', '{', '{"rrfs":-1}', '{"rrfs":10081}', '{"rrfs":"360"}']) {
+      const response = await worker.fetch(request('/latest/rrfs.json'), envFor(latestObjects, {
+        STALE_AFTER_MINUTES_BY_MODEL: invalid,
+      }));
+      assert.equal(response.headers.get('X-Mesoscale-Stale'), 'true', invalid);
+    }
+    const unsafeFallback = await worker.fetch(request('/latest/rrfs.json'), envFor(latestObjects, {
+      STALE_AFTER_MINUTES: '999999', STALE_AFTER_MINUTES_BY_MODEL: '{}',
+    }));
+    assert.equal(unsafeFallback.headers.get('X-Mesoscale-Stale'), 'true');
+    const legacyFallback = await worker.fetch(request('/latest/rrfs.json'), envFor(latestObjects, {
+      STALE_AFTER_MINUTES: '60', STALE_AFTER_MINUTES_BY_MODEL: '{"rrfs":null}',
+    }));
+    assert.equal(legacyFallback.headers.get('X-Mesoscale-Stale'), 'true');
+  });
+});
+
+serialTest('status cache keys include every resolved model threshold', async () => {
+  await withNow('2026-11-08T15:15:00Z', async () => {
+    await withCache(async (cache) => {
+      const objects = {};
+      for (const modelId of ['hrrr', 'rap', 'rrfs']) {
+        objects[`mesoscale/v1/latest/${modelId}.json`] = pointer(modelId);
+        objects[`mesoscale/v1/health/2026-11-08/${modelId}.json`] = {
+          schemaVersion: 1, modelId, status: 'complete', generatedAt: '2026-11-08T15:10:00Z',
+        };
+      }
+      const defaultEnv = envFor(objects, { STALE_AFTER_MINUTES_BY_MODEL: '{}' });
+      const rrfsGraceEnv = envFor(objects, { STALE_AFTER_MINUTES_BY_MODEL: '{"rrfs":540}' });
+      const defaultStatus = await worker.fetch(request('/status'), defaultEnv);
+      const rrfsGraceStatus = await worker.fetch(request('/status'), rrfsGraceEnv);
+      assert.equal((await defaultStatus.json()).models[2].stale, true);
+      assert.equal((await rrfsGraceStatus.json()).models[2].stale, false);
+      assert.equal(cache.size(), 2);
+    });
   });
 });
 

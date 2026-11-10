@@ -14,7 +14,7 @@ import type { RootState } from '../../store';
 import type { ForecastCycle } from '../../types/outlooks';
 
 jest.mock('../../utils/stormReportParser', () => ({
-  fetchStormReports: jest.fn(),
+  fetchFilteredStormReports: jest.fn(),
   fetchTodayStormReports: jest.fn(),
   fetchYesterdayStormReports: jest.fn(),
   formatReportDate: jest.fn((date: Date) =>
@@ -27,7 +27,7 @@ jest.mock('../../utils/verificationUtils', () => ({
   formatVerificationSummary: jest.fn(() => 'Detailed verification summary'),
 }));
 
-const mockFetchStormReports = jest.requireMock('../../utils/stormReportParser').fetchStormReports as jest.Mock;
+const mockFetchFilteredStormReports = jest.requireMock('../../utils/stormReportParser').fetchFilteredStormReports as jest.Mock;
 const mockFetchTodayStormReports = jest.requireMock('../../utils/stormReportParser').fetchTodayStormReports as jest.Mock;
 const mockFetchYesterdayStormReports = jest.requireMock('../../utils/stormReportParser').fetchYesterdayStormReports as jest.Mock;
 const mockAnalyzeVerification = jest.requireMock('../../utils/verificationUtils').analyzeVerification as jest.Mock;
@@ -117,7 +117,7 @@ describe('VerificationPanel', () => {
     jest.clearAllMocks();
     mockAnalyzeVerification.mockReturnValue(analysisResult);
     mockFormatVerificationSummary.mockReturnValue('Detailed verification summary');
-    mockFetchStormReports.mockResolvedValue([
+    mockFetchFilteredStormReports.mockResolvedValue([
       { type: 'tornado' },
       { type: 'wind' },
     ]);
@@ -179,7 +179,7 @@ describe('VerificationPanel', () => {
 
       await waitFor(() => expect(mockFetchTodayStormReports).toHaveBeenCalled());
       expect(mockFetchYesterdayStormReports).not.toHaveBeenCalled();
-      expect(mockFetchStormReports).not.toHaveBeenCalled();
+      expect(mockFetchFilteredStormReports).not.toHaveBeenCalled();
       await waitFor(() => expect(store.getState().stormReports.reports).toHaveLength(1));
 
       mockFetchYesterdayStormReports.mockRejectedValueOnce(new Error('Service unavailable'));
@@ -201,11 +201,32 @@ describe('VerificationPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
 
     expect(await screen.findByText(/Choose a valid report date/i)).toBeInTheDocument();
-    expect(mockFetchStormReports).not.toHaveBeenCalled();
+    expect(mockFetchFilteredStormReports).not.toHaveBeenCalled();
     expect(mockFetchTodayStormReports).not.toHaveBeenCalled();
     expect(mockFetchYesterdayStormReports).not.toHaveBeenCalled();
     expect(store.getState().stormReports.date).toBeNull();
     expect(store.getState().stormReports.loading).toBe(false);
+  });
+
+  test('shows the filtered report unavailable state for an archived date', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-04-20T12:00:00.000Z'));
+    mockFetchFilteredStormReports.mockRejectedValueOnce(
+      new Error('Filtered SPC storm reports are unavailable for 240506.')
+    );
+
+    try {
+      renderPanel(buildStore(), { activePanel: 'setup' });
+      fireEvent.change(screen.getByLabelText(/Select Date/i), { target: { value: '2024-05-06' } });
+      fireEvent.click(screen.getByRole('button', { name: /Load Reports/i }));
+
+      expect(await screen.findByText(/Filtered SPC storm reports are unavailable for 240506/i)).toBeInTheDocument();
+      expect(mockFetchFilteredStormReports).toHaveBeenCalledWith('240506');
+      expect(mockFetchTodayStormReports).not.toHaveBeenCalled();
+      expect(mockFetchYesterdayStormReports).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   test('uses the current SPC report day before the 12Z boundary', () => {

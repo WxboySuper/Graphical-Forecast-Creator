@@ -20,7 +20,7 @@ describe('mesoscale client', () => {
   it('maps catalog parameters through the provider normalizer and keeps fixture legend metadata', () => {
     const catalog = getFixtureCatalog('hrrr');
     expect(catalog).not.toBeNull();
-    const normalized = normalizeMesoscaleCatalog(catalog!);
+    const normalized = normalizeMesoscaleCatalog(catalog!, Date.now(), true);
     expect(normalized[0].state).toBe('stale');
     if (normalized[0].state === 'stale') expect(normalized[0].parameters[0].definition.units).toBe('J kg-1');
   });
@@ -30,6 +30,22 @@ describe('mesoscale client', () => {
     expect(catalog).not.toBeNull();
     const result = normalizeCatalogFrame(catalog!, 0, Date.parse('2026-05-20T12:30:00Z'));
     expect(result).toMatchObject({ state: 'partial', unavailableParameters: [{ id: 'cin' }, { id: 'srh' }] });
+  });
+
+  it('uses the Worker stale header for catalog age instead of a client threshold', async () => {
+    const catalog = getFixtureCatalog('hrrr')!;
+    const fetcher = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'X-Mesoscale-Stale': 'false', 'X-Mesoscale-Age-Minutes': '195' }),
+      json: async () => catalog,
+    });
+    const result = await fetchMesoscaleCatalog({ model: 'hrrr', cycle: resolveCycleId(catalog.cycleTime), options: {
+      fetcher,
+      config: { ...fixtures.config!, fixtures: false },
+    } });
+    expect(result).toMatchObject({ state: 'ready', stale: false, ageMinutes: 195 });
+    if ('data' in result) expect(normalizeMesoscaleCatalog(result.data, Date.now(), result.stale)[0].state).toBe('ready');
   });
 
   it('maps a failed catalog parameter to unavailable data while keeping other fields', () => {

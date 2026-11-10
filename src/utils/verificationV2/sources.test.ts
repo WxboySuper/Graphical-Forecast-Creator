@@ -162,25 +162,29 @@ describe('source loaders', () => {
       );
     });
 
-    test('falls back to the raw archive when the filtered archive is unavailable', async () => {
+    test('does not fall back to raw reports when the filtered archive is unavailable', async () => {
       global.fetch = jest.fn()
-        .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' })
-        .mockResolvedValueOnce({
-          ok: true,
-          statusText: 'OK',
-          text: () => Promise.resolve([
-            'Raw Tornado LSR',
-            'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
-            '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
-          ].join('\n')),
-        }) as unknown as typeof global.fetch;
+        .mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' }) as unknown as typeof global.fetch;
 
-      const reports = await loadReportsForDate('2024-05-06');
+      await expect(loadReportsForDate('2024-05-06')).rejects.toThrow(
+        'Filtered SPC storm reports are unavailable for 240506.'
+      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/240506_rpts_filtered.csv');
+    });
 
-      expect(reports).toHaveLength(1);
-      expect(reports[0]).toMatchObject({ type: 'tornado', magnitude: 'EF1', latitude: 33.5, longitude: -97.2 });
-      expect(global.fetch).toHaveBeenNthCalledWith(1, 'https://www.spc.noaa.gov/climo/reports/240506_rpts_filtered.csv');
-      expect(global.fetch).toHaveBeenNthCalledWith(2, 'https://www.spc.noaa.gov/climo/reports/240506_rpts_raw.csv');
+    test('rejects raw archive content served at the filtered URL', async () => {
+      mockFetch([
+        'Raw Tornado LSR',
+        'Time,EF_Scale,Remarks,LAT,LON,Location,County,State,Speed(MPH),Size(1/100in.)',
+        '1234,EF1,,33.5,-97.2,Ada,Denton,TX,,',
+      ].join('\n'));
+
+      await expect(loadReportsForDate('2024-05-06')).rejects.toThrow(
+        'Filtered SPC storm reports are unavailable for 240506.'
+      );
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch).toHaveBeenCalledWith('https://www.spc.noaa.gov/climo/reports/240506_rpts_filtered.csv');
     });
 
     test('treats blank strings as invalid dates, not as today', async () => {

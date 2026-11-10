@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { useMesoscaleLatest, useMesoscaleStatus, selectMesoscaleFrames } from './hooks';
+import { useMesoscaleFrames, useMesoscaleLatest, useMesoscaleStatus, selectMesoscaleFrames } from './hooks';
 import { getFixtureCatalog } from './fixtures/catalogs';
 
 describe('mesoscale hooks', () => {
@@ -16,6 +16,17 @@ describe('mesoscale hooks', () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     unmount();
     expect((requestSignal as unknown as AbortSignal).aborted).toBe(true);
+  });
+
+  it('stays loading without a request until the latest cycle is known', async () => {
+    const fetcher = jest.fn();
+    const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
+    const { result, rerender } = renderHook(({ cycle }: { cycle: string | null }) => useMesoscaleFrames('hrrr', cycle, { config, fetcher }), { initialProps: { cycle: null as string | null } });
+    expect(result.current.result.state).toBe('loading');
+    expect(fetcher).not.toHaveBeenCalled();
+    fetcher.mockReturnValue(new Promise(() => undefined));
+    rerender({ cycle: '2026-05-20T12:00:00Z' });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
   });
 
   it('keeps f00 analysis separate from f01 and later forecast frames', () => {
@@ -39,7 +50,7 @@ describe('mesoscale hooks', () => {
     await waitFor(() => expect(result.current).toMatchObject({ state: 'malformed' }));
   });
 
-  it('keeps the result stale flag aligned with model freshness', async () => {
+  it('uses the Worker stale flag for model freshness', async () => {
     const generatedAt = new Date().toISOString();
     const fetcher = jest.fn().mockResolvedValue({
       ok: true,
@@ -59,6 +70,6 @@ describe('mesoscale hooks', () => {
     });
     const config = { baseUrl: 'https://mesoscale.example.test', fixtures: false, enabled: true };
     const { result } = renderHook(() => useMesoscaleStatus({ config, fetcher }));
-    await waitFor(() => expect(result.current).toMatchObject({ state: 'stale', stale: true, data: { models: [{ stale: true }] } }));
+    await waitFor(() => expect(result.current).toMatchObject({ state: 'ready', stale: false, data: { models: [{ stale: false }] } }));
   });
 });

@@ -10,7 +10,7 @@ inspect, decode, or calculate weather data.
 ## Deploy
 
 The `Release | Beta` workflow (`release-beta.yml`) deploys `gfc-mesoscale` after
-every beta cut. It runs when an owner dispatches it and on a daily schedule that
+every beta cut. It runs when an owner dispatches it and on a six-hourly schedule that
 skips itself unless `main` has new commits since the latest beta tag. The Worker
 is separate from the beta site Worker (`deploy-beta-workers.yml`).
 
@@ -37,7 +37,12 @@ time, runs the Worker tests, deploys, and checks `GET /status`. Edit the other
   (`https://staging-gfc.weatherboysuper.com`), beta
   (`https://beta.gfcweather.com`), and local Vite development
   (`http://localhost:3000` and `http://localhost:3002`).
-- `STALE_AFTER_MINUTES`: the operational age limit; it defaults to 180.
+- `STALE_AFTER_MINUTES`: the fallback age limit; it defaults to 180 minutes.
+- `STALE_AFTER_MINUTES_BY_MODEL`: a JSON object of model-specific age limits in
+  minutes. The current defaults are `hrrr: 180`, `rap: 180`, and `rrfs: 540`.
+  Values must be whole numbers from 0 through 10,080. Missing or invalid model
+  values use `STALE_AFTER_MINUTES`; malformed JSON, arrays, and non-object JSON
+  disable model overrides and use that fallback for every model.
 
 To deploy by hand, run the render script with `CLOUDFLARE_ACCOUNT_ID`,
 `MESOSCALE_R2_BUCKET`, and `MESOSCALE_PUBLIC_BASE_URL` set, then
@@ -71,7 +76,12 @@ model with `latestCycleTime`, recomputed `ageMinutes`, `stale`, `health`, and
 `partial`, and `failed` states plus `missing` or `invalid` for absent or broken
 records. A broken current-day health record remains `invalid` rather than being
 masked by yesterday's summary. A failed R2 read is reported as `unavailable`,
-separate from a missing object or an invalid record.
+separate from a missing object or an invalid record. The response shape stays
+the same when thresholds differ by model. `/latest/{model}.json` and catalog
+responses expose the matching live age and stale state in
+`X-Mesoscale-Age-Minutes` and `X-Mesoscale-Stale`; the catalog JSON shape does
+not change. The app trusts these Worker values and does not choose a second
+stale threshold.
 
 ## Cache and usage budget
 
