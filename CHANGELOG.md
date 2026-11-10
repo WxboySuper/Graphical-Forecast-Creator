@@ -9,6 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **Routine app libraries:** Updated Redux Toolkit to 2.14.0, Sentry React to 11.11.0, Firebase to 13.2.0, Lucide icons to 1.70.0, and Vite to 8.3.6, along with build and test tools, to keep state handling, error reporting, icons, and builds on supported releases.
 - **Routine server libraries:** Updated Sentry Node to 11.11.0 and express-rate-limit to 8.7.3 to keep server error monitoring and request rate limiting on supported releases.
 - **App libraries:** Update Sentry React to 11.10.0, Lucide icons to 1.65.0, React Redux to 9.3.1, and React Router to 8.5.1, along with development and build tools.
 - **Server libraries:** Update Sentry Node to 11.10.0, express-rate-limit to 8.7.2, and Stripe to 23.1.0.
