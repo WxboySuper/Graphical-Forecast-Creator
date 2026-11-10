@@ -91,10 +91,11 @@
 .monitor-mesoscale__legend {
   position: absolute;
   right: 12px;
-  bottom: 42px;
+  /* Below the "Read-only monitor" badge, away from the attribution that wraps along the bottom. */
+  top: 48px;
   z-index: 2;
   max-width: min(280px, calc(100% - 24px));
-  max-height: 35%;
+  max-height: calc(100% - 64px);
   overflow: auto;
   padding: 8px;
   border: 1px solid var(--border-color);

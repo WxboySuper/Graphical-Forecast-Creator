@@ -265,6 +265,7 @@ class IngestTests(unittest.TestCase):
             self.assertEqual((header["min_zoom"], header["max_zoom"]), (3, 4))
             self.assertEqual((header["min_lon_e7"], header["min_lat_e7"], header["max_lon_e7"], header["max_lat_e7"]), (-1300000000, 200000000, -600000000, 550000000))
 
+
     def test_partial_cycle_never_moves_latest_pointer(self):
         with tempfile.TemporaryDirectory() as temporary:
             store = MemoryStore(Path(temporary))

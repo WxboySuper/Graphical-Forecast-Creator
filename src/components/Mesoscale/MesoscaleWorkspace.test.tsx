@@ -48,14 +48,18 @@ describe('MesoscaleWorkspace', () => {
     mockFrames.mockReset();
   });
 
-  it('shows a loading screen while the latest run resolves', () => {
+  it('shows a loading state in the rail while the latest run resolves, with the workspace already usable', () => {
     mockLatest.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
+    mockFrames.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
     renderWorkspace();
-    expect(screen.getByRole('status')).toHaveTextContent(/loading the latest hrrr run/i);
-    expect(mockFrames).not.toHaveBeenCalled();
+    expect(screen.getByText(/loading the latest hrrr run/i)).toBeInTheDocument();
+    expect(screen.getByTestId('map-stub')).toBeInTheDocument();
+    // No catalog is requested until the latest cycle is known.
+    expect(mockFrames).toHaveBeenCalledWith('hrrr', null);
   });
 
   it('explains an unavailable source without showing old data, and reloads the lookup on retry', () => {
+    mockFrames.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
     let lookups = 0;
     // A real hook loads on mount, so count mounts: a retry must start a fresh lookup.
     mockLatest.mockImplementation(() => {
@@ -64,9 +68,22 @@ describe('MesoscaleWorkspace', () => {
     });
     renderWorkspace();
     expect(screen.getByRole('alert')).toHaveTextContent(/unavailable/i);
+    expect(screen.getByText(/model data is not available right now/i)).toBeInTheDocument();
     expect(lookups).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(lookups).toBe(2);
+  });
+
+  it('keeps the map, areas, and discussion usable while model data is unavailable', () => {
+    mockLatest.mockReturnValue({ result: { state: 'upstream-failure', message: 'down', retryable: true }, ageMinutes: null, stale: false });
+    mockFrames.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
+    renderWorkspace();
+    expect(screen.getByTestId('map-stub')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Model' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Areas/ }));
+    expect(screen.getByText(/no areas yet/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }));
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 
   it('shows the readout for the analysis frame and labels it as model initialization', () => {

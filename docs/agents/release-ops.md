@@ -12,7 +12,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
-| `release-beta.yml` | Full beta cut, run on `main`; also runs daily and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
+| `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
 | `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
 | `bootstrap-stable-release.yml` | Create `stable/X.Y.x` at the approved main commit | |
@@ -21,6 +21,8 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 | `deploy-main-to-vps.yml` | Production/staging VPS deploy | |
 | `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
+
+Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v1.8 changelog belongs to the stable release (`changelog-and-prs`).
 
 Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEASE-BETA -f dry_run=false -f deploy_api=true`. Concurrency group `beta-release`. Beta cuts only bump `package.json`; `CHANGELOG.md` is not rewritten.
 

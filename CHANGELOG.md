@@ -46,6 +46,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Mesoscale radar and satellite context:** Mesoscale Data tab can now overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
+- **Keyboard vertex editing:** Mesoscale areas can now be reshaped vertex by vertex from the keyboard with vertex stepping, arrow-key nudging in selectable steps, and add or delete controls.
 - **Mesoscale workspace on beta:** The Mesoscale forecast workspace and its Monitor panel are now available on beta for early-access testing.
 - **Reliable Mesoscale map display:** Model layers stay visible at the default map zoom with the standard basemap, so beta testers no longer see a blank map.
 - **Clearer Mesoscale field names:** Model fields show readable labels such as CAPE (surface), storm-relative helicity ranges, and composite reflectivity.
@@ -77,6 +79,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Embedded discussions:** Keep the selected map day when the Discussion URL changes inside a multi-day grouping.
+- **Verification reports:** Grade archived dates against filtered SPC reports only and show an unavailable message when the filtered archive cannot be used.
+- **Mesoscale workspace without model data:** The map, area tools, and Areas and Discussion tabs stay usable with an explanation, retry action, and model switcher when model data is loading or unavailable instead of replacing the workspace with an error screen.
+- **Phone area toolbar overlap:** The area toolbar now sits below the Data toggle on narrow screens instead of overlapping it.
 - **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
 - **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
 - **Beta release checks:** Invalid retry settings now fall back to defaults so post-deploy smoke checks run as intended.

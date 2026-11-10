@@ -73,6 +73,15 @@ const unavailableParameterIds = (catalog: MesoscaleCatalog, analysis: NonNullabl
   return [...new Set(ids)].join(', ') || 'some catalog fields';
 };
 
+type SourceInfo = NonNullable<MesoscaleCatalog['source']>;
+
+/** Demo imagery gets one plain note instead of a fake source link; real data links to its source. */
+export const SourceLine: React.FC<{ source?: SourceInfo }> = ({ source }) => {
+  if (isMesoscaleDemoData()) return <span role="note">Demo data: placeholder imagery, not real model output.</span>;
+  if (!source) return <span>Source attribution unavailable</span>;
+  return <a href={source.url} target="_blank" rel="noreferrer">{source.attribution}</a>;
+};
+
 const AnalysisReadout: React.FC<{ model: MesoscaleModelId; catalog: MesoscaleCatalog; analysis: NonNullable<ReturnType<typeof findAnalysisFrame>>; ageMinutes: number | null; stale: boolean }> = ({ model, catalog, analysis, ageMinutes, stale }) => {
   const source = catalog.source ?? analysis.parameters[0]?.source;
   const hasUnavailableFields = catalog.status === 'partial' || analysis.status === 'partial';
@@ -82,8 +91,7 @@ const AnalysisReadout: React.FC<{ model: MesoscaleModelId; catalog: MesoscaleCat
       <span>Cycle {formatUtc(catalog.cycleTime)}</span>
       <span>Valid {formatUtc(analysis.validTime)}</span>
       <span>{ageMinutes === null ? 'Age unknown' : `${ageMinutes} min old`}{stale ? ' · stale' : ''}</span>
-      {source ? <a href={source.url} target="_blank" rel="noreferrer">{source.attribution}</a> : <span>Source attribution unavailable</span>}
-      {isMesoscaleDemoData() ? <span role="note">Demo data: placeholder imagery, not real model output.</span> : null}
+      <SourceLine source={source} />
       {hasUnavailableFields ? <span role="status">Unavailable parameters: {unavailableParameterIds(catalog, analysis)}</span> : null}
     </div>
   );

@@ -13,8 +13,12 @@ export interface MesoscaleAreasController extends AreaHistory {
   select: (id: string | null) => void;
   atLimit: boolean;
   addPolygon: (polygon: Polygon) => void;
-  updateArea: (id: string, changes: Partial<MesoscaleArea>) => void;
-  setGeometry: (id: string, polygon: Polygon) => void;
+  updateArea: (id: string, changes: Partial<MesoscaleArea>, coalesceKey?: string) => void;
+  /** `coalesce` merges a run of vertex nudges into one undo step. */
+  setGeometry: (id: string, polygon: Polygon, coalesce?: boolean) => void;
+  /** The vertex being edited from the keyboard, highlighted on the map. */
+  activeVertex: number | null;
+  setActiveVertex: (index: number | null) => void;
   removeArea: (id: string) => void;
 }
 
@@ -24,6 +28,7 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
   const { areas, commit } = history;
   const [tool, setTool] = useState<AreaTool>('select');
   const [pickedId, setSelectedId] = useState<string | null>(null);
+  const [activeVertex, setActiveVertex] = useState<number | null>(null);
   // Undo or redo can remove the picked area; never expose an id that no longer exists.
   const selectedId = areas.some(area => area.id === pickedId) ? pickedId : null;
   const atLimit = areas.length >= MAX_MESOSCALE_AREAS;
@@ -38,14 +43,17 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
     setTool('select');
   }, [commit]);
 
-  const updateArea = useCallback((id: string, changes: Partial<MesoscaleArea>) => {
+  const updateArea = useCallback((id: string, changes: Partial<MesoscaleArea>, coalesceKey?: string) => {
     const updatedAt = new Date().toISOString();
-    // Typing in one field is one undo step; geometry changes always get their own.
-    const key = 'geometry' in changes ? undefined : `${id}:${Object.keys(changes).join(',')}`;
+    // Typing in one field is one undo step; geometry changes get their own unless the caller merges them.
+    const key = coalesceKey ?? ('geometry' in changes ? undefined : `${id}:${Object.keys(changes).join(',')}`);
     commit((current) => current.map(area => (area.id === id ? { ...area, ...changes, updatedAt } : area)), key);
   }, [commit]);
 
-  const setGeometry = useCallback((id: string, geometry: Polygon) => updateArea(id, { geometry }), [updateArea]);
+  const setGeometry = useCallback(
+    (id: string, geometry: Polygon, coalesce = false) => updateArea(id, { geometry }, coalesce ? `${id}:vertex` : undefined),
+    [updateArea],
+  );
 
   const removeArea = useCallback((id: string) => {
     commit((current) => current.filter(area => area.id !== id));
@@ -53,5 +61,5 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
   }, [commit]);
 
   const select = useCallback((id: string | null) => setSelectedId(id), []);
-  return { ...history, tool, setTool, selectedId, select, atLimit, addPolygon, updateArea, setGeometry, removeArea };
+  return { ...history, tool, setTool, selectedId, select, atLimit, addPolygon, updateArea, setGeometry, activeVertex, setActiveVertex, removeArea };
 };
