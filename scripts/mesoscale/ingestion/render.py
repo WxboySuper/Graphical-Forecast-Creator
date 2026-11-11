@@ -243,12 +243,7 @@ def fixed_stp_inputs(field_outputs: dict) -> dict | None:
 
 def fixed_stp_output(inputs: dict, source_parts: list[dict], cin: dict | None, np) -> dict:
     """Build the output record and provenance for one derived STP grid."""
-    cape = np.asarray(inputs["cape-surface"]["values"], dtype=float)
-    lcl = np.asarray(inputs["surface-lcl"]["values"], dtype=float)
-    srh = np.asarray(inputs["srh-0-1km"]["values"], dtype=float)
-    u = np.asarray(inputs["stp-input-vucsh"]["values"], dtype=float)
-    v = np.asarray(inputs["stp-input-vvcsh"]["values"], dtype=float)
-    values = calculate_fixed_stp(cape, lcl, srh, u, v, cin, np)
+    values = calculate_fixed_stp(inputs, cin, np)
     source_hash = hashlib.sha256("".join(item["sourceHash"] for item in source_parts).encode("ascii")).hexdigest()
     return {
         "values": values,
@@ -261,16 +256,19 @@ def fixed_stp_output(inputs: dict, source_parts: list[dict], cin: dict | None, n
     }
 
 
-def calculate_fixed_stp(cape, lcl, srh, u, v, cin: dict | None, np):
-    """Apply fixed-layer STP terms; VUCSH/VVCSH values are already m/s."""
-    bwd6 = np.hypot(u, v)
-    f_lcl = np.clip((2000 - lcl) / 1000, 0, 1)
+def calculate_fixed_stp(inputs: dict, cin: dict | None, np):
+    """Apply fixed-layer STP terms to the input grids; VUCSH/VVCSH values are already m/s."""
+    grids = {
+        name: np.asarray(inputs[field_id]["values"], dtype=float)
+        for name, field_id in (("cape", "cape-surface"), ("lcl", "surface-lcl"), ("srh", "srh-0-1km"), ("u", "stp-input-vucsh"), ("v", "stp-input-vvcsh"))
+    }
+    cin_values = None if cin is None else np.asarray(cin["values"], dtype=float)
+    bwd6 = np.hypot(grids["u"], grids["v"])
+    f_lcl = np.clip((2000 - grids["lcl"]) / 1000, 0, 1)
     f_bwd6 = np.where(bwd6 < 12.5, 0, np.clip(bwd6, 0, 30) / 20)
-    f_cin = np.ones_like(cape) if cin is None else np.clip((200 + np.asarray(cin["values"], dtype=float)) / 150, 0, 1)
-    values = (cape / 1500) * f_lcl * (srh / 150) * f_bwd6 * f_cin
-    valid_grids = [cape, lcl, srh, u, v]
-    if cin is not None:
-        valid_grids.append(np.asarray(cin["values"], dtype=float))
+    f_cin = np.ones_like(grids["cape"]) if cin_values is None else np.clip((200 + cin_values) / 150, 0, 1)
+    values = (grids["cape"] / 1500) * f_lcl * (grids["srh"] / 150) * f_bwd6 * f_cin
+    valid_grids = list(grids.values()) + ([] if cin_values is None else [cin_values])
     valid = np.logical_and.reduce([valid_data(grid) for grid in valid_grids])
     return np.where(valid, values, np.nan)
 
