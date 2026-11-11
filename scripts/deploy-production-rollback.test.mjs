@@ -9,8 +9,8 @@ test('manual rollback to a pre-Worker tag can write the version marker without W
 });
 
 test('manual rollback to a pre-Worker tag skips Worker-only alert generation and deployment', () => {
-  const alertStep = workflow.match(/- name: Write derived production alert banner([\s\S]*?)(?=\n      - name:)/)?.[1];
-  const workerStep = workflow.match(/- name: Deploy production Worker frontend([\s\S]*?)(?=\n      - name:)/)?.[1];
+  const alertStep = workflow.match(/- name: Write derived production alert banner([\s\S]*?)(?=\n {6}- name:)/)?.[1];
+  const workerStep = workflow.match(/- name: Deploy production Worker frontend([\s\S]*?)(?=\n {6}- name:)/)?.[1];
   const smokeStep = workflow.match(/- name: Smoke test production Worker frontend and API([\s\S]*?)(?=\n\s*$)/)?.[1];
 
   assert.ok(alertStep, 'production alert step must exist');

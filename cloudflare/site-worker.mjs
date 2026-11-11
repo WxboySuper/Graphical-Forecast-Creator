@@ -25,8 +25,16 @@ const serviceUnavailable = (error) =>
   Response.json({ error }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
 
 const isHostname = (value) => {
-  if (!/^[a-z0-9.-]+$/i.test(value) || value.startsWith('.') || value.endsWith('.') || value.includes('..')) return false;
-  return value.split('.').every((label) => label.length > 0 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label));
+  if (!/^[a-z0-9.-]+$/i.test(value)) return false;
+  if (value.startsWith('.') || value.endsWith('.')) return false;
+  if (value.includes('..')) return false;
+
+  const labels = value.split('.');
+  return labels.every((label) => {
+    if (label.length === 0 || label.length > 63) return false;
+    if (!/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label)) return false;
+    return true;
+  });
 };
 
 /** Redirects the configured alias to the canonical host without dropping path or query. */
