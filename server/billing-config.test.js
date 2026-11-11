@@ -67,6 +67,13 @@ describe('getBillingReturnBaseUrl', () => {
       'https://beta-gfc.weatherboysuper.com'
     );
   });
+
+  it('accepts the legacy production origin during the hostname transition', () => {
+    process.env.SERVER_TARGET = 'production';
+    process.env.APP_BASE_URL = 'https://gfcweather.com';
+    const req = { headers: { origin: 'https://gfc.weatherboysuper.com' } };
+    assert.equal(getBillingReturnBaseUrl(req), 'https://gfc.weatherboysuper.com');
+  });
 });
 
 describe('getBillingRuntimeConfig', () => {

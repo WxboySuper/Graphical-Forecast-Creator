@@ -126,7 +126,7 @@ be passed to `normalizeProviderPayload` unchanged:
   "displayType": "raster",
   "data": {
     "type": "xyz-raster",
-    "urlTemplate": "https://gfc.weatherboysuper.com/api/mesoscale/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png",
+    "urlTemplate": "https://gfcweather.com/api/mesoscale/tiles/hrrr/20261108T1200Z/f00/temperature-2m/{z}/{x}/{y}.png",
     "archiveKey": "mesoscale/v1/archives/hrrr/20261108T1200Z/f00/temperature-2m.pmtiles",
     "tileCompression": "none",
     "format": "image/png",
@@ -231,7 +231,7 @@ The pointer is small and changes only after a complete cycle catalog is live:
   "schemaVersion": 1,
   "modelId": "hrrr",
   "cycleTime": "2026-11-08T12:00:00Z",
-  "catalogUrl": "https://gfc.weatherboysuper.com/api/mesoscale/catalog/hrrr/20261108T1200Z.json",
+  "catalogUrl": "https://gfcweather.com/api/mesoscale/catalog/hrrr/20261108T1200Z.json",
   "publishedAt": "2026-11-08T13:04:11Z"
 }
 ```

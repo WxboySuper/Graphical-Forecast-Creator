@@ -2,7 +2,7 @@
 
 Graphical Forecast Creator (GFC) is a free, open-source web app where people build severe-weather outlooks like the SPC's, write a discussion, watch the weather unfold, then grade themselves. It exists as a hands-on learning tool, so the **core experience is free forever**.
 
-Live: <https://gfc.weatherboysuper.com> · Desktop-first, with some mobile support.
+Live: <https://gfcweather.com> · Desktop-first, with some mobile support.
 
 ## The four modes
 

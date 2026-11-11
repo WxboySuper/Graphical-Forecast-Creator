@@ -17,7 +17,7 @@ const matchesSharedSecret = (expectedSecret, suppliedSecret) => {
 
 /** Returns the Worker-forwarded client IP when the request proves the shared secret, else null. */
 const getTrustedWorkerClientIp = (req) => {
-  const secret = process.env.BETA_WORKER_SHARED_SECRET;
+  const secret = process.env.PRODUCTION_WORKER_SHARED_SECRET || process.env.BETA_WORKER_SHARED_SECRET;
   if (!matchesSharedSecret(secret, req.get(WORKER_SECRET_HEADER))) return null;
   const clientIp = req.get(WORKER_CLIENT_IP_HEADER) || '';
   return net.isIP(clientIp) ? clientIp : null;

@@ -2,7 +2,7 @@
 
 **A web application for creating professional severe weather outlooks, verifying forecasts, and writing forecast discussions.**
 
-Live App: [gfc.weatherboysuper.com](https://gfc.weatherboysuper.com/)
+Live App: [gfcweather.com](https://gfcweather.com/)
 
 ---
 

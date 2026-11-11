@@ -4,7 +4,9 @@ permissions:
   contents: read
 
 # Production deployment is activated by a manually created stable release, or can
-# be run manually for an intentional operator deployment.
+# be run manually for an intentional operator deployment. The Worker serves the
+# frontend; the VPS continues to host the production API. The VPS frontend option
+# exists for an intentional rollback only.
 # Queue overlapping production deploys; release dirs are versioned but symlink swap and
 # pm2 restart are not safe to run concurrently across SSH sessions.
 concurrency:
@@ -16,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git tag or branch to deploy (default: stable/1.7.x)'
+        description: 'Stable branch or release tag to deploy (default: stable/2.x)'
         required: false
         type: string
       deploy_action:
@@ -33,6 +35,16 @@ on:
         description: 'Allow re-staging the same releaseId'
         required: false
         default: false
+        type: boolean
+      deploy_vps_frontend:
+        description: 'Also deploy the frontend to the VPS for a rollback'
+        required: false
+        default: false
+        type: boolean
+      deploy_worker:
+        description: 'Deploy the Worker frontend (disable when rolling back to a tag without Worker files)'
+        required: false
+        default: true
         type: boolean
 
 jobs:
@@ -55,13 +67,13 @@ jobs:
           if [ "$GHA_EVENT_NAME" = "release" ]; then
             echo "ref=${GHA_TAG_NAME}" >> "$GITHUB_OUTPUT"
           elif [ -n "$GHA_INPUT_REF" ]; then
-            if ! printf '%s' "$GHA_INPUT_REF" | grep -Eq '^stable/[0-9]+\.[0-9]+\.x$'; then
-              echo "::error::Manual production deploys must target a stable/* release line." >&2
+            if ! printf '%s' "$GHA_INPUT_REF" | grep -Eq '^(stable/[0-9]+\.x|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
+              echo "::error::Manual production deploys must target a stable/X.x line or stable release tag." >&2
               exit 1
             fi
             echo "ref=${GHA_INPUT_REF}" >> "$GITHUB_OUTPUT"
           else
-            echo "ref=stable/1.7.x" >> "$GITHUB_OUTPUT"
+            echo "ref=stable/2.x" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout
@@ -70,9 +82,9 @@ jobs:
           ref: ${{ steps.checkout_ref.outputs.ref }}
 
       - name: Verify stable release tag matches package.json
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || startsWith(inputs.ref, 'v')
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || (startsWith(inputs.ref, 'v') && inputs.ref) }}
         run: |
           set -euo pipefail
           PKG=$(node -p "require('./package.json').version")
@@ -174,6 +186,7 @@ jobs:
         if: steps.manifest.outputs.skip != 'true'
         run: pnpm run build
         env:
+          PUBLIC_URL: https://gfcweather.com
           VITE_BUILD_TARGET: production
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -185,6 +198,15 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           CI: false
+
+      - name: Write frontend version marker
+        if: steps.manifest.outputs.skip != 'true'
+        run: |
+          if [ -f scripts/write-version.mjs ]; then
+            node scripts/write-version.mjs build/version.json
+          else
+            node -e "const fs=require('node:fs');const p=require('./package.json');fs.writeFileSync('build/version.json',JSON.stringify({version:p.version},null,2)+'\\n')"
+          fi
 
       - name: Verify Sentry sourcemap publication (production)
         if: steps.manifest.outputs.skip != 'true'
@@ -235,7 +257,7 @@ jobs:
           cat > prod-server.env <<EOF
           PORT=3006
           LOG_DIR=/opt/gfc-analytics/logs
-          APP_BASE_URL=https://gfc.weatherboysuper.com
+          APP_BASE_URL=https://gfcweather.com
           SERVER_TARGET=production
           ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
           METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
@@ -251,6 +273,7 @@ jobs:
           FIREBASE_ADMIN_PRIVATE_KEY=${{ secrets.FIREBASE_ADMIN_PRIVATE_KEY }}
           SENTRY_DSN=${{ secrets.SENTRY_DSN }}
           SENTRY_BROWSER_DSN=${{ secrets.VITE_SENTRY_DSN }}
+          PRODUCTION_WORKER_SHARED_SECRET=${{ secrets.PRODUCTION_WORKER_SHARED_SECRET }}
           SENTRY_ENVIRONMENT=production
           SENTRY_RELEASE=graphical-forecast-creator@${{ steps.app_version.outputs.sentry_release }}
           EOF
@@ -279,22 +302,29 @@ jobs:
           EOF
           node scripts/write-deployment-env.mjs deploy/beta-deployment-config.json >> staging-server.env
 
+      - name: Write derived production alert banner
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live'
+        run: BANNER_SURFACE=live node scripts/write-derived-alert-banner.mjs
+
       - name: Deploy live release (full)
         if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live'
         env:
           RELEASE_DIR: ${{ steps.app_version.outputs.release_dir }}
+          DEPLOY_VPS_FRONTEND: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy_vps_frontend || false }}
         run: |
           set -euo pipefail
           HOST="root@${{ secrets.PROD_SSH_HOST }}"
 
           ssh -o StrictHostKeyChecking=yes "$HOST" "mkdir -p /var/www/gfc/releases /opt/gfc-analytics/releases /opt/gfc-analytics/config /opt/gfc-analytics/logs"
 
-          rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
+          if [[ "$DEPLOY_VPS_FRONTEND" == "true" ]]; then
+            rsync -avz --delete build/ "$HOST:/var/www/gfc/releases/$RELEASE_DIR/"
+          fi
           rsync -avz --exclude='node_modules' --exclude='logs' server/ "$HOST:/opt/gfc-analytics/releases/$RELEASE_DIR/"
           rsync -avz deploy/production-release.json "$HOST:/opt/gfc-analytics/config/production-release.json"
           rsync -avz prod-server.env "$HOST:/opt/gfc-analytics/config/.env"
 
-          ssh -o StrictHostKeyChecking=yes "$HOST" "RELEASE_DIR='$RELEASE_DIR' bash -s" <<'REMOTE'
+          ssh -o StrictHostKeyChecking=yes "$HOST" "RELEASE_DIR='$RELEASE_DIR' DEPLOY_VPS_FRONTEND='$DEPLOY_VPS_FRONTEND' bash -s" <<'REMOTE'
           set -euo pipefail
           WEB_ROOT=/var/www/gfc
           ANALYTICS_ROOT=/opt/gfc-analytics
@@ -311,7 +341,9 @@ jobs:
             done
           fi
 
-          ln -sfn "$WEB_ROOT/releases/$RELEASE_DIR" "$WEB_ROOT/current"
+          if [ "${DEPLOY_VPS_FRONTEND:-false}" = "true" ]; then
+            ln -sfn "$WEB_ROOT/releases/$RELEASE_DIR" "$WEB_ROOT/current"
+          fi
           ln -sfn "$ANALYTICS_ROOT/releases/$RELEASE_DIR" "$ANALYTICS_ROOT/current"
           cd "$ANALYTICS_ROOT/current"
           npm install --omit=dev --quiet
@@ -397,3 +429,22 @@ jobs:
           fi
           pm2 save
           REMOTE
+
+      - name: Deploy production Worker frontend
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live' && (github.event_name == 'release' || inputs.deploy_worker)
+        run: |
+          if [ -n "$PRODUCTION_WORKER_SHARED_SECRET" ]; then
+            printf '%s' "$PRODUCTION_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4 secret put PRODUCTION_WORKER_SHARED_SECRET --config cloudflare/wrangler.production.jsonc
+          fi
+          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.production.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PRODUCTION_WORKER_SHARED_SECRET: ${{ secrets.PRODUCTION_WORKER_SHARED_SECRET }}
+
+      - name: Smoke test production Worker frontend and API
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live' && (github.event_name == 'release' || inputs.deploy_worker)
+        run: node scripts/smoke-test-beta-site.mjs
+        env:
+          SITE_ORIGIN: https://gfcweather.com
+          EXPECTED_VERSION: ${{ steps.app_version.outputs.raw }}

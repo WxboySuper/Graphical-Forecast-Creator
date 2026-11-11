@@ -1,7 +1,7 @@
 /**
- * Post-deploy smoke checks for the beta site (HTML shell, API status, optional version.json).
+ * Post-deploy smoke checks for a hosted site (HTML shell, API status, optional version.json).
  */
-const BETA_ORIGIN = process.env.BETA_ORIGIN ?? 'https://beta.gfcweather.com';
+const SITE_ORIGIN = process.env.SITE_ORIGIN ?? process.env.BETA_ORIGIN ?? 'https://beta.gfcweather.com';
 const EXPECTED_VERSION = process.env.EXPECTED_VERSION ?? '';
 const DEFAULT_MAX_ATTEMPTS = 6;
 const DEFAULT_RETRY_DELAY_MS = 10_000;
@@ -33,7 +33,7 @@ async function fetchStatus(url) {
 /** Require the beta shell to respond with HTML and HTTP 200. */
 function assertHomePage(home) {
   if (home.status !== 200) {
-    throw new Error(`Beta home returned HTTP ${home.status} (expected 200).`);
+    throw new Error(`Site home returned HTTP ${home.status} (expected 200).`);
   }
   if (!home.body.includes('<!DOCTYPE html') && !home.body.includes('<html')) {
     throw new Error('Beta home did not return HTML.');
@@ -43,7 +43,7 @@ function assertHomePage(home) {
 /** Require the capabilities status endpoint to return HTTP 200. */
 function assertCapabilitiesStatus(api, statusUrl) {
   if (api.status !== 200) {
-    throw new Error(`Beta API ${statusUrl} returned HTTP ${api.status} (expected 200).`);
+    throw new Error(`Site API ${statusUrl} returned HTTP ${api.status} (expected 200).`);
   }
 }
 
@@ -65,7 +65,7 @@ function assertDeployedVersion(versionResponse) {
 
 /** Run all smoke assertions once against the configured beta origin. */
 async function checkOnce() {
-  const origin = BETA_ORIGIN.replace(/\/$/, '');
+  const origin = SITE_ORIGIN.replace(/\/$/, '');
   const homeUrl = `${origin}/`;
   const statusUrl = `${origin}/api/capabilities/status`;
   const versionUrl = `${origin}/version.json`;
@@ -85,7 +85,7 @@ async function run() {
     try {
       await checkOnce();
       console.log(
-        `Smoke test passed for ${BETA_ORIGIN}${EXPECTED_VERSION ? ` (version ${EXPECTED_VERSION})` : ''} on attempt ${attempt}.`,
+        `Smoke test passed for ${SITE_ORIGIN}${EXPECTED_VERSION ? ` (version ${EXPECTED_VERSION})` : ''} on attempt ${attempt}.`,
       );
       return;
     } catch (error) {
