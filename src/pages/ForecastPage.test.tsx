@@ -516,7 +516,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(createStore());
 
     expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/temporarily disabled while the SPC HREF source/i);
-    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/REFSCT.*v1\.8/i);
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/REFSCT.*v2/i);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
