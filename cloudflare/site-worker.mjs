@@ -8,7 +8,7 @@ const isApiPath = (pathname) => pathname === API_PREFIX || pathname.startsWith(`
 
 /** Returns the validated API origin URL, or a fail-closed response when it cannot be used. */
 const resolveApiOrigin = (env) => {
-  const configuredOrigin = env.API_ORIGIN || env.BETA_API_ORIGIN;
+  const configuredOrigin = env?.API_ORIGIN || env?.BETA_API_ORIGIN;
   if (!configuredOrigin) return { error: serviceUnavailable('The API origin is not configured.') };
   let apiOrigin;
   try {
@@ -16,6 +16,7 @@ const resolveApiOrigin = (env) => {
   } catch {
     return { error: serviceUnavailable('The API origin is invalid.') };
   }
+  if (!apiOrigin.hostname) return { error: serviceUnavailable('The API origin must include a host.') };
   if (apiOrigin.protocol !== 'https:') return { error: serviceUnavailable('The API origin must be an HTTPS URL.') };
   if (apiOrigin.username || apiOrigin.password) {
     return { error: serviceUnavailable('The API origin must not include credentials.') };
@@ -69,10 +70,10 @@ export default {
     const requestUrl = new URL(request.url);
     const aliasResponse = redirectAlias(requestUrl, env);
     if (aliasResponse) return aliasResponse;
+    if (isApiPath(requestUrl.pathname)) return proxyApi(request, requestUrl, env);
     if (typeof env?.ASSETS?.fetch !== 'function') {
       return serviceUnavailable('The static assets binding is missing.');
     }
-    if (!isApiPath(requestUrl.pathname)) return env.ASSETS.fetch(request);
-    return proxyApi(request, requestUrl, env);
+    return env.ASSETS.fetch(request);
   },
 };

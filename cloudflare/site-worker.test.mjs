@@ -211,3 +211,9 @@ test('a missing environment or assets binding fails closed instead of throwing',
     assert.equal(response.headers.get('cache-control'), 'no-store');
   }
 });
+
+test('API requests with no environment fail closed without needing the assets binding', async () => {
+  const response = await worker.fetch(apiRequest(), undefined);
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
