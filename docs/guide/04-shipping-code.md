@@ -8,15 +8,15 @@ Nothing deploys just because a PR merged. Releases and deployments are deliberat
 gitGraph
   commit id: "feature PRs"
   commit id: "..."
-  branch stable/1.8.x
-  commit id: "release v1.8.0"
+  branch stable/2.x
+  commit id: "release v2.0.0"
   checkout main
   commit id: "next-major work"
-  checkout stable/1.8.x
+  checkout stable/2.x
   branch hotfix/crash
   commit id: "fix"
-  checkout stable/1.8.x
-  merge hotfix/crash id: "v1.8.1"
+  checkout stable/2.x
+  merge hotfix/crash id: "v2.1.0"
   checkout main
   commit id: "forward-port"
 ```
@@ -24,11 +24,13 @@ gitGraph
 | Branch | Role |
 |--------|------|
 | `main` | Next-major integration line. Normal PR target. |
-| `stable/X.Y.x` | Production line for one release family. Frozen except for hotfixes. |
+| `stable/X.x` | Production line for one release family. Frozen except for hotfixes. |
 | `hotfix/*` | Urgent production fix, branched from the stable line. |
 | `fix/*`, other | Descriptive names only; branch names are not merge gates. |
 
 "Beta" is **not a branch**; it is a prerelease cut from `main`.
+
+GFC displays flat release labels such as `v2` and `v2.1`. Package versions and git tags use padded semver (`2.0.0` and `v2.0.0`); the patch slot stays `0`. Beta versions use `2.0.0-beta.N` with a continuing counter. Hotfixes use the next flat minor label, such as `v2.1`. See [release operations](../agents/release-ops.md#versioning).
 
 ## Every PR
 
@@ -38,7 +40,7 @@ gitGraph
 | `Changelog-Impact:` | Meaning | You must also |
 |---------------------|---------|---------------|
 | `beta` | User-visible change landing on `main` | Add an entry under `### Next major / beta` in `CHANGELOG.md` |
-| `hotfix` | User-visible change on a stable line | Add an entry under `### Stable X.Y.x hotfixes` |
+| `hotfix` | User-visible change on a stable line | Add an entry under the current stable-line hotfix lane |
 | `none` | No public impact | Add `Changelog-Reason:` |
 | `inherited` | Forward-port of a stable fix | Add `Port of #123` |
 
@@ -58,7 +60,7 @@ flowchart TD
   end
   subgraph Stable["Stable (new major/minor)"]
     S1[Prepare Main Stable Promotion] --> S2[Merge promotion PR to main]
-    S2 --> S3[Bootstrap Stable Release Line<br/>creates stable/X.Y.x]
+    S2 --> S3[Bootstrap Stable Release Line<br/>creates stable/X.x]
     S3 --> S4[Create Stable Release<br/>from stable branch]
     S4 --> S5[Publishing the release deploys production]
   end
@@ -90,7 +92,7 @@ flowchart TD
 | `release-beta.yml` | Cut and deploy a beta |
 | `deploy-beta-workers.yml` | Redeploy an existing ref to the beta Worker |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` |
-| `bootstrap-stable-release.yml` | Create `stable/X.Y.x` |
+| `bootstrap-stable-release.yml` | Create `stable/X.x` |
 | `release-stable.yml` | Create stable or hotfix release (triggers prod deploy) |
 | `deploy-staging.yml` | Rehearsal deploy |
 | `deploy-main-to-vps.yml` | Production/staging VPS deploy |

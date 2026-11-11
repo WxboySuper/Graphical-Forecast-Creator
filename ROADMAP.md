@@ -34,7 +34,7 @@ shape:
 - v1.4 established hosted accounts, entitlements, and the cloud forecast
   library. v1.6 introduced Monitor. v1.7 expanded the hosted product and added
   release and security safeguards.
-- The current v1.8 direction is to keep forecast workspace state independent,
+- The current v2 direction is to keep forecast workspace state independent,
   make persistence ownership explicit, and document the route, state, export,
   and exposure boundaries before adding more product surface.
 

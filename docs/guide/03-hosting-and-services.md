@@ -7,7 +7,7 @@
 | `local` | localhost:3000 | your machine | Development. Works with no credentials. |
 | `beta` | beta.gfcweather.com | Cloudflare Worker `gfc-beta` + beta API on the VPS | Open beta: prerelease testing of `main`, open to everyone, existing subscriptions apply. |
 | `staging` | staging-gfc.weatherboysuper.com | VPS | Manual rehearsal of any ref before production. |
-| `production` | gfc.weatherboysuper.com | VPS | What users get. Runs a `stable/X.Y.x` release. |
+| `production` | gfc.weatherboysuper.com | VPS | What users get. Runs a `stable/X.x` release. |
 
 > Some older docs and code comments still mention `beta-gfc.weatherboysuper.com`. The Cloudflare config (`cloudflare/wrangler.beta.jsonc`) says `beta.gfcweather.com` is current.
 

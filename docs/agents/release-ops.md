@@ -4,9 +4,15 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 ## Model
 
-- `main` = next-major line. `stable/X.Y.x` = production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
+- `main` = next-major line. `stable/X.x` = production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
 - Targets: `local`, `beta` (beta.gfcweather.com, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (staging-gfc.weatherboysuper.com), `production` (gfc.weatherboysuper.com).
 - Old docs/comments may say `beta-gfc.weatherboysuper.com`; the Cloudflare config uses `beta.gfcweather.com`.
+
+## Versioning
+
+GFC release labels use a flat major version. The next major is `v2`, followed by `v3`; a minor such as `v2.1` maps to the package and tag version `2.1.0` / `v2.1.0`. The patch slot stays `0`. Use short labels (`v2`, `v2.1`) in UI, docs, release titles, changelog prose, and PR text. Use padded semver (`2.0.0`, `2.1.0`) in `package.json`, and `v2.0.0`, `v2.1.0` for git tags.
+
+Beta tags keep their semver prerelease form and share one increasing counter. The next beta for v2 is `2.0.0-beta.16`, tagged `v2.0.0-beta.16`. Production branches use `stable/2.x`; a hotfix for the current v2 line is labeled `v2.1` and tagged `v2.1.0`. Existing `stable/1.x` branches, tags, and v1.x changelog entries remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
 
 ## Workflows
 
@@ -15,14 +21,14 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 | `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
 | `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
-| `bootstrap-stable-release.yml` | Create `stable/X.Y.x` at the approved main commit | |
+| `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
 | `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
 | `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
 | `deploy-main-to-vps.yml` | Production/staging VPS deploy | |
 | `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
 
-Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v1.8 changelog belongs to the stable release (`changelog-and-prs`).
+Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v2 changelog belongs to the stable release (`changelog-and-prs`).
 
 Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEASE-BETA -f dry_run=false -f deploy_api=true`. Concurrency group `beta-release`. Beta cuts only bump `package.json`; `CHANGELOG.md` is not rewritten.
 
