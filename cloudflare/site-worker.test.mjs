@@ -112,7 +112,7 @@ test('uses the secret paired with the selected API origin and replaces spoofed h
     },
   });
   const cases = [
-    { API_ORIGIN: 'https://production.example.test', BETA_API_ORIGIN: 'https://beta.example.test', PRODUCTION_WORKER_SHARED_SECRET: 'production-secret', BETA_WORKER_SHARED_SECRET: 'beta-secret', expectedOrigin: 'https://production.example.test/api/test', expectedSecret: 'production-secret' },
+    { API_ORIGIN: 'https://production.example.test', PRODUCTION_WORKER_SHARED_SECRET: 'production-secret', BETA_WORKER_SHARED_SECRET: 'beta-secret', expectedOrigin: 'https://production.example.test/api/test', expectedSecret: 'production-secret' },
     { BETA_API_ORIGIN: 'https://beta.example.test', PRODUCTION_WORKER_SHARED_SECRET: 'production-secret', BETA_WORKER_SHARED_SECRET: 'beta-secret', expectedOrigin: 'https://beta.example.test/api/test', expectedSecret: 'beta-secret' },
   ];
   try {
@@ -216,4 +216,13 @@ test('API requests with no environment fail closed without needing the assets bi
   const response = await worker.fetch(apiRequest(), undefined);
   assert.equal(response.status, 503);
   assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('setting both API origins fails closed so beta can never inherit the production origin', async () => {
+  const response = await worker.fetch(apiRequest(), {
+    API_ORIGIN: 'https://api.example.test',
+    BETA_API_ORIGIN: 'https://beta-api.example.test',
+    ASSETS: noAssetsForApi,
+  });
+  assert.equal(response.status, 503);
 });
