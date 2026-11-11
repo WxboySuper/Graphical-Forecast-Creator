@@ -41,6 +41,7 @@ export interface MesoscaleParameterDefinition {
   level: MesoscaleLevel;
   legend: MesoscaleLegendStop[];
   displayType: MesoscaleDisplayType;
+  metadata?: Record<string, unknown>;
 }
 
 /** Flat adapter input shape. Provider adapters map their response to this before normalization. */
@@ -52,6 +53,7 @@ export interface MesoscaleProviderParameter<TData = unknown> {
   legend: MesoscaleLegendStop[];
   displayType: MesoscaleDisplayType;
   data: TData;
+  metadata?: Record<string, unknown>;
 }
 
 /** Provider-neutral adapter payload. Timestamp strings must include an explicit timezone. */

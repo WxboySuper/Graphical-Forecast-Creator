@@ -7,6 +7,7 @@ import React from 'react';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import type { MesoscaleCatalogParameter } from '../../mesoscale';
 import { groupParameters } from './layerGroups';
+import { filterExposedMesoscaleParameters } from './layerExposure';
 import { addLayer, moveLayer, removeLayer, setOpacity, type ActiveLayers } from './layerOrdering';
 
 interface LayerPanelProps {
@@ -107,11 +108,14 @@ const AvailableFields: React.FC<LayerPanelProps> = ({ parameters, layers, onChan
   </div>
 );
 
-export const LayerPanel: React.FC<LayerPanelProps> = (props) => (
-  <section className="mesoscale-section" aria-labelledby="mesoscale-layers-heading">
-    <h2 id="mesoscale-layers-heading" className="mesoscale-section__title">On the map</h2>
-    <ActiveStack {...props} />
-    <h2 className="mesoscale-section__title mesoscale-section__title--sub">Fields</h2>
-    <AvailableFields {...props} />
-  </section>
-);
+export const LayerPanel: React.FC<LayerPanelProps> = (props) => {
+  const exposedProps = { ...props, parameters: filterExposedMesoscaleParameters(props.parameters) };
+  return (
+    <section className="mesoscale-section" aria-labelledby="mesoscale-layers-heading">
+      <h2 id="mesoscale-layers-heading" className="mesoscale-section__title">On the map</h2>
+      <ActiveStack {...exposedProps} />
+      <h2 className="mesoscale-section__title mesoscale-section__title--sub">Fields</h2>
+      <AvailableFields {...exposedProps} />
+    </section>
+  );
+};

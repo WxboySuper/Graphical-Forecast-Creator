@@ -49,7 +49,7 @@ const ALL_TARGETS_ON = {
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
 
-/** Single source of truth for v1.7 feature exposure and lifecycle metadata. */
+/** Single source of truth for feature exposure and lifecycle metadata. */
 export const FEATURE_EXPOSURE_REGISTRY = {
   exportMap: {
     exposure: { ...ALL_TARGETS_ON },
@@ -189,6 +189,15 @@ export const FEATURE_EXPOSURE_REGISTRY = {
       'Beta is on for early-access testing (#1800). Keep staging and production disabled until the owner approves the Mesoscale Forecast workspace for release (#919).',
     serverBacked: false,
     trackingIssue: 919,
+  },
+  mesoscaleDerivedParameters: {
+    exposure: { local: true, beta: true, staging: false, production: false },
+    owner: 'WxboySuper',
+    addedDate: '2026-11-10',
+    temporary: true,
+    removalCondition: 'Review the fixed-layer STP ingest and production display before enabling it for production (#1801).',
+    serverBacked: false,
+    trackingIssue: 1801,
   },
   winterWorkspace: {
     exposure: { ...ALL_TARGETS_OFF },

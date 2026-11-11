@@ -88,23 +88,26 @@ turn a successful publish into failed health; the next successful run retries.
 
 ## R2 operation and storage estimate
 
-The current field inventory has 18 HRRR fields, 17 RAP fields (RAP omits
-surface LCL), and 18 RRFS fields. One complete cycle writes one archive per
-field/frame plus catalog, latest pointer, and health objects:
+The native field inventory has 18 HRRR fields, 17 RAP fields (RAP omits
+surface LCL), and 18 RRFS fields. Fixed-layer STP adds one optional archive
+per HRRR frame and one per RRFS f00 frame when its inputs are available. One
+complete cycle writes one archive per field/frame plus catalog, latest pointer,
+and health objects:
 
 | Model | Archives | Other writes | Class A writes per cycle |
 |---|---:|---:|---:|
-| HRRR f00-f06 | 126 | 3 | 129 |
+| HRRR f00-f06 | 133 | 3 | 136 |
 | RAP f00 | 17 | 3 | 20 |
-| RRFS f00 | 18 | 3 | 21 |
+| RRFS f00 | 19 | 3 | 22 |
 
 At 24 completed hourly cycles per day for each model and a 30-day month, that
-is about 122,400 Class A writes per month. The 2026-11-08 baseline run at zooms
+is about 128,160 Class A writes per month when STP is present in all HRRR and RRFS frames. The derived archives add up to 5,760 Class A writes per month (7 HRRR frames plus RRFS f00 across 720 hourly cycles). Class B operations remain about 15,120 per month. The 2026-11-08 baseline run at zooms
 3-4 counted 270 PNG tiles across each HRRR frame, or 15 tiles per field. The
 2026-11-09 run at zooms 3-5 counted 846 tiles, or 47 per field. Packing them
-into 18 field archives reduces archive PUTs from 846 to 18 per frame, about
-47x, and yields 126 archive objects per seven-frame cycle. Packing remains
-below the requested roughly 100x reduction. At seven ingest-side Class B operations per new cycle in
+into one archive per native field reduces archive PUTs from 846 to 18 per
+HRRR frame, about 47x, and yields 126 native archive objects per seven-frame
+cycle. Fixed-layer STP adds up to seven more HRRR archives and one RRFS archive
+per hourly set. Packing remains below the requested roughly 100x reduction. At seven ingest-side Class B operations per new cycle in
 steady state (catalog checks, pointer check, verification listing, and
 retention listings), the same schedule is about 15,120 Class B operations per
 month. These estimates exclude Worker tile reads and retries while NOAA
@@ -116,6 +119,24 @@ seven frames and 18 fields per frame. It generated 126 archives totaling
 rendered 1,890 PNG tiles and took 445.13 seconds (7m 25s). Dry-run mode made
 no R2 writes.
 
+Live derived-field dry runs, 2026-11-11, used current NOAA cycles and local
+output only. HRRR cycle `2026-11-11T05:00:00Z` completed seven frames with 19
+parameters each, 133 archives, 6,251 tiles, 164,028,067 downloaded bytes, and
+92,364,584 archive bytes in 701.33 seconds. Its seven STP archives totaled
+817,799 bytes (116,828 bytes per archive on average). RRFS cycle
+`2026-11-11T03:00:00Z` completed f00 with 19 parameters, 19 archives, 893
+tiles, 23,210,142 downloaded bytes, and 13,581,881 archive bytes in 112.18
+seconds. The RRFS STP archive was 122,468 bytes. Both runs used `--dry-run` and
+made no R2 writes.
+
+At 720 hourly cycles per model per month, publishing STP on every eligible
+frame adds up to 5,760 Class A writes monthly. The measured archive bytes imply
+about 676,992,240 bytes of additional monthly writes across HRRR and RRFS. Six
+retained cycles keep about 5,641,602 additional bytes (5.38 MiB): 48 STP
+archives, using the measured HRRR seven-frame and RRFS f00 totals. Class B
+operations do not change. The estimated monthly total rises from about 122,400
+to 128,160 Class A writes, 12.8% of the 1 million allowance, while retained
+storage rises by about 5.38 MiB.
 ## Zoom measurement and model limits
 
 A Windows dry run used the pinned dependencies and NOAA HRRR cycle

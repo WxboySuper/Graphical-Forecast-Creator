@@ -65,7 +65,7 @@ const toProviderPayload = (catalog: MesoscaleCatalog, frame: MesoscaleCatalog['f
     validTime: frame.validTime,
     domain: { id: catalog.domain.id, name: catalog.domain.name, bounds: catalog.domain.bounds },
     source: catalog.source ?? frame.parameters[0]?.source,
-    parameters: frame.parameters.filter(parameter => parameter.status !== 'failed').map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data })),
+    parameters: frame.parameters.filter(parameter => parameter.status !== 'failed').map(parameter => ({ id: parameter.id, displayName: parameter.displayName, units: parameter.units, level: parameter.level, legend: parameter.legend, displayType: parameter.displayType, data: parameter.data, metadata: parameter.metadata })),
     requestedParameterIds: frame.requestedParameterIds ?? catalog.requestedParameterIds ?? frame.parameters.map(parameter => parameter.id),
     unavailableParameters,
     stale,

@@ -217,6 +217,89 @@ def process_f00(context: CycleContext) -> dict:
     return process_frames(CycleContext(context.model, context.cycle, context.source_url, context.modified, context.output, (frame,)))
 
 
+def derive_fixed_stp(field_outputs, np, model_id: str) -> None:
+    """Add fixed-layer STP only when every required NOAA grid is present and aligned."""
+    if model_id not in {"hrrr", "rrfs"}:
+        return
+    inputs = fixed_stp_inputs(field_outputs)
+    if inputs is None:
+        return
+    grids = list(inputs.values())
+    if not grids_match(grids, np):
+        return
+    cin = first_grid(field_outputs, "cin-surface")
+    if cin is not None and not grids_match([inputs["cape-surface"], cin], np):
+        return
+    source_parts = grids + ([cin] if cin is not None else [])
+    field_outputs["stp-fixed-surface"] = [fixed_stp_output(inputs, source_parts, cin, np)]
+
+
+def fixed_stp_inputs(field_outputs: dict) -> dict | None:
+    """Return the complete set of required STP inputs, or None when one is absent."""
+    required = ("cape-surface", "surface-lcl", "srh-0-1km", "stp-input-vucsh", "stp-input-vvcsh")
+    inputs = {field_id: first_grid(field_outputs, field_id) for field_id in required}
+    return None if any(item is None for item in inputs.values()) else inputs
+
+
+def fixed_stp_output(inputs: dict, source_parts: list[dict], cin: dict | None, np) -> dict:
+    """Build the output record and provenance for one derived STP grid."""
+    values = calculate_fixed_stp(inputs, cin, np)
+    source_hash = hashlib.sha256("".join(item["sourceHash"] for item in source_parts).encode("ascii")).hexdigest()
+    return {
+        "values": values,
+        "lats": inputs["cape-surface"]["lats"],
+        "lons": inputs["cape-surface"]["lons"],
+        "sourceHash": source_hash,
+        "sourceBytes": sum(item["sourceBytes"] for item in source_parts),
+        "sourceInputs": [stp_source_input(item) for item in source_parts],
+        "record": {"parameter": "derived index", "level": "surface-based fixed layer"},
+    }
+
+
+def calculate_fixed_stp(inputs: dict, cin: dict | None, np):
+    """Apply fixed-layer STP terms to the input grids; VUCSH/VVCSH values are already m/s."""
+    grids = {
+        name: np.asarray(inputs[field_id]["values"], dtype=float)
+        for name, field_id in (("cape", "cape-surface"), ("lcl", "surface-lcl"), ("srh", "srh-0-1km"), ("u", "stp-input-vucsh"), ("v", "stp-input-vvcsh"))
+    }
+    cin_values = None if cin is None else np.asarray(cin["values"], dtype=float)
+    bwd6 = np.hypot(grids["u"], grids["v"])
+    f_lcl = np.clip((2000 - grids["lcl"]) / 1000, 0, 1)
+    f_bwd6 = np.where(bwd6 < 12.5, 0, np.clip(bwd6, 0, 30) / 20)
+    f_cin = np.ones_like(grids["cape"]) if cin_values is None else np.clip((200 + cin_values) / 150, 0, 1)
+    values = (grids["cape"] / 1500) * f_lcl * (grids["srh"] / 150) * f_bwd6 * f_cin
+    valid_grids = list(grids.values()) + ([] if cin_values is None else [cin_values])
+    valid = np.logical_and.reduce([valid_data(grid) for grid in valid_grids])
+    return np.where(valid, values, np.nan)
+
+
+def stp_source_input(item: dict) -> dict:
+    """Return catalog provenance for one NOAA source grid."""
+    return {
+        "parameter": item["record"].get("parameter"),
+        "message": item["record"],
+        "sha256": item["sourceHash"],
+        "bytes": item["sourceBytes"],
+    }
+
+
+def first_grid(field_outputs: dict, field_id: str) -> dict | None:
+    grids = field_outputs.get(field_id)
+    return grids[0] if grids else None
+
+
+def grids_match(grids: list[dict], np) -> bool:
+    first = grids[0]
+    return all(
+        np.shape(item["values"]) == np.shape(first["values"])
+        and np.shape(item["lats"]) == np.shape(first["lats"])
+        and np.shape(item["lons"]) == np.shape(first["lons"])
+        and np.allclose(item["lats"], first["lats"])
+        and np.allclose(item["lons"], first["lons"])
+        for item in grids[1:]
+    )
+
+
 
 def combine_wind(field_outputs, np):
     components = field_outputs.pop("wind-speed-10m", [])
@@ -376,7 +459,7 @@ def source_record(request: DecodeRequest, parameter: str) -> dict:
 
 
 def decoded_field(field_id: str, request: DecodeRequest, grid: GridData, record: dict) -> tuple[str, dict]:
-    operation = FIELDS[field_id][5]
+    operation = FIELDS[field_id][5] if field_id in FIELDS else "native"
     converted = VALUE_CONVERSIONS.get(operation, identity_conversion)(grid.values)
     item = {"values": converted, "lats": grid.latitudes, "lons": grid.longitudes, "sourceHash": request.digest, "sourceBytes": len(request.content), "record": record}
     return field_id, item

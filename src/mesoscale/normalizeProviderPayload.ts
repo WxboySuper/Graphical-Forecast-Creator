@@ -16,6 +16,7 @@ interface RawParameter {
   legend: NormalizedMesoscaleParameters['parameters'][number]['definition']['legend'];
   displayType: MesoscaleDisplayType;
   data: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 interface RawUnavailableParameter {
@@ -75,6 +76,7 @@ function normalizeValidPayload<TData>(
       level: parameter.level,
       legend: parameter.legend,
       displayType: parameter.displayType,
+      metadata: parameter.metadata,
     },
     data: parameter.data as TData,
   }));

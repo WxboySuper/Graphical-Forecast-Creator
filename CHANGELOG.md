@@ -49,6 +49,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Fixed-layer Significant Tornado Parameter:** Publish a derived HRRR and RRFS index from verified model fields. Its calculation runs in GitHub Actions and stays hidden from production until the client exposure flag is approved.
+
 - **Mesoscale radar and satellite context:** Mesoscale Data tab can now overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
 - **Keyboard vertex editing:** Mesoscale areas can now be reshaped vertex by vertex from the keyboard with vertex stepping, arrow-key nudging in selectable steps, and add or delete controls.
 - **Mesoscale workspace on beta:** The Mesoscale forecast workspace and its Monitor panel are now available on beta for early-access testing.

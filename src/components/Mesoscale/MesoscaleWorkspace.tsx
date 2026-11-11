@@ -11,6 +11,7 @@ import UnofficialBadge from '../Map/UnofficialBadge';
 import { MesoscaleLegend } from './MesoscaleLegend';
 import { MesoscaleMap } from './MesoscaleMap';
 import { WorkspaceRail, type RailTab } from './WorkspaceRail';
+import { filterExposedMesoscaleParameters } from './layerExposure';
 import { AreaLegend } from './areas/AreaLegend';
 import { AreaToolbar } from './areas/AreaToolbar';
 import { MesoscaleAreaLayer } from './areas/MesoscaleAreaLayer';
@@ -60,7 +61,7 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
     setTab('areas');
     setRailOpen(true);
   }, [selectedId]);
-  const parameters = data.kind === 'ready' ? data.parameters : null;
+  const parameters = data.kind === 'ready' ? filterExposedMesoscaleParameters(data.parameters) : null;
   const layerSpecs = useMemo(() => (parameters ? buildLayerSpecs(parameters, selection) : []), [parameters, selection]);
   const legendParameters = useMemo(() => [...layerSpecs].reverse().map(spec => spec.parameter), [layerSpecs]);
 

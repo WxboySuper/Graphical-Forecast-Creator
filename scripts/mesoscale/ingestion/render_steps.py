@@ -12,7 +12,7 @@ from inventory import parse_idx, resolve_ranges
 
 from .archives import ArchiveRequest, create_archive
 from .discovery import FrameSource, request
-from .fields import FIELDS, VERSION, Model, display_name, identities_for_field, source_metadata, zoom_range
+from .fields import DERIVED_INPUT_IDENTITIES, FIELDS, OPTIONAL_FIELDS, VERSION, Model, display_name, identities_for_field, source_metadata, zoom_range
 
 BOUNDS = [-130, 20, -60, 55]
 
@@ -90,6 +90,10 @@ def process_frame(request: FrameProcessRequest) -> FrameResult:
     source = load_source(frame_context)
     fields, downloaded = decode_source(frame_context, source, request.decode_range, np)
     combined = request.combine_wind(fields, np)
+    from .render import derive_fixed_stp
+    derive_fixed_stp(combined, np, context.model.id)
+    for input_id in ("stp-input-vucsh", "stp-input-vvcsh"):
+        combined.pop(input_id, None)
     params, archives, tiles, tile_bytes, archive_bytes = render_fields(frame_context, source, combined, request.render_tiles)
     return FrameResult(frame, params, archives, tiles, tile_bytes, archive_bytes, downloaded, source.received)
 
@@ -117,6 +121,11 @@ def select_fields(model: Model, records: list, size: int) -> dict:
         for group in identities_for_field(model.id, field_id, spec[0])
         for identity in group
     }
+    if model.id in {"hrrr", "rrfs"}:
+        identities.update({
+            f"{field_id}:{identity['parameter']}": identity
+            for field_id, identity in DERIVED_INPUT_IDENTITIES.items()
+        })
     return resolve_allowlist(records, size, identities)
 
 
@@ -195,16 +204,31 @@ def parameter_metadata(request: ParameterBuild) -> dict:
     hour = context.forecast_hour
     level = next((entry["record"].get("level") for entry in descriptors if entry["record"].get("level")), spec[3])
     min_zoom, max_zoom = zoom_range(context.model.id)
-    return {"id": field_id, "displayName": display_name(field_id), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": [{"value": value, "label": str(value), "color": color} for value, color in spec[4]], "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": min_zoom, "maxZoom": max_zoom, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"sourceInputs": item["sourceInputs"]} if field_id == "wind-speed-10m" else {})}
+    legend = [{"value": value, "label": "1 (conventional reference, not a probability)" if field_id == "stp-fixed-surface" and value == 1 else str(value), "color": color} for value, color in spec[4]]
+    metadata = {"calculation": "derived index, calculated by GFC from NOAA model fields", "formula": "STP = (SBCAPE / 1500) * clamp((2000 - SBLCL) / 1000, 0, 1) * (SRH01 / 150) * fBWD6 * fCIN; fBWD6 = 0 when BWD6 < 12.5 m/s, otherwise clamp(BWD6, 0, 30) / 20; fCIN = clamp((200 + SBCIN) / 150, 0, 1) when surface CIN is available, otherwise 1", "inputs": ["CAPE:surface (SBCAPE, J/kg)", "HGT:level of adiabatic condensation from sfc (surface LCL, m AGL)", "HLCY:1000-0 m above ground (0-1 km SRH, m2/s2)", "VUCSH:0-6000 m above ground and VVCSH:0-6000 m above ground (BWD6 components, m/s; NOAA metadata labels units s**-1)", "CIN:surface (SBCIN, J/kg; optional CIN factor)"]} if field_id == "stp-fixed-surface" else None
+    return {"id": field_id, "displayName": display_name(field_id), "units": spec[1], "level": {"type": spec[2], "label": level}, "legend": legend, "displayType": "raster", "data": {"type": "xyz-raster", "urlTemplate": f"https://gfc.weatherboysuper.com/api/mesoscale/tiles/{context.model.id}/{cycle_id}/f{hour:02d}/{field_id}/{{z}}/{{x}}/{{y}}.png", "format": "image/png", "projection": "EPSG:3857", "minZoom": min_zoom, "maxZoom": max_zoom, "bounds": BOUNDS}, "source": source_metadata(context.model), "receivedAt": source.received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": max(0, int((processed-context.cycle).total_seconds() // 60)), "processingVersion": VERSION, "status": "complete", "sourceSha256": item["sourceHash"], "sourceBytes": item["sourceBytes"], **({"metadata": metadata} if metadata else {}), **({"sourceInputs": item["sourceInputs"]} if field_id in {"wind-speed-10m", "stp-fixed-surface"} else {})}
 
 
 def frame_record(context, result: FrameResult) -> dict:
     hour = result.source.forecast_hour
     cycle_text = (context.cycle + timedelta(hours=hour)).strftime("%Y-%m-%dT%H:%M:%SZ")
     expected = set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())
+    if context.model.id == "rap":
+        expected.discard("stp-fixed-surface")
     available = {parameter["id"] for parameter in result.parameters}
-    missing = [{"id": field_id, "reason": "No exact parameter and level match in the frame .idx"} for field_id in sorted(expected - available)]
-    status = "complete" if not missing else "partial"
+    missing = [
+        {
+            "id": field_id,
+            "reason": (
+                "Required input is missing or its grid does not align"
+                if field_id == "stp-fixed-surface"
+                else "No exact parameter and level match in the frame .idx"
+            ),
+        }
+        for field_id in sorted(expected - available)
+    ]
+    required_missing = {item["id"] for item in missing} - OPTIONAL_FIELDS
+    status = "partial" if required_missing else "complete"
     return {"forecastHour": hour, "validTime": cycle_text, "frameType": "analysis" if hour == 0 else "forecast", "status": status, "parameters": result.parameters, "unavailableParameters": missing}
 
 
@@ -216,7 +240,8 @@ def build_catalog(request: CycleBuild) -> dict:
     received = min((result.received for result in request.results), default=processed)
     age = max(0, int((processed-context.cycle).total_seconds() // 60))
     min_zoom, max_zoom = zoom_range(context.model.id)
-    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": min_zoom, "maxZoom": max_zoom}, "source": source_metadata(context.model), "requestedParameterIds": sorted(set(FIELDS) - ({"surface-lcl"} if context.model.id == "rap" else set())), "frames": frames}
+    requested = set(FIELDS) - ({"surface-lcl", "stp-fixed-surface"} if context.model.id == "rap" else set())
+    return {"schemaVersion": 1, "model": {"id": context.model.id, "name": context.model.name}, "cycleTime": cycle_text, "status": "complete" if complete else "partial", "receivedAt": received.strftime("%Y-%m-%dT%H:%M:%SZ"), "processedAt": processed.strftime("%Y-%m-%dT%H:%M:%SZ"), "ageMinutes": age, "processingVersion": VERSION, "domain": {"id": "conus", "name": "CONUS", "projection": "EPSG:3857", "bounds": BOUNDS, "minZoom": min_zoom, "maxZoom": max_zoom}, "source": source_metadata(context.model), "requestedParameterIds": sorted(requested), "frames": frames}
 
 
 def cycle_metrics(frames: list[dict], results: list[FrameResult]) -> dict:

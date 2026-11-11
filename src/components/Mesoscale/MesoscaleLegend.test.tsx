@@ -33,4 +33,18 @@ describe('MesoscaleLegend', () => {
     render(<MesoscaleLegend parameters={[missing]} />);
     expect(screen.getByText('CAPE (surface)')).toBeInTheDocument();
   });
+
+  it('shows every fixed-layer STP threshold and explains the reference value', () => {
+    const stp = parameter({
+      id: 'stp-fixed-surface',
+      displayName: 'Significant Tornado Parameter (fixed layer)',
+      units: '1',
+      legend: [0, 0.5, 1, 2, 4, 8].map(value => ({ value, label: String(value), color: '#123456' })),
+    });
+    render(<MesoscaleLegend parameters={[stp]} />);
+    for (const threshold of ['0', '0.5', '1', '2', '4', '8']) {
+      expect(screen.getByText(threshold)).toBeInTheDocument();
+    }
+    expect(screen.getByText('1 is a conventional reference, not a probability.')).toBeInTheDocument();
+  });
 });

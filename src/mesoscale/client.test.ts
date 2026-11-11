@@ -20,9 +20,21 @@ describe('mesoscale client', () => {
   it('maps catalog parameters through the provider normalizer and keeps fixture legend metadata', () => {
     const catalog = getFixtureCatalog('hrrr');
     expect(catalog).not.toBeNull();
-    const normalized = normalizeMesoscaleCatalog(catalog!, Date.now(), true);
+    const withMetadata = {
+      ...catalog!,
+      frames: catalog!.frames.map((frame, index) => index === 0 ? {
+        ...frame,
+        parameters: frame.parameters.map((parameter, parameterIndex) => parameterIndex === 0
+          ? { ...parameter, metadata: { calculation: 'derived index, calculated by GFC from NOAA model fields' } }
+          : parameter),
+      } : frame),
+    };
+    const normalized = normalizeMesoscaleCatalog(withMetadata, Date.now(), true);
     expect(normalized[0].state).toBe('stale');
-    if (normalized[0].state === 'stale') expect(normalized[0].parameters[0].definition.units).toBe('J kg-1');
+    if (normalized[0].state === 'stale') {
+      expect(normalized[0].parameters[0].definition.units).toBe('J kg-1');
+      expect(normalized[0].parameters[0].definition.metadata?.calculation).toBe('derived index, calculated by GFC from NOAA model fields');
+    }
   });
 
   it('keeps unavailable catalog fields partial instead of filling them in', () => {

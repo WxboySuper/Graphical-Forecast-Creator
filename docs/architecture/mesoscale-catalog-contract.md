@@ -153,14 +153,38 @@ be passed to `normalizeProviderPayload` unchanged:
 `level.type` uses the existing client enum: `surface`, `pressure`, `height`,
 `depth`, `layer`, or `model`. `legend` stops are numeric native/display values
 with human labels and CSS hex colors. Colors style values only. T2m, Td2m and
-10 m wind-speed values may use explicit unit conversion; no derived
-meteorological diagnostic is permitted. Wind speed is `sqrt(U10² + V10²)` in
-m/s, a display arithmetic conversion of the two native components. CAPE and
-CIN keep the exact NCEP level string in `level.label`; do not label them MU, ML,
-or surface-based unless the inventory explicitly verifies that identity. The
-`VUCSH`/`VVCSH` 0-6 km records are omitted because NCEP reports their units as
-`s**-1` and the inventory does not establish an exact conversion to standard
-bulk wind difference in `m s**-1`.
+10 m wind-speed values may use explicit unit conversion. The GitHub Actions
+ingest also derives `stp-fixed-surface` for HRRR and RRFS when all required
+grids are available. Its parameter metadata identifies it as a derived index,
+includes the formula, and lists the source fields. The read-only Worker and
+client never calculate weather diagnostics. Wind speed is `sqrt(U10^2 + V10^2)`
+in m/s, a display conversion of two native components. CAPE and CIN keep the
+exact NCEP level string in `level.label`; do not relabel them MU, ML, or
+surface-based unless the inventory verifies that identity.
+
+The fixed-layer STP formula is `(SBCAPE / 1500) * fLCL * (SRH01 / 150) *
+fBWD6 * fCIN`. `fLCL = clamp((2000 - SBLCL) / 1000, 0, 1)`. `fBWD6` is zero
+below 12.5 m/s and otherwise `clamp(BWD6, 0, 30) / 20`, where
+`BWD6 = sqrt(VUCSH^2 + VVCSH^2)` from the 0-6000 m above-ground records. No depth
+multiplier is applied. If surface CIN is present, `fCIN = clamp((200 + SBCIN) /
+150, 0, 1)`; if the optional CIN input is absent, that factor is 1. The inputs
+are `CAPE:surface`, `HGT:level of adiabatic condensation from sfc`,
+`HLCY:1000-0 m above ground`, `VUCSH:0-6000 m above ground`,
+`VVCSH:0-6000 m above ground`, and optional `CIN:surface`. The display name
+states fixed layer, units are `1`, and legend stops are 0, 0.5, 1, 2, 4, and 8.
+The label at 1 calls it a conventional reference, not a probability.
+
+NCEP's RRFS f000 index reports `VUCSH` and `VVCSH` units as `s**-1`. On the
+2026-11-09 18Z file, I downloaded only the two indexed 0-6000 m messages:
+VUCSH bytes 146107515-147171716 (1,064,202 bytes) and VVCSH bytes
+147171717-148213614 (1,041,898 bytes). ecCodes decoded them as
+`heightAboveGroundLayer`, top 0 m and bottom 6000 m. VUCSH values ranged from
+-21.3 to 41.9 (mean 10.710); VVCSH ranged from -37.2 to 33.1 (mean -0.136).
+Those values are consistent with wind components in m/s, despite the reported
+unit string. The ingest uses the components as m/s without multiplying by
+layer depth. RAP is skipped because its index lacks surface LCL. Effective-
+layer STP and SCP are not built: the required parcel, effective SRH, and
+effective shear inputs are unavailable.
 
 `status` is `complete`, `partial`, or `failed` at cycle, frame, and parameter
 level. A partial cycle is diagnostic only and cannot be the model's latest
@@ -192,8 +216,11 @@ The remaining cycle catalog fields are:
 
 The producer writes `status: complete` only if every configured required field
 for that model/frame was fetched, decoded, tiled and checksum-verified. Optional
-fields can be unavailable without failing the frame. v1.8 publishes native
-fields only; SCP and STP are out of scope.
+fields can be unavailable without failing the frame. Fixed-layer STP is
+optional: if any required input is missing or grids do not align, the derived
+parameter is omitted and listed in `unavailableParameters`. The raw 0-6000 m
+shear components are ingest-only and do not become separate catalog
+parameters.
 
 ## Latest pointer
 
