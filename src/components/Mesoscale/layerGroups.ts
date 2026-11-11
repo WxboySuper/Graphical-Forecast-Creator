@@ -13,7 +13,7 @@ export interface LayerGroup {
 
 const GROUP_DEFINITIONS: ReadonlyArray<{ id: string; label: string; pattern: RegExp }> = [
   { id: 'instability', label: 'Instability', pattern: /^(cape|cin)-/ },
-  { id: 'rotation', label: 'Wind and rotation', pattern: /^(srh|wind)-/ },
+  { id: 'rotation', label: 'Wind and rotation', pattern: /^(srh|wind|stp)-/ },
   { id: 'moisture', label: 'Temperature and moisture', pattern: /^(temperature|dewpoint|pwat|surface-lcl)/ },
   { id: 'other', label: 'Pressure and radar', pattern: /./ },
 ];

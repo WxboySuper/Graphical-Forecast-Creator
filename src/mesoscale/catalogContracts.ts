@@ -26,6 +26,7 @@ export interface MesoscaleCatalogParameter {
   };
   source: MesoscaleProviderPayload['source'];
   status: 'complete' | 'partial' | 'failed';
+  metadata?: Record<string, unknown>;
 }
 
 export interface MesoscaleCatalogFrame {

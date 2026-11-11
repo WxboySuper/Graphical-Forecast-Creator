@@ -32,11 +32,19 @@ or a forecast frame.
 
 The normalized response retains model, cycle time, forecast hour, valid time,
 domain, source attribution, parameter identity, units, level, legend, display
-type, and provider data. The normalizer validates those fields and passes the
-data through unchanged. It does not derive or convert meteorological values.
-STP, SCP, EHI, and other composites are accepted only when the provider supplies
-them. A field the provider does not return stays omitted or appears in
-`unavailableParameters`; adapters must not fill it with a calculation or guess.
+type, provider data, and optional parameter metadata. The normalizer validates
+those fields and passes the data through unchanged. It does not derive or
+convert meteorological values. The GitHub Actions publisher may publish the
+documented `stp-fixed-surface` index for HRRR and RRFS after calculating it
+from verified NOAA fields; the catalog carries its formula and input list.
+Adapters and the client must not calculate diagnostics or fill missing fields.
+A field the catalog does not return stays omitted or appears in
+`unavailableParameters`.
+
+The Mesoscale and Monitor layer lists apply the `mesoscaleDerivedParameters`
+build-target flag before showing the derived field or creating its map layer.
+The ingest catalog can continue to publish the field when that client flag is
+off, so a production build stays hidden while beta builds can review it.
 
 Consumers can distinguish `loading`, `ready`, `partial`, `stale`, `malformed`,
 and `upstream-failure`. Partial responses retain available values and identify

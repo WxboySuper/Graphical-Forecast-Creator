@@ -76,6 +76,7 @@ describe('featureExposure registry', () => {
       'tropicalWorkspace',
       'customWorkspace',
       'mesoscaleWorkspace',
+      'mesoscaleDerivedParameters',
       'winterWorkspace',
       'collaborationRoom',
       'paintBucketTool',
@@ -144,6 +145,20 @@ describe('featureExposure registry', () => {
       expect(isFeatureExposedOnTarget(feature, 'staging')).toBe(false);
       expect(isFeatureExposedOnTarget(feature, 'production')).toBe(false);
     }
+  });
+
+  test('keeps derived mesoscale parameters on local and beta, and off on staging and production', () => {
+    expect(getFeatureExposure('mesoscaleDerivedParameters')).toMatchObject({
+      temporary: true,
+      trackingIssue: 1801,
+      removalCondition: expect.any(String),
+    });
+    expect(FEATURE_EXPOSURE_REGISTRY.mesoscaleDerivedParameters.exposure).toEqual({
+      local: true,
+      beta: true,
+      staging: false,
+      production: false,
+    });
   });
 
   test('keeps unreleased v1.7 workstreams disabled outside their explicitly approved targets', () => {

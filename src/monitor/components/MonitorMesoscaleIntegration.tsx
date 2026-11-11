@@ -3,6 +3,7 @@ import type { MesoscaleCatalog, MesoscaleCatalogParameter, MesoscaleLayerSpec, M
 import { useMesoscaleFrames, useMesoscaleLatest } from '../../mesoscale';
 import { isMesoscaleDemoData } from '../../mesoscale/fixtures/client';
 import { LayerPanel } from '../../components/Mesoscale/LayerPanel';
+import { filterExposedMesoscaleParameters } from '../../components/Mesoscale/layerExposure';
 import { formatUtc } from '../../components/Mesoscale/SourcePanel';
 import type { MonitorMesoscaleSettings } from '../types';
 import '../../components/Mesoscale/Mesoscale.css';
@@ -50,7 +51,7 @@ const findAnalysisFrame = (catalog: MesoscaleCatalog | null) =>
   catalog?.frames.find((frame) => frame.frameType === 'analysis' && frame.forecastHour === 0);
 
 const availableParameters = (frame: ReturnType<typeof findAnalysisFrame>): MesoscaleCatalogParameter[] =>
-  frame?.parameters.filter((parameter) => parameter.status !== 'failed') ?? [];
+  filterExposedMesoscaleParameters(frame?.parameters.filter((parameter) => parameter.status !== 'failed') ?? []);
 
 const selectedLayerSpecs = (settings: MonitorMesoscaleSettings, parameters: MesoscaleCatalogParameter[]): MesoscaleLayerSpec[] => {
   const parameterById = new Map(parameters.map((parameter) => [parameter.id, parameter]));

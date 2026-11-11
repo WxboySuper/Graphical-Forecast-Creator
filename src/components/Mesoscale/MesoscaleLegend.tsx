@@ -21,11 +21,19 @@ const endLabels = (parameter: MesoscaleCatalogParameter): [string, string] => {
 
 const LegendRow: React.FC<{ parameter: MesoscaleCatalogParameter }> = ({ parameter }) => {
   const [low, high] = endLabels(parameter);
+  const isFixedStp = parameter.id === 'stp-fixed-surface';
   return (
     <li className="mesoscale-legend__row">
       <div className="mesoscale-legend__name">{parameter.displayName} <span>({parameter.units})</span></div>
       <div className="mesoscale-legend__ramp" style={{ background: rampFor(parameter) }} />
-      <div className="mesoscale-legend__ends"><span>{low}</span><span>{high}</span></div>
+      {isFixedStp ? (
+        <>
+          <div className="mesoscale-legend__thresholds" role="group" aria-label="STP thresholds">
+            {stopsOf(parameter).map(stop => <span key={stop.value}>{stop.value}</span>)}
+          </div>
+          <p className="mesoscale-legend__note">1 is a conventional reference, not a probability.</p>
+        </>
+      ) : <div className="mesoscale-legend__ends"><span>{low}</span><span>{high}</span></div>}
     </li>
   );
 };

@@ -57,7 +57,14 @@ FIELDS = {
     "pwat": ({"PWAT": "entire atmosphere (considered as a single layer)"}, "kg m⁻²", "layer", "entire atmosphere", [(0, "#fff7fb"), (10, "#ece7f2"), (25, "#a6bddb"), (40, "#2b8cbe"), (60, "#045a8d")], "native"),
     "mslp": ({"MSLMA": "mean sea level", "MSLET": "mean sea level"}, "hPa", "surface", "mean sea level", [(960, "#313695"), (980, "#74add1"), (1000, "#ffffbf"), (1020, "#fdae61"), (1040, "#a50026")], "pressure"),
     "reflectivity": ({"REFC": "entire atmosphere"}, "dBZ", "model", "entire atmosphere", [(5, "#04e9e7"), (20, "#019ff4"), (35, "#0300f4"), (45, "#02fd02"), (55, "#fdf802"), (65, "#fd0100"), (75, "#a80000")], "native"),
+    "stp-fixed-surface": ({}, "1", "layer", "surface-based fixed layer", [(0, "#ffffcc"), (0.5, "#a1dab4"), (1, "#41b6c4"), (2, "#2c7fb8"), (4, "#253494"), (8, "#542788")], "derived"),
 }
+
+DERIVED_INPUT_IDENTITIES = {
+    "stp-input-vucsh": {"parameter": "VUCSH", "level": "0-6000 m above ground"},
+    "stp-input-vvcsh": {"parameter": "VVCSH", "level": "0-6000 m above ground"},
+}
+OPTIONAL_FIELDS = {"stp-fixed-surface"}
 
 DISPLAY_NAMES = {
     "temperature-2m": "2 m temperature",
@@ -78,6 +85,7 @@ DISPLAY_NAMES = {
     "pwat": "Precipitable water",
     "mslp": "Mean sea level pressure",
     "reflectivity": "Composite reflectivity",
+    "stp-fixed-surface": "Significant Tornado Parameter (fixed layer)",
 }
 
 
@@ -91,6 +99,8 @@ def required_identities(model_id: str) -> list[list[dict[str, str]]]:
 
 
 def identities_for_field(model_id: str, field_id: str, records: dict[str, str]) -> list[list[dict[str, str]]]:
+    if field_id == "stp-fixed-surface":
+        return []
     if model_id == "rap" and field_id == "surface-lcl":
         return []
     group = [{"parameter": parameter, "level": required_level(model_id, field_id, level)} for parameter, level in records.items()]

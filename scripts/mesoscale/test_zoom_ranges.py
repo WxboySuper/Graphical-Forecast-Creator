@@ -1,6 +1,7 @@
 """Model zoom range and PMTiles directory regressions."""
 
 from datetime import UTC, datetime
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -33,6 +34,29 @@ class ZoomRangeTests(unittest.TestCase):
             context, source, cycle, "temperature-2m", item, FIELDS["temperature-2m"], [item],
         ))
         self.assertEqual((parameter["data"]["minZoom"], parameter["data"]["maxZoom"]), (3, 5))
+
+    def test_fixed_stp_catalog_metadata_names_formula_inputs_and_reference_threshold(self):
+        cycle = datetime(2026, 11, 9, 16, tzinfo=UTC)
+        context = SimpleNamespace(model=MODELS["hrrr"], cycle=cycle, forecast_hour=0)
+        source = SourceBundle(0, [], {}, cycle)
+        item = {"record": {"level": "surface-based fixed layer"}, "sourceHash": "a" * 64, "sourceBytes": 10, "sourceInputs": []}
+
+        parameter = parameter_metadata(ParameterBuild(
+            context, source, cycle, "stp-fixed-surface", item, FIELDS["stp-fixed-surface"], [item],
+        ))
+
+        self.assertEqual(parameter["id"], "stp-fixed-surface")
+        self.assertIn("fixed layer", parameter["displayName"])
+        self.assertEqual(parameter["units"], "1")
+        self.assertEqual([stop["value"] for stop in parameter["legend"]], [0, 0.5, 1, 2, 4, 8])
+        self.assertIn("conventional reference, not a probability", parameter["legend"][2]["label"])
+        self.assertEqual(parameter["metadata"]["calculation"], "derived index, calculated by GFC from NOAA model fields")
+        self.assertIn("SBCAPE / 1500", parameter["metadata"]["formula"])
+        self.assertEqual(len(parameter["metadata"]["inputs"]), 5)
+        schema = json.loads((Path(__file__).parent / "catalog.schema.json").read_text(encoding="utf-8"))
+        metadata_schema = schema["properties"]["frames"]["items"]["properties"]["parameters"]["items"]["properties"]["metadata"]
+        from jsonschema import Draft202012Validator
+        Draft202012Validator(metadata_schema).validate(parameter["metadata"])
 
 
 class ZoomArchiveTests(unittest.TestCase):
