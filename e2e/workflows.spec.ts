@@ -18,8 +18,8 @@ const prepareWorkflowSession = async (page: Page): Promise<void> => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('gfc-local-beta-bypass', 'true');
-    localStorage.setItem('gfc-tos-accepted', '2.0.0');
-    localStorage.setItem('gfc-privacy-policy-accepted', '1.8.0');
+    localStorage.setItem('gfc-tos-accepted', '2');
+    localStorage.setItem('gfc-privacy-policy-accepted', '2');
     sessionStorage.setItem('gfc-e2e-session-initialized', 'true');
   });
 };

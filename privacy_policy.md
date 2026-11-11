@@ -1,5 +1,5 @@
 # Privacy Policy
-**Version 1.8.0 — Last Updated: November 8, 2026**
+**Version 2 — Last Updated: November 11, 2026**
 
 This file mirrors the in-app Privacy Policy (`src/components/PrivacyPolicy/PrivacyPolicyModal.tsx`), which is the version users accept. Keep the two in sync.
 

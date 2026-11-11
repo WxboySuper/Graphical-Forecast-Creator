@@ -11,7 +11,7 @@ import './ToSModal.css';
 
 // Bump this version string whenever the ToS changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const TOS_VERSION = '2.0.0';
+const TOS_VERSION = '2';
 const STORAGE_KEY = 'gfc-tos-accepted';
 
 /** Returns true if the user has accepted the current version of the Terms of Service. */
@@ -233,7 +233,7 @@ const ToSModal: React.FC<ToSModalProps> = ({ onAccept, viewOnly = false, onClose
           <div className="tos-modal-header-row">
             <div>
               <h2 id="tos-title">Terms of Service</h2>
-              <p>Please read and accept before using Graphical Forecast Creator &mdash; ToS v2, Effective March 31, 2026</p>
+              <p>Please read and accept before using Graphical Forecast Creator &mdash; Version {TOS_VERSION}, Effective March 31, 2026</p>
             </div>
             {viewOnly && (
               <button className="tos-close-view-btn" onClick={onClose} aria-label="Close">

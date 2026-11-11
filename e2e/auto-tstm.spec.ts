@@ -18,7 +18,7 @@ const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) 
 };
 
 // Auto-TSTM is temporarily disabled client-side while the SPC HREF source is
-// decommissioned (REFS / REFSCT replacement planned for v1.8). The client must not
+// decommissioned (REFS / REFSCT replacement planned for v2). The client must not
 // hit /api/tstm/* in normal use and the entry point must stay visibly disabled.
 test.describe('Auto-TSTM disabled (HREF decommission)', () => {
   test.beforeEach(async ({ page }) => {

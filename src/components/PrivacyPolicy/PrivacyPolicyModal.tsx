@@ -12,8 +12,8 @@ import { isProductAnalyticsEnabled, setProductAnalyticsEnabled, trackProductPage
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.8.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'November 8, 2026';
+const PRIVACY_POLICY_VERSION = '2';
+const PRIVACY_POLICY_LAST_UPDATED = 'November 11, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -50,7 +50,24 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
     'We now list Cloudflare among the infrastructure providers that process requests for the beta site and feedback service.',
     'Our contact address for privacy questions and deletion requests is now contact@gfcweather.com.',
   ],
+  '2': [
+    'The Privacy Policy now uses the flat Version 2 label for the v2 release. You will need to accept this updated version before continuing.',
+  ],
 };
+
+function comparePolicyVersions(left: string, right: string): number {
+  if (!/^\d+(?:\.\d+)*$/.test(left) || !/^\d+(?:\.\d+)*$/.test(right)) return 1;
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+
+  return 0;
+}
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
 export function hasAcceptedPrivacyPolicy(): boolean {
@@ -84,7 +101,7 @@ export function getStoredVersion(): string | null {
 export function getWhatsNewItems(lastAcceptedVersion: string | null): string[] {
   const items: string[] = [];
   for (const [version, entries] of Object.entries(PRIVACY_POLICY_CHANGELOG)) {
-    if (lastAcceptedVersion == null || version > lastAcceptedVersion) {
+    if (lastAcceptedVersion == null || comparePolicyVersions(version, lastAcceptedVersion) > 0) {
       items.push(...entries);
     }
   }
