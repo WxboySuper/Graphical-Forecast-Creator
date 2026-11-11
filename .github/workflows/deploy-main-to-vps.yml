@@ -438,9 +438,9 @@ jobs:
         if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live' && (github.event_name == 'release' || inputs.deploy_worker)
         run: |
           if [ -n "$PRODUCTION_WORKER_SHARED_SECRET" ]; then
-            printf '%s' "$PRODUCTION_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4 secret put PRODUCTION_WORKER_SHARED_SECRET --config cloudflare/wrangler.production.jsonc
+            printf '%s' "$PRODUCTION_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4.160.1 secret put PRODUCTION_WORKER_SHARED_SECRET --config cloudflare/wrangler.production.jsonc
           fi
-          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.production.jsonc
+          pnpm dlx wrangler@4.160.1 deploy --config cloudflare/wrangler.production.jsonc
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
