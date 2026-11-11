@@ -20,6 +20,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Release and policy versions:** GFC now uses flat release labels such as v2 and v2.1, with padded semver for packages and tags. The Terms of Service and Privacy Policy now use flat Version 2 labels, so you will be asked to accept both updated policies.
 - **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a beta Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
 - **Forecast menu:** The header Forecast tab opens a workspace showcase with an icon, description, and focus chips for each workspace, marks the current one, previews upcoming workspaces, and keeps Discussion one click away.
 - **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher. Discussion opens full width or in a resizable side panel, the choice is remembered, and narrow panels switch between Edit and Preview. Existing `/discussion` links open here with their query parameters and hash preserved.
@@ -28,7 +29,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Monitor NWS alerts:** After a refresh fails, the Monitor shows when the displayed alert polygons were last fetched and keeps the retry action clear.
 - **Map basemaps:** Forecast, verification, and monitor maps use OpenStreetMap instead of CARTO tiles; saved Carto styles select OpenStreetMap.
 - **Auto-TSTM:** Automatic thunderstorm guidance is temporarily disabled while the SPC HREF source is retired. The forecast page explains the planned replacement.
-- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy policy v1.8.0 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
+- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy Policy Version 2 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
 
 #### Fixed
 

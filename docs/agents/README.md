@@ -2,6 +2,8 @@
 
 Audience: coding agents working in this repo. Terse, rule-first, verifiable. Humans should read [`docs/guide/`](../guide/README.md) instead.
 
+Release labels use the flat scheme described in [release operations](release-ops.md#versioning).
+
 Entry point is [`/AGENTS.md`](../../AGENTS.md). Load only what the task needs:
 
 | Task | Read |

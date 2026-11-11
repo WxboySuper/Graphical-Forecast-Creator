@@ -13,6 +13,7 @@ describe('ToSModal', () => {
   test('tracks current ToS acceptance and gates the accept button behind the checkbox', () => {
     const onAccept = jest.fn();
     render(<ToSModal onAccept={onAccept} />);
+    expect(screen.getByText(/Version 2, Effective March 31, 2026/u)).toBeInTheDocument();
 
     const acceptButton = screen.getByRole('button', { name: /Accept & Continue/i });
     expect(hasAcceptedToS()).toBe(false);
@@ -27,6 +28,11 @@ describe('ToSModal', () => {
 
     expect(onAccept).toHaveBeenCalledTimes(1);
     expect(hasAcceptedToS()).toBe(true);
+  });
+
+  test('requires users with a stored semver ToS acceptance to accept flat Version 2', () => {
+    localStorage.setItem('gfc-tos-accepted', '2.0.0');
+    expect(hasAcceptedToS()).toBe(false);
   });
 
   test('lists the Discord and the contact email in the Contact Us section', () => {

@@ -56,5 +56,5 @@ Key idea: **everything core works with no account and no server.** Hosted pieces
 | **Custom product** | A user-defined layer style; premium users can save reusable ones. |
 | **Exposure** | Whether a feature is visible on a given deploy target. See [Feature gating](05-feature-gating.md). |
 | **Build target** | `local`, `beta`, `staging`, or `production`. |
-| **Stable line** | A `stable/X.Y.x` branch; this is what production runs. |
+| **Stable line** | A `stable/X.x` branch; this is what production runs. |
 | **Lane** | A section of `CHANGELOG.md` a PR must add to (beta lane or stable hotfix lane). |

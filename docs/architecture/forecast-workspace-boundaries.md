@@ -3,7 +3,7 @@
 Issue: [#914](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/914)
 
 This document defines the route, product ownership, and persistence contract
-for the v1.8 Forecast area. It is the architectural base for the workspace
+for the v2 Forecast area. It is the architectural base for the workspace
 implementation, not a promise that every workspace already has a page.
 
 Contract and implementation record have separate jobs. This file states the
@@ -15,7 +15,7 @@ intent and that record describes that branch's code.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Availability source |
+| Workspace | Canonical path | v2 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
 | Mesoscale | `/forecast/mesoscale` | gated by `mesoscaleWorkspace` (local only); tracked in #919 | Workspace status |

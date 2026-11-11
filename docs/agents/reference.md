@@ -1,6 +1,6 @@
 # Lookup tables
 
-Facts verified against the code on 2026-11-08 (v1.8.0-beta.6). Re-verify with grep before relying on a value; the code wins.
+Facts verified against the code on 2026-11-08 (v2 beta 6). Re-verify with grep before relying on a value; the code wins.
 
 ## Routes (`src/App.tsx`)
 
@@ -59,6 +59,6 @@ Server: `PORT`, `SERVER_TARGET`, `APP_BASE_URL`, `BETA_WORKER_SHARED_SECRET`, `A
 
 ## GitHub
 
-- Milestones: `v1.8` (current), `Future Features`.
+- Milestones: `v2` (current), `Future Features`.
 - Labels in use: type (`Bug`, `Enhancement`, `Feature`, `Refactor`, `Documentation`, `Accessibility`, `Performance`), area (`Component: Map|Outlooks|Drawing-Tools|Export|UI|Storage`), priority (`P0`-`P2`, `Priority: *`), `Emergency`, `dependencies`, plus automation labels (`opencode-audit`, `opencode-audit-eligible`, `porting/conflicts`). Several roadmap-style labels (`reliability`, `ecosystem`, ...) come from another project's template and are unused; ignore them. The `Component: Map` description still says Leaflet; the map is OpenLayers.
 - `main` has **no branch protection rule** (API returned 404); required checks are enforced by workflow policy and review habit, not GitHub settings. Do not assume a red check blocks the merge button.
