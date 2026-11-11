@@ -52,8 +52,14 @@ export default {
       return Response.json({ error: 'The API origin is invalid.' }, { status: 503 });
     }
 
-    if (apiOrigin.protocol !== 'https:' || apiOrigin.username || apiOrigin.password) {
+    if (apiOrigin.protocol !== 'https:') {
       return Response.json({ error: 'The API origin must be an HTTPS URL.' }, { status: 503 });
+    }
+    if (apiOrigin.username) {
+      return Response.json({ error: 'The API origin must not include credentials.' }, { status: 503 });
+    }
+    if (apiOrigin.password) {
+      return Response.json({ error: 'The API origin must not include credentials.' }, { status: 503 });
     }
 
     apiOrigin.pathname = `${apiOrigin.pathname.replace(/\/$/, '')}${requestUrl.pathname}`;
