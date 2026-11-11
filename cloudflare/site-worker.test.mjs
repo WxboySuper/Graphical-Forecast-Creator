@@ -193,3 +193,21 @@ test('returns an uncached 502 when the API origin cannot be reached', async () =
     globalThis.fetch = originalFetch;
   }
 });
+
+test('the alias redirect drops the port from the target', async () => {
+  const response = await worker.fetch(new Request('https://www.gfcweather.com:8443/forecast?day=2'), {
+    CANONICAL_HOST: 'gfcweather.com',
+    WWW_HOST: 'www.gfcweather.com',
+    ASSETS: { fetch: () => assert.fail('Alias requests must redirect before assets') },
+  });
+  assert.equal(response.status, 308);
+  assert.equal(response.headers.get('location'), 'https://gfcweather.com/forecast?day=2');
+});
+
+test('a missing environment or assets binding fails closed instead of throwing', async () => {
+  for (const env of [undefined, {}, { ASSETS: {} }]) {
+    const response = await worker.fetch(new Request('https://gfcweather.com/forecast'), env);
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  }
+});

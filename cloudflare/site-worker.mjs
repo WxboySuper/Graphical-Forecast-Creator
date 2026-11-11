@@ -41,15 +41,19 @@ const isHostname = (value) => {
 
 /** Redirects the configured alias to the canonical host without dropping path or query. */
 const redirectAlias = (requestUrl, env) => {
-  const aliasHost = (env.WWW_HOST || '').trim().toLowerCase();
+  const aliasHost = (env?.WWW_HOST || '').trim().toLowerCase();
   if (!isHostname(aliasHost) || requestUrl.hostname.toLowerCase() !== aliasHost) return null;
-  const canonicalHost = (env.CANONICAL_HOST || '').trim().toLowerCase();
+  const canonicalHost = (env?.CANONICAL_HOST || '').trim().toLowerCase();
   if (!isHostname(canonicalHost) || canonicalHost === aliasHost) {
     return serviceUnavailable('The canonical host is missing or invalid.');
   }
   const redirectUrl = new URL(requestUrl);
   redirectUrl.hostname = canonicalHost;
   redirectUrl.protocol = 'https:';
+  redirectUrl.port = '';
+  redirectUrl.username = '';
+  redirectUrl.password = '';
+  redirectUrl.hash = '';
   return Response.redirect(redirectUrl.toString(), 308);
 };
 
@@ -59,6 +63,10 @@ export default {
     const requestUrl = new URL(request.url);
     const aliasResponse = redirectAlias(requestUrl, env);
     if (aliasResponse) return aliasResponse;
+
+    if (!env || typeof env.ASSETS?.fetch !== 'function') {
+      return serviceUnavailable('The static assets binding is missing.');
+    }
 
     if (!isApiPath(requestUrl.pathname)) return env.ASSETS.fetch(request);
 
