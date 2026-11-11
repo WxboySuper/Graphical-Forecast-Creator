@@ -29,7 +29,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Monitor NWS alerts:** After a refresh fails, the Monitor shows when the displayed alert polygons were last fetched and keeps the retry action clear.
 - **Map basemaps:** Forecast, verification, and monitor maps use OpenStreetMap instead of CARTO tiles; saved Carto styles select OpenStreetMap.
 - **Auto-TSTM:** Automatic thunderstorm guidance is temporarily disabled while the SPC HREF source is retired. The forecast page explains the planned replacement.
-- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy policy v1.8.0 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
+- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy Policy Version 2 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
 
 #### Fixed
 

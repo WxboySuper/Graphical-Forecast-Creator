@@ -9,14 +9,14 @@ gitGraph
   commit id: "feature PRs"
   commit id: "..."
   branch stable/2.x
-  commit id: "release v2.0.0"
+  commit id: "release v2"
   checkout main
   commit id: "next-major work"
   checkout stable/2.x
   branch hotfix/crash
   commit id: "fix"
   checkout stable/2.x
-  merge hotfix/crash id: "v2.1.0"
+  merge hotfix/crash id: "v2.1"
   checkout main
   commit id: "forward-port"
 ```
