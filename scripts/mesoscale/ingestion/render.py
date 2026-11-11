@@ -221,63 +221,68 @@ def derive_fixed_stp(field_outputs, np, model_id: str) -> None:
     """Add fixed-layer STP only when every required NOAA grid is present and aligned."""
     if model_id not in {"hrrr", "rrfs"}:
         return
-    required = (
-        "cape-surface",
-        "surface-lcl",
-        "srh-0-1km",
-        "stp-input-vucsh",
-        "stp-input-vvcsh",
-    )
-    inputs = {field_id: first_grid(field_outputs, field_id) for field_id in required}
-    if any(item is None for item in inputs.values()):
+    inputs = fixed_stp_inputs(field_outputs)
+    if inputs is None:
         return
     grids = list(inputs.values())
     if not grids_match(grids, np):
         return
+    cin = first_grid(field_outputs, "cin-surface")
+    if cin is not None and not grids_match([inputs["cape-surface"], cin], np):
+        return
+    source_parts = grids + ([cin] if cin is not None else [])
+    field_outputs["stp-fixed-surface"] = [fixed_stp_output(inputs, source_parts, cin, np)]
 
+
+def fixed_stp_inputs(field_outputs: dict) -> dict | None:
+    """Return the complete set of required STP inputs, or None when one is absent."""
+    required = ("cape-surface", "surface-lcl", "srh-0-1km", "stp-input-vucsh", "stp-input-vvcsh")
+    inputs = {field_id: first_grid(field_outputs, field_id) for field_id in required}
+    return None if any(item is None for item in inputs.values()) else inputs
+
+
+def fixed_stp_output(inputs: dict, source_parts: list[dict], cin: dict | None, np) -> dict:
+    """Build the output record and provenance for one derived STP grid."""
     cape = np.asarray(inputs["cape-surface"]["values"], dtype=float)
     lcl = np.asarray(inputs["surface-lcl"]["values"], dtype=float)
     srh = np.asarray(inputs["srh-0-1km"]["values"], dtype=float)
     u = np.asarray(inputs["stp-input-vucsh"]["values"], dtype=float)
     v = np.asarray(inputs["stp-input-vvcsh"]["values"], dtype=float)
-    bwd6 = np.hypot(u, v)
-    valid = np.logical_and.reduce([valid_data(values) for values in (cape, lcl, srh, u, v)])
-
-    cin = first_grid(field_outputs, "cin-surface")
-    if cin is None:
-        f_cin = np.ones_like(cape)
-    else:
-        if not grids_match([inputs["cape-surface"], cin], np):
-            return
-        cin_values = np.asarray(cin["values"], dtype=float)
-        valid &= valid_data(cin_values)
-        f_cin = np.clip((200 + cin_values) / 150, 0, 1)
-
-    f_lcl = np.clip((2000 - lcl) / 1000, 0, 1)
-    f_bwd6 = np.where(bwd6 < 12.5, 0, np.clip(bwd6, 0, 30) / 20)
-    stp = (cape / 1500) * f_lcl * (srh / 150) * f_bwd6 * f_cin
-    stp = np.where(valid, stp, np.nan)
-
-    source_parts = grids + ([cin] if cin is not None else [])
-    source_inputs = [
-        {
-            "parameter": item["record"].get("parameter"),
-            "message": item["record"],
-            "sha256": item["sourceHash"],
-            "bytes": item["sourceBytes"],
-        }
-        for item in source_parts
-    ]
+    values = calculate_fixed_stp(cape, lcl, srh, u, v, cin, np)
     source_hash = hashlib.sha256("".join(item["sourceHash"] for item in source_parts).encode("ascii")).hexdigest()
-    field_outputs["stp-fixed-surface"] = [{
-        "values": stp,
+    return {
+        "values": values,
         "lats": inputs["cape-surface"]["lats"],
         "lons": inputs["cape-surface"]["lons"],
         "sourceHash": source_hash,
         "sourceBytes": sum(item["sourceBytes"] for item in source_parts),
-        "sourceInputs": source_inputs,
+        "sourceInputs": [stp_source_input(item) for item in source_parts],
         "record": {"parameter": "derived index", "level": "surface-based fixed layer"},
-    }]
+    }
+
+
+def calculate_fixed_stp(cape, lcl, srh, u, v, cin: dict | None, np):
+    """Apply fixed-layer STP terms; VUCSH/VVCSH values are already m/s."""
+    bwd6 = np.hypot(u, v)
+    f_lcl = np.clip((2000 - lcl) / 1000, 0, 1)
+    f_bwd6 = np.where(bwd6 < 12.5, 0, np.clip(bwd6, 0, 30) / 20)
+    f_cin = np.ones_like(cape) if cin is None else np.clip((200 + np.asarray(cin["values"], dtype=float)) / 150, 0, 1)
+    values = (cape / 1500) * f_lcl * (srh / 150) * f_bwd6 * f_cin
+    valid_grids = [cape, lcl, srh, u, v]
+    if cin is not None:
+        valid_grids.append(np.asarray(cin["values"], dtype=float))
+    valid = np.logical_and.reduce([valid_data(grid) for grid in valid_grids])
+    return np.where(valid, values, np.nan)
+
+
+def stp_source_input(item: dict) -> dict:
+    """Return catalog provenance for one NOAA source grid."""
+    return {
+        "parameter": item["record"].get("parameter"),
+        "message": item["record"],
+        "sha256": item["sourceHash"],
+        "bytes": item["sourceBytes"],
+    }
 
 
 def first_grid(field_outputs: dict, field_id: str) -> dict | None:
