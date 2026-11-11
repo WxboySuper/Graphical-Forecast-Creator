@@ -7,6 +7,7 @@ import { CHANGELOG_LANE_HEADINGS } from './changelog-lanes.mjs';
 const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none|inherited)\s*$/gim;
 const REASON_PATTERN = /^Changelog-Reason:\s*(\S.*)$/im;
 const SOURCE_PATTERN = /(?:port|backport|forward[- ]port|inherited)\s+(?:of\s+)?#(\d+)/i;
+const PREVIOUS_STABLE_LANE_HEADING = '### Stable 1.7.x hotfixes';
 
 /** @typedef {'beta' | 'hotfix' | 'none' | 'inherited'} ChangelogImpact */
 
@@ -36,6 +37,12 @@ const laneHeadingForImpact = (impact) =>
 
 /** @param {string[]} changedFiles @param {string} path @returns {boolean} */
 const hasChangedChangelog = (changedFiles, path) => changedFiles.includes(path);
+
+/** @param {string} changelog @param {string} baseChangelog */
+const isStableLaneHeadingMigration = (changelog, baseChangelog) =>
+  baseChangelog.includes(PREVIOUS_STABLE_LANE_HEADING) &&
+  changelog.includes(CHANGELOG_LANE_HEADINGS['stable-hotfix']) &&
+  changelog.replace(CHANGELOG_LANE_HEADINGS['stable-hotfix'], PREVIOUS_STABLE_LANE_HEADING) === baseChangelog;
 
 /** @param {string} changelog @param {string} heading */
 const extractLaneBody = (changelog, heading) => {
@@ -78,6 +85,9 @@ const validateLane = ({ declaration, changelog, path, baseRef, baseChangelog }) 
 /** @param {{ declaration: object; changedFiles: string[]; changelog: string; baseChangelog: string; baseRef: string; path: string }} context */
 const validateImpactFile = ({ declaration, changedFiles, changelog, baseChangelog, baseRef, path }) => {
   if (declaration.impact === 'none') {
+    if (hasChangedChangelog(changedFiles, path) && isStableLaneHeadingMigration(changelog, baseChangelog)) {
+      return { ok: true, reason: `Changelog impact explicitly waived: ${declaration.reason}` };
+    }
     return hasChangedChangelog(changedFiles, path)
       ? { ok: false, reason: `Changelog-Impact: none cannot modify ${path}; choose beta or hotfix instead.` }
       : { ok: true, reason: `Changelog impact explicitly waived: ${declaration.reason}` };

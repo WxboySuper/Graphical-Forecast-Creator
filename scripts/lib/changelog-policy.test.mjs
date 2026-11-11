@@ -116,3 +116,17 @@ test('a waived impact that still modifies the changelog fails the check', () => 
   assert.equal(result.ok, false);
   assert.equal(result.impact, 'none');
 });
+
+test('allows only the stable lane heading migration with no user-facing changelog impact', () => {
+  const baseChangelog = '# Changelog\n\n### Stable 1.7.x hotfixes\n\n- Existing stable fix\n';
+  const changelog = baseChangelog.replace('### Stable 1.7.x hotfixes', '### Stable v2.x hotfixes');
+  const result = evaluateChangelogPolicy({
+    baseRef: 'main',
+    changedFiles: ['CHANGELOG.md'],
+    body: 'Changelog-Impact: none\nChangelog-Reason: Rename the stable release lane for flat versions.',
+    changelog,
+    baseChangelog,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.impact, 'none');
+});
