@@ -34,6 +34,7 @@ class ZoomRangeTests(unittest.TestCase):
             context, source, cycle, "temperature-2m", item, FIELDS["temperature-2m"], [item],
         ))
         self.assertEqual((parameter["data"]["minZoom"], parameter["data"]["maxZoom"]), (3, 5))
+        self.assertTrue(parameter["data"]["urlTemplate"].startswith("https://gfcweather.com/api/mesoscale/tiles/"))
 
     def test_fixed_stp_catalog_metadata_names_formula_inputs_and_reference_threshold(self):
         cycle = datetime(2026, 11, 9, 16, tzinfo=UTC)

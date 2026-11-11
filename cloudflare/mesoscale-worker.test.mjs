@@ -6,7 +6,7 @@ import { clearPmtilesCacheForTests } from './pmtiles-reader.mjs';
 import { createPmtilesFixture, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
 const serialTest = (name, run) => test(name, { concurrency: false }, run);
-const ORIGIN = 'https://gfc.weatherboysuper.com';
+const ORIGIN = 'https://gfcweather.com';
 const envFor = (objects = {}, overrides = {}) => ({
   MESOSCALE_BUCKET: {
     get: async (key) => {
@@ -16,7 +16,7 @@ const envFor = (objects = {}, overrides = {}) => ({
       return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value), body: new Blob([serialized]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
     },
   },
-  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
+  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://gfc.weatherboysuper.com,https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
   PUBLIC_BASE_URL: 'https://mesoscale.example.test',
   ...overrides,
 });
@@ -138,6 +138,8 @@ serialTest('CORS allows configured origins and omits permission for other origin
   const allowed = await worker.fetch(request('/latest/hrrr.json', { headers: { Origin: ORIGIN } }), env);
   assert.equal(allowed.headers.get('Access-Control-Allow-Origin'), ORIGIN);
   assert.match(allowed.headers.get('Vary') ?? '', /Origin/);
+  const legacy = await worker.fetch(request('/status', { headers: { Origin: 'https://gfc.weatherboysuper.com' } }), env);
+  assert.equal(legacy.headers.get('Access-Control-Allow-Origin'), 'https://gfc.weatherboysuper.com');
   const localBeta = await worker.fetch(request('/status', { headers: { Origin: 'http://localhost:3002' } }), env);
   assert.equal(localBeta.headers.get('Access-Control-Allow-Origin'), 'http://localhost:3002');
   assert.match(localBeta.headers.get('Vary') ?? '', /Origin/);

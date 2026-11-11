@@ -33,7 +33,7 @@ time, runs the Worker tests, deploys, and checks `GET /status`. Edit the other
 `vars` in the checked-in file:
 
 - `CORS_ALLOWED_ORIGINS`: a comma-separated exact origin list. The default covers
-  production (`https://gfc.weatherboysuper.com`), staging
+  production (`https://gfcweather.com`), staging
   (`https://staging-gfc.weatherboysuper.com`), beta
   (`https://beta.gfcweather.com`), and local Vite development
   (`http://localhost:3000` and `http://localhost:3002`).

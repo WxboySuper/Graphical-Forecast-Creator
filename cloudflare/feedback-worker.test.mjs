@@ -164,7 +164,7 @@ const validBody = (overrides = {}) => ({ category: 'bug', message: 'This is a de
 function harness(options = {}) {
   const db = options.db ?? new FakeD1();
   const waits = [];
-  const env = { FIREBASE_PROJECT_ID: project, FEEDBACK_HASH_SALT: 'pepper', FEEDBACK_ALLOWED_ORIGINS: 'https://beta.gfcweather.com,http://localhost:3000', FEEDBACK_DB: db, NOW: () => 1950000000000, JWKS_FETCH: async () => Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }), ...options.env };
+  const env = { FIREBASE_PROJECT_ID: project, FEEDBACK_HASH_SALT: 'pepper', FEEDBACK_ALLOWED_ORIGINS: 'https://beta.gfcweather.com,https://gfcweather.com,https://gfc.weatherboysuper.com,http://localhost:3000', FEEDBACK_DB: db, NOW: () => 1950000000000, JWKS_FETCH: async () => Response.json({ keys: [jwk] }, { headers: { 'cache-control': 'max-age=300' } }), ...options.env };
   const ctx = { waitUntil(promise) { waits.push(promise); } };
   return { db, env, ctx, waits };
 }
@@ -194,6 +194,9 @@ test('health and origin policy', async () => {
   const preflight = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'OPTIONS', headers: { origin: 'https://beta.gfcweather.com' } }), env, ctx);
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://beta.gfcweather.com');
+  const productionPreflight = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { method: 'OPTIONS', headers: { origin: 'https://gfcweather.com' } }), env, ctx);
+  assert.equal(productionPreflight.status, 204);
+  assert.equal(productionPreflight.headers.get('access-control-allow-origin'), 'https://gfcweather.com');
   const denied = await post(env, ctx, { body: validBody(), auth: await token(), origin: 'https://evil.example' });
   assert.equal(denied.status, 403); assert.equal(denied.headers.has('access-control-allow-origin'), false);
 });

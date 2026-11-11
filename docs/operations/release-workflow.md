@@ -84,9 +84,9 @@ To promote the next-major line to production:
 1. Run **Prepare Main Stable Promotion** with the reviewed `main` ref and target version.
 2. Review and merge the generated promotion PR into `main`.
 3. Run **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit.
-4. Run **Create Stable Release** manually from the stable branch. If the branch still has the beta package version (for example `1.7.0-beta.114`), the workflow converts it to the stable version (`1.7.0`), commits that package update to the stable branch, and then creates the release.
+4. Run **Create Stable Release** manually from the stable branch. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`, commits that package update to the stable branch, and creates tag `v2.0.0` with the short display label `v2`.
 
-The stable GitHub Release uses the short label, such as `v2` or `v2.1`, and may include GitHub's generated merged-PR notes afterward. Production deployment is activated by the published stable release. After publication, the workflow dispatches the same changelog audit against the selected `stable/X.x` line; any corrective changelog update is proposed through a separate PR.
+The stable GitHub Release title uses the short label, such as `v2` or `v2.1`; its git tag uses padded semver, such as `v2.0.0` or `v2.1.0`. The release starts with the curated changelog entry and may include GitHub's generated merged-PR notes. Publishing triggers the production workflow. For a live manifest action, it deploys the VPS API and `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected stable branch, such as `stable/2.x`; any corrective changelog update is proposed through a separate PR.
 
 The stable branch is now the immutable production family. New work can continue on `main` without changing what production runs.
 
@@ -160,5 +160,29 @@ when the stable changelog entry is carried forward.
 | `release-stable.yml` | Create a stable or hotfix release |
 | `opencode-changelog-audit.yml` | Manually or weekly compare code changes with the Unreleased changelog and open a corrective PR when needed; manual runs can set `baseline_ref` to bound the range |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |
-| `deploy-main-to-vps.yml` | Deploy a published stable release or selected ref |
+| `deploy-main-to-vps.yml` | Deploy the production Worker frontend and VPS API, or manually deploy a selected stable ref; VPS frontend is an opt-in rollback path |
 | `forward-port-stable-fix.yml` | Carry stable fixes forward into `main` |
+
+## Production Cloudflare cutover
+
+Complete these owner-side steps before publishing the first v2 stable release, currently targeted for Saturday, 2026-11-21. This repo does not change DNS, Cloudflare account settings, Firebase, Stripe, Google OAuth, Sentry, or Umami.
+
+1. Add the `gfcweather.com` zone to Cloudflare. Set apex and `www` DNS records to the production Worker custom domain targets. Confirm SSL/TLS covers both names.
+2. Create Worker custom domains for `gfcweather.com` and `www.gfcweather.com`. The config is [`cloudflare/wrangler.production.jsonc`](../../cloudflare/wrangler.production.jsonc). Confirm `www` returns a permanent redirect to the apex host.
+3. In Firebase Authentication, add `gfcweather.com` and `www.gfcweather.com` to Authorized domains. Confirm the configured Firebase auth domain and Google sign-in redirect handler remain valid for these origins.
+4. In Stripe, add `https://gfcweather.com` as an allowed return URL and confirm checkout and billing portal redirects. Confirm the webhook endpoint continues to reach the VPS API at the legacy host, or update it if the API endpoint changes.
+5. Add `https://gfcweather.com` and `https://www.gfcweather.com` to the Google OAuth authorized JavaScript origins. Keep the Firebase handler redirect URI authorized.
+6. Add the new site origin to Sentry and Umami allowed-domain settings. The Sentry browser tunnel remains `/api/sentry-tunnel`; telemetry still loads from `telemetry.gfc.weatherboysuper.com`.
+7. Set GitHub Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `PRODUCTION_WORKER_SHARED_SECRET`. Set the same worker shared secret in the VPS production environment. Do not copy values into the repo.
+8. Set production API configuration `APP_BASE_URL=https://gfcweather.com`. Keep the legacy origin allowed for Stripe returns during transition. Verify `CORS_ALLOWED_ORIGINS` on the mesoscale Worker and `FEEDBACK_ALLOWED_ORIGINS` on the feedback Worker contain both production origins. The Express API has no configurable CORS allowlist because browser API calls use the same-origin site Worker. `cloudflare/wrangler.production.jsonc` currently proxies API paths to the legacy hostname.
+9. Rehearse the Worker on a non-production host with production build settings and a safe API target. Verify SPA routes, static assets, cache headers, `/api/capabilities/status`, `/api/sentry-tunnel`, Firebase sign-in, Stripe return flow, alert banner, and `version.json`.
+10. Install [`server/nginx-legacy-redirect.conf`](../../server/nginx-legacy-redirect.conf) on the VPS. Keep valid TLS for `gfc.weatherboysuper.com`. It permanently redirects page paths and queries to `gfcweather.com`, but preserves `/api/*` and `/api/sentry-tunnel` for the Worker-to-VPS API proxy.
+11. Run **Create Stable Release** from `stable/2.x`. The published release runs the Worker + API deploy and checks `https://gfcweather.com/version.json` against the release version.
+12. Roll back the Worker with `wrangler rollback --config cloudflare/wrangler.production.jsonc`. If the API also needs rollback, dispatch `deploy-main-to-vps.yml` with the previous stable tag and `deploy_action=live`. For a tag predating Worker support, set `deploy_worker=false`: the workflow writes `build/version.json` with its inline compatibility fallback and skips the derived Worker alert-banner step. To serve the VPS frontend, also set `deploy_vps_frontend=true`, route the production hostname back to the VPS, and disable the nginx legacy redirect.
+13. Verify apex and `www` redirects, old-host page redirects with path and query, legacy API availability, auth callbacks, Stripe checkout/portal/webhooks, Sentry events, Umami events, alert banner content, cache policy, and the API status route.
+
+Open decisions before cutover:
+
+- Confirm the legacy hostname will remain a stable VPS API origin after its page requests redirect. The Worker currently depends on that split behavior.
+- Decide how timed `production-release.json` rollouts should activate the Worker. The VPS cron still promotes VPS symlinks only; it does not schedule Worker releases.
+- Confirm whether the Stripe webhook dashboard currently targets the legacy hostname and whether it should remain there during the transition.

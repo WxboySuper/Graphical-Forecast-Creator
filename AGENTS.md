@@ -23,7 +23,7 @@ To some this is a critical learning ground in their knowledge of the atmosphere 
 
 ## Where is GFC Available?
 
-Right now GFC is available on the web at gfc.weatherboysuper.com and is accessible on any platform with a web browser, though it's primarily built for desktop/large screen users, it has some mobile components.
+Right now GFC is available on the web at gfcweather.com and is accessible on any platform with a web browser, though it's primarily built for desktop/large screen users, it has some mobile components.
 
 ## What can be done in GFC?
 

@@ -14,7 +14,7 @@ GFC uses one self-hosted Umami instance with two website records: one for produc
 
 Change the initial Umami administrator password immediately. Create exactly two websites:
 
-- Production: gfc.weatherboysuper.com
+- Production: gfcweather.com
 - Beta: beta-gfc.weatherboysuper.com
 
 Put their IDs in GitHub Actions secrets named VITE_UMAMI_PRODUCTION_WEBSITE_ID and VITE_UMAMI_BETA_WEBSITE_ID. Add VITE_UMAMI_HOST with the public telemetry HTTPS origin. Production and beta builds receive both IDs but choose only their matching hostname at runtime.
