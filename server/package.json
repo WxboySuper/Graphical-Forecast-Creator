@@ -17,6 +17,8 @@
     "stripe": "^23.1.0"
   },
   "overrides": {
+    "glob": "^14.0.4",
+    "minimatch": "^11.0.5",
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "@tootallnate/once": "3.0.1",
