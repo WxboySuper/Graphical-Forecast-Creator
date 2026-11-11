@@ -6,27 +6,35 @@ const API_PREFIX = '/api';
 
 const isApiPath = (pathname) => pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
 
-/** Returns the validated API origin URL, or a fail-closed response when it cannot be used. */
-const resolveApiOrigin = (env) => {
-  if (env?.API_ORIGIN && env?.BETA_API_ORIGIN) {
-    return { error: serviceUnavailable('Set only one of API_ORIGIN and BETA_API_ORIGIN.') };
-  }
-  const isProduction = Boolean(env?.API_ORIGIN);
-  const configuredOrigin = isProduction ? env.API_ORIGIN : env?.BETA_API_ORIGIN;
-  if (!configuredOrigin) return { error: serviceUnavailable('The API origin is not configured.') };
-  let apiOrigin;
+/** Picks the one configured origin and its paired secret; fails closed when none or both are set. */
+const selectOrigin = (env) => {
+  if (env?.API_ORIGIN && env?.BETA_API_ORIGIN) return { message: 'Set only one of API_ORIGIN and BETA_API_ORIGIN.' };
+  if (env?.API_ORIGIN) return { configured: env.API_ORIGIN, workerSecret: env.PRODUCTION_WORKER_SHARED_SECRET };
+  if (env?.BETA_API_ORIGIN) return { configured: env.BETA_API_ORIGIN, workerSecret: env.BETA_WORKER_SHARED_SECRET };
+  return { message: 'The API origin is not configured.' };
+};
+
+/** Parses an origin as a credential-free HTTPS URL with a host; returns a reason when it is not one. */
+const parseHttpsOrigin = (configured) => {
+  let url;
   try {
-    apiOrigin = new URL(configuredOrigin);
+    url = new URL(configured);
   } catch {
-    return { error: serviceUnavailable('The API origin is invalid.') };
+    return { message: 'The API origin is invalid.' };
   }
-  if (!apiOrigin.hostname) return { error: serviceUnavailable('The API origin must include a host.') };
-  if (apiOrigin.protocol !== 'https:') return { error: serviceUnavailable('The API origin must be an HTTPS URL.') };
-  if (apiOrigin.username || apiOrigin.password) {
-    return { error: serviceUnavailable('The API origin must not include credentials.') };
-  }
-  const workerSecret = isProduction ? env.PRODUCTION_WORKER_SHARED_SECRET : env.BETA_WORKER_SHARED_SECRET;
-  return { apiOrigin, workerSecret };
+  if (!url.hostname) return { message: 'The API origin must include a host.' };
+  if (url.protocol !== 'https:') return { message: 'The API origin must be an HTTPS URL.' };
+  if (url.username || url.password) return { message: 'The API origin must not include credentials.' };
+  return { url };
+};
+
+/** Returns the validated API origin and its paired secret, or a fail-closed response. */
+const resolveApiOrigin = (env) => {
+  const selected = selectOrigin(env);
+  if (selected.message) return { error: serviceUnavailable(selected.message) };
+  const parsed = parseHttpsOrigin(selected.configured);
+  if (parsed.message) return { error: serviceUnavailable(parsed.message) };
+  return { apiOrigin: parsed.url, workerSecret: selected.workerSecret };
 };
 
 /** Builds the upstream request: path and query forwarded, spoofable headers removed, trusted client IP added. */
