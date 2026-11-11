@@ -11,6 +11,16 @@ test('calculateNextBetaVersion increments from the latest beta tag', () => {
   assert.equal(result.strategy, 'increment');
 });
 
+test('continues the beta counter while moving from v1.8 to flat v2', () => {
+  const result = calculateNextBetaVersion({
+    packageVersion: '1.8.0-beta.15',
+    betaTags: ['v1.8.0-beta.14', 'v1.8.0-beta.15'],
+    targetBase: '2.0.0',
+  });
+  assert.equal(result.version, '2.0.0-beta.16');
+  assert.equal(result.strategy, 'increment');
+});
+
 test('calculateNextBetaVersion retries an untagged package version', () => {
   const result = calculateNextBetaVersion({
     packageVersion: '1.8.0-beta.5',

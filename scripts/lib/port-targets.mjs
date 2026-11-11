@@ -19,7 +19,7 @@ export const parseOpenPortPrsJson = (json) => {
  * is not approved for the current production line.
  */
 export const resolvePortTargets = ({ baseBranch }) =>
-  /^stable\/\d+\.\d+\.x$/.test(baseBranch) ? ['main'] : [];
+  /^stable\/\d+(?:\.\d+)?\.x$/.test(baseBranch) ? ['main'] : [];
 
 /** @param {string} text @param {number} sourcePrNumber @returns {boolean} */
 const referencesSourcePr = (text, sourcePrNumber) =>

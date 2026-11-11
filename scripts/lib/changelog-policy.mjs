@@ -18,8 +18,8 @@ export { CHANGELOG_LANE_HEADINGS };
  * @returns {string}
  */
 export const changelogLaneHeadingForBase = (baseRef) => {
-  const match = baseRef.match(/^stable\/(\d+\.\d+)\.x$/);
-  return match ? `### Stable ${match[1]}.x hotfixes` : CHANGELOG_LANE_HEADINGS['next-major'];
+  const match = baseRef.match(/^stable\/(\d+)\.x$/);
+  return match ? `### Stable v${match[1]}.x hotfixes` : CHANGELOG_LANE_HEADINGS['next-major'];
 };
 
 /**
