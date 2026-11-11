@@ -3,7 +3,8 @@ const WORKER_CLIENT_IP_HEADER = 'x-gfc-worker-client-ip';
 const WORKER_SECRET_HEADER = 'x-gfc-worker-secret';
 
 const MAX_CLIENT_IP_LENGTH = 45;
-const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const IPV4_OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
+const IPV4_PATTERN = new RegExp(`^(?:${IPV4_OCTET}\\.){3}${IPV4_OCTET}$`);
 const IPV6_PATTERN = /^[0-9a-f]{0,4}(?::[0-9a-f]{0,4}){2,7}$/i;
 
 /** Cheap shape check; the API server performs the authoritative net.isIP validation. */
@@ -20,15 +21,26 @@ const applyTrustedClientIp = (headers, clientIp, secret) => {
 
 const isApiPath = (pathname) => pathname === API_PREFIX || pathname.startsWith(`${API_PREFIX}/`);
 
+const serviceUnavailable = (error) =>
+  Response.json({ error }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+
+const isHostname = (value) => {
+  if (!/^[a-z0-9.-]+$/i.test(value) || value.startsWith('.') || value.endsWith('.') || value.includes('..')) return false;
+  return value.split('.').every((label) => label.length > 0 && label.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label));
+};
+
 /** Redirects the configured alias to the canonical host without dropping path or query. */
 const redirectAlias = (requestUrl, env) => {
   const aliasHost = (env.WWW_HOST || '').trim().toLowerCase();
-  if (!aliasHost || requestUrl.hostname.toLowerCase() !== aliasHost) return null;
-  const canonicalHost = (env.CANONICAL_HOST || '').trim();
-  if (!canonicalHost) return Response.json({ error: 'The canonical host is not configured.' }, { status: 503 });
-  requestUrl.hostname = canonicalHost;
-  requestUrl.protocol = 'https:';
-  return Response.redirect(requestUrl.toString(), 301);
+  if (!isHostname(aliasHost) || requestUrl.hostname.toLowerCase() !== aliasHost) return null;
+  const canonicalHost = (env.CANONICAL_HOST || '').trim().toLowerCase();
+  if (!isHostname(canonicalHost) || canonicalHost === aliasHost) {
+    return serviceUnavailable('The canonical host is missing or invalid.');
+  }
+  const redirectUrl = new URL(requestUrl);
+  redirectUrl.hostname = canonicalHost;
+  redirectUrl.protocol = 'https:';
+  return Response.redirect(redirectUrl.toString(), 308);
 };
 
 /** Serves static assets and proxies API paths to the configured VPS origin. */
@@ -42,24 +54,24 @@ export default {
 
     const configuredOrigin = env.API_ORIGIN || env.BETA_API_ORIGIN;
     if (!configuredOrigin) {
-      return Response.json({ error: 'The API origin is not configured.' }, { status: 503 });
+      return serviceUnavailable('The API origin is not configured.');
     }
 
     let apiOrigin;
     try {
       apiOrigin = new URL(configuredOrigin);
     } catch {
-      return Response.json({ error: 'The API origin is invalid.' }, { status: 503 });
+      return serviceUnavailable('The API origin is invalid.');
     }
 
     if (apiOrigin.protocol !== 'https:') {
-      return Response.json({ error: 'The API origin must be an HTTPS URL.' }, { status: 503 });
+      return serviceUnavailable('The API origin must be an HTTPS URL.');
     }
     if (apiOrigin.username) {
-      return Response.json({ error: 'The API origin must not include credentials.' }, { status: 503 });
+      return serviceUnavailable('The API origin must not include credentials.');
     }
     if (apiOrigin.password) {
-      return Response.json({ error: 'The API origin must not include credentials.' }, { status: 503 });
+      return serviceUnavailable('The API origin must not include credentials.');
     }
 
     apiOrigin.pathname = `${apiOrigin.pathname.replace(/\/$/, '')}${requestUrl.pathname}`;
@@ -70,7 +82,9 @@ export default {
     headers.delete(WORKER_CLIENT_IP_HEADER);
     headers.delete(WORKER_SECRET_HEADER);
 
-    const workerSecret = env.PRODUCTION_WORKER_SHARED_SECRET || env.BETA_WORKER_SHARED_SECRET;
+    const workerSecret = env.API_ORIGIN
+      ? env.PRODUCTION_WORKER_SHARED_SECRET
+      : env.BETA_WORKER_SHARED_SECRET;
     applyTrustedClientIp(headers, request.headers.get('cf-connecting-ip'), workerSecret);
 
     const apiRequest = new Request(apiOrigin, new Request(request, { headers }));
