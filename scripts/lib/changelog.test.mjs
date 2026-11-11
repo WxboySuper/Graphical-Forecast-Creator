@@ -58,7 +58,7 @@ test('extractReleaseNotes falls back to Unreleased for beta without line section
 
 test('extracts the next-major lane for beta releases', () => {
   const notes = extractReleaseNotes(
-    '# Changelog\n\n### Next major / beta\n\n#### Added\n- New map\n\n### Stable 1.7.x hotfixes\n\n#### Fixed\n- Production fix\n',
+    '# Changelog\n\n### Next major / beta\n\n#### Added\n- New map\n\n### Stable v2.x hotfixes\n\n#### Fixed\n- Production fix\n',
     '2.0.0-beta.1',
     'next-major',
   );
@@ -110,7 +110,7 @@ test('extractReleaseNotes prefers an exact version section after beta promotion'
 
 test('extracts the stable hotfix lane for production releases', () => {
   const lane = extractChangelogLane(
-    '# Changelog\n\n### Next major / beta\n\n#### Added\n- New map\n\n### Stable 1.7.x hotfixes\n\n#### Fixed\n- Production fix\n',
+    '# Changelog\n\n### Next major / beta\n\n#### Added\n- New map\n\n### Stable v2.x hotfixes\n\n#### Fixed\n- Production fix\n',
     'stable-hotfix',
   );
   assert.match(lane ?? '', /Production fix/);

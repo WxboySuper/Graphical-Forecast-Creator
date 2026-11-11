@@ -11,7 +11,7 @@ on:
         default: main
         type: string
       version:
-        description: 'Stable major release version, for example 2.0.0'
+        description: 'Flat stable version, for example 2.0.0 or 2.1.0'
         required: true
         type: string
       confirmation:
@@ -78,7 +78,7 @@ jobs:
 
             Source ref: `${{ inputs.source_ref }}`
 
-            This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into `main`, bootstrap `stable/${{ inputs.version }}.x` from that exact main commit, then use the manual stable release workflow.
+            This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into `main`, bootstrap `stable/<flat-major>.x` from that exact main commit, then use the manual stable release workflow.
 
             Changelog-Impact: beta
         run: |

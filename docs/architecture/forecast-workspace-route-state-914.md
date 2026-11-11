@@ -4,7 +4,7 @@ Issue: [#914](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/91
 Implemented in: #1456
 Base doc: [Forecast workspace boundaries](./forecast-workspace-boundaries.md)
 
-This record pins down what #1456 actually built. The base doc describes the planned v1.8 layout. This one describes the working subset and the rules the code now enforces.
+This record pins down what #1456 actually built. The base doc describes the planned v2 layout. This one describes the working subset and the rules the code now enforces.
 
 ## Routes
 

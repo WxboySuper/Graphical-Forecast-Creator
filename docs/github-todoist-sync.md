@@ -15,7 +15,7 @@ The workflow hardcodes the two ongoing GFC subproject IDs:
 - Maintenance: `6hWfhw6hPHWxf5Hw`, used as the fallback route.
 - Infrastructure: `6hWfhw4gMqJGQH23`, used for the `infrastructure` label.
 
-Repo Audit and v1.8 are intentionally not hardcoded because they are temporary projects. Add a route in the workflow if a future sync needs to target another temporary project. The first matching route wins. A task with no matching label goes to Maintenance.
+Repo Audit and v2 are intentionally not hardcoded because they are temporary projects. Add a route in the workflow if a future sync needs to target another temporary project. The first matching route wins. A task with no matching label goes to Maintenance.
 
 ## What appears in Todoist
 

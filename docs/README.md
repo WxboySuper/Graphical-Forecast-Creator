@@ -70,7 +70,7 @@ When a change crosses a boundary, update the relevant doc in the same PR.
 ### Architecture contracts
 
 - [Repository map](./architecture/codebase-inventory.md)
-- [Forecast workspace boundaries](./architecture/forecast-workspace-boundaries.md) (v1.8 plan) and [implemented route/state decisions](./architecture/forecast-workspace-route-state-914.md)
+- [Forecast workspace boundaries](./architecture/forecast-workspace-boundaries.md) (v2 plan) and [implemented route/state decisions](./architecture/forecast-workspace-route-state-914.md)
 - [Cloud-cycle storage](./architecture/cloud-cycle-storage.md)
 - [Deterministic Redux transitions](./architecture/deterministic-redux-transitions.md)
 - [Discussion wall-clock times](./architecture/discussion-wall-clock-times.md)

@@ -20,6 +20,7 @@ describe('port targets', () => {
 
   it('ports stable merges to main only', () => {
     assert.deepEqual(resolvePortTargets({ baseBranch: 'stable/1.6.x' }), ['main']);
+    assert.deepEqual(resolvePortTargets({ baseBranch: 'stable/2.x' }), ['main']);
   });
 
   it('does not port main merges back to stable', () => {

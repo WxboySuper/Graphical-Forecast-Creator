@@ -5,7 +5,7 @@
 const BETA_PRERELEASE_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$/i;
 const STABLE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const RELEASE_BRANCH_PATTERN = /^release\/v[0-9]+\.[0-9]+\.[0-9]+$/;
-const STABLE_LINE_PATTERN = /^stable\/[0-9]+\.[0-9]+\.x$/;
+const STABLE_LINE_PATTERN = /^stable\/[0-9]+(?:\.[0-9]+)?\.x$/;
 
 /**
  * @param {string} message

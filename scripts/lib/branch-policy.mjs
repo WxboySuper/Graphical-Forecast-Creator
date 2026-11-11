@@ -3,7 +3,7 @@
 /** @typedef {BranchPolicyOk | BranchPolicyFail} BranchPolicyResult */
 
 const PORT_BRANCH_PATTERN = /^port\/\d+-to-/;
-const STABLE_BRANCH_PATTERN = /^stable\/\d+\.\d+\.x$/;
+const STABLE_BRANCH_PATTERN = /^stable\/\d+(?:\.\d+)?\.x$/;
 
 /**
  * @param {string} headRef

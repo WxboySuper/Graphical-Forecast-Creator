@@ -1,6 +1,6 @@
 # 8. Product and data reference
 
-A decision-maker's cheat sheet: what exists, who gets it, where data goes, and what it costs to run. Verified 2026-11-08 against v1.8.0-beta.6; the code is the source of truth.
+A decision-maker's cheat sheet: what exists, who gets it, where data goes, and what it costs to run. Verified 2026-11-08 against v2 beta 6; the code is the source of truth.
 
 ## Pages (what a user can open)
 

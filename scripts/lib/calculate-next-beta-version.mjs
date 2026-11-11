@@ -131,22 +131,30 @@ export const calculateNextBetaVersion = ({
   betaTags,
   explicitVersion = '',
   taggedVersions = null,
+  targetBase = undefined,
 }) => {
   const explicit = explicitVersion.trim();
-  const base = resolveBetaVersionBase(packageVersion);
+  const base = targetBase ?? resolveBetaVersionBase(packageVersion);
   if (!base) {
     throw new Error(`Unsupported main package version: ${packageVersion}`);
   }
 
   const tagSet = taggedVersions ?? new Set(betaTags);
-  const lastTagged = lastBetaNumberForBase(betaTags, base);
+  const lastTaggedForBase = lastBetaNumberForBase(betaTags, base);
+  const lastTagged = lastTaggedForBase ?? betaTags
+    .map((tag) => parseBetaVersion(tag.startsWith('v') ? tag.slice(1) : tag)?.beta)
+    .filter((value) => value !== undefined)
+    .sort((left, right) => left - right)
+    .at(-1);
 
   if (explicit) {
     validateExplicitBetaVersion({ explicit, packageVersion, tagSet, betaTags, base });
     return { version: explicit, strategy: 'explicit' };
   }
 
-  const retry = tryRetryUnpublishedPackageVersion({ packageVersion, tagSet, lastTagged });
+  const retry = base === resolveBetaVersionBase(packageVersion)
+    ? tryRetryUnpublishedPackageVersion({ packageVersion, tagSet, lastTagged: lastTaggedForBase })
+    : null;
   if (retry) {
     return { version: retry, strategy: 'retry-unpublished' };
   }

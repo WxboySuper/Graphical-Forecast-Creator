@@ -9,7 +9,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 | Core features are always free; premium only where operating the feature costs money | Mission: GFC is a learning tool | A core feature starts costing real money |
 | Open source, MIT | Owner can't maintain alone; learners can fork | Abuse or licensing issue |
 | Everything works with no account or server | Low barrier; resilient | Never, without a strong reason |
-| `main` is next-major; `stable/X.Y.x` is production; beta is a prerelease, not a branch | Lets big work continue while production stays frozen and hotfixable | Release pain grows |
+| `main` is next-major; `stable/X.x` is production; beta is a prerelease, not a branch | Lets big work continue while production stays frozen and hotfixable | Release pain grows |
 | Nothing deploys on merge | Deploys are owner-initiated | You want continuous deploy |
 | Features hidden by a registry per environment, fail closed | Ship unfinished work safely; server can be killed instantly | Registry becomes too heavy |
 | Stripe is the source of truth for premium | One billing authority; webhooks update Firestore | Moving billing provider |
@@ -29,7 +29,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 |----------|---------|
 | Turn on GitHub branch protection / required checks? | Currently off, so merges rely on habit ([page 7](07-working-with-agents.md)) |
 | Which hostname is canonical for beta? | Config says `beta.gfcweather.com`; old text says `beta-gfc.weatherboysuper.com`; the marketing mock uses `app.gfcweather.com`. Is a domain move planned? |
-| What ships in v1.8? | 6 open issues in the `v1.8` milestone (128 closed). Direction: independent forecast workspaces, explicit persistence ownership. |
+| What ships in v2? | 6 open issues in the `v2` milestone (128 closed). Direction: independent forecast workspaces, explicit persistence ownership. |
 | Tropical workspace and collaboration room | Gated off. Each needs its own product decision and exposure key before work starts. |
 | WarnGen, historical replay, WxSim game | Ideas only (`Future Features` milestone, 10 issues). No contract exists. |
 | Which components move first when restructuring? | See "soft spots" in [architecture](02-architecture.md) |

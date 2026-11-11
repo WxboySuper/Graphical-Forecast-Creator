@@ -10,8 +10,8 @@ test('exposes the land-masking controls on the beta forecast workflow', async ({
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('gfc-local-beta-bypass', 'true');
-    localStorage.setItem('gfc-tos-accepted', '2.0.0');
-    localStorage.setItem('gfc-privacy-policy-accepted', '1.8.0');
+    localStorage.setItem('gfc-tos-accepted', '2');
+    localStorage.setItem('gfc-privacy-policy-accepted', '2');
   });
   await page.goto('/?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Day 1', exact: true }).click();

@@ -11,7 +11,7 @@ const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const eventName = process.env.GITHUB_EVENT_NAME ?? '';
 
 const isStableHotfix =
-  eventName === 'pull_request' && /^stable\/\d+\.\d+\.x$/.test(baseRef);
+  eventName === 'pull_request' && /^stable\/\d+(?:\.\d+)?\.x$/.test(baseRef);
 
 if (!isStableHotfix) {
   process.exit(0);

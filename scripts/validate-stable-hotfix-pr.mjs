@@ -12,7 +12,7 @@ import {
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
 
-if (!/^stable\/\d+\.\d+\.x$/.test(baseRef)) {
+if (!/^stable\/\d+(?:\.\d+)?\.x$/.test(baseRef)) {
   console.log('Not a stable-line PR; skipping stable hotfix policy.');
   process.exit(0);
 }
@@ -42,18 +42,24 @@ if (!current || !previous) {
   process.exit(1);
 }
 
-const sameStableLine = current[1] === previous[1] && current[2] === previous[2];
-const advancesPatch = Number(current[3]) > Number(previous[3]);
-if (!sameStableLine || !advancesPatch) {
+const flatStableVersion = baseRef.match(/^stable\/(\d+)\.x$/);
+const legacyStableLine = baseRef.match(/^stable\/(\d+)\.(\d+)\.x$/);
+const sameMajor = current[1] === previous[1] &&
+  (!flatStableVersion || current[1] === flatStableVersion[1]) &&
+  (!legacyStableLine || (current[1] === legacyStableLine[1] && current[2] === legacyStableLine[2]));
+const advancesFlatMinor = flatStableVersion
+  ? Number(current[2]) > Number(previous[2]) && current[3] === '0'
+  : current[1] === previous[1] && current[2] === previous[2] && Number(current[3]) > Number(previous[3]);
+if (!sameMajor || !advancesFlatMinor) {
   console.error(
     [
-      'Stable hotfix PRs must advance the patch version from ',
+      'Stable hotfix PRs must advance the flat version from ',
       basePackage.version,
       ' to a newer ',
       current[1],
       '.',
       current[2],
-      '.Y version.',
+      '.Y.0 version on the same flat major.',
     ].join(''),
   );
   process.exit(1);

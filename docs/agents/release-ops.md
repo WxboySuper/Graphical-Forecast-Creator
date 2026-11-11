@@ -8,14 +8,20 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 - Targets: `local`, `beta` (beta.gfcweather.com, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (staging-gfc.weatherboysuper.com), `production` (gfcweather.com, Cloudflare Worker `gfc-production` + VPS API at `/opt/gfc-analytics`).
 - Old docs/comments may say `beta-gfc.weatherboysuper.com`; the Cloudflare config uses `beta.gfcweather.com`.
 
+## Versioning
+
+GFC release labels use a flat major version. The next major is `v2`, followed by `v3`; a minor such as `v2.1` maps to the package and tag version `2.1.0` / `v2.1.0`. The patch slot stays `0`. Use short labels (`v2`, `v2.1`) in UI, docs, release titles, changelog prose, and PR text. Use padded semver (`2.0.0`, `2.1.0`) in `package.json`, and `v2.0.0`, `v2.1.0` for git tags.
+
+Beta tags keep their semver prerelease form and share one increasing counter. The next beta for v2 is `2.0.0-beta.16`, tagged `v2.0.0-beta.16`. Production branches use `stable/2.x`; a hotfix for the current v2 line is labeled `v2.1` and tagged `v2.1.0`. Existing `stable/1.x` branches, tags, and v1.x changelog entries remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
+
 ## Workflows
 
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
-| `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional `version` (`X.Y.Z-beta.N`), `previous_tag` |
-| `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
+| `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional version (`2.0.0-beta.N`), `previous_tag` |
+| `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=v2.0.0-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
-| `bootstrap-stable-release.yml` | Create `stable/X.Y.x` at the approved main commit | |
+| `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
 | `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
 | `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | |
@@ -28,13 +34,13 @@ Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEA
 
 ### Beta sequence
 
-lint+test -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `vX.Y.Z-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
+lint+test -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `v2.0.0-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
 
 ### Beta failure recovery
 
 | Situation | Action |
 |-----------|--------|
-| Worker deploy failed, tag exists | `deploy-beta-workers.yml ref=vX.Y.Z-beta.N` or `wrangler rollback` |
+| Worker deploy failed, tag exists | `deploy-beta-workers.yml ref=v2.0.0-beta.N` or `wrangler rollback` |
 | VPS API deploy failed | Redo API steps manually. **Do not rerun the Release Beta workflow** (cuts a new version). Worker-only redeploy does not update the API. |
 | Smoke failed | Fix, redeploy by tag, then publish the draft |
 | Draft left open | Redeploy by tag, confirm smoke, publish draft in GitHub or delete it |

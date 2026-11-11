@@ -35,6 +35,11 @@ describe('package-version policy', () => {
     assert.equal(isReleasePromotionBranch('release/v1.6.0'), true);
   });
 
+  it('accepts the flat stable branch while retaining legacy stable lines', () => {
+    assert.equal(evaluateVersionPolicy({ version: '2.1.0', targetBranch: 'stable/2.x' }).ok, true);
+    assert.equal(evaluateVersionPolicy({ version: '1.7.7', targetBranch: 'stable/1.7.x' }).ok, true);
+  });
+
   it('allows stable and beta versions on the main integration line', () => {
     const result = evaluateVersionPolicy({
       version: '1.6.0',

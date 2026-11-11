@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Stable branch or release tag to deploy (default: stable/2.x)'
+        description: 'Stable branch or padded semver release tag to deploy (default: stable/2.x)'
         required: false
         type: string
       deploy_action:
@@ -68,8 +68,8 @@ jobs:
           if [ "$GHA_EVENT_NAME" = "release" ]; then
             echo "ref=${GHA_TAG_NAME}" >> "$GITHUB_OUTPUT"
           elif [ -n "$GHA_INPUT_REF" ]; then
-            if ! printf '%s' "$GHA_INPUT_REF" | grep -Eq '^(stable/[0-9]+\.x|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
-              echo "::error::Manual production deploys must target a stable/X.x line or stable release tag." >&2
+            if ! printf '%s' "$GHA_INPUT_REF" | grep -Eq '^(stable/[0-9]+(\.[0-9]+)?\.x|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
+              echo "::error::Manual production deploys must target a stable/X.x branch or padded stable tag such as v2.0.0." >&2
               exit 1
             fi
             echo "ref=${GHA_INPUT_REF}" >> "$GITHUB_OUTPUT"

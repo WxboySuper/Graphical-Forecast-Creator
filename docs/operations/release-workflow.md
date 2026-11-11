@@ -3,7 +3,7 @@
 GFC has one integration branch and separate stable production lines:
 
 - `main` is the next-major integration line. It is the normal PR target and has no branch-title restriction.
-- `stable/X.Y.x` is the production line for the `X.Y` release family.
+- `stable/X.x` is the production line for a flat major release family such as `stable/2.x`.
 - `beta` is no longer an integration branch. It is retired after the cutover is complete.
 
 Nothing deploys merely because a PR merges. Releases and deployments are intentional manual actions.
@@ -34,11 +34,11 @@ Changelog-Reason: CI/tooling-only change.
 The PR must change the matching lane in `CHANGELOG.md` when the impact is `beta` or `hotfix`:
 
 - `### Next major / beta` for work landing on `main`.
-- `### Stable X.Y.x hotfixes` for work landing on `stable/X.Y.x`.
+- The stable-line hotfix lane for work landing on the current `stable/X.x` branch.
 
 The check compares the lane before and after the PR. Merely touching the changelog or changing a different lane does not satisfy the gate.
 
-For eligible same-repository PRs targeting `main` or `stable/X.Y.x`, a `beta` or
+For eligible same-repository PRs targeting `main` or `stable/X.x`, a `beta` or
 `hotfix` decision is enough to request an automatic entry. The trusted
 `pull_request_target` changelog workflow runs a bounded, read-only OpenCode draft
 when the PR has not already changed `CHANGELOG.md`. OpenCode receives the PR
@@ -83,10 +83,10 @@ To promote the next-major line to production:
 
 1. Run **Prepare Main Stable Promotion** with the reviewed `main` ref and target version.
 2. Review and merge the generated promotion PR into `main`.
-3. Run **Bootstrap Stable Release Line** to create `stable/X.Y.x` at that exact approved main commit.
-4. Run **Create Stable Release** manually from the stable branch. If the branch still has the beta package version (for example `1.7.0-beta.114`), the workflow converts it to the stable version (`1.7.0`), commits that package update to the stable branch, and then creates the release.
+3. Run **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit.
+4. Run **Create Stable Release** manually from the stable branch. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`, commits that package update to the stable branch, and creates tag `v2.0.0` with the short display label `v2`.
 
-The stable GitHub Release starts with the curated changelog entry and may include GitHub's generated merged-PR notes afterward. Publishing triggers the production workflow. For a live manifest action it deploys the VPS API, the `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected `stable/X.Y.x` line; any corrective changelog update is proposed through a separate PR.
+The stable GitHub Release title uses the short label, such as `v2` or `v2.1`; its git tag uses padded semver, such as `v2.0.0` or `v2.1.0`. The release starts with the curated changelog entry and may include GitHub's generated merged-PR notes. Publishing triggers the production workflow. For a live manifest action, it deploys the VPS API and `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected stable branch, such as `stable/2.x`; any corrective changelog update is proposed through a separate PR.
 
 The stable branch is now the immutable production family. New work can continue on `main` without changing what production runs.
 
@@ -94,9 +94,9 @@ The stable branch is now the immutable production family. New work can continue 
 
 For an urgent production fix:
 
-1. Create a `hotfix/*` branch from the current `stable/X.Y.x` line.
+1. Create a `hotfix/*` branch from the current `stable/X.x` line.
 2. Open a reviewed PR into that stable branch.
-3. Add the fix to the `Stable X.Y.x hotfixes` changelog lane.
+3. Add the fix to the current stable-line hotfix changelog lane.
 4. Run **Deploy Staging** with the hotfix branch, commit, or PR ref.
 5. After staging verification, merge the hotfix PR.
 6. Run **Create Stable Release** for the stable line.
@@ -138,7 +138,7 @@ The release script resolves the previous tag from the same release history, or a
 
 ## Stable fixes forward-port into main
 
-When a reviewed PR merges into a `stable/X.Y.x` branch, the
+When a reviewed PR merges into a `stable/X.x` branch, the
 `Forward-port Stable Fix` workflow prepares a normal draft PR from the stable
 merge into `main`. It applies the trusted merge commit's diff to the current
 `main` branch; it never checks out or executes code from the original PR head,
@@ -156,7 +156,7 @@ when the stable changelog entry is carried forward.
 | --- | --- |
 | `release-beta.yml` | Version, release, build, and deploy a beta prerelease from `main` |
 | `prepare-stable-promotion.yml` | Create a reviewed main promotion PR |
-| `bootstrap-stable-release.yml` | Create the immutable `stable/X.Y.x` branch from the approved main commit |
+| `bootstrap-stable-release.yml` | Create the immutable `stable/X.x` branch from the approved main commit |
 | `release-stable.yml` | Create a stable or hotfix release |
 | `opencode-changelog-audit.yml` | Manually or weekly compare code changes with the Unreleased changelog and open a corrective PR when needed; manual runs can set `baseline_ref` to bound the range |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |

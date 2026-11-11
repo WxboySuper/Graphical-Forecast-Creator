@@ -21,3 +21,15 @@ test('manual rollback to a pre-Worker tag skips Worker-only alert generation and
   assert.ok(smokeStep, 'production Worker smoke step must exist');
   assert.match(smokeStep, /github\.event_name == 'release' \|\| inputs\.deploy_worker/);
 });
+
+test('production dispatch accepts flat stable branches and padded stable tags only', () => {
+  const refValidation = workflow.split('\n').find((line) => line.includes('GHA_INPUT_REF') && line.includes('grep -Eq'));
+  const pattern = refValidation?.match(/grep -Eq '([^']+)'/)?.[1];
+  assert.ok(pattern, 'production ref validation pattern must exist');
+  const accepts = (ref) => new RegExp(pattern).test(ref);
+
+  assert.equal(accepts('stable/2.x'), true);
+  assert.equal(accepts('stable/2.1.x'), true);
+  assert.equal(accepts('v2.0.0'), true);
+  assert.equal(accepts('v2.0.0-beta.16'), false);
+});

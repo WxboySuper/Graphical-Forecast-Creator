@@ -37,7 +37,7 @@ Actually exercise user-visible changes (browser/Playwright), not just static tes
 | Branch | Rule |
 |--------|------|
 | `main` | Next-major integration; default PR target |
-| `stable/X.Y.x` | Production line. Hotfixes start here. Never merge `main` into it. |
+| `stable/X.x` | Production line. Hotfixes start here. Never merge `main` into it. |
 | `hotfix/*` | From the current stable line, PR into it |
 | `fix/*`, others | Descriptive only; not merge gates |
 
@@ -55,7 +55,7 @@ Conventional Commits: `feat|fix|chore|docs|style|refactor(scope): message`. Exam
 | Value | Required companion |
 |-------|--------------------|
 | `beta` | Entry in `CHANGELOG.md` under `### Next major / beta` (the check diffs that lane) |
-| `hotfix` | Entry under `### Stable X.Y.x hotfixes` |
+| `hotfix` | Entry under the current stable-line hotfix lane |
 | `none` | `Changelog-Reason:` |
 | `inherited` | `Port of #<n>`; no second entry |
 
