@@ -7,154 +7,72 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Next major / beta
 
-#### Dependencies
-
-- **Security fixes:** Pin patched versions of minimatch, glob, and the gRPC library used by Firebase in the app and the hosted server to close open Dependabot advisories, with no change to app behavior.
-- **Routine app libraries:** Updated Redux Toolkit to 2.14.0, Sentry React to 11.11.0, Firebase to 13.2.0, Lucide icons to 1.70.0, and Vite to 8.3.6, along with build and test tools, to keep state handling, error reporting, icons, and builds on supported releases.
-- **Routine server libraries:** Updated Sentry Node to 11.11.0 and express-rate-limit to 8.7.3 to keep server error monitoring and request rate limiting on supported releases.
-- **App libraries:** Update Sentry React to 11.10.0, Lucide icons to 1.65.0, React Redux to 9.3.1, and React Router to 8.5.1, along with development and build tools.
-- **Server libraries:** Update Sentry Node to 11.10.0, express-rate-limit to 8.7.2, and Stripe to 23.1.0.
-- **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
-<!-- dependabot-automation -->
-
-- **@sentry/react:** ^10.74.0 → ^11.9.0
-- **@testing-library/jest-dom:** ^7.0.0 → ^7.0.1
-- **@testing-library/react:** ^16.2.0 → ^16.3.3
-- **@testing-library/user-event:** ^14.6.6 → ^14.6.7
-- **@types/node:** ^26.4.0 → ^26.5.1
-- **@types/react-dom:** 19.2.5 → 19.3.0
-- **firebase:** ^12.19.0 → ^13.0.0
-- **immer:** ^11.1.18 → ^11.2.9
-- **lucide-react:** ^1.45.0 → ^1.61.0
-- **ol-mapbox-style:** ^13.4.3 → ^13.8.0
-- **react-router:** ^8.3.1 → ~8.5.0
-- **rollup:** >=4.62.4 → >=4.63.1
-- **uuid:** ^14.0.1 → ^14.0.3
-- **web-vitals:** ^6.1.0 → ^6.2.1
-- **@firebase/rules-unit-testing:** ^5.0.1 → ^5.0.2
-- **@vitejs/plugin-react:** ^6.0.5 → ^6.1.1
-- **babel-jest:** ^30.5.0 → ^30.5.1
-- **esbuild:** ^0.28.1 → ^0.28.2
-- **eslint-plugin-jest:** ^29.16.0 → ^29.16.5
-- **firebase-tools:** 15.26.0 → 15.28.2
-- **globals:** ^17.11.0 → ^17.12.0
-- **jest:** ^30.5.0 → ^30.5.1
-- **jest-environment-jsdom:** ^30.5.0 → ^30.5.1
-- **typescript-eslint:** ^8.68.0 → ^8.70.0
-- **vite:** ^8.3.0 → ^8.3.5
-- **@sentry/node:** ^10.69.0 → ^11.9.0 (`server`)
-- **firebase-admin:** ^14.3.0 → ^14.5.0 (`server`)
-- **express-rate-limit:** ^8.7.0 → ^8.7.1 (`server`)
-- **stripe:** ^22.6.1 → ^23.0.1 (`server`)
-
 #### Added
 
-- **Fixed-layer Significant Tornado Parameter:** Publish a derived HRRR and RRFS index from verified model fields. Its calculation runs in GitHub Actions and stays hidden from production until the client exposure flag is approved.
-
-- **Mesoscale radar and satellite context:** Mesoscale Data tab can now overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
-- **Keyboard vertex editing:** Mesoscale areas can now be reshaped vertex by vertex from the keyboard with vertex stepping, arrow-key nudging in selectable steps, and add or delete controls.
-- **Mesoscale workspace on beta:** The Mesoscale forecast workspace and its Monitor panel are now available on beta for early-access testing.
-- **Reliable Mesoscale map display:** Model layers stay visible at the default map zoom with the standard basemap, so beta testers no longer see a blank map.
-- **Clearer Mesoscale field names:** Model fields show readable labels such as CAPE (surface), storm-relative helicity ranges, and composite reflectivity.
-- **Outlook editing:** Add beta-gated paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
-- **Population estimates:** Add a beta WorldPop estimate for the active day's active-hazard outlook polygons.
-- **Cities in outlooks:** List the cities inside the active outlook in the beta population estimate dialog, using a bundled public-domain places dataset.
-- **KMZ/KML export:** Add a beta export prototype for forecast products.
-- **Send feedback:** Signed-in users can send bugs, ideas, and questions from a feedback dialog in the Resources menu, and the beta site shows a beta notice with an always-visible feedback button.
+- **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It is available on beta for early-access testing and has a matching panel in Monitor.
+- **Mesoscale areas and discussion:** Draw polygons, circles, ellipses, and rectangles with forecaster hazard styling, reshape them vertex by vertex with the mouse or keyboard (stepping, arrow-key nudging, add and delete), and write a mesoscale discussion alongside them. Areas and discussion save on your device and keep working when model data is unavailable.
+- **Mesoscale radar and satellite context:** Overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
+- **Fixed-layer Significant Tornado Parameter:** A derived HRRR and RRFS index calculated from verified model fields. It stays hidden from production until it is approved there.
+- **Outlook editing:** Beta paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
+- **Population and cities:** A beta WorldPop estimate for the active day's outlook polygons, including the cities inside them from a bundled public-domain places dataset.
+- **KMZ/KML export:** A beta export prototype for forecast products.
+- **Send feedback:** Signed-in users can send bugs, ideas, and questions from the Resources menu. The beta site also shows a beta notice with an always-visible feedback button.
 
 #### Changed
 
-- **Contact:** GFC now has one contact address, contact@gfcweather.com, for questions, billing issues, privacy requests, and any concerns. It appears in the menu on every page, on the home, account, and pricing pages, and in the Terms of Service and Privacy Policy.
-- **Privacy policy v1.8.0:** Added a section describing the optional Send feedback form (what it collects, where it is stored, how long it is kept), noted that feedback is not removed automatically when an account is deleted, and listed Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
-- **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher, and choose whether Discussion opens full width or in a resizable side panel beside the map. The layout choice is remembered, and narrow panels stack the fields and switch between Edit and Preview.
-- **Discussion links:** Existing `/discussion` links now open the discussion inside the severe forecast workspace with query parameters and the URL hash preserved.
-- **Forecast menu:** The header Forecast tab now opens a workspace showcase with an icon, description, and focus chips for each available workspace, marks the current one, previews upcoming workspaces as not yet available, and keeps Discussion one click away.
-- **Monitor NWS alerts:** Show when displayed alert polygons were last fetched after a refresh fails, and keep the retry action clear.
-- **Auto-TSTM:** Temporarily disable automatic thunderstorm guidance while the SPC HREF source is retired. The forecast page explains the planned replacement.
-- **Map basemaps:** Replace CARTO tiles with OpenStreetMap for forecast, verification, and monitor maps; saved Carto styles now select OpenStreetMap.
-- **Verification and forecast drawing:** Use SPC-filtered storm reports in verification, enable KML/KMZ export and optional land clipping for staging validation, keep production exposure off, and leave clipping off by default.
-- **Open beta:** `beta.gfcweather.com` is now open to everyone instead of requiring an invite. Sign in with your existing account and your current plan applies there. Old beta sign-in and invite links redirect to the home page.
-- **Beta hosting:** Serve the beta frontend from `beta.gfcweather.com` on Cloudflare Workers while keeping the existing VPS API in place.
-- **Beta releases:** Run the full beta cut (changelog audit, version bump, draft GitHub prerelease, pre-build validation, Cloudflare deploy, VPS API deploy, and smoke tests via `version.json`) from one `release-beta` workflow with optional dry run.
-- **Beta Worker observability:** Enable Workers Logs and traces for `gfc-beta` via Wrangler observability settings (GitHub Actions remains the only deploy path).
-
-- **Forecast workspaces:** Scope forecast routes, autosave, session restore, and cloud-cycle saves and loads to the active workspace, including a beta-gated Custom workspace at `/forecast/custom`.
-- **Custom products:** Move custom layer and reusable product editing into the beta-gated Custom Forecast workspace; preserve embedded legacy layers and snapshots for existing saved cycles and exports.
-- **Cloud Library workspaces:** Organize saved forecasts with workspace tabs and shareable workspace links.
+- **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a beta Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
+- **Forecast menu:** The header Forecast tab opens a workspace showcase with an icon, description, and focus chips for each workspace, marks the current one, previews upcoming workspaces, and keeps Discussion one click away.
+- **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher. Discussion opens full width or in a resizable side panel, the choice is remembered, and narrow panels switch between Edit and Preview. Existing `/discussion` links open here with their query parameters and hash preserved.
+- **Open beta:** `beta.gfcweather.com` is open to everyone. Sign in with your existing account and your current plan applies. Old beta sign-in and invite links redirect to the home page.
+- **Verification:** Archived dates are graded against SPC-filtered storm reports only, with an unavailable message when the filtered archive cannot be used.
+- **Monitor NWS alerts:** After a refresh fails, the Monitor shows when the displayed alert polygons were last fetched and keeps the retry action clear.
+- **Map basemaps:** Forecast, verification, and monitor maps use OpenStreetMap instead of CARTO tiles; saved Carto styles select OpenStreetMap.
+- **Auto-TSTM:** Automatic thunderstorm guidance is temporarily disabled while the SPC HREF source is retired. The forecast page explains the planned replacement.
+- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy policy v1.8.0 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
 
 #### Fixed
 
-- **Embedded discussions:** Keep the selected map day when the Discussion URL changes inside a multi-day grouping.
-- **Verification reports:** Grade archived dates against filtered SPC reports only and show an unavailable message when the filtered archive cannot be used.
-- **Mesoscale workspace without model data:** The map, area tools, and Areas and Discussion tabs stay usable with an explanation, retry action, and model switcher when model data is loading or unavailable instead of replacing the workspace with an error screen.
-- **Phone area toolbar overlap:** The area toolbar now sits below the Data toggle on narrow screens instead of overlapping it.
-- **Grade history restore:** Corrupted saved grade snapshots now show a notice instead of crashing or loading invalid results when reopened.
-- **Auto-TSTM generation:** Invalid server timeout settings now fall back to the default instead of stopping generation immediately.
-- **Beta release checks:** Invalid retry settings now fall back to defaults so post-deploy smoke checks run as intended.
-- **Documentation drawer:** Keep the selected tab and scroll position when the layout updates while the drawer is open.
-- **Account deletion:** Retry final cleanup when the account identity has already been removed, while reporting incomplete billing or data cleanup as a failure.
-- **Monitor state outlines:** Apply the active map theme when state boundaries finish loading.
-- **KMZ exports:** Preserve significant-threat hazard colors in exported forecast polygons.
-- **Categorical outlook conversion:** Keep significant-threat markers from breaking probability category lookup.
-- **Monitor radar sites:** Preserve partial and cleared radar-site values when monitor settings are normalized.
-- **Hosted map settings:** Keep the selected basemap after hosted settings sync completes.
-- **Monitor alert refresh:** Show background alert refresh failures while keeping the last available frames visible.
-- **Monitor alert playback:** Keep the alert animation following new snapshots after the 12-frame window fills instead of replaying stale frames.
-- **Imported discussions:** Treat non-string discussion content as empty during completion checks and draft merges.
-- **Population estimate cancellation:** Allow closing the dialog while WorldPop is calculating and abort the pending request.
-- **Verification clear:** Loading a different forecast in classic verification now clears loaded storm reports and ignores report requests that were already in flight when the clear happened.
-- **Verification report dates:** Reject empty or malformed report dates before requesting SPC storm reports instead of fetching an invalid archive file.
-- **Restored grade evidence:** Restoring a saved grade snapshot now makes storm report evidence visible again even if it was hidden.
-- **Discussion editor headings:** Insert H1/H2/H3 markup at the start of the current line instead of splitting text at the cursor.
-- **CIG risk conversion:** Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
-- **Monitor alert popup:** Keep a selected NWS alert popup open while animation frames advance instead of dismissing it on every frame; dismiss with the close button or by clicking elsewhere on the map.
-- **Stale page recovery:** Forecast, discussion, verification, monitor, cloud, and admin pages now trigger one automatic reload instead of staying stuck loading when the cached app references outdated files.
-- **Saved products:** Allow up to twelve reusable categories per hosted custom product, surface save failures in the editor, and simplify hosted Firestore rules while keeping category shape validation on the client.
-- **Beta sign-in on Cloudflare:** Allow Google Sign-In scripts in the beta content security policy so hosted auth works on `beta.gfcweather.com`.
-- **Beta billing on Cloudflare:** Return Stripe checkout and portal sessions to the beta hostname the user started from, including `beta.gfcweather.com`.
-- **Beta analytics on Cloudflare:** Pass Umami build settings into the Cloudflare Workers beta deploy so opted-in visits can be counted.
-- **Sentry tunnel:** Stop aborting upstream fetches when the request stream closes after the body is read on Node 24, which had caused every forwarded envelope to return 504.
-- **Cloud forecast history:** Enforce ownership when overwriting saved cycles, cap saved history and cloud metadata, and keep sync status current without side effects on legacy reads.
-- **Outlook reliability:** Apply total severe-event thresholds, preserve significant-outlook state when toggled, and reject unsupported outlook maps.
-- **Storm reports and monitor alerts:** Parse rolling-year report dates correctly and avoid overlapping alert refreshes.
-- **Verification summaries:** Show zero misses when no reports are available instead of reporting a 100% miss rate.
-- **Forecast file handling:** Validate copied forecast files before import and keep generated downloads available long enough for browsers to save them.
-- **Reference layers and dialogs:** Restore saved reference-layer settings and keep keyboard focus inside open dialogs.
-- **Beta account access:** Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
-- **Alert banner schedules:** Enforce configured start and expiry times after validating the schedule, and ignore stale configuration fetches.
-- **Autosave restore:** Ignore invalid snapshot timestamps so a malformed save cannot block a valid newer snapshot.
-- **Deployment action selection:** Treat the automatic choice as a request to use the release manifest.
-- **Basemap loading:** Remove the broken Carto dark basemap, restore vendored geometry on nested forecast routes, and prevent late loads from replacing a newer map choice.
-- **Forecast geometry:** Reject malformed geometry before map snapping and preserve the last valid shape when derivation fails.
-- **Tabbed forecast toolbar:** Stop section labels, day controls, layer chips, and custom draw panels from overlapping at desktop widths around 1024px by enforcing section minimum widths, clipping overflow, and horizontal scrolling in each tab row.
-- **Auto-categorical recovery:** Recover after worker failures or timeouts, preserve the latest edit, and avoid retrying unchanged failed geometry.
-- **Polygon editing:** Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
-- **Cloud cycle saves:** Reject empty cycle ids and dates with a 400 response instead of a generic 500.
+- **Mesoscale:**
+  - The map shows model layers at the default zoom on the standard basemap instead of a blank map.
+  - The map, area tools, and Areas and Discussion tabs stay usable with a retry action and model switcher when model data is loading or unavailable.
+  - The area toolbar no longer overlaps the Data toggle on phones.
+- **Discussions:** Keep the selected map day when the Discussion URL changes inside a multi-day grouping. Treat non-string imported content as empty, and insert H1/H2/H3 headings at the start of the current line instead of splitting text at the cursor.
+- **Verification:** Show zero misses when no reports are available instead of a 100% miss rate. Reject empty or malformed report dates before requesting SPC reports, and clear loaded reports (and ignore in-flight requests) when a different forecast is loaded. Restoring a saved grade snapshot makes storm report evidence visible again, and corrupted snapshots show a notice instead of crashing.
+- **Monitor alerts:**
+  - Keep a selected alert popup open while animation frames advance.
+  - Keep playback following new snapshots after the 12-frame window fills.
+  - Show background refresh failures while keeping the last frames visible, and avoid overlapping refreshes.
+  - Preserve partial and cleared radar-site values and apply the active map theme once state boundaries load.
+- **Forecast geometry and editing:**
+  - Reject malformed geometry before map snapping and keep the last valid shape when derivation fails.
+  - Limit vertex changes to the selected outlook and record multi-vertex edits as one undo step.
+  - Recover auto-categorical generation after worker failures or timeouts without retrying unchanged failed geometry.
+  - Apply total severe-event thresholds, preserve significant-outlook state, and keep significant-threat markers from breaking probability category lookup.
+  - Use a probability's nearest lower mapped CIG category when a valid CIG combination has no explicit rule.
+  - Validate copied forecast files before import and keep generated downloads available long enough to save.
+- **Tabbed forecast toolbar:** Section labels, day controls, layer chips, and custom draw panels no longer overlap around 1024px wide.
+- **Maps and layers:** Restore saved reference-layer settings, keep the selected basemap after hosted settings sync, remove the broken Carto dark basemap, and prevent late loads from replacing a newer map choice. Preserve significant-threat colors in KMZ exports and apply the map theme to state outlines.
+- **Cloud and accounts:**
+  - Enforce ownership when overwriting saved cycles, cap saved history, and reject empty cycle ids and dates with a 400 instead of a 500.
+  - Allow up to twelve reusable categories per hosted custom product and surface save failures in the editor.
+  - Retry final cleanup when account deletion finds the identity already removed, while reporting incomplete billing or data cleanup as a failure.
+  - Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
+- **Beta site:** Google Sign-In, Stripe checkout and portal returns, and opted-in analytics now work on `beta.gfcweather.com`.
+- **App stability:**
+  - Pages reload once automatically instead of staying stuck loading when the cached app references outdated files.
+  - Allow closing the population estimate dialog while it calculates, and keep the Documentation drawer's tab and scroll position when the layout updates.
+  - Keep keyboard focus inside open dialogs.
+  - Ignore invalid autosave timestamps, apply alert banner start and expiry times after validating them, and fall back to defaults for invalid Auto-TSTM timeout settings.
 
 #### Security
 
 - **Account and request security:** Require sign-in for product analytics, validate billing redirects, hide internal billing errors, enforce the production content security policy, and keep sensitive error details out of Sentry breadcrumbs.
-- **Dependency fixes:** Pin patched versions of browserslist, fast-uri, qs, uuid, and OpenTelemetry core.
-- **body-parser security fix:** Update the hosted API's Express body-parser dependency to 2.4.0 to address CVE-2026-111181.
+- **Dependency advisories:** Patched versions of minimatch, glob, the gRPC library used by Firebase, browserslist, fast-uri, qs, uuid, OpenTelemetry core, and body-parser (CVE-2026-111181) replace vulnerable ones in the app and hosted server.
 
 #### Dependencies
 
-- **Server billing and monitoring:** Update the hosted server Stripe library to 23.0.1 and Sentry Node SDK from 11.8.0 to 11.9.0 to keep premium checkout and error monitoring on supported releases with no change to billing behavior.
-- **Routine app libraries:** Updated Sentry React to 11.9.0, Immer to 11.2.9, Lucide icons to 1.61.0, and React Router to 8.5.0 to keep error reporting, forecast editing, icons, and page navigation on supported releases.
-- **Interface components:** Updated dialog, dropdown, popover, tabs, and tooltip libraries to keep forecast dialogs, menus, and tooltips working reliably.
-- **Maps and navigation:** Updated map style handling, routing, and core rendering libraries to keep basemaps and page navigation working smoothly.
-- **Firebase SDK:** Updated Firebase from 12.19.0 to 13.0.0 to keep hosted Google sign-in, session persistence, and Firestore cloud sync on a supported release with no change to existing behavior.
-- **Sentry Node server SDK:** Update the hosted server error monitoring dependency from 11.6.0 to 11.8.0 to keep crash reporting on a supported release.
-- **Routine library updates:** Updated app libraries including OpenLayers 10.11.0 for maps, Radix UI primitives, Redux Toolkit 2.13.0, Lucide icons 1.55.0 and Sentry 11.6.0 for ongoing compatibility and maintenance.
-- **Stripe server SDK:** Update the server Stripe library from 22.6.2 to 23.0.0 to keep premium checkout, customer portal, and subscription webhooks on a supported release with no change to billing behavior.
-- **Server:** Update hosted API dependencies to Sentry Node 11.8.0, Express 5.3.0, and Express Rate Limit 8.7.1 to keep error monitoring, routing, and request limits current.
-- **Server:** Update Sentry Node SDK to 11.0 for hosted error monitoring.
-- **Browser error monitoring:** Update the Sentry React SDK from version 10 to version 11 for crash and performance reporting.
-- **App and tooling:** Update React and React DOM to 19.3, Firebase to 12.19, Sentry to 10.75, Lucide to 1.47, Vite to 8.3, and related packages.
-- **Server:** Update Sentry to 10.75, Firebase Admin to 14.4, Stripe to 22.6, and related server packages.
-- **firebase-admin:** 14.4.0 → 14.5.0 (`server`)
-
-#### Dependency summary
+- **App libraries:** React and React DOM 19.3, Firebase 13.2, Sentry React 11.11, Redux Toolkit 2.14, Vite 8.3, Lucide icons 1.70, React Router 8.5, OpenLayers 10.11, Radix UI primitives, and related build and test tools.
+- **Server libraries:** Sentry Node 11.11, Firebase Admin 14.5, Stripe 23.1, Express 5.3, and express-rate-limit 8.7.
 <!-- dependabot-automation -->
 
 ### Stable 1.7.x hotfixes
