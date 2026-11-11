@@ -50,7 +50,7 @@ test.describe('Auto-TSTM disabled (HREF decommission)', () => {
     await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(
       /temporarily disabled while the SPC HREF source/i,
     );
-    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(/REFSCT.*v1\.8/i);
+    await expect(page.getByTestId('auto-tstm-disabled-banner')).toContainText(/REFSCT.*v2/i);
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: 'Auto-TSTM' })).toBeDisabled();
