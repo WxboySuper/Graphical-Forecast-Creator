@@ -25,9 +25,11 @@ async function prepare(route) {
     if (version) version.textContent = 'v2';
     document.querySelectorAll('[data-testid*="beta"], [data-testid*="feedback"], [data-testid="auto-tstm-disabled-banner"], [data-testid="categorical-error-banner"], [role="alert"]').forEach((element) => element.remove());
     document.querySelectorAll('.beta-banner, .feedback-button, [data-sonner-toaster]').forEach((element) => element.remove());
+    const bannerPrefixes = ['Auto-TSTM disabled:', 'CATEGORICAL GENERATION PAUSED'];
+    const isBannerText = (text) => bannerPrefixes.some((prefix) => text.startsWith(prefix));
     for (const element of document.querySelectorAll('body *')) {
       const text = element.textContent?.trim() ?? '';
-      if (element.childElementCount === 0 && (text.startsWith('Auto-TSTM disabled:') || text.startsWith('CATEGORICAL GENERATION PAUSED'))) {
+      if (element.childElementCount === 0 && isBannerText(text)) {
         element.closest('[class*="banner"], [class*="alert"], [class*="notice"]')?.remove();
         element.remove();
       }

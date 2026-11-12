@@ -63,13 +63,17 @@ const emitScripts = (outDir, srcDir) => {
   return urls;
 };
 
-/** Copies maplibre-gl for the home page hero map so no third-party CDN is needed. */
+/** Copies the ESM maplibre-gl build (module, shared chunk, worker, CSS) into a versioned folder. */
 const emitMaplibre = (outDir, root) => {
-  const dist = path.join(root, 'node_modules', 'maplibre-gl', 'dist');
-  return {
-    maplibreJs: emitHashed(outDir, 'maplibre-gl', '.js', readFileSync(path.join(dist, 'maplibre-gl.js'))),
-    maplibreCss: emitHashed(outDir, 'maplibre-gl', '.css', readFileSync(path.join(dist, 'maplibre-gl.css'))),
-  };
+  const packageDir = path.join(root, 'node_modules', 'maplibre-gl');
+  const { version } = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
+  const target = path.join(outDir, 'assets', 'h', `maplibre-${version}`);
+  mkdirSync(target, { recursive: true });
+  for (const file of ['maplibre-gl.mjs', 'maplibre-gl-shared.mjs', 'maplibre-gl-worker.mjs', 'maplibre-gl.css']) {
+    cpSync(path.join(packageDir, 'dist', file), path.join(target, file));
+  }
+  const base = `/assets/h/maplibre-${version}`;
+  return { maplibreModule: `${base}/maplibre-gl.mjs`, maplibreCss: `${base}/maplibre-gl.css` };
 };
 
 const loadPartials = (srcDir) => {
@@ -85,6 +89,17 @@ const renderLegal = (meta, root) => (meta.markdown ? marked.parse(readText(root,
 
 const pageOutputPath = (routePath) => (routePath === '/' ? 'index.html' : path.posix.join(routePath.replace(/^\//, ''), 'index.html'));
 
+/** Builds the script, stylesheet, and module-preload tags that a page's front matter asks for. */
+const pageAssetTags = (meta, globals) => {
+  const isHome = meta.script === 'home';
+  const script = meta.script ? globals.scripts[meta.script] : '';
+  return {
+    pageScript: script ? `<script src="${script}" defer></script>` : '',
+    pageStyles: isHome ? `<link rel="stylesheet" href="${globals.maplibreCss}">` : '',
+    pageVendor: isHome ? `<link rel="modulepreload" href="${globals.maplibreModule}">` : '',
+  };
+};
+
 /** Renders one page file into the layout and returns its output record. */
 const renderPage = ({ file, srcDir, root, partials, globals }) => {
   const { meta, body } = parseFrontMatter(readText(srcDir, 'pages', file));
@@ -97,9 +112,7 @@ const renderPage = ({ file, srcDir, root, partials, globals }) => {
     canonical: `${globals.siteUrl}${meta.path === '/' ? '/' : meta.path}`,
     bodyClass: meta.bodyClass ?? '',
     active: meta.active ?? '',
-    pageScript: meta.script && globals.scripts[meta.script] ? `<script src="${globals.scripts[meta.script]}" defer></script>` : '',
-    pageStyles: meta.script === 'home' ? `<link rel="stylesheet" href="${globals.maplibreCss}">` : '',
-    pageVendor: meta.script === 'home' ? `<script src="${globals.maplibreJs}" defer></script>` : '',
+    ...pageAssetTags(meta, globals),
     legal: renderLegal(meta, root),
     releases: meta.generated === 'releases' ? buildReleaseHtml(root) : '',
     noindex: meta.noindex === 'true' ? '<meta name="robots" content="noindex">' : '',

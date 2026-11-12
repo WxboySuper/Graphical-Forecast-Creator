@@ -1,4 +1,3 @@
-/* global maplibregl */
 (()=>{
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MM=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360)),MS=37.94,MR=MS*180/Math.PI;const P=(lon,lat)=>[500+(lon+97.4)*MS,MR*(MM(43)-MM(lat))];
@@ -147,8 +146,10 @@ ds.forEach(d=>{d.addEventListener('mouseenter',()=>matchMedia('(hover:hover)').m
 
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
-function mkMap(el,style){if(!window.maplibregl)return;window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0,preserveDrawingBuffer:true});let d=0;m.on('idle',()=>{if(!d){d=1;window.__mapsPending--}})}
-document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(a,'positron');mkMap(b,'dark')}else mkMap(el,'liberty')});
+function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0,preserveDrawingBuffer:true});let d=0;m.on('idle',()=>{if(!d){d=1;window.__mapsPending--}})}
+function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
+// maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
+const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>initMaps(m.default||m)).catch(()=>{})
 // bento map: custom layer mini
 const bm=document.getElementById('bentoMap');const p=PROD.rain;if(bm){
 bm.innerHTML=`<rect width="400" height="220" rx="12" fill="#f3f1ea"/><g transform="translate(-200,-95) scale(.62)">${p.paths.map((d,i)=>`<path d="${d}" fill="${p.cats[i][1]}" fill-opacity=".85" stroke="#000" stroke-width="2.5"/>`).join('')}</g>
