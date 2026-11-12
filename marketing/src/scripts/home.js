@@ -104,7 +104,8 @@ const MW=380;function fit(box){const a=box.querySelector('.appc');if(!a)return;c
  if(w<700){a.classList.add('m');const s=w/MW;let H=box.id==='storyBox'?Math.max(440,Math.min(640,(window.innerHeight-box.offsetTop-14)/s)):620;a.style.height=H+'px';a.style.width=MW+'px';a.style.transform=`scale(${s})`;box.style.height=(H*s)+'px';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox',`${(+v.dataset.fc)-500} 0 1000 526`));return}
  a.classList.remove('m');a.style.height='';a.style.width='';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox','0 0 1000 526'));let s=w/1000,fx=0;const min=box.dataset.min?+box.dataset.min:0;if(s<min){fx=+(a.dataset.fx||0);s=min;fx=Math.max(0,Math.min(fx,1000-w/s))}a.style.transform=`translate(${-fx*s}px,0) scale(${s})`;box.style.height=(640*s)+'px'}
 const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));let GEN=0;const clear=()=>{GEN++;T.forEach(id=>{clearTimeout(id);clearInterval(id)});T.length=0};
-function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',p.getTotalLength().toFixed(0)))}
+const pathLength=p=>{try{return p.getTotalLength()}catch{return 0}};
+function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',pathLength(p).toFixed(0)))}
 const SEG=1.5,GAP=.25,clamp01=v=>Math.min(1,Math.max(0,v));
 function paintPolys(ps,L,t){let active=-1;ps.forEach((p,i)=>{const q=clamp01((t-i*(SEG+GAP))/SEG);p.style.strokeDashoffset=L[i]*(1-q);if(q>0&&q<1)active=i;if(q>=1&&p.style.fillOpacity==='0'){p.style.transition='fill-opacity .4s ease';p.style.fillOpacity='.82'}});return active}
 function placePen(pen,ps,L,active,t){if(!pen||active<0)return;const pt=ps[active].getPointAtLength(clamp01((t-active*(SEG+GAP))/SEG)*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
@@ -112,7 +113,7 @@ function finishPolys(g,ps,pen){if(pen)pen.setAttribute('opacity',0);ps.forEach(p
 function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.classList.remove('done');g.getBoundingClientRect();
  const ps=[...g.querySelectorAll('.poly')];const instant=RM||force;if(instant||!ps.length){finishPolys(g,ps,null);return}
  // one clock drives both the outline and the pen, so the pen is always at the end of the drawn line
- const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(p=>p.getTotalLength());
+ const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(pathLength);
  ps.forEach((p,i)=>{p.style.transition='none';p.style.strokeDashoffset=L[i];p.style.fillOpacity=0});
  if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),inStory=!!a.closest('#storyBox'),myGen=inStory?GEN:0;
  (function f(n){const t=Math.max(0,(n-t0)/1000),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));let active=-1;

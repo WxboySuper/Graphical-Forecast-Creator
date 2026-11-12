@@ -99,3 +99,4 @@ footer .fine{text-align:center;margin:12px 0 0;font-size:.85rem}
 /* keep the illustrated app visible even if its script never sizes it */
 .hero .appbox,.stage .appbox{min-height:320px}
 .after-lede{margin-top:22px}.after-cards{margin-top:28px}
+.button-row{display:flex;gap:16px;flex-wrap:wrap}
