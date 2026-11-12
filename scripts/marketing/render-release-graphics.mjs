@@ -74,7 +74,16 @@ const CARDS = {
 };
 
 const mime = (file) => (file.endsWith('.png') ? 'image/png' : 'image/jpeg');
-const dataUri = (file) => `data:${mime(file)};base64,${readFileSync(path.join(file.includes('lockup') ? ASSETS : LIVE, file)).toString('base64')}`;
+/** Screenshots may be saved as PNG by the capture script or as optimized JPEG; use whichever exists. */
+const resolveAsset = (file) => {
+  const dir = file.includes('lockup') ? ASSETS : LIVE;
+  const alternate = file.endsWith('.png') ? file.replace(/[.]png$/, '.jpg') : file.replace(/[.]jpg$/, '.png');
+  return [file, alternate].find((candidate) => existsSync(path.join(dir, candidate))) ?? file;
+};
+const dataUri = (requested) => {
+  const file = resolveAsset(requested);
+  return `data:${mime(file)};base64,${readFileSync(path.join(file.includes('lockup') ? ASSETS : LIVE, file)).toString('base64')}`;
+};
 const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[FEATURES[name]]}</svg>`;
 
 const floatHtml = (card) =>
@@ -104,7 +113,7 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   for (const card of cards) {
-    if (!existsSync(path.join(LIVE, card.shot.file))) { process.stdout.write(`skip ${card.file}: ${card.shot.file} missing\n`); continue; }
+    if (!existsSync(path.join(LIVE, resolveAsset(card.shot.file)))) { process.stdout.write(`skip ${card.file}: ${card.shot.file} missing\n`); continue; }
     const htmlFile = path.join(tmp, `${card.file}.html`);
     writeFileSync(htmlFile, cardHtml(card));
     await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });

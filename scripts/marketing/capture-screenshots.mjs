@@ -1,3 +1,8 @@
+/**
+ * Captures product screenshots for the marketing site from a running local app.
+ * It needs the Vite dev server (`pnpm dev`, default http://127.0.0.1:3000 or GFC_CAPTURE_URL)
+ * because the seeding step imports TypeScript sources through the dev server.
+ */
 import { chromium } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';

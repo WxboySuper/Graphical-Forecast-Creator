@@ -109,6 +109,7 @@ const pageOutputPath = (routePath) => {
 const pageAssetTags = (meta, globals) => {
   const isHome = meta.script === 'home';
   const script = meta.script ? globals.scripts[meta.script] : '';
+  if (meta.script && !script) throw new Error(`Unknown page script "${meta.script}"; add marketing/src/scripts/${meta.script}.js`);
   return {
     pageScript: script ? `<script src="${script}" defer></script>` : '',
     pageStyles: isHome ? `<link rel="stylesheet" href="${globals.maplibreCss}">` : '',
@@ -168,10 +169,16 @@ const containsPath = (parent, child) => {
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 };
 
+/** Temp folders are only cleared when they sit inside a gfc-* scratch directory this tooling created. */
+const isScratchDir = (target) => {
+  const relative = path.relative(path.resolve(os.tmpdir()), target);
+  return containsPath(path.resolve(os.tmpdir()), target) && path.basename(relative.split(path.sep)[0]).startsWith('gfc-');
+};
+
 /** Only clears an output folder strictly inside the repository or the OS temp directory. */
 const assertSafeOutDir = (root, outDir) => {
   const resolved = path.resolve(outDir);
-  const allowed = containsPath(path.resolve(root), resolved) || containsPath(path.resolve(os.tmpdir()), resolved);
+  const allowed = containsPath(path.resolve(root), resolved) || isScratchDir(resolved);
   if (!allowed) throw new Error(`Refusing to clear output directory outside the repository or temp folder: ${resolved}`);
 };
 

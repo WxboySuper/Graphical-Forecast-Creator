@@ -29,14 +29,14 @@ export const parseFrontMatter = (source) => {
 };
 
 const lookup = (values, key) => {
-  if (!(key in values)) throw new Error(`Missing template value "${key}"`);
+  if (!Object.hasOwn(values, key)) throw new Error(`Missing template value "${key}"`);
   return values[key];
 };
 
 const expandPartials = (template, partials, depth = 0) => {
   if (depth > 5) throw new Error('Partials are nested too deeply');
   return template.replace(/\{\{>\s*([\w-]+)\s*\}\}/g, (_match, name) => {
-    if (!(name in partials)) throw new Error(`Missing partial "${name}"`);
+    if (!Object.hasOwn(partials, name)) throw new Error(`Missing partial "${name}"`);
     return expandPartials(partials[name], partials, depth + 1);
   });
 };
