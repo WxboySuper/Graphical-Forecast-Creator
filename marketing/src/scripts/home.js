@@ -108,14 +108,14 @@ function paintPolys(ps,L,t){let active=-1;ps.forEach((p,i)=>{const q=clamp01((t-
 function placePen(pen,ps,L,active,t){if(!pen||active<0)return;const pt=ps[active].getPointAtLength(clamp01((t-active*(SEG+GAP))/SEG)*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
 function finishPolys(g,ps,pen){if(pen)pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done')}
 function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.classList.remove('done');g.getBoundingClientRect();
- const ps=[...g.querySelectorAll('.poly')];if(RM||force){finishPolys(g,ps,null);return}
+ const ps=[...g.querySelectorAll('.poly')];if(RM||force||!ps.length){finishPolys(g,ps,null);return}
  // one clock drives both the outline and the pen, so the pen is always at the end of the drawn line
  const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(p=>p.getTotalLength());
  ps.forEach((p,i)=>{p.style.transition='none';p.style.strokeDashoffset=L[i];p.style.fillOpacity=0});
- if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),myGen=GEN;
+ if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),inStory=!!a.closest('#storyBox'),myGen=inStory?GEN:0;
  (function f(n){const t=Math.max(0,(n-t0)/1000),active=paintPolys(ps,L,t),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));
   cats.forEach((c,k)=>c.classList.toggle('on',k===i));placePen(pen,ps,L,active,t);
-  const finished=t>=ps.length*(SEG+GAP)||!a.isConnected||GEN!==myGen;
+  const finished=t>=ps.length*(SEG+GAP)||!a.isConnected||(inStory&&GEN!==myGen);
   if(finished){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
