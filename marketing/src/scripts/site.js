@@ -44,7 +44,7 @@
   }
 
   const current = document.body.dataset.active;
-  if (current) {
+  if (current && /^[a-z0-9-]+$/i.test(current)) {
     const safe = window.CSS && CSS.escape ? CSS.escape(current) : current.replace(/[^\w-]/g, '');
     try {
       document.querySelectorAll('[data-nav="' + safe + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));

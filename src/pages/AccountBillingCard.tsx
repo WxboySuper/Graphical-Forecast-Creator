@@ -183,6 +183,9 @@ export const AccountBillingCard: React.FC = () => {
       <CardContent className="account-section-content">
         <BillingSummaryGrid billingStatus={billingStatus} currentPlanPrice={currentPlanPrice} />
         <BillingCardMessages supportCopy={supportCopy} portalMessage={portalMessage} error={error} />
+        {!premiumActive && !checkoutEnabled ? (
+          <p className="text-sm text-muted-foreground">Upgrading is not available on this deployment yet.</p>
+        ) : null}
         <BillingActionRow
           stripeCustomerId={stripeCustomerId}
           billingEnabled={billingEnabled}

@@ -46,6 +46,15 @@ describe('AccountBillingCard checkout', () => {
     expect(screen.getByRole('button', { name: /upgrade monthly/i })).not.toBeDisabled();
   });
 
+  it('explains why the upgrade buttons are disabled when checkout is off', () => {
+    mockUseEntitlement.mockReturnValue({ ...baseEntitlement, checkoutEnabled: false, openCheckout: jest.fn() });
+
+    render(<AccountBillingCard />);
+
+    expect(screen.getByRole('button', { name: /upgrade annual/i })).toBeDisabled();
+    expect(screen.getByText(/not available on this deployment yet/i)).toBeInTheDocument();
+  });
+
   it('hides upgrade buttons for premium accounts and links to the marketing pricing page', () => {
     mockUseEntitlement.mockReturnValue({ ...baseEntitlement, premiumActive: true, openCheckout: jest.fn() });
 
