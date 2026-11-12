@@ -145,14 +145,21 @@ export const AccountBillingCard: React.FC = () => {
   };
 
   /** Starts Stripe checkout for one billing interval and surfaces failures in the card. */
-  const handleCheckout = (plan: CheckoutPlan) => {
+  const handleCheckout = async (plan: CheckoutPlan) => {
     setPortalMessage(null);
     setSubmittingPlan(plan);
-    openCheckout(plan)
-      .catch((nextError) => {
-        setPortalMessage(nextError instanceof Error ? nextError.message : 'Unable to start checkout right now.');
-      })
-      .finally(() => setSubmittingPlan(null));
+    try {
+      await openCheckout(plan);
+    } catch (nextError) {
+      setPortalMessage(nextError instanceof Error ? nextError.message : 'Unable to start checkout right now.');
+    } finally {
+      setSubmittingPlan(null);
+    }
+  };
+
+  /** Wraps checkout so button handlers stay synchronous. */
+  const handleCheckoutClick = (plan: CheckoutPlan) => {
+    handleCheckout(plan).catch(() => undefined);
   };
 
   const upgrade = premiumActive ? null : (
@@ -161,7 +168,7 @@ export const AccountBillingCard: React.FC = () => {
       submittingPlan={submittingPlan}
       annualDisplayPrice={annualDisplayPrice}
       monthlyDisplayPrice={monthlyDisplayPrice}
-      onCheckout={handleCheckout}
+      onCheckout={handleCheckoutClick}
     />
   );
 
