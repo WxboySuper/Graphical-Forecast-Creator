@@ -15,7 +15,7 @@
   }
 
   const top = document.getElementById('top');
-  const onScroll = () => top && top.classList.toggle('scrolled', scrollY > 20);
+  const onScroll = () => top && top.classList.toggle('scrolled', window.scrollY > 20);
   addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
