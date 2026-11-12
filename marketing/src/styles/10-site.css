@@ -43,8 +43,8 @@ section{position:relative}
 .story{height:560vh}
 .stage{position:sticky;top:0;height:100vh;display:grid;grid-template-columns:minmax(0,.58fr) minmax(0,1.9fr);gap:clamp(24px,3.5vw,56px);align-items:center;padding:84px clamp(18px,3.5vw,56px) 30px;background:radial-gradient(100% 90% at 70% 50%,#11304d 0%,var(--bg) 70%)}
 .steps{position:relative;min-height:440px}
-.step{position:absolute;inset:0;opacity:0;transform:translateY(16px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
-.step.active{opacity:1;transform:none}
+.step{position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(16px);transition:opacity .6s var(--ease),transform .6s var(--ease),visibility 0s linear .6s}
+.step.active{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}
 .step .num{font:500 .9rem "IBM Plex Mono",Consolas,monospace;color:var(--accent-blue)}
 .step h2{font-size:clamp(2rem,3.6vw,3.4rem);line-height:1;letter-spacing:-.03em;margin:10px 0 16px}
 .step p{color:var(--ink-soft);font-size:1.06rem;line-height:1.6;margin:0;max-width:400px}

@@ -7,5 +7,8 @@
     theme = prefersLight ? 'light' : 'dark';
   }
   document.documentElement.dataset.theme = theme;
-  document.documentElement.classList.add('js');
+  const root = document.documentElement;
+  root.classList.add('js');
+  // If the main script never marks the page as ready, show everything instead of leaving content collapsed.
+  setTimeout(() => { if (!root.classList.contains('site-ready')) root.classList.remove('js'); }, 4000);
 })();

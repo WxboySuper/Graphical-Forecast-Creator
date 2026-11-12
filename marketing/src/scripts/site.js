@@ -1,6 +1,7 @@
 /* Shared behavior: theme toggle, sticky header, mobile menu, FAQ accordions, scroll reveal. */
 (() => {
   const root = document.documentElement;
+  root.classList.add('site-ready');
   const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const themeButton = document.getElementById('themeBtn');
   const label = () => themeButton && themeButton.setAttribute('aria-label', root.dataset.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');

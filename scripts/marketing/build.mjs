@@ -114,12 +114,15 @@ const pageAssetTags = (meta, globals) => {
 
 const hasParentSegment = (value) => value.split(/[\\/]/).includes('..');
 
+const isSafeRoute = (value) => value.startsWith('/') && !hasParentSegment(value);
+
+const isSafeRelative = (value) => !path.isAbsolute(value) && !hasParentSegment(value);
+
 /** Rejects front matter that could read or write outside the repository or the output folder. */
 const assertPageMeta = (meta, file) => {
-  if (!meta.path.startsWith('/') || hasParentSegment(meta.path)) throw new Error(`${file}: path must be an absolute route without ".." segments`);
+  if (!isSafeRoute(meta.path)) throw new Error(`${file}: path must be an absolute route without ".." segments`);
   for (const key of ['output', 'markdown']) {
-    const value = meta[key];
-    if (value && (path.isAbsolute(value) || hasParentSegment(value))) throw new Error(`${file}: ${key} must be a relative path without ".." segments`);
+    if (meta[key] && !isSafeRelative(meta[key])) throw new Error(`${file}: ${key} must be a relative path without ".." segments`);
   }
 };
 
