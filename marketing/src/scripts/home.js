@@ -154,5 +154,5 @@ function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibreg
 (window.requestIdleCallback||setTimeout)(()=>{const u=radarURL();document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))});
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
-const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>initMaps(m.default||m)).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
+const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>{const lib=m.default||m;if(typeof lib.Map!=='function')throw new Error('Unexpected maplibre-gl module shape');initMaps(lib)}).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
 })();
