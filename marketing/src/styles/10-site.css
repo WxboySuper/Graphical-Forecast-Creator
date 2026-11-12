@@ -316,7 +316,6 @@ footer .trust{text-align:center;margin:0 0 18px}
 footer .trust span{display:inline-block;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line);font-family:"IBM Plex Mono",Consolas,monospace;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}
 footer .links{display:flex;flex-wrap:wrap;gap:14px 26px;justify-content:center}footer .links a{text-decoration:none}
 .js .reveal{opacity:0;transform:translateY(26px);transition:opacity .9s var(--ease),transform .9s var(--ease)}.js .reveal.in{opacity:1;transform:none}
-.mini-days span{padding:10px 0}
 
 /* ===== mobile app mockup (phone layout, readable scale) ===== */
 .appc.m .ab{height:44px;padding:0 10px}.appc.m .ab nav,.appc.m .ab .rt .ver,.appc.m .ab .rt span:nth-child(2){display:none}

@@ -11,7 +11,6 @@
  .js .top.menu-open nav{display:flex}.top.menu-open{background:var(--bg)}
  .top nav a,.top nav .themebtn{padding:14px 4px;border-bottom:1px solid var(--line)}.top nav .cta{margin-top:12px;text-align:center}
 }
-main.page{padding-top:96px}
 .pagehead{padding-top:clamp(40px,7vw,96px);padding-bottom:clamp(24px,4vw,48px)}
 .pagehead h1{font-size:clamp(2.6rem,6.4vw,5.4rem);line-height:.96;letter-spacing:-.035em;margin:12px 0 18px}
 .pagehead h1 .light{color:var(--accent-blue)}
