@@ -112,11 +112,23 @@ const pageAssetTags = (meta, globals) => {
   };
 };
 
+const hasParentSegment = (value) => value.split(/[\\/]/).includes('..');
+
+/** Rejects front matter that could read or write outside the repository or the output folder. */
+const assertPageMeta = (meta, file) => {
+  if (!meta.path.startsWith('/') || hasParentSegment(meta.path)) throw new Error(`${file}: path must be an absolute route without ".." segments`);
+  for (const key of ['output', 'markdown']) {
+    const value = meta[key];
+    if (value && (path.isAbsolute(value) || hasParentSegment(value))) throw new Error(`${file}: ${key} must be a relative path without ".." segments`);
+  }
+};
+
 /** Renders one page file into the layout and returns its output record. */
 const renderPage = ({ file, srcDir, root, partials, globals }) => {
   const { meta, body } = parseFrontMatter(readText(srcDir, 'pages', file));
   if (!meta.title || !meta.path) throw new Error(`${file} needs title and path front matter`);
   const content = body;
+  assertPageMeta(meta, file);
   const values = {
     ...globals,
     title: meta.title,

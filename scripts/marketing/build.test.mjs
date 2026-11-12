@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -55,6 +55,33 @@ describe('release data validation', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('page front matter safety', () => {
+  const build = (frontMatter) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-fm-'));
+    try {
+      const src = path.join(root, 'marketing', 'src');
+      for (const dir of ['pages', 'partials', 'data', 'styles', 'scripts']) mkdirSync(path.join(src, dir), { recursive: true });
+      writeFileSync(path.join(src, 'data', 'site.json'), JSON.stringify({ siteUrl: 'https://example.test', description: 'd' }));
+      writeFileSync(path.join(src, 'partials', 'layout.html'), '{{{ content }}}');
+      writeFileSync(path.join(src, 'scripts', 'site.js'), '1');
+      writeFileSync(path.join(src, 'scripts', 'theme.js'), '1');
+      writeFileSync(path.join(src, 'pages', 'x.html'), ['---', ...frontMatter, '---', 'body'].join('\n'));
+      for (const pkg of ['@fontsource-variable/bricolage-grotesque', '@fontsource/ibm-plex-mono', 'maplibre-gl']) {
+        cpSync(path.join(ROOT, 'node_modules', pkg), path.join(root, 'node_modules', pkg), { recursive: true, dereference: true });
+      }
+      return buildSite({ root, outDir: path.join(root, 'out') });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it('rejects parent segments and absolute values in routes, outputs, and markdown sources', () => {
+    assert.throws(() => build(['title: x', 'path: /../evil']), /without ".." segments/);
+    assert.throws(() => build(['title: x', 'path: /ok', 'output: ../../evil.html']), /output must be a relative path/);
+    assert.throws(() => build(['title: x', 'path: /ok', 'markdown: ../secret.md']), /markdown must be a relative path/);
   });
 });
 

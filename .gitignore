@@ -84,6 +84,5 @@ __pycache__/
 *.py[cod]
 cloudflare/wrangler.mesoscale.rendered.json
 
-# Marketing site build output and scratch
-marketing/dist/
+# Marketing site scratch files
 scripts/marketing/.tmp/

@@ -41,12 +41,26 @@ const renderRelease = (release, index) => `
 
 const REQUIRED_TEXT = ['label', 'title', 'summary'];
 
+const assertText = (value, keys, where) => {
+  for (const key of keys) {
+    if (typeof value?.[key] !== 'string') throw new Error(`releases.json ${where} needs a string "${key}"`);
+  }
+};
+
+const assertSection = (section, where) => {
+  assertText(section, ['title', 'body'], where);
+  for (const [shotIndex, shot] of (section.screenshots ?? []).entries()) assertText(shot, ['src', 'alt'], `${where} screenshot ${shotIndex}`);
+};
+
 /** Fails with a readable message when a release entry is missing what the page needs. */
 const assertRelease = (release, index) => {
   for (const key of REQUIRED_TEXT) {
     if (typeof release?.[key] !== 'string') throw new Error(`releases.json entry ${index} needs a string "${key}"`);
   }
   if (!Array.isArray(release.sections)) throw new Error(`releases.json entry ${index} needs a "sections" array`);
+  release.sections.forEach((section, sectionIndex) => assertSection(section, `entry ${index} section ${sectionIndex}`));
+  for (const [itemIndex, item] of (release.improvements ?? []).entries()) assertText(item, ['text'], `entry ${index} improvement ${itemIndex}`);
+  if (release.heroImage) assertText(release.heroImage, ['src', 'alt'], `entry ${index} heroImage`);
 };
 
 /** Builds the release archive markup, newest release first. */

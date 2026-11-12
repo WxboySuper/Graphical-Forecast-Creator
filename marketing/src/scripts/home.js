@@ -106,7 +106,8 @@ function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;s
   ps.forEach((p,i)=>{const q=Math.min(1,Math.max(0,(t-i*(SEG+GAP))/SEG));p.style.strokeDashoffset=L[i]*(1-q);if(q>0&&q<1)active=i;if(q>=1&&p.style.fillOpacity==='0'){p.style.transition='fill-opacity .4s ease';p.style.fillOpacity='.82'}});
   const i=Math.min(ps.length-1,Math.max(0,Math.floor(t/(SEG+GAP))));cats.forEach((c,k)=>c.classList.toggle('on',k===i));
   if(active>=0){const q=Math.min(1,(t-active*(SEG+GAP))/SEG),pt=ps[active].getPointAtLength(q*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
-  if(t>=ps.length*(SEG+GAP)||!a.isConnected||GEN!==myGen){pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done');return}
+  const superseded=!a.isConnected||GEN!==myGen;
+  if(t>=ps.length*(SEG+GAP)||superseded){pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done');return}
   requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}

@@ -93,6 +93,7 @@ async function capture(name) {
     canvas.getContext('2d').drawImage(bitmap, 0, 0);
     return await new Promise((resolve) => {
       canvas.toBlob(async (blob) => {
+        if (!blob) throw new Error('This browser could not encode the canvas as WebP');
         const buffer = await blob.arrayBuffer();
         resolve(Array.from(new Uint8Array(buffer)));
       }, 'image/webp', 0.82);
