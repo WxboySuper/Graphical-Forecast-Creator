@@ -113,7 +113,9 @@ const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   for (const card of cards) {
-    if (!existsSync(path.join(LIVE, resolveAsset(card.shot.file)))) { process.stdout.write(`skip ${card.file}: ${card.shot.file} missing\n`); continue; }
+    const needed = [[LIVE, card.shot.file], ...(card.float ? [[LIVE, card.float.file]] : []), [ASSETS, 'brand-lockup.png']];
+    const missing = needed.find(([dir, file]) => !existsSync(path.join(dir, resolveAsset(file))));
+    if (missing) { process.stdout.write(`skip ${card.file}: ${missing[1]} missing\n`); continue; }
     const htmlFile = path.join(tmp, `${card.file}.html`);
     writeFileSync(htmlFile, cardHtml(card));
     await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });
