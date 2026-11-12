@@ -117,6 +117,7 @@ const renderPage = ({ file, srcDir, root, partials, globals }) => {
     title: meta.title,
     description: meta.description ?? globals.defaultDescription,
     canonical: `${globals.siteUrl}${meta.path === '/' ? '/' : meta.path}`,
+    canonicalTag: meta.noindex === 'true' ? '' : `<link rel="canonical" href="${globals.siteUrl}${meta.path === '/' ? '/' : meta.path}">`,
     bodyClass: meta.bodyClass ?? '',
     active: meta.active ?? '',
     ...pageAssetTags(meta, globals),
@@ -138,18 +139,21 @@ const sitemapXml = (siteUrl, records) => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 };
 
-/** Builds the marketing site into outDir and returns the rendered page routes. */
+const isFilesystemRoot = (target) => path.dirname(target) === target;
+
+const containsPath = (parent, child) => {
+  const relative = path.relative(parent, child);
+  return !relative.startsWith('..') && !path.isAbsolute(relative);
+};
+
 /** Refuses to wipe an output folder that is a filesystem root, the repository root, or one of its parents. */
 const assertSafeOutDir = (root, outDir) => {
   const resolved = path.resolve(outDir);
-  const repo = path.resolve(root);
-  const relative = path.relative(resolved, repo);
-  const isRoot = path.dirname(resolved) === resolved;
-  if (isRoot || resolved === repo || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
-    throw new Error(`Refusing to clear unsafe output directory: ${resolved}`);
-  }
+  const unsafe = isFilesystemRoot(resolved) || containsPath(resolved, path.resolve(root));
+  if (unsafe) throw new Error(`Refusing to clear unsafe output directory: ${resolved}`);
 };
 
+/** Builds the marketing site into outDir and returns the rendered page routes. */
 export const buildSite = ({ root = ROOT, outDir = path.join(root, 'marketing', 'dist') } = {}) => {
   const srcDir = path.join(root, 'marketing', 'src');
   const site = JSON.parse(readText(srcDir, 'data', 'site.json'));

@@ -30,7 +30,7 @@
   }
 
   const current = document.body.dataset.active;
-  if (current) document.querySelectorAll('[data-nav="' + CSS.escape(current) + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
+  if (current) document.querySelectorAll('[data-nav="' + (window.CSS && CSS.escape ? CSS.escape(current) : current.replace(/[^w-]/g, '')) + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
 
   document.querySelectorAll('.qa button').forEach((button) => button.addEventListener('click', () => {
     const open = button.getAttribute('aria-expanded') !== 'true';
