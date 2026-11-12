@@ -29,6 +29,18 @@
       toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
       if (top) top.classList.toggle('menu-open', open);
     });
+    const closeMenu = () => {
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', 'Open menu');
+      if (top) top.classList.remove('menu-open');
+    };
+    addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+        closeMenu();
+        toggle.focus();
+      }
+    });
+    addEventListener('resize', () => { if (window.innerWidth > 980) closeMenu(); });
   }
 
   const current = document.body.dataset.active;
