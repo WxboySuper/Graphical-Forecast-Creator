@@ -21,26 +21,31 @@ const WARN=[['#ff0000',[[-95.62,35.02],[-95.18,35.38],[-94.98,35.22],[-95.05,34.
  ['#ffff00',[[-93.75,37.25],[-93.10,37.78],[-92.82,37.52],[-93.02,37.12],[-93.48,37.02],[-93.70,37.08]]],
  ['#ffff00',[[-96.95,33.55],[-96.48,33.98],[-96.15,33.80],[-96.30,33.40]]]];
 const SREP=[['#ff0000',-95.55,34.98],['#ff0000',-94.45,36.42],['#0000ff',-95.9,34.5],['#0000ff',-94.9,35.6],['#0000ff',-93.6,37.2],['#00c000',-96.3,34.0],['#00c000',-94.6,35.9],['#0000ff',-95.2,35.2]];
-let _rad=null;function renderRadar(done){if(_rad){done(_rad);return}const W=1000,H=526,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);
- const hs=(x,y)=>{let n=Math.imul(x,374761393)+Math.imul(y,668265263)|0;n=Math.imul(n^n>>>13,1274126177);return((n^n>>>16)>>>0)/4294967296};
- const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);const a=hs(xi,yi),b=hs(xi+1,yi),c=hs(xi,yi+1),d=hs(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
- const fbm=(x,y)=>{let t=0,a=.5,f=1;for(let i=0;i<5;i++){t+=a*vn(x*f,y*f);f*=2.1;a*=.5}return t};
- // squall line axis as polyline (lon,lat) -> pixel
- const L=[[-97.3,33.3],[-96.3,34.2],[-95.4,35.1],[-94.6,36.0],[-93.9,36.9],[-93.1,37.7],[-92.4,38.5]].map(q=>P(...q).map(v=>v));
- const cores=[[-95.45,35.05,1.25],[-94.2,36.55,1.2],[-94.75,35.8,.8],[-95.9,34.35,.8],[-93.3,37.35,.85],[-96.6,33.72,.6],[-92.7,38.2,.5]].map(([lo,la,k])=>{const[x,y]=P(lo,la);return[x,y,k]});
- const iso=[[-97.6,35.4,7],[-98.1,34.7,5],[-92.2,36.6,6],[-91.8,37.4,4],[-96.9,36.3,5]].map(([lo,la,r])=>{const[x,y]=P(lo,la);return[x,y,r]});
- const segd=(x,y)=>{let best=1e9,side=0;for(let i=0;i<L.length-1;i++){const[ax,ay]=L[i],[bx,by]=L[i+1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy))),px=ax+t*dx-x,py=ay+t*dy-y,d=Math.hypot(px,py);if(d<best){best=d;side=(dx*(y-ay)-dy*(x-ax))}}return[best,side]};
- const row=y=>{for(let x=0;x<W;x++){const X=x/2,Y=y/2,n=fbm(X/14,Y/14),n2=fbm(X/5+40,Y/5+9);
-  const wx=X*2+(n-.5)*36,wy=Y*2+(fbm(X/14+7,Y/14+3)-.5)*36;const[d,side]=segd(wx,wy);
-  // leading convective edge narrow, trailing stratiform wide on NW side (side>0)
-  let z=0;const conv=Math.exp(-(d*d)/(2*9*9))*(0.55+0.6*n2);z=Math.max(z,conv*58);
-  if(side<0){const st=Math.exp(-d/50)*(n*1.25);z=Math.max(z,st*36)}else{z=Math.max(z,Math.exp(-d/14)*n*30)}
-  for(const[cx,cy,k]of cores){const r=Math.hypot(wx-cx,(wy-cy)*1.25);z=Math.max(z,Math.exp(-(r*r)/(2*11*11))*(52+20*k)*(0.8+0.35*n2))}
-  for(const[cx,cy,r]of iso){const rr=Math.hypot(wx-cx,wy-cy);z=Math.max(z,Math.exp(-(rr*rr)/(2*4*r*r))*(30+25*n2))}
-  z+= (n2-.5)*9;const o=(y*W+x)*4;if(z<13){im.data[o+3]=0;continue}
-  const k=Math.min(DBZ.length-1,Math.max(0,Math.floor((z-5)/5)));const c=DBZ[k][1];im.data[o]=parseInt(c.slice(1,3),16);im.data[o+1]=parseInt(c.slice(3,5),16);im.data[o+2]=parseInt(c.slice(5,7),16);im.data[o+3]=z<20?120:215}};
- // draw the radar in short time slices so it never blocks scrolling or input
- let y=0;(function slice(){const t0=performance.now();while(y<H&&performance.now()-t0<10)row(y++);if(y<H){setTimeout(slice,0);return}g.putImageData(im,0,0);_rad=cv.toDataURL();done(_rad)})()}
+const hs=(x,y)=>{let n=Math.imul(x,374761393)+Math.imul(y,668265263)|0;n=Math.imul(n^n>>>13,1274126177);return((n^n>>>16)>>>0)/4294967296};
+const vn=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);const a=hs(xi,yi),b=hs(xi+1,yi),c=hs(xi,yi+1),d=hs(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v};
+const fbm=(x,y)=>{let t=0,a=.5,f=1;for(let i=0;i<5;i++){t+=a*vn(x*f,y*f);f*=2.1;a*=.5}return t};
+// squall line axis, storm cores and isolated cells, converted from lon/lat to map pixels once
+let _cells=null;
+function radarCells(){if(_cells)return _cells;const toPx=([lo,la,v])=>{const[x,y]=P(lo,la);return[x,y,v]};
+ _cells={L:[[-97.3,33.3],[-96.3,34.2],[-95.4,35.1],[-94.6,36.0],[-93.9,36.9],[-93.1,37.7],[-92.4,38.5]].map(q=>P(...q)),
+  cores:[[-95.45,35.05,1.25],[-94.2,36.55,1.2],[-94.75,35.8,.8],[-95.9,34.35,.8],[-93.3,37.35,.85],[-96.6,33.72,.6],[-92.7,38.2,.5]].map(toPx),
+  iso:[[-97.6,35.4,7],[-98.1,34.7,5],[-92.2,36.6,6],[-91.8,37.4,4],[-96.9,36.3,5]].map(toPx)};return _cells}
+function segd(L,x,y){let best=1e9,side=0;for(let i=0;i<L.length-1;i++){const[ax,ay]=L[i],[bx,by]=L[i+1],dx=bx-ax,dy=by-ay,t=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(dx*dx+dy*dy))),px=ax+t*dx-x,py=ay+t*dy-y,d=Math.hypot(px,py);if(d<best){best=d;side=(dx*(y-ay)-dy*(x-ax))}}return[best,side]}
+// leading convective edge is narrow; trailing stratiform rain is wide on the NW side
+function edgeZ(d,side,n,n2){const conv=Math.exp(-(d*d)/(2*9*9))*(0.55+0.6*n2)*58;return side<0?Math.max(conv,Math.exp(-d/50)*n*1.25*36):Math.max(conv,Math.exp(-d/14)*n*30)}
+function radarZ(x,y){const{L,cores,iso}=radarCells(),X=x/2,Y=y/2,n=fbm(X/14,Y/14),n2=fbm(X/5+40,Y/5+9),wx=X*2+(n-.5)*36,wy=Y*2+(fbm(X/14+7,Y/14+3)-.5)*36,[d,side]=segd(L,wx,wy);
+ let z=edgeZ(d,side,n,n2);
+ for(const[cx,cy,k]of cores){const r=Math.hypot(wx-cx,(wy-cy)*1.25);z=Math.max(z,Math.exp(-(r*r)/(2*11*11))*(52+20*k)*(0.8+0.35*n2))}
+ for(const[cx,cy,r]of iso){const rr=Math.hypot(wx-cx,wy-cy);z=Math.max(z,Math.exp(-(rr*rr)/(2*4*r*r))*(30+25*n2))}
+ return z+(n2-.5)*9}
+function radarPixel(data,o,z){if(z<13){data[o+3]=0;return}
+ const c=DBZ[Math.min(DBZ.length-1,Math.max(0,Math.floor((z-5)/5)))][1];data[o]=parseInt(c.slice(1,3),16);data[o+1]=parseInt(c.slice(3,5),16);data[o+2]=parseInt(c.slice(5,7),16);data[o+3]=z<20?120:215}
+let _rad=null;
+// draw the radar in short time slices so it never blocks scrolling or input
+function renderRadar(done){if(_rad){done(_rad);return}
+ const W=1000,H=526,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);let y=0;
+ const row=()=>{for(let x=0;x<W;x++)radarPixel(im.data,(y*W+x)*4,radarZ(x,y));y++};
+ const slice=()=>{const t0=performance.now();while(y<H&&performance.now()-t0<10)row();if(y<H){setTimeout(slice,0);return}g.putImageData(im,0,0);_rad=cv.toDataURL();done(_rad)};slice()}
 function reportColor(t){if(t<.25)return'#FF0000';return t<.65?'#0000FF':'#00FF00'}
 function mapSVG(id,prod,o={}){
  let h=`<svg class="map" data-fc="${o.radar?640:({rain:610,fire:330,tor:560}[prod]||500)}" viewBox="0 0 1000 526" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sample ${PROD[prod]?PROD[prod].name:''} forecast map"><defs><radialGradient id="dbz${id}"><stop offset="0" stop-color="#c00000"/><stop offset=".22" stop-color="#ff3b00"/><stop offset=".45" stop-color="#ffd400"/><stop offset=".7" stop-color="#18b018" stop-opacity=".85"/><stop offset="1" stop-color="#18b018" stop-opacity="0"/></radialGradient><linearGradient id="tint${id}" x1="0" x2="1"><stop offset="0" stop-color="#e6ecdc" stop-opacity="0"/><stop offset=".5" stop-color="#e3eadb"/></linearGradient><filter id="bl${id}"><feGaussianBlur stdDeviation="3"/></filter></defs>
@@ -98,19 +103,20 @@ const MW=380;function fit(box){const a=box.querySelector('.appc');if(!a)return;c
  a.classList.remove('m');a.style.height='';a.style.width='';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox','0 0 1000 526'));let s=w/1000,fx=0;const min=box.dataset.min?+box.dataset.min:0;if(s<min){fx=+(a.dataset.fx||0);s=min;fx=Math.max(0,Math.min(fx,1000-w/s))}a.style.transform=`translate(${-fx*s}px,0) scale(${s})`;box.style.height=(640*s)+'px'}
 const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));let GEN=0;const clear=()=>{GEN++;T.forEach(id=>{clearTimeout(id);clearInterval(id)});T.length=0};
 function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',p.getTotalLength().toFixed(0)))}
+const SEG=1.5,GAP=.25,clamp01=v=>Math.min(1,Math.max(0,v));
+function paintPolys(ps,L,t){let active=-1;ps.forEach((p,i)=>{const q=clamp01((t-i*(SEG+GAP))/SEG);p.style.strokeDashoffset=L[i]*(1-q);if(q>0&&q<1)active=i;if(q>=1&&p.style.fillOpacity==='0'){p.style.transition='fill-opacity .4s ease';p.style.fillOpacity='.82'}});return active}
+function placePen(pen,ps,L,active,t){if(!pen||active<0)return;const pt=ps[active].getPointAtLength(clamp01((t-active*(SEG+GAP))/SEG)*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
+function finishPolys(g,ps,pen){if(pen)pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done')}
 function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.classList.remove('done');g.getBoundingClientRect();
- const ps=[...g.querySelectorAll('.poly')];if(RM||force){ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.add('done');return}
+ const ps=[...g.querySelectorAll('.poly')];if(RM||force){finishPolys(g,ps,null);return}
  // one clock drives both the outline and the pen, so the pen is always at the end of the drawn line
- const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],SEG=1.5,GAP=.25,L=ps.map(p=>p.getTotalLength());
+ const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(p=>p.getTotalLength());
  ps.forEach((p,i)=>{p.style.transition='none';p.style.strokeDashoffset=L[i];p.style.fillOpacity=0});
- pen?.setAttribute('opacity',1);const t0=performance.now(),myGen=GEN;
- (function f(n){const t=Math.max(0,(n-t0)/1000);let active=-1;
-  ps.forEach((p,i)=>{const q=Math.min(1,Math.max(0,(t-i*(SEG+GAP))/SEG));p.style.strokeDashoffset=L[i]*(1-q);if(q>0&&q<1)active=i;if(q>=1&&p.style.fillOpacity==='0'){p.style.transition='fill-opacity .4s ease';p.style.fillOpacity='.82'}});
-  const i=Math.min(ps.length-1,Math.max(0,Math.floor(t/(SEG+GAP))));cats.forEach((c,k)=>c.classList.toggle('on',k===i));
-  if(active>=0){const q=Math.min(1,(t-active*(SEG+GAP))/SEG),pt=ps[active].getPointAtLength(q*L[active]);pen?.setAttribute('cx',pt.x);pen?.setAttribute('cy',pt.y)}
-  const superseded=!a.isConnected||GEN!==myGen;
-  if(t>=ps.length*(SEG+GAP)||superseded){pen?.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done');return}
-  requestAnimationFrame(f)})(t0)}
+ if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),myGen=GEN;
+ (function f(n){const t=Math.max(0,(n-t0)/1000),active=paintPolys(ps,L,t),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));
+  cats.forEach((c,k)=>c.classList.toggle('on',k===i));placePen(pen,ps,L,active,t);
+  const finished=t>=ps.length*(SEG+GAP)||!a.isConnected||GEN!==myGen;
+  if(finished){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
 function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n));a.querySelector('.ab').dataset.page=n}
