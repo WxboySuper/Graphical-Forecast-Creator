@@ -3,9 +3,11 @@ import { isApiPath, isLegacyPath } from './marketing-worker-paths.mjs';
 import { parseAppOrigin } from './marketing-worker-origin.mjs';
 import { secureMarketingResponse } from './marketing-worker-response.mjs';
 import { serviceUnavailable } from './site-worker-response.mjs';
+import { isHostname } from './site-worker-hosts.mjs';
 
 const hasMarketingAssets = (env) => typeof env?.ASSETS?.fetch === 'function';
-const hasMarketingHosts = (env) => Boolean(env?.CANONICAL_HOST && env?.WWW_HOST);
+const isMarketingHost = (value) => isHostname(value ?? '');
+const hasMarketingHosts = (env) => isMarketingHost(env?.CANONICAL_HOST) && isMarketingHost(env?.WWW_HOST);
 const isConfiguredAppOrigin = (origin) => Boolean(origin);
 
 const redirect = (url, hostname) => {
@@ -19,11 +21,11 @@ const redirect = (url, hostname) => {
   return Response.redirect(target, 308);
 };
 
-const isMarketingHost = (url, env) => [env.CANONICAL_HOST, env.WWW_HOST].some((host) => url.hostname.toLowerCase() === host.toLowerCase());
+const isAllowedMarketingHost = (url, env) => [env.CANONICAL_HOST, env.WWW_HOST].some((host) => url.hostname.toLowerCase() === host.toLowerCase());
 
 const legacyRedirect = (url, env, appOrigin) => {
   if (!isLegacyPath(url.pathname)) return null;
-  if (!isMarketingHost(url, env)) return null;
+  if (!isAllowedMarketingHost(url, env)) return null;
   return redirect(url, appOrigin.hostname);
 };
 
@@ -50,6 +52,10 @@ export default {
     const hostRedirect = canonicalRedirect(url, env);
     if (hostRedirect) return hostRedirect;
     if (isApiPath(url.pathname)) return proxyMarketingApi(request, env, configuration.appOrigin);
-    return secureMarketingResponse(await env.ASSETS.fetch(request), url);
+    try {
+      return secureMarketingResponse(await env.ASSETS.fetch(request), url);
+    } catch {
+      return serviceUnavailable('The marketing assets are unavailable.');
+    }
   },
 };

@@ -3,6 +3,7 @@ const hasExtraComponents = (url) => url.pathname !== '/' || Boolean(url.search |
 const isSecureOrigin = (url) => {
   if (url.protocol !== 'https:') return false;
   if (!url.hostname) return false;
+  if (url.port) return false;
   if (hasCredentials(url)) return false;
   return !hasExtraComponents(url);
 };

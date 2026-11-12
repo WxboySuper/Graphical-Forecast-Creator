@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import worker from './marketing-worker.mjs';
-import { LEGACY_PATHS } from './marketing-worker-paths.mjs';
+import { LEGACY_PATHS, marketingWorkerFirstPaths } from './marketing-worker-paths.mjs';
+import { secureMarketingResponse } from './marketing-worker-response.mjs';
 
 const env = (overrides = {}) => ({
   CANONICAL_HOST: 'gfcweather.com', WWW_HOST: 'www.gfcweather.com', APP_ORIGIN: 'https://app.gfcweather.com', PRODUCTION_WORKER_SHARED_SECRET: 'shared-secret',
@@ -21,6 +22,7 @@ test('redirects legacy application routes on apex and www to app with 308 and qu
 
 test('wrangler sends every legacy prefix and API path through the Worker', () => {
   const configuration = JSON.parse(readFileSync(new URL('./wrangler.marketing.jsonc', import.meta.url), 'utf8'));
+  assert.deepEqual(configuration.assets.run_worker_first, marketingWorkerFirstPaths());
   const workerFirst = new Set(configuration.assets.run_worker_first);
   for (const prefix of LEGACY_PATHS) {
     assert.ok(workerFirst.has(prefix), `${prefix} must run through the Worker`);
@@ -34,6 +36,20 @@ test('does not redirect marketing pricing or updates paths', async () => {
   for (const path of ['/pricing', '/updates']) {
     const response = await worker.fetch(new Request(`https://gfcweather.com${path}`), env());
     assert.equal(await response.text(), 'site');
+  }
+});
+
+test('returns a no-store 503 when the assets binding rejects', async () => {
+  const response = await worker.fetch(new Request('https://gfcweather.com/'), env({ ASSETS: { fetch: async () => { throw new Error('offline'); } } }));
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('rejects malformed marketing host configuration', async () => {
+  for (const host of ['gfcweather.com:443', 'user@gfcweather.com', 'gfcweather.com/path', 'https://gfcweather.com']) {
+    const response = await worker.fetch(new Request('https://gfcweather.com/'), env({ CANONICAL_HOST: host }));
+    assert.equal(response.status, 503, host);
+    assert.equal(response.headers.get('cache-control'), 'no-store', host);
   }
 });
 
@@ -58,6 +74,20 @@ test('forwards API method and body through service binding and strips spoofed tr
   assert.equal(forwarded.headers.get('x-gfc-worker-secret'), 'shared-secret');
   assert.equal(forwarded.headers.get('cf-connecting-ip'), '203.0.113.7');
   assert.equal(response.status, 202);
+});
+
+test('strips URL credentials and hash when forwarding API requests', async () => {
+  let forwarded;
+  const request = new Request('https://gfcweather.com/api/health?q=1', { headers: { 'cf-connecting-ip': '203.0.113.7' } });
+  Object.defineProperty(request, 'url', { value: 'https://user:secret@gfcweather.com/api/health?q=1#fragment' });
+  await worker.fetch(request, env({ APP_WORKER: { fetch: async (req) => { forwarded = req; return new Response('ok'); } } }));
+  assert.equal(forwarded.url, 'https://app.gfcweather.com/api/health?q=1');
+});
+
+test('rejects explicit APP_ORIGIN ports', async () => {
+  const response = await worker.fetch(new Request('https://gfcweather.com/'), env({ APP_ORIGIN: 'https://app.gfcweather.com:8443' }));
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
 test('fails closed without app service binding or assets binding', async () => {
@@ -96,4 +126,16 @@ test('serves the asset 404 and sets marketing security and cache headers', async
 test('hashed assets receive immutable caching', async () => {
   const response = await worker.fetch(new Request('https://gfcweather.com/assets/site-Abcdef012345.js'), env());
   assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+});
+
+test('marketing response handles null-body statuses and invalid status text', async () => {
+  const response = secureMarketingResponse({
+    status: 204,
+    statusText: 'invalid\rstatus',
+    headers: new Headers(),
+    body: new ReadableStream(),
+  }, new URL('https://gfcweather.com/'));
+  assert.equal(response.status, 204);
+  assert.equal(response.body, null);
+  assert.equal(response.statusText, '');
 });

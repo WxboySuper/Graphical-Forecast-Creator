@@ -16,6 +16,9 @@ const buildAppRequest = (request, appOrigin, headers) => {
   target.hostname = appOrigin.hostname;
   target.port = '';
   target.protocol = 'https:';
+  target.username = '';
+  target.password = '';
+  target.hash = '';
   return new Request(target, new Request(request, { headers }));
 };
 
