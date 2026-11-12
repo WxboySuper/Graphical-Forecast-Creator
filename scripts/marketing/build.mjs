@@ -16,11 +16,19 @@ import { buildReleaseHtml } from './releases.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const FONT_FILES = {
-  __FONT_BRICOLAGE__: ['@fontsource-variable/bricolage-grotesque', 'files/bricolage-grotesque-latin-wght-normal.woff2'],
-  __FONT_PLEX_400__: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-400-normal.woff2'],
-  __FONT_PLEX_500__: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-500-normal.woff2'],
-  __FONT_PLEX_600__: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-600-normal.woff2'],
+  bricolage: ['@fontsource-variable/bricolage-grotesque', 'files/bricolage-grotesque-latin-wght-normal.woff2'],
+  plex400: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-400-normal.woff2'],
+  plex500: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-500-normal.woff2'],
+  plex600: ['@fontsource/ibm-plex-mono', 'files/ibm-plex-mono-latin-600-normal.woff2'],
 };
+
+/** Builds the @font-face rules from the emitted, fingerprinted font URLs. */
+const fontFaceCss = (urls) => [
+  `@font-face{font-family:"Bricolage Grotesque";src:url(${urls.bricolage}) format("woff2");font-weight:200 800;font-display:swap}`,
+  `@font-face{font-family:"IBM Plex Mono";src:url(${urls.plex400}) format("woff2");font-weight:400;font-display:swap}`,
+  `@font-face{font-family:"IBM Plex Mono";src:url(${urls.plex500}) format("woff2");font-weight:500;font-display:swap}`,
+  `@font-face{font-family:"IBM Plex Mono";src:url(${urls.plex600}) format("woff2");font-weight:600;font-display:swap}`,
+].join('\n');
 
 const hashOf = (content) => createHash('sha256').update(content).digest('hex').slice(0, 10);
 
@@ -49,11 +57,7 @@ const emitFonts = (outDir, root) => {
 };
 
 const emitStyles = (outDir, srcDir, fontUrls) => {
-  let css = listFiles(path.join(srcDir, 'styles'), '.css')
-    .map((name) => readText(srcDir, 'styles', name))
-    .join('\n');
-  for (const [token, url] of Object.entries(fontUrls)) css = css.split(token).join(url);
-  if (css.includes('__FONT_')) throw new Error('A font placeholder was not replaced; check FONT_FILES in scripts/marketing/build.mjs');
+  const css = [fontFaceCss(fontUrls), ...listFiles(path.join(srcDir, 'styles'), '.css').map((name) => readText(srcDir, 'styles', name))].join('\n');
   return emitHashed(outDir, 'site', '.css', css);
 };
 

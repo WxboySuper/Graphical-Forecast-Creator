@@ -115,11 +115,10 @@ function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on
 function typeInto(el,text,speed,done){if(RM){el.textContent=text;if(done)done();return}let i=0;const iv=setInterval(()=>{i+=2;el.textContent=text.slice(0,i);if(i>=text.length){clearInterval(iv);if(done)done()}},speed);T.push(iv)}
 
 // hero
-if(!['heroBox','storyBox','story','top','doorsEl'].every(id=>document.getElementById(id)))return;
-const hb=document.getElementById('heroBox');hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');ha.querySelector('.dhelp').style.display='none';ha.querySelector('.tp').classList.remove('on');ha.querySelector('.td').classList.add('on');ha.querySelector('.td').style.cssText='background:#111;color:#fff';
-setTimeout(()=>drawPolys(ha),400);
+const hb=document.getElementById('heroBox');if(hb){hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');ha.querySelector('.dhelp').style.display='none';ha.querySelector('.tp').classList.remove('on');ha.querySelector('.td').classList.add('on');ha.querySelector('.td').style.cssText='background:#111;color:#fff';
+setTimeout(()=>drawPolys(ha),400);}
 // story
-const sb=document.getElementById('storyBox');sb.dataset.min='.7';const sa=build(sb,{id:'s',prod:'rain',story:true});
+const sb=document.getElementById('storyBox'),sec=document.getElementById('story'),topEl=document.getElementById('top');if(sb&&sec&&topEl){sb.dataset.min='.7';const sa=build(sb,{id:'s',prod:'rain',story:true});
 const SUM='A slow-moving front will stall from eastern Oklahoma into southern Missouri. Repeated rounds of storms with precipitable water near 1.8 inches will bring 2-4 inches of rain, locally higher in the Ozarks. Flash flooding is the main concern overnight.';
 const steps=[
  a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'forecast');hidePolys(a);tab(a,'days','days');a.querySelector('.lgd').innerHTML=legend(null,'severe');a.querySelector('.cated').classList.remove('on');a.querySelector('.dhelp').style.display='';
@@ -138,15 +137,15 @@ const steps=[
  a=>{a.dataset.fx='480';a.classList.remove('dark');a.querySelector('.moon').textContent='☾';view(a,'verification');const vv=a.querySelector('.vv');vv.classList.remove('go');a.querySelector('.gnum').textContent='0';a.querySelectorAll('.hz i').forEach(i=>i.style.width='0');
    later(500,()=>{vv.classList.add('go');a.querySelectorAll('.hz i').forEach(i=>i.style.width=i.dataset.w+'%');const e=a.querySelector('.gnum'),t0=performance.now(),myGen=GEN;(function f(n){if(GEN!==myGen){e.textContent=78;return}const p=Math.min(1,(n-t0)/1400);e.textContent=Math.round(78*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)})}
 ];
-const sec=document.getElementById('story'),stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
-function onScroll(){document.getElementById('top').classList.toggle('scrolled',window.scrollY>20);const r=sec.getBoundingClientRect(),tot=Math.max(1,sec.offsetHeight-window.innerHeight),p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
+const stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
+function onScroll(){topEl.classList.toggle('scrolled',window.scrollY>20);const r=sec.getBoundingClientRect(),tot=Math.max(1,sec.offsetHeight-window.innerHeight),p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
  if(s!==cur&&r.top<window.innerHeight*.5){cur=s;clear();stepEls.forEach((e,i)=>e.classList.toggle('active',i===s));bars.forEach((e,i)=>e.classList.toggle('on',i<=s));steps[s](sa);fit(sb)}}
 const frame=f=>{let t=0;return()=>{if(t)return;t=requestAnimationFrame(()=>{t=0;f()})}};
-addEventListener('scroll',frame(onScroll),{passive:true});addEventListener('resize',frame(()=>{fit(hb);fit(sb)}));onScroll();
+addEventListener('scroll',frame(onScroll),{passive:true});addEventListener('resize',frame(()=>{if(hb)fit(hb);fit(sb)}));onScroll();}
 // doors
-const doors=document.getElementById('doorsEl'),ds=[...doors.querySelectorAll('.door')];doors.classList.add('has-open');
+const doors=document.getElementById('doorsEl');if(doors){const ds=[...doors.querySelectorAll('.door')];doors.classList.add('has-open');
 function openDoor(d){ds.forEach(x=>{const o=x===d;x.classList.toggle('open',o);x.dataset.open=String(o)})}
-ds.forEach(d=>{d.addEventListener('mouseenter',()=>mq('(hover:hover)')&&openDoor(d));d.addEventListener('click',e=>{if(!e.target.closest('a'))openDoor(d)});d.addEventListener('focus',()=>openDoor(d));d.addEventListener('keydown',e=>{if(e.target===d&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDoor(d)}})});
+ds.forEach(d=>{d.addEventListener('mouseenter',()=>mq('(hover:hover)')&&openDoor(d));d.addEventListener('click',e=>{if(!e.target.closest('a'))openDoor(d)});d.addEventListener('focus',()=>openDoor(d));d.addEventListener('keydown',e=>{if(e.target===d&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDoor(d)}})});}
 
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
