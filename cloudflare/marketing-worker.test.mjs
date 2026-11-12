@@ -121,6 +121,8 @@ test('serves the asset 404 and sets marketing security and cache headers', async
   assert.equal(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
   assert.match(response.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.doesNotMatch(response.headers.get('content-security-policy'), /unpkg/i);
+  assert.match(response.headers.get('content-security-policy'), /script-src 'self'(;|$)/);
+  assert.match(response.headers.get('content-security-policy'), /worker-src 'self' blob:/);
 });
 
 test('hashed assets receive immutable caching', async () => {

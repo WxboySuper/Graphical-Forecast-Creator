@@ -133,6 +133,7 @@ export const buildSite = ({ root = ROOT, outDir = path.join(root, 'marketing', '
     ...emitMaplibre(outDir, root),
   };
   globals.siteScript = globals.scripts.site ?? '';
+  globals.themeScript = globals.scripts.theme ?? '';
   if (existsSync(path.join(srcDir, 'assets'))) cpSync(path.join(srcDir, 'assets'), path.join(outDir, 'assets', 'img'), { recursive: true });
   if (existsSync(path.join(root, 'public', 'favicon.ico'))) cpSync(path.join(root, 'public', 'favicon.ico'), path.join(outDir, 'favicon.ico'));
   const partials = loadPartials(srcDir);
