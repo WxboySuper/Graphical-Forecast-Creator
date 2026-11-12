@@ -187,7 +187,7 @@ jobs:
         if: steps.manifest.outputs.skip != 'true'
         run: pnpm run build
         env:
-          PUBLIC_URL: https://gfcweather.com
+          PUBLIC_URL: https://app.gfcweather.com
           VITE_BUILD_TARGET: production
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -258,7 +258,7 @@ jobs:
           cat > prod-server.env <<EOF
           PORT=3006
           LOG_DIR=/opt/gfc-analytics/logs
-          APP_BASE_URL=https://gfcweather.com
+          APP_BASE_URL=https://app.gfcweather.com
           SERVER_TARGET=production
           ADMIN_UID_ALLOWLIST=${{ secrets.ADMIN_UID_ALLOWLIST }}
           METRICS_HASH_SALT=${{ secrets.METRICS_HASH_SALT }}
@@ -446,9 +446,41 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PRODUCTION_WORKER_SHARED_SECRET: ${{ secrets.PRODUCTION_WORKER_SHARED_SECRET }}
 
-      - name: Smoke test production Worker frontend and API
+      - name: Check for marketing Worker support
+        id: marketing
+        if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live' && (github.event_name == 'release' || inputs.deploy_worker)
+        run: |
+          if [ -f cloudflare/marketing-worker.mjs ] && [ -f cloudflare/wrangler.marketing.jsonc ] && [ -f scripts/marketing/build.mjs ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build marketing site
+        if: steps.marketing.outputs.available == 'true'
+        run: pnpm run marketing:build
+
+      - name: Deploy marketing Worker
+        if: steps.marketing.outputs.available == 'true'
+        run: |
+          if [ -z "$PRODUCTION_WORKER_SHARED_SECRET" ]; then
+            echo "::error::PRODUCTION_WORKER_SHARED_SECRET is required for trusted client IP forwarding."
+            exit 1
+          fi
+          printf '%s' "$PRODUCTION_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4.160.1 secret put PRODUCTION_WORKER_SHARED_SECRET --config cloudflare/wrangler.marketing.jsonc
+          pnpm dlx wrangler@4.160.1 deploy --config cloudflare/wrangler.marketing.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PRODUCTION_WORKER_SHARED_SECRET: ${{ secrets.PRODUCTION_WORKER_SHARED_SECRET }}
+
+      - name: Smoke test production application Worker and API
         if: steps.manifest.outputs.skip != 'true' && steps.manifest.outputs.action == 'live' && (github.event_name == 'release' || inputs.deploy_worker)
         run: node scripts/smoke-test-beta-site.mjs
         env:
-          SITE_ORIGIN: https://gfcweather.com
+          SITE_ORIGIN: https://app.gfcweather.com
           EXPECTED_VERSION: ${{ steps.app_version.outputs.raw }}
+
+      - name: Smoke test marketing Worker
+        if: steps.marketing.outputs.available == 'true'
+        run: node scripts/smoke-test-marketing-site.mjs

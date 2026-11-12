@@ -24,7 +24,7 @@ const renderSuspended = (ui: ReactNode) =>
 describe('isChunkLoadError', () => {
   test('matches the GFC-WEB-16 CSS preload failure', () => {
     expect(
-      isChunkLoadError(new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-2yPt00pt.css'))
+      isChunkLoadError(new Error('Unable to preload CSS for https://app.gfcweather.com/assets/ForecastMap-2yPt00pt.css'))
     ).toBe(true);
   });
 
@@ -72,7 +72,7 @@ describe('lazyWithReload', () => {
   test.each([
     {
       type: 'CSS preload failure',
-      error: new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-abc.css'),
+      error: new Error('Unable to preload CSS for https://app.gfcweather.com/assets/ForecastMap-abc.css'),
     },
     {
       type: 'HTML MIME failure',
@@ -99,7 +99,7 @@ describe('lazyWithReload', () => {
     const reload = jest.fn();
     const Page = lazyWithReload(
       'forecast',
-      () => Promise.reject(new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-abc.css')),
+      () => Promise.reject(new Error('Unable to preload CSS for https://app.gfcweather.com/assets/ForecastMap-abc.css')),
       reload
     );
 
@@ -120,7 +120,7 @@ describe('lazyWithReload', () => {
       const reload = jest.fn();
       const Page = lazyWithReload(
         'forecast',
-        () => Promise.reject(new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-abc.css')),
+        () => Promise.reject(new Error('Unable to preload CSS for https://app.gfcweather.com/assets/ForecastMap-abc.css')),
         reload
       );
 

@@ -8,7 +8,7 @@ The feedback API runs as a standalone Cloudflare Worker at `feedback.gfcweather.
 2. Copy its database ID into `cloudflare/wrangler.feedback.jsonc`, replacing `REPLACE_WITH_D1_DATABASE_ID`.
 3. Replace `REPLACE_WITH_FIREBASE_PROJECT_ID` with the Firebase project ID used by GFC.
 4. Add GitHub Actions repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The API token needs Workers Scripts edit, D1 edit, and access to this account.
-5. Confirm `FEEDBACK_ALLOWED_ORIGINS` includes the beta and production frontend origins. Local origins are included by default for development.
+5. Confirm `FEEDBACK_ALLOWED_ORIGINS` includes the beta origin plus `https://app.gfcweather.com` and `https://gfcweather.com` during the hostname transition. Local origins are included by default for development.
 6. Run the **Deploy feedback Worker** workflow once. It applies remote D1 migrations and deploys the Worker. Submissions return 503 until the required hash salt is set.
 7. In **Workers & Pages → gfc-feedback → Settings → Variables and Secrets**, add secret `FEEDBACK_HASH_SALT` (a long random value, required) and secret `FEEDBACK_ADMIN_TOKEN` (a separate long random value). Add `FEEDBACK_DISCORD_WEBHOOK_URL` if Discord delivery is wanted. Set `FEEDBACK_DISCORD_TAG_BETA` and `FEEDBACK_DISCORD_TAG_PROD` as ordinary variables if the forum uses corresponding tag IDs.
 8. Confirm `feedback.gfcweather.com` appears under the Worker custom domains and resolves in the Cloudflare zone. Wrangler provisions the configured custom domain during deploy.

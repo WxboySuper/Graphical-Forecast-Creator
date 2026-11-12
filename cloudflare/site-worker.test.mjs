@@ -44,7 +44,7 @@ test('static header rules cover CSP and avoid caching runtime release markers', 
   assert.match(headers, /\/version\.json\s+Cache-Control: no-store/);
   assert.match(headers, /\/alert-banner\.json\s+Cache-Control: no-store/);
   const nginx = readFileSync(new URL('../server/nginx-legacy-redirect.conf', import.meta.url), 'utf8');
-  assert.match(nginx, /return 308 https:\/\/gfcweather\.com\$request_uri;/);
+  assert.match(nginx, /return 308 https:\/\/app\.gfcweather\.com\$request_uri;/);
 });
 
 test('redirects www to the canonical host with a method-preserving permanent redirect', async () => {
@@ -124,6 +124,30 @@ test('uses the secret paired with the selected API origin and replaces spoofed h
       assert.equal(proxiedRequest.headers.get('x-gfc-worker-client-ip'), '203.0.113.8');
       assert.equal(proxiedRequest.headers.get('x-gfc-worker-secret'), env.expectedSecret);
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('accepts the marketing Worker client IP only with the production shared secret', async () => {
+  const originalFetch = globalThis.fetch;
+  let proxiedRequest;
+  globalThis.fetch = async (request) => { proxiedRequest = request; return new Response('ok'); };
+  try {
+    const request = apiRequest('/test', {
+      headers: {
+        'cf-connecting-ip': '2a06:98c0:3600::103',
+        'x-gfc-worker-client-ip': '203.0.113.18',
+        'x-gfc-worker-secret': 'production-secret',
+      },
+    });
+    await worker.fetch(request, {
+      API_ORIGIN: 'https://api.example.test',
+      PRODUCTION_WORKER_SHARED_SECRET: 'production-secret',
+      ASSETS: noAssetsForApi,
+    });
+    assert.equal(proxiedRequest.headers.get('x-gfc-worker-client-ip'), '203.0.113.18');
+    assert.equal(proxiedRequest.headers.get('x-gfc-worker-secret'), 'production-secret');
   } finally {
     globalThis.fetch = originalFetch;
   }

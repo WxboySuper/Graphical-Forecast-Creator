@@ -1,4 +1,4 @@
-import { applyTrustedClientIp, WORKER_CLIENT_IP_HEADER, WORKER_SECRET_HEADER } from './site-worker-client-ip.mjs';
+import { applyTrustedClientIp, getTrustedClientIp, WORKER_CLIENT_IP_HEADER, WORKER_SECRET_HEADER } from './site-worker-client-ip.mjs';
 import { redirectAlias } from './site-worker-hosts.mjs';
 import { serviceUnavailable } from './site-worker-response.mjs';
 
@@ -47,7 +47,7 @@ const buildApiRequest = (request, requestUrl, { apiOrigin, workerSecret }) => {
   headers.delete(WORKER_CLIENT_IP_HEADER);
   headers.delete(WORKER_SECRET_HEADER);
 
-  applyTrustedClientIp(headers, request.headers.get('cf-connecting-ip'), workerSecret);
+  applyTrustedClientIp(headers, getTrustedClientIp(request.headers, workerSecret) || request.headers.get('cf-connecting-ip'), workerSecret);
   return new Request(apiOrigin, new Request(request, { headers }));
 };
 

@@ -6,7 +6,7 @@
 export const PRODUCT_ANALYTICS_PREFERENCE_KEY = 'gfc-analytics-enabled';
 const LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY = 'gfc-workflow-analytics-enabled';
 
-const PRODUCTION_HOSTNAMES = new Set(['gfcweather.com', 'www.gfcweather.com', 'gfc.weatherboysuper.com']);
+const PRODUCTION_HOSTNAMES = new Set(['app.gfcweather.com', 'gfcweather.com', 'www.gfcweather.com', 'gfc.weatherboysuper.com']);
 const BETA_HOSTNAME = 'beta-gfc.weatherboysuper.com';
 const CLOUDFLARE_BETA_HOSTNAME = 'beta.gfcweather.com';
 

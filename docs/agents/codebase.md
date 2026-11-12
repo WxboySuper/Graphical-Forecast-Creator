@@ -11,7 +11,7 @@
 | `scripts/`, `scripts/lib/` | CI, release, changelog, exposure tooling. Logic in `lib/`, entry points thin |
 | `scripts/mesoscale/` | NOAA HRRR/RAP/RRFS ingest package and local fixtures; scheduled upload workflow is `.github/workflows/mesoscale-ingest.yml` |
 | `deploy/` | `*-deployment-config.json` (server capability switches), `production-release.json`, umami |
-| `cloudflare/` | Beta Worker (`beta-worker.mjs`, `wrangler.beta.jsonc`) and the feedback Worker + D1 (`feedback-worker.mjs`, `feedback/`, `wrangler.feedback.jsonc`) |
+| `cloudflare/` | Production app Worker (`site-worker.mjs`, `wrangler.production.jsonc`), marketing Worker (`marketing-worker.mjs`, `wrangler.marketing.jsonc`), beta Worker, feedback Worker + D1, and mesoscale services |
 | `.github/workflows/` | CI, release, deploy, OpenCode automation |
 | `design/marketing/` | Marketing page designs (not app code) |
 | `public/` | Static assets, `alert-banner.json` |

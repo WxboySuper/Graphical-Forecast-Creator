@@ -1,7 +1,7 @@
 name: Release | Stable
 
 # Stable releases are created only from an approved stable/* release line.
-# The published release then activates the production deployment workflow.
+# The published release then deploys the app Worker, marketing Worker, and VPS API.
 on:
   workflow_dispatch:
     inputs:
@@ -65,6 +65,7 @@ jobs:
   release:
     needs: [final_changelog_audit, changelog_gate]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     outputs:
@@ -127,7 +128,8 @@ jobs:
 
       - name: Create GitHub stable release
         env:
-          GH_TOKEN: ${{ github.token }}
+          # A PAT is required so publishing this release triggers the production deploy workflow.
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: stable-hotfix

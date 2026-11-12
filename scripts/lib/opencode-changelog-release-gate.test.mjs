@@ -33,6 +33,7 @@ test('stable release requires a clean final audit; beta does not run one', () =>
   assert.doesNotMatch(stableWf, /Dispatch post-release changelog audit/);
   assert.match(stableWf, /RELEASE_NOTES_MODE: changelog-and-prs/);
   assert.match(stableWf, /needs: \[final_changelog_audit, changelog_gate\]/);
+  assert.match(stableWf, /Create GitHub stable release[\s\S]*?GH_TOKEN: \$\{\{ secrets\.GH_PAT \}\}/);
   const beta = readFileSync(new URL('../../.github/workflows/release-beta.yml', import.meta.url), 'utf8');
   assert.doesNotMatch(beta, /final_changelog_audit|changelog_gate|opencode-changelog-audit/);
   // Betas list only the pull requests since the previous beta; the full v1.8 changelog is for the stable release.
