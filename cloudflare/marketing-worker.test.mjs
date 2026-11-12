@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import worker from './marketing-worker.mjs';
+import { LEGACY_PATHS } from './marketing-worker-paths.mjs';
 
 const env = (overrides = {}) => ({
   CANONICAL_HOST: 'gfcweather.com', WWW_HOST: 'www.gfcweather.com', APP_ORIGIN: 'https://app.gfcweather.com', PRODUCTION_WORKER_SHARED_SECRET: 'shared-secret',
@@ -9,12 +11,23 @@ const env = (overrides = {}) => ({
 
 test('redirects legacy application routes on apex and www to app with 308 and query', async () => {
   for (const host of ['gfcweather.com', 'www.gfcweather.com']) {
-    for (const path of ['/forecast', '/forecast/x', '/discussion', '/discussion/x', '/monitor', '/verification', '/cloud', '/account', '/admin', '/beta', '/beta-access', '/beta-access/x']) {
+    for (const path of ['/forecast', '/forecast/x', '/discussion', '/discussion/x', '/monitor', '/monitor/foo', '/verification', '/verification/report', '/cloud', '/cloud/settings', '/account', '/account/settings', '/admin', '/admin/users', '/beta', '/beta/enroll', '/beta-access', '/beta-access/x']) {
       const response = await worker.fetch(new Request(`https://${host}${path}?from=old`), env());
       assert.equal(response.status, 308, `${host}${path}`);
       assert.equal(response.headers.get('location'), `https://app.gfcweather.com${path}?from=old`);
     }
   }
+});
+
+test('wrangler sends every legacy prefix and API path through the Worker', () => {
+  const configuration = JSON.parse(readFileSync(new URL('./wrangler.marketing.jsonc', import.meta.url), 'utf8'));
+  const workerFirst = new Set(configuration.assets.run_worker_first);
+  for (const prefix of LEGACY_PATHS) {
+    assert.ok(workerFirst.has(prefix), `${prefix} must run through the Worker`);
+    assert.ok(workerFirst.has(`${prefix}/*`), `${prefix} subpaths must run through the Worker`);
+  }
+  assert.ok(workerFirst.has('/api'));
+  assert.ok(workerFirst.has('/api/*'));
 });
 
 test('does not redirect marketing pricing or updates paths', async () => {
