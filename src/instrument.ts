@@ -23,6 +23,11 @@ const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,
 const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
 const OPAQUE_GLOBAL_ERROR_MESSAGE = /^uncaught exception: undefined$/i;
 const GLOBAL_ERROR_MECHANISM = 'auto.browser.global_handlers.onerror';
+const UNHANDLED_REJECTION_MECHANISM = 'auto.browser.global_handlers.onunhandledrejection';
+const KEYLESS_UNHANDLED_REJECTION_VALUES_BY_TYPE = new Map([
+  ['CustomEvent', 'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection'],
+  ['UnhandledRejection', 'Object captured as promise rejection with keys: [object has no keys]'],
+]);
 const EXPECTED_MONITOR_REFERENCE_OUTAGE_TAG = 'gfc_monitor_reference_outage';
 
 const REQUEST_LIFECYCLE_MESSAGES = [
@@ -70,6 +75,45 @@ function isOpaqueGlobalError(value: SentryExceptionValue): boolean {
     value.mechanism?.type === GLOBAL_ERROR_MECHANISM &&
     value.mechanism.handled === false
   );
+}
+
+function hasKeylessUnhandledRejectionMessage(value: SentryExceptionValue): boolean {
+  return KEYLESS_UNHANDLED_REJECTION_VALUES_BY_TYPE.get(value.type ?? '') === value.value;
+}
+
+function hasUnhandledRejectionMechanism(value: SentryExceptionValue): boolean {
+  return (
+    value.mechanism?.type === UNHANDLED_REJECTION_MECHANISM &&
+    value.mechanism.handled === false
+  );
+}
+
+function isKeylessUnhandledRejectionWrapper(value: SentryExceptionValue): boolean {
+  if (!hasKeylessUnhandledRejectionMessage(value)) {
+    return false;
+  }
+  if (value.type === 'Error') {
+    return false;
+  }
+  return hasUnhandledRejectionMechanism(value);
+}
+
+/** True for one matching browser rejection wrapper with no actionable context. */
+function isKeylessUnhandledRejectionNoise(event: Sentry.Event): boolean {
+  const values = event.exception?.values ?? [];
+  if (values.length !== 1) {
+    return false;
+  }
+  if (!isKeylessUnhandledRejectionWrapper(values[0])) {
+    return false;
+  }
+  if (hasApplicationStackFrame(values)) {
+    return false;
+  }
+
+  // As with opaque global errors, keep stackless wrappers when breadcrumbs show
+  // useful activity. Their exact messages alone do not explain that context.
+  return !hasActionableBreadcrumbs(event);
 }
 
 /** True for a no-stack AbortError DOMException rejection (SDK/browser noise). */
@@ -149,6 +193,10 @@ function isKnownBrowserNoise(event: Sentry.Event): boolean {
   // store action is not useful context for an otherwise stackless browser error.
   if (values.some(isOpaqueGlobalError)) {
     return !(hasApplicationStackFrame(values) || hasActionableBreadcrumbs(event));
+  }
+
+  if (isKeylessUnhandledRejectionNoise(event)) {
+    return true;
   }
 
   return false;

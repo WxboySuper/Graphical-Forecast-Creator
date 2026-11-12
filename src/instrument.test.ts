@@ -146,6 +146,94 @@ describe('instrument', () => {
     },
   });
 
+  const createKeylessUnhandledRejection = (
+    value: string,
+    options: {
+      type?: string;
+      mechanismType?: string;
+      frameFilename?: string;
+      breadcrumbs?: Array<{ category?: string; message?: string }>;
+    } = {},
+  ) => ({
+    exception: {
+      values: [
+        {
+          type: options.type,
+          value,
+          mechanism: {
+            type: options.mechanismType ?? 'auto.browser.global_handlers.onunhandledrejection',
+            handled: false,
+          },
+          stacktrace: options.frameFilename
+            ? { frames: [{ filename: options.frameFilename, function: 'renderForecast' }] }
+            : undefined,
+        },
+      ],
+    },
+    breadcrumbs: options.breadcrumbs,
+  });
+
+  const customEventRejectionMessage =
+    'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection';
+  const emptyObjectRejectionMessage =
+    'Object captured as promise rejection with keys: [object has no keys]';
+
+  const keylessUnhandledRejectionCases: Array<[
+    string,
+    string,
+    Parameters<typeof createKeylessUnhandledRejection>[1],
+    boolean,
+  ]> = [
+    [
+      'drops the CustomEvent wrapper',
+      customEventRejectionMessage,
+      { type: 'CustomEvent' },
+      true,
+    ],
+    [
+      'drops the empty Object wrapper',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection' },
+      true,
+    ],
+    [
+      'keeps the CustomEvent wrapper with an app frame',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', frameFilename: 'src/App.tsx' },
+      false,
+    ],
+    [
+      'keeps the empty Object wrapper with an app frame',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection', frameFilename: 'src/App.tsx' },
+      false,
+    ],
+    [
+      'keeps the CustomEvent wrapper from another mechanism',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', mechanismType: 'auto.browser.global_handlers.onerror' },
+      false,
+    ],
+    [
+      'keeps the empty Object wrapper from another mechanism',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection', mechanismType: 'auto.browser.global_handlers.onerror' },
+      false,
+    ],
+    [
+      'keeps wrappers with actionable breadcrumbs',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', breadcrumbs: [{ message: 'forecast route loaded' }] },
+      false,
+    ],
+    [
+      'keeps other unhandled rejection messages',
+      'Object captured as promise rejection with keys: [object has keys: value]',
+      { type: 'UnhandledRejection' },
+      false,
+    ],
+  ];
+
   const loadBeforeSend = () => {
     globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
     // skipcq: JS-C1003, JS-0359 — isolateModules needs require for fresh module load
@@ -250,6 +338,57 @@ describe('instrument', () => {
 
   it('drops no-stack opaque global error noise from Firefox', () => {
     expectBeforeSendToDrop(() => createOpaqueGlobalError());
+  });
+
+  it('keeps real Error rejections', () => {
+    expectBeforeSendToKeep(() =>
+      createKeylessUnhandledRejection(customEventRejectionMessage, {
+        type: 'Error',
+      })
+    );
+  });
+
+  it('drops literal Sentry type/value shapes for both keyless wrappers', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const mechanism = {
+        type: 'auto.browser.global_handlers.onunhandledrejection',
+        handled: false,
+      };
+      const events = [
+        {
+          exception: {
+            values: [{
+              type: 'CustomEvent',
+              value: 'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection',
+              mechanism,
+            }],
+          },
+        },
+        {
+          exception: {
+            values: [{
+              type: 'UnhandledRejection',
+              value: 'Object captured as promise rejection with keys: [object has no keys]',
+              mechanism,
+            }],
+          },
+        },
+      ];
+
+      events.forEach((event) => {
+        expect(beforeSend(event as Parameters<typeof beforeSend>[0], {})).toBeNull();
+      });
+    });
+  });
+
+  it.each(keylessUnhandledRejectionCases)('%s', (_label, message, options, shouldDrop) => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createKeylessUnhandledRejection(message, options) as Parameters<typeof beforeSend>[0];
+
+      expect(beforeSend(event, {})).toBe(shouldDrop ? null : event);
+    });
   });
 
   it('keeps opaque global errors when they have application stack frames', () => {
