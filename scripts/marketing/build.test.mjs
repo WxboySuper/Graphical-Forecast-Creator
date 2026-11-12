@@ -112,7 +112,7 @@ describe('marketing site build', () => {
 
   it('writes a sitemap that excludes the 404 page and a robots file', () => {
     const sitemap = read('sitemap.xml');
-    assert.match(sitemap, /<loc>https:\/\/gfcweather\.com\/pricing<\/loc>/);
+    assert.ok(sitemap.includes('<loc>https://gfcweather.com/pricing/</loc>'));
     assert.doesNotMatch(sitemap, /404/);
     assert.match(read('robots.txt'), /Sitemap: https:\/\/gfcweather\.com\/sitemap\.xml/);
   });

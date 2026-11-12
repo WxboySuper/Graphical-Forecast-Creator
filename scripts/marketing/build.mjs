@@ -92,6 +92,9 @@ const loadPartials = (srcDir) => {
 /** Renders the Markdown source named in front matter (legal pages), or an empty string. */
 const renderLegal = (meta, root) => (meta.markdown ? marked.parse(readText(root, meta.markdown), { gfm: true }) : '');
 
+/** Public URL form of a route: pages are served as folders, so non-root routes end with a slash. */
+const publicPath = (routePath) => (routePath === '/' || routePath.endsWith('/') ? routePath : `${routePath}/`);
+
 const pageOutputPath = (routePath) => {
   if (routePath === '/') return 'index.html';
   if (routePath === '/404') return '404.html';
@@ -118,8 +121,8 @@ const renderPage = ({ file, srcDir, root, partials, globals }) => {
     ...globals,
     title: meta.title,
     description: meta.description ?? globals.defaultDescription,
-    canonical: `${globals.siteUrl}${meta.path === '/' ? '/' : meta.path}`,
-    canonicalTag: meta.noindex === 'true' ? '' : `<link rel="canonical" href="${globals.siteUrl}${meta.path === '/' ? '/' : meta.path}">`,
+    canonical: `${globals.siteUrl}${publicPath(meta.path)}`,
+    canonicalTag: meta.noindex === 'true' ? '' : `<link rel="canonical" href="${globals.siteUrl}${publicPath(meta.path)}">`,
     bodyClass: meta.bodyClass ?? '',
     active: meta.active ?? '',
     ...pageAssetTags(meta, globals),
@@ -136,7 +139,7 @@ const renderPage = ({ file, srcDir, root, partials, globals }) => {
 const sitemapXml = (siteUrl, records) => {
   const urls = records
     .filter((record) => record.indexed)
-    .map((record) => `  <url><loc>${siteUrl}${record.route === '/' ? '/' : record.route}</loc></url>`)
+    .map((record) => `  <url><loc>${siteUrl}${publicPath(record.route)}</loc></url>`)
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 };
@@ -170,6 +173,7 @@ export const buildSite = ({ root = ROOT, outDir = path.join(root, 'marketing', '
   };
   globals.siteScript = globals.scripts.site ?? '';
   globals.themeScript = globals.scripts.theme ?? '';
+  if (!globals.siteScript || !globals.themeScript) throw new Error('marketing/src/scripts must contain site.js and theme.js');
   if (existsSync(path.join(srcDir, 'assets'))) cpSync(path.join(srcDir, 'assets'), path.join(outDir, 'assets', 'img'), { recursive: true });
   if (existsSync(path.join(root, 'public', 'favicon.ico'))) cpSync(path.join(root, 'public', 'favicon.ico'), path.join(outDir, 'favicon.ico'));
   const partials = loadPartials(srcDir);

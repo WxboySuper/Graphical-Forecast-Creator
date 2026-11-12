@@ -1,7 +1,7 @@
 /* Shared behavior: theme toggle, sticky header, mobile menu, FAQ accordions, scroll reveal. */
 (() => {
   const root = document.documentElement;
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const themeButton = document.getElementById('themeBtn');
   const label = () => themeButton && themeButton.setAttribute('aria-label', root.dataset.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
   if (themeButton) {
@@ -21,6 +21,7 @@
   const toggle = document.getElementById('navToggle');
   const nav = document.getElementById('primaryNav');
   if (toggle && nav) {
+    root.classList.add('nav-js');
     toggle.addEventListener('click', () => {
       const open = toggle.getAttribute('aria-expanded') !== 'true';
       toggle.setAttribute('aria-expanded', String(open));
