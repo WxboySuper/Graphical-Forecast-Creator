@@ -45,11 +45,25 @@ describe('release notes rendering', () => {
   });
 });
 
+describe('release data validation', () => {
+  it('fails with a readable message when an entry is malformed', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-bad-'));
+    try {
+      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
+      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ title: 'No label' }]));
+      assert.throws(() => buildReleaseHtml(root), /releases.json entry 0 needs a string "label"/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('build safety', () => {
-  it('refuses to clear the repository root or a filesystem root as the output directory', () => {
-    assert.throws(() => buildSite({ root: ROOT, outDir: ROOT }), /unsafe output directory/);
-    assert.throws(() => buildSite({ root: ROOT, outDir: path.dirname(ROOT) }), /unsafe output directory/);
-    assert.throws(() => buildSite({ root: ROOT, outDir: path.parse(ROOT).root }), /unsafe output directory/);
+  it('refuses to clear the repository root, its parents, a filesystem root, or an unrelated folder', () => {
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.join(path.dirname(ROOT), 'unrelated-gfc-output') }), /Refusing to clear output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: ROOT }), /Refusing to clear output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.dirname(ROOT) }), /Refusing to clear output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.parse(ROOT).root }), /Refusing to clear output directory/);
   });
 });
 

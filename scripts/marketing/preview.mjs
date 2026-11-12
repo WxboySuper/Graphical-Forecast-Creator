@@ -14,7 +14,8 @@ const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascrip
 
 const resolveFile = (pathname) => {
   const direct = path.join(ROOT, decodeURIComponent(pathname));
-  if (!direct.startsWith(ROOT)) return path.join(ROOT, '404.html');
+  const relative = path.relative(ROOT, direct);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) return path.join(ROOT, '404.html');
   if (existsSync(direct) && statSync(direct).isFile()) return direct;
   const index = path.join(direct, 'index.html');
   return existsSync(index) ? index : path.join(ROOT, '404.html');

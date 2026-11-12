@@ -6,6 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
@@ -139,18 +140,16 @@ const sitemapXml = (siteUrl, records) => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 };
 
-const isFilesystemRoot = (target) => path.dirname(target) === target;
-
 const containsPath = (parent, child) => {
   const relative = path.relative(parent, child);
-  return !relative.startsWith('..') && !path.isAbsolute(relative);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
 };
 
-/** Refuses to wipe an output folder that is a filesystem root, the repository root, or one of its parents. */
+/** Only clears an output folder strictly inside the repository or the OS temp directory. */
 const assertSafeOutDir = (root, outDir) => {
   const resolved = path.resolve(outDir);
-  const unsafe = isFilesystemRoot(resolved) || containsPath(resolved, path.resolve(root));
-  if (unsafe) throw new Error(`Refusing to clear unsafe output directory: ${resolved}`);
+  const allowed = containsPath(path.resolve(root), resolved) || containsPath(path.resolve(os.tmpdir()), resolved);
+  if (!allowed) throw new Error(`Refusing to clear output directory outside the repository or temp folder: ${resolved}`);
 };
 
 /** Builds the marketing site into outDir and returns the rendered page routes. */

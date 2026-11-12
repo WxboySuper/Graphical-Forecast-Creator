@@ -39,8 +39,19 @@ const renderRelease = (release, index) => `
   ${renderImprovements(release.improvements)}
 </section>`;
 
+const REQUIRED_TEXT = ['label', 'title', 'summary'];
+
+/** Fails with a readable message when a release entry is missing what the page needs. */
+const assertRelease = (release, index) => {
+  for (const key of REQUIRED_TEXT) {
+    if (typeof release?.[key] !== 'string') throw new Error(`releases.json entry ${index} needs a string "${key}"`);
+  }
+  if (!Array.isArray(release.sections)) throw new Error(`releases.json entry ${index} needs a "sections" array`);
+};
+
 /** Builds the release archive markup, newest release first. */
 export const buildReleaseHtml = (root) => {
   const releases = JSON.parse(readFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), 'utf8'));
+  releases.forEach(assertRelease);
   return releases.map(renderRelease).join('\n');
 };

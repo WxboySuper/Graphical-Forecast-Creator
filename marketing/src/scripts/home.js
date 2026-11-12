@@ -90,12 +90,12 @@ function verifyView(id){return `<div class="view vv" data-v="verification"><div 
  <div class="vr"><h5>Overall Grade</h5><div class="g"><span class="gnum">0</span> <small>/ 100</small></div><span class="smp">SAMPLE DATA</span>
  ${[['Tornado',74],['Wind',81],['Hail',79]].map(([k,v])=>`<div class="hz"><span>${k}</span><span class="bb"><i data-w="${v}"></i></span><b>${v}</b></div>`).join('')}<div class="ev">Evidence: 30 SPC storm reports · 2 NOAA DAT surveys (sample)</div></div></div></div>`}
 function build(box,o){box.innerHTML=`<div class="appc">${topbar('Forecast')}${forecastView(o.id,o.prod)}${o.story?discussionView()+monitorView(o.id+'m')+verifyView(o.id+'v'):''}</div>`;const a=box.querySelector('.appc');fit(box);return a}
-const MW=380;function fit(box){const a=box.querySelector('.appc');const w=box.clientWidth;
+const MW=380;function fit(box){const a=box.querySelector('.appc');if(!a)return;const w=box.clientWidth;
  if(w<700){a.classList.add('m');const s=w/MW;let H=box.id==='storyBox'?Math.max(440,Math.min(640,(innerHeight-box.offsetTop-14)/s)):620;a.style.height=H+'px';a.style.width=MW+'px';a.style.transform=`scale(${s})`;box.style.height=(H*s)+'px';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox',`${(+v.dataset.fc)-500} 0 1000 526`));return}
  a.classList.remove('m');a.style.height='';a.style.width='';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox','0 0 1000 526'));let s=w/1000,fx=0;const min=box.dataset.min?+box.dataset.min:0;if(s<min){fx=+(a.dataset.fx||0);s=min;fx=Math.max(0,Math.min(fx,1000-w/s))}a.style.transform=`translate(${-fx*s}px,0) scale(${s})`;box.style.height=(640*s)+'px'}
 const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));const clear=()=>{T.forEach(id=>{clearTimeout(id);clearInterval(id)});T.length=0};
 function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',p.getTotalLength().toFixed(0)))}
-function drawPolys(a,force){const g=a.querySelector('.vf .polys');setL(g);g.classList.remove('done');g.getBoundingClientRect();
+function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.classList.remove('done');g.getBoundingClientRect();
  const ps=[...g.querySelectorAll('.poly')];if(RM||force){ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.add('done');return}
  // one clock drives both the outline and the pen, so the pen is always at the end of the drawn line
  const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],SEG=1.5,GAP=.25,L=ps.map(p=>p.getTotalLength());
@@ -107,7 +107,7 @@ function drawPolys(a,force){const g=a.querySelector('.vf .polys');setL(g);g.clas
   if(active>=0){const q=Math.min(1,(t-active*(SEG+GAP))/SEG),pt=ps[active].getPointAtLength(q*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
   if(t>=ps.length*(SEG+GAP)||!a.isConnected){pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done');return}
   requestAnimationFrame(f)})(t0)}
-function hidePolys(a){const g=a.querySelector('.vf .polys');setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
+function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
 function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n));a.querySelector('.ab').dataset.page=n}
 function typeInto(el,text,speed,done){if(RM){el.textContent=text;if(done)done();return}let i=0;const iv=setInterval(()=>{i+=2;el.textContent=text.slice(0,i);if(i>=text.length){clearInterval(iv);if(done)done()}},speed);T.push(iv)}
@@ -138,7 +138,7 @@ const steps=[
    later(500,()=>{vv.classList.add('go');a.querySelectorAll('.hz i').forEach(i=>i.style.width=i.dataset.w+'%');const e=a.querySelector('.gnum'),t0=performance.now();(function f(n){const p=Math.min(1,(n-t0)/1400);e.textContent=Math.round(78*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)})}
 ];
 const sec=document.getElementById('story'),stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
-function onScroll(){document.getElementById('top').classList.toggle('scrolled',scrollY>20);const r=sec.getBoundingClientRect(),tot=sec.offsetHeight-innerHeight,p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
+function onScroll(){document.getElementById('top').classList.toggle('scrolled',scrollY>20);const r=sec.getBoundingClientRect(),tot=Math.max(1,sec.offsetHeight-innerHeight),p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
  if(s!==cur&&r.top<innerHeight*.5){cur=s;clear();stepEls.forEach((e,i)=>e.classList.toggle('active',i===s));bars.forEach((e,i)=>e.classList.toggle('on',i<=s));steps[s](sa);fit(sb)}}
 const frame=f=>{let t=0;return()=>{if(t)return;t=requestAnimationFrame(()=>{t=0;f()})}};
 addEventListener('scroll',frame(onScroll),{passive:true});addEventListener('resize',frame(()=>{fit(hb);fit(sb)}));onScroll();
