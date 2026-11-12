@@ -43,8 +43,8 @@ function radarPixel(data,o,z){if(z<13){data[o+3]=0;return}
 let _rad=null;
 // draw the radar in short time slices so it never blocks scrolling or input
 function renderRadar(done){if(_rad){done(_rad);return}
- const W=1000,H=526,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);let y=0;
- const row=()=>{for(let x=0;x<W;x++)radarPixel(im.data,(y*W+x)*4,radarZ(x,y));y++};
+ const W=500,H=263,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);let y=0;
+ const row=()=>{for(let x=0;x<W;x++)radarPixel(im.data,(y*W+x)*4,radarZ(x*2,y*2));y++};
  const slice=()=>{const t0=performance.now();while(y<H&&performance.now()-t0<10)row();if(y<H){setTimeout(slice,0);return}g.putImageData(im,0,0);_rad=cv.toDataURL();done(_rad)};slice()}
 function reportColor(t){if(t<.25)return'#FF0000';return t<.65?'#0000FF':'#00FF00'}
 function mapSVG(id,prod,o={}){
@@ -113,8 +113,9 @@ function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;s
  const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(p=>p.getTotalLength());
  ps.forEach((p,i)=>{p.style.transition='none';p.style.strokeDashoffset=L[i];p.style.fillOpacity=0});
  if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),inStory=!!a.closest('#storyBox'),myGen=inStory?GEN:0;
- (function f(n){const t=Math.max(0,(n-t0)/1000),active=paintPolys(ps,L,t),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));
-  cats.forEach((c,k)=>c.classList.toggle('on',k===i));placePen(pen,ps,L,active,t);
+ (function f(n){const t=Math.max(0,(n-t0)/1000),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));let active=-1;
+  try{active=paintPolys(ps,L,t);placePen(pen,ps,L,active,t)}catch{finishPolys(g,ps,pen);return}
+  cats.forEach((c,k)=>c.classList.toggle('on',k===i));
   const outdated=inStory&&GEN!==myGen,stale=!a.isConnected||outdated;
   if(stale||t>=ps.length*(SEG+GAP)){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
@@ -157,7 +158,7 @@ ds.forEach(d=>{d.addEventListener('mouseenter',()=>mq('(hover:hover)')&&openDoor
 
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
-function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0,preserveDrawingBuffer:true});let d=0;m.on('idle',()=>{if(!d){d=1;window.__mapsPending--}})}
+function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0});let d=0;const ready=()=>{if(!d){d=1;window.__mapsPending--}};m.on('error',ready);m.on('idle',()=>{ready()})}
 (window.requestIdleCallback||setTimeout)(()=>renderRadar(u=>document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))));
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
