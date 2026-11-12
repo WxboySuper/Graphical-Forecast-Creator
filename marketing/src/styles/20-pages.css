@@ -98,4 +98,4 @@ footer .fine{text-align:center;margin:12px 0 0;font-size:.85rem}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 /* keep the illustrated app visible even if its script never sizes it */
 .hero .appbox,.stage .appbox{min-height:320px}
-.mt-22{margin-top:22px}.mt-28{margin-top:28px}
+.after-lede{margin-top:22px}.after-cards{margin-top:28px}
