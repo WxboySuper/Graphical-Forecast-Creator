@@ -25,17 +25,18 @@
       const open = toggle.getAttribute('aria-expanded') !== 'true';
       toggle.setAttribute('aria-expanded', String(open));
       toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-      top.classList.toggle('menu-open', open);
+      if (top) top.classList.toggle('menu-open', open);
     });
   }
 
   const current = document.body.dataset.active;
-  if (current) document.querySelectorAll('[data-nav="' + current + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
+  if (current) document.querySelectorAll('[data-nav="' + CSS.escape(current) + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
 
   document.querySelectorAll('.qa button').forEach((button) => button.addEventListener('click', () => {
     const open = button.getAttribute('aria-expanded') !== 'true';
     button.setAttribute('aria-expanded', String(open));
-    button.closest('.qa').classList.toggle('open', open);
+    const item = button.closest('.qa');
+    if (item) item.classList.toggle('open', open);
   }));
 
   const revealed = document.querySelectorAll('.reveal');

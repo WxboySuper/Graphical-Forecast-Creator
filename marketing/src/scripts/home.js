@@ -38,6 +38,7 @@ let _rad=null;function radarURL(){if(_rad)return _rad;const W=1000,H=526,cv=docu
   z+= (n2-.5)*9;const o=(y*W+x)*4;if(z<13){im.data[o+3]=0;continue}
   const k=Math.min(DBZ.length-1,Math.max(0,Math.floor((z-5)/5)));const c=DBZ[k][1];im.data[o]=parseInt(c.slice(1,3),16);im.data[o+1]=parseInt(c.slice(3,5),16);im.data[o+2]=parseInt(c.slice(5,7),16);im.data[o+3]=z<20?120:215}
  g.putImageData(im,0,0);return _rad=cv.toDataURL()}
+function reportColor(t){if(t<.25)return'#FF0000';return t<.65?'#0000FF':'#00FF00'}
 function mapSVG(id,prod,o={}){
  let h=`<svg class="map" data-fc="${o.radar?640:({rain:610,fire:330,tor:560}[prod]||500)}" viewBox="0 0 1000 526" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sample ${prod?PROD[prod].name:''} forecast map"><defs><radialGradient id="dbz${id}"><stop offset="0" stop-color="#c00000"/><stop offset=".22" stop-color="#ff3b00"/><stop offset=".45" stop-color="#ffd400"/><stop offset=".7" stop-color="#18b018" stop-opacity=".85"/><stop offset="1" stop-color="#18b018" stop-opacity="0"/></radialGradient><linearGradient id="tint${id}" x1="0" x2="1"><stop offset="0" stop-color="#e6ecdc" stop-opacity="0"/><stop offset=".5" stop-color="#e3eadb"/></linearGradient><filter id="bl${id}"><feGaussianBlur stdDeviation="3"/></filter></defs>
  <rect class="m-land" width="1000" height="526"/><foreignObject x="0" y="0" width="1000" height="526"><div xmlns="http://www.w3.org/1999/xhtml" class="ml" data-s="${o.radar?'mon':'lib'}"></div></foreignObject>`;
@@ -45,11 +46,11 @@ function mapSVG(id,prod,o={}){
  h+=`<path class="m-st" d="${GEO.ST}"/>`;
  
  if(prod){const p=PROD[prod];h+=`<g class="polys ${o.draw?'draw':''}" ${o.op?`opacity="${o.op}"`:''}>`+p.paths.map((d,i)=>`<path class="poly" d="${d}" fill="${p.cats[i][1]}" style="--d:${(i*1.1).toFixed(1)}s"/>`).join('')+`</g>`}
- if(o.radar){h+=`<image class="radar" href="${radarURL()}" x="0" y="0" width="1000" height="526" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+ if(o.radar){h+=`<image class="radar" href="" x="0" y="0" width="1000" height="526" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
   const poly=a=>a.map(q=>P(...q).map(v=>v.toFixed(1)).join(',')).join(' ');
   h+=`<g class="warn" fill="none" stroke-width="1.6" stroke-linejoin="miter">`+WARN.map(([c,pp])=>`<polygon points="${poly(pp)}" stroke="${c}"/>`).join('')+`</g>`;
   h+=SREP.map(([c,lo,la])=>{const[x,y]=P(lo,la);return`<circle class="warn" cx="${x}" cy="${y}" r="2.6" fill="${c}" stroke="#000" stroke-width=".6"/>`}).join('')}
- if(o.reports){let s=11;const r=()=>(s=s*16807%2147483647)/2147483647;const C=P(-96.2,36.9);let out='';for(let i=0;i<30;i++){const u=(r()*2-1)*260,v=(r()*2-1)*80,A=-30*Math.PI/180;const x=C[0]+u*Math.cos(A)-v*Math.sin(A),y=C[1]+u*Math.sin(A)+v*Math.cos(A);const t=r();const c=t<.25?'#FF0000':t<.65?'#0000FF':'#00FF00';out+=`<circle class="rpt" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${c}" stroke="#000" stroke-opacity=".4" style="transition-delay:${(i*.05).toFixed(2)}s"/>`}h+=out}
+ if(o.reports){let s=11;const r=()=>(s=s*16807%2147483647)/2147483647;const C=P(-96.2,36.9);let out='';for(let i=0;i<30;i++){const u=(r()*2-1)*260,v=(r()*2-1)*80,A=-30*Math.PI/180;const x=C[0]+u*Math.cos(A)-v*Math.sin(A),y=C[1]+u*Math.sin(A)+v*Math.cos(A);const t=r();const c=reportColor(t);out+=`<circle class="rpt" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="${c}" stroke="#000" stroke-opacity=".4" style="transition-delay:${(i*.05).toFixed(2)}s"/>`}h+=out}
  h+=`<circle class="pen2" r="6" fill="#fff" stroke="#1683f8" stroke-width="3" opacity="0"/></svg>`;return h}
 const I={home:'<path d="M3 11l9-7 9 7v9H3z"/>',map:'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/>',msg:'<rect x="3" y="4" width="18" height="14" rx="2"/>',chk:'<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',ant:'<path d="M12 12v9M8 8a5 5 0 018 0M5 5a9 9 0 0114 0"/>',pen:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',lay:'<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',wr:'<path d="M14 6a4 4 0 105 5l-8 8-4-1-1-4z"/>',book:'<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/>'};
 const ic=k=>`<svg viewBox="0 0 24 24">${I[k]}</svg>`;
@@ -92,7 +93,7 @@ function build(box,o){box.innerHTML=`<div class="appc">${topbar('Forecast')}${fo
 const MW=380;function fit(box){const a=box.querySelector('.appc');const w=box.clientWidth;
  if(w<700){a.classList.add('m');const s=w/MW;let H=box.id==='storyBox'?Math.max(440,Math.min(640,(innerHeight-box.offsetTop-14)/s)):620;a.style.height=H+'px';a.style.width=MW+'px';a.style.transform=`scale(${s})`;box.style.height=(H*s)+'px';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox',`${(+v.dataset.fc)-500} 0 1000 526`));return}
  a.classList.remove('m');a.style.height='';a.style.width='';a.querySelectorAll('svg.map').forEach(v=>v.setAttribute('viewBox','0 0 1000 526'));let s=w/1000,fx=0;const min=box.dataset.min?+box.dataset.min:0;if(s<min){fx=+(a.dataset.fx||0);s=min;fx=Math.max(0,Math.min(fx,1000-w/s))}a.style.transform=`translate(${-fx*s}px,0) scale(${s})`;box.style.height=(640*s)+'px'}
-const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));const clear=()=>{T.forEach(clearTimeout);T.length=0};
+const T=[];const later=(ms,f)=>T.push(setTimeout(f,RM?0:ms));const clear=()=>{T.forEach(id=>{clearTimeout(id);clearInterval(id)});T.length=0};
 function setL(g){g.querySelectorAll('.poly').forEach(p=>p.style.setProperty('--L',p.getTotalLength().toFixed(0)))}
 function drawPolys(a,force){const g=a.querySelector('.vf .polys');setL(g);g.classList.remove('done');g.getBoundingClientRect();
  const ps=[...g.querySelectorAll('.poly')];if(RM||force){ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.add('done');return}
@@ -113,6 +114,7 @@ function typeInto(el,text,speed,done){if(RM){el.textContent=text;if(done)done();
 
 // theme toggle (persisted)
 // hero
+if(!['heroBox','storyBox','story','top','doorsEl'].every(id=>document.getElementById(id)))return;
 const hb=document.getElementById('heroBox');hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');ha.querySelector('.dhelp').style.display='none';ha.querySelector('.tp').classList.remove('on');ha.querySelector('.td').classList.add('on');ha.querySelector('.td').style.cssText='background:#111;color:#fff';
 setTimeout(()=>drawPolys(ha),400);
 // story
@@ -120,8 +122,8 @@ const sb=document.getElementById('storyBox');sb.dataset.min='.7';const sa=build(
 const SUM='A slow-moving front will stall from eastern Oklahoma into southern Missouri. Repeated rounds of storms with precipitable water near 1.8 inches will bring 2-4 inches of rain, locally higher in the Ozarks. Flash flooding is the main concern overnight.';
 const steps=[
  a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'forecast');hidePolys(a);tab(a,'days','days');a.querySelector('.lgd').innerHTML=legend(null,'severe');a.querySelector('.cated').classList.remove('on');a.querySelector('.dhelp').style.display='';
-   const ds=[...a.querySelectorAll('.dn')];ds.forEach(d=>d.classList.toggle('on',d.dataset.d==1));
-   later(900,()=>{ds.forEach(d=>d.classList.toggle('on',d.dataset.d==2));a.querySelector('.ctxd').textContent='Day 2';a.querySelector('.dcur').textContent='Day 2'});
+   const ds=[...a.querySelectorAll('.dn')];ds.forEach(d=>d.classList.toggle('on',Number(d.dataset.d)===1));
+   later(900,()=>{ds.forEach(d=>d.classList.toggle('on',Number(d.dataset.d)===2));a.querySelector('.ctxd').textContent='Day 2';a.querySelector('.dcur').textContent='Day 2'});
    later(2000,()=>{tab(a,'draw','severe');a.dataset.fx='0';fit(sb)});
    later(3300,()=>{tab(a,'draw','custom');a.dataset.fx='250';fit(sb);a.querySelector('.lgd').innerHTML=legend(null);const pl=a.querySelector('.plus');pl.classList.add('hot');const t=a.querySelector('.ltitle');t.value='';a.querySelector('.cats').style.visibility='hidden';
      later(500,()=>{pl.classList.remove('hot');let i=0;const nm='Heavy Rain Risk';const iv=setInterval(()=>{t.value=nm.slice(0,++i);if(i>=nm.length){clearInterval(iv);a.querySelector('.cated').classList.add('on');a.querySelector('.cats').style.visibility='';a.querySelector('.lgd').innerHTML=legend('rain')}},RM?0:60);T.push(iv)})})},
@@ -138,7 +140,8 @@ const steps=[
 const sec=document.getElementById('story'),stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
 function onScroll(){document.getElementById('top').classList.toggle('scrolled',scrollY>20);const r=sec.getBoundingClientRect(),tot=sec.offsetHeight-innerHeight,p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
  if(s!==cur&&r.top<innerHeight*.5){cur=s;clear();stepEls.forEach((e,i)=>e.classList.toggle('active',i===s));bars.forEach((e,i)=>e.classList.toggle('on',i<=s));steps[s](sa);fit(sb)}}
-addEventListener('scroll',onScroll,{passive:true});addEventListener('resize',()=>{fit(hb);fit(sb)});onScroll();
+const frame=f=>{let t=0;return()=>{if(t)return;t=requestAnimationFrame(()=>{t=0;f()})}};
+addEventListener('scroll',frame(onScroll),{passive:true});addEventListener('resize',frame(()=>{fit(hb);fit(sb)}));onScroll();
 // doors
 const doors=document.getElementById('doorsEl'),ds=[...doors.querySelectorAll('.door')];doors.classList.add('has-open');
 function openDoor(d){ds.forEach(x=>{const o=x===d;x.classList.toggle('open',o);x.setAttribute('aria-expanded',o)})}
@@ -147,11 +150,8 @@ ds.forEach(d=>{d.addEventListener('mouseenter',()=>matchMedia('(hover:hover)').m
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
 function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0,preserveDrawingBuffer:true});let d=0;m.on('idle',()=>{if(!d){d=1;window.__mapsPending--}})}
+(window.requestIdleCallback||setTimeout)(()=>{const u=radarURL();document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))});
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
 const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>initMaps(m.default||m)).catch(()=>{})
-// bento map: custom layer mini
-const bm=document.getElementById('bentoMap');const p=PROD.rain;if(bm){
-bm.innerHTML=`<rect width="400" height="220" rx="12" fill="#f3f1ea"/><g transform="translate(-200,-95) scale(.62)">${p.paths.map((d,i)=>`<path d="${d}" fill="${p.cats[i][1]}" fill-opacity=".85" stroke="#000" stroke-width="2.5"/>`).join('')}</g>
-<g font-family="-apple-system,Segoe UI,sans-serif"><rect x="12" y="12" width="132" height="86" rx="10" fill="rgba(248,250,255,.95)" stroke="#cbd5e1"/><text x="22" y="30" font-size="11" fill="#333">Custom Layers</text>${p.cats.map(([k,c],i)=>`<rect x="22" y="${40+i*18}" width="12" height="12" fill="${c}" stroke="#555"/><text x="40" y="${50+i*18}" font-size="10" fill="#333">${k}</text>`).join('')}</g>`;}
 })();

@@ -40,8 +40,6 @@ section{position:relative}
 .hero .ctas{margin-top:34px;display:flex;justify-content:center;align-items:center;gap:26px;flex-wrap:wrap}
 .hero .fine{color:var(--ink-soft);font-size:.92rem;margin:18px auto 0;text-align:center}
 .hero .heroapp{position:relative;max-width:1180px;margin:52px auto 0}
-.hero .copy{position:relative;text-align:center;max-width:960px;margin:0 auto}
-.hero .heroapp{position:relative;max-width:1180px;margin:52px auto 0}
 .story{height:560vh}
 .stage{position:sticky;top:0;height:100vh;display:grid;grid-template-columns:minmax(0,.58fr) minmax(0,1.9fr);gap:clamp(24px,3.5vw,56px);align-items:center;padding:84px clamp(18px,3.5vw,56px) 30px;background:radial-gradient(100% 90% at 70% 50%,#11304d 0%,var(--bg) 70%)}
 .steps{position:relative;min-height:440px}
@@ -317,7 +315,7 @@ footer{padding:34px clamp(18px,4vw,56px) 40px;border-top:1px solid var(--line);c
 footer .trust{text-align:center;margin:0 0 18px}
 footer .trust span{display:inline-block;padding:7px 14px;border-radius:999px;background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line);font-family:"IBM Plex Mono",Consolas,monospace;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}
 footer .links{display:flex;flex-wrap:wrap;gap:14px 26px;justify-content:center}footer .links a{text-decoration:none}
-.reveal{opacity:0;transform:translateY(26px);transition:opacity .9s var(--ease),transform .9s var(--ease)}.reveal.in{opacity:1;transform:none}
+.js .reveal{opacity:0;transform:translateY(26px);transition:opacity .9s var(--ease),transform .9s var(--ease)}.js .reveal.in{opacity:1;transform:none}
 .mini-days span{padding:10px 0}
 
 /* ===== mobile app mockup (phone layout, readable scale) ===== */
@@ -399,7 +397,7 @@ footer .links{display:flex;flex-wrap:wrap;gap:14px 26px;justify-content:center}f
 [data-theme=light] footer .trust span{background:#fff}
 [data-theme=light] .modechip{background:#fff}
 @media (max-width:980px){
- .top nav a:not(.cta){display:none}.top nav{gap:10px}
+ .top nav{gap:10px}
  .bento-sec.wrap,.what.wrap,.faq.wrap{padding-left:clamp(18px,4vw,56px);padding-right:clamp(18px,4vw,56px)}
  .stage{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:start;padding:76px 14px 14px;gap:30px}
  .steps{min-height:200px}.step h2{font-size:1.8rem;margin:6px 0 8px}.step p{font-size:.95rem}.step ul{display:none}
@@ -417,4 +415,4 @@ footer .links{display:flex;flex-wrap:wrap;gap:14px 26px;justify-content:center}f
  .bento{grid-template-columns:1fr}.t-a,.t-b,.t-f{grid-column:auto}
  .hero .heroapp{margin:36px -18px 0}.hero .appbox,.stage .appbox{border-radius:12px}
 }
-@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.reveal{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.js .reveal{opacity:1;transform:none}}

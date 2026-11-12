@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { buildSite } from './build.mjs';
+import { buildReleaseHtml } from './releases.mjs';
 import { escapeHtml, parseFrontMatter, renderTemplate } from './template.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -25,6 +26,21 @@ describe('template engine', () => {
     assert.deepEqual(meta, { title: 'A: B', path: '/x' });
     assert.equal(body, '<p>hi</p>');
     assert.equal(escapeHtml('"\''), '&quot;&#39;');
+  });
+});
+
+describe('release notes rendering', () => {
+  it('escapes every release field so release data cannot inject markup', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-'));
+    try {
+      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
+      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ label: 'v9"><b>', title: '<script>alert(1)</script>', summary: '<img src=x onerror=alert(1)>', sections: [{ title: '<i>', body: '<u>', bullets: ['<s>'] }], improvements: [{ id: 'x', text: '<em>' }] }]));
+      const html = buildReleaseHtml(root);
+      assert.doesNotMatch(html, /<script|<img|<b>|<i>|<u>|<s>|<em>/);
+      assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
