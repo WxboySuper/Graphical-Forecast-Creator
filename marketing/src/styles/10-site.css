@@ -32,7 +32,7 @@ section{position:relative}
 /* hero */
 .hero{min-height:100vh;padding:120px clamp(18px,4vw,56px) 70px;overflow:hidden;
  background:radial-gradient(60% 50% at 50% 0%,#13304d 0%,transparent 70%),var(--bg)}
-.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;mask-image:radial-gradient(70% 60% at 50% 30%,#000 0%,transparent 75%);pointer-events:none}
+.hero::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(70% 60% at 50% 30%,#000 0%,transparent 75%);mask-image:radial-gradient(70% 60% at 50% 30%,#000 0%,transparent 75%);pointer-events:none}
 .hero .copy{position:relative;text-align:center;max-width:960px;margin:0 auto}
 .hero h1{font-size:clamp(3rem,8vw,7.2rem);line-height:.92;letter-spacing:-.035em;margin:14px 0 20px}
 .hero h1 span{display:block}.hero h1 .light{color:var(--accent-blue)}

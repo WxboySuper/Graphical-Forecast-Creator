@@ -45,7 +45,7 @@ function radarPixel(data,o,z){if(z<13){data[o+3]=0;return}
 let _rad=null;
 // draw the radar in short time slices so it never blocks scrolling or input
 function renderRadar(done){if(_rad){done(_rad);return}
- const W=500,H=263,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d'),im=g.createImageData(W,H);let y=0;
+ const W=500,H=263,cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');if(!g){done(null);return}const im=g.createImageData(W,H);let y=0;
  const row=()=>{for(let x=0;x<W;x++)radarPixel(im.data,(y*W+x)*4,radarZ(x*2,y*2));y++};
  const slice=()=>{const t0=performance.now();while(y<H&&performance.now()-t0<10)row();if(y<H){setTimeout(slice,0);return}g.putImageData(im,0,0);_rad=cv.toDataURL();done(_rad)};slice()}
 function reportColor(t){if(t<.25)return'#FF0000';return t<.65?'#0000FF':'#00FF00'}
@@ -162,7 +162,7 @@ ds.forEach(d=>{d.addEventListener('mouseenter',()=>mq('(hover:hover)')&&openDoor
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
 function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/'+style,center:[-97.4,37.7226],zoom:Math.log2(MS*360/512),interactive:false,attributionControl:false,fadeDuration:0});let d=0;const ready=()=>{if(!d){d=1;window.__mapsPending--}};m.on('error',ready);m.on('idle',()=>{ready()})}
-(window.requestIdleCallback||setTimeout)(()=>renderRadar(u=>document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))));
+(window.requestIdleCallback||setTimeout)(()=>renderRadar(u=>u&&document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))));
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
 const mapLink=document.querySelector('link[rel=modulepreload][data-maplibre]'),mapUrl=mapLink&&new URL(mapLink.href);if(mapUrl&&mapUrl.origin===location.origin&&mapUrl.pathname.startsWith('/assets/h/maplibre-'))import(mapUrl.href).then(m=>{const lib=m.default||m;if(typeof lib.Map!=='function')throw new Error('Unexpected maplibre-gl module shape');initMaps(lib)}).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
