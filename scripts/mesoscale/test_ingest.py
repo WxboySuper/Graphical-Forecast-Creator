@@ -19,7 +19,7 @@ from ingestion.archives import ArchiveRequest, create_archive
 from ingestion.render_steps import FrameResult, cycle_metrics
 from ingestion.health import HealthReport, write_health
 from ingestion import cli
-from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range, write_temp_content
+from ingestion.render import valid_data, resampled_rgba, combine_wind, RasterRequest, DecodeRequest, decode_range, write_temp_content, hex_rgb
 from ingestion.store import ObjectCheck, R2Credentials, R2Store
 from inventory import IndexRecord
 
@@ -475,6 +475,20 @@ class IngestTests(unittest.TestCase):
         rgba = resampled_rgba(request)
         self.assertEqual(int(rgba[5, 5, 3]), 190)
         self.assertEqual(int(rgba[0, 0, 3]), 0)
+
+    def test_reflectivity_below_five_dbz_is_transparent_and_echo_keeps_palette_color(self):
+        import numpy as np
+        stops = [(5, "#04e9e7"), (20, "#019ff4"), (35, "#0300f4")]
+        request = RasterRequest(np.array([1, 10, 1, 10]), np.array([1, 1, 10, 10]), np.array([0, 5, -2, 20]), 12, 12, stops, 5)
+        rgba = resampled_rgba(request)
+        self.assertEqual(tuple(rgba[1, 1]), (0, 0, 0, 0))
+        self.assertEqual(tuple(rgba[10, 10]), (*hex_rgb("#019ff4"), 190))
+
+    def test_other_fields_keep_below_legend_range_clipping(self):
+        import numpy as np
+        request = RasterRequest(np.array([0, 2, 0, 2]), np.array([0, 0, 2, 2]), np.array([-10, -10, -10, -10]), 3, 3, [(0, "#000000"), (10, "#ffffff")])
+        rgba = resampled_rgba(request)
+        self.assertEqual(tuple(rgba[1, 1]), (0, 0, 0, 190))
 
     def test_render_returns_transparent_image_when_grid_is_outside_extent(self):
         import numpy as np

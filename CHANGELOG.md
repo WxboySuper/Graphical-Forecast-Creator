@@ -34,6 +34,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Fixed
 
 - **Mesoscale:**
+  - Composite reflectivity leaves areas below 5 dBZ transparent instead of painting the map with the lowest legend color.
   - The map shows model layers at the default zoom on the standard basemap instead of a blank map.
   - The map, area tools, and Areas and Discussion tabs stay usable with a retry action and model switcher when model data is loading or unavailable.
   - The area toolbar no longer overlaps the Data toggle on phones.
