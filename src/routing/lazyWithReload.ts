@@ -5,11 +5,12 @@ const RELOAD_GUARD_PREFIX = 'gfc-chunk-reload:';
 /**
  * Error text produced when a hashed lazy chunk or its CSS is gone or
  * unreachable. Covers Vite ("Unable to preload CSS for ...", "Failed to
- * fetch dynamically imported module"), webpack ("Loading chunk ... failed",
- * "ChunkLoadError"), and plain dynamic-import failures.
+ * fetch dynamically imported module"), browsers returning HTML for a stale
+ * chunk ("is not a valid JavaScript MIME type"), webpack ("Loading chunk ...
+ * failed", "ChunkLoadError"), and plain dynamic-import failures.
  */
 const CHUNK_LOAD_PATTERN =
-  /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk \d+ failed|ChunkLoadError/i;
+  /Unable to preload CSS|Failed to fetch dynamically imported module|Importing a module script failed|is not a valid JavaScript MIME type|Loading chunk \d+ failed|ChunkLoadError/i;
 
 /** Reports whether an error looks like a stale-asset or transient chunk load failure. */
 export const isChunkLoadError = (error: unknown): boolean => {
