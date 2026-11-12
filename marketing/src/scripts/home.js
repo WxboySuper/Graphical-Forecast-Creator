@@ -1,5 +1,5 @@
 (()=>{
-const VER=document.body.dataset.version||'v2';
+const VER=(document.body.dataset.version||'v2').replace(/[^A-Za-z0-9 .-]/g,'');
 const mq=q=>typeof matchMedia==='function'&&matchMedia(q).matches;
 const RM=mq('(prefers-reduced-motion: reduce)');
 const MM=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360)),MS=37.94,MR=MS*180/Math.PI;const P=(lon,lat)=>[500+(lon+97.4)*MS,MR*(MM(43)-MM(lat))];
@@ -108,15 +108,15 @@ function paintPolys(ps,L,t){let active=-1;ps.forEach((p,i)=>{const q=clamp01((t-
 function placePen(pen,ps,L,active,t){if(!pen||active<0)return;const pt=ps[active].getPointAtLength(clamp01((t-active*(SEG+GAP))/SEG)*L[active]);pen.setAttribute('cx',pt.x);pen.setAttribute('cy',pt.y)}
 function finishPolys(g,ps,pen){if(pen)pen.setAttribute('opacity',0);ps.forEach(p=>{p.style.strokeDashoffset='';p.style.fillOpacity='';p.style.transition=''});g.classList.add('done')}
 function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.classList.remove('done');g.getBoundingClientRect();
- const ps=[...g.querySelectorAll('.poly')];if(RM||force||!ps.length){finishPolys(g,ps,null);return}
+ const ps=[...g.querySelectorAll('.poly')];const instant=RM||force;if(instant||!ps.length){finishPolys(g,ps,null);return}
  // one clock drives both the outline and the pen, so the pen is always at the end of the drawn line
  const pen=a.querySelector('.vf .pen2'),cats=[...a.querySelectorAll('.cat')],L=ps.map(p=>p.getTotalLength());
  ps.forEach((p,i)=>{p.style.transition='none';p.style.strokeDashoffset=L[i];p.style.fillOpacity=0});
  if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),inStory=!!a.closest('#storyBox'),myGen=inStory?GEN:0;
  (function f(n){const t=Math.max(0,(n-t0)/1000),active=paintPolys(ps,L,t),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));
   cats.forEach((c,k)=>c.classList.toggle('on',k===i));placePen(pen,ps,L,active,t);
-  const finished=t>=ps.length*(SEG+GAP)||!a.isConnected||(inStory&&GEN!==myGen);
-  if(finished){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
+  const stale=!a.isConnected||(inStory&&GEN!==myGen);
+  if(stale||t>=ps.length*(SEG+GAP)){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
 function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n));a.querySelector('.ab').dataset.page=n}
@@ -161,5 +161,5 @@ function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibreg
 (window.requestIdleCallback||setTimeout)(()=>renderRadar(u=>document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))));
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
-const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>{const lib=m.default||m;if(typeof lib.Map!=='function')throw new Error('Unexpected maplibre-gl module shape');initMaps(lib)}).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
+const mapLink=document.querySelector('link[rel=modulepreload]'),mapUrl=mapLink&&new URL(mapLink.href);if(mapUrl&&mapUrl.origin===location.origin&&mapUrl.pathname.startsWith('/assets/h/maplibre-'))import(mapUrl.href).then(m=>{const lib=m.default||m;if(typeof lib.Map!=='function')throw new Error('Unexpected maplibre-gl module shape');initMaps(lib)}).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
 })();
