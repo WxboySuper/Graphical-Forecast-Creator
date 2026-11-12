@@ -18,3 +18,11 @@ export const applyTrustedClientIp = (headers, clientIp, secret) => {
   headers.set(WORKER_SECRET_HEADER, secret);
 };
 
+/** Accepts a Worker-forwarded address only when its shared secret matches this Worker. */
+export const getTrustedClientIp = (headers, secret) => {
+  if (!secret || headers.get(WORKER_SECRET_HEADER) !== secret) return null;
+  const trustedHeaders = new Headers();
+  applyTrustedClientIp(trustedHeaders, headers.get(WORKER_CLIENT_IP_HEADER), secret);
+  return trustedHeaders.get(WORKER_CLIENT_IP_HEADER);
+};
+

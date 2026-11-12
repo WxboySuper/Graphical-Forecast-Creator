@@ -7,7 +7,8 @@
 | `local` | localhost:3000 | your machine | Development. Works with no credentials. |
 | `beta` | beta.gfcweather.com | Cloudflare Worker `gfc-beta` + beta API on the VPS | Open beta: prerelease testing of `main`, open to everyone, existing subscriptions apply. |
 | `staging` | staging-gfc.weatherboysuper.com | VPS | Manual rehearsal of any ref before production. |
-| `production` | gfcweather.com | Cloudflare Worker `gfc-production` + VPS API | What users get. Runs the `stable/2.x` line, displayed as `v2`; its stable tag is `v2.0.0`. `www` redirects to the apex. |
+| `production app` | app.gfcweather.com | Cloudflare Worker `gfc-production` + VPS API | Forecasting, discussion, monitoring, verification, account, and billing. Runs the `stable/2.x` line. |
+| `marketing` | gfcweather.com and www.gfcweather.com | Cloudflare Worker `gfc-marketing` | Public marketing pages. `www` redirects to the apex. Legacy app paths redirect to `app.gfcweather.com`. |
 
 > Some older docs and code comments still mention `beta-gfc.weatherboysuper.com`. The Cloudflare config (`cloudflare/wrangler.beta.jsonc`) says `beta.gfcweather.com` is current.
 
@@ -45,7 +46,7 @@ Each VPS app directory uses `releases/<version>/` plus a `current` symlink, so a
 | **Umami** (self-hosted) | Privacy-conscious usage analytics | One instance, separate website records for prod and beta. Never mix them. |
 | **NOAA / NWS / SPC / radar** | Monitor and verification data | Fetched from the browser, normalised before reaching UI. |
 | **WorldPop** | Beta population estimate | On-demand, informational only. |
-| **Cloudflare** | Beta and production sites, plus the feedback Worker (D1) at `feedback.gfcweather.com` | `gfc-production` serves production assets and proxies API requests to the VPS. Deploys run through GitHub Actions. See [beta feedback](../operations/beta-feedback.md). |
+| **Cloudflare** | App, marketing, beta, and feedback sites, plus the feedback Worker (D1) at `feedback.gfcweather.com` | `gfc-production` serves the app and proxies API requests to the VPS. `gfc-marketing` serves the apex and forwards API requests to the app Worker. Deploys run through GitHub Actions. See [beta feedback](../operations/beta-feedback.md). |
 
 ## One-time chores that are easy to forget
 

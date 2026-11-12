@@ -6,8 +6,7 @@
   "compatibility_date": "2026-09-29",
   "workers_dev": false,
   "routes": [
-    { "pattern": "gfcweather.com", "custom_domain": true },
-    { "pattern": "www.gfcweather.com", "custom_domain": true }
+    { "pattern": "app.gfcweather.com", "custom_domain": true }
   ],
   "assets": {
     "directory": "../build",
@@ -17,8 +16,7 @@
   },
   "vars": {
     "API_ORIGIN": "https://gfc.weatherboysuper.com",
-    "CANONICAL_HOST": "gfcweather.com",
-    "WWW_HOST": "www.gfcweather.com"
+    "CANONICAL_HOST": "app.gfcweather.com"
   },
   "observability": {
     "enabled": true,

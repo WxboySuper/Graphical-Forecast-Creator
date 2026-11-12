@@ -2,7 +2,7 @@
 
 **A web application for creating professional severe weather outlooks, verifying forecasts, and writing forecast discussions.**
 
-Live App: [gfcweather.com](https://gfcweather.com/)
+Live App: [app.gfcweather.com](https://app.gfcweather.com/). Marketing site: [gfcweather.com](https://gfcweather.com/).
 
 ---
 

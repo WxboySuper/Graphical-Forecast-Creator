@@ -64,6 +64,7 @@
     "typecheck:test": "node scripts/check-test-types.mjs",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint .",
+    "marketing:build": "node scripts/marketing/build.mjs",
     "lint:fix": "eslint . --fix",
     "docs:inventory": "node scripts/generate-repository-inventory.mjs",
     "docs:site": "node scripts/build-local-docs.mjs",

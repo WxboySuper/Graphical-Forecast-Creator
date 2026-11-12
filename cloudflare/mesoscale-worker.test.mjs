@@ -6,7 +6,7 @@ import { clearPmtilesCacheForTests } from './pmtiles-reader.mjs';
 import { createPmtilesFixture, rangeBucket } from './pmtiles-fixture.test-helper.mjs';
 
 const serialTest = (name, run) => test(name, { concurrency: false }, run);
-const ORIGIN = 'https://gfcweather.com';
+const ORIGIN = 'https://app.gfcweather.com';
 const envFor = (objects = {}, overrides = {}) => ({
   MESOSCALE_BUCKET: {
     get: async (key) => {
@@ -16,7 +16,7 @@ const envFor = (objects = {}, overrides = {}) => ({
       return { size: new TextEncoder().encode(serialized).byteLength, json: async () => structuredClone(value), body: new Blob([serialized]).stream(), httpEtag: '"obj-1"', httpMetadata: { contentType: key.endsWith('.png') ? 'image/png' : 'application/json' } };
     },
   },
-  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://gfc.weatherboysuper.com,https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
+  CORS_ALLOWED_ORIGINS: `${ORIGIN},https://gfcweather.com,https://gfc.weatherboysuper.com,https://staging-gfc.weatherboysuper.com,https://beta.gfcweather.com,http://localhost:3000,http://localhost:3002`,
   PUBLIC_BASE_URL: 'https://mesoscale.example.test',
   ...overrides,
 });

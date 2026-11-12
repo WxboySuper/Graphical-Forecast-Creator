@@ -1,6 +1,6 @@
 import { serviceUnavailable } from './site-worker-response.mjs';
 
-const isHostname = (value) => {
+export const isHostname = (value) => {
   if (value.length > 253) return false;
   if (!/^[a-z0-9.-]+$/i.test(value)) return false;
   if (value.startsWith('.')) return false;

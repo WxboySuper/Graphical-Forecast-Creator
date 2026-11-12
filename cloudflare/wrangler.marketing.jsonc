@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "gfc-marketing",
+  "account_id": "3488c751e28fdbb1b31d95deac5e6cfd",
+  "main": "./marketing-worker.mjs",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "gfcweather.com", "custom_domain": true },
+    { "pattern": "www.gfcweather.com", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": "../marketing/dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/forecast", "/forecast/*", "/discussion", "/discussion/*", "/monitor", "/monitor/*", "/verification", "/verification/*", "/cloud", "/cloud/*", "/account", "/account/*", "/admin", "/admin/*", "/beta", "/beta/*", "/beta-access", "/beta-access/*", "/api", "/api/*"]
+  },
+  "services": [{ "binding": "APP_WORKER", "service": "gfc-production" }],
+  "vars": {
+    "CANONICAL_HOST": "gfcweather.com",
+    "WWW_HOST": "www.gfcweather.com",
+    "APP_ORIGIN": "https://app.gfcweather.com"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "invocation_logs": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  }
+}

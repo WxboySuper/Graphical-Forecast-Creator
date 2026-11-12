@@ -5,7 +5,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 ## Model
 
 - `main` = next-major line. `stable/2.x` = v2 production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
-- Targets: `local`, `beta` (beta.gfcweather.com, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (staging-gfc.weatherboysuper.com), `production` (gfcweather.com, Cloudflare Worker `gfc-production` + VPS API at `/opt/gfc-analytics`).
+- Targets: `local`, `beta` (`beta.gfcweather.com`, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (`staging-gfc.weatherboysuper.com`), `production` (`app.gfcweather.com`, Cloudflare Worker `gfc-production` + VPS API at `/opt/gfc-analytics`). The apex and `www` hostnames serve the separate `gfc-marketing` Worker.
 - Old docs/comments may say `beta-gfc.weatherboysuper.com`; the Cloudflare config uses `beta.gfcweather.com`.
 
 ## Versioning
@@ -54,13 +54,13 @@ GitHub Release notes: beta = native PR list + changelog link; stable = curated c
 
 ## Production Worker and rollback
 
-`release-stable.yml` publishes a stable release. `deploy-main-to-vps.yml` then builds the frontend, deploys the VPS API, deploys the `gfc-production` Worker for manifest action `live`, and checks `https://gfcweather.com/version.json` plus the API status route. `action=stage` still prepares the VPS staging preview and timed VPS rollout. The VPS cron cannot activate a Worker, so the Worker only changes when the production workflow runs with `action=live`.
+`release-stable.yml` publishes a stable release. `deploy-main-to-vps.yml` then builds the app, deploys the VPS API, deploys `gfc-production` to `app.gfcweather.com`, builds and deploys `gfc-marketing` to the apex and `www`, then smoke-tests both Workers. It skips marketing steps for older refs without marketing files. `action=stage` still prepares the VPS staging preview and timed VPS rollout. The VPS cron cannot activate a Worker, so Workers change only when the production workflow runs with `action=live`.
 
-The Worker serves `/assets/*` with immutable caching, serves SPA routes from the asset binding, and proxies `/api/*` and `/api/sentry-tunnel` through `https://gfc.weatherboysuper.com` to the existing VPS API. Install [`server/nginx-legacy-redirect.conf`](../../server/nginx-legacy-redirect.conf) after cutover. It redirects legacy page requests with path and query intact, while leaving API paths on the VPS. The Worker redirects `www.gfcweather.com` to `gfcweather.com`.
+The app Worker serves `/assets/*` with immutable caching, serves SPA routes from its asset binding, and proxies `/api/*` and `/api/sentry-tunnel` through `https://gfc.weatherboysuper.com` to the existing VPS API. The marketing Worker serves static pages, redirects legacy app paths to `app.gfcweather.com`, and forwards `/api/*` through its service binding to `gfc-production`. It sends other `www` requests to the apex. Both workers apply security headers. Install [`server/nginx-legacy-redirect.conf`](../../server/nginx-legacy-redirect.conf) after cutover so the VPS sends page requests to the app hostname and leaves API paths on the VPS.
 
-To roll back the frontend, run `wrangler rollback --config cloudflare/wrangler.production.jsonc` for the Worker. If the API also needs rollback, run `deploy-main-to-vps.yml` with the previous stable release tag and `deploy_action=live`. For a tag predating Worker support, set `deploy_worker=false`; the workflow uses an inline version-marker fallback and skips the Worker alert-banner generation step. Set `deploy_vps_frontend=true` only when the VPS frontend is needed. Serving it requires an owner-side traffic-route change to send the production hostname to the VPS and disabling the legacy nginx redirect.
+To roll back the app, run `wrangler rollback --config cloudflare/wrangler.production.jsonc`; roll back the marketing Worker with `wrangler rollback --config cloudflare/wrangler.marketing.jsonc`. If the API also needs rollback, run `deploy-main-to-vps.yml` with the previous stable release tag and `deploy_action=live`. For a tag predating Worker support, set `deploy_worker=false`; the workflow uses an inline version-marker fallback and skips Worker deploys. Older refs without marketing files skip the marketing build and deploy. Set `deploy_vps_frontend=true` only when the VPS frontend is needed. Serving it requires an owner-side traffic-route change to send the app hostname to the VPS and disabling the legacy nginx redirect.
 
-Production frontend deploys require `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and optionally `PRODUCTION_WORKER_SHARED_SECRET` in GitHub Actions. When configured, the workflow sends the same shared secret to the Worker and VPS API environment. Never print or commit secret values.
+Production frontend deploys require `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `PRODUCTION_WORKER_SHARED_SECRET` in GitHub Actions. The workflow installs the same secret on both production Workers and in the VPS API environment so the marketing-to-app service binding can forward a verified client IP. Never print or commit secret values.
 
 ## VPS layout
 
