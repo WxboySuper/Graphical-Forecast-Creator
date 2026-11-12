@@ -115,7 +115,7 @@ function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;s
  if(pen)pen.setAttribute('opacity',1);const t0=performance.now(),inStory=!!a.closest('#storyBox'),myGen=inStory?GEN:0;
  (function f(n){const t=Math.max(0,(n-t0)/1000),active=paintPolys(ps,L,t),i=Math.min(ps.length-1,Math.floor(t/(SEG+GAP)));
   cats.forEach((c,k)=>c.classList.toggle('on',k===i));placePen(pen,ps,L,active,t);
-  const stale=!a.isConnected||(inStory&&GEN!==myGen);
+  const outdated=inStory&&GEN!==myGen,stale=!a.isConnected||outdated;
   if(stale||t>=ps.length*(SEG+GAP)){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
