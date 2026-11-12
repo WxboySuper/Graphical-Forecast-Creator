@@ -27,6 +27,7 @@ class TileRenderRequest:
     root: Path
     stops: list[tuple[float, str]]
     max_zoom: int = ZOOM_MAX
+    transparent_below: float | None = None
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class RasterRequest:
     width: int
     height: int
     stops: list[tuple[float, str]]
+    transparent_below: float | None = None
 
 
 @dataclass(frozen=True)
@@ -102,7 +104,7 @@ def render_tiles(request: TileRenderRequest) -> tuple[int, int]:
     inside = valid & (px >= 0) & (px < width) & (py >= 0) & (py < height)
     if not inside.any():
         raise ValueError("decoded field does not overlap the Web Mercator tile domain")
-    rgba = resampled_rgba(RasterRequest(px[inside], py[inside], values[inside], width, height, stops))
+    rgba = resampled_rgba(RasterRequest(px[inside], py[inside], values[inside], width, height, stops, request.transparent_below))
     image = Image.fromarray(rgba, "RGBA")
     root.mkdir(parents=True, exist_ok=True)
     count, total = save_tiles(image, root, max_zoom)
@@ -131,6 +133,8 @@ def resampled_rgba(request: RasterRequest):
     grid_x, grid_y = np.meshgrid(np.arange(x0, x1 + 1), np.arange(y0, y1 + 1))
     samples = griddata(np.column_stack((px, py)), values, (grid_x, grid_y), method="linear")
     mask = np.isfinite(samples)
+    if request.transparent_below is not None:
+        mask &= samples >= request.transparent_below
     colors = interpolate_colors(samples, stops)
     rgba[y0:y1 + 1, x0:x1 + 1][mask, :3] = colors[mask, :3]
     rgba[y0:y1 + 1, x0:x1 + 1, 3][mask] = 190

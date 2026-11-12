@@ -2,6 +2,8 @@
 
 This package discovers NOAA cycles, downloads allowlisted native fields, renders transparent XYZ PNG tiles, packs one PMTiles v3 archive per field and frame, and publishes a catalog and health report to local storage or Cloudflare R2. HRRR publishes f00-f06; RAP and RRFS publish f00. The hourly GitHub Actions workflow is `.github/workflows/mesoscale-ingest.yml`; its cron remains off until `MESOSCALE_INGEST_ENABLED=true` and the R2 secrets are configured.
 
+Reflectivity tiles leave interpolated values below 5 dBZ transparent. Other fields continue to clip values outside their legend range to the nearest color stop.
+
 ## Local use
 
 Install the pinned dependencies from `requirements.txt`, then run the package tests:

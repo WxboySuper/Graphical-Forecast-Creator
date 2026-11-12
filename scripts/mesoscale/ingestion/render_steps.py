@@ -179,7 +179,7 @@ def render_fields(context, source: SourceBundle, fields: dict, render_tiles) -> 
         item, spec = descriptors[0], FIELDS[field_id]
         field_dir = root / field_id
         from .render import TileRenderRequest
-        tile_count, bytes_written = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4], max_zoom))
+        tile_count, bytes_written = render_tiles(TileRenderRequest(item["values"], item["lats"], item["lons"], field_dir, spec[4], max_zoom, 5 if field_id == "reflectivity" else None))
         key = archive_key(context, field_id)
         archive = create_archive(ArchiveRequest(field_dir, root / f"{field_id}.pmtiles", min_zoom, max_zoom))
         parameter = parameter_metadata(ParameterBuild(context, source, processed, field_id, item, spec, descriptors))
