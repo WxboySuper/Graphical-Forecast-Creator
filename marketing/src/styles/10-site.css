@@ -303,9 +303,9 @@ kbd{font:600 .74rem "IBM Plex Mono",monospace;background:#f1f5f9;border:1px soli
 .qa button span.pm{font:400 1.6rem monospace;color:var(--accent-blue);transition:transform .3s}
 .qa button[aria-expanded=true] span.pm{transform:rotate(45deg)}
 .qa button span.pm{display:inline-block;width:1em;line-height:1;text-align:center;flex:none;margin-left:14px}
-.qa .ans{display:grid;grid-template-rows:0fr;transition:grid-template-rows .4s var(--ease)}
+.qa .ans{display:grid;grid-template-rows:1fr;transition:grid-template-rows .4s var(--ease)}.js .qa .ans{grid-template-rows:0fr}
 .qa .ans>div{overflow:hidden}.qa .ans p{margin:0 0 22px;color:var(--ink-soft);line-height:1.6;max-width:720px}
-.qa.open .ans{grid-template-rows:1fr}
+.js .qa.open .ans{grid-template-rows:1fr}
 /* account + footer */
 .account{overflow:hidden;text-align:center;padding:140px clamp(18px,4vw,56px) 120px;background:radial-gradient(80% 80% at 50% 0%,#16385d 0%,var(--bg) 70%)}
 .account h2{font-size:clamp(2.6rem,6vw,5.4rem);letter-spacing:-.035em;line-height:.95;margin:14px auto 22px;max-width:980px}

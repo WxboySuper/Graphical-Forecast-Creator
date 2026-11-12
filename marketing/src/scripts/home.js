@@ -40,12 +40,12 @@ let _rad=null;function radarURL(){if(_rad)return _rad;const W=1000,H=526,cv=docu
  g.putImageData(im,0,0);return _rad=cv.toDataURL()}
 function reportColor(t){if(t<.25)return'#FF0000';return t<.65?'#0000FF':'#00FF00'}
 function mapSVG(id,prod,o={}){
- let h=`<svg class="map" data-fc="${o.radar?640:({rain:610,fire:330,tor:560}[prod]||500)}" viewBox="0 0 1000 526" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sample ${prod?PROD[prod].name:''} forecast map"><defs><radialGradient id="dbz${id}"><stop offset="0" stop-color="#c00000"/><stop offset=".22" stop-color="#ff3b00"/><stop offset=".45" stop-color="#ffd400"/><stop offset=".7" stop-color="#18b018" stop-opacity=".85"/><stop offset="1" stop-color="#18b018" stop-opacity="0"/></radialGradient><linearGradient id="tint${id}" x1="0" x2="1"><stop offset="0" stop-color="#e6ecdc" stop-opacity="0"/><stop offset=".5" stop-color="#e3eadb"/></linearGradient><filter id="bl${id}"><feGaussianBlur stdDeviation="3"/></filter></defs>
+ let h=`<svg class="map" data-fc="${o.radar?640:({rain:610,fire:330,tor:560}[prod]||500)}" viewBox="0 0 1000 526" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Sample ${PROD[prod]?PROD[prod].name:''} forecast map"><defs><radialGradient id="dbz${id}"><stop offset="0" stop-color="#c00000"/><stop offset=".22" stop-color="#ff3b00"/><stop offset=".45" stop-color="#ffd400"/><stop offset=".7" stop-color="#18b018" stop-opacity=".85"/><stop offset="1" stop-color="#18b018" stop-opacity="0"/></radialGradient><linearGradient id="tint${id}" x1="0" x2="1"><stop offset="0" stop-color="#e6ecdc" stop-opacity="0"/><stop offset=".5" stop-color="#e3eadb"/></linearGradient><filter id="bl${id}"><feGaussianBlur stdDeviation="3"/></filter></defs>
  <rect class="m-land" width="1000" height="526"/><foreignObject x="0" y="0" width="1000" height="526"><div xmlns="http://www.w3.org/1999/xhtml" class="ml" data-s="${o.radar?'mon':'lib'}"></div></foreignObject>`;
  
  h+=`<path class="m-st" d="${GEO.ST}"/>`;
  
- if(prod){const p=PROD[prod];h+=`<g class="polys ${o.draw?'draw':''}" ${o.op?`opacity="${o.op}"`:''}>`+p.paths.map((d,i)=>`<path class="poly" d="${d}" fill="${p.cats[i][1]}" style="--d:${(i*1.1).toFixed(1)}s"/>`).join('')+`</g>`}
+ if(PROD[prod]){const p=PROD[prod];h+=`<g class="polys ${o.draw?'draw':''}" ${o.op?`opacity="${o.op}"`:''}>`+p.paths.map((d,i)=>`<path class="poly" d="${d}" fill="${p.cats[i][1]}" style="--d:${(i*1.1).toFixed(1)}s"/>`).join('')+`</g>`}
  if(o.radar){h+=`<image class="radar" href="" x="0" y="0" width="1000" height="526" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
   const poly=a=>a.map(q=>P(...q).map(v=>v.toFixed(1)).join(',')).join(' ');
   h+=`<g class="warn" fill="none" stroke-width="1.6" stroke-linejoin="miter">`+WARN.map(([c,pp])=>`<polygon points="${poly(pp)}" stroke="${c}"/>`).join('')+`</g>`;
