@@ -113,7 +113,7 @@ const pageAssetTags = (meta, globals) => {
   return {
     pageScript: script ? `<script src="${script}" defer></script>` : '',
     pageStyles: isHome ? `<link rel="stylesheet" href="${globals.maplibreCss}">` : '',
-    pageVendor: isHome ? `<link rel="modulepreload" href="${globals.maplibreModule}">` : '',
+    pageVendor: isHome ? `<link rel="modulepreload" data-maplibre href="${globals.maplibreModule}">` : '',
   };
 };
 
