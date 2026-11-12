@@ -29,32 +29,33 @@ describe('template engine', () => {
   });
 });
 
-describe('release notes rendering', () => {
-  it('escapes every release field so release data cannot inject markup', () => {
+
+
+describe('release data', () => {
+  /** Renders release notes from a temporary releases.json holding the given text. */
+  const render = (json) => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-'));
     try {
       mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
-      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ label: 'v9"><b>', title: '<script>alert(1)</script>', summary: '<img src=x onerror=alert(1)>', sections: [{ title: '<i>', body: '<u>', bullets: ['<s>'] }], improvements: [{ id: 'x', text: '<em>' }] }]));
-      const html = buildReleaseHtml(root);
-      const lowered = html.toLowerCase();
-      for (const tag of ['<script', '<img', '<b>', '<i>', '<u>', '<s>', '<em>']) assert.ok(!lowered.includes(tag), `${tag} must be escaped`);
-      assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), json);
+      return buildReleaseHtml(root);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  });
-});
+  };
+  const release = (extra) => JSON.stringify([{ label: 'v9', title: 't', summary: 's', sections: [{ title: 'a', body: 'b' }], ...extra }]);
 
-describe('release data validation', () => {
-  it('fails with a readable message when an entry is malformed', () => {
-    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-bad-'));
-    try {
-      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
-      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ title: 'No label' }]));
-      assert.throws(() => buildReleaseHtml(root), /releases.json entry 0 needs a string "label"/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it('escapes every release field so release data cannot inject markup', () => {
+    const html = render(JSON.stringify([{ label: 'v9"><b>', title: '<script>alert(1)</script>', summary: '<img src=x onerror=alert(1)>', sections: [{ title: '<i>', body: '<u>', bullets: ['<s>'] }], improvements: [{ id: 'x', text: '<em>' }] }]));
+    const lowered = html.toLowerCase();
+    for (const tag of ['<script', '<img', '<b>', '<i>', '<u>', '<s>', '<em>']) assert.ok(!lowered.includes(tag), `${tag} must be escaped`);
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+  });
+
+  it('fails with readable messages for malformed data', () => {
+    assert.throws(() => render(JSON.stringify([{ title: 'No label' }])), /releases.json entry 0 needs a string "label"/);
+    assert.throws(() => render('{}'), /non-empty array/);
+    assert.throws(() => render(release({ sections: [{ title: 'a', body: 'b', screenshots: 'oops' }] })), /screenshots must be an array/);
   });
 });
 
@@ -92,31 +93,7 @@ describe('template lookups', () => {
   });
 });
 
-describe('release file shape', () => {
-  it('rejects a releases file that is not a non-empty array', () => {
-    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-shape-'));
-    try {
-      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
-      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), '{}');
-      assert.throws(() => buildReleaseHtml(root), /non-empty array/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-});
 
-describe('release list validation', () => {
-  it('rejects non-array lists with a readable message', () => {
-    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-list-'));
-    try {
-      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
-      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ label: 'v9', title: 't', summary: 's', sections: [{ title: 'a', body: 'b', screenshots: 'oops' }] }]));
-      assert.throws(() => buildReleaseHtml(root), /screenshots must be an array/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-});
 
 describe('build safety', () => {
   it('refuses to clear the repository root, its parents, a filesystem root, or an unrelated folder', () => {
