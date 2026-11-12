@@ -1,11 +1,9 @@
 # Product content
 
-`src/content` contains static product content and release-specific data used by
-the application, such as update entries. Keep content declarative and separate
-from route composition, feature exposure, and domain state.
+`src/content` contains static product content used by the application. Keep
+content declarative and separate from route composition, feature exposure, and
+domain state.
 
-Update content consumers and focused tests when a content shape changes.
-
-Versioned update entries remain under `src/content/updates/`; the public
-`/updates` route currently selects the release entry through an explicit import
-in `UpdatesPage.tsx`, while older versions stay available as source history.
+Release notes and pricing no longer live in the app. They are published on the
+marketing site (`marketing/src`, see `docs/agents/codebase.md`); the app's
+`/pricing` and `/updates` routes redirect there through `ExternalRedirect`.

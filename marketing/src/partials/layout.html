@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<script src="{{ themeScript }}"></script>
+<title>{{ title }}</title>
+<meta name="description" content="{{ description }}">
+{{{ canonicalTag }}}
+<link rel="icon" href="/favicon.ico">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ name }}">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical }}">
+<meta property="og:image" content="{{ siteUrl }}/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+{{{ noindex }}}
+<link rel="stylesheet" href="{{ cssHref }}">
+{{{ pageStyles }}}
+</head>
+<body class="{{ bodyClass }}" data-active="{{ active }}" data-version="{{ versionLabel }}">
+<a class="skip" href="#main">Skip to content</a>
+{{> header}}
+<main id="main">
+{{{ content }}}
+</main>
+{{> footer}}
+<script src="{{ siteScript }}" defer></script>
+{{{ pageVendor }}}
+{{{ pageScript }}}
+</body>
+</html>

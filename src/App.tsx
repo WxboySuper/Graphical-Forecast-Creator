@@ -28,14 +28,14 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
-import PricingPage from './pages/PricingPage';
-import { UpdatesPage } from './pages/UpdatesPage';
 import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { lazyWithReload } from './routing/lazyWithReload';
+import { ExternalRedirect } from './routing/ExternalRedirect';
+import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from './config/marketingLinks';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
@@ -179,10 +179,11 @@ const AppRoutes: React.FC = () => {
       <Route path="beta" element={<Navigate to="/" replace />} />
       <Route path="beta-access/*" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
-        <Route path="updates" element={<UpdatesPage />} />
+        {/* Pricing and release notes now live on the marketing site. */}
+        <Route path="updates" element={<ExternalRedirect to={MARKETING_UPDATES_URL} label="what's new" />} />
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
-        <Route path="pricing" element={<PricingPage />} />
+        <Route path="pricing" element={<ExternalRedirect to={MARKETING_PRICING_URL} label="pricing" />} />
         <Route path="admin" element={<Suspense fallback={<RouteFallback />}><AdminPage /></Suspense>} />
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">

@@ -1,6 +1,13 @@
 {
-  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable.",
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. marketing/src/scripts/home.js is a decorative, self-contained illustration of the app for the marketing home page: its scene builders are intentionally parallel and take geometry parameters, and it is not shared application code.",
   "rule_sets": [
+    {
+      "matching_content_path": "marketing/src/scripts/home.js",
+      "rules": [
+        { "name": "Code Duplication", "weight": 0.0 },
+        { "name": "Excess Number of Function Arguments", "weight": 0.0 }
+      ]
+    },
     {
       "matching_content_path": "src/pages/ForecastPage.tsx",
       "rules": [{ "name": "Lines of Code in a Single File", "weight": 0.0 }]

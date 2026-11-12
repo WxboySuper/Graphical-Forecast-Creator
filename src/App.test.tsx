@@ -15,13 +15,6 @@ jest.mock('./pages/AccountPage', () => ({
   __esModule: true,
   default: () => <div>AccountPage Mock</div>,
 }));
-jest.mock('./pages/PricingPage', () => ({
-  __esModule: true,
-  default: () => <div>PricingPage Mock</div>,
-}));
-jest.mock('./pages/UpdatesPage', () => ({
-  UpdatesPage: () => <div>UpdatesPage Mock</div>,
-}));
 jest.mock('./pages/HomePage', () => ({
   __esModule: true,
   default: () => <div>HomePage Mock</div>,

@@ -9,7 +9,8 @@ Facts verified against the code on 2026-11-08 (v2 beta 6). Re-verify with grep b
 | `/` | `HomePage` | `*` redirects to `/`; retired `/beta` and `/beta-access/*` links also redirect to `/` |
 | `/forecast`, `/forecast/<workspace>` | `ForecastPage` | Workspaces from `src/routing/forecastWorkspaceRoutes.ts`; legacy `?workspace=` handled there. Contract: [workspace boundaries](../architecture/forecast-workspace-boundaries.md) |
 | `/discussion`, `/verification`, `/monitor` | lazy pages | `Suspense` + `RouteFallback` |
-| `/account`, `/pricing`, `/cloud`, `/admin`, `/updates` | account, pricing, cloud library, admin metrics, release notes | `/updates` has an nginx exact-match rule (`server/nginx.conf`) |
+| `/account`, `/cloud`, `/admin` | account (including checkout), cloud library, admin metrics | none |
+| `/pricing`, `/updates` | redirect to the marketing site (`gfcweather.com/pricing/`, `/updates/`) through `ExternalRedirect`; the pages live in `marketing/src` | the VPS nginx exact-match rule for `/updates` only matters for the legacy VPS frontend |
 | `/dev/feature-exposure` | `FeatureExposureDiagnosticsPage` | dev diagnostics |
 | gated | built by `src/routing/buildFeatureGatedRoutes.tsx` | e.g. `/tropical`, `/collaborate`; absent when disabled |
 
