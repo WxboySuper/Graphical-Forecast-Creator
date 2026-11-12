@@ -16,7 +16,11 @@
 
   const top = document.getElementById('top');
   const onScroll = () => top && top.classList.toggle('scrolled', window.scrollY > 20);
-  addEventListener('scroll', onScroll, { passive: true });
+  let scrollFrame = 0;
+  addEventListener('scroll', () => {
+    if (scrollFrame) return;
+    scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; onScroll(); });
+  }, { passive: true });
   onScroll();
 
   const toggle = document.getElementById('navToggle');

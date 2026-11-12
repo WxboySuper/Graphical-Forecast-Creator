@@ -1,5 +1,7 @@
 (()=>{
 const VER=(document.body.dataset.version||'v2').replace(/[^A-Za-z0-9 .-]/g,'');
+// scene lookups fall back to a detached element, so a missing node can never abort the whole illustration
+const qs=(root,sel)=>root.querySelector(sel)||document.createElement('div');
 const mq=q=>typeof matchMedia==='function'&&matchMedia(q).matches;
 const RM=mq('(prefers-reduced-motion: reduce)');
 const MM=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360)),MS=37.94,MR=MS*180/Math.PI;const P=(lon,lat)=>[500+(lon+97.4)*MS,MR*(MM(43)-MM(lat))];
@@ -120,31 +122,31 @@ function drawPolys(a,force){const g=a.querySelector('.vf .polys');if(!g)return;s
   if(stale||t>=ps.length*(SEG+GAP)){finishPolys(g,ps,pen);return}requestAnimationFrame(f)})(t0)}
 function hidePolys(a){const g=a.querySelector('.vf .polys');if(!g)return;setL(g);g.querySelectorAll('.poly').forEach(p=>{p.style.transition='none';p.style.strokeDashoffset='';p.style.fillOpacity=''});g.classList.remove('done');g.getBoundingClientRect();g.querySelectorAll('.poly').forEach(p=>p.style.transition='')}
 function tab(a,t,row){a.querySelectorAll('.vf .tabs [data-tab]').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));a.querySelectorAll('.vf .row').forEach(e=>e.classList.toggle('on',e.dataset.row===row))}
-function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n));a.querySelector('.ab').dataset.page=n}
+function view(a,v){a.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.dataset.v===v));const n={forecast:'Forecast',discussion:'Discussion',monitor:'Monitor',verification:'Verification'}[v];a.querySelectorAll('.ab nav span').forEach(e=>e.classList.toggle('on',e.dataset.nav===n));qs(a,'.ab').dataset.page=n}
 function typeInto(el,text,speed,done){if(RM){el.textContent=text;if(done)done();return}let i=0;const iv=setInterval(()=>{i+=2;el.textContent=text.slice(0,i);if(i>=text.length){clearInterval(iv);if(done)done()}},speed);T.push(iv)}
 
 // hero
-const hb=document.getElementById('heroBox');if(hb){hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');ha.querySelector('.dhelp').style.display='none';ha.querySelector('.tp').classList.remove('on');ha.querySelector('.td').classList.add('on');ha.querySelector('.td').style.cssText='background:#111;color:#fff';
+const hb=document.getElementById('heroBox');if(hb){hb.dataset.min='.68';const ha=build(hb,{id:'h',prod:'fire'});ha.dataset.fx='60';fit(hb);tab(ha,'draw','custom');qs(ha,'.dhelp').style.display='none';qs(ha,'.tp').classList.remove('on');qs(ha,'.td').classList.add('on');qs(ha,'.td').style.cssText='background:#111;color:#fff';
 setTimeout(()=>drawPolys(ha),400);}
 // story
 const sb=document.getElementById('storyBox'),sec=document.getElementById('story'),topEl=document.getElementById('top');if(sb&&sec&&topEl){sb.dataset.min='.7';const sa=build(sb,{id:'s',prod:'rain',story:true});
 const SUM='A slow-moving front will stall from eastern Oklahoma into southern Missouri. Repeated rounds of storms with precipitable water near 1.8 inches will bring 2-4 inches of rain, locally higher in the Ozarks. Flash flooding is the main concern overnight.';
 const steps=[
- a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'forecast');hidePolys(a);tab(a,'days','days');a.querySelector('.lgd').innerHTML=legend(null,'severe');a.querySelector('.cated').classList.remove('on');a.querySelector('.dhelp').style.display='';
+ a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'forecast');hidePolys(a);tab(a,'days','days');qs(a,'.lgd').innerHTML=legend(null,'severe');qs(a,'.cated').classList.remove('on');qs(a,'.dhelp').style.display='';
    const ds=[...a.querySelectorAll('.dn')];ds.forEach(d=>d.classList.toggle('on',Number(d.dataset.d)===1));
-   later(900,()=>{ds.forEach(d=>d.classList.toggle('on',Number(d.dataset.d)===2));a.querySelector('.ctxd').textContent='Day 2';a.querySelector('.dcur').textContent='Day 2'});
+   later(900,()=>{ds.forEach(d=>d.classList.toggle('on',Number(d.dataset.d)===2));qs(a,'.ctxd').textContent='Day 2';qs(a,'.dcur').textContent='Day 2'});
    later(2000,()=>{tab(a,'draw','severe');a.dataset.fx='0';fit(sb)});
-   later(3300,()=>{tab(a,'draw','custom');a.dataset.fx='250';fit(sb);a.querySelector('.lgd').innerHTML=legend(null);const pl=a.querySelector('.plus');pl.classList.add('hot');const t=a.querySelector('.ltitle');t.value='';a.querySelector('.cats').style.visibility='hidden';
-     later(500,()=>{pl.classList.remove('hot');let i=0;const nm='Heavy Rain Risk';const iv=setInterval(()=>{t.value=nm.slice(0,++i);if(i>=nm.length){clearInterval(iv);a.querySelector('.cated').classList.add('on');a.querySelector('.cats').style.visibility='';a.querySelector('.lgd').innerHTML=legend('rain')}},RM?0:60);T.push(iv)})})},
- a=>{a.dataset.fx='400';a.classList.remove('dark');view(a,'forecast');tab(a,'draw','custom');a.querySelector('.ltitle').value='Heavy Rain Risk';a.querySelector('.cated').classList.remove('on');a.querySelector('.lgd').innerHTML=legend('rain');a.querySelector('.dhelp').style.display='none';
-   a.querySelector('.tp').classList.remove('on');const td=a.querySelector('.td');td.classList.add('on');td.style.cssText='background:#111;color:#fff';drawPolys(a)},
- a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'discussion');const q=a.querySelector('#q1t'),pv=a.querySelector('#prev');q.textContent='';a.querySelector('.fname').textContent='Your name or username';
+   later(3300,()=>{tab(a,'draw','custom');a.dataset.fx='250';fit(sb);qs(a,'.lgd').innerHTML=legend(null);const pl=qs(a,'.plus');pl.classList.add('hot');const t=qs(a,'.ltitle');t.value='';qs(a,'.cats').style.visibility='hidden';
+     later(500,()=>{pl.classList.remove('hot');let i=0;const nm='Heavy Rain Risk';const iv=setInterval(()=>{t.value=nm.slice(0,++i);if(i>=nm.length){clearInterval(iv);qs(a,'.cated').classList.add('on');qs(a,'.cats').style.visibility='';qs(a,'.lgd').innerHTML=legend('rain')}},RM?0:60);T.push(iv)})})},
+ a=>{a.dataset.fx='400';a.classList.remove('dark');view(a,'forecast');tab(a,'draw','custom');qs(a,'.ltitle').value='Heavy Rain Risk';qs(a,'.cated').classList.remove('on');qs(a,'.lgd').innerHTML=legend('rain');qs(a,'.dhelp').style.display='none';
+   qs(a,'.tp').classList.remove('on');const td=qs(a,'.td');td.classList.add('on');td.style.cssText='background:#111;color:#fff';drawPolys(a)},
+ a=>{a.dataset.fx='0';a.classList.remove('dark');view(a,'discussion');const q=qs(a,'#q1t'),pv=qs(a,'#prev');q.textContent='';qs(a,'.fname').textContent='Your name or username';
    const head='Graphical Forecast Creator\nDay 1 Outlook Discussion\n\nIssued: Wednesday, May 6, 2026 at 07:00 AM CDT\nValid: Wed, May 6, 07:00 AM CDT to Thu, May 7, 07:00 AM CDT\n\n** UNOFFICIAL OUTLOOK - FOR EDUCATIONAL/DEMONSTRATION PURPOSES ONLY **\n\n---\n\nSUMMARY\n';pv.textContent=head;
    later(400,()=>typeInto(q,SUM,28,()=>{}));later(400,()=>{let i=0;const iv=setInterval(()=>{i+=2;pv.textContent=head+SUM.slice(0,i);if(i>=SUM.length)clearInterval(iv)},RM?0:28);T.push(iv)})},
- a=>{a.dataset.fx='330';view(a,'monitor');const vm=a.querySelector('.vm');vm.classList.remove('live');a.querySelector('.rsrc').textContent='Off';const m=a.querySelector('.moon');
-   later(500,()=>m.classList.add('pulse'));later(1100,()=>{a.classList.add('dark');m.textContent='☀';m.classList.remove('pulse')});later(1500,()=>{a.querySelector('.rsrc').textContent='MRMS CONUS';vm.classList.add('live')})},
- a=>{a.dataset.fx='480';a.classList.remove('dark');a.querySelector('.moon').textContent='☾';view(a,'verification');const vv=a.querySelector('.vv');vv.classList.remove('go');a.querySelector('.gnum').textContent='0';a.querySelectorAll('.hz i').forEach(i=>i.style.width='0');
-   later(500,()=>{vv.classList.add('go');a.querySelectorAll('.hz i').forEach(i=>i.style.width=i.dataset.w+'%');const e=a.querySelector('.gnum'),t0=performance.now(),myGen=GEN;(function f(n){if(GEN!==myGen){e.textContent=78;return}const p=Math.min(1,(n-t0)/1400);e.textContent=Math.round(78*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)})}
+ a=>{a.dataset.fx='330';view(a,'monitor');const vm=qs(a,'.vm');vm.classList.remove('live');qs(a,'.rsrc').textContent='Off';const m=qs(a,'.moon');
+   later(500,()=>m.classList.add('pulse'));later(1100,()=>{a.classList.add('dark');m.textContent='☀';m.classList.remove('pulse')});later(1500,()=>{qs(a,'.rsrc').textContent='MRMS CONUS';vm.classList.add('live')})},
+ a=>{a.dataset.fx='480';a.classList.remove('dark');qs(a,'.moon').textContent='☾';view(a,'verification');const vv=qs(a,'.vv');vv.classList.remove('go');qs(a,'.gnum').textContent='0';a.querySelectorAll('.hz i').forEach(i=>i.style.width='0');
+   later(500,()=>{vv.classList.add('go');a.querySelectorAll('.hz i').forEach(i=>i.style.width=i.dataset.w+'%');const e=qs(a,'.gnum'),t0=performance.now(),myGen=GEN;(function f(n){if(GEN!==myGen){e.textContent=78;return}const p=Math.min(1,(n-t0)/1400);e.textContent=Math.round(78*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)})(t0)})}
 ];
 const stepEls=[...document.querySelectorAll('.step')],bars=[...document.querySelectorAll('.progress span')];let cur=-1;
 function onScroll(){topEl.classList.toggle('scrolled',window.scrollY>20);const r=sec.getBoundingClientRect(),tot=Math.max(1,sec.offsetHeight-window.innerHeight),p=Math.min(.999,Math.max(0,-r.top/tot)),s=Math.floor(p*5);
