@@ -47,8 +47,14 @@ const assertText = (value, keys, where) => {
   }
 };
 
+const assertList = (value, where) => {
+  if (value !== undefined && !Array.isArray(value)) throw new Error(`releases.json ${where} must be an array`);
+};
+
 const assertSection = (section, where) => {
   assertText(section, ['title', 'body'], where);
+  assertList(section.screenshots, `${where} screenshots`);
+  assertList(section.bullets, `${where} bullets`);
   for (const [shotIndex, shot] of (section.screenshots ?? []).entries()) assertText(shot, ['src', 'alt'], `${where} screenshot ${shotIndex}`);
 };
 
@@ -59,6 +65,7 @@ const assertRelease = (release, index) => {
   }
   if (!Array.isArray(release.sections)) throw new Error(`releases.json entry ${index} needs a "sections" array`);
   release.sections.forEach((section, sectionIndex) => assertSection(section, `entry ${index} section ${sectionIndex}`));
+  assertList(release.improvements, `entry ${index} improvements`);
   for (const [itemIndex, item] of (release.improvements ?? []).entries()) assertText(item, ['text'], `entry ${index} improvement ${itemIndex}`);
   if (release.heroImage) assertText(release.heroImage, ['src', 'alt'], `entry ${index} heroImage`);
 };

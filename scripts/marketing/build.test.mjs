@@ -92,6 +92,19 @@ describe('template lookups', () => {
   });
 });
 
+describe('release list validation', () => {
+  it('rejects non-array lists with a readable message', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-list-'));
+    try {
+      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
+      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ label: 'v9', title: 't', summary: 's', sections: [{ title: 'a', body: 'b', screenshots: 'oops' }] }]));
+      assert.throws(() => buildReleaseHtml(root), /screenshots must be an array/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('build safety', () => {
   it('refuses to clear the repository root, its parents, a filesystem root, or an unrelated folder', () => {
     assert.throws(() => buildSite({ root: ROOT, outDir: path.join(path.dirname(ROOT), 'unrelated-gfc-output') }), /Refusing to clear output directory/);
