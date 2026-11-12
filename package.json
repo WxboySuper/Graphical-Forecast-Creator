@@ -88,7 +88,9 @@
     "deploy": "gh-pages -d build",
     "prebuild": "pnpm run css:build",
     "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css",
-    "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch"
+    "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch",
+    "marketing:build": "node scripts/marketing/build.mjs",
+    "marketing:preview": "node scripts/marketing/preview.mjs"
   },
   "browserslist": {
     "production": [
@@ -110,6 +112,8 @@
     "@babel/preset-typescript": "^8.0.7",
     "@eslint/js": "^9.39.5",
     "@firebase/rules-unit-testing": "^6.0.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
     "@playwright/test": "^1.65.0",
     "@sentry/vite-plugin": "^11.11.0",
     "@tailwindcss/cli": "^4.3.5",
@@ -140,6 +144,8 @@
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
+    "maplibre-gl": "4.7.1",
+    "marked": "13.0.3",
     "postcss": "8.5.32",
     "rollup": ">=4.67.5",
     "tailwindcss": "^4.3.5",

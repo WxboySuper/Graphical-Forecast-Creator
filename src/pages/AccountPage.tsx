@@ -45,6 +45,7 @@ import ContactEmailLink from "../components/ContactEmailLink";
 import { AccountDeletionCard } from "./AccountDeletionCard";
 import { AccountBillingCard } from "./AccountBillingCard";
 import { AccountSummaryTile as SummaryTile } from "./AccountSummaryTile";
+import { MARKETING_PRICING_URL } from "../config/marketingLinks";
 import "./AccountPage.css";
 
 import {
@@ -772,10 +773,10 @@ const SignedOutSupportCard: React.FC = () => (
         remain available with or without an account.
       </p>
       <Button asChild variant="outline" className="w-full">
-        <Link to="/pricing">
+        <a href={MARKETING_PRICING_URL}>
           <Crown className="mr-2 h-4 w-4" />
           View Pricing
-        </Link>
+        </a>
       </Button>
     </CardContent>
   </Card>

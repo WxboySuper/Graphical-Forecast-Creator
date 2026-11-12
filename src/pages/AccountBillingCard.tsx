@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react';
 import { Crown, LoaderCircle } from 'lucide-react';
-import { Link } from 'react-router';
+import { MARKETING_PRICING_URL } from '../config/marketingLinks';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import {
@@ -48,6 +48,28 @@ const BillingSummaryGrid: React.FC<{ billingStatus: string; currentPlanPrice: st
   </div>
 );
 
+type CheckoutPlan = 'monthly' | 'annual';
+
+/** Upgrade buttons that start Stripe checkout for a free account. */
+const UpgradeButtons: React.FC<{
+  disabled: boolean;
+  submittingPlan: CheckoutPlan | null;
+  annualDisplayPrice: string;
+  monthlyDisplayPrice: string;
+  onCheckout: (plan: CheckoutPlan) => void;
+}> = ({ disabled, submittingPlan, annualDisplayPrice, monthlyDisplayPrice, onCheckout }) => (
+  <>
+    <Button disabled={disabled} onClick={() => onCheckout('annual')}>
+      {submittingPlan === 'annual' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Crown className="mr-2 h-4 w-4" />}
+      Upgrade annual ({annualDisplayPrice})
+    </Button>
+    <Button variant="outline" disabled={disabled} onClick={() => onCheckout('monthly')}>
+      {submittingPlan === 'monthly' ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : null}
+      Upgrade monthly ({monthlyDisplayPrice})
+    </Button>
+  </>
+);
+
 /** Billing management and pricing navigation actions. */
 const BillingActionRow: React.FC<{
   stripeCustomerId: string | null;
@@ -55,7 +77,8 @@ const BillingActionRow: React.FC<{
   openingPortal: boolean;
   premiumActive: boolean;
   onOpenPortal: () => void;
-}> = ({ stripeCustomerId, billingEnabled, openingPortal, premiumActive, onOpenPortal }) => (
+  upgrade: React.ReactNode;
+}> = ({ stripeCustomerId, billingEnabled, openingPortal, premiumActive, onOpenPortal, upgrade }) => (
   <div className="account-button-row">
     {stripeCustomerId && billingEnabled ? (
       <Button variant="outline" onClick={onOpenPortal} disabled={openingPortal}>
@@ -63,11 +86,11 @@ const BillingActionRow: React.FC<{
         Manage Subscription
       </Button>
     ) : null}
-    <Button asChild variant={getPricingButtonVariant(premiumActive)}>
-      <Link to="/pricing">
-        <Crown className="mr-2 h-4 w-4" />
+    {upgrade}
+    <Button asChild variant={premiumActive ? getPricingButtonVariant(premiumActive) : 'outline'}>
+      <a href={MARKETING_PRICING_URL} target="_blank" rel="noreferrer">
         View Pricing
-      </Link>
+      </a>
     </Button>
   </div>
 );
@@ -91,16 +114,19 @@ export const AccountBillingCard: React.FC = () => {
     annualDisplayPrice,
     billingEnabled,
     billingStatus,
+    checkoutEnabled,
     effectiveSource,
     error,
     monthlyDisplayPrice,
     openBillingPortal,
+    openCheckout,
     planInterval,
     premiumActive,
     stripeCustomerId,
   } = useEntitlement();
   const [portalMessage, setPortalMessage] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [submittingPlan, setSubmittingPlan] = useState<CheckoutPlan | null>(null);
   const currentPlanPrice = getCurrentPlanPrice(premiumActive, planInterval, monthlyDisplayPrice, annualDisplayPrice);
   const planLabel = getPlanLabel(premiumActive, planInterval, effectiveSource);
   const supportCopy = getBillingSupportCopy(effectiveSource, premiumActive, annualPromoActive);
@@ -117,6 +143,27 @@ export const AccountBillingCard: React.FC = () => {
       setOpeningPortal(false);
     }
   };
+
+  /** Starts Stripe checkout for one billing interval and surfaces failures in the card. */
+  const handleCheckout = (plan: CheckoutPlan) => {
+    setPortalMessage(null);
+    setSubmittingPlan(plan);
+    openCheckout(plan)
+      .catch((nextError) => {
+        setPortalMessage(nextError instanceof Error ? nextError.message : 'Unable to start checkout right now.');
+      })
+      .finally(() => setSubmittingPlan(null));
+  };
+
+  const upgrade = premiumActive ? null : (
+    <UpgradeButtons
+      disabled={!checkoutEnabled || submittingPlan !== null}
+      submittingPlan={submittingPlan}
+      annualDisplayPrice={annualDisplayPrice}
+      monthlyDisplayPrice={monthlyDisplayPrice}
+      onCheckout={handleCheckout}
+    />
+  );
 
   /** Wraps the portal action so button handlers stay synchronous. */
   const handleOpenPortalClick = () => {
@@ -135,6 +182,7 @@ export const AccountBillingCard: React.FC = () => {
           openingPortal={openingPortal}
           premiumActive={premiumActive}
           onOpenPortal={handleOpenPortalClick}
+          upgrade={upgrade}
         />
       </CardContent>
     </Card>

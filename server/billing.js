@@ -291,7 +291,7 @@ const handleCheckout = async (req, res) => {
     line_items: [{ price: priceId, quantity: 1 }],
     allow_promotion_codes: true,
     success_url: `${baseUrl}/account?checkout=success`,
-    cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
+    cancel_url: `${baseUrl}/account?checkout=cancelled`,
     ...(getCheckoutCustomerEmail(decodedToken) ? { customer_email: getCheckoutCustomerEmail(decodedToken) } : {}),
     metadata,
     subscription_data: {

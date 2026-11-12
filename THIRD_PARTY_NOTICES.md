@@ -11,6 +11,8 @@ to each.
 - **@babel/preset-typescript** ^8.0.7 (root (pnpm)) — MIT — allowed
 - **@eslint/js** ^9.39.5 (root (pnpm)) — MIT — allowed
 - **@firebase/rules-unit-testing** ^6.0.0 (root (pnpm)) — Apache-2.0 — allowed
+- **@fontsource-variable/bricolage-grotesque** ^5.3.0 (root (pnpm)) — OFL-1.1 — review-required
+- **@fontsource/ibm-plex-mono** ^5.3.0 (root (pnpm)) — OFL-1.1 — review-required
 - **@playwright/test** ^1.65.0 (root (pnpm)) — Apache-2.0 — allowed
 - **@radix-ui/react-dialog** ^1.3.1 (root (pnpm)) — MIT — allowed
 - **@radix-ui/react-dropdown-menu** ^2.2.1 (root (pnpm)) — MIT — allowed
@@ -57,6 +59,8 @@ to each.
 - **jest-environment-jsdom** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **jszip** ^3.10.2 (root (pnpm)) — (MIT OR GPL-3.0-or-later) — allowed
 - **lucide-react** ^1.70.0 (root (pnpm)) — ISC — allowed
+- **maplibre-gl** 4.7.1 (root (pnpm)) — BSD-3-Clause — allowed
+- **marked** 13.0.3 (root (pnpm)) — MIT — allowed
 - **ol** ^10.11.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **ol-mapbox-style** ^13.9.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **postcss** 8.5.32 (root (pnpm)) — MIT — allowed

@@ -1,0 +1,76 @@
+---
+title: Pricing | Graphical Forecast Creator
+path: /pricing
+active: pricing
+bodyClass: page-pricing
+description: Forecasting in Graphical Forecast Creator is always free. Premium covers the hosted layer: cloud storage and access from every device.
+---
+<div class="page">
+<div class="wrap pagehead reveal">
+ <h1>Free to forecast.<span class="light"> Premium for the cloud.</span></h1>
+</div>
+
+<section class="wrap">
+ <div class="plans">
+  <article class="plan reveal">
+   <p class="eyebrow">Local-first plan</p>
+   <h2>Free</h2>
+   <div class="price">$0<small>always available</small></div>
+   <p class="alt">No account required to start.</p>
+   <p class="blurb">The core of GFC is free and always will be. Everything needed to build, write, save, export, and verify forecasts on your device.</p>
+   <ul>
+    <li>Forecast workspace, map editor, and eight-day cycles</li>
+    <li>Discussion editor, monitor, and verification</li>
+    <li>Local autosave, cycle history, and package exports</li>
+    <li>Free account settings sync</li>
+   </ul>
+   <a class="btn btn-ghost" href="{{ appUrl }}">Keep using GFC free</a>
+  </article>
+  <article class="plan featured reveal">
+   <span class="badge">Hosted</span>
+   <p class="eyebrow">Hosted plan</p>
+   <h2>Premium</h2>
+   <div class="price">{{ annualPrice }}<small>/year</small></div>
+   <p class="alt">or {{ monthlyPrice }}/month</p>
+   <p class="blurb">The official hosted service: cloud storage, sync between devices, and a way to support the infrastructure.</p>
+   <ul>
+    <li>Everything in Free</li>
+    <li>Hosted cloud storage for your forecast cycles</li>
+    <li>Cross-device access through the official GFC service</li>
+    <li>Funds hosting without putting core forecasting behind a paywall</li>
+   </ul>
+   <a class="btn btn-primary" href="{{ appUrl }}/account">Upgrade in your account</a>
+  </article>
+ </div>
+</section>
+
+<section class="section wrap">
+ <p class="eyebrow">Compare plans</p>
+ <h2 class="big">What is included.</h2>
+ <table class="compare">
+  <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col">Premium</th></tr></thead>
+  <tbody>
+   <tr><th scope="row">Forecast workspace and map editor</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Discussion editor</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Monitor</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Verification</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Local autosave and cycle history</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Package and file exports</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Account settings sync</th><td class="yes">✓</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Hosted cloud cycle storage</th><td class="no">–</td><td class="yes">✓</td></tr>
+   <tr><th scope="row">Cross-device cloud access</th><td class="no">–</td><td class="yes">✓</td></tr>
+  </tbody>
+ </table>
+</section>
+
+<section class="faq wrap" aria-labelledby="pfaq-h">
+ <h2 class="big" id="pfaq-h">Pricing questions.</h2>
+ <div class="faqlist">
+  <div class="qa"><button aria-expanded="false" aria-controls="p1" id="pq1">Is forecasting really free?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="p1" role="region" aria-labelledby="pq1"><div><p>Yes. The forecast builder, discussion editor, monitor, verification, local autosave, and exports are free, with or without an account. Anything that costs money to operate, like cloud storage, is what Premium covers.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="p2" id="pq2">What happens if Premium lapses?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="p2" role="region" aria-labelledby="pq2"><div><p>Your local work stays fully available. Only new cloud writes are turned off, and everything you saved stays yours.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="p3" id="pq3">Why does Premium exist?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="p3" role="region" aria-labelledby="pq3"><div><p>Hosting cloud storage costs real money. Premium lets the people who want it help cover that cost, so core forecasting never has to go behind a paywall.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="p4" id="pq4">How do I upgrade or cancel?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="p4" role="region" aria-labelledby="pq4"><div><p>Sign in and open your Account page. You can upgrade there, and manage or cancel your subscription from the same place. Payments are processed by Stripe.</p></div></div></div>
+ </div>
+ <p class="note" style="margin-top:28px">Billing questions or concerns? Email <a href="mailto:{{ contactEmail }}">{{ contactEmail }}</a>.</p>
+</section>
+</div>

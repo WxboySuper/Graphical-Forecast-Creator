@@ -125,7 +125,6 @@ describe('NavbarSections', () => {
               />
             }
           />
-          <Route path="/updates" element={<div>Updates destination</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -148,10 +147,8 @@ describe('NavbarSections', () => {
     const contactLink = screen.getByRole('link', { name: /Contact us/i });
     expect(contactLink).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
     expect(contactLink).toHaveTextContent('contact@gfcweather.com');
-    const whatsNewLink = screen.getByRole('link', { name: /What's New/i });
-    expect(whatsNewLink).toHaveAttribute('href', '/updates');
-    fireEvent.click(whatsNewLink);
-    expect(screen.getByText('Updates destination')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /What's New/i })).toHaveAttribute('href', 'https://gfcweather.com/updates/');
+    expect(screen.getByRole('link', { name: /Pricing/i })).toHaveAttribute('href', 'https://gfcweather.com/pricing/');
   });
 
   test('renders signed-out and dark-mode labels', () => {

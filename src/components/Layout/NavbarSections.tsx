@@ -53,6 +53,7 @@ import {
 } from '../../config/featureNavigation';
 import { ForecastNavigationMenu } from './ForecastMenu';
 import type { LucideIcon } from 'lucide-react';
+import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from '../../config/marketingLinks';
 declare const __GFC_APP_VERSION__: string;
 
 const appVersion = formatDisplayVersion(typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev');
@@ -268,10 +269,10 @@ const MoreActionsMenu: FC<{
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem asChild>
-          <NavLink to="/updates">
+          <a href={MARKETING_UPDATES_URL} target="_blank" rel="noreferrer">
             <Sparkles className="h-4 w-4" />
             What&apos;s New
-          </NavLink>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onViewTerms}>
           <FileText className="h-4 w-4" />
@@ -282,10 +283,10 @@ const MoreActionsMenu: FC<{
           Privacy Policy
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/pricing">
+          <a href={MARKETING_PRICING_URL} target="_blank" rel="noreferrer">
             <Crown className="h-4 w-4" />
             Pricing
-          </NavLink>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href={CONTACT_MAILTO} title={`Email ${CONTACT_EMAIL}`}>

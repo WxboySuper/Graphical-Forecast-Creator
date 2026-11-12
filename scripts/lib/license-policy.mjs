@@ -24,6 +24,7 @@ export const ALLOWED_LICENSES = new Set([
 /** Licenses that require an explicit, documented review before shipping. */
 export const REVIEW_REQUIRED_LICENSES = new Set([
   'MPL-2.0',
+  'OFL-1.1',
   'EPL-2.0',
   'LGPL-2.1-only',
   'LGPL-2.1-or-later',

@@ -1,0 +1,128 @@
+---
+title: GFC: Create forecasts. Your way.
+path: /
+description: Graphical Forecast Creator is a free forecast builder for weather people. Draw your own outlooks, explain your reasoning, monitor the day, and verify how it held up.
+script: home
+bodyClass: home
+---
+<section class="hero" id="hero">
+ <div class="copy">
+  <h1><span>Create forecasts.</span><span class="light">Your way.</span></h1>
+  <p class="sub">A forecast builder for weather people. Make your own products, draw them on the map across an eight-day cycle, explain your reasoning, and check how it verified.</p>
+  <div class="ctas">
+   <a class="btn btn-primary" href="{{ appUrl }}/account">Create Account</a>
+   <a class="textlink" href="{{ appUrl }}">Continue without account →</a>
+  </div>
+ </div>
+ <div class="heroapp"><div class="appbox" id="heroBox"></div></div>
+</section>
+
+<section class="story" id="story" aria-label="How a forecast comes together">
+ <div class="stage">
+  <div class="steps">
+   <div class="step active"><div class="num">01 / Plan</div><h2>Pick the day. Pick the product.</h2><p>Choose a day in your cycle, Day 1 through 8. Then start the severe outlook that comes built in, or press + to create your own custom layer.</p><ul><li>Days 1–8 in one cycle</li><li>The severe outlook: Tor, Wind, Hail, Cat</li><li>Custom layers with your own categories</li></ul></div>
+   <div class="step"><div class="num">02 / Build</div><h2>Draw it on the map.</h2><p>Pick a category and draw polygons. Your legend builds itself as you go.</p><ul><li>Pan, Draw, Delete, undo and redo</li><li>Custom colors and opacity per category</li><li>Save to your library of products</li></ul></div>
+   <div class="step"><div class="num">03 / Explain</div><h2>Explain your reasoning.</h2><p>Write freeform in the DIY editor, or answer the Guided questions and watch a formatted discussion build in the live preview.</p><ul><li>Valid times and forecaster name</li><li>Guided sections: summary, setup, expectations</li><li>Export when you're done</li></ul></div>
+   <div class="step"><div class="num">04 / Monitor</div><h2>Monitor the day.</h2><p>Bring up radar, satellite, NWS watches and warnings, and SPC storm reports. Dark mode is one tap away.</p><ul><li>MRMS radar and GOES satellite</li><li>NWS warning polygons and SPC reports</li><li>Light and dark themes</li></ul></div>
+   <div class="step"><div class="num">05 / Verify</div><h2>See what held up.</h2><p>Load your forecast package and grade it against SPC storm reports and NOAA DAT surveys. You get a score out of 100.</p><ul><li>Hazard-by-hazard breakdown</li><li>Evidence you can inspect on the map</li></ul></div>
+   <div class="progress" aria-hidden="true"><span class="on"></span><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div class="appbox" id="storyBox"></div>
+ </div>
+</section>
+
+<section class="doors-section" id="doors" aria-labelledby="doors-h">
+ <div class="section-head reveal">
+  <h2 class="big" id="doors-h">Built for your first forecast and your hundredth.</h2>
+ </div>
+ <div class="doors" id="doorsEl">
+  <div class="door beginner open" tabindex="0" role="button" aria-expanded="true" aria-label="New to forecasting">
+   <div class="eyebrow">New to forecasting</div>
+   <h3>Start with the guide rails.</h3>
+   <p class="pitch">Begin with the built-in severe outlook, follow the on-map hints, and let the Guided discussion ask you the right questions.</p>
+   <div class="demo">
+    <div class="frag"><div class="t"><span>Guided discussion</span><span>Step 1 of 4</span></div>
+     <div class="guide"><div class="now"><b>1</b><span>Summary: what's the overall threat?</span></div><div><b>2</b><span>Meteorological setup</span></div><div><b>3</b><span>Severe weather expectations</span></div><div><b>4</b><span>Save, and the preview formats it</span></div></div></div>
+    <div class="more">
+     <div class="frag"><div class="t"><span>On-map help</span></div><p style="margin:0;font-size:.88rem;line-height:1.5">Pan mode: drag map to move, scroll to zoom. Click a polygon to see its details.</p></div>
+     <div class="frag"><div class="t"><span>The severe outlook</span></div><div class="probrow"><span class="pill on" style="background:#1683f8;color:#fff">Tor</span><span class="pill" style="background:#f1f5f9">Wind</span><span class="pill" style="background:#f1f5f9">Hail</span><span class="pill" style="background:#f1f5f9">Cat</span></div></div>
+    </div>
+   </div>
+   <div class="actions"><a class="btn btn-primary" href="{{ appUrl }}">Try it without an account</a><span class="hint">Tap to open</span></div>
+  </div>
+  <div class="door experienced" tabindex="0" role="button" aria-expanded="false" aria-label="Experienced forecaster">
+   <div class="eyebrow">Experienced forecaster</div>
+   <h3>Build your own products.</h3>
+   <p class="pitch">Design custom layers, plan a full eight-day cycle with ghost layers, package your work, and grade it against real evidence.</p>
+   <div class="demo">
+    <div class="frag"><div class="t"><span>Custom layer</span><span>Heavy Rain Risk</span></div>
+     <div class="probrow"><span class="pill" style="background:#9fd0ff">Low</span><span class="pill" style="background:#3d8bf2;color:#fff">Moderate</span><span class="pill on" style="background:#123f9c;color:#fff">High</span><span class="pill" style="background:#f1f5f9">+ Add</span></div></div>
+    <div class="more">
+     <div class="two">
+      <div class="frag"><div class="t"><span>Forecast days</span></div><div class="probrow"><span class="pill" style="background:#1683f8;color:#fff;min-width:30px">1</span><span class="pill" style="background:#f1f5f9;min-width:30px">2</span><span class="pill" style="background:#f1f5f9;min-width:30px">3</span><span class="pill" style="background:#f1f5f9;min-width:30px">…8</span></div><p style="margin:8px 0 0;font-size:.8rem;color:#475569">Ghost layers show other products while you draw.</p></div>
+      <div class="frag"><div class="t"><span>Tools</span></div><div class="kbd"><kbd>Package</kbd><span>Bundle your forecast</span><kbd>Export</kbd><span>Take it with you</span><kbd>T W H C</kbd><span>Outlook type keys</span></div></div>
+     </div>
+     <div class="frag"><div class="t"><span>Forecast Grade</span><span style="color:#92400e">Sample data</span></div><div class="vstats"><div><b>78</b><small>Overall / 100</small></div><div><b>SPC</b><small>Storm reports</small></div><div><b>DAT</b><small>NOAA surveys</small></div></div></div>
+    </div>
+   </div>
+   <div class="actions"><a class="btn btn-ghost" href="{{ appUrl }}/account">Create an account</a><span class="hint">Tap to open</span></div>
+  </div>
+ </div>
+</section>
+
+<section class="bento-sec wrap" aria-labelledby="bento-h">
+ <div class="reveal"><h2 class="big" id="bento-h">Everything a forecast needs.</h2></div>
+ <div class="bento reveal">
+  <div class="tile t-a"><h3>Custom layers</h3><p>Create a layer, name it, and give each category its own color and opacity. Heavy rain, fire weather, winter precip: your call.</p>
+   <div class="viz" style="position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);aspect-ratio:8/5"><img src="/assets/img/live/layers-tile-crop.jpg" alt="Drawn tornado probability outlook with legend in the Forecast view" loading="lazy" style="display:block;width:100%;height:100%;object-fit:cover"></div></div>
+  <div class="tile t-b"><h3>Multi-day cycles</h3><p>One cycle, eight forecast days. Jump between them from the Days tab.</p><div class="viz mini-days"><span class="on">1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
+  <div class="tile"><h3>Guided discussion</h3><p>Answer the questions; the live preview formats it.</p><div class="viz" style="font:11px/1.6 'IBM Plex Mono',monospace;background:#fff;color:#111;border-radius:10px;padding:10px">Day 1 Outlook Discussion<br>** UNOFFICIAL OUTLOOK **</div></div>
+  <div class="tile"><h3>Monitor</h3><p>Radar, satellite, warnings, and reports in one read-only view.</p><div class="viz" style="position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);aspect-ratio:8/5"><img src="/assets/img/live/monitor-tile-crop.jpg" alt="Monitor view showing live MRMS radar reflectivity over the southern Plains" loading="lazy" style="display:block;width:100%;height:100%;object-fit:cover"><span style="position:absolute;left:8px;bottom:8px;font:600 10px/1 'IBM Plex Mono',monospace;background:rgba(15,23,42,.82);color:#fff;padding:5px 7px;border-radius:6px">MRMS reflectivity</span></div></div>
+  <div class="tile t-b"><h3>The severe outlook, built in</h3><p>Tornado, wind, and hail probabilities with hatching, plus an automatic categorical map.</p><div class="viz mini-days"><span class="on">Tor</span><span>Wind</span><span>Hail</span><span>Cat</span></div></div>
+  <div class="tile t-b"><h3>Forecast Grade &amp; packages</h3><p>Save, package, and export your forecast, then grade it against SPC reports and NOAA DAT surveys.</p><div class="viz exp"><span>Save</span><span>Package</span><span>Export</span><span>78 / 100</span></div></div>
+ </div>
+</section>
+
+<section class="what wrap" id="what" aria-labelledby="what-h">
+ <div class="reveal">
+  <h2 class="big" id="what-h">A place to make your own forecasts, then check them.</h2>
+  <p class="lede">GFC is a forecast builder for weather enthusiasts, students, and forecasters who want practice. You make the call. The reports grade it.</p>
+ </div>
+ <div class="isnt reveal">
+  <div class="y"><h3>What it is</h3><ul><li>A builder for your own forecast products</li><li>A way to explain and share your reasoning</li><li>A practice loop: plan, build, monitor, verify</li></ul></div>
+  <div class="n"><h3>What it isn't</h3><ul><li>An official forecast or warning source</li><li>Something to make safety decisions with</li><li>Affiliated with the NWS or SPC</li></ul></div>
+ </div>
+</section>
+
+
+<section class="teaser wrap" aria-labelledby="teaser-h">
+ <div class="teaser-grid">
+  <div class="teaser-card reveal"><p class="eyebrow">Pricing</p><h2 id="teaser-h">Forecasting stays free.</h2><p class="lede">Build, write, save, export, and verify forecasts on your device at no cost. Premium covers the hosted layer: cloud storage and access from every device.</p><p><a class="btn btn-ghost" href="/pricing/">See pricing</a></p></div>
+  <div class="teaser-card reveal"><p class="eyebrow">New in v2</p><h2>A bigger forecast desk.</h2><p class="lede">A mesoscale workspace with HRRR, RAP, and RRFS fields, forecast workspaces, and a calmer severe discussion editor.</p><p><a class="btn btn-ghost" href="/updates/">See what&#39;s new</a></p></div>
+ </div>
+</section>
+
+<section class="faq wrap" id="faq" aria-labelledby="faq-h">
+ <div class="reveal"><h2 class="big" id="faq-h">Good questions.</h2></div>
+ <div class="faqlist">
+  <div class="qa"><button aria-expanded="false" aria-controls="a1" id="q1">Is it free?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a1" role="region" aria-labelledby="q1"><div><p>Yes. Building, writing, saving, exporting, and verifying forecasts on your device is free, with or without an account. Premium only covers the hosted layer, like cloud storage. See <a href="/pricing/">Pricing</a>.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a2" id="q2">Do I need an account?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a2" role="region" aria-labelledby="q2"><div><p>No. Continue without an account to try it. Create one when you want to sync your settings, or to use cloud storage with Premium.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a3" id="q3">Is this official?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a3" role="region" aria-labelledby="q3"><div><p>No. Forecasts made in GFC are unofficial and not for safety decisions. For official outlooks, watches, and warnings, use weather.gov.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a4" id="q4">Is it only for severe weather?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a4" role="region" aria-labelledby="q4"><div><p>No. The severe outlook is built in, but custom layers let you build any product you want: heavy rain, fire weather, winter precipitation, tropical areas of interest, and more.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a5" id="q5">Where is my work saved?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a5" role="region" aria-labelledby="q5"><div><p>On your device, automatically, with a history of earlier cycles. If you have Premium, you can also keep cycles in the cloud and open them from any device.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a6" id="q6">Can I use it on my phone?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a6" role="region" aria-labelledby="q6"><div><p>GFC is built for desktops and large screens, where drawing on a map is comfortable. Some parts work on mobile, but a bigger screen is the best experience.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a7" id="q7">Can I use it in a class or a club?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a7" role="region" aria-labelledby="q7"><div><p>Yes. GFC is made for learning, and personal, educational, and non-commercial use is exactly what it is for.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a8" id="q8">Can I share my forecasts?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a8" role="region" aria-labelledby="q8"><div><p>Yes. You can export your forecast and share it, as long as it is clearly labeled unofficial. Your forecasts belong to you.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a9" id="q9">How do I get help or report a problem?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a9" role="region" aria-labelledby="q9"><div><p>Ask in the <a href="https://discord.gg/SGk37rg8sz">community Discord</a>, use Send feedback in the app, or <a href="/contact/">contact us</a>.</p></div></div></div>
+  <div class="qa"><button aria-expanded="false" aria-controls="a10" id="q10">Is the code open source?<span class="pm" aria-hidden="true">+</span></button><div class="ans" id="a10" role="region" aria-labelledby="q10"><div><p>Yes. Everything is public on <a href="https://github.com/WxboySuper/Graphical-Forecast-Creator">GitHub</a>.</p></div></div></div>
+ </div>
+</section>
+
+<section class="account" id="account">
+ <div class="reveal">
+  <h2>Make your first forecast today.</h2>
+  <p>Create an account to save your work and unlock features. Or jump straight in and start building.</p>
+  <div class="ctas"><a class="btn btn-primary" href="{{ appUrl }}/account">Create Account</a><a class="btn btn-ghost" href="{{ appUrl }}">Continue Without Account</a></div>
+  <p class="shape">Help shape the future of Graphical Forecast Creator. <a href="{{ betaUrl }}">Try the open beta</a> and <a href="/contact/">tell us what you think</a>.</p>
+ </div>
+</section>

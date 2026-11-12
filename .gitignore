@@ -83,3 +83,7 @@ night-watch.config.json
 __pycache__/
 *.py[cod]
 cloudflare/wrangler.mesoscale.rendered.json
+
+# Marketing site build output and scratch
+marketing/dist/
+scripts/marketing/.tmp/
