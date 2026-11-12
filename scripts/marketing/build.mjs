@@ -53,6 +53,7 @@ const emitStyles = (outDir, srcDir, fontUrls) => {
     .map((name) => readText(srcDir, 'styles', name))
     .join('\n');
   for (const [token, url] of Object.entries(fontUrls)) css = css.split(token).join(url);
+  if (css.includes('__FONT_')) throw new Error('A font placeholder was not replaced; check FONT_FILES in scripts/marketing/build.mjs');
   return emitHashed(outDir, 'site', '.css', css);
 };
 

@@ -30,7 +30,14 @@
   }
 
   const current = document.body.dataset.active;
-  if (current) document.querySelectorAll('[data-nav="' + (window.CSS && CSS.escape ? CSS.escape(current) : current.replace(/[^w-]/g, '')) + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
+  if (current) {
+    const safe = window.CSS && CSS.escape ? CSS.escape(current) : current.replace(/[^\w-]/g, '');
+    try {
+      document.querySelectorAll('[data-nav="' + safe + '"]').forEach((link) => link.setAttribute('aria-current', 'page'));
+    } catch {
+      /* an unusual data-active value only loses the active-link highlight */
+    }
+  }
 
   document.querySelectorAll('.qa button').forEach((button) => button.addEventListener('click', () => {
     const open = button.getAttribute('aria-expanded') !== 'true';

@@ -6,9 +6,9 @@
 .navtoggle span{display:block;width:18px;height:2px;background:var(--ink);border-radius:2px;transition:transform .3s var(--ease),opacity .3s}
 .top.menu-open .navtoggle span:nth-child(1){transform:translateY(7px) rotate(45deg)}.top.menu-open .navtoggle span:nth-child(2){opacity:0}.top.menu-open .navtoggle span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 @media(max-width:980px){
- .navtoggle{display:flex}
- .top nav{position:absolute;inset:100% 0 auto 0;flex-direction:column;align-items:stretch;gap:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px clamp(18px,4vw,56px) 18px;display:none}
- .top.menu-open nav{display:flex}.top.menu-open{background:var(--bg)}
+ .js .navtoggle{display:flex}
+ .js .top nav{position:absolute;inset:100% 0 auto 0;flex-direction:column;align-items:stretch;gap:0;background:var(--bg);border-bottom:1px solid var(--line);padding:8px clamp(18px,4vw,56px) 18px;display:none}
+ .js .top.menu-open nav{display:flex}.top.menu-open{background:var(--bg)}
  .top nav a,.top nav .themebtn{padding:14px 4px;border-bottom:1px solid var(--line)}.top nav .cta{margin-top:12px;text-align:center}
 }
 main.page{padding-top:96px}
