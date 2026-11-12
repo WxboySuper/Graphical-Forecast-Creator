@@ -1,7 +1,7 @@
 (()=>{
 const VER=(document.body.dataset.version||'v2').replace(/[^A-Za-z0-9 .-]/g,'');
 // scene lookups fall back to a detached element, so a missing node can never abort the whole illustration
-const qs=(root,sel)=>root.querySelector(sel)||document.createElement('div');
+const qs=(root,sel)=>{const el=root.querySelector(sel);if(el)return el;console.warn('Illustration node missing: '+sel);return document.createElement('div')};
 const mq=q=>typeof matchMedia==='function'&&matchMedia(q).matches;
 const RM=mq('(prefers-reduced-motion: reduce)');
 const MM=l=>Math.log(Math.tan(Math.PI/4+l*Math.PI/360)),MS=37.94,MR=MS*180/Math.PI;const P=(lon,lat)=>[500+(lon+97.4)*MS,MR*(MM(43)-MM(lat))];
