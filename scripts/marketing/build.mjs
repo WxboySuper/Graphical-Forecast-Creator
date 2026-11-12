@@ -63,13 +63,16 @@ const emitScripts = (outDir, srcDir) => {
   return urls;
 };
 
+const MAPLIBRE_FILES = ['maplibre-gl.mjs', 'maplibre-gl-shared.mjs', 'maplibre-gl-worker.mjs', 'maplibre-gl.css'];
+
 /** Copies the ESM maplibre-gl build (module, shared chunk, worker, CSS) into a versioned folder. */
 const emitMaplibre = (outDir, root) => {
   const packageDir = path.join(root, 'node_modules', 'maplibre-gl');
   const { version } = JSON.parse(readFileSync(path.join(packageDir, 'package.json'), 'utf8'));
   const target = path.join(outDir, 'assets', 'h', `maplibre-${version}`);
   mkdirSync(target, { recursive: true });
-  for (const file of ['maplibre-gl.mjs', 'maplibre-gl-shared.mjs', 'maplibre-gl-worker.mjs', 'maplibre-gl.css']) {
+  for (const file of MAPLIBRE_FILES) {
+    if (!existsSync(path.join(packageDir, 'dist', file))) throw new Error(`maplibre-gl ${version} is missing dist/${file}; update MAPLIBRE_FILES in scripts/marketing/build.mjs`);
     cpSync(path.join(packageDir, 'dist', file), path.join(target, file));
   }
   const base = `/assets/h/maplibre-${version}`;
@@ -87,7 +90,11 @@ const loadPartials = (srcDir) => {
 /** Renders the Markdown source named in front matter (legal pages), or an empty string. */
 const renderLegal = (meta, root) => (meta.markdown ? marked.parse(readText(root, meta.markdown), { gfm: true }) : '');
 
-const pageOutputPath = (routePath) => (routePath === '/' ? 'index.html' : path.posix.join(routePath.replace(/^\//, ''), 'index.html'));
+const pageOutputPath = (routePath) => {
+  if (routePath === '/') return 'index.html';
+  if (routePath === '/404') return '404.html';
+  return path.posix.join(routePath.slice(1), 'index.html');
+};
 
 /** Builds the script, stylesheet, and module-preload tags that a page's front matter asks for. */
 const pageAssetTags = (meta, globals) => {
@@ -132,9 +139,21 @@ const sitemapXml = (siteUrl, records) => {
 };
 
 /** Builds the marketing site into outDir and returns the rendered page routes. */
+/** Refuses to wipe an output folder that is a filesystem root, the repository root, or one of its parents. */
+const assertSafeOutDir = (root, outDir) => {
+  const resolved = path.resolve(outDir);
+  const repo = path.resolve(root);
+  const relative = path.relative(resolved, repo);
+  const isRoot = path.dirname(resolved) === resolved;
+  if (isRoot || resolved === repo || (!relative.startsWith('..') && !path.isAbsolute(relative))) {
+    throw new Error(`Refusing to clear unsafe output directory: ${resolved}`);
+  }
+};
+
 export const buildSite = ({ root = ROOT, outDir = path.join(root, 'marketing', 'dist') } = {}) => {
   const srcDir = path.join(root, 'marketing', 'src');
   const site = JSON.parse(readText(srcDir, 'data', 'site.json'));
+  assertSafeOutDir(root, outDir);
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
   const fontUrls = emitFonts(outDir, root);

@@ -36,11 +36,20 @@ describe('release notes rendering', () => {
       mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
       writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), JSON.stringify([{ label: 'v9"><b>', title: '<script>alert(1)</script>', summary: '<img src=x onerror=alert(1)>', sections: [{ title: '<i>', body: '<u>', bullets: ['<s>'] }], improvements: [{ id: 'x', text: '<em>' }] }]));
       const html = buildReleaseHtml(root);
-      assert.doesNotMatch(html, /<script|<img|<b>|<i>|<u>|<s>|<em>/);
+      const lowered = html.toLowerCase();
+      for (const tag of ['<script', '<img', '<b>', '<i>', '<u>', '<s>', '<em>']) assert.ok(!lowered.includes(tag), `${tag} must be escaped`);
       assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('build safety', () => {
+  it('refuses to clear the repository root or a filesystem root as the output directory', () => {
+    assert.throws(() => buildSite({ root: ROOT, outDir: ROOT }), /unsafe output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.dirname(ROOT) }), /unsafe output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.parse(ROOT).root }), /unsafe output directory/);
   });
 });
 
@@ -63,6 +72,7 @@ describe('marketing site build', () => {
       assert.ok(existsSync(path.join(outDir, route === '/' ? 'index.html' : `${route.slice(1)}/index.html`)), `${route} output missing`);
     }
     assert.ok(existsSync(path.join(outDir, '404.html')));
+    assert.ok(!existsSync(path.join(outDir, '404', 'index.html')));
   });
 
   it('points app links at the app host and never at third-party CDNs', () => {

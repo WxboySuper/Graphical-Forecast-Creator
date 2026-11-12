@@ -101,14 +101,17 @@ const outDir = path.join(ROOT, 'marketing', 'src', 'assets', 'updates', release)
 mkdirSync(outDir, { recursive: true });
 const tmp = mkdtempSync(path.join(os.tmpdir(), 'gfc-graphics-'));
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-for (const card of cards) {
-  if (!existsSync(path.join(LIVE, card.shot.file))) { process.stdout.write(`skip ${card.file}: ${card.shot.file} missing\n`); continue; }
-  const htmlFile = path.join(tmp, `${card.file}.html`);
-  writeFileSync(htmlFile, cardHtml(card));
-  await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });
-  await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: path.join(outDir, `${card.file}.jpg`), type: 'jpeg', quality: 90 });
-  process.stdout.write(`rendered ${card.file}\n`);
+try {
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+  for (const card of cards) {
+    if (!existsSync(path.join(LIVE, card.shot.file))) { process.stdout.write(`skip ${card.file}: ${card.shot.file} missing\n`); continue; }
+    const htmlFile = path.join(tmp, `${card.file}.html`);
+    writeFileSync(htmlFile, cardHtml(card));
+    await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'load' });
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({ path: path.join(outDir, `${card.file}.jpg`), type: 'jpeg', quality: 90 });
+    process.stdout.write(`rendered ${card.file}\n`);
+  }
+} finally {
+  await browser.close();
 }
-await browser.close();

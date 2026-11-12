@@ -20,9 +20,18 @@ const resolveFile = (pathname) => {
   return existsSync(index) ? index : path.join(ROOT, '404.html');
 };
 
+const send = (response, status, type, body) => {
+  response.writeHead(status, { 'content-type': type, 'content-security-policy': MARKETING_CSP });
+  response.end(body);
+};
+
 const port = Number(process.env.PORT) || 4173;
 createServer((request, response) => {
-  const file = resolveFile(new URL(request.url, 'http://localhost').pathname);
-  response.writeHead(file.endsWith('404.html') ? 404 : 200, { 'content-type': TYPES[path.extname(file)] ?? 'application/octet-stream', 'content-security-policy': MARKETING_CSP });
-  response.end(readFileSync(file));
-}).listen(port, () => process.stdout.write(`Marketing preview on http://localhost:${port}\n`));
+  try {
+    const file = resolveFile(new URL(request.url, 'http://localhost').pathname);
+    send(response, file.endsWith('404.html') ? 404 : 200, TYPES[path.extname(file)] ?? 'application/octet-stream', readFileSync(file));
+  } catch {
+    send(response, 400, 'text/plain', 'Bad request');
+  }
+}).listen(port, () => process.stdout.write(`Marketing preview on http://localhost:${port}
+`));

@@ -144,8 +144,8 @@ const frame=f=>{let t=0;return()=>{if(t)return;t=requestAnimationFrame(()=>{t=0;
 addEventListener('scroll',frame(onScroll),{passive:true});addEventListener('resize',frame(()=>{fit(hb);fit(sb)}));onScroll();
 // doors
 const doors=document.getElementById('doorsEl'),ds=[...doors.querySelectorAll('.door')];doors.classList.add('has-open');
-function openDoor(d){ds.forEach(x=>{const o=x===d;x.classList.toggle('open',o);x.setAttribute('aria-expanded',o)})}
-ds.forEach(d=>{d.addEventListener('mouseenter',()=>matchMedia('(hover:hover)').matches&&openDoor(d));d.addEventListener('click',e=>{if(!e.target.closest('a'))openDoor(d)});d.addEventListener('focus',()=>openDoor(d));d.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDoor(d)}})});
+function openDoor(d){ds.forEach(x=>{const o=x===d;x.classList.toggle('open',o);x.dataset.open=String(o)})}
+ds.forEach(d=>{d.addEventListener('mouseenter',()=>matchMedia('(hover:hover)').matches&&openDoor(d));d.addEventListener('click',e=>{if(!e.target.closest('a'))openDoor(d)});d.addEventListener('focus',()=>openDoor(d));d.addEventListener('keydown',e=>{if(e.target===d&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDoor(d)}})});
 
 // real basemap: OpenFreeMap tiles via MapLibre, aligned to P() (Web Mercator, same scale/center)
 window.__mapsPending=0;
@@ -153,5 +153,5 @@ function mkMap(maplibregl,el,style){window.__mapsPending++;const m=new maplibreg
 (window.requestIdleCallback||setTimeout)(()=>{const u=radarURL();document.querySelectorAll('image.radar').forEach(i=>i.setAttribute('href',u))});
 function initMaps(maplibregl){document.querySelectorAll('.ml').forEach(el=>{if(el.dataset.s==='mon'){const a=document.createElement('div'),b=document.createElement('div');a.className='lt';b.className='dk';el.append(a,b);mkMap(maplibregl,a,'positron');mkMap(maplibregl,b,'dark')}else mkMap(maplibregl,el,'liberty')})}
 // maplibre-gl 6 ships as an ES module; the build preloads it and this loads it without an inline script
-const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>initMaps(m.default||m)).catch(()=>{})
+const mapModule=document.querySelector('link[rel=modulepreload]');if(mapModule)import(mapModule.href).then(m=>initMaps(m.default||m)).catch(err=>console.warn('Hero map unavailable; showing the static background.',err))
 })();
