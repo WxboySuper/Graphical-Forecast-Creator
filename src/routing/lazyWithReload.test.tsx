@@ -32,6 +32,7 @@ describe('isChunkLoadError', () => {
     'Failed to fetch dynamically imported module: https://example.com/assets/ForecastPage-abc.js',
     'Importing a module script failed.',
     'Loading chunk 42 failed.',
+    "TypeError: 'text/html' is not a valid JavaScript MIME type.",
   ])('matches bundler chunk failure: %s', (message) => {
     expect(isChunkLoadError(new Error(message))).toBe(true);
   });
@@ -42,7 +43,13 @@ describe('isChunkLoadError', () => {
     expect(isChunkLoadError(error)).toBe(true);
   });
 
-  test.each([[null], [undefined], [new Error('boom')], ['plain string']])('rejects non-chunk failures: %p', (value) => {
+  test.each([
+    [null],
+    [undefined],
+    [new Error('boom')],
+    [new TypeError('Failed to read property')],
+    ['plain string'],
+  ])('rejects non-chunk failures: %p', (value) => {
     expect(isChunkLoadError(value)).toBe(false);
   });
 });
@@ -62,11 +69,20 @@ describe('lazyWithReload', () => {
     expect(reload).not.toHaveBeenCalled();
   });
 
-  test('reloads once on a chunk failure and stays on the fallback', async () => {
+  test.each([
+    {
+      type: 'CSS preload failure',
+      error: new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-abc.css'),
+    },
+    {
+      type: 'HTML MIME failure',
+      error: new TypeError("'text/html' is not a valid JavaScript MIME type."),
+    },
+  ])('reloads once for a $type and stays on the fallback', async ({ error }) => {
     const reload = jest.fn();
     const Page = lazyWithReload(
       'forecast',
-      () => Promise.reject(new Error('Unable to preload CSS for https://gfcweather.com/assets/ForecastMap-abc.css')),
+      () => Promise.reject(error),
       reload
     );
 

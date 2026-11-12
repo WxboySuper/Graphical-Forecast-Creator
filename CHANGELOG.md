@@ -60,7 +60,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
   - Repair existing beta entitlement records and preserve subscription data when an invite is claimed.
 - **Beta site:** Google Sign-In, Stripe checkout and portal returns, and opted-in analytics now work on `beta.gfcweather.com`.
 - **App stability:**
-  - Pages reload once automatically instead of staying stuck loading when the cached app references outdated files.
+  - Pages reload once automatically instead of staying stuck loading when the cached app references outdated files, including when a stale chunk request returns HTML.
   - Allow closing the population estimate dialog while it calculates, and keep the Documentation drawer's tab and scroll position when the layout updates.
   - Keep keyboard focus inside open dialogs.
   - Ignore invalid autosave timestamps, apply alert banner start and expiry times after validating them, and fall back to defaults for invalid Auto-TSTM timeout settings.
