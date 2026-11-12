@@ -86,6 +86,13 @@ describe('page front matter safety', () => {
   });
 });
 
+describe('template substitution', () => {
+  it('does not re-scan substituted values for tags', () => {
+    assert.equal(renderTemplate('{{{ body }}}', { body: '{{ secret }}', secret: 'x' }), '{{ secret }}');
+    assert.equal(renderTemplate('{{ body }}', { body: '{{{ secret }}}', secret: 'x' }), '{{{ secret }}}');
+  });
+});
+
 describe('template lookups', () => {
   it('does not resolve inherited object members as values', () => {
     assert.throws(() => renderTemplate('{{ constructor }}', {}), /Missing template value/);
@@ -100,6 +107,7 @@ describe('build safety', () => {
     assert.throws(() => buildSite({ root: ROOT, outDir: path.join(path.dirname(ROOT), 'unrelated-gfc-output') }), /Refusing to clear output directory/);
     assert.throws(() => buildSite({ root: ROOT, outDir: path.join(os.tmpdir(), 'not-ours', 'out') }), /Refusing to clear output directory/);
     assert.throws(() => buildSite({ root: ROOT, outDir: ROOT }), /Refusing to clear output directory/);
+    assert.throws(() => buildSite({ root: ROOT, outDir: path.join(ROOT, 'marketing', 'src') }), /Refusing to clear output directory/);
     assert.throws(() => buildSite({ root: ROOT, outDir: path.dirname(ROOT) }), /Refusing to clear output directory/);
     assert.throws(() => buildSite({ root: ROOT, outDir: path.parse(ROOT).root }), /Refusing to clear output directory/);
   });

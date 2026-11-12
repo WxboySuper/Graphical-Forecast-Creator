@@ -175,11 +175,23 @@ const isScratchDir = (target) => {
   return containsPath(path.resolve(os.tmpdir()), target) && path.basename(relative.split(path.sep)[0]).startsWith('gfc-');
 };
 
-/** Only clears an output folder strictly inside the repository or the OS temp directory. */
+/** Only clears the repository's marketing build folder or a gfc-* scratch directory in the OS temp folder. */
 const assertSafeOutDir = (root, outDir) => {
   const resolved = path.resolve(outDir);
-  const allowed = containsPath(path.resolve(root), resolved) || isScratchDir(resolved);
-  if (!allowed) throw new Error(`Refusing to clear output directory outside the repository or temp folder: ${resolved}`);
+  const buildDir = path.resolve(root, 'marketing', 'dist');
+  const allowed = resolved === buildDir || containsPath(buildDir, resolved) || isScratchDir(resolved);
+  if (!allowed) throw new Error(`Refusing to clear output directory outside marketing/dist or a gfc scratch folder: ${resolved}`);
+};
+
+/** Two pages must not claim the same route or output file, or one would silently overwrite the other. */
+const assertUniqueOutputs = (records) => {
+  const seen = new Set();
+  for (const record of records) {
+    for (const key of [`route ${record.route}`, `output ${record.outputPath}`]) {
+      if (seen.has(key)) throw new Error(`Two pages share the same ${key}`);
+      seen.add(key);
+    }
+  }
 };
 
 /** Builds the marketing site into outDir and returns the rendered page routes. */
@@ -206,6 +218,7 @@ export const buildSite = ({ root = ROOT, outDir = path.join(root, 'marketing', '
   const records = listFiles(path.join(srcDir, 'pages'), '.html')
     .filter((file) => !file.startsWith('_'))
     .map((file) => renderPage({ file, srcDir, root, partials, globals }));
+  assertUniqueOutputs(records);
   for (const record of records) {
     const target = path.join(outDir, record.outputPath);
     mkdirSync(path.dirname(target), { recursive: true });

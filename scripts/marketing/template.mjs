@@ -42,7 +42,9 @@ const expandPartials = (template, partials, depth = 0) => {
 };
 
 /** Renders a template with partial includes and escaped or raw values. */
+// One pass over the template, so substituted values are never scanned for further tags.
+const VALUE_TAG = /\{\{\{\s*([\w.-]+)\s*\}\}\}|\{\{\s*([\w.-]+)\s*\}\}/g;
+
 export const renderTemplate = (template, values, partials = {}) =>
-  expandPartials(template, partials)
-    .replace(/\{\{\{\s*([\w.-]+)\s*\}\}\}/g, (_match, key) => String(lookup(values, key)))
-    .replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_match, key) => escapeHtml(lookup(values, key)));
+  expandPartials(template, partials).replace(VALUE_TAG, (_match, rawKey, escapedKey) =>
+    rawKey ? String(lookup(values, rawKey)) : escapeHtml(lookup(values, escapedKey)));
