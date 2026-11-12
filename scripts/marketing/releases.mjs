@@ -73,6 +73,7 @@ const assertRelease = (release, index) => {
 /** Builds the release archive markup, newest release first. */
 export const buildReleaseHtml = (root) => {
   const releases = JSON.parse(readFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), 'utf8'));
+  if (!Array.isArray(releases) || releases.length === 0) throw new Error('releases.json must be a non-empty array of releases');
   releases.forEach(assertRelease);
   return releases.map(renderRelease).join('\n');
 };

@@ -36,6 +36,7 @@ try {
   // Draw one hazard area over the central Plains.
   await page.getByRole('button', { name: 'Draw a polygon' }).click();
   const box = await page.locator('canvas').first().boundingBox();
+  if (!box) throw new Error('The map canvas is not visible; the Mesoscale workspace did not finish loading');
   const at = (fx, fy) => [box.x + box.width * fx, box.y + box.height * fy];
   for (const [fx, fy] of [[0.52, 0.5], [0.62, 0.46], [0.69, 0.55], [0.64, 0.66], [0.55, 0.64]]) {
     const [x, y] = at(fx, fy);

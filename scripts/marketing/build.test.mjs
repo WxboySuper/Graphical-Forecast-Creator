@@ -92,6 +92,19 @@ describe('template lookups', () => {
   });
 });
 
+describe('release file shape', () => {
+  it('rejects a releases file that is not a non-empty array', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-shape-'));
+    try {
+      mkdirSync(path.join(root, 'marketing', 'src', 'data'), { recursive: true });
+      writeFileSync(path.join(root, 'marketing', 'src', 'data', 'releases.json'), '{}');
+      assert.throws(() => buildReleaseHtml(root), /non-empty array/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('release list validation', () => {
   it('rejects non-array lists with a readable message', () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'gfc-releases-list-'));

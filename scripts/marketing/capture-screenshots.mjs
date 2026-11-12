@@ -75,7 +75,8 @@ async function seedTornadoOutlook() {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.app-navbar__version');
   await page.evaluate(() => {
-    document.querySelector('.app-navbar__version').textContent = 'v2';
+    const versionLabel = document.querySelector('.app-navbar__version');
+    if (versionLabel) versionLabel.textContent = 'v2';
     document.querySelectorAll('[data-testid="auto-tstm-disabled-banner"], [data-testid="categorical-error-banner"], [role="alert"]').forEach((element) => element.remove());
   });
   await page.waitForTimeout(9000);
