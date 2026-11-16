@@ -1,3 +1,8 @@
+/**
+ * File: server/lib/serverTarget.test.js
+ * Purpose: Tests server deployment target parsing, defaults, and validation across runtime environments.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');

@@ -1,3 +1,6 @@
+/**
+ * Custom product actions hook. Coordinates user actions for creating, editing, and removing custom forecast products.
+ */
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { HostedCustomProduct, OneOffCustomLayer } from '../types/customProducts';
 import type { CustomProductsRepository } from '../lib/customProductsRepository';

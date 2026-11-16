@@ -1,3 +1,8 @@
+/**
+ * Verification-neighborhood test boundary: this suite verifies spatial
+ * neighborhood construction, grid limits, geometry handling, and report or
+ * outlook evidence selection used by Verification scoring.
+ */
 import * as turf from '@turf/turf';
 import type { Feature, Point } from 'geojson';
 import type { OutlookData } from '../../types/outlooks';

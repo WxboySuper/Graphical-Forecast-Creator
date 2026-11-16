@@ -1,3 +1,8 @@
+/**
+ * Day-rollover prompt storage helpers.
+ *
+ * This module reads and writes the scoped local state used to decide whether a new forecast day needs a prompt. The rollover UI owns presentation; storage scope owns key isolation.
+ */
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getStorageScope, getScopedStorageKey } from './storageScope';
 

@@ -1,3 +1,7 @@
+/**
+ * Defines idempotency-ledger helpers for processed Stripe billing webhook events.
+ * This module owns webhook-event deduplication state and retention metadata; signature verification and business transitions are handled elsewhere.
+ */
 'use strict';
 
 const EVENT_LEDGER_COLLECTION = 'processedStripeWebhookEvents';

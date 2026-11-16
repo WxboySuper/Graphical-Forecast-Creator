@@ -1,3 +1,9 @@
+/**
+ * Outlook domain utilities: this module maps outlook types, probabilities,
+ * colors, and categorical relationships into stable forecast-facing values.
+ * It is a pure domain boundary and does not own UI state, persistence, or map
+ * lifecycle behavior.
+ */
 import {
   CategoricalRiskLevel,
   ColorMappings,

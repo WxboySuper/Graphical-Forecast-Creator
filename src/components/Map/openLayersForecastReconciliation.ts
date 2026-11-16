@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastReconciliation.ts
+ * Purpose: Reconciles application forecast state with the current OpenLayers feature collection.
+ */
+
 import { captureMessage } from "@sentry/react";
 import type VectorSource from "ol/source/Vector";
 import type OLFeature from "ol/Feature";

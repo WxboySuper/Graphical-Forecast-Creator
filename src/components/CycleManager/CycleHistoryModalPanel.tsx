@@ -1,3 +1,7 @@
+/**
+ * Composes the cycle-history modal from current-cycle and saved-cycle sections.
+ * This component owns modal layout and section callbacks; cycle persistence and history calculations are supplied by its parent and helpers.
+ */
 import React from 'react';
 import type { SavedCycle } from '../../store/forecastSlice';
 import type { ForecastCycle } from '../../types/outlooks';

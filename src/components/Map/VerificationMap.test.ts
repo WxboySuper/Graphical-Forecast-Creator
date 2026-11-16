@@ -1,3 +1,7 @@
+/**
+ * Verification-map barrel tests. Verify the public map export delegates to the
+ * OpenLayers verification implementation.
+ */
 import VerificationMap from './VerificationMap';
 import OpenLayersVerificationMap from './OpenLayersVerificationMap';
 

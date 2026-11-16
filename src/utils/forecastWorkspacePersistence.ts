@@ -136,12 +136,19 @@ const assertCloudWorkspaceMatches = (
   }
 };
 
+const assertCloudWorkspaceSupported = (workspaceId: ForecastWorkspaceId): void => {
+  if (workspaceId === 'mesoscale') {
+    throw new Error('Cloud storage is not supported for Mesoscale forecasts. Use local autosave or JSON export.');
+  }
+};
+
 export const buildCloudSessionPayload = (
   workspaceId: ForecastWorkspaceId,
   payload: unknown,
   validators: ForecastWorkspaceLegacyValidators = {},
 ): ForecastWorkspaceSaveEnvelope => {
   const owner = requireForecastWorkspaceId(workspaceId);
+  assertCloudWorkspaceSupported(owner);
   const classification = classifyForecastWorkspacePayload(payload, validators);
   if (!classification.ok) throw getForecastWorkspaceLoadError(classification);
 
@@ -181,7 +188,11 @@ export const buildCloudSessionPayload = (
  */
 export const buildCloudLoadValidators = (
   workspaceId: ForecastWorkspaceId,
-): ForecastWorkspaceLegacyValidators => ({
+): ForecastWorkspaceLegacyValidators => {
+  if (workspaceId === 'mesoscale') {
+    throw new Error('Cloud storage is not supported for Mesoscale forecasts.');
+  }
+  return ({
   isSeverePayload: (value): value is GFCForecastSaveData => {
     if (workspaceId === 'custom') return false;
     return validateForecastData(value);
@@ -190,4 +201,5 @@ export const buildCloudLoadValidators = (
     if (workspaceId !== 'custom') return false;
     return validateForecastData(value);
   },
-});
+  });
+};

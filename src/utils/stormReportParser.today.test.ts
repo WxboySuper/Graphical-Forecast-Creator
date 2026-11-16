@@ -1,3 +1,6 @@
+/**
+ * Current-day storm report tests. Verify date filtering keeps reports from the requested operational day.
+ */
 import {
   fetchTodayStormReports,
   fetchYesterdayStormReports,

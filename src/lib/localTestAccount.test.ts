@@ -1,3 +1,6 @@
+/**
+ * Local test account tests. Verify fixture-account setup and reset behavior used by local development and CI.
+ */
 import { clearLocalTestAccount, createLocalTestUser, isLocalTestAccountEnabled, readLocalTestAccount } from './localTestAccount';
 
 describe('local test account fixture', () => {

@@ -1,3 +1,7 @@
+/**
+ * Outlook polygon trimming helpers. It removes empty or out-of-scope geometry
+ * from outlook features according to the selected land-mask strategy.
+ */
 import type { Feature, Polygon, MultiPolygon } from 'geojson';
 import type { OutlookData, OutlookType } from '../../types/outlooks';
 import type { LandMaskFeature, LandMaskStrategy } from './types';

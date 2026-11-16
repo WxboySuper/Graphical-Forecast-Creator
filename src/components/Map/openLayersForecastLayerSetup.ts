@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastLayerSetup.ts
+ * Purpose: Builds and configures OpenLayers forecast layers, sources, styles, and interactions.
+ */
+
 import LayerGroup from "ol/layer/Group";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";

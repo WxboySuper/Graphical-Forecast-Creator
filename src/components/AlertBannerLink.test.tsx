@@ -1,3 +1,7 @@
+/**
+ * Alert-banner link tests. Covers internal routes, safe external URLs, and rejected
+ * destinations so the banner cannot create unsafe navigation.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { AlertBannerLink } from './AlertBannerLink';

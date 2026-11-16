@@ -1,3 +1,7 @@
+/**
+ * Forecast-map Redux selector hook. It gathers active forecast, overlay, and
+ * custom-layer state into the map props consumed by the rendering components.
+ */
 import { useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { Feature as GeoJsonFeature } from "geojson";
@@ -10,6 +14,7 @@ import {
   selectCurrentOutlooks,
 } from "../../store/forecastSlice";
 import { isFeatureExposed } from "../../config/featureExposure";
+import { isCustomWorkspaceActive } from "../../config/forecastWorkspaces";
 import { computeZIndex } from "../../utils/mapStyleUtils";
 import type { EditableOutlookType, OutlookMapLike } from "./openLayersMapStyles";
 
@@ -20,8 +25,16 @@ const useForecastMapSelections = () => {
   const canUndo = useSelector(selectCanUndo);
   const canRedo = useSelector(selectCanRedo);
   const customEditor = useSelector((state: RootState) => state.forecast.customEditor);
+  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const customLayers = useSelector(selectCurrentCustomLayers);
-  const customMode = isFeatureExposed("customProducts") && customEditor.mode === "custom";
+  const customProductsExposed = isFeatureExposed("customProducts");
+  const customMode = isCustomWorkspaceActive(
+    workspaceId,
+    customProductsExposed,
+    isFeatureExposed("customWorkspace"),
+  );
+  const showCustomLayers = customProductsExposed
+    && (customMode || customLayers.layers.length > 0);
   const activeCustomLayer = customLayers.layers.find(({ id }) => id === customEditor.activeLayerId) ?? customLayers.layers[0];
   const activeCustomCategory = activeCustomLayer?.categories.find(({ id }) => id === customEditor.activeCategoryId) ?? activeCustomLayer?.categories[0];
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
@@ -42,6 +55,7 @@ const useForecastMapSelections = () => {
     customEditor,
     customLayers,
     customMode,
+    showCustomLayers,
     activeCustomLayer,
     activeCustomCategory,
     currentMapView,
@@ -92,7 +106,7 @@ const projectCustomLayerFeatures = (layer: ForecastMapSelections["customLayers"]
 const projectCustomFeatures = (customLayers: ForecastMapSelections["customLayers"]) =>
   customLayers.layers.flatMap(projectCustomLayerFeatures);
 
-const useForecastMapFeatureProjection = ({ customMode, drawingState, outlooks, customLayers }: Pick<ForecastMapSelections, "customMode" | "drawingState" | "outlooks" | "customLayers">) => {
+const useForecastMapFeatureProjection = ({ customMode, showCustomLayers, drawingState, outlooks, customLayers }: Pick<ForecastMapSelections, "customMode" | "showCustomLayers" | "drawingState" | "outlooks" | "customLayers">) => {
   const serializedFeatures = projectActiveOutlookFeatures(
     outlooks,
     drawingState.activeOutlookType,
@@ -100,8 +114,8 @@ const useForecastMapFeatureProjection = ({ customMode, drawingState, outlooks, c
   );
 
   const serializedCustomFeatures = useMemo(
-    () => customMode ? projectCustomFeatures(customLayers) : [],
-    [customLayers, customMode],
+    () => showCustomLayers ? projectCustomFeatures(customLayers) : [],
+    [customLayers, showCustomLayers],
   );
 
   return {

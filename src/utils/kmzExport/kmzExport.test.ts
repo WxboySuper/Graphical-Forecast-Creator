@@ -1,3 +1,6 @@
+/**
+ * KMZ export tests. Verify forecast layers and metadata are packaged into a valid KMZ export.
+ */
 import type { Feature, Polygon } from 'geojson';
 import type { ForecastCycle } from '../../types/outlooks';
 import { buildStructuredKmlDocument } from './buildKml';

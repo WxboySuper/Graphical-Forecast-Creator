@@ -1,3 +1,8 @@
+/**
+ * Forecast-page test boundary: this suite verifies page orchestration,
+ * persistence prompts, imports, rollover actions, and user-visible forecast
+ * workflows through the page's public behavior and mocked service edges.
+ */
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -6,28 +11,18 @@ import { MemoryRouter, useLocation } from 'react-router';
 import ForecastPage, {
   buildMapView,
   buildRestoreKey,
-  buildRolloverSaveLabel,
   canToggleSignificantForState,
   clearStoredCloudSession,
-  cycleHasDiscussionContent,
   dayHasAnyFeatures,
-  formatRolloverDayLabel,
-  getDayRolloverPromptState,
   getProbabilityList,
   getUndoRedoAction,
   hasAnyModifierKey,
-  hasRestorableCloudSelection,
-  hasRolloverForecastData,
   hasUnpublishedDiscussionDrafts,
-  hasUnsavedRolloverCandidateSession,
   isTypingTarget,
   normalizeProbability,
   parseLoadedForecast,
-  parseStoredCloudMeta,
   parseStoredForecastPayload,
   processShortcutKeyDown,
-  runDayRolloverCloudSaveAction,
-  runDayRolloverDownloadAction,
   readStoredDayValue,
   writeStoredDayValue,
 } from './ForecastPage';
@@ -242,7 +237,8 @@ describe('ForecastPage layout selection', () => {
     renderForecastPage(store);
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing severe forecast workspace')).not.toBeInTheDocument();
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toBeInTheDocument();
   });
 
   test('tags new cycles with the active workspace after route ownership is synchronized', () => {
@@ -279,7 +275,7 @@ describe('ForecastPage layout selection', () => {
     act(() => store.dispatch(setForecastWorkspace('custom')));
 
     expect(screen.getByText('ForecastTabbedToolbarLayout Mock')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByText('Preparing custom forecast workspace')).not.toBeInTheDocument();
   });
 
   test('keeps a handoff staged for another workspace and restores this one locally', async () => {
@@ -467,7 +463,7 @@ describe('ForecastPage layout selection', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
     expect(screen.getByTestId('forecast-page-workspace')).toContainElement(
       screen.getByText('ForecastTabbedToolbarLayout Mock'),
     );
@@ -507,13 +503,20 @@ describe('ForecastPage layout selection', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
     await waitFor(() => expect(sessionStorage.getItem('gfc:legacy-forecast-notice')).toBe('true'));
     firstRender.unmount();
 
     renderForecastPage(createStore());
 
-    expect(screen.getByRole('status')).toHaveTextContent('/forecast/severe');
+    expect(screen.getByTestId('legacy-forecast-notice')).toHaveTextContent('/forecast/severe');
+  });
+
+  test('shows the Auto-TSTM disabled banner while HREF is decommissioned', () => {
+    renderForecastPage(createStore());
+
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/temporarily disabled while the SPC HREF source/i);
+    expect(screen.getByTestId('auto-tstm-disabled-banner')).toHaveTextContent(/REFSCT.*v2/i);
   });
 
   test('consumes a validated reusable-product handoff into custom forecast state', async () => {
@@ -552,7 +555,7 @@ describe('ForecastPage layout selection', () => {
     renderForecastPageInWorkspace(store, 'custom');
 
     await waitFor(() => expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers[0]?.label).toBe('Fire weather'));
-    expect(store.getState().forecast.customEditor.mode).toBe('custom');
+    expect(store.getState().forecast.workspaceId).toBe('custom');
     expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
   });
 
@@ -582,7 +585,7 @@ describe('ForecastPage layout selection', () => {
     // The restore toast proves the handoff effect has run with ready=true.
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('Session restored from auto-save.', 'success'));
     expect(store.getState().forecast.forecastCycle.days[1]?.customLayers?.layers ?? []).toHaveLength(0);
-    expect(store.getState().forecast.customEditor.mode).toBe('severe');
+    expect(store.getState().forecast.workspaceId).toBe('severe');
     expect(JSON.parse(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY) ?? 'null')).toEqual({
       workspaceId: 'custom',
       layer: stagedLayer,
@@ -638,8 +641,8 @@ describe('ForecastPage layout selection', () => {
       workspaceId: 'custom',
       layer: stagedLayer,
     });
-    // The failed handoff adds no layer, and the workspace keeps its own editor mode.
-    expect(store.getState().forecast.customEditor.mode).toBe('custom');
+    // The failed handoff adds no layer, and the route keeps ownership of the workspace.
+    expect(store.getState().forecast.workspaceId).toBe('custom');
   });
 
   test('discards a staged reusable-product handoff if premium expired before forecast load', async () => {
@@ -856,20 +859,10 @@ describe('ForecastPage helpers', () => {
   test('handles rollover labels, storage helpers, and session metadata parsing', () => {
     writeStoredDayValue('test-day', '2026-04-24');
     expect(readStoredDayValue('test-day')).toBe('2026-04-24');
-    expect(buildRolloverSaveLabel('2026-04-24')).toContain('Apr 24');
-    expect(buildRolloverSaveLabel('not-a-date')).toContain('not-a-date');
-    expect(formatRolloverDayLabel('2026-04-24')).toContain('April 24');
-    expect(formatRolloverDayLabel('bad-date')).toBe('bad-date');
 
     expect(parseStoredForecastPayload(null)).toBeNull();
     expect(parseStoredForecastPayload('not-json')).toBeNull();
     expect(parseStoredForecastPayload(JSON.stringify({ nope: true }))).toBeNull();
-
-    expect(parseStoredCloudMeta(null)).toBeNull();
-    expect(parseStoredCloudMeta('not-json')).toBeNull();
-    expect(parseStoredCloudMeta('{"id":"abc","label":"Cycle"}')).toEqual({ id: 'abc', label: 'Cycle' });
-    expect(hasRestorableCloudSelection({ id: 'abc', label: 'Cycle' })).toBe(true);
-    expect(hasRestorableCloudSelection({ id: 'abc' })).toBe(false);
 
     sessionStorage.setItem('cloudCyclePayload:severe:anonymous', 'payload');
     sessionStorage.setItem('cloudCycleMeta:severe:anonymous', 'meta');
@@ -882,67 +875,7 @@ describe('ForecastPage helpers', () => {
     expect(sessionStorage.getItem('cloudCyclePayload:custom:anonymous')).toBe('custom-payload');
   });
 
-  test('recovers a pending rollover prompt after session restore marks the cycle saved', () => {
-    const emptyCycle = createStore().getState().forecast.forecastCycle;
-    const pending = { previousDay: '2026-04-23', currentDay: '2026-04-24' };
-    expect(getDayRolloverPromptState({
-      restoreComplete: true,
-      lastActiveDay: '2026-04-24',
-      today: '2026-04-24',
-      alreadyPromptedToday: true,
-      pendingPrompt: pending,
-      promptOpen: false,
-      forecastCycle: emptyCycle,
-      isSaved: true,
-    })).toEqual(pending);
-  });
-
-  test('covers rollover download and cloud-save success and failure paths', async () => {
-    const forecastCycle = createStore().getState().forecast.forecastCycle;
-    const mapView = { center: [0, 0] as [number, number], zoom: 4 };
-    const dispatch = jest.fn();
-    const clearCurrent = jest.fn();
-    const exportSpy = jest.spyOn(fileUtils, 'downloadBlob').mockImplementation(() => undefined);
-
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(true);
-    expect(dispatch).toHaveBeenCalledTimes(1);
-    exportSpy.mockImplementationOnce(() => { throw new Error('download failed'); });
-    dispatch.mockClear();
-    expect(runDayRolloverDownloadAction({ forecastCycle, mapView, dispatch, workspaceId: 'severe' })).toBe(false);
-    expect(dispatch).not.toHaveBeenCalled();
-
-    const saveCycle = jest.fn().mockResolvedValue(true);
-    dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(true);
-    expect(saveCycle).toHaveBeenCalledWith(expect.stringContaining('Rollover save'), forecastCycle.cycleDate, expect.any(Object), expect.any(Object), undefined, { saveAsNew: true, workspaceId: 'severe' });
-    expect(clearCurrent).toHaveBeenCalled();
-    expect(dispatch).toHaveBeenCalledTimes(1);
-
-    saveCycle.mockResolvedValueOnce(false);
-    clearCurrent.mockClear();
-    dispatch.mockClear();
-    expect(await runDayRolloverCloudSaveAction({ forecastCycle, currentMapView: mapView, saveCycle, clearCurrent, dispatch, workspaceId: 'severe' })).toBe(false);
-    expect(clearCurrent).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
-    exportSpy.mockRestore();
-  });
-
   test('detects rollover candidates, map view fallbacks, keyboard targets, and undo/redo keys', () => {
-    const emptyCycle = createStore().getState().forecast.forecastCycle;
-    expect(hasRolloverForecastData(emptyCycle)).toBe(false);
-    expect(cycleHasDiscussionContent(emptyCycle)).toBe(false);
-    expect(hasUnsavedRolloverCandidateSession(emptyCycle, true)).toBe(false);
-
-    const cycleWithDiscussion = {
-      ...emptyCycle,
-      days: {
-        ...emptyCycle.days,
-        1: { ...emptyCycle.days[1], discussion: 'A discussion' },
-      },
-    };
-    expect(cycleHasDiscussionContent(cycleWithDiscussion)).toBe(true);
-    expect(hasUnsavedRolloverCandidateSession(cycleWithDiscussion, false)).toBe(true);
-
     expect(buildMapView({ current: null })).toEqual({ center: [39.8283, -98.5795], zoom: 4 });
     expect(buildMapView({ current: { getView: () => ({ center: [1, 2], zoom: 8 }) } as never })).toEqual({
       center: [1, 2],

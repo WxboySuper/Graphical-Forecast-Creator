@@ -6,8 +6,7 @@ import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
 
 const globalScope = globalThis as typeof globalThis & {
-  __GFC_BETA_MODE__?: boolean;
-  __GFC_BETA_INVITE_PATH__?: string;
+  __GFC_FEEDBACK_API_URL__?: string;
   __GFC_BUILD_TARGET__?: import('./config/buildTarget').BuildTarget;
   __GFC_DEV_MODE__?: boolean;
   __GFC_FIREBASE_API_KEY__?: string;
@@ -30,12 +29,8 @@ if (!globalScope.TextDecoder) {
   globalScope.TextDecoder = TextDecoder as typeof globalScope.TextDecoder;
 }
 
-if (typeof globalScope.__GFC_BETA_MODE__ === 'undefined') {
-  globalScope.__GFC_BETA_MODE__ = false;
-}
-
-if (typeof globalScope.__GFC_BETA_INVITE_PATH__ === 'undefined') {
-  globalScope.__GFC_BETA_INVITE_PATH__ = '';
+if (typeof globalScope.__GFC_FEEDBACK_API_URL__ === 'undefined') {
+  globalScope.__GFC_FEEDBACK_API_URL__ = 'https://feedback.example.test';
 }
 
 if (typeof globalScope.__GFC_BUILD_TARGET__ === 'undefined') {

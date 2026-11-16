@@ -1,3 +1,6 @@
+/**
+ * NWS alert refresh tests. Verify monitor alerts refresh on schedule and handle stale or failed responses.
+ */
 import { act, renderHook } from '@testing-library/react';
 import * as nwsAlerts from './nwsAlerts';
 import { useMonitorNwsAlertsRefresh } from './useMonitorNwsAlertsRefresh';

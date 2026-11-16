@@ -30,7 +30,7 @@ jest.mock('../../utils/fileUtils', () => ({
 }));
 
 jest.mock('../../utils/stormReportParser', () => ({
-  fetchStormReports: jest.fn(),
+  fetchFilteredStormReports: jest.fn(),
   fetchTodayStormReports: jest.fn(),
   fetchYesterdayStormReports: jest.fn(),
   formatReportDate: jest.fn((date: Date) =>
@@ -52,7 +52,7 @@ const mockUseAuth = jest.requireMock('../../auth/AuthProvider').useAuth as jest.
 const mockReadForecastImportFile = jest.requireMock('../../utils/fileUtils').readForecastImportFile as jest.Mock;
 const mockValidateForecastDataReason = jest.requireMock('../../utils/fileUtils').validateForecastDataReason as jest.Mock;
 const mockDeserializeForecast = jest.requireMock('../../utils/fileUtils').deserializeForecast as jest.Mock;
-const mockFetchStormReports = jest.requireMock('../../utils/stormReportParser').fetchStormReports as jest.Mock;
+const mockFetchFilteredStormReports = jest.requireMock('../../utils/stormReportParser').fetchFilteredStormReports as jest.Mock;
 const mockFetchTodayStormReports = jest.requireMock('../../utils/stormReportParser').fetchTodayStormReports as jest.Mock;
 const mockFetchYesterdayStormReports = jest.requireMock('../../utils/stormReportParser').fetchYesterdayStormReports as jest.Mock;
 
@@ -89,7 +89,7 @@ const startPendingReportLoad = async () => {
   const pendingReports = new Promise<StormReport[]>((resolve) => {
     resolveReports = resolve;
   });
-  mockFetchStormReports.mockReturnValue(pendingReports);
+  mockFetchFilteredStormReports.mockReturnValue(pendingReports);
   mockFetchTodayStormReports.mockReturnValue(pendingReports);
   mockFetchYesterdayStormReports.mockReturnValue(pendingReports);
 
@@ -99,7 +99,7 @@ const startPendingReportLoad = async () => {
   expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: /Load Reports/i }));
   await waitFor(() => expect(
-    mockFetchStormReports.mock.calls.length +
+    mockFetchFilteredStormReports.mock.calls.length +
     mockFetchTodayStormReports.mock.calls.length +
     mockFetchYesterdayStormReports.mock.calls.length
   ).toBe(1));
@@ -143,7 +143,7 @@ describe('VerificationMode with in-flight storm reports', () => {
         },
       },
     });
-    mockFetchStormReports.mockReset();
+    mockFetchFilteredStormReports.mockReset();
     mockFetchTodayStormReports.mockReset();
     mockFetchYesterdayStormReports.mockReset();
   });

@@ -3,7 +3,7 @@
 Issue: [#914](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/914)
 
 This document defines the route, product ownership, and persistence contract
-for the v1.8 Forecast area. It is the architectural base for the workspace
+for the v2 Forecast area. It is the architectural base for the workspace
 implementation, not a promise that every workspace already has a page.
 
 Contract and implementation record have separate jobs. This file states the
@@ -15,10 +15,10 @@ intent and that record describes that branch's code.
 
 The planned Forecast routes are:
 
-| Workspace | Canonical path | v1.8 state | Availability source |
+| Workspace | Canonical path | v2 state | Availability source |
 | --- | --- | --- | --- |
 | Severe | `/forecast/severe` | available now | core Forecast |
-| Mesoscale | `/forecast/mesoscale` | future; tracked in #919 | Workspace status |
+| Mesoscale | `/forecast/mesoscale` | gated by `mesoscaleWorkspace` (local only); tracked in #919 | Workspace status |
 | Tropical | `/forecast/tropical` | future; tracked in #432 | Workspace status |
 | Winter | `/forecast/winter` | future; tracked in #913 | Workspace status |
 | Custom | `/forecast/custom` | gated; `customProducts` on for every target, availability follows implementation; `/custom-products` remains a separate library route | `customProducts` |
@@ -161,9 +161,11 @@ and lifecycle before its discussion UI is integrated:
 - Severe owns severe outlook geometry, outlook editing, and its discussion
   content. Existing `ForecastState` and `ForecastCycle` remain the source of
   truth during the Severe migration.
-- Mesoscale owns provider parameter selection, model context, and short-term
-  forecast geometry. It must not write into Severe outlook maps. Any later
-  discussion feature must define a Mesoscale-specific scope ID and draft lifecycle.
+- Mesoscale owns short-term forecast areas, free-text discussion, and selected
+  model context. Its versioned product save is independent of `ForecastCycle`;
+  local autosaves and JSON transfers use Mesoscale ownership and validation.
+  Cloud storage remains unsupported until a separate premium decision. It must
+  not write into Severe outlook maps.
 - Custom owns custom forecast layers, category/product editing, and its product
   metadata. Any later discussion feature must define a Custom-specific scope ID
   and draft lifecycle. Existing custom layers embedded in legacy

@@ -15,6 +15,7 @@ import {
   resolveUnavailableForecastWorkspacePath,
 } from './forecastWorkspaceRoutes';
 import { getForecastWorkspace } from '../config/forecastWorkspaces';
+import { BUILD_TARGETS } from '../config/buildTarget';
 
 describe('forecast workspace route contract', () => {
   test('uses the canonical Severe route for the legacy Forecast entry point', () => {
@@ -51,8 +52,24 @@ describe('forecast workspace route contract', () => {
     // remains exercisable where the workspace is switched on.
     expect(getExposedForecastWorkspacePaths('local')).toEqual([
       '/forecast/severe',
+      '/forecast/mesoscale',
       '/forecast/custom',
     ]);
+  });
+
+  test.each(BUILD_TARGETS)('keeps navigation route exposure aligned on the %s target', (target) => {
+    const exposedPaths = getExposedForecastWorkspacePaths(target);
+    const routePaths = getExposedForecastWorkspaceRoutes(target).map((route) => route.path);
+
+    expect(routePaths).toEqual(exposedPaths);
+    expect(exposedPaths).not.toContain('/forecast/tropical');
+    expect(exposedPaths).not.toContain('/forecast/winter');
+    if (target === 'production' || target === 'staging') {
+      expect(exposedPaths).toEqual(['/forecast/severe']);
+    } else {
+      // Mesoscale is in beta early access (#1800); Custom is exercisable on beta and local.
+      expect(exposedPaths).toEqual(['/forecast/severe', '/forecast/mesoscale', '/forecast/custom']);
+    }
   });
 
   test('scopes route identity to forecast routes and gates legacy fallback by exposure', () => {
@@ -76,7 +93,7 @@ describe('forecast workspace route contract', () => {
     const routes = getExposedForecastWorkspaceRoutes('production');
     expect(routes.map((route) => route.id)).toEqual(['severe']);
     const betaRoutes = getExposedForecastWorkspaceRoutes('beta');
-    expect(betaRoutes.map((route) => route.id)).toEqual(['severe', 'custom']);
+    expect(betaRoutes.map((route) => route.id)).toEqual(['severe', 'mesoscale', 'custom']);
     for (const route of betaRoutes) {
       expect(route.path).toBe(`/forecast/${route.routePath}`);
     }

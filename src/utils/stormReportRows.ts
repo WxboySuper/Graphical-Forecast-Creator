@@ -1,3 +1,7 @@
+/**
+ * Converts storm reports into stable section descriptors and CSV-oriented row data.
+ * This utility owns report-row shaping and field normalization; fetching, rendering, and persistence remain outside its boundary.
+ */
 import { v4 as uuidv4 } from 'uuid';
 import type { ReportType, StormReport } from '../types/stormReports';
 import { buildCsvRow, extractStormReportMagnitude, splitCsvLine, type StormReportRowFieldMap } from './stormReportCsv';

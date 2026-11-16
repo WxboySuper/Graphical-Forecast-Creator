@@ -1,3 +1,8 @@
+/**
+ * Workflow-package serialization helpers. This module validates forecast
+ * package metadata and converts persisted packages for import, export, and
+ * cloud workflows.
+ */
 import type { DayType, GFCForecastSaveData } from '../types/outlooks';
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 import { WORKFLOW_SCHEMA_VERSION, type CycleMetadata, type SerializedOutlookVersionData, type SerializedWorkflowPackage } from '../types/workflow';

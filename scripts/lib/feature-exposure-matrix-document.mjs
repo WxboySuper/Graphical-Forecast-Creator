@@ -1,3 +1,7 @@
+/**
+ * Feature-exposure matrix documentation builder. It validates the tracked
+ * matrix and renders the Markdown reference used by release tooling.
+ */
 const TARGETS = ['local', 'beta', 'staging', 'production'];
 const EXPECTED_HEADER = [
   'Registry key(s) / surface',

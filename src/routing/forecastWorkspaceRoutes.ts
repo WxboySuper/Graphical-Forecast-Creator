@@ -5,6 +5,7 @@ import {
   getForecastWorkspace,
   getForecastWorkspaceByPath,
   getExposedForecastWorkspaces,
+  hasCloudStorage,
   isForecastWorkspaceExposed,
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
@@ -119,12 +120,12 @@ export const isForecastWorkspaceRouteAvailable = (
   return getExposedForecastWorkspaceRoutes(target).some((route) => route.id === workspaceId);
 };
 
-/** A workspace can open cloud payloads only when it has a registered editor route for the target. */
+/** A workspace can open cloud payloads only when it has cloud storage and a registered editor route for the target. */
 export const isSupportedCloudLoadWorkspace = (
   workspaceId: ForecastWorkspaceId,
   workspace: ForecastWorkspaceDefinition | undefined,
   target?: BuildTarget,
-): boolean => isForecastWorkspaceRouteAvailable(workspaceId, workspace, target);
+): boolean => hasCloudStorage(workspaceId) && isForecastWorkspaceRouteAvailable(workspaceId, workspace, target);
 
 /** Resolves a known workspace route only when its build target does not expose it. */
 export const resolveUnavailableForecastWorkspacePath = (

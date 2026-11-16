@@ -12,7 +12,7 @@ Short-term model layers, including NDFD, are intentionally deferred.
 
 | Product | Official source | Shape/use | Refresh and validity | Attribution/operations |
 | --- | --- | --- | --- | --- |
-| NWS point/grid forecast | [`/points/{lat},{lon}`](https://api.weather.gov/points/39.7456,-97.0892), then the discovered `forecast`, `forecastHourly`, or `forecastGridData` link | JSON-LD/GeoJSON point metadata plus linked forecast periods; use for a selected point or forecast metadata, not a fabricated polygon | The point response supplies the current WFO/grid mapping and cache headers; periodically re-check `/points` because the mapping can change | NOAA/NWS open data. Send an identifying `User-Agent` with contact information and respect provider rate limits |
+| NWS point/grid forecast | [`/points/{lat},{lon}`](https://api.weather.gov/points/39.7456,-97.0892), then the discovered `forecast`, `forecastHourly`, or `forecastGridData` link | JSON-LD/GeoJSON point metadata plus linked forecast periods; use for a selected point or forecast metadata, not a fabricated polygon | The point response supplies the current WFO/grid mapping and cache headers; periodically re-check `/points` because the mapping can change | NOAA/NWS open data. Browser requests cannot set an identifying `User-Agent`; server-side requests should include one with contact information. Respect provider rate limits |
 | NDFD temperature forecast (deferred) | [NDFD temperature MapServer](https://mapservices.weather.noaa.gov/raster/rest/services/NDFD/NDFD_temp/MapServer) | Candidate time-enabled WMS raster for a future short-term model layer; not implemented in this release | Revalidate provider behavior before implementation | NOAA/NWS/DISS GIS service |
 | SPC Mesoscale Discussions | [SPC ArcGIS layer](https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/spc_mesoscale_discussion/MapServer/0), [SPC MD RSS](https://www.spc.noaa.gov/products/spcmdrss.xml), and [ActiveMD.kmz](https://www.spc.noaa.gov/products/md/ActiveMD.kmz) | GeoJSON polygon layer with provider metadata such as `name`, `folderpath` (active-until text), `popupinfo` (product link), and ArcGIS timestamps; RSS or the linked MD product supplies richer issuance text | The ArcGIS service documents updates within 15 minutes of an MD/MCD issuance and is not time-enabled; treat the current response as a replaceable snapshot | NOAA/NWS/SPC. Keep the product number, source link, and provider validity text visible; never infer structured validity or interpret an MD as a GFC warning or forecast edit |
 
@@ -25,14 +25,16 @@ release. The implemented reference layer is the current SPC MCD polygon feed.
 
 The current Monitor already consumes NOAA services directly from the browser,
 so the first implementation should use typed client adapters rather than add a
-new server proxy. Each adapter must:
+new server proxy. Browser adapters cannot set the identifying `User-Agent`
+header because browsers forbid scripts from setting it. When a request runs on
+the server, identify the application and include contact information in the
+`User-Agent` sent to `api.weather.gov`. Each adapter must:
 
-1. send the NWS identifying `User-Agent` when using `api.weather.gov`;
-2. honor provider cache headers where available and apply a bounded client
+1. honor provider cache headers where available and apply a bounded client
    cache so refresh/playback cannot create request loops;
-3. keep the last valid normalized snapshot for a short, visible stale window;
-4. expose `loading`, `empty`, `stale`, and `error` states separately; and
-5. retain `sourceUrl`, `sourceName`, `attribution`, `issuedAt`, `validFrom`,
+2. keep the last valid normalized snapshot for a short, visible stale window;
+3. expose `loading`, `empty`, `stale`, and `error` states separately; and
+4. retain `sourceUrl`, `sourceName`, `attribution`, `issuedAt`, `validFrom`,
    and provider `validityText` in the normalized record. Only populate
    `validFrom` or `validTo` when the provider supplies parseable timestamps.
 

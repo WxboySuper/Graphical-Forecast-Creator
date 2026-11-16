@@ -1,0 +1,8 @@
+{
+  "sourceUrl": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2.idx",
+  "objectUrl": "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261108/conus/hrrr.t12z.wrfsfcf00.grib2",
+  "sourceLastModified": "Sun, 08 Nov 2026 12:51:24 GMT",
+  "objectSizeBytes": 136859480,
+  "capturedAt": "2026-11-08",
+  "note": "Unmodified full NOAA .idx response, saved as a small fixture. The linked GRIB object is not included."
+}

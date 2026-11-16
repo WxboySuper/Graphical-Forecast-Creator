@@ -1,3 +1,6 @@
+/**
+ * Export timeout tests. Verify deferred export cleanup and timeout behavior.
+ */
 jest.setTimeout(10000);
 
 afterEach(() => {

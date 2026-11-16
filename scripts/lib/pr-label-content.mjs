@@ -1,3 +1,7 @@
+/**
+ * Pull-request label-content policy helpers. It matches changed paths against
+ * label rules and builds the content used by repository automation comments.
+ */
 import { anyFileMatches, pathMatches } from './glob-match.mjs';
 
 /** @typedef {{ changedFiles: string[]; head: string }} ContentContext */

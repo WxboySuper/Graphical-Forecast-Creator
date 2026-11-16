@@ -1,3 +1,6 @@
+/**
+ * Verifies stable/main port direction and detection of manually opened forward-port PRs.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import * as portTargetExports from './port-targets.mjs';
@@ -17,6 +20,7 @@ describe('port targets', () => {
 
   it('ports stable merges to main only', () => {
     assert.deepEqual(resolvePortTargets({ baseBranch: 'stable/1.6.x' }), ['main']);
+    assert.deepEqual(resolvePortTargets({ baseBranch: 'stable/2.x' }), ['main']);
   });
 
   it('does not port main merges back to stable', () => {

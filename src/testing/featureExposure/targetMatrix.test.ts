@@ -1,3 +1,6 @@
+/**
+ * Feature exposure target matrix tests. Verify feature decisions remain consistent across supported build targets.
+ */
 import { BUILD_TARGETS } from '../../config/buildTarget';
 import { runWithBuildTarget, withNoAsyncSideEffects } from './harness';
 

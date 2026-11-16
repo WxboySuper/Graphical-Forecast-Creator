@@ -1,3 +1,6 @@
+/**
+ * Forecast UI variant tests. Verify forecast controls select the correct display variant for each mode.
+ */
 import {
   normalizeForecastUiVariant,
   readStoredForecastUiVariant,

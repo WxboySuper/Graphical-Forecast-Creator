@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/OpenLayersVerificationMap.tsx
+ * Purpose: Renders the OpenLayers verification map and coordinates verification layers and controls.
+ */
+
 import React, {
   forwardRef,
   useEffect,

@@ -1,3 +1,6 @@
+/**
+ * V17 workstream exposure tests. Verify the rollout contract exposes the intended workstream only on supported targets.
+ */
 import { BUILD_TARGETS } from './buildTarget';
 import {
   FEATURE_EXPOSURE_REGISTRY,

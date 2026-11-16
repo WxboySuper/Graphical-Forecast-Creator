@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersFeatureSync.ts
+ * Purpose: Synchronizes forecast features and layer state between application data and OpenLayers.
+ */
+
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 import type VectorSource from "ol/source/Vector";
@@ -36,6 +41,7 @@ export type ForecastSourceDescriptorPlan = {
 export type ForecastSourceDescriptorPlanOptions = {
   normalDescriptors: FeatureSyncDescriptor[];
   customMode: boolean;
+  showCustomLayers?: boolean;
   customDescriptors: FeatureSyncDescriptor[];
   source: VectorSource;
   categoricalSource: VectorSource;
@@ -73,6 +79,7 @@ export const getForecastSourceDescriptorPlan = (
   {
     normalDescriptors,
     customMode,
+    showCustomLayers = false,
     customDescriptors,
     source,
     categoricalSource,
@@ -80,7 +87,10 @@ export const getForecastSourceDescriptorPlan = (
 ): ForecastSourceDescriptorPlan => ({
   source: customMode
     ? customDescriptors
-    : normalDescriptors.filter(({ targetSource }) => targetSource === source),
+    : [
+        ...normalDescriptors.filter(({ targetSource }) => targetSource === source),
+        ...(showCustomLayers ? customDescriptors : []),
+      ],
   categorical: customMode
     ? []
     : normalDescriptors.filter(({ targetSource }) => targetSource === categoricalSource),

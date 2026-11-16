@@ -1,4 +1,12 @@
 // @codescene(disable:"Code Duplication")
+/**
+ * OpenLayers implementation of the forecast editor map.
+ *
+ * The component owns the live map instance and its interaction lifecycle while
+ * delegating feature conversion, source reconciliation, layer construction,
+ * and interaction policies to adjacent helpers. The forwarded handle exposes
+ * the small imperative surface needed by the forecast page.
+ */
 import {
   forwardRef,
   useEffect,
@@ -114,6 +122,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       canUndo,
       canRedo,
       customMode,
+      showCustomLayers,
       activeCustomLayer,
       activeCustomCategory,
       currentMapView,
@@ -1069,7 +1078,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
         ),
         700,
       );
-      const customDescriptors: FeatureSyncDescriptor[] = customMode
+      const customDescriptors: FeatureSyncDescriptor[] = showCustomLayers
         ? serializedCustomFeatures.map(({ feature, category, layer }, index) => {
             const stableId = feature.id == null ? `legacy-index-${index}` : String(feature.id);
             const zIndex = 700 + layer.order * 20 + category.order;
@@ -1159,6 +1168,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       const sourceDescriptorPlan = getForecastSourceDescriptorPlan({
         normalDescriptors,
         customMode,
+        showCustomLayers,
         customDescriptors,
         source,
         categoricalSource: catSource,
@@ -1194,6 +1204,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       outlookOpacity,
       serializedCustomFeatures,
       customMode,
+      showCustomLayers,
       outlooks,
       drawingState.activeOutlookType,
       ghostOutlooks,

@@ -11,7 +11,7 @@ on:
         default: main
         type: string
       version:
-        description: 'Stable release version, for example 1.7.0'
+        description: 'Flat stable release version, for example 2.0.0 or 2.1.0'
         required: true
         type: string
       confirmation:
@@ -49,7 +49,7 @@ jobs:
           fi
 
           if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.0$'; then
-            echo "::error::Stable version must be a major.minor.0 version, got $TARGET_VERSION."
+            echo "::error::Stable version must be a padded flat X.Y.0 version, got $TARGET_VERSION."
             exit 1
           fi
 
@@ -59,7 +59,7 @@ jobs:
             exit 1
           fi
 
-          STABLE_BRANCH="stable/${TARGET_VERSION%.*}.x"
+          STABLE_BRANCH="stable/${TARGET_VERSION%%.*}.x"
           if git ls-remote --exit-code --heads origin "$STABLE_BRANCH" >/dev/null 2>&1; then
             echo "::error::Stable branch $STABLE_BRANCH already exists; refusing to overwrite it."
             exit 1

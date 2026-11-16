@@ -1,3 +1,7 @@
+/**
+ * Modal-portal tests. Verify modal children render at document.body instead of the
+ * parent test container so fixed overlays have a stable host.
+ */
 import { render, screen, within } from '@testing-library/react';
 import ModalPortal from './ModalPortal';
 

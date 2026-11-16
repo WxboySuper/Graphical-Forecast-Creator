@@ -215,7 +215,7 @@ finding. The workflow paginates through all review threads and comments rather
 than sampling the first page. If GitHub cannot return the complete history, the
 review job stops before publishing a score.
 The flat changelog audit is available as **Maintenance | OpenCode changelog
-audit**. Run it manually for `main` or a `stable/X.Y.x` line, or let it run each
+audit**. Run it manually for `main` or a `stable/X.x` line, or let it run each
 Friday to keep the Unreleased lane clean and fill gaps as they appear. Beta and
 stable release workflows call the same bounded audit as a required final
 preflight before version preparation, release publication, or deployment. The
@@ -245,7 +245,7 @@ merges, releases, or deploys.
 
 Manual runs also accept an optional `baseline_ref`, which must be a full commit
 SHA or an ancestor version tag for the selected release line. `main` accepts
-beta tags; `stable/X.Y.x` accepts stable `vX.Y.Z` tags from that same line.
+beta tags; `stable/X.x` accepts padded stable semver tags from that same line.
 This prevents a baseline from another release line from widening the audit.
 It overrides the saved/tag baseline for that run only; a clean result records the
 audited head as the next normal baseline. Leave it blank for ordinary runs.

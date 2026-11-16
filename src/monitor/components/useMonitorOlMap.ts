@@ -1,3 +1,7 @@
+/**
+ * Coordinates the OpenLayers map instance used by monitor-mode overlays and reports.
+ * This hook owns map lifecycle and view synchronization; report fetching, alert filtering, and forecast state remain separate concerns.
+ */
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { useSelector } from 'react-redux';
 import type { StormReport } from '../../types/stormReports';
@@ -17,6 +21,8 @@ import {
   clearMonitorAlertPopup,
   renderMonitorAlertPopup,
 } from './renderMonitorAlertPopup';
+import type { MesoscaleLayerSpec } from '../../mesoscale';
+import { useMonitorMesoscaleLayerSync } from './useMonitorMesoscaleLayerSync';
 
 interface UseMonitorOlMapArgs {
   mapView: MonitorMapView;
@@ -30,6 +36,7 @@ interface UseMonitorOlMapArgs {
   alertsOpacity: number;
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   mapElementRef: RefObject<HTMLDivElement | null>;
+  mesoscaleLayers?: MesoscaleLayerSpec[];
 }
 
 /** Wires Monitor OpenLayers map bootstrap, layers, and imperative alert popups. */
@@ -92,5 +99,6 @@ export const useMonitorOlMap = (args: UseMonitorOlMapArgs) => {
     selectedAlertDetailUrl,
     onClearSelectedAlert: clearSelectedAlert,
   });
+  useMonitorMesoscaleLayerSync(args.mesoscaleLayers ?? [], refs);
 
 };

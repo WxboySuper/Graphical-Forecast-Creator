@@ -1,3 +1,7 @@
+/**
+ * Defines normalized detail fields extracted from National Weather Service alerts.
+ * This module owns the monitor alert-detail data contract; parsing, fetching, and presentation are implemented by neighboring modules.
+ */
 export interface NwsAlertDetails {
   event: string;
   headline: string | null;

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastDrawHandlers.ts
+ * Purpose: Defines OpenLayers drawing handlers for creating forecast features.
+ */
+
 import { captureException } from "@sentry/react";
 import GeoJSON from "ol/format/GeoJSON";
 import type OLFeature from "ol/Feature";

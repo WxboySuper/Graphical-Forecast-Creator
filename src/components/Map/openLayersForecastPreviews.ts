@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastPreviews.ts
+ * Purpose: Coordinates temporary OpenLayers forecast previews during drawing and editing workflows.
+ */
+
 import GeoJSON from "ol/format/GeoJSON";
 import type { default as OLFeature } from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";

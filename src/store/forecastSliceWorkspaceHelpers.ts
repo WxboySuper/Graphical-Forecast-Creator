@@ -3,12 +3,10 @@ import type { CycleMetadata, StandardGrouping, WorkflowMetadata } from '../types
 import type { UnknownAction } from '@reduxjs/toolkit';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { readActionTimestamp } from './timestampMiddleware';
-import {
-  resolveForecastWorkspaceId,
-  type ForecastWorkspaceId,
-} from '../config/forecastWorkspaces';
+import { resolveForecastWorkspaceId } from '../config/forecastWorkspaces';
 import { getFirstExposedOutlookType } from '../config/productExposureSelectors';
 import type { ForecastState, SavedCycle } from './forecastSlice';
+import { freezeMap } from './forecastStateFactory';
 
 type DayBucket = 'day12' | 'day3' | 'day48';
 
@@ -166,25 +164,6 @@ export const createEmptyOutlook = (day: DayType, now: string): OutlookDay => {
   };
 };
 
-/** Returns a read-only Map proxy that throws if a consumer tries to mutate it. */
-const freezeMap = <K, V>(map: Map<K, V>): Map<K, V> =>
-  new Proxy(map, {
-    set: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    deleteProperty: () => {
-      throw new Error('Attempted to mutate a shared read-only outlook map.');
-    },
-    get: (target, property, receiver) => {
-      if (property === 'set' || property === 'delete' || property === 'clear') {
-        return () => {
-          throw new Error('Attempted to mutate a shared read-only outlook map.');
-        };
-      }
-      return Reflect.get(target, property, receiver);
-    },
-  });
-
 /** Deeply guards a value so shared fallbacks cannot be mutated. */
 const deepFreezeOutlookData = (data: OutlookData): OutlookData => {
   const guarded: OutlookData = {};
@@ -208,12 +187,12 @@ const EMPTY_OUTLOOK_DATA_BY_DAY: Record<string, OutlookData> = {
   day48: deepFreezeOutlookData(createEmptyOutlook(4, INITIAL_TIMESTAMP).data),
 };
 
-/** Returns the shared empty outlook data for a day, or null when the day is unknown. */
-export const sharedEmptyOutlookData = (day: DayType): OutlookData | null => {
+/** Returns shared empty outlook data for a day, using the day 4-8 shape when the day is unknown. */
+export const sharedEmptyOutlookData = (day: DayType): OutlookData => {
   if (day === 1 || day === 2) return EMPTY_OUTLOOK_DATA_BY_DAY.day12;
   if (day === 3) return EMPTY_OUTLOOK_DATA_BY_DAY.day3;
   if (day >= 4 && day <= 8) return EMPTY_OUTLOOK_DATA_BY_DAY.day48;
-  return null;
+  return EMPTY_OUTLOOK_DATA_BY_DAY.day48;
 };
 
 /** Bumps the cycle generation when the active forecast document is fully replaced. */
@@ -231,21 +210,17 @@ export const normalizeCycleWorkspace = (cycle: SavedCycle | null | undefined): S
 };
 
 /**
- * Returns the tool and custom-editor defaults one workspace starts from.
- * The outlook type comes from build-target exposure and the custom editor only
- * opens in custom mode for the workspace that owns custom layers, so a switch
- * never seeds Severe's defaults into another product.
+ * Returns neutral tool and custom-editor selection defaults for a workspace.
+ * Workspace identity owns editor context; editor state only tracks selected
+ * custom layers and categories.
  */
-export const createWorkspaceEditorDefaults = (
-  workspaceId: ForecastWorkspaceId,
-): Pick<ForecastState, 'drawingState' | 'customEditor'> => ({
+export const createWorkspaceEditorDefaults = (): Pick<ForecastState, 'drawingState' | 'customEditor'> => ({
   drawingState: {
     activeOutlookType: getFirstExposedOutlookType() ?? 'tornado',
     activeProbability: '2%',
     isSignificant: false,
   },
   customEditor: {
-    mode: workspaceId === 'custom' ? 'custom' : 'severe',
     activeLayerId: null,
     activeCategoryId: null,
   },

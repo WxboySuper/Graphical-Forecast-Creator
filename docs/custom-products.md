@@ -21,11 +21,11 @@ The TypeScript contracts live in `src/types/customProducts.ts`; strict runtime v
 
 ## Local one-off layer workflow
 
-On an exposed build, the Draw tab starts in the existing Severe mode and exposes
-a leftmost Severe/Custom switch. Custom mode replaces the severe controls with
-layer and category controls while leaving the severe forecast data untouched.
-Each forecast day owns its custom layers independently. Layer/category order,
-labels, fill and stroke appearance, hatching, and polygon geometry are included
+On builds that expose `customWorkspace` (currently local and beta), the Custom
+workspace Draw tab contains the layer and category controls. Severe has only its
+severe outlook controls. Each forecast day in a Custom workspace owns its custom
+layers independently. Layer/category order, labels, fill and stroke appearance,
+hatching, and polygon geometry are included
 in normal forecast JSON saves and restored only after strict schema validation.
 
 Custom edits participate in the existing day-scoped undo/redo history. The map,
@@ -103,6 +103,17 @@ explicitly excluded from existing severe `forecastDays`, `totalOutlooks`, and
 `totalFeatures` analytics. They are also never inputs to Auto-Categorical,
 which continues to read only tornado, wind, hail, and total-severe maps. The
 local workflow banner discloses these exclusions whenever its active grouping
-contains custom content. Custom UI is rendered on every release target; hosted
-writes remain subject to the entitlement and capability checks above.
+contains custom content. Custom editing follows the `customWorkspace` route
+gate, currently local and beta. The separate `/custom-products` library keeps
+its `customProducts` gate. Hosted writes remain subject to the entitlement and
+capability checks above.
+
+Legacy forecast files and saved cycles can contain `customLayers` while their
+workspace is Severe or unspecified. Load, save, import, export, snapshots, and
+read-only map rendering retain that embedded data. The app does not silently
+move a whole legacy forecast into the Custom workspace, since the old record has
+no workspace ownership metadata that identifies such a move safely. New Custom
+workspace saves carry the normal `workspaceId: "custom"` metadata. Monitor and
+other read-only views render the embedded layer snapshot from the selected
+cycle, without requiring access to the reusable product or its owner account.
 

@@ -3,11 +3,11 @@
 Issue: [#486](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/486)
 Parent tracker: [#434](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/434)
 
-This is the current-state guide for contributors. It explains where behavior
-lives, how the application is assembled, and which boundaries are intentional.
-DOC-03 (#488) supplies the generated local inventory as the exhaustive
-file-level companion; this document stays curated and human-sized so it is
-useful on its own before the later stack layer is present.
+This is the curated guide for the current architecture. It explains where
+behavior lives, how the application is assembled, and which boundaries are
+intentional. DOC-03 (#488) supplies the generated local inventory as the
+exhaustive file-level companion; this document stays human-sized so it remains
+useful when the generated snapshot is unavailable.
 
 ## Product shape
 
@@ -106,45 +106,9 @@ These services are optional from the local developer experience. A local build
 must remain useful without hosted credentials, while hosted-only capabilities
 must be visibly gated and server-checked.
 
-## Baseline inventory snapshot
+## Current counts
 
-The prior read-only audit indexed **591 files**, recorded **11 mutual owner
-edges**, and retained the following highest-volume owners and cross-owner
-imports. This snapshot keeps the reviewable baseline in committed
-documentation; DOC-03 adds a deterministic generator for current checkout
-data rather than silently replacing these facts with ignored output.
-
-Largest owner/file counts:
-
-| Owner | Files |
-| --- | ---: |
-| `src/components` | 155 |
-| `src/utils` | 57 |
-| `scripts/lib` | 50 |
-| `src/pages` | 44 |
-| `scripts/root` | 33 |
-| `src/monitor` | 31 |
-| `server/root` | 21 |
-| `src/hooks` | 20 |
-| `server/lib` | 19 |
-| `src/config` | 15 |
-| `src/store` | 13 |
-| `.github/workflows` | 11 |
-
-Highest cross-owner import edges:
-
-| Edge | Count |
-| --- | ---: |
-| `src/components -> src/store` | 55 |
-| `src/pages -> src/components` | 49 |
-| `src/components -> src/monitor` | 47 |
-| `scripts/root -> scripts/lib` | 45 |
-| `src/components -> src/types` | 36 |
-| `src/pages -> src/store` | 31 |
-| `src/components -> src/utils` | 26 |
-| `src/components -> src/lib` | 24 |
-| `src/hooks -> src/utils` | 19 |
-| `src/hooks -> src/types` | 17 |
+File and import-edge counts go stale quickly. Generate them with `pnpm run docs:inventory` (output is ignored, under `docs/personal`).
 
 ## Build, test, and deployment
 

@@ -1,3 +1,7 @@
+/**
+ * Integrated-toolbar tab list. It renders the forecast editor's tab triggers
+ * and reports the active tab through the surrounding toolbar state.
+ */
 import React from 'react';
 import { CalendarDays, Layers, PenTool, Wrench } from 'lucide-react';
 import { TabsList, TabsTrigger } from '../ui/tabs';

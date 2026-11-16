@@ -1,3 +1,7 @@
+/**
+ * Third-party notice generator. It reads dependency license metadata, applies
+ * the repository's license policy, and writes the attribution notice artifact.
+ */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -136,7 +140,7 @@ export const renderNotices = (entries) => {
   }
 
   lines.push('', 'License categories: allowed, review-required, prohibited, unknown.');
-  return lines.join('\n');
+  return `${lines.join('\n')}\n`;
 };
 
 /** Writes the notice document to the repository root. */

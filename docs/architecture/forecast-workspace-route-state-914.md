@@ -4,13 +4,13 @@ Issue: [#914](https://github.com/WxboySuper/Graphical-Forecast-Creator/issues/91
 Implemented in: #1456
 Base doc: [Forecast workspace boundaries](./forecast-workspace-boundaries.md)
 
-This record pins down what #1456 actually built. The base doc describes the planned v1.8 layout. This one describes the working subset and the rules the code now enforces.
+This record pins down what #1456 actually built. The base doc describes the planned v2 layout. This one describes the working subset and the rules the code now enforces.
 
 ## Routes
 
 - `/forecast/severe` is the available editor. `/forecast` redirects there and keeps query parameters and hash.
-- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor. Issue #914 ships the route contract, so staging and production keep the workspace on the unavailable-workspace page instead of opening a second production editor.
-- `/forecast/mesoscale`, `/forecast/tropical`, and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
+- `/forecast/custom` is registered only when `customWorkspace` is on, which today means local and beta. It reuses the shared ForecastPage editor and owns custom layer and product editing controls. Staging and production keep the workspace on the unavailable-workspace page.
+- `/forecast/mesoscale` renders its own page (`MesoscalePage`, not `ForecastPage`) and is registered only where `mesoscaleWorkspace` is on, which today means local builds. Mesoscale products have no cloud storage, so the workspace is excluded from cloud loads and from Cloud Library tabs. `/forecast/tropical` and `/forecast/winter` editors stay unregistered while their exposure keys are off. A direct visit to one of those known workspace IDs, or to `/forecast/custom` on a release target, renders the accessible unavailable-workspace page. Unknown `/forecast/*` IDs keep the normal unregistered-route handling.
 - `/custom-products` stays a separate library route gated by `customProducts`. It is not a legacy Forecast editor path.
 - Canonical matching tolerates trailing slashes. Non-forecast pages leave Redux workspace ownership alone instead of resetting it to Severe.
 
@@ -33,6 +33,7 @@ This record pins down what #1456 actually built. The base doc describes the plan
 
 - A staged custom-product handoff names its destination workspace. The forecast editor consumes it only when it is mounted as that workspace, so a Custom product can never land in Severe. The library hands off to `/forecast/custom`.
 - Cloud loads classify the payload with the production validators before anything is written. An already enveloped payload is reused as is, an envelope that names another workspace is rejected, malformed input throws instead of being wrapped as forecast data, and a Custom record's save classifies as Custom rather than Severe.
+- Mesoscale product data uses its own `schemaVersion` envelope with `workspaceId: "mesoscale"` and a `product` payload, because its areas and model context are not a `ForecastCycle`. Its local autosave and JSON transfer validators reject Severe, Custom, unknown, malformed, and oversized input. Cloud handoffs reject Mesoscale with an unsupported-storage error.
 - A workspace can open cloud payloads only when it has a registered editor route for the current build target. That is Severe everywhere and Custom where `customWorkspace` is on. The check reads the shared workspace registry and exposure contract, not a separate hardcoded list.
 - A handoff that reaches the wrong editor is a user-visible error. The pending session stays staged under the workspace that owns it, the editor shows an error toast, and local restore still runs, so a handoff waiting for another editor is neither deleted nor allowed to hide this workspace's own session. Its owner opens or clears it on a later mount.
 - A malformed or unknown pending handoff is cleared with an invalid-session error, and local restore still runs. Absence alone is not treated as corruption.
@@ -49,7 +50,8 @@ This record pins down what #1456 actually built. The base doc describes the plan
 ## Follow-ups, not in scope
 
 - Full workspace switcher stays with #917.
-- Custom UI move and compatibility redirect stay with #915.
+- `/custom-products` remains the product library. Selecting a product hands its detached snapshot to `/forecast/custom`; Severe never offers custom editing controls.
+- Legacy forecast files and saved cycles keep their embedded `customLayers` data and remain readable through existing render, export, and import paths. They are not relabeled as Custom workspace records because no owner metadata exists to safely move the whole forecast.
 - Discussion embedding and `/discussion` handoff stay with #916.
 - Mesoscale registration stays with #919.
 

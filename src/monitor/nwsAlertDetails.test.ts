@@ -1,3 +1,6 @@
+/**
+ * NWS alert detail tests. Verify alert payloads are normalized into the monitor detail model.
+ */
 import {
   formatNwsAlertTime,
   parseNwsAlertProperties,

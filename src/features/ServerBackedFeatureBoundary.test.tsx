@@ -1,3 +1,6 @@
+/**
+ * Server-backed feature boundary tests. Verify server entitlement and client exposure jointly control gated UI.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import { resetServerCapabilityStatusState } from '../config/serverCapabilityStatus';
 import { ServerBackedFeatureBoundary } from './ServerBackedFeatureBoundary';

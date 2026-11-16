@@ -18,7 +18,7 @@ const fixtureChangelog = `# Changelog
 
 - **Feature:** User-visible beta work.
 
-### Stable 1.7.x hotfixes
+### Stable v2.x hotfixes
 
 #### Fixed
 
@@ -45,7 +45,7 @@ test('prepare-beta-release bumps package.json only and leaves CHANGELOG structur
 
   const changelog = readFileSync(join(dir, 'CHANGELOG.md'), 'utf8');
   assert.match(changelog, /### Next major \/ beta/);
-  assert.match(changelog, /### Stable 1\.7\.x hotfixes/);
+  assert.match(changelog, /### Stable v2\.x hotfixes/);
   assert.doesNotMatch(changelog, /## v1\.8\.0-beta\.5/);
   assert.equal(JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).version, '1.8.0-beta.5');
 });

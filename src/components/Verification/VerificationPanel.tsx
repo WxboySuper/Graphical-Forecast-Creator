@@ -1,3 +1,9 @@
+/**
+ * Verification panel: this component presents storm-report evidence, filters,
+ * summaries, and verification actions for the active forecast. It owns panel
+ * composition and user interaction wiring while spatial analysis and forecast
+ * state remain in their dedicated utilities and store modules.
+ */
 import React, { useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { RootState } from '../../store';
@@ -11,7 +17,7 @@ import {
   clearReports
 } from '../../store/stormReportsSlice';
 import { selectVerificationOutlooksForDay } from '../../store/verificationSlice';
-import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../../utils/stormReportParser';
+import { fetchFilteredStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../../utils/stormReportParser';
 import {
   getCurrentSpcReportDate,
   isTodayReportDate,
@@ -45,7 +51,7 @@ const fetchReportsForSource = (
   if (source === 'yesterday') {
     return fetchYesterdayStormReports();
   }
-  return fetchStormReports(reportDate);
+  return fetchFilteredStormReports(reportDate);
 };
 
 const isCurrentReportRequest = (

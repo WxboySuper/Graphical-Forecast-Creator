@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/ForecastTransferModal.tsx
+ * Purpose: Renders forecast transfer controls and coordinates import/export transfer actions.
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,

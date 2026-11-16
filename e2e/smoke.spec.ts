@@ -1,3 +1,8 @@
+/**
+ * E2E contract for smoke.spec.
+ *
+ * This file defines browser-level checks for the smoke.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 
 /**

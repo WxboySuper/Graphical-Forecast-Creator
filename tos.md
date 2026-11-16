@@ -1,4 +1,5 @@
 **Terms of Service for Graphical Forecast Creator (GFC)**  
+**Version: 2**<br>
 **Effective Date:** March 31, 2026
 
 Welcome to the Graphical Forecast Creator ("GFC", "the App"). By clicking "I Agree" or by using this application, you acknowledge that you have read, understood, and agree to be bound by the following terms and conditions. If you do not agree, please refrain from using the service.
@@ -42,7 +43,7 @@ Welcome to the Graphical Forecast Creator ("GFC", "the App"). By clicking "I Agr
    These Terms shall be governed by and construed in accordance with the laws of the State of Oklahoma, United States, without regard to its conflict of law provisions. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts located in Oklahoma.
 
 10. **Contact Us**  
-    If you have any questions regarding these Terms, please reach out via the official GFC Support Discord.
+    If you have any questions regarding these Terms, please reach out via the official GFC Support Discord or email contact@gfcweather.com.
 
 11. **Accounts, Premium Subscriptions, and Billing**  
     - GFC offers an optional premium subscription for hosted cloud storage and cross-device synchronization.

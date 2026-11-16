@@ -1,12 +1,17 @@
+/**
+ * E2E contract for discussion.spec.
+ *
+ * This file defines browser-level checks for the discussion.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
-import { prepareAppState } from './testSetup';
+import { navigateToDiscussion, prepareAppState } from './testSetup';
 
 test.describe('Discussion workflow', () => {
   test.beforeEach(async ({ page }) => {
     await prepareAppState(page);
   });
 
-  test('keeps the standalone day discussion route usable on a portrait phone', async ({ page }) => {
+  test('opens the in-workspace discussion on a portrait phone through the legacy route', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/discussion');
 
@@ -22,7 +27,7 @@ test.describe('Discussion workflow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ uid: 'e2e-user', email: 'e2e@example.test', displayName: 'E2E Forecaster', betaAccess: true }),
+        body: JSON.stringify({ uid: 'e2e-user', email: 'e2e@example.test', displayName: 'E2E Forecaster' }),
       });
     });
     await page.goto('/?localTestAccount=premium');
@@ -32,8 +37,8 @@ test.describe('Discussion workflow', () => {
     await startWorkflow.click();
     await expect(page).toHaveURL('/forecast/severe');
 
-    await page.getByRole('link', { name: 'Discussion' }).click();
-    await expect(page).toHaveURL('/discussion');
+    await navigateToDiscussion(page);
+    await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     const scope = page.getByRole('combobox', { name: 'Discussion scope' });
     const editor = page.locator('textarea.diy-textarea');
     await expect(scope).toBeVisible();

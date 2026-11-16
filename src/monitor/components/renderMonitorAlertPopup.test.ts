@@ -1,3 +1,6 @@
+/**
+ * Monitor alert popup tests. Verify alert details render with the correct report and map context.
+ */
 import { renderMonitorAlertPopup, clearMonitorAlertPopup } from './renderMonitorAlertPopup';
 import type { NwsAlertDetails } from '../nwsAlertDetails';
 

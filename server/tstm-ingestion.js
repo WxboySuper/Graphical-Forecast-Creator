@@ -1,3 +1,9 @@
+/**
+ * Auto-TSTM ingestion boundary: this module validates and stores generated
+ * weather guidance before it is served through the hosted API. It owns input
+ * normalization, cache/persistence coordination, and ingestion errors while
+ * request authentication and response shaping remain in route modules.
+ */
 'use strict';
 
 const fs = require('fs');

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "model": { "id": "hrrr", "name": "High-Resolution Rapid Refresh", "capabilities": { "availableParameterIds": [], "maxForecastHour": 48, "cycleCadenceMinutes": 60 } },
+  "frameType": "forecast",
+  "cycleTime": "not-a-time",
+  "forecastHour": 1.5,
+  "validTime": "2026-05-20T13:00:00Z",
+  "domain": { "id": "conus", "name": "Contiguous United States" },
+  "source": { "providerId": "example-provider", "providerName": "Example Provider", "datasetId": "hrrr", "attribution": "Data provided by Example Provider" },
+  "parameters": []
+}

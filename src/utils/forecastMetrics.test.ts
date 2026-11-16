@@ -1,3 +1,6 @@
+/**
+ * Forecast metrics tests. Verify forecast scoring and metric aggregation produce stable results.
+ */
 import { countForecastMetrics } from './forecastMetrics';
 
 describe('forecastMetrics', () => {

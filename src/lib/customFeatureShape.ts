@@ -1,3 +1,6 @@
+/**
+ * Custom feature shape helpers. Defines the normalized geometry shape used by custom forecast products.
+ */
 import { getCustomGeometryDimension, isCustomPolygonGeometry } from './customGeometry';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

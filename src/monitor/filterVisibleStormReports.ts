@@ -1,3 +1,6 @@
+/**
+ * Visible storm report filter. Selects reports that belong in the current monitor map view.
+ */
 import type { MonitorOutlookLayerType } from './types';
 import type { ReportType, StormReport } from '../types/stormReports';
 

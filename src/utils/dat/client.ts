@@ -1,3 +1,9 @@
+/**
+ * DAT client boundary: this module fetches and normalizes public storm-report
+ * data for verification workflows, including request parameters and upstream
+ * response handling. It owns transport and normalization concerns, not map
+ * rendering, scoring, or forecast persistence.
+ */
 import type {
   Feature,
   FeatureCollection,

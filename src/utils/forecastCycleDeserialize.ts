@@ -1,3 +1,7 @@
+/**
+ * Reconstructs a forecast cycle from serialized save data and legacy persistence shapes.
+ * This utility owns cycle-data normalization and compatibility defaults; it does not persist, render, or dispatch forecast state.
+ */
 import type {
   GFCForecastSaveData,
   ForecastCycle,

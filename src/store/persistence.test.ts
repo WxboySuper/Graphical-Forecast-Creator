@@ -1,3 +1,6 @@
+/**
+ * Store persistence tests. Verify application state serialization, restoration, and version handling.
+ */
 import { setWorkflowActive } from './forecastSlice';
 import { store } from './index';
 import { initializeStorePersistence } from './persistence';

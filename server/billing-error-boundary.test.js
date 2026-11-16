@@ -126,4 +126,35 @@ describe('billing route error boundary', () => {
     assert.equal(response.headers['X-Request-ID'], response.body.requestId);
     assert.equal(JSON.stringify(response.body).includes(providerMessage), false);
   });
+
+  it('reports handler failures after a valid signature as a server error', async () => {
+    const providerMessage = 'Firestore transaction outage details';
+    const response = createResponse();
+    const errorLog = mock.method(console, 'error', () => {});
+    const stripe = {
+      webhooks: {
+        constructEvent: () => ({ id: 'evt_1', type: 'invoice.paid', data: { object: { subscription: 'sub_1' } } }),
+      },
+      subscriptions: {
+        retrieve: async () => {
+          throw new Error(providerMessage);
+        },
+      },
+    };
+
+    try {
+      await __testing.processWebhookRequest(
+        { path: '/api/billing/webhook', body: '{}', headers: { 'stripe-signature': 'good' } },
+        response,
+        stripe,
+        'secret'
+      );
+    } finally {
+      errorLog.mock.restore();
+    }
+
+    assert.equal(response.statusCode, 500);
+    assert.equal(response.body.code, 'billing_webhook_processing_failed');
+    assert.equal(JSON.stringify(response.body).includes(providerMessage), false);
+  });
 });

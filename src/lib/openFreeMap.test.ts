@@ -1,3 +1,6 @@
+/**
+ * OpenFreeMap tests. Verify map style and source configuration returned by the OpenFreeMap integration.
+ */
 let openFreeMap: typeof import('./openFreeMap');
 
 const stylePayload = {

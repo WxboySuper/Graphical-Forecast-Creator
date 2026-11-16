@@ -21,8 +21,9 @@ and checksummed at build time.
 | `usStates` | `public/geodata/us-states.json` | [PublicaMundi/MappingAPI](https://github.com/PublicaMundi/MappingAPI) `data/geojson/us-states.json` | Public domain (US Census TIGER-derived) | `6F23ED91...80D193B` |
 | `worldCountries` | `public/geodata/ne_110m_admin_0_countries.geojson` | [nvkelso/natural-earth-vector](https://github.com/nvkelso/natural-earth-vector) `geojson/ne_110m_admin_0_countries.geojson` | Public domain (Natural Earth) | `6866C877...39C977F` |
 | `lakes` | `public/geodata/ne_110m_lakes.geojson` | [nvkelso/natural-earth-vector](https://github.com/nvkelso/natural-earth-vector) `geojson/ne_110m_lakes.geojson` | Public domain (Natural Earth) | `EB02ECC8...2D2FFC9` |
+| `usPlaces` | `public/geodata/us-places.json` | Natural Earth `ne_10m_populated_places_simple`, filtered to US places with pop_max >= 5000 (compact rows, ~32 KB) | Public domain (Natural Earth) | `595A59F8...0DCE8F` |
 
-Retrieval date for all datasets: **2026-08-04**.
+Retrieval date: **2026-08-04** (`usPlaces`: **2026-11-08**).
 
 ## Updating a dataset
 

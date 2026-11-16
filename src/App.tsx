@@ -1,3 +1,9 @@
+/**
+ * Application shell: this module composes providers, global lifecycle hooks,
+ * route definitions, lazy page boundaries, and top-level error handling. It
+ * owns application composition but delegates state, feature exposure, auth,
+ * and page behavior to their dedicated modules.
+ */
 import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
@@ -22,20 +28,18 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
-import PricingPage from './pages/PricingPage';
-import { UpdatesPage } from './pages/UpdatesPage';
-import BetaLandingPage from './pages/BetaLandingPage';
-import BetaInvitePage from './pages/BetaInvitePage';
-import BetaAccessGuard from './components/Beta/BetaAccessGuard';
 import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 import { initProductAnalytics } from './lib/productAnalytics';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { lazyWithReload } from './routing/lazyWithReload';
+import { ExternalRedirect } from './routing/ExternalRedirect';
+import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from './config/marketingLinks';
 import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
+  getForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
   getUnavailableForecastWorkspaceRoutes,
   resolveRouteForecastWorkspaceContext,
@@ -48,8 +52,8 @@ import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWor
 const ForecastPage = lazyWithReload('forecast', () =>
   import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
 );
-const DiscussionPage = lazyWithReload('discussion', () =>
-  import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage }))
+const MesoscalePage = lazyWithReload('mesoscale', () =>
+  import('./pages/MesoscalePage').then((module) => ({ default: module.MesoscalePage }))
 );
 const VerificationPage = lazyWithReload('verification', () =>
   import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
@@ -92,7 +96,20 @@ export const ForecastLegacyRedirect = () => {
   );
 };
 
-const BETA_MODE = __GFC_BETA_MODE__;
+/**
+ * Sends legacy Discussion links into the matching workspace with their query and
+ * hash intact. The legacy Discussion page had a single URL, so any extra path
+ * after `/discussion` carries no meaning and is intentionally dropped.
+ */
+export const DiscussionLegacyRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.delete('workspace');
+  params.set('surface', 'discussion');
+  const hintedWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
+  const pathname = hintedWorkspace ? getForecastWorkspacePath(hintedWorkspace.id) : '/forecast/severe';
+  return <Navigate to={{ pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
+};
 
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
@@ -158,14 +175,15 @@ const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="beta" element={<BetaLandingPage />} />
-      <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
+      {/* The closed-beta gate is gone; keep old bookmarks and invite links working. */}
+      <Route path="beta" element={<Navigate to="/" replace />} />
+      <Route path="beta-access/*" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
-        <Route path="updates" element={<UpdatesPage />} />
-        <Route element={<BetaAccessGuard />}>
+        {/* Pricing and release notes now live on the marketing site. */}
+        <Route path="updates" element={<ExternalRedirect to={MARKETING_UPDATES_URL} label="what's new" />} />
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
-        <Route path="pricing" element={<PricingPage />} />
+        <Route path="pricing" element={<ExternalRedirect to={MARKETING_PRICING_URL} label="pricing" />} />
         <Route path="admin" element={<Suspense fallback={<RouteFallback />}><AdminPage /></Suspense>} />
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
@@ -174,7 +192,7 @@ const AppRoutes: React.FC = () => {
             <Route
               key={route.id}
               path={route.routePath}
-              element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={route.id} /></Suspense>}
+              element={<Suspense fallback={<RouteFallback />}>{route.id === 'mesoscale' ? <MesoscalePage /> : <ForecastPage workspaceId={route.id} />}</Suspense>}
             />
           ))}
           {getUnavailableForecastWorkspaceRoutes().map((route) => (
@@ -185,7 +203,7 @@ const AppRoutes: React.FC = () => {
             />
           ))}
         </Route>
-        <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
+        <Route path="discussion/*" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
         {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
@@ -199,9 +217,8 @@ const AppRoutes: React.FC = () => {
           />
         ) : null}
         {buildFeatureGatedRoutes()}
-        </Route>
       </Route>
-      <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

@@ -1,8 +1,7 @@
 import type { OverlaysState } from '../store/overlaysSlice';
 import { normalizeBaseMapStyle, type LegacyBaseMapStyle } from '../store/overlaysSlice';
 import type { OutlookType } from '../types/outlooks';
-import type { MonitorSettings } from '../monitor/types';
-import { areMonitorSettingsEqual } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areSyncedMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 import type { ForecastUiVariant } from '../utils/forecastUiVariant';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
@@ -21,6 +20,29 @@ export interface UserSettingsDocument {
   monitorSettings: MonitorSettings;
 }
 
+export type RemoteSettingsInput = Partial<Omit<UserSettingsDocument, 'monitorSettings'>> & {
+  monitorSettings?: Partial<MonitorSettings>;
+};
+
+export type RemoteUserSettingsDocument = Omit<UserSettingsDocument, 'monitorSettings'> & {
+  monitorSettings: Omit<MonitorSettings, 'mesoscale'>;
+};
+
+export const toRemoteMonitorSettings = (
+  settings: MonitorSettings,
+): Omit<MonitorSettings, 'mesoscale'> => {
+  const { mesoscale: _localOnly, ...remoteSettings } = settings;
+  return remoteSettings;
+};
+
+/** Removes Monitor display preferences before a settings document leaves this browser. */
+export const toRemoteUserSettingsDocument = (
+  settings: UserSettingsDocument,
+): RemoteUserSettingsDocument => ({
+  ...settings,
+  monitorSettings: toRemoteMonitorSettings(settings.monitorSettings),
+});
+
 /** Compares hosted settings fields excluding updatedAt metadata. */
 const compareUserSettingsFields = (
   left: UserSettingsDocument,
@@ -33,7 +55,7 @@ const compareUserSettingsFields = (
   left.defaultForecasterName === right.defaultForecasterName &&
   left.forecastUiVariant === right.forecastUiVariant &&
   JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
-  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
+  areSyncedMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
 
 /** True when two normalized settings payloads contain the same user-visible values. */
 export const areUserSettingsEqual = (
@@ -94,7 +116,7 @@ const readGhostOutlooks = (value: unknown): UserSettingsDocument['ghostOutlooks'
 
 const USER_SETTINGS_FIELD_READERS: {
   key: keyof UserSettingsDocument;
-  read: (partial: Partial<UserSettingsDocument>) => UserSettingsDocument[keyof UserSettingsDocument] | null;
+  read: (partial: RemoteSettingsInput) => UserSettingsDocument[keyof UserSettingsDocument] | null;
 }[] = [
   {
     key: 'darkMode',
@@ -129,13 +151,16 @@ const USER_SETTINGS_FIELD_READERS: {
   },
   {
     key: 'monitorSettings',
-    read: (partial) => normalizeMonitorSettings(partial.monitorSettings),
+    read: (partial) => ({
+      ...normalizeMonitorSettings(partial.monitorSettings),
+      mesoscale: DEFAULT_MONITOR_SETTINGS.mesoscale,
+    }),
   },
 ];
 
 /** Validates a Firestore settings payload before the app applies it locally. */
 export const readRemoteSettings = (
-  value: Partial<UserSettingsDocument> | undefined,
+  value: RemoteSettingsInput | undefined,
   fallback?: UserSettingsDocument,
 ): UserSettingsDocument | null => {
   if (!value) {

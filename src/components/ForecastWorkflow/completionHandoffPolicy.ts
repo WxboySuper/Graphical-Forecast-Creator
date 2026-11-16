@@ -1,3 +1,7 @@
+/**
+ * Completion-handoff policy. Defines which completed cycle and workflow combinations
+ * receive export, return, and monitor guidance.
+ */
 import type { CycleMetadata, WorkflowMetadata } from '../../types/workflow';
 
 export interface CompletionHandoffEligibility { showHandoff: boolean; showMonitor: boolean; }
@@ -5,11 +9,9 @@ export interface CompletionHandoffEligibility { showHandoff: boolean; showMonito
 const MONITOR_SUPPORTED_GROUPINGS = new Set(['day1']);
 const COMPLETED_STATUSES = new Set(['completed', 'completed-with-omissions']);
 
-/** Returns whether the cycle reached a completion status eligible for handoff guidance. */
 const isCompletedCycle = (cycle: CycleMetadata | undefined): cycle is CycleMetadata =>
   Boolean(cycle && COMPLETED_STATUSES.has(cycle.status));
 
-/** Returns whether the workflow uses one of the supported short-term groupings. */
 const isSupportedShortTermWorkflow = (workflow: WorkflowMetadata | undefined): workflow is WorkflowMetadata =>
   Boolean(
     workflow

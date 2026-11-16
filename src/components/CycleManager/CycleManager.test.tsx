@@ -1,3 +1,8 @@
+/**
+ * Cycle-manager test boundary: this suite verifies saved-cycle dialogs,
+ * restore/copy actions, deletion flows, and cycle-manager state transitions
+ * through the user-facing component contract.
+ */
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -88,7 +93,7 @@ const baseForecastState: ForecastState = {
   historyByDay: {},
   discussionDraftsByScope: {},
   discussionDraftsByWorkspace: {},
-  customEditor: { mode: 'severe', activeLayerId: null, activeCategoryId: null },
+  customEditor: { activeLayerId: null, activeCategoryId: null },
   isWorkflowActive: false,
   completionValidation: { lastResult: null, showCompletionModal: false, omittedDays: {} },
   outlookVersionSnapshots: [],

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/useForecastWorkspaceController.tsx
+ * Purpose: Coordinates forecast workspace controller state, callbacks, persistence, and modal orchestration.
+ */
+
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';

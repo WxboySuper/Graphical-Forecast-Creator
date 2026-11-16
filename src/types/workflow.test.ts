@@ -1,3 +1,8 @@
+/**
+ * Workflow-type test boundary: this suite verifies runtime guards and typed
+ * normalization for forecast-cycle statuses, outlook versions, grouping, and
+ * workflow metadata exchanged across persistence and UI boundaries.
+ */
 import type {
   CycleStatus,
   OutlookStatus,

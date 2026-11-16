@@ -1,3 +1,6 @@
+/**
+ * Feature-gated route tests. Verify route builders include only the features exposed to the active target.
+ */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes } from 'react-router';
 import {

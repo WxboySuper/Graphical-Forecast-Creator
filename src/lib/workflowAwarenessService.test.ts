@@ -1,3 +1,6 @@
+/**
+ * Workflow awareness service tests. Verify persistence and retrieval of workflow metadata used by collaboration features.
+ */
 jest.mock('firebase/firestore', () => ({
   collection: jest.fn((...parts: string[]) => ({ parts })),
   deleteDoc: jest.fn(() => Promise.resolve()),

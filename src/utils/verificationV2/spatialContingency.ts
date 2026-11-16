@@ -1,3 +1,8 @@
+/**
+ * Spatial contingency verification calculations.
+ *
+ * This module computes neighborhood-based forecast and observation agreement for verification. Grade orchestration supplies inputs and owns scoring decisions.
+ */
 import type { StormReport } from '../../types/stormReports';
 import { notEvaluatedComponent, scoredComponent, type ComponentScore } from './gradeContract';
 import { roundTo } from './gridEvaluation';

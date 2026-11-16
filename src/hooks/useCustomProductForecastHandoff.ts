@@ -9,7 +9,7 @@ import {
   restoreCustomProductForecastHandoff,
 } from '../lib/customProductHandoff';
 import type { RootState } from '../store';
-import { addCustomLayer, setCustomEditorMode } from '../store/forecastSlice';
+import { addCustomLayer } from '../store/forecastSlice';
 import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 
 const restoreWithError = (message: string, addToast: AddToastFn, layer: Parameters<typeof restoreCustomProductForecastHandoff>[0], workspaceId: ForecastWorkspaceId) => {
@@ -46,6 +46,5 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
       return;
     }
     dispatch(addCustomLayer(stagedLayer));
-    dispatch(setCustomEditorMode('custom'));
   }, [addToast, destinationDay, dispatch, premiumActive, ready, workspaceId]);
 };

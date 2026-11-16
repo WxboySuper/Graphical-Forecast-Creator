@@ -1,3 +1,9 @@
+/**
+ * Discussion grouping utilities: this module resolves discussion scopes,
+ * grouping ownership, defaults, and guided-content relationships for forecast
+ * cycles. It owns pure discussion-domain transformations and does not own UI
+ * editing, persistence, or route orchestration.
+ */
 import type { DiscussionData, DiscussionGrouping, DayType, ForecastCycle, GuidedDiscussionData } from '../types/outlooks';
 import type { StandardGrouping, WorkflowMetadata } from '../types/workflow';
 

@@ -1,3 +1,9 @@
+/**
+ * Feature-exposure policy: this module defines the registry and target-aware
+ * decisions used to expose product surfaces and server-backed capabilities.
+ * It is the client policy boundary; route rendering and server authorization
+ * consume these decisions but do not duplicate them.
+ */
 import { BUILD_TARGETS, type BuildTarget, getBuildTarget } from './buildTarget';
 
 export type FeatureExposureMatrix = Readonly<Record<BuildTarget, boolean>>;
@@ -43,7 +49,7 @@ const ALL_TARGETS_ON = {
 const CORE_PRODUCT_OWNER = 'WxboySuper';
 const CORE_PRODUCT_ADDED_DATE = '2026-06-21';
 
-/** Single source of truth for v1.7 feature exposure and lifecycle metadata. */
+/** Single source of truth for feature exposure and lifecycle metadata. */
 export const FEATURE_EXPOSURE_REGISTRY = {
   exportMap: {
     exposure: { ...ALL_TARGETS_ON },
@@ -175,14 +181,23 @@ export const FEATURE_EXPOSURE_REGISTRY = {
     trackingIssue: 915,
   },
   mesoscaleWorkspace: {
-    exposure: { ...ALL_TARGETS_OFF },
+    exposure: { local: true, beta: true, staging: false, production: false },
     owner: 'WxboySuper',
     addedDate: '2026-08-28',
     temporary: true,
     removalCondition:
-      'Remove after the Mesoscale Forecast workspace and provider contract complete their staged rollout (#919).',
+      'Beta is on for early-access testing (#1800). Keep staging and production disabled until the owner approves the Mesoscale Forecast workspace for release (#919).',
     serverBacked: false,
     trackingIssue: 919,
+  },
+  mesoscaleDerivedParameters: {
+    exposure: { local: true, beta: true, staging: false, production: false },
+    owner: 'WxboySuper',
+    addedDate: '2026-11-10',
+    temporary: true,
+    removalCondition: 'Review the fixed-layer STP ingest and production display before enabling it for production (#1801).',
+    serverBacked: false,
+    trackingIssue: 1801,
   },
   winterWorkspace: {
     exposure: { ...ALL_TARGETS_OFF },

@@ -1,0 +1,237 @@
+import { HEADER_BYTES, parseHeader } from './pmtiles-header.mjs';
+import { validateArchiveRanges } from './pmtiles-layout.mjs';
+import { decompressDirectory } from './pmtiles-compression.mjs';
+import {
+  MAX_DIRECTORY_BYTES, PmtilesError, safeEnd, decodeDirectory, hilbertDistance,
+} from './pmtiles-format.mjs';
+
+export { decodeDirectory, parseHeader, PmtilesError };
+
+const MAX_ARCHIVES = 8;
+const MAX_DIRECTORIES = 4;
+const MAX_TILE_BYTES = 8 * 1024 * 1024;
+const archives = new Map();
+
+const integerCoordinate = (value) => Number.isInteger(value);
+const inTileBounds = (value, zoom) => {
+  if (value < 0) return false;
+  return value < 2 ** zoom;
+};
+const validTileCoordinate = ({ zoom, x, y }) => {
+  if (!integerCoordinate(x) || !integerCoordinate(y)) return false;
+  if (!inTileBounds(x, zoom)) return false;
+  return inTileBounds(y, zoom);
+};
+
+const cacheArchive = (key, state) => {
+  // Archive keys are create-only under the published catalog contract.
+  archives.delete(key);
+  archives.set(key, state);
+  while (archives.size > MAX_ARCHIVES) archives.delete(archives.keys().next().value);
+};
+
+const cachedArchive = (key) => {
+  const state = archives.get(key);
+  if (!state) return null;
+  archives.delete(key);
+  archives.set(key, state);
+  return state;
+};
+
+const validateRange = ({ offset, length }) => {
+  if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length)) throw new PmtilesError('Invalid PMTiles range');
+  if (offset < 0 || length <= 0) throw new PmtilesError('Invalid PMTiles range');
+  if (!Number.isSafeInteger(offset + length)) throw new PmtilesError('Invalid PMTiles range');
+};
+
+const fetchRangeObject = async ({ bucket, key, offset, length, missingAllowed }) => {
+  let object;
+  try {
+    object = await bucket.get(key, { range: { offset, length } });
+  } catch (error) {
+    throw new PmtilesError('PMTiles range read failed', { cause: error });
+  }
+  if (!object) {
+    if (missingAllowed) return null;
+    throw new PmtilesError('PMTiles range is missing');
+  }
+  return object;
+};
+
+const readRangeBody = async (object) => {
+  try {
+    return new Uint8Array(await object.arrayBuffer());
+  } catch (error) {
+    throw new PmtilesError('PMTiles range body is unreadable', { cause: error });
+  }
+};
+
+const validateRangeBody = ({ object, bytes, offset, length }) => {
+  if (bytes.byteLength !== length) throw new PmtilesError('Truncated PMTiles range');
+  if (Number.isSafeInteger(object.size) && safeEnd(offset, length, 'Invalid PMTiles range') > object.size) throw new PmtilesError('PMTiles range exceeds archive size');
+};
+
+const rangeBody = async ({ object, offset, length }) => {
+  const bytes = await readRangeBody(object);
+  validateRangeBody({ object, bytes, offset, length });
+  return { bytes, etag: object.httpEtag || object.etag || null, size: object.size };
+};
+
+const rangeBytes = async (options) => {
+  validateRange(options);
+  const object = await fetchRangeObject(options);
+  return object ? rangeBody({ object, offset: options.offset, length: options.length }) : null;
+};
+
+const assertArchiveEtag = ({ state, range }) => {
+  if (!state.etag || !range.etag) invalidateArchive(state, 'PMTiles archive identity is unavailable');
+  if (state.etag !== range.etag) invalidateArchive(state, 'PMTiles archive changed during request');
+};
+
+const assertArchiveSize = ({ state, range }) => {
+  if (!Number.isSafeInteger(state.size) || !Number.isSafeInteger(range.size)) {
+    invalidateArchive(state, 'PMTiles archive identity is unavailable');
+  }
+  if (state.size !== range.size) invalidateArchive(state, 'PMTiles archive changed during request');
+};
+
+const invalidateArchive = (state, message) => {
+  archives.delete(state.key);
+  throw new PmtilesError(message);
+};
+
+const assertArchiveIdentity = (identity) => {
+  assertArchiveEtag(identity);
+  assertArchiveSize(identity);
+};
+
+const archiveState = async (bucket, key) => {
+  const cached = cachedArchive(key);
+  if (cached) return cached;
+  const result = await rangeBytes({ bucket, key, offset: 0, length: HEADER_BYTES, missingAllowed: true });
+  if (!result) return null;
+  if (!result.etag) throw new PmtilesError('PMTiles archive identity is unavailable');
+  const header = parseHeader(result.bytes);
+  validateArchiveRanges(header, result.size);
+  const state = { key, header, etag: result.etag, size: result.size, directories: new Map() };
+  cacheArchive(key, state);
+  return state;
+};
+
+const directoryAt = async ({ bucket, key, state, offset, length }) => {
+  if (length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles directory is too large');
+  const cacheKey = `${offset}:${length}`;
+  if (state.directories.has(cacheKey)) {
+    const cached = state.directories.get(cacheKey);
+    state.directories.delete(cacheKey);
+    state.directories.set(cacheKey, cached);
+    return cached;
+  }
+  const range = await rangeBytes({ bucket, key, offset, length });
+  assertArchiveIdentity({ state, range });
+  const decoded = decodeDirectory(await decompressDirectory(range.bytes, state.header.internalCompression));
+  state.directories.set(cacheKey, decoded);
+  while (state.directories.size > MAX_DIRECTORIES) state.directories.delete(state.directories.keys().next().value);
+  return decoded;
+};
+
+const predecessorEntry = (entries, tileId) => {
+  let lower = 0;
+  let upper = entries.length - 1;
+  let found = null;
+  while (lower <= upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const candidate = entries[middle];
+    if (candidate.tileId > tileId) upper = middle - 1;
+    else { found = candidate; lower = middle + 1; }
+  }
+  return found;
+};
+
+export const findDirectoryEntry = (entries, tileId) => {
+  const found = predecessorEntry(entries, tileId);
+  if (!found) return null;
+  if (found.runLength === 0) return found;
+  return tileId < found.tileId + found.runLength ? found : null;
+};
+
+const leafEntry = async ({ bucket, key, state, tileId, entry }) => {
+  if (!entry) return null;
+  const header = state.header;
+  const end = safeEnd(entry.offset, entry.length, 'Invalid PMTiles leaf directory range');
+  const offset = safeEnd(header.leafOffset, entry.offset, 'Invalid PMTiles leaf range');
+  if (end > header.leafLength) throw new PmtilesError('PMTiles leaf directory entry exceeds its section');
+  if (entry.length > MAX_DIRECTORY_BYTES) throw new PmtilesError('PMTiles leaf directory entry is too large');
+  const leaf = await directoryAt({ bucket, key, state, offset, length: entry.length });
+  const resolved = findDirectoryEntry(leaf, tileId);
+  if (resolved?.runLength === 0) throw new PmtilesError('PMTiles leaf directory cannot reference another leaf');
+  return resolved;
+};
+
+const tileEntry = async ({ bucket, key, state, tileId }) => {
+  const { header } = state;
+  const root = await directoryAt({ bucket, key, state, offset: header.rootOffset, length: header.rootLength });
+  const entry = findDirectoryEntry(root, tileId);
+  if (entry?.runLength !== 0) return entry;
+  return leafEntry({ bucket, key, state, tileId, entry });
+};
+
+const tileRange = (header, entry) => {
+  if (entry.length > MAX_TILE_BYTES) throw new PmtilesError('PMTiles tile entry is too large');
+  const offset = safeEnd(header.tileOffset, entry.offset, 'Invalid PMTiles tile range');
+  if (safeEnd(entry.offset, entry.length, 'Invalid PMTiles tile entry range') > header.tileLength) throw new PmtilesError('PMTiles tile entry exceeds tile data section');
+  return { offset, length: entry.length };
+};
+
+const tileEtag = (etag, range) => {
+  const clean = etag?.replaceAll('"', '').trim();
+  if (!clean || !/^[\x21\x23-\x7E]+$/.test(clean)) return null;
+  return `W/"${clean}-${range.offset}-${range.length}"`;
+};
+
+const tileResult = async ({ bucket, key, state, entry, headOnly }) => {
+  const header = state.header;
+  if (!entry || entry.runLength === 0) {
+    const probe = await rangeBytes({ bucket, key, offset: header.rootOffset, length: 1 });
+    assertArchiveIdentity({ state, range: probe });
+    return { state: 'missing-tile' };
+  }
+  const range = tileRange(header, entry);
+  const etag = tileEtag(state.etag, range);
+  const data = await rangeBytes({ bucket, key, ...range, ...(headOnly ? { length: 1 } : {}) });
+  assertArchiveIdentity({ state, range: data });
+  if (headOnly) return { state: 'found', length: range.length, etag };
+  return { state: 'found', bytes: data.bytes, length: range.length, etag };
+};
+
+export const readTile = async ({ bucket, key, zoom, x, y, minZoom, maxZoom, headOnly = false }) => {
+  const state = await archiveState(bucket, key);
+  if (!state) return { state: 'missing-archive' };
+  const requestState = tileRequestState({ header: state.header, minZoom, maxZoom, zoom, x, y });
+  if (requestState) return { state: requestState };
+  return resolveTileRequest({ bucket, key, state, zoom, x, y, headOnly });
+};
+
+export const clearPmtilesCacheForTests = () => archives.clear();
+
+const assertCatalogZoom = ({ header, minZoom, maxZoom }) => {
+  if (header.minZoom !== minZoom || header.maxZoom !== maxZoom) throw new PmtilesError('PMTiles zoom interval does not match catalog');
+};
+
+const validRequestedZoom = (zoom, header) => {
+  if (!Number.isInteger(zoom)) return false;
+  if (zoom < header.minZoom) return false;
+  return zoom <= header.maxZoom;
+};
+
+const tileRequestState = ({ header, minZoom, maxZoom, zoom, x, y }) => {
+  assertCatalogZoom({ header, minZoom, maxZoom });
+  if (!validRequestedZoom(zoom, header)) return 'out-of-zoom';
+  if (!validTileCoordinate({ zoom, x, y })) return 'missing-tile';
+  return null;
+};
+
+const resolveTileRequest = async ({ bucket, key, state, zoom, x, y, headOnly }) => {
+  const entry = await tileEntry({ bucket, key, state, tileId: hilbertDistance(zoom, x, y) });
+  return tileResult({ bucket, key, state, entry, headOnly });
+};

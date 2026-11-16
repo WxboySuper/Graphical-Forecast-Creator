@@ -1,5 +1,11 @@
 'use strict';
 
+/**
+ * Server metrics test boundary: this suite verifies analytics event handling,
+ * validation, persistence, and failure behavior at the server metrics adapter
+ * with Firebase dependencies isolated in test doubles.
+ */
+
 const { after, beforeEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -16,12 +22,13 @@ let premiumCountCalls = 0;
 let premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
 let premiumFallbackGet = async () => ({ size: 0 });
 let clock = 0;
+let adminAuth = null;
 
 const createRef = (collection, id) => ({ collection, id, key: `${collection}/${id}` });
 const snapshot = (ref) => ({ exists: documents.has(ref.key), data: () => documents.get(ref.key) || {} });
 const db = {
-  collection: (collection) => ({
-    doc: (id) => createRef(collection, id),
+  collection: (collectionName) => ({
+    doc: (id) => createRef(collectionName, id),
     where: () => ({
       get: () => premiumFallbackGet(),
       count: () => ({
@@ -53,11 +60,12 @@ require.cache[firebaseAdminPath] = {
   id: firebaseAdminPath,
   filename: firebaseAdminPath,
   loaded: true,
-  exports: { getAdminDb: () => db, getAdminAuth: () => null, hasFirebaseAdminConfig: () => true },
+  exports: { getAdminDb: () => db, getAdminAuth: () => adminAuth, hasFirebaseAdminConfig: () => true },
 };
 delete require.cache[metricsPath];
 const { countPremiumSubscriptions, countTotalAccounts, recordBillingMetricEvent } = require('./metrics');
 const { handleMetricEvent, requiresAuthenticatedMetricEvent } = require('./metrics');
+const { getDayKey } = require('./metricsValues');
 
 const createResponse = () => {
   const response = {
@@ -81,6 +89,11 @@ const createUnauthenticatedRequest = (event) => ({
   body: { event, installationId: 'test-installation' },
 });
 
+const createAuthenticatedRequest = (event, installationId = 'test-installation') => ({
+  headers: { authorization: 'Bearer test-token' },
+  body: { event, installationId },
+});
+
 beforeEach(() => {
   documents.clear();
   aggregateGet = async () => ({ data: () => ({ count: 3 }) });
@@ -90,6 +103,7 @@ beforeEach(() => {
   premiumCountCalls = 0;
   premiumAggregateGet = async () => ({ data: () => ({ count: 4 }) });
   premiumFallbackGet = async () => ({ size: 0 });
+  adminAuth = null;
   clock += 10 * 60 * 1000;
   Date.now = () => clock;
 });
@@ -229,5 +243,85 @@ describe('product metric authentication contract', () => {
 
   it('does not classify unsupported events as trusted metric writes', () => {
     assert.equal(requiresAuthenticatedMetricEvent('unknown'), false);
+  });
+});
+
+describe('daily active device dedupe limits', () => {
+  it('counts at most five distinct devices per authenticated account per day', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+
+    for (let index = 1; index <= 6; index += 1) {
+      const response = createResponse();
+      await handleMetricEvent(createAuthenticatedRequest('cycle_saved', `installation-${index}`), response);
+      assert.equal(response.statusCode, 204);
+    }
+
+    const dailyMetrics = documents.get(`adminDailyMetrics/${getDayKey()}`);
+    const deviceDedupes = [...documents.entries()].filter(([key, data]) =>
+      key.startsWith('adminMetricDedupes/') && data.kind === 'device'
+    );
+    assert.equal(deviceDedupes.length, 5);
+    assert.equal(dailyMetrics.activeDevices, 5);
+    assert.equal(documents.get(`adminMetricDedupes/account:${getDayKey()}:user-1`).deviceCount, 5);
+  });
+
+  it('keeps recording events and user progress after the device cap is reached', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+
+    for (let index = 1; index <= 6; index += 1) {
+      await handleMetricEvent(createAuthenticatedRequest('cycle_saved', `installation-${index}`), createResponse());
+    }
+    await handleMetricEvent(createAuthenticatedRequest('cloud_cycle_loaded', 'installation-7'), createResponse());
+
+    assert.equal(documents.get('userMetrics/user-1').cyclesCreated, 6);
+    const dailyMetrics = documents.get(`adminDailyMetrics/${getDayKey()}`);
+    assert.equal(dailyMetrics.cloudLoads, 1);
+    assert.equal(dailyMetrics.activeDevices, 5);
+  });
+
+  it('keeps identical client ids separate across authenticated accounts', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+    await handleMetricEvent(createAuthenticatedRequest('cycle_saved', 'shared-id'), createResponse());
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-2' }) };
+    await handleMetricEvent(createAuthenticatedRequest('cycle_saved', 'shared-id'), createResponse());
+
+    const deviceDedupes = [...documents.entries()].filter(([key, data]) =>
+      key.startsWith('adminMetricDedupes/') && data.kind === 'device'
+    );
+    assert.equal(deviceDedupes.length, 2);
+    assert.deepEqual(deviceDedupes.map(([, data]) => data.uid).sort(), ['user-1', 'user-2']);
+    assert.equal(documents.get(`adminDailyMetrics/${getDayKey()}`).activeDevices, 2);
+  });
+});
+
+describe('product metric live summary', () => {
+  it('records the event when an optional live headline lookup fails', async () => {
+    adminAuth = { verifyIdToken: async () => ({ uid: 'user-1' }) };
+    premiumAggregateGet = async () => {
+      throw new Error('aggregation unavailable');
+    };
+    premiumFallbackGet = async () => {
+      throw new Error('fallback unavailable');
+    };
+
+    const dayKey = getDayKey();
+    documents.set(`adminDailyMetrics/${dayKey}`, {
+      cloudSaves: 2,
+      premiumSubscriptions: 7,
+    });
+
+    const response = createResponse();
+    await handleMetricEvent(createAuthenticatedRequest('cloud_cycle_saved'), response);
+
+    assert.equal(response.statusCode, 204);
+    const dailyMetrics = [...documents.entries()].find(([key]) =>
+      key.startsWith('adminDailyMetrics/')
+    )?.[1];
+    assert.equal(dailyMetrics.cloudSaves, 3);
+    // A failed lookup leaves the stored total untouched instead of resetting to zero or rejecting the event.
+    assert.equal(dailyMetrics.premiumSubscriptions, 7);
+    // The independent storage lookup still lands instead of being discarded.
+    assert.equal(typeof dailyMetrics.storageBytes, 'number');
+    assert.ok(dailyMetrics.storageBytes > 0);
   });
 });

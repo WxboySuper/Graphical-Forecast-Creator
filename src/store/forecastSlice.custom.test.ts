@@ -1,3 +1,8 @@
+/**
+ * Forecast custom-layer test boundary: this suite verifies reducer behavior
+ * for custom products, custom geometry, schema-version handling, and copying
+ * custom features across forecast cycles.
+ */
 import type { Polygon } from 'geojson';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type OneOffCustomLayer, type CustomPolygonFeature } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
@@ -157,6 +162,7 @@ describe('custom layer forecast state', () => {
     state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, saveCurrentCycle({ label: 'Custom source' }));
     const sourceLayers = state.savedCycles[0].forecastCycle.days[1]!.customLayers!;
+    const previousGeneration = state.cycleGeneration;
 
     state = reducer(state, startFromPreviousCycle({
       sourceCycleId: state.savedCycles[0].id,
@@ -166,6 +172,7 @@ describe('custom layer forecast state', () => {
     }));
 
     const rolledLayers = state.forecastCycle.days[2]!.customLayers!;
+    expect(state.cycleGeneration).toBe(previousGeneration + 1);
     expect(rolledLayers).toEqual(sourceLayers);
     expect(rolledLayers).not.toBe(sourceLayers);
   });

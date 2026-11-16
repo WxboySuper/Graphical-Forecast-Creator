@@ -1,3 +1,9 @@
+/**
+ * Owns the browser export pipeline for forecast maps and images: clone preparation,
+ * overlay rendering, map/image readiness, format selection, and final download. Callers
+ * provide map and presentation options; this module keeps DOM cleanup and export timing
+ * details out of React components and Redux state ownership.
+ */
 import { store } from '../store';
 
 type ExportMapLike = {
@@ -574,6 +580,9 @@ export interface CloneCallbackOptions extends OverlayOptions {
 export function buildCloneCallback(options: CloneCallbackOptions = {}) {
   const { includeLegendAndStatus = false, ...overlayOptions } = options;
   return function (clonedRoot: HTMLElement) {
+    // The workspace can keep the live map mounted but hidden while Review is open.
+    // Export captures the map subtree alone, so make that cloned subtree visible.
+    clonedRoot.style.visibility = 'visible';
     hideElementsInClone(clonedRoot, [
       '.ol-control',
       '.map-toolbar-bottom-right',

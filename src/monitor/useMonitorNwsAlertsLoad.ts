@@ -1,3 +1,8 @@
+/**
+ * Monitor NWS alert loading hook.
+ *
+ * This hook fetches and normalizes National Weather Service alerts for monitor layers, exposing loading and error state to the monitor UI. Layer rendering stays in monitor components.
+ */
 import { useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { AddToastFn } from '../components/Layout';
 import { fetchActiveNwsAlerts, snapshotCollectionsEqual, type NwsAlertFeatureCollection } from './nwsAlerts';

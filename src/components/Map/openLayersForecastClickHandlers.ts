@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastClickHandlers.ts
+ * Purpose: Defines OpenLayers forecast-map click handlers and feature-selection behavior.
+ */
+
 import OLMap from "ol/Map";
 import Overlay from "ol/Overlay";
 import VectorLayer from "ol/layer/Vector";

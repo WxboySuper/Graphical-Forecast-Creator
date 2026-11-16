@@ -78,7 +78,7 @@ Approved rows use a permanent lifecycle. Auto-TSTM, Forecast Workflow v2, Verifi
 - **Registry:** `temporary: true`, client-only
 - **Gates:** gated lazy route `/collaborate`, navbar item `collaboration-room`
 - **Tests:** exemplar contract runner + route/nav tests
-- **Beta enablement:** tracker #433; first enable PR: TBD
+- **Beta enablement:** tracker #433; first enable PR: not assigned
 
 ## Commands
 

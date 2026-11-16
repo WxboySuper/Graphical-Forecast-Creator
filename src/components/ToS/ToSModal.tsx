@@ -1,10 +1,17 @@
+/**
+ * Terms-of-service modal: this component presents the current user-facing terms
+ * document and its accessible acknowledgment dialog. It owns modal lifecycle
+ * and local interaction state; legal text and account persistence are kept in
+ * their separate content and policy boundaries.
+ */
+import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 import './ToSModal.css';
 
 // Bump this version string whenever the ToS changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const TOS_VERSION = '2.0.0';
+const TOS_VERSION = '2';
 const STORAGE_KEY = 'gfc-tos-accepted';
 
 /** Returns true if the user has accepted the current version of the Terms of Service. */
@@ -128,7 +135,7 @@ const ToSTermsContent: React.FC = () => (
     <p>
       If you have any questions regarding these Terms, please reach out via the{' '}
       <a href="https://discord.gg/SGk37rg8sz" target="_blank" rel="noopener noreferrer">official GFC Support Discord</a>
-      .
+      {' '}or email <ContactEmailLink />.
     </p>
 
     <h3>11. Accounts, Premium Subscriptions, and Billing</h3>
@@ -226,7 +233,7 @@ const ToSModal: React.FC<ToSModalProps> = ({ onAccept, viewOnly = false, onClose
           <div className="tos-modal-header-row">
             <div>
               <h2 id="tos-title">Terms of Service</h2>
-              <p>Please read and accept before using Graphical Forecast Creator &mdash; ToS v2, Effective March 31, 2026</p>
+              <p>Please read and accept before using Graphical Forecast Creator &mdash; Version {TOS_VERSION}, Effective March 31, 2026</p>
             </div>
             {viewOnly && (
               <button className="tos-close-view-btn" onClick={onClose} aria-label="Close">

@@ -22,6 +22,7 @@
 
 # production
 /build
+/marketing/dist
 
 # misc
 .DS_Store
@@ -32,13 +33,6 @@
 
 npm-debug.log*
 firestore-debug.log
-cloudflare/wrangler.beta.clerk-d1.generated.jsonc
-beta-d1-backup.sql
-beta-d1-backup-verified.sql
-beta-firestore-manifest.json
-beta-firestore-full-snapshot.jsonl
-beta-firestore-email-hashes.txt
-by-email/
 yarn-debug.log*
 yarn-error.log*
 
@@ -85,3 +79,17 @@ night-watch.config.json
 
 # Ephemeral OpenCode CI review artifacts
 /.opencode-pr-review/
+# Python bytecode from the mesoscale ingestion tools
+__pycache__/
+*.py[cod]
+cloudflare/wrangler.mesoscale.rendered.json
+
+# Marketing site scratch files
+scripts/marketing/.tmp/
+cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+beta-d1-backup.sql
+beta-d1-backup-verified.sql
+beta-firestore-manifest.json
+beta-firestore-full-snapshot.jsonl
+beta-firestore-email-hashes.txt
+by-email/

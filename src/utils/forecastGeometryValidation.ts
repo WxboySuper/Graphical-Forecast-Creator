@@ -1,3 +1,7 @@
+/**
+ * Forecast geometry validation helpers. It checks coordinate counts, nesting,
+ * and geometry shape before imported or edited features enter forecast state.
+ */
 import type { Feature, Geometry } from 'geojson';
 import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 

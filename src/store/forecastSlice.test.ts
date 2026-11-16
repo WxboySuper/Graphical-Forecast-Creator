@@ -1,7 +1,14 @@
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module")
+/**
+ * Forecast-slice test boundary: this suite exercises reducer transitions,
+ * imports, history operations, and forecast-cycle serialization contracts.
+ * It verifies state behavior through public actions rather than UI rendering.
+ */
 import type { Feature, Polygon } from 'geojson';
+import { produce } from 'immer';
 import type { DayType, DiscussionData } from '../types/outlooks';
 import type { WorkflowMetadata } from '../types/workflow';
+import { applyCreateOutlookUpdate } from './forecastVersioning';
 import reducer, {
   addFeature,
   applyAutoCategoricalSync,
@@ -23,6 +30,7 @@ import reducer, {
   updateFeature,
   updateFeaturesBatch,
   removeFeature,
+  resetCategorical,
   completeCycle,
   completeWithOmissions,
   dismissCompletionModal,
@@ -41,8 +49,6 @@ import reducer, {
   updateDiscussionDraft,
   migrateDiscussionDrafts,
   setAutoCategoricalError,
-  selectCurrentOutlooks,
-  selectOutlooksForDay,
   setOutlookOpacity,
   selectCurrentOutlookOpacity,
   toggleSignificant,
@@ -146,6 +152,49 @@ describe('setOutlookMap', () => {
 
     expect(state.forecastCycle.days[4]?.data['day4-8']).toBe(supportedMap);
     expect(state.isSaved).toBe(false);
+  });
+
+  test('inserts a missing current day before updating its outlook map', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const day = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[day]; });
+    const map = new Map<string, Feature[]>();
+
+    const nextState = reducer(state, setOutlookMap({ outlookType: 'tornado', map }));
+
+    expect(nextState.forecastCycle.days[day]?.data.tornado).toBe(map);
+  });
+
+  test('no-op feature updates do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[2]; });
+    const afterSingle = reducer(state, updateFeature({ feature: createFeature('missing', 0), day: 2 }));
+    expect(afterSingle).toBe(state);
+    expect(afterSingle.forecastCycle.days[2]).toBeUndefined();
+
+    const missingCurrent = produce(initial, (draft) => {
+      delete draft.forecastCycle.days[draft.forecastCycle.currentDay];
+    });
+    const afterBatch = reducer(missingCurrent, updateFeaturesBatch({ features: [createFeature('missing', 0)] }));
+    expect(afterBatch).toBe(missingCurrent);
+    expect(afterBatch.forecastCycle.days[missingCurrent.forecastCycle.currentDay]).toBeUndefined();
+  });
+
+  test('read-only reducer fallbacks do not create a missing day', () => {
+    const initial = reducer(undefined, { type: 'test/init' });
+    const currentDay = initial.forecastCycle.currentDay;
+    const state = produce(initial, (draft) => { delete draft.forecastCycle.days[currentDay]; });
+
+    const afterRemove = reducer(state, removeFeature({
+      outlookType: 'tornado',
+      probability: '2%',
+      featureId: 'missing',
+    }));
+    const afterReset = reducer(afterRemove, resetCategorical());
+
+    expect(afterRemove).toBe(state);
+    expect(afterReset).toBe(state);
+    expect(afterReset.forecastCycle.days[currentDay]).toBeUndefined();
   });
 
   test('keeps day-specific supported outlook maps available', () => {
@@ -452,6 +501,35 @@ describe('forecastSlice undo/redo', () => {
     state = reducer(state, undoLastEdit());
     expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([0, 0]);
     expect((getTornadoFeatures(state)[1].geometry as Polygon).coordinates[0][0]).toEqual([1, 1]);
+  });
+
+  test('re-finds later feature indexes after an earlier batched delete', () => {
+    let state = reducer(undefined, addFeature({ feature: createFeature('feature-a', 0) }));
+    state = reducer(state, addFeature({ feature: createFeature('feature-b', 1) }));
+
+    state = reducer(state, updateFeaturesBatch({
+      features: [
+        {
+          ...createFeature('feature-a', 0),
+          geometry: null,
+          properties: { outlookType: 'tornado', probability: '2%', isSignificant: false },
+        },
+        {
+          ...createFeature('feature-b', 6),
+          properties: {
+            outlookType: 'tornado',
+            probability: '2%',
+            isSignificant: false,
+            batchUpdated: true,
+          },
+        },
+      ],
+    }));
+
+    expect(getTornadoFeatures(state)).toHaveLength(1);
+    expect(getTornadoFeatures(state)[0].id).toBe('feature-b');
+    expect((getTornadoFeatures(state)[0].geometry as Polygon).coordinates[0][0]).toEqual([6, 6]);
+    expect(getTornadoFeatures(state)[0].properties?.batchUpdated).toBe(true);
   });
 
   test('deep-clones nested feature properties in history snapshots', () => {
@@ -1080,6 +1158,22 @@ describe('forecastSlice undo/redo', () => {
         expect(day48State.forecastCycle.currentDay).toBe(4);
         expect(day48State.forecastCycle.days[4]).toBeDefined();
       });
+
+      it('clears active workflow metadata when starting a plain blank cycle', () => {
+        let state = reducer(undefined, startBlankCycle({
+          workflowTemplate: testWorkflowTemplate,
+          cycleDate: '2026-07-04',
+        }));
+        expect(state.workflowMetadata).toBeDefined();
+        expect(state.isWorkflowActive).toBe(true);
+
+        state = reducer(state, startBlankCycle({ cycleDate: '2026-07-05' }));
+
+        expect(state.forecastCycle.cycleDate).toBe('2026-07-05');
+        expect(state.workflowMetadata).toBeUndefined();
+        expect(state.workflowTemplate).toBeUndefined();
+        expect(state.isWorkflowActive).toBe(false);
+      });
     });
 
     it('validates completion against the active workflow groupings only', () => {
@@ -1291,74 +1385,7 @@ describe('forecastSlice undo/redo', () => {
     });
   });
 
-  describe('selector referential stability', () => {
-    const withForecast = (forecastState: ReturnType<typeof reducer>) => ({ forecast: forecastState } as Parameters<typeof selectCurrentOutlooks>[0]);
-
-    it('selectCurrentOutlooks returns the same fallback reference for an absent current day', () => {
-      // Point currentDay at a day that has no entry so the selector must fall
-      // back to the shared empty reference rather than real day data.
-      const base = reducer(undefined, setForecastDay(1));
-      const absentDayState = {
-        ...base,
-        forecastCycle: { ...base.forecastCycle, currentDay: 5 as DayType },
-      };
-      const state = withForecast(absentDayState);
-      const first = selectCurrentOutlooks(state);
-      const second = selectCurrentOutlooks(state);
-      expect(first).toBe(second);
-    });
-
-    it('keeps fallback selectors referentially stable for all supported day shapes', () => {
-      const state = withForecast(reducer(undefined, setForecastDay(1)));
-      expect(selectOutlooksForDay(state, 2)).toBe(selectOutlooksForDay(state, 2));
-      expect(selectOutlooksForDay(state, 3)).toBe(selectOutlooksForDay(state, 3));
-      expect(selectOutlooksForDay(state, 4)).toBe(selectOutlooksForDay(state, 4));
-
-      const base = reducer(undefined, setForecastDay(1));
-      const unknownDayState = withForecast(base);
-      const fallback = selectOutlooksForDay(unknownDayState, 99 as DayType);
-
-      expect(fallback).toBeDefined();
-      expect(fallback['day4-8']).toBeInstanceOf(Map);
-      expect(fallback).toBe(selectOutlooksForDay(unknownDayState, 99 as DayType));
-    });
-
-    it('selectCurrentOutlooks returns a safe fallback for an unknown current day', () => {
-      const base = reducer(undefined, setForecastDay(1));
-      const state = withForecast({
-        ...base,
-        forecastCycle: { ...base.forecastCycle, currentDay: 99 as DayType },
-      });
-      const fallback = selectCurrentOutlooks(state);
-
-      expect(fallback).toBeDefined();
-      expect(fallback['day4-8']).toBeInstanceOf(Map);
-      expect(fallback).toBe(selectCurrentOutlooks(state));
-    });
-
-    it('does not expose the shared fallback as the current day data for a real day', () => {
-      const forecastState = reducer(undefined, setForecastDay(1));
-      const real = forecastState.forecastCycle.days[1]?.data;
-      expect(real).toBeDefined();
-      expect(selectCurrentOutlooks(withForecast(forecastState))).toBe(real);
-    });
-
-    it('throws when a consumer tries to mutate the shared fallback map', () => {
-      const base = reducer(undefined, setForecastDay(1));
-      const absentDayState = {
-        ...base,
-        forecastCycle: { ...base.forecastCycle, currentDay: 5 as DayType },
-      };
-      const fallback = selectCurrentOutlooks(withForecast(absentDayState));
-      const day48Map = fallback['day4-8']!;
-      expect(day48Map).toBeInstanceOf(Map);
-      expect(() => day48Map.set('30%', [])).toThrow(/read-only outlook map/);
-      expect(() => day48Map.clear()).toThrow(/read-only outlook map/);
-    });
-  });
 });
-
-
 describe('deleteSavedCycle workspace ownership', () => {
   const initialState = reducer(undefined, { type: '@@INIT' });
   const savedCycle = (id: string, workspaceId: 'severe' | 'custom') => ({
@@ -1383,5 +1410,106 @@ describe('deleteSavedCycle workspace ownership', () => {
 
     const afterOwnedDelete = reducer(afterForeignDelete, deleteSavedCycle('custom-cycle'));
     expect(afterOwnedDelete.savedCycles.map((cycle) => cycle.id)).toEqual(['severe-cycle']);
+  });
+});
+
+describe('applyCreateOutlookUpdate seam', () => {
+  const seamWorkflowTemplate: WorkflowMetadata = {
+    id: 'severe-day1',
+    label: 'Severe Convective Day 1',
+    groupings: ['day1'],
+  };
+
+  const createAcknowledgedForecast = () => {
+    let state = reducer(undefined, startBlankCycle({
+      workflowTemplate: seamWorkflowTemplate,
+      cycleDate: '2026-07-04',
+    }));
+    state = reducer(state, addFeature({ feature: createFeature('day-1-feature', 0) }));
+    state = reducer(state, markAsSaved());
+    const acknowledged = produce(state, (draft) => {
+      draft.forecastCycle.completionAcknowledgedAt = '2026-07-04T12:00:00.000Z';
+    });
+    const now = '2026-07-04T13:00:00.000Z';
+    return { acknowledged, now };
+  };
+
+  const applyOutlookUpdate = (state: ReturnType<typeof reducer>, now: string) =>
+    produce(state, (draft) => {
+      applyCreateOutlookUpdate(draft, now);
+    });
+
+  it('transitions version and status and invalidates completion', () => {
+    const { acknowledged, now } = createAcknowledgedForecast();
+    const next = applyOutlookUpdate(acknowledged, now);
+
+    const workflowMetadata = next.workflowMetadata!;
+    expect(workflowMetadata.outlookVersions).toHaveLength(2);
+    expect(workflowMetadata.outlookVersions[0].status).toBe('completed');
+    expect(workflowMetadata.outlookVersions[1]).toMatchObject({
+      version: 2,
+      status: 'in-progress',
+      derivedFrom: 1,
+      createdAt: now,
+    });
+    expect(workflowMetadata.status).toBe('in-progress');
+    expect(next.forecastCycle.updateInProgressVersion).toBe(2);
+    expect(next.isSaved).toBe(false);
+    expect(next.forecastCycle.completionAcknowledgedAt).toBeUndefined();
+    expect(next.completionValidation.lastResult).toBeNull();
+  });
+
+  it('clones populated days into the previous version snapshot', () => {
+    const { acknowledged, now } = createAcknowledgedForecast();
+    const next = applyOutlookUpdate(acknowledged, now);
+    const liveFeature = next.forecastCycle.days[1]!.data.tornado!.get('2%')![0]!;
+    const snapshotFeature = next.outlookVersionSnapshots[0]!.days[1]!.data.tornado!.get('2%')![0]!;
+    expect(next.outlookVersionSnapshots).toHaveLength(1);
+    expect(next.outlookVersionSnapshots[0]).toMatchObject({ version: 1, createdAt: now });
+    expect(snapshotFeature.id).toBe('day-1-feature');
+    expect(snapshotFeature).not.toBe(liveFeature);
+    expect(snapshotFeature).toEqual(liveFeature);
+  });
+
+  it('advances without workflow metadata', () => {
+    const base = reducer(undefined, startBlankCycle({}));
+    expect(base.workflowMetadata).toBeUndefined();
+    const now = '2026-07-04T13:00:00.000Z';
+
+    const next = produce(base, (draft) => {
+      applyCreateOutlookUpdate(draft, now);
+    });
+
+    expect(next.workflowMetadata).toBeUndefined();
+    expect(next.forecastCycle.updateInProgressVersion).toBe(1);
+    expect(next.isSaved).toBe(false);
+    expect(next.outlookVersionSnapshots).toHaveLength(1);
+    expect(next.outlookVersionSnapshots[0]).toMatchObject({ version: 0, createdAt: now });
+  });
+
+  it('skips the snapshot when no day is populated', () => {
+    const base = reducer(undefined, startBlankCycle({
+      workflowTemplate: seamWorkflowTemplate,
+      cycleDate: '2026-07-04',
+    }));
+    const emptied = produce(base, (draft) => {
+      draft.forecastCycle.days = {};
+    });
+    const now = '2026-07-04T13:00:00.000Z';
+
+    const next = produce(emptied, (draft) => {
+      applyCreateOutlookUpdate(draft, now);
+    });
+
+    expect(next.outlookVersionSnapshots).toHaveLength(0);
+    expect(next.workflowMetadata?.outlookVersions).toHaveLength(2);
+    expect(next.workflowMetadata?.outlookVersions[1]).toMatchObject({
+      version: 2,
+      status: 'in-progress',
+      derivedFrom: 1,
+      createdAt: now,
+    });
+    expect(next.forecastCycle.updateInProgressVersion).toBe(2);
+    expect(next.isSaved).toBe(false);
   });
 });

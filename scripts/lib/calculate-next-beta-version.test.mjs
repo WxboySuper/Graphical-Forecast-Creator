@@ -2,14 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateNextBetaVersion } from './calculate-next-beta-version.mjs';
 
-test('calculateNextBetaVersion increments from the latest beta tag', () => {
-  const result = calculateNextBetaVersion({
+for (const { name, packageVersion, betaTags, targetBase, expectedVersion } of [
+  {
+    name: 'increments from the latest beta tag',
     packageVersion: '1.8.0-beta.5',
     betaTags: ['v1.8.0-beta.1', 'v1.8.0-beta.5'],
+    expectedVersion: '1.8.0-beta.6',
+  },
+  {
+    name: 'continues the beta counter while moving from v1.8 to flat v2',
+    packageVersion: '1.8.0-beta.15',
+    betaTags: ['v1.8.0-beta.14', 'v1.8.0-beta.15'],
+    targetBase: '2.0.0',
+    expectedVersion: '2.0.0-beta.16',
+  },
+]) {
+  test(`calculateNextBetaVersion ${name}`, () => {
+    const result = calculateNextBetaVersion({ packageVersion, betaTags, targetBase });
+    assert.equal(result.version, expectedVersion);
+    assert.equal(result.strategy, 'increment');
   });
-  assert.equal(result.version, '1.8.0-beta.6');
-  assert.equal(result.strategy, 'increment');
-});
+}
 
 test('calculateNextBetaVersion retries an untagged package version', () => {
   const result = calculateNextBetaVersion({

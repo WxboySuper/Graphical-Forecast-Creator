@@ -1,3 +1,6 @@
+/**
+ * Discussion grouping tests. Verify discussion entries group by forecast cycle and date as intended.
+ */
 import type { ForecastCycle } from '../types/outlooks';
 import {
   getDiscussionForGrouping,

@@ -1,3 +1,9 @@
+/**
+ * Verification source resolution: this module selects and normalizes forecast,
+ * observation, and account-tier sources for the grading pipeline. It owns
+ * source precedence and availability rules while spatial scoring and UI state
+ * live in separate modules.
+ */
 import type { ForecastCycle } from '../../types/outlooks';
 import type { StormReport } from '../../types/stormReports';
 import type {
@@ -11,7 +17,7 @@ import {
   validateForecastData,
 } from '../fileUtils';
 import { resolveNativeFileContent } from '../forecastTransfer/nativeImportUtils';
-import { fetchStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../stormReportParser';
+import { fetchFilteredStormReports, fetchTodayStormReports, fetchYesterdayStormReports } from '../stormReportParser';
 import { isTodayReportDate, isYesterdayReportDate, toArchiveDate } from './archiveDate';
 import type { PackageGrade, ProductKind } from './gradeContract';
 import { queryDatEvidenceForDate, type DatEvidence } from '../dat';
@@ -148,7 +154,7 @@ const reportFeedForDate = (reportDate: string | null, now: Date = new Date()): R
 const fetchReportFeed = (reportDate: string | null, now: Date): Promise<StormReport[]> => {
   const feed = reportFeedForDate(reportDate, now);
   if (feed.source === 'archive') {
-    return fetchStormReports(feed.archiveDate);
+    return fetchFilteredStormReports(feed.archiveDate);
   }
   return feed.source === 'yesterday' ? fetchYesterdayStormReports() : fetchTodayStormReports();
 };
@@ -158,8 +164,8 @@ const fetchReportFeed = (reportDate: string | null, now: Date): Promise<StormRep
  *
  * The current SPC report day is routed to the live today_filtered.csv feed, and the
  * previous SPC report day to the live yesterday_filtered.csv feed, matching SPC's
- * 12Z–11:59Z publication window. Older dates try the filtered archive first and
- * fall back to the raw archive when the filtered feed is unavailable or invalid.
+ * 12Z–11:59Z publication window. Older dates use only the filtered archive and
+ * report unavailable data as a blocking source error.
  */
 export const loadReportsForDate = async (
   reportDate: string | null,

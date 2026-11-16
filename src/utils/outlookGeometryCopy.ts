@@ -1,3 +1,7 @@
+/**
+ * Outlook geometry-copy helpers. It clones forecast feature geometry and
+ * preserves the outlook metadata needed by editing and serialization paths.
+ */
 import type { Feature } from 'geojson';
 import type { DayType, OutlookType } from '../types/outlooks';
 import { getAvailableProbabilities } from '../components/OutlookPanel/outlookPanelUtils';

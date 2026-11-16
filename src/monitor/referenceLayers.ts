@@ -1,3 +1,9 @@
+/**
+ * Monitor reference-layer contracts: this module defines the identifiers,
+ * normalized geometry shapes, and source metadata used by monitor overlays.
+ * It owns shared data contracts and does not fetch upstream data or render map
+ * layers itself.
+ */
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 export type MonitorReferenceLayerId = 'spc-mesoscale-discussion';
 

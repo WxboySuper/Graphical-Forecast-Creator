@@ -1,3 +1,7 @@
+/**
+ * Firestore custom-products repository. It reads, subscribes to, and persists
+ * hosted custom-product records behind the shared repository interface.
+ */
 import {
   collection,
   doc,

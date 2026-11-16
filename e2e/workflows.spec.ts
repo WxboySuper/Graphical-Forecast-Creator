@@ -1,11 +1,15 @@
+/**
+ * E2E contract for workflows.spec.
+ *
+ * This file defines browser-level checks for the workflows.spec workflow and its user-visible behavior.
+ */
 import { test, expect, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import JSZip from 'jszip';
+import { navigateToDiscussion, navigateToSevereForecast } from './testSetup';
 
 const workflowPanel = (page: Page) => page.locator('section[aria-label="Forecast package workflow"]');
 const homeNav = (page: Page) => page.locator('a[href="/"]').last();
-const forecastNav = (page: Page) => page.locator('a[href="/forecast"]');
-const discussionNav = (page: Page) => page.locator('a[href="/discussion"]');
 
 /** Starts each test from a genuinely empty local session while accepting app agreements. */
 const prepareWorkflowSession = async (page: Page): Promise<void> => {
@@ -14,17 +18,14 @@ const prepareWorkflowSession = async (page: Page): Promise<void> => {
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('gfc-local-beta-bypass', 'true');
-    localStorage.setItem('gfc-tos-accepted', '2.0.0');
-    localStorage.setItem('gfc-privacy-policy-accepted', '1.7.0');
+    localStorage.setItem('gfc-tos-accepted', '2');
+    localStorage.setItem('gfc-privacy-policy-accepted', '2');
     sessionStorage.setItem('gfc-e2e-session-initialized', 'true');
   });
 };
 
 /** Starts one of the user-facing workflow templates from Home. */
 const startWorkflow = async (page: Page, scope: string, expectedLabel: string): Promise<void> => {
-  // waitUntil domcontentloaded (not load): the app is a React SPA and full
-  // navigations can stall on external subresources (fonts, analytics), which
-  // used to blow the default 30s test timeout under CI load.
   await page.goto('/?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: scope, exact: true }).click();
   await page.getByRole('button', { name: 'Start Workflow', exact: true }).click();
@@ -33,7 +34,7 @@ const startWorkflow = async (page: Page, scope: string, expectedLabel: string): 
   await expect(page).toHaveURL(/\/forecast\/severe$/, { timeout: 15000 });
   await homeNav(page).click();
   await expect(page.locator('main').last()).toContainText(expectedLabel, { timeout: 15000 });
-  await forecastNav(page).click();
+  await navigateToSevereForecast(page);
   await expect(workflowPanel(page)).toBeVisible({ timeout: 15000 });
 };
 
@@ -62,7 +63,7 @@ test.describe('Workflow continuity', () => {
   test('does not carry a Day 1 discussion into a new Days 4-8 workflow', async ({ page }) => {
     await startWorkflow(page, 'Day 1', 'Severe Convective Day 1');
 
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     const editor = page.getByPlaceholder(/Write your forecast discussion here/i);
     await editor.fill('Day 1 continuity sentinel — must never appear in Days 4-8.');
 
@@ -72,28 +73,28 @@ test.describe('Workflow continuity', () => {
     await page.getByRole('button', { name: 'Start Workflow', exact: true }).click();
     await homeNav(page).click();
     await expect(page.locator('main').last()).toContainText('Severe Convective Days 4-8');
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
 
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(editor).toHaveValue('');
     await expect(page.getByText(/Day 1 continuity sentinel/i)).not.toBeVisible();
   });
 
   test('preserves multiple saved scoped discussions through route navigation', async ({ page }) => {
     await startWorkflow(page, 'Full Outlook', 'Convective Outlook (Full)');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
 
     const scope = page.getByRole('combobox', { name: 'Discussion scope' });
     const editor = page.getByPlaceholder(/Write your forecast discussion here/i);
     await scope.selectOption('day1');
     await editor.fill('Day 1 draft survives a hard reload.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await scope.selectOption('day4-8');
     await expect(scope).toHaveValue('day4-8');
     await editor.fill('Days 4-8 draft survives a hard reload.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(scope).toHaveValue('day4-8');
     await expect(editor).toHaveValue('Days 4-8 draft survives a hard reload.');
 
@@ -103,26 +104,10 @@ test.describe('Workflow continuity', () => {
 
   test('round-trips a workflow package through the actual download and upload controls', async ({ page }) => {
     await startWorkflow(page, 'Day 2', 'Severe Convective Day 2');
-    await page.getByRole('radio', { name: 'Custom' }).click();
-    await page.getByRole('button', { name: 'Add custom layer' }).click();
-    await page.getByLabel('Layer title').fill('Package fire layer');
-    await page.getByLabel('Layer title').blur();
-    await page.getByLabel('Category label').fill('Critical fire');
-    await page.getByLabel('Category label').blur();
-    await page.getByLabel('Category hatch').click();
-    await page.getByRole('button', { name: 'Crosshatch', exact: true }).click();
-    await page.getByRole('button', { name: 'Draw polygons' }).click();
-    const viewport = page.locator('.map-container .ol-viewport');
-    const box = await viewport.boundingBox();
-    if (!box) throw new Error('Map viewport has no measurable bounds');
-    await page.mouse.click(box.x + box.width * .42, box.y + box.height * .38);
-    await page.mouse.click(box.x + box.width * .58, box.y + box.height * .38);
-    await page.mouse.dblclick(box.x + box.width * .5, box.y + box.height * .56);
-    await expect(workflowPanel(page)).toContainText('excluded from severe analytics and Auto-Categorical');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await page.getByPlaceholder(/Write your forecast discussion here/i).fill('Package round-trip sentinel.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
 
     const downloadPromise = page.waitForEvent('download');
     await workflowPanel(page).getByRole('button', { name: 'Export', exact: true }).click();
@@ -137,12 +122,6 @@ test.describe('Workflow continuity', () => {
     if (manifestFile === null) throw new Error('Workflow package manifest is missing');
     const manifest = JSON.parse(await manifestFile.async('string'));
     expect(manifest.forecast.workspaceId).toBe(manifest.workspaceId);
-    const innerForecast = manifest.forecast.forecast;
-    const exportedLayer = innerForecast.forecastCycle.days['2'].customLayers.layers[0];
-    expect(exportedLayer.label).toBe('Package fire layer');
-    expect(exportedLayer.categories[0].style.hatch).toBe('crosshatch');
-    expect(exportedLayer.features[0].geometry.type).toBe('Polygon');
-    expect(manifest.customContent).toEqual({ included: true, severeAnalytics: 'excluded', autoCategorical: 'excluded' });
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     const chooserPromise = page.waitForEvent('filechooser');
@@ -152,12 +131,9 @@ test.describe('Workflow continuity', () => {
     await page.waitForTimeout(1000);
 
     await expect(page).toHaveURL(/\/$/);
-    await forecastNav(page).click();
+    await navigateToSevereForecast(page);
     await expect(workflowPanel(page)).toContainText('Day 2 package', { timeout: 15000 });
-    await page.getByRole('radio', { name: 'Custom' }).click();
-    await expect(page.getByLabel('Layer title')).toHaveValue('Package fire layer');
-    await expect(page.getByLabel('Category hatch')).toHaveText('Crosshatch');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await expect(page.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Package round-trip sentinel.');
   });
 
@@ -168,10 +144,10 @@ test.describe('Workflow continuity', () => {
     test(`keeps the custom workflow disclosure readable on ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await startWorkflow(page, 'Day 1', 'Severe Convective Day 1');
-      await page.getByRole('radio', { name: 'Custom' }).click();
+      await page.goto('/forecast/custom', { waitUntil: 'domcontentloaded' });
+      await expect(page.getByTestId('custom-workspace-controls')).toBeVisible();
       await page.getByRole('button', { name: 'Add custom layer' }).click();
 
-      await expect(workflowPanel(page).getByRole('note')).toContainText('excluded from severe analytics and Auto-Categorical');
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
     });
@@ -179,7 +155,7 @@ test.describe('Workflow continuity', () => {
 
   test('keeps workflow state after opening a second page in the same browser context', async ({ page, context }) => {
     await startWorkflow(page, 'Day 3', 'Severe Convective Day 3');
-    await discussionNav(page).click();
+    await navigateToDiscussion(page);
     await page.getByPlaceholder(/Write your forecast discussion here/i).fill('Cross-page continuity sentinel.');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     // Save dispatches to Redux immediately, but the snapshot is persisted to
@@ -202,7 +178,7 @@ test.describe('Workflow continuity', () => {
     const secondPage = await context.newPage();
     await secondPage.goto('/forecast?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
     await expect(workflowPanel(secondPage)).toContainText('Day 3 package', { timeout: 15000 });
-    await discussionNav(secondPage).click();
+    await navigateToDiscussion(secondPage);
     await expect(secondPage.getByPlaceholder(/Write your forecast discussion here/i)).toHaveValue('Cross-page continuity sentinel.');
     await secondPage.close();
   });

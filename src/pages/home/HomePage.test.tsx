@@ -1,3 +1,8 @@
+/**
+ * Home-page test boundary: this suite verifies landing-page routing, recent
+ * forecast entry points, capability-aware actions, and loading or empty states
+ * through the page's user-facing contract.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import HomePage from '../HomePage';
@@ -82,6 +87,7 @@ describe('HomePage', () => {
     expect(screen.getByText(/No account required/i)).toBeInTheDocument();
     expect(screen.getByText(/Powerful tools for every step/i)).toBeInTheDocument();
     expect(screen.getByText(/More with an account/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contact@gfcweather.com' })).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
 
     fireEvent.click(screen.getByRole('button', { name: /Start a new forecast/i }));
     expect(handlers.handleNavigateForecast).toHaveBeenCalled();
@@ -185,6 +191,7 @@ describe('HomePage', () => {
     expect(screen.getByText(/Cycle history modal open/i)).toBeInTheDocument();
     expect(screen.getByText(/Confirm start new cycle modal open/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /View full history/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contact@gfcweather.com' })).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
 
     const dayOneButton = screen.getByRole('button', { name: /Day 1/i });
     expect(dayOneButton).toBeEnabled();

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersFeatureSync.test.ts
+ * Purpose: Tests synchronization of forecast features into OpenLayers layers and cleanup behavior.
+ */
+
 import GeoJSON from "ol/format/GeoJSON";
 import Feature from "ol/Feature";
 import Point from "ol/geom/Point";
@@ -179,6 +184,14 @@ describe("reconcileFeatureSource", () => {
       source,
       categoricalSource,
     })).toEqual({ source: [custom], categorical: [] });
+    expect(getForecastSourceDescriptorPlan({
+      normalDescriptors: [normal, categorical],
+      customMode: false,
+      showCustomLayers: true,
+      customDescriptors: [custom],
+      source,
+      categoricalSource,
+    })).toEqual({ source: [normal, custom], categorical: [categorical] });
   });
 
   test("preserves feature identity when descriptors are reordered", () => {

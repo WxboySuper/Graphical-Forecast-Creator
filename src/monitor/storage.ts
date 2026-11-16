@@ -1,3 +1,6 @@
+/**
+ * Monitor storage helpers. Persists and restores monitor-specific settings and cached state.
+ */
 import { DEFAULT_MONITOR_SETTINGS, MonitorSettings } from './types';
 import { normalizeMonitorSettings } from './monitorSettingsNormalize';
 

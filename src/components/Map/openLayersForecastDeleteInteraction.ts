@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastDeleteInteraction.ts
+ * Purpose: Defines the OpenLayers delete interaction for removing forecast features safely.
+ */
+
 import { click } from "ol/events/condition";
 import type OLFeature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";

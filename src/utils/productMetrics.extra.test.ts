@@ -1,3 +1,6 @@
+/**
+ * Additional product metrics tests. Cover edge cases in metric event construction and filtering.
+ */
 type FetchMock = jest.Mock<Promise<{ ok: boolean }>, [RequestInfo | URL, RequestInit?]>;
 
 describe('productMetrics extra', () => {

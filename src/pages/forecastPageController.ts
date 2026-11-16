@@ -1,3 +1,10 @@
+/**
+ * Forecast route orchestration: this module connects the forecast page to
+ * Redux, persistence, imports/exports, cloud-cycle actions, and day rollover.
+ * It owns page-level coordination and delegates domain transformations to the
+ * store, hooks, and utilities; it does not define map rendering or persistence
+ * formats.
+ */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, UnknownAction } from 'redux';
 import type { ForecastMapHandle } from '../components/Map/ForecastMap';
@@ -19,6 +26,8 @@ import { downloadBlob, readForecastImportFile, validateForecastDataReason } from
 import { resolveNativeFileContent } from '../utils/forecastTransfer/nativeImportUtils';
 import { buildWorkspaceForecastFilename } from '../utils/forecastTransfer/transferExportUtils';
 import type { ForecastCycle } from '../types/outlooks';
+import type { CycleMetadata } from '../types/workflow';
+import { isMetadataOnlyOutlookVersion } from '../lib/workflowMetadataContract';
 import { deserializeForecastWorkspace, serializeForecastWorkspace } from '../utils/forecastWorkspacePersistenceAdapter';
 import { getForecastImportWorkspaceError } from '../utils/forecastTransfer/importPolicy';
 
@@ -68,6 +77,74 @@ interface StoredCloudMeta {
   id?: string;
   label?: string;
 }
+
+const MAX_MAP_LATITUDE = 90;
+const MAX_MAP_LONGITUDE = 180;
+const MAX_MAP_ZOOM = 28;
+
+/** Returns true only for real numbers the map can project. */
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/** Returns true for a finite coordinate inside its axis bounds. */
+const isMapCoordinate = (value: unknown, limit: number): value is number =>
+  isFiniteNumber(value) && Math.abs(value) <= limit;
+
+/** Returns true for a `[latitude, longitude]` pair inside world bounds. */
+const isMapCenter = (value: unknown): value is [number, number] => {
+  if (!Array.isArray(value) || value.length !== 2) return false;
+  return isMapCoordinate(value[0], MAX_MAP_LATITUDE) && isMapCoordinate(value[1], MAX_MAP_LONGITUDE);
+};
+
+/** Returns true for a zoom level the map library accepts. */
+const isMapZoom = (value: unknown): value is number =>
+  isFiniteNumber(value) && value >= 0 && value <= MAX_MAP_ZOOM;
+
+/** Narrows unknown input to a non-array object record. */
+const isMetadataRecord = (value: unknown): value is Record<string, unknown> => {
+  if (typeof value !== 'object') return false;
+  if (value === null) return false;
+  return !Array.isArray(value);
+};
+
+/** Returns true when every outlook version is safe for workflow actions to read. */
+const hasValidOutlookVersions = (value: Record<string, unknown>): boolean => {
+  if (!Array.isArray(value.outlookVersions)) return false;
+  return value.outlookVersions.every(isMetadataOnlyOutlookVersion);
+};
+
+/** Narrows untrusted input to metadata whose outlook versions are well formed. */
+const isRestorableCycleMetadata = (value: unknown): value is CycleMetadata => {
+  if (!isMetadataRecord(value)) return false;
+  return hasValidOutlookVersions(value);
+};
+
+/**
+ * Narrows untrusted map state to a view the map library can render.
+ *
+ * Restore and import payloads come from local storage, session storage, cloud
+ * cycles, and user-supplied files, so a view is only usable when its center and
+ * zoom are finite and inside the world/zoom bounds the map understands.
+ */
+export const parseRestorableMapView = (
+  value: unknown,
+): { center: [number, number]; zoom: number } | null => {
+  if (!value || typeof value !== 'object') return null;
+  const { center, zoom } = value as { center?: unknown; zoom?: unknown };
+  if (!isMapCenter(center) || !isMapZoom(zoom)) return null;
+  return { center, zoom };
+};
+
+/**
+ * Narrows untrusted workflow metadata to the shape later workflow actions read.
+ *
+ * `forecastSlice` calls `workflowMetadata.outlookVersions.forEach` without a
+ * guard and reads `version`/`status` off every entry, so metadata whose version
+ * list is missing, not an array, or holds malformed entries would throw on the
+ * next workflow action. Anything else is passed through unchanged.
+ */
+export const parseRestorableCycleMetadata = (value: unknown): CycleMetadata | null =>
+  isRestorableCycleMetadata(value) ? value : null;
 
 /** Reads the current map view through the adapter, with the application default as a safe fallback. */
 export const buildMapView = (ref: React.RefObject<ForecastMapHandle | null>) => {
@@ -139,7 +216,8 @@ export const dayHasAnyFeatures = (dayData: unknown): boolean => {
 /** Imports the cycle payload and its workflow metadata into the active session. */
 const applyImportCycleState = (dispatch: ShortcutDispatch, result: ForecastImportResult): void => {
   dispatch(importForecastCycle(result.forecastCycle));
-  if (result.cycleMetadata) dispatch(setWorkflowMetadata(result.cycleMetadata));
+  const cycleMetadata = parseRestorableCycleMetadata(result.cycleMetadata);
+  if (cycleMetadata) dispatch(setWorkflowMetadata(cycleMetadata));
   else if (result.cycleMetadata === null) dispatch(clearWorkflowMetadata());
 };
 
@@ -149,8 +227,9 @@ const applyImportMapViewState = (
   mapRef: React.RefObject<ForecastMapHandle | null>,
   result: ForecastImportResult,
 ): null => {
-  if (result.mapView) {
-    dispatch(setMapView(result.mapView));
+  const mapView = parseRestorableMapView(result.mapView);
+  if (mapView) {
+    dispatch(setMapView(mapView));
     return null;
   }
   const currentDayData = result.forecastCycle.days[result.forecastCycle.currentDay]?.data;
@@ -312,9 +391,11 @@ const restoreStoredForecastPayload = (
   const deserializedCycle = restored.forecastCycle;
   dispatch(preserveDiscussionDrafts ? restoreForecastCycle(deserializedCycle, true) : importForecastCycle(deserializedCycle));
   const rawData = getForecastDataFromWorkspacePayload(data) as LoadedForecastPayload['rawData'];
-  if (rawData.cycleMetadata) dispatch(setWorkflowMetadata(rawData.cycleMetadata));
+  const cycleMetadata = parseRestorableCycleMetadata(rawData.cycleMetadata);
+  if (cycleMetadata) dispatch(setWorkflowMetadata(cycleMetadata));
   else if (rawData.cycleMetadata === null) dispatch(clearWorkflowMetadata());
-  if (rawData.mapView) dispatch(setMapView(rawData.mapView));
+  const mapView = parseRestorableMapView(rawData.mapView);
+  if (mapView) dispatch(setMapView(mapView));
 };
 
 interface RestoreCloudSessionOptions {
@@ -325,6 +406,15 @@ interface RestoreCloudSessionOptions {
   workspaceId: ForecastWorkspaceId;
 }
 
+const rejectUnsupportedMesoscaleCloudHandoff = (userId: string | null | undefined, addToast: AddToastFn): boolean => {
+  const scope = { userId, workspaceId: 'mesoscale' as const };
+  const payloadKey = getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_PAYLOAD_KEY, scope });
+  const metaKey = getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_META_KEY, scope });
+  if (!sessionStorage.getItem(payloadKey) && !sessionStorage.getItem(metaKey)) return false;
+  addToast('Cloud storage is not supported for Mesoscale forecasts.', 'error');
+  return false;
+};
+
 const restoreCloudSession = ({
   dispatch,
   addToast,
@@ -332,6 +422,7 @@ const restoreCloudSession = ({
   userId,
   workspaceId,
 }: RestoreCloudSessionOptions): boolean => {
+  if (workspaceId === 'mesoscale') return rejectUnsupportedMesoscaleCloudHandoff(userId, addToast);
   const payloadKey = getCloudSessionStorageKey({ baseKey: CLOUD_CYCLE_PAYLOAD_KEY, scope: { userId, workspaceId } });
   const storedValue = sessionStorage.getItem(payloadKey);
   const payload = parseStoredForecastPayload(storedValue, workspaceId);

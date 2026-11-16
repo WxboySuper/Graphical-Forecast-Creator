@@ -1,3 +1,6 @@
+/**
+ * Covers branch eligibility, exclusions, grace periods, orphan classification, report output, and issue lookup.
+ */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';

@@ -1,3 +1,8 @@
+/**
+ * DAT-client test boundary: this suite verifies query construction, batching,
+ * record limits, typed client errors, and request behavior at the DAT service
+ * adapter without depending on a live remote endpoint.
+ */
 import {
   buildDatQueryParams,
   DatClient,

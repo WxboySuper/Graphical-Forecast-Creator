@@ -1,3 +1,7 @@
+/**
+ * Textarea primitive tests. Verify native props, class merging, and ref forwarding
+ * for the shared multiline input boundary.
+ */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

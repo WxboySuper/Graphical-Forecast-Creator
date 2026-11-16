@@ -1,3 +1,9 @@
+/**
+ * Repository inventory generator: this command scans tracked source boundaries,
+ * imports, and documentation metadata into the generated architecture report.
+ * It owns reproducible filesystem traversal and serialization; it does not
+ * modify application code or define architectural policy.
+ */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

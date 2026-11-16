@@ -1,3 +1,7 @@
+/**
+ * Renders reusable source-selection panels for forecast-grade package imports.
+ * This module owns file and cloud source chooser UI; it delegates package loading and grading decisions to its callers.
+ */
 import React, { useRef } from 'react';
 import { FileUp } from 'lucide-react';
 import type { GradeAccountTier, PackageSourceKind } from '../../types/forecastGrade';

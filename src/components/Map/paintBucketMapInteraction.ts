@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/paintBucketMapInteraction.ts
+ * Purpose: Implements paint-bucket map selection and fill interactions for forecast regions.
+ */
+
 import type OLMap from 'ol/Map';
 import type VectorLayer from 'ol/layer/Vector';
 import type { AppDispatch } from '../../store';

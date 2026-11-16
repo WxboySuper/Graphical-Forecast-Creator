@@ -1,3 +1,8 @@
+/**
+ * Custom-product snapshot helpers.
+ *
+ * This module creates and restores stable snapshots for custom forecast products. Editor UI owns user interaction; persistence callers own where snapshots are stored.
+ */
 import {
   CUSTOM_PRODUCT_LIMITS,
   CUSTOM_PRODUCTS_SCHEMA_VERSION,

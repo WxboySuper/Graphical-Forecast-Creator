@@ -1,7 +1,12 @@
+/**
+ * Client product-analytics definitions and event helpers. This module names
+ * supported events, validates their properties, and queues telemetry while
+ * respecting the user's analytics preference and current host.
+ */
 export const PRODUCT_ANALYTICS_PREFERENCE_KEY = 'gfc-analytics-enabled';
 const LEGACY_WORKFLOW_ANALYTICS_PREFERENCE_KEY = 'gfc-workflow-analytics-enabled';
 
-const PRODUCTION_HOSTNAME = 'gfc.weatherboysuper.com';
+const PRODUCTION_HOSTNAMES = new Set(['app.gfcweather.com', 'gfcweather.com', 'www.gfcweather.com', 'gfc.weatherboysuper.com']);
 const BETA_HOSTNAME = 'beta-gfc.weatherboysuper.com';
 const CLOUDFLARE_BETA_HOSTNAME = 'beta.gfcweather.com';
 
@@ -65,7 +70,7 @@ const hasAllowedProperties = (event: ProductAnalyticsEvent, properties?: Product
 /** Returns the privacy-isolated Umami website zone for a public GFC hostname. */
 export const getProductAnalyticsZone = (hostname?: string): AnalyticsZone | null => {
   const host = hostname ?? (typeof window === 'undefined' ? '' : window.location.hostname);
-  if (host === PRODUCTION_HOSTNAME) return 'production';
+  if (PRODUCTION_HOSTNAMES.has(host)) return 'production';
   if (host === BETA_HOSTNAME || host === CLOUDFLARE_BETA_HOSTNAME) return 'beta';
   return null;
 };

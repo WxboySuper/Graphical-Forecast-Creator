@@ -1,3 +1,7 @@
+/**
+ * Coordinates React effects for automatic TSTM preview generation and context changes.
+ * This hook owns effect timing and stale-request handling; request execution and state definitions remain in the companion Auto-TSTM modules.
+ */
 import { useEffect, type MutableRefObject } from 'react';
 import type { DayType, ForecastCycle } from '../types/outlooks';
 import type { TstmGenerationRequest, TstmGenerationResponse } from '../types/tstmGeneration';

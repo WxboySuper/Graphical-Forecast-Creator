@@ -1,3 +1,8 @@
+/**
+ * Local test-account state helpers.
+ *
+ * This module manages the development-only local test-account tier in scoped storage. Production authentication and billing state are intentionally outside this boundary.
+ */
 export type LocalTestAccountTier = 'free' | 'premium';
 
 const LOCAL_TEST_ACCOUNT_STORAGE_KEY = 'gfc-local-test-account';

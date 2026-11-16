@@ -1,5 +1,5 @@
 const PORT_HEAD_PATTERN = /^port\/(\d+)-to-(.+)$/;
-const STABLE_LINE_PATTERN = /^stable\/\d+\.\d+\.x$/;
+const STABLE_LINE_PATTERN = /^stable\/\d+(?:\.\d+)?\.x$/;
 
 /** @param {string} headRef */
 export const parsePortBranch = (headRef) => {
@@ -42,7 +42,7 @@ export const evaluatePortPrPolicy = ({
   if (!STABLE_LINE_PATTERN.test(sourcePrBaseRef)) {
     return {
       ok: false,
-      message: `Port PR ${headRef} must originate from a stable/X.Y.x PR; source base was ${sourcePrBaseRef || 'unknown'}.`,
+      message: `Port PR ${headRef} must originate from a stable/X.x PR; source base was ${sourcePrBaseRef || 'unknown'}.`,
     };
   }
 

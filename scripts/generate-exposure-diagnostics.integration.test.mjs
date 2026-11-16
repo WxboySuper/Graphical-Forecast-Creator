@@ -1,3 +1,6 @@
+/**
+ * Exercises the diagnostics CLI in JSON and human-readable modes, including its exit status.
+ */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';

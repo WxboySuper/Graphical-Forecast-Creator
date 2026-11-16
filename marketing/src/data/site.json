@@ -1,0 +1,13 @@
+{
+  "name": "Graphical Forecast Creator",
+  "siteUrl": "https://gfcweather.com",
+  "appUrl": "https://app.gfcweather.com",
+  "betaUrl": "https://beta.gfcweather.com",
+  "contactEmail": "contact@gfcweather.com",
+  "versionLabel": "v2",
+  "description": "Graphical Forecast Creator is a free forecast builder for weather people. Draw your own outlooks on the map, explain your reasoning, monitor the day, and verify how it held up.",
+  "monthlyPrice": "$3",
+  "annualPrice": "$30",
+  "discordUrl": "https://discord.gg/SGk37rg8sz",
+  "repoUrl": "https://github.com/WxboySuper/Graphical-Forecast-Creator"
+}

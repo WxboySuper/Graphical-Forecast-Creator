@@ -1,3 +1,7 @@
+/**
+ * Defines shared monitor-mode configuration and state types for radar, reports, alerts, and overlays.
+ * This module owns monitor domain contracts; loading, rendering, and persistence behavior live in the corresponding hooks and components.
+ */
 export type MonitorRadarMode = 'none' | 'mrms-conus' | 'site';
 
 export type MonitorRadarProduct = 'bref-qcd' | 'cref-qcd' | 'sr-bref' | 'sr-bvel';
@@ -12,6 +16,16 @@ export type MonitorOutlookLayerType = (typeof MONITOR_OUTLOOK_LAYER_TYPES)[numbe
 
 export interface MonitorReferenceLayerSettings {
   spcMesoscaleDiscussionEnabled: boolean;
+}
+
+export interface MonitorMesoscaleLayerSetting {
+  id: string;
+  opacity: number;
+}
+
+export interface MonitorMesoscaleSettings {
+  model: 'hrrr' | 'rap' | 'rrfs';
+  layers: MonitorMesoscaleLayerSetting[];
 }
 
 export interface MonitorOutlookSourceSelection {
@@ -47,6 +61,7 @@ export interface MonitorSettings {
   alertsShowWarnings: boolean;
   alertsShowAdvisories: boolean;
   referenceLayers: MonitorReferenceLayerSettings;
+  mesoscale: MonitorMesoscaleSettings;
 }
 
 export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
@@ -80,7 +95,17 @@ export const DEFAULT_MONITOR_SETTINGS: MonitorSettings = {
   referenceLayers: {
     spcMesoscaleDiscussionEnabled: false,
   },
+  mesoscale: {
+    model: 'hrrr',
+    layers: [],
+  },
 };
 
 export const areMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean =>
   JSON.stringify(left) === JSON.stringify(right);
+
+export const areSyncedMonitorSettingsEqual = (left: MonitorSettings, right: MonitorSettings): boolean => {
+  const { mesoscale: _leftMesoscale, ...leftSynced } = left;
+  const { mesoscale: _rightMesoscale, ...rightSynced } = right;
+  return JSON.stringify(leftSynced) === JSON.stringify(rightSynced);
+};

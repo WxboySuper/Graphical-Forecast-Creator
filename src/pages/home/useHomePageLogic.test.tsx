@@ -1,3 +1,8 @@
+/**
+ * Home-page logic test boundary: this suite verifies recent-cycle loading,
+ * restore/delete actions, route decisions, and user-facing state transitions
+ * exposed by the home-page orchestration hook.
+ */
 import React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -198,6 +203,26 @@ describe('useHomePageLogic', () => {
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
+  });
+
+  test.each([
+    ['quick-start', (result: { current: ReturnType<typeof useHomePageLogic> }) => {
+      const button = document.createElement('button');
+      button.dataset.day = '2';
+      result.current.handleQuickStartClick({ currentTarget: button } as unknown as React.MouseEvent<HTMLButtonElement>);
+    }],
+    ['workflow start', (result: { current: ReturnType<typeof useHomePageLogic> }) => {
+      result.current.handleStartWorkflow({ id: 'severe-day1', label: 'Day 1', groupings: ['day1'] });
+    }],
+  ])('%s falls back to the exposed workspace when the persisted one is not exposed', (_name, run) => {
+    const store = buildStore({ workspaceId: 'winter', isSaved: true });
+    const { result } = renderHook(() => useHomePageLogic(), { wrapper: wrapper(store) });
+
+    act(() => run(result));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/forecast/severe');
+    // Redux must already be on the fallback so the destination route does not reset the new work.
+    expect(store.getState().forecast.workspaceId).toBe('severe');
   });
 
   test('ignores malformed quick-start and recent-cycle clicks', () => {

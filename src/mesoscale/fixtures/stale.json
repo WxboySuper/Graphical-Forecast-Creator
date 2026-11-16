@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "model": { "id": "hrrr", "name": "High-Resolution Rapid Refresh", "capabilities": { "availableParameterIds": ["pwat"], "maxForecastHour": 48, "cycleCadenceMinutes": 60 } },
+  "frameType": "forecast",
+  "cycleTime": "2026-05-20T06:00:00Z",
+  "forecastHour": 6,
+  "validTime": "2026-05-20T12:00:00Z",
+  "domain": { "id": "conus", "name": "Contiguous United States" },
+  "source": { "providerId": "example-provider", "providerName": "Example Provider", "datasetId": "hrrr", "attribution": "Data provided by Example Provider" },
+  "stale": true,
+  "parameters": [
+    {
+      "id": "pwat",
+      "displayName": "Precipitable Water",
+      "units": "mm",
+      "level": { "type": "layer", "label": "Atmospheric column" },
+      "legend": [{ "value": 0, "label": "0" }, { "value": 50, "label": "50" }],
+      "displayType": "contour",
+      "data": [[12, 20, 35]]
+    }
+  ]
+}

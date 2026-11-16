@@ -1,3 +1,6 @@
+/**
+ * Keyboard shortcut key tests. Verify shortcut normalization and matching across supported key formats.
+ */
 import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from './keyboardShortcutKey';
 
 describe('keyboardShortcutKey', () => {

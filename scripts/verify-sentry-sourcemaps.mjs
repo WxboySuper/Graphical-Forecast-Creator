@@ -1,3 +1,7 @@
+/**
+ * Sentry sourcemap verification script. It locates release artifacts, checks
+ * their uploaded bundles, and removes temporary verification files on cleanup.
+ */
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {

@@ -1,3 +1,7 @@
+/**
+ * Forecast-outlook import validation. It checks outlook payload structure and
+ * feature geometry limits before data enters forecast state.
+ */
 import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 import { validateFeature } from './forecastGeometryValidation';
 

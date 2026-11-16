@@ -1,8 +1,11 @@
+/**
+ * Cloud-source picker. Loads the signed-in user's saved cloud packages and
+ * exposes the selectable package list inside the forecast-grade source panel.
+ */
 import React from 'react';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useCloudCycles } from '../../hooks/useCloudCycles';
 
-/** Premium cloud package picker rendered inside the source panel. */
 const CloudSourcePicker: React.FC<{ onLoad: (id: string, label: string) => void }> = ({ onLoad }) => {
   const { addToast } = useAppLayout();
   const { cycles, loading, error } = useCloudCycles();

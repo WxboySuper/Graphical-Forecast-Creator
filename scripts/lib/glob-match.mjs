@@ -6,11 +6,29 @@
 export const escapeRegex = (segment) => segment.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 
 /**
- * Build a regex body where * matches one path segment (no slashes).
+ * Build a regex body where * matches within one path segment and ** crosses
+ * path segments. A ** immediately followed by a slash also matches zero
+ * directories, so a nested CSS glob also matches a file directly in its root.
  *
  * @param {string} pattern
  */
-export const globToRegexBody = (pattern) => pattern.split('*').map(escapeRegex).join('[^/]*');
+export const globToRegexBody = (pattern) => {
+  let body = '';
+  for (let index = 0; index < pattern.length; index += 1) {
+    if (pattern.startsWith('**/', index)) {
+      body += '(?:[^/]+/)*';
+      index += 2;
+    } else if (pattern.startsWith('**', index)) {
+      body += '.*';
+      index += 1;
+    } else if (pattern[index] === '*') {
+      body += '[^/]*';
+    } else {
+      body += escapeRegex(pattern[index]);
+    }
+  }
+  return body;
+};
 
 /**
  * Match a repository path against a simple glob (star, double-star-slash prefix, trailing-slash-star suffix).

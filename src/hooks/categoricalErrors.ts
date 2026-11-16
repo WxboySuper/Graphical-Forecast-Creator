@@ -1,3 +1,6 @@
+/**
+ * Categorical error helpers. Normalizes worker and forecast-category failures for callers and visible diagnostics.
+ */
 export class CategoricalDerivationError extends Error {
   constructor(message: string) {
     super(message);

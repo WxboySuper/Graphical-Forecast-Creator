@@ -1,3 +1,7 @@
+/**
+ * Status-overlay tests. Verify selector-driven loading, error, and status content
+ * for the forecast and verification map overlays.
+ */
 import { render, screen } from '@testing-library/react';
 import { useSelector } from 'react-redux';
 import StatusOverlay from './StatusOverlay';

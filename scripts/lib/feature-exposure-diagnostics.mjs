@@ -1,3 +1,9 @@
+/**
+ * Exposure-diagnostics library: this module reads the client/server exposure
+ * registries and turns alignment failures into structured diagnostic records.
+ * It owns parsing and diagnostic shaping while the CLI entry point owns output
+ * and process exit behavior.
+ */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

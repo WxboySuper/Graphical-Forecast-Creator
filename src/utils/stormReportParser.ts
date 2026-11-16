@@ -1,3 +1,7 @@
+/**
+ * Storm-report parsing entry point. It combines archive and current-day row
+ * parsers and exposes normalized storm-report records to monitor and grading.
+ */
 import { StormReport, ReportType } from '../types/stormReports';
 import { parseArchiveCsvRow, TODAY_SECTION_HEADERS } from './stormReportRows';
 import { parseTodayStormReportCsv } from './stormReportTodayCsv';
@@ -226,6 +230,27 @@ export async function fetchStormReports(date: string): Promise<StormReport[]> {
   }
   rememberRawArchive(date);
   return raw.reports;
+}
+
+/** Fetches only the filtered SPC archive for verification, with no raw fallback. */
+export async function fetchFilteredStormReports(date: string): Promise<StormReport[]> {
+  const url = archiveUrlForDate({ date, format: 'filtered' });
+  const unavailableMessage = `Filtered SPC storm reports are unavailable for ${date}.`;
+  const { response, text } = await fetchResponseText({ url, context: `filtered SPC storm reports for ${date}` });
+  if (!response.ok) {
+    throw new Error(unavailableMessage);
+  }
+  if (!text) {
+    throw new Error(unavailableMessage);
+  }
+  if (!hasFilteredArchiveHeaders({ csvText: text })) {
+    throw new Error(unavailableMessage);
+  }
+  try {
+    return parseTodayStormReportCsv(text);
+  } catch {
+    throw new Error(unavailableMessage);
+  }
 }
 
 /** Reuses a short-lived raw-archive probe result and bounds session memory. */

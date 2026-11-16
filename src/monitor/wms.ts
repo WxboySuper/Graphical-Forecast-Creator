@@ -1,3 +1,8 @@
+/**
+ * Web Map Service helpers for monitor radar and satellite layers. It defines
+ * layer configuration types and resolves the latest available times for the
+ * products shown by the monitor map.
+ */
 import type { MonitorRadarMode, MonitorRadarProduct, MonitorSatelliteProduct } from './types';
 
 export interface WmsLayerConfig {

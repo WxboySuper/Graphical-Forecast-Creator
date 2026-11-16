@@ -1,9 +1,16 @@
+/**
+ * Billing service: this module handles Stripe event interpretation,
+ * entitlement persistence, and idempotent billing-side effects used by the
+ * server routes. It owns provider integration and storage coordination while
+ * route authentication and client presentation remain outside this boundary.
+ */
 'use strict';
 
 const { randomUUID } = require('node:crypto');
 const Stripe = require('stripe');
 const rateLimit = require('express-rate-limit');
 const { applyEntitlementWebhookEvent } = require('./billing-webhook-state');
+const { registerBillingRoutes: registerBillingRoutesImpl } = require('./billingRoutes');
 const { getAdminAuth, getAdminDb } = require('./firebase-admin');
 const {
   getBillingReturnBaseUrl,
@@ -284,7 +291,7 @@ const handleCheckout = async (req, res) => {
     line_items: [{ price: priceId, quantity: 1 }],
     allow_promotion_codes: true,
     success_url: `${baseUrl}/account?checkout=success`,
-    cancel_url: `${baseUrl}/pricing?checkout=cancelled`,
+    cancel_url: `${baseUrl}/account?checkout=cancelled`,
     ...(getCheckoutCustomerEmail(decodedToken) ? { customer_email: getCheckoutCustomerEmail(decodedToken) } : {}),
     metadata,
     subscription_data: {
@@ -382,12 +389,14 @@ const cleanupBlockedCheckoutSession = async (
   if (!uid) return false;
   if (!stripe) throw new Error('Stripe is not configured for late Checkout cleanup.');
 
-  if (session.payment_status === 'unpaid') return false;
-
-  const subscription = await getCheckoutSubscription(stripe, session);
-  const refundTarget = await resolveCheckoutRefundTarget(stripe, session, subscription);
-  ensurePaidCheckoutHasRefundTarget(session, refundTarget);
-  await refundBlockedCheckout(stripe, session, refundTarget);
+  // An unpaid Checkout still creates a Stripe customer and subscription, so the
+  // customer must be deleted even though there is no payment to refund.
+  if (session.payment_status !== 'unpaid') {
+    const subscription = await getCheckoutSubscription(stripe, session);
+    const refundTarget = await resolveCheckoutRefundTarget(stripe, session, subscription);
+    ensurePaidCheckoutHasRefundTarget(session, refundTarget);
+    await refundBlockedCheckout(stripe, session, refundTarget);
+  }
 
   await deleteStripeCustomer({ stripe, customerId: getStripeObjectId(session.customer) });
   console.warn('[billing] checkout:refunded-deleted-user', {
@@ -442,21 +451,32 @@ const isInvoiceForDeletedAccount = (subscription, invoice, customerId) => {
     : isStripeCustomerDeletionBlocked(getAdminDb(), customerId);
 };
 
+/** Refunds a late invoice payment when its account deletion has started or finished. */
+const refundInvoiceForDeletedAccount = async (invoice, stripe) => {
+  const customerId = getStripeObjectId(invoice.customer);
+  await refundDeletedAccountInvoice(invoice, { stripe: stripe || getStripeClient(), customerId });
+};
+
 /** Applies invoice notifications from the current authoritative subscription state. */
 const handleInvoiceEvent = async (event, stripe) => {
   const subscription = await resolveAuthoritativeSubscription(stripe, event);
+  const invoice = event.data.object;
+  const invoiceCustomerId = getStripeObjectId(invoice.customer);
   if (!subscription) {
+    // The subscription no longer exists (for example account deletion removed it
+    // before a delayed payment event arrived). That payment still needs a refund.
+    if (await isInvoiceForDeletedAccount(null, invoice, invoiceCustomerId)) {
+      await refundInvoiceForDeletedAccount(invoice, stripe);
+      return;
+    }
     console.warn('[billing] invoice:skipped-no-subscription', { eventId: event.id, eventType: event.type });
     return;
   }
   const result = await writeEntitlement(createSubscriptionEntitlementWrite(subscription), event);
-  const invoice = event.data.object;
-  const invoiceStripe = stripe || getStripeClient();
-  const invoiceCustomerId = getStripeObjectId(invoice.customer);
   const shouldRefund = result?.reason === 'deleted-user' ||
     (result?.reason === 'missing-target' && await isInvoiceForDeletedAccount(subscription, invoice, invoiceCustomerId));
   if (shouldRefund) {
-    await refundDeletedAccountInvoice(invoice, { stripe: invoiceStripe, customerId: invoiceCustomerId });
+    await refundInvoiceForDeletedAccount(invoice, stripe);
   }
 };
 
@@ -498,10 +518,9 @@ const handleBillingConfig = (_req, res) => {
 
 /** Handles webhook requests once Stripe availability has been confirmed. */
 const processWebhookRequest = async (req, res, stripe, webhookSecret) => {
+  let event;
   try {
-    const event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], webhookSecret);
-    await handleWebhookEvent(event, stripe);
-    res.status(200).json({ received: true });
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], webhookSecret);
   } catch (error) {
     sendBillingError({
       req,
@@ -510,6 +529,23 @@ const processWebhookRequest = async (req, res, stripe, webhookSecret) => {
       fallbackMessage: 'Invalid Stripe webhook payload.',
       failureCode: 'billing_webhook_invalid',
       statusCode: 400,
+    });
+    return;
+  }
+
+  // Failures after signature verification are server-side problems. Answering
+  // 5xx keeps Stripe retrying and stops blaming the sender for an outage.
+  try {
+    await handleWebhookEvent(event, stripe);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    sendBillingError({
+      req,
+      res,
+      error,
+      fallbackMessage: 'Stripe webhook processing failed.',
+      failureCode: 'billing_webhook_processing_failed',
+      statusCode: 500,
     });
   }
 };
@@ -537,33 +573,18 @@ const wrapBillingJsonRoute = ({ handler, fallbackMessage, failureCode }) => asyn
 
 /** Registers the billing endpoints on the existing hosted-service Express app. */
 const registerBillingRoutes = (app, express) => {
-  app.get('/api/billing/config', handleBillingConfig);
-  app.post(
-    '/api/billing/webhook',
+  registerBillingRoutesImpl({
+    app,
+    express,
     webhookRateLimit,
-    express.raw({ type: 'application/json' }),
-    handleBillingWebhook
-  );
-  app.post(
-    '/api/billing/checkout',
     checkoutRateLimit,
-    express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute({
-      handler: handleCheckout,
-      fallbackMessage: 'Unable to create checkout session.',
-      failureCode: 'billing_checkout_failed',
-    })
-  );
-  app.post(
-    '/api/billing/portal',
     portalRateLimit,
-    express.json({ limit: '8kb' }),
-    wrapBillingJsonRoute({
-      handler: handleBillingPortal,
-      fallbackMessage: 'Unable to open the billing portal.',
-      failureCode: 'billing_portal_failed',
-    })
-  );
+    handleBillingConfig,
+    handleBillingWebhook,
+    handleCheckout,
+    handleBillingPortal,
+    wrapBillingJsonRoute,
+  });
 };
 
 module.exports = {

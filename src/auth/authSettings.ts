@@ -1,6 +1,10 @@
+/**
+ * Local-auth settings helpers. This module defines persisted settings and
+ * normalizes account preferences before they enter auth state.
+ */
 import { serverTimestamp } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
-import { DEFAULT_MONITOR_SETTINGS, areMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, areSyncedMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import {
   DEFAULT_FORECAST_UI_VARIANT,
@@ -9,6 +13,11 @@ import {
 } from '../utils/forecastUiVariant';
 import type { OverlaysState } from '../store/overlaysSlice';
 import type { OutlookType } from '../types/outlooks';
+import {
+  toRemoteMonitorSettings,
+  toRemoteUserSettingsDocument,
+  type RemoteSettingsInput,
+} from './userSettingsDocument';
 
 const OUTLOOK_TYPES: readonly OutlookType[] = [
   'tornado',
@@ -41,7 +50,7 @@ export interface UserSettingsDocument {
   monitorSettings: MonitorSettings;
 }
 
-/** The profile fields read by the auth provider. */
+/** Beta entitlement flag stored on the Firebase user profile. */
 export interface UserProfileDocument {
   betaAccess?: boolean;
 }
@@ -63,8 +72,8 @@ type RequiredRemoteSettingsFields = Pick<
 
 /** Validates required fields and supported values before accepting remote settings. */
 const hasRequiredRemoteSettingsFields = (
-  value: Partial<UserSettingsDocument>,
-): value is RequiredRemoteSettingsFields & Partial<UserSettingsDocument> => {
+  value: RemoteSettingsInput,
+): value is RequiredRemoteSettingsFields & RemoteSettingsInput => {
   const { darkMode, baseMapStyle, stateBorders, counties, ghostOutlooks, defaultForecasterName } = value;
   return (
     typeof darkMode === 'boolean' &&
@@ -78,7 +87,7 @@ const hasRequiredRemoteSettingsFields = (
 };
 
 /** Safely parse the settings fields stored in a remote document. */
-export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefined): UserSettingsDocument | null => {
+export const readRemoteSettings = (value: RemoteSettingsInput | undefined): UserSettingsDocument | null => {
   if (!value) return null;
 
   if (!hasRequiredRemoteSettingsFields(value)) return null;
@@ -91,7 +100,10 @@ export const readRemoteSettings = (value: Partial<UserSettingsDocument> | undefi
     ghostOutlooks: value.ghostOutlooks,
     defaultForecasterName: value.defaultForecasterName,
     forecastUiVariant: normalizeForecastUiVariant(value.forecastUiVariant) ?? DEFAULT_FORECAST_UI_VARIANT,
-    monitorSettings: normalizeMonitorSettings(value.monitorSettings),
+    monitorSettings: {
+      ...normalizeMonitorSettings(value.monitorSettings),
+      mesoscale: DEFAULT_MONITOR_SETTINGS.mesoscale,
+    },
   };
 };
 
@@ -106,7 +118,7 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
     ghostOutlooks: overlays.ghostOutlooks,
     defaultForecasterName,
     forecastUiVariant,
-    monitorSettings: monitorSettings ?? DEFAULT_MONITOR_SETTINGS,
+    monitorSettings: toRemoteMonitorSettings(monitorSettings ?? DEFAULT_MONITOR_SETTINGS) as MonitorSettings,
   };
 };
 
@@ -120,7 +132,7 @@ export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boo
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
 
-/** Reads the current beta-access flag from one hosted profile document snapshot. */
+/** Reads the beta-access flag from a Firebase profile snapshot. */
 export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
   Boolean(value?.betaAccess);
 
@@ -128,7 +140,7 @@ export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
 
 /** Builds the payload used when seeding or repairing a remote settings document. */
 export const getRemoteSeedPayload = (settings: UserSettingsDocument, opts?: { includeCreatedAt?: boolean }) => ({
-  ...settings,
+  ...toRemoteUserSettingsDocument(settings),
   updatedAt: serverTimestamp(),
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
@@ -142,7 +154,7 @@ const compareUserSettingsFields = (left: UserSettingsDocument, right: UserSettin
   left.defaultForecasterName === right.defaultForecasterName &&
   left.forecastUiVariant === right.forecastUiVariant &&
   JSON.stringify(left.ghostOutlooks) === JSON.stringify(right.ghostOutlooks) &&
-  areMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
+  areSyncedMonitorSettingsEqual(left.monitorSettings, right.monitorSettings);
 
 /** True when two normalized settings payloads contain the same user-visible values. */
 export const areUserSettingsEqual = (

@@ -1,3 +1,8 @@
+/**
+ * Server-capability status test boundary: this suite verifies response
+ * validation, availability transitions, shared-status loading, and UI-facing
+ * fallback behavior when the hosted capability endpoint is unavailable.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import {
   fetchServerCapabilityStatus,

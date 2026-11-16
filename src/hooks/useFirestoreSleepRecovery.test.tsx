@@ -1,3 +1,6 @@
+/**
+ * Firestore sleep recovery tests. Verify the client recovers cleanly when Firestore resumes after an inactive period.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import {
   disableNetwork,

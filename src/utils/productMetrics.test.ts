@@ -1,3 +1,6 @@
+/**
+ * Product metrics tests. Verify product event names, payloads, and queue behavior.
+ */
 jest.mock('../lib/firebase', () => ({ isHostedAuthEnabled: false }));
 import { queueProductMetric } from './productMetrics';
 

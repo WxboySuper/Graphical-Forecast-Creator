@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersForecastViewSync.ts
+ * Purpose: Synchronizes OpenLayers forecast-map view state with application selection and viewport state.
+ */
+
 import type OLMap from "ol/Map";
 import { fromLonLat, toLonLat } from "ol/proj";
 import type { MutableRefObject } from "react";

@@ -1,3 +1,6 @@
+/**
+ * Exercises valid and invalid feature registries, including target coverage and lifecycle metadata.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { evaluateFeatureExposurePolicy } from './feature-exposure-policy.mjs';

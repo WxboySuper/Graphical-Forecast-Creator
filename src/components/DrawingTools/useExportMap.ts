@@ -1,3 +1,7 @@
+/**
+ * Map-export hook. It captures the active OpenLayers map, formats export
+ * metadata, and exposes image/download state to drawing-tool controls.
+ */
 import { useState, useCallback, type RefObject } from 'react';
 import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import type OLMap from 'ol/Map';

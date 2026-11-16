@@ -1,5 +1,9 @@
+/**
+ * Redux slice for monitor settings and selected products. It stores normalized
+ * monitor preferences consumed by the monitor page and map controls.
+ */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { DEFAULT_MONITOR_SETTINGS, type MonitorMapView, type MonitorOutlookLayerType, type MonitorOutlookSourceSelection, type MonitorReferenceLayerSettings, type MonitorSettings } from '../monitor/types';
+import { DEFAULT_MONITOR_SETTINGS, type MonitorMapView, type MonitorMesoscaleSettings, type MonitorOutlookLayerType, type MonitorOutlookSourceSelection, type MonitorReferenceLayerSettings, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import { resolveRadarProductForMode } from '../monitor/wms';
 
@@ -103,6 +107,9 @@ const monitorSlice = createSlice({
     ) => {
       state.referenceLayers[action.payload.layer] = action.payload.enabled;
     },
+    setMonitorMesoscaleSettings: (state, action: PayloadAction<MonitorMesoscaleSettings>) => {
+      state.mesoscale = normalizeMonitorSettings({ ...state, mesoscale: action.payload }).mesoscale;
+    },
   },
 });
 
@@ -130,6 +137,7 @@ export const {
   setAlertsShowWarnings,
   setAlertsShowAdvisories,
   setReferenceLayerEnabled,
+  setMonitorMesoscaleSettings,
 } = monitorSlice.actions;
 
 export default monitorSlice.reducer;

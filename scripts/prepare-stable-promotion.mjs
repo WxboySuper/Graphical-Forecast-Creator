@@ -4,7 +4,7 @@ import { deriveStableVersion } from './lib/package-version.mjs';
 
 const targetVersion = process.argv[2] ?? '';
 if (!/^\d+\.\d+\.0$/.test(targetVersion)) {
-  console.error('Usage: node scripts/prepare-stable-promotion.mjs <major.minor.0>');
+  console.error('Usage: node scripts/prepare-stable-promotion.mjs <flat-version-X.Y.0>');
   process.exit(1);
 }
 

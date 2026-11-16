@@ -1,3 +1,7 @@
+/**
+ * Provides page-level actions for creating, updating, and selecting discussion groupings.
+ * This hook owns URL and store action coordination; discussion editing and persistence details remain in their dedicated modules.
+ */
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useSearchParams } from 'react-router';

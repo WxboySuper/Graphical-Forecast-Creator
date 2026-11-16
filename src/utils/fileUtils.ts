@@ -1,3 +1,9 @@
+/**
+ * Owns forecast persistence and interchange boundaries: serialization, legacy hydration,
+ * import validation, discussion grouping, and ZIP/package downloads. Callers use this
+ * module for stable file formats and compatibility behavior; Redux state and UI lifecycle
+ * decisions remain outside this utility layer.
+ */
 import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';

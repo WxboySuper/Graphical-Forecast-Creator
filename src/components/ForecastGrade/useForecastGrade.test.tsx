@@ -1,3 +1,8 @@
+/**
+ * Forecast-grade hook test boundary: this suite verifies the hook's derived
+ * score state, async grading lifecycle, and store integration across outlook,
+ * verification, and storm-report inputs without mounting the full page.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
