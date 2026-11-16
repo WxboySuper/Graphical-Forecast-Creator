@@ -60,7 +60,7 @@ to each.
 - **jszip** ^3.10.2 (root (pnpm)) — (MIT OR GPL-3.0-or-later) — allowed
 - **lucide-react** ^1.72.0 (root (pnpm)) — ISC — allowed
 - **maplibre-gl** 6.18.0 (root (pnpm)) — BSD-3-Clause — allowed
-- **marked** 13.0.3 (root (pnpm)) — MIT — allowed
+- **marked** 18.2.0 (root (pnpm)) — MIT — allowed
 - **ol** ^10.11.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **ol-mapbox-style** ^13.9.0 (root (pnpm)) — BSD-2-Clause — allowed
 - **postcss** 8.5.32 (root (pnpm)) — MIT — allowed

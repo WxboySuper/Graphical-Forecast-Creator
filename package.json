@@ -144,7 +144,7 @@
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
     "maplibre-gl": "6.18.0",
-    "marked": "13.0.3",
+    "marked": "18.2.0",
     "postcss": "8.5.32",
     "rollup": ">=4.68.3",
     "tailwindcss": "^4.3.5",
