@@ -76,6 +76,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
+- **App libraries:** Updated to Firebase 13.3, Sentry React 11.12, Lucide icons 1.72, and current build and test tools for compatibility and maintenance.
+- **Server dependencies:** Updated server error reporting, request rate limiting, and Firebase Admin libraries to compatible maintenance releases to keep billing, monitoring, and authentication reliable.
 - **App libraries:** React and React DOM 19.3, Firebase 13.2, Sentry React 11.11, Redux Toolkit 2.14, Vite 8.3, Lucide icons 1.70, React Router 8.5, OpenLayers 10.11, Radix UI primitives, and related build and test tools.
 - **Server libraries:** Sentry Node 11.11, Firebase Admin 14.5, Stripe 23.1, Express 5.3, and express-rate-limit 8.7.
 <!-- dependabot-automation -->

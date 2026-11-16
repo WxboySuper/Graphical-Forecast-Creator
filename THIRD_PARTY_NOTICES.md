@@ -4,8 +4,8 @@ GFC is built on open-source software. This document lists the packages used
 by the shipped application, their licenses, and the policy category applied
 to each.
 
-- **@babel/core** ^8.1.0 (root (pnpm)) — MIT — allowed
-- **@babel/parser** ^8.1.0 (root (pnpm)) — MIT — allowed
+- **@babel/core** ^8.1.2 (root (pnpm)) — MIT — allowed
+- **@babel/parser** ^8.1.2 (root (pnpm)) — MIT — allowed
 - **@babel/preset-env** ^8.0.7 (root (pnpm)) — MIT — allowed
 - **@babel/preset-react** ^8.0.1 (root (pnpm)) — MIT — allowed
 - **@babel/preset-typescript** ^8.0.7 (root (pnpm)) — MIT — allowed
@@ -21,13 +21,13 @@ to each.
 - **@radix-ui/react-tabs** ^1.2.1 (root (pnpm)) — MIT — allowed
 - **@radix-ui/react-tooltip** ^1.4.1 (root (pnpm)) — MIT — allowed
 - **@reduxjs/toolkit** ^2.14.0 (root (pnpm)) — MIT — allowed
-- **@sentry/react** ^11.11.0 (root (pnpm)) — MIT — allowed
-- **@sentry/vite-plugin** ^11.11.0 (root (pnpm)) — MIT — allowed
+- **@sentry/react** ^11.12.0 (root (pnpm)) — MIT — allowed
+- **@sentry/vite-plugin** ^11.12.0 (root (pnpm)) — MIT — allowed
 - **@tailwindcss/cli** ^4.3.5 (root (pnpm)) — MIT — allowed
 - **@testing-library/dom** ^10.4.2 (root (pnpm)) — MIT — allowed
 - **@testing-library/jest-dom** ^7.0.1 (root (pnpm)) — MIT — allowed
 - **@testing-library/react** ^16.3.3 (root (pnpm)) — MIT — allowed
-- **@testing-library/user-event** ^14.6.8 (root (pnpm)) — MIT — allowed
+- **@testing-library/user-event** ^14.6.10 (root (pnpm)) — MIT — allowed
 - **@turf/turf** ^7.4.0 (root (pnpm)) — MIT — allowed
 - **@types/geojson** ^7946.0.16 (root (pnpm)) — MIT — allowed
 - **@types/jest** ^30.0.0 (root (pnpm)) — MIT — allowed
@@ -35,7 +35,7 @@ to each.
 - **@types/react** 19.3.0 (root (pnpm)) — MIT — allowed
 - **@types/react-dom** 19.3.0 (root (pnpm)) — MIT — allowed
 - **@typescript/native** npm:typescript@^7.0.2 (root (pnpm)) — Apache-2.0 — allowed
-- **@vitejs/plugin-react** ^6.2.1 (root (pnpm)) — MIT — allowed
+- **@vitejs/plugin-react** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **autoprefixer** ^10.6.2 (root (pnpm)) — MIT — allowed
 - **babel-jest** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **babel-plugin-istanbul** ^8.0.0 (root (pnpm)) — BSD-3-Clause — allowed
@@ -48,17 +48,17 @@ to each.
 - **eslint-plugin-react** ^7.37.5 (root (pnpm)) — MIT — allowed
 - **eslint-plugin-react-hooks** ^7.1.1 (root (pnpm)) — MIT — allowed
 - **eslint-plugin-testing-library** ^7.16.2 (root (pnpm)) — MIT — allowed
-- **firebase** ^13.2.0 (root (pnpm)) — Apache-2.0 — allowed
-- **firebase-tools** 15.35.0 (root (pnpm)) — MIT — allowed
+- **firebase** ^13.3.0 (root (pnpm)) — Apache-2.0 — allowed
+- **firebase-tools** 15.36.0 (root (pnpm)) — MIT — allowed
 - **gh-pages** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **globals** ^17.14.0 (root (pnpm)) — MIT — allowed
 - **html2canvas** ^1.4.1 (root (pnpm)) — MIT — allowed
 - **identity-obj-proxy** ^3.0.0 (root (pnpm)) — MIT — allowed
-- **immer** ^11.2.9 (root (pnpm)) — MIT — allowed
+- **immer** ^11.2.10 (root (pnpm)) — MIT — allowed
 - **jest** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **jest-environment-jsdom** ^30.5.2 (root (pnpm)) — MIT — allowed
 - **jszip** ^3.10.2 (root (pnpm)) — (MIT OR GPL-3.0-or-later) — allowed
-- **lucide-react** ^1.70.0 (root (pnpm)) — ISC — allowed
+- **lucide-react** ^1.72.0 (root (pnpm)) — ISC — allowed
 - **maplibre-gl** 6.18.0 (root (pnpm)) — BSD-3-Clause — allowed
 - **marked** 13.0.3 (root (pnpm)) — MIT — allowed
 - **ol** ^10.11.0 (root (pnpm)) — BSD-2-Clause — allowed
@@ -69,18 +69,18 @@ to each.
 - **react-redux** ^9.3.1 (root (pnpm)) — MIT — allowed
 - **react-router** ~8.5.1 (root (pnpm)) — MIT — allowed
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
-- **rollup** >=4.67.5 (root (pnpm)) — MIT — allowed
+- **rollup** >=4.68.3 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.7.0 (root (pnpm)) — MIT — allowed
 - **tailwindcss** ^4.3.5 (root (pnpm)) — MIT — allowed
 - **typescript** npm:@typescript/typescript6@^6.0.2 (root (pnpm)) — Apache-2.0 — allowed
-- **typescript-eslint** ^8.72.1 (root (pnpm)) — MIT — allowed
+- **typescript-eslint** ^8.72.2 (root (pnpm)) — MIT — allowed
 - **uuid** ^14.0.3 (root (pnpm)) — MIT — allowed
-- **vite** ^8.3.6 (root (pnpm)) — MIT — allowed
+- **vite** ^8.3.8 (root (pnpm)) — MIT — allowed
 - **yaml** 2.9.1 (root (pnpm)) — ISC — allowed
-- **@sentry/node** ^11.11.0 (server (npm)) — MIT — allowed
+- **@sentry/node** ^11.12.0 (server (npm)) — MIT — allowed
 - **express** ^5.3.0 (server (npm)) — MIT — allowed
-- **express-rate-limit** ^8.7.3 (server (npm)) — MIT — allowed
-- **firebase-admin** ^14.5.0 (server (npm)) — Apache-2.0 — allowed
+- **express-rate-limit** ^8.7.4 (server (npm)) — MIT — allowed
+- **firebase-admin** ^14.5.1 (server (npm)) — Apache-2.0 — allowed
 - **stripe** ^23.1.0 (server (npm)) — MIT — allowed
 - **cfgrib** 0.9.15.1 (server (python)) — Apache-2.0 — allowed
 - **numpy** 2.4.1 (server (python)) — BSD-3-Clause — allowed
