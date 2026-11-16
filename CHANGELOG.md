@@ -35,6 +35,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Outlook editing:** Dragging a polygon's vertices until it collapses no longer triggers an auto-trim error, and categorical generation failures are now reported so they can be traced and fixed.
 - **Mesoscale:**
   - Composite reflectivity leaves areas below 5 dBZ transparent instead of painting the map with the lowest legend color.
   - The map shows model layers at the default zoom on the standard basemap instead of a blank map.

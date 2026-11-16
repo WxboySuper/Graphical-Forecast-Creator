@@ -5,6 +5,7 @@
  * Redux dispatch, map rendering, and persistence remain outside this boundary.
  */
 import * as turf from '@turf/turf';
+import { captureException } from '@sentry/react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Feature, FeatureCollection, Polygon, MultiPolygon, Position } from 'geojson';
 import { tornadoToCategorical, windToCategorical, hailToCategorical, totalSevereToCategorical } from '../utils/outlookUtils';
@@ -69,9 +70,15 @@ const safeUnion = (features: Feature<Polygon | MultiPolygon>[]): Feature<Polygon
     if (error instanceof CategoricalDerivationError) {
       throw error;
     }
-    throw new CategoricalDerivationError(
+    const derivationError = new CategoricalDerivationError(
       `Turf union failed for ${features.length} polygon(s): ${error instanceof Error ? error.message : String(error)}`
     );
+    // The editor surfaces this as a toast only, so report it to make bad user geometry traceable.
+    captureException(derivationError, {
+      tags: { featureOperation: 'derive-categorical' },
+      extra: { polygonCount: features.length, featureIds: features.map((feature) => feature.id) },
+    });
+    throw derivationError;
   }
 };
 
