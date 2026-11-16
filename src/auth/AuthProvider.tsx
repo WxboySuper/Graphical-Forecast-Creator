@@ -22,7 +22,6 @@ import {
 } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -32,7 +31,7 @@ import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
 import { isBetaClerkD1Mode } from '../lib/betaApi';
 import { ClerkAuthContextProvider } from './ClerkAuthContextProvider';
-import { readProfileBetaAccess, type UserProfileDocument } from './authSettings';
+import { useFirebaseBetaAccess } from './useFirebaseBetaAccess';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
@@ -552,44 +551,9 @@ const useHostedAuthState = (): AuthContextValue => {
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
-  const [betaAccess, setBetaAccess] = useState(false);
-  const [betaAccessLoading, setBetaAccessLoading] = useState(false);
-  const betaAccessRequestIdRef = useRef(0);
+  const { betaAccess, betaAccessLoading, refreshBetaAccess } = useFirebaseBetaAccess(status, user);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    if (!isHostedAuthEnabled || !db || !user) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-    const requestId = ++betaAccessRequestIdRef.current;
-    setBetaAccessLoading(true);
-    try {
-      const profile = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
-      if (requestId === betaAccessRequestIdRef.current) {
-        setBetaAccess(readProfileBetaAccess(profile.data() as Partial<UserProfileDocument> | undefined));
-      }
-    } catch {
-      if (requestId === betaAccessRequestIdRef.current) setBetaAccess(false);
-    } finally {
-      if (requestId === betaAccessRequestIdRef.current) setBetaAccessLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (status === 'loading') {
-      setBetaAccessLoading(true);
-      return;
-    }
-    if (status !== 'signed_in' || !user) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-    refreshBetaAccess().catch(() => undefined);
-  }, [refreshBetaAccess, status, user]);
 
   useEffect(() => {
     currentDarkModeRef.current = darkMode;
