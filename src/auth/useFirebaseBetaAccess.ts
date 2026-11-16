@@ -27,15 +27,30 @@ const readFirebaseBetaAccess = async (user: User): Promise<boolean> => {
   return readProfileBetaAccess(profile.data() as Partial<UserProfileDocument> | undefined);
 };
 
+const clearFirebaseBetaAccess = (
+  setBetaAccess: Dispatch<SetStateAction<boolean>>,
+  setBetaAccessLoading: Dispatch<SetStateAction<boolean>>,
+): void => {
+  setBetaAccess(false);
+  setBetaAccessLoading(false);
+};
+
 const refreshFirebaseBetaAccess = async ({
   user,
   requestIdRef,
   setBetaAccess,
   setBetaAccessLoading,
 }: FirebaseBetaAccessRequest): Promise<void> => {
-  if (!isHostedAuthEnabled || !db || !user) {
-    setBetaAccess(false);
-    setBetaAccessLoading(false);
+  if (!isHostedAuthEnabled) {
+    clearFirebaseBetaAccess(setBetaAccess, setBetaAccessLoading);
+    return;
+  }
+  if (!db) {
+    clearFirebaseBetaAccess(setBetaAccess, setBetaAccessLoading);
+    return;
+  }
+  if (!user) {
+    clearFirebaseBetaAccess(setBetaAccess, setBetaAccessLoading);
     return;
   }
 
