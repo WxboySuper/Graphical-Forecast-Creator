@@ -38,7 +38,7 @@ function createAdminMetricsSummary({ accounts, premium, storage, dailyMetrics })
 
 function toCount(value) { return Number(value ?? 0); }
 
-async function loadAdminMetricRows(db, days) {
+function loadAdminMetricRows(db, days) {
   const windowStart = `-${days - 1} days`;
   return Promise.all([
     db.prepare('SELECT COUNT(*) AS count FROM users').first(),
