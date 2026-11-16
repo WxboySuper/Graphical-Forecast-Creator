@@ -210,6 +210,20 @@ describe('openLayersMapStyles', () => {
     expect(toUpdatedGeoJsonFeature(feature as never, format as never, false)).toBeNull();
   });
 
+  test('toUpdatedGeoJsonFeature returns null for polygons with a ring of fewer than 4 positions', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'hail', probability: '5%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const collapsed = [[0, 0], [1, 1], [0, 0]];
+    const valid = [[0, 0], [1, 0], [1, 1], [0, 0]];
+    const polygon = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [collapsed] }) };
+    const multi = { writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [[valid], [collapsed]] }) };
+    const ok = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [valid] }) };
+
+    expect(toUpdatedGeoJsonFeature(feature as never, polygon as never, false)).toBeNull();
+    expect(toUpdatedGeoJsonFeature(feature as never, multi as never, false)).toBeNull();
+    expect(toUpdatedGeoJsonFeature(feature as never, ok as never, false)).not.toBeNull();
+  });
+
   test('toTstmPreviewOlStyle and toGhostOlStyle build styles', () => {
     expect(toTstmPreviewOlStyle().getZIndex()).toBe(42 + 650);
     expect(toGhostOlStyle({ outlookType: 'categorical', probability: 'TSTM', isCategorical: true }).getZIndex()).toBe(42 + 500);

@@ -251,7 +251,13 @@ export const isPolygonOrMultiPolygon = (value: unknown): value is Polygon | Mult
   return type === "Polygon" || type === "MultiPolygon";
 };
 
-/** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted. */
+/** True when any ring has fewer than 4 positions (the minimum for a closed ring), which the clipper rejects. */
+export const hasDegenerateRing = (geometry: Polygon | MultiPolygon): boolean => {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  return polygons.some((rings) => rings.some((ring) => ring.length < 4));
+};
+
+/** Converts an OL feature back to a GeoJSON Feature object with current projection, enriched with Redux state properties. Returns null if identity or geometry cannot be extracted or a ring is degenerate. */
 export const toUpdatedGeoJsonFeature = (
   feature: FeatureLike,
   format: GeoJSON,
@@ -268,6 +274,7 @@ export const toUpdatedGeoJsonFeature = (
     featureProjection: "EPSG:3857",
   });
   if (!isPolygonOrMultiPolygon(geometryObject)) return null;
+  if (hasDegenerateRing(geometryObject)) return null;
 
   return {
     type: "Feature",
