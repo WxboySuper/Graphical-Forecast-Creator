@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { db, isHostedAuthEnabled, requireDb } from '../lib/firebase';
@@ -12,6 +12,72 @@ interface FirebaseBetaAccessState {
   refreshBetaAccess: () => Promise<void>;
 }
 
+interface FirebaseBetaAccessRequest {
+  user: User | null;
+  requestIdRef: MutableRefObject<number>;
+  setBetaAccess: Dispatch<SetStateAction<boolean>>;
+  setBetaAccessLoading: Dispatch<SetStateAction<boolean>>;
+}
+
+const isCurrentRequest = (requestId: number, latestRequestId: MutableRefObject<number>): boolean =>
+  requestId === latestRequestId.current;
+
+const readFirebaseBetaAccess = async (user: User): Promise<boolean> => {
+  const profile = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
+  return readProfileBetaAccess(profile.data() as Partial<UserProfileDocument> | undefined);
+};
+
+const refreshFirebaseBetaAccess = async ({
+  user,
+  requestIdRef,
+  setBetaAccess,
+  setBetaAccessLoading,
+}: FirebaseBetaAccessRequest): Promise<void> => {
+  if (!isHostedAuthEnabled || !db || !user) {
+    setBetaAccess(false);
+    setBetaAccessLoading(false);
+    return;
+  }
+
+  const requestId = ++requestIdRef.current;
+  setBetaAccessLoading(true);
+  try {
+    const hasBetaAccess = await readFirebaseBetaAccess(user);
+    if (isCurrentRequest(requestId, requestIdRef)) setBetaAccess(hasBetaAccess);
+  } catch {
+    if (isCurrentRequest(requestId, requestIdRef)) setBetaAccess(false);
+  } finally {
+    if (isCurrentRequest(requestId, requestIdRef)) setBetaAccessLoading(false);
+  }
+};
+
+interface FirebaseBetaAccessStatus {
+  status: HostedAuthStatus;
+  user: User | null;
+  refreshBetaAccess: () => Promise<void>;
+  setBetaAccess: Dispatch<SetStateAction<boolean>>;
+  setBetaAccessLoading: Dispatch<SetStateAction<boolean>>;
+}
+
+const syncFirebaseBetaAccessStatus = ({
+  status,
+  user,
+  refreshBetaAccess,
+  setBetaAccess,
+  setBetaAccessLoading,
+}: FirebaseBetaAccessStatus): void => {
+  if (status === 'loading') {
+    setBetaAccessLoading(true);
+    return;
+  }
+  if (status !== 'signed_in' || !user) {
+    setBetaAccess(false);
+    setBetaAccessLoading(false);
+    return;
+  }
+  refreshBetaAccess().catch(() => undefined);
+};
+
 /** Reads Firebase beta access from the signed-in user's profile document. */
 export const useFirebaseBetaAccess = (
   status: HostedAuthStatus,
@@ -22,37 +88,11 @@ export const useFirebaseBetaAccess = (
   const requestIdRef = useRef(0);
 
   const refreshBetaAccess = useCallback(async (): Promise<void> => {
-    if (!isHostedAuthEnabled || !db || !user) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-
-    const requestId = ++requestIdRef.current;
-    setBetaAccessLoading(true);
-    try {
-      const profile = await getDoc(doc(requireDb(), 'userProfiles', user.uid));
-      if (requestId === requestIdRef.current) {
-        setBetaAccess(readProfileBetaAccess(profile.data() as Partial<UserProfileDocument> | undefined));
-      }
-    } catch {
-      if (requestId === requestIdRef.current) setBetaAccess(false);
-    } finally {
-      if (requestId === requestIdRef.current) setBetaAccessLoading(false);
-    }
+    await refreshFirebaseBetaAccess({ user, requestIdRef, setBetaAccess, setBetaAccessLoading });
   }, [user]);
 
   useEffect(() => {
-    if (status === 'loading') {
-      setBetaAccessLoading(true);
-      return;
-    }
-    if (status !== 'signed_in' || !user) {
-      setBetaAccess(false);
-      setBetaAccessLoading(false);
-      return;
-    }
-    refreshBetaAccess().catch(() => undefined);
+    syncFirebaseBetaAccessStatus({ status, user, refreshBetaAccess, setBetaAccess, setBetaAccessLoading });
   }, [refreshBetaAccess, status, user]);
 
   return { betaAccess, betaAccessLoading, refreshBetaAccess };
