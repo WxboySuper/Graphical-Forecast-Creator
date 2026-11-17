@@ -18,7 +18,7 @@
 | Script tests | `pnpm run test:scripts` |
 | Server tests | `npm test --prefix server` |
 | E2E | `pnpm run test:e2e` |
-| Exposure | `pnpm test:exposure`, `pnpm validate:feature-exposure` |
+| Flags | `pnpm flags check` |
 | Firestore rules | `pnpm run test:firestore-rules` |
 | Build | `pnpm run build` |
 | Security | `pnpm audit` |

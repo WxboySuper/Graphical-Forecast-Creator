@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { FeatureBoundary } from './FeatureBoundary';
-import { BUILD_TARGETS, runWithBuildTarget } from '../testing/featureExposure/harness';
+import { BUILD_TARGETS, runWithBuildTarget } from '../testing/flags';
 import { MonitorMesoscaleIntegration } from '../monitor/components/MonitorMesoscaleIntegration';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 

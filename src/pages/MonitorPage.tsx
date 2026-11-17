@@ -50,7 +50,7 @@ import { useMonitorStormReports } from '../monitor/useMonitorStormReports';
 import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { FeatureBoundary } from '../features/FeatureBoundary';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import { trackEvent } from '../lib/telemetry';
 import type { MesoscaleCatalogParameter, MesoscaleLayerSpec } from '../mesoscale';
 import type { MonitorMesoscaleView } from '../monitor/components/MonitorMesoscaleIntegration';
@@ -407,7 +407,7 @@ const MonitorPageWorkspace: React.FC<MonitorPageWorkspaceProps> = (props) => {
   const clearMesoscaleDisplay = useCallback(() => {
     setMesoscaleDisplay({ ...EMPTY_MESOSCALE_DISPLAY, model: props.settings.mesoscale.model });
   }, [props.settings.mesoscale.model]);
-  const mesoscalePanel = isFeatureExposed('mesoscaleWorkspace') ? (
+  const mesoscalePanel = flag('mesoscaleWorkspace') ? (
     <FeatureBoundary feature="mesoscaleWorkspace">
       <MonitorMesoscaleErrorBoundary key={props.settings.mesoscale.model} onError={clearMesoscaleDisplay}>
         <React.Suspense fallback={<div className="monitor-mesoscale__loading" role="status">Loading mesoscale parameters…</div>}>

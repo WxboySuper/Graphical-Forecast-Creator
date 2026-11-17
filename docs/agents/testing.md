@@ -9,7 +9,7 @@
 | Scripts | beside script in `scripts/`, `scripts/lib/` | `pnpm run test:scripts` |
 | Browser workflows | `e2e/*.spec.ts` | Playwright (`pnpm run test:e2e`) |
 | Firestore rules | `tests/firestore.rules.test.mjs` | `pnpm run test:firestore-rules` (emulator) |
-| Feature exposure | `*.exposure.test.ts(x)`, `server/testing/` | `pnpm test:exposure` |
+| Feature flags | `src/config/flags.baseline.test.tsx`, `server/lib/flags.test.js`, `scripts/flags.test.mjs` | `pnpm flags check` plus the suites above |
 
 ## Rules
 
@@ -21,9 +21,9 @@
 - Coverage exclusions in `jest.config.js` need an owner and justification in [`coverage-exclusions.md`](../coverage-exclusions.md); update both together.
 - Type-checks for tests: `pnpm run typecheck:test`; e2e: `typecheck:e2e`.
 
-## Feature-exposure tests
+## Feature flag tests
 
-Every gated feature needs either a contract test or an entry in `src/config/featureExposure.acknowledgements.json` (non-empty `reason`, positive `trackingIssue`). See [feature-exposure.md](feature-exposure.md).
+Per-target baseline checks are derived from `server/flags.json`, so a new flag is covered automatically. Write a test only for the feature's own behavior, using `withFlag` from `src/testing/flags.ts`. See [feature-exposure.md](feature-exposure.md).
 
 ## When to write code comments
 

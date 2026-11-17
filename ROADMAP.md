@@ -15,7 +15,7 @@ the feature-exposure policy.
 The current architecture and ownership map live in
 [`docs/guide/02-architecture.md`](docs/guide/02-architecture.md).
 The [workspace boundaries](docs/architecture/forecast-workspace-boundaries.md)
-and [feature-exposure workstreams](docs/operations/feature-exposure-workstreams.md)
+and [feature flags](docs/agents/feature-exposure.md)
 describe the active architecture work. Use the
 [release workflow](docs/operations/release-workflow.md) and operations guides
 for deploy and support work.

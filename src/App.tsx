@@ -4,7 +4,7 @@
  * owns application composition but delegates state, feature exposure, auth,
  * and page behavior to their dedicated modules.
  */
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import { store, type RootState } from './store';
@@ -37,7 +37,6 @@ import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { lazyWithReload } from './routing/lazyWithReload';
 import { ExternalRedirect } from './routing/ExternalRedirect';
 import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from './config/marketingLinks';
-import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
 import {
   getDefaultForecastWorkspacePath,
   getForecastWorkspacePath,
@@ -66,14 +65,6 @@ const CloudLibraryPage = lazyWithReload('cloud', () => import('./pages/CloudLibr
 const AdminPage = lazyWithReload('admin', () =>
   import('./pages/AdminPage').then((module) => ({ default: module.AdminPage }))
 );
-
-const FeatureExposureDiagnosticsPage = __GFC_DEV_MODE__
-  ? lazy(() =>
-      import('./pages/FeatureExposureDiagnosticsPage').then((module) => ({
-        default: module.FeatureExposureDiagnosticsPage,
-      }))
-    )
-  : null;
 
 /** Accessible loading placeholder shown while a lazy route chunk downloads. */
 const RouteFallback = () => (
@@ -210,16 +201,6 @@ const AppRoutes: React.FC = () => {
         <Route path="discussion/*" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
-        {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
-          <Route
-            path="dev/feature-exposure"
-            element={
-              <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading diagnostics…</div>}>
-                <FeatureExposureDiagnosticsPage />
-              </Suspense>
-            }
-          />
-        ) : null}
         {buildFeatureGatedRoutes()}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

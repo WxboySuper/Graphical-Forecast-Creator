@@ -97,7 +97,7 @@ import {
   type FeatureSyncStats,
 } from "./openLayersFeatureSync";
 import { useForecastMapReduxState } from "./useForecastMapReduxState";
-import { isFeatureExposed } from "../../config/featureExposure";
+import { flag } from "../../config/flags";
 import { isPaintBucketOutlookType, type PaintBucketMode, type PaintBucketStepDirection } from "../../utils/paintBucket";
 import { trimGeometryForAutoDraw } from "../../hooks/useTrimCurrentDayOutlooks";
 import { clearLandMaskRuntimeCache, ensureLandMask } from "../../utils/outlookPolygonMasking/landMaskRuntime";
@@ -137,7 +137,7 @@ const OpenLayersForecastMap = forwardRef<MapAdapterHandle<OLMap> | null, OpenLay
       serializedFeatures,
       serializedCustomFeatures,
     } = useForecastMapReduxState();
-    const paintBucketEnabled = isFeatureExposed("paintBucketTool");
+    const paintBucketEnabled = flag("paintBucketTool");
     const paintBucketAvailable = paintBucketEnabled
       && !customMode
       && isPaintBucketOutlookType(drawingState.activeOutlookType);

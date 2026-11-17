@@ -160,13 +160,13 @@ describe('local documentation renderer', () => {
 
   test('resolves local non-Markdown links against repository files', async () => {
     const repoFiles = await collectRepoFiles();
-    const html = renderMarkdown('[registry](../../src/config/featureExposure.ts)', {
+    const html = renderMarkdown('[registry](../../src/config/flags.ts)', {
       sourcePath: 'docs/operations/example.md',
       pageMap: new Map(),
       repoFiles,
     });
-    assert.match(html, /href="\.\.\/\.\.\/\.\.\/src\/config\/featureExposure\.ts"/);
-    assert.ok(repoFiles.has('src/config/featureExposure.ts'));
+    assert.match(html, /href="\.\.\/\.\.\/\.\.\/src\/config\/flags\.ts"/);
+    assert.ok(repoFiles.has('src/config/flags.ts'));
   });
 
   test('includes every code boundary guide linked from docs/README.md in the page map', async () => {

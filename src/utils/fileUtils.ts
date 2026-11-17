@@ -21,7 +21,7 @@ import { deserializeForecastCycleDays, normalizeForecastCurrentDay } from './for
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload, createForecastWorkspaceSave } from './forecastWorkspaceEnvelope';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import { MAX_IMPORT_BYTES, validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
 export { MAX_IMPORT_BYTES } from './forecastImportValidation';
@@ -168,7 +168,7 @@ export const readForecastImportFile = async (file: File): Promise<unknown> => {
   if (!byteGate.ok) {
     throw new Error(byteGate.reason);
   }
-  if (isFeatureExposed('customProducts') && isZipImport(file, bytes)) return readForecastPackage(file, bytes);
+  if (flag('customProducts') && isZipImport(file, bytes)) return readForecastPackage(file, bytes);
   return readForecastJson(file, bytes);
 };
 

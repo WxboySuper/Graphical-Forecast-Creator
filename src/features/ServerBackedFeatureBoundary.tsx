@@ -3,7 +3,7 @@
  * This component owns exposure-boundary rendering; server capability detection and feature policy remain delegated to configuration and runtime hooks.
  */
 import type { ReactNode } from 'react';
-import { getFeatureExposure, isFeatureExposed, type FeatureKey } from '../config/featureExposure';
+import { flag, flagCapability, type FlagName } from '../config/flags';
 import {
   useServerBackedFeatureRuntimeState,
   useServerCapabilityAvailable,
@@ -11,7 +11,7 @@ import {
 import { FeatureBoundary } from './FeatureBoundary';
 
 type ServerBackedFeatureBoundaryProps = {
-  feature: FeatureKey;
+  feature: FlagName;
   children: ReactNode;
   unavailableMessage?: string;
 };
@@ -31,20 +31,15 @@ export const ServerBackedFeatureUnavailable = ({
 );
 
 /** Returns whether a server-backed feature is available at runtime on this deployment. */
-export const useServerBackedFeatureAvailable = (feature: FeatureKey): boolean => {
-  const compileTimeExposed = isFeatureExposed(feature);
+export const useServerBackedFeatureAvailable = (feature: FlagName): boolean => {
+  const compileTimeExposed = flag(feature);
   const serverAvailable = useServerCapabilityAvailable(feature);
 
   if (!compileTimeExposed) {
     return false;
   }
 
-  const definition = getFeatureExposure(feature);
-  if (!definition.serverBacked) {
-    return true;
-  }
-
-  return serverAvailable;
+  return flagCapability(feature) ? serverAvailable : true;
 };
 
 /** Applies runtime server availability checks inside a compile-time feature boundary. */
@@ -54,9 +49,8 @@ const ServerBackedFeatureRuntimeBoundary = ({
   unavailableMessage,
 }: ServerBackedFeatureBoundaryProps) => {
   const runtimeState = useServerBackedFeatureRuntimeState(feature);
-  const definition = getFeatureExposure(feature);
 
-  if (!definition.serverBacked) {
+  if (!flagCapability(feature)) {
     return children;
   }
 

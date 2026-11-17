@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { MesoscaleCatalogParameter } from '../mesoscale';
 import { LayerPanel } from '../components/Mesoscale/LayerPanel';
-import { FEATURE_EXPOSURE_REGISTRY, isFeatureExposedOnTarget } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import { BUILD_TARGETS, type BuildTarget } from '../config/buildTarget';
 
 const STP_PARAMETER: MesoscaleCatalogParameter = {
@@ -32,7 +32,7 @@ describe('mesoscale derived parameter exposure', () => {
 
   test.each(BUILD_TARGETS)('%s layer list follows the fail-closed exposure matrix', (target: BuildTarget) => {
     globalThis.__GFC_BUILD_TARGET__ = target;
-    const exposed = isFeatureExposedOnTarget('mesoscaleDerivedParameters', target);
+    const exposed = flag('mesoscaleDerivedParameters', target);
     const onChange = jest.fn();
     render(<LayerPanel parameters={[STP_PARAMETER]} layers={[]} onChange={onChange} />);
 
@@ -42,6 +42,5 @@ describe('mesoscale derived parameter exposure', () => {
       fireEvent.click(layer!);
       expect(onChange).toHaveBeenCalledWith([{ id: 'stp-fixed-surface', opacity: expect.any(Number) }]);
     }
-    expect(FEATURE_EXPOSURE_REGISTRY.mesoscaleDerivedParameters.exposure[target]).toBe(exposed);
   });
 });

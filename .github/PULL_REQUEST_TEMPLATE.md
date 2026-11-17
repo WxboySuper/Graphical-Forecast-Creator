@@ -32,7 +32,7 @@ Port of #
 <!-- Does this PR remove or plan to remove a temporary feature? If so, confirm removal metadata is updated. -->
 
 - [ ] N/A — no temporary features affected
-- [ ] Temporary feature removal included (confirm `removalCondition` metadata is present in `src/config/featureExposure.ts`)
+- [ ] Temporary feature removal included (a dev flag has a `removeBy` in `server/flags.json`; `pnpm flags` lists them)
 
 ## Review requests
 

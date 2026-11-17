@@ -171,7 +171,7 @@ describe('TabbedIntegratedToolbar completion validation exposure', () => {
   ])(
     'Complete action visibility follows forecastWorkflowV2 exposure (exposed=%s)',
     async (exposed, visible) => {
-      jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(exposed);
+      jest.spyOn(require('../../config/flags'), 'flag').mockReturnValue(exposed);
       const user = userEvent.setup();
 
       renderToolbar();
@@ -225,7 +225,7 @@ describe('custom Draw mode exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
   test('keeps hosted Draw UI unchanged with no custom toggle or placeholder', () => {
-    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockImplementation((feature) => feature !== 'customProducts');
+    jest.spyOn(require('../../config/flags'), 'flag').mockImplementation((feature) => feature !== 'customProducts');
     renderToolbar();
     expect(screen.queryByRole('radiogroup', { name: 'Drawing product' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Saved products/i })).not.toBeInTheDocument();
@@ -234,7 +234,7 @@ describe('custom Draw mode exposure', () => {
   });
 
   test('keeps Custom controls out of Severe and creates signed-out layers in Custom', async () => {
-    jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../../config/flags'), 'flag').mockReturnValue(true);
     const user = userEvent.setup();
     const store = createStore();
     const severeRender = renderToolbar(store);

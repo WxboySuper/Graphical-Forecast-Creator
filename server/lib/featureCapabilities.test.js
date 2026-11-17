@@ -16,13 +16,13 @@ const {
   sendDisabledCapabilityResponse,
 } = require('./featureCapabilities');
 const {
+  allTargetsEnabledRouteOptions,
   assertCapabilityRouteRejectsWithoutWork,
   createTestAppWithGate,
   disabledCapabilityStatusFixtures,
   getServerUrl,
   startTestServer,
-} = require('../testing/featureExposureHarness');
-const { allTargetsEnabledRouteOptions } = require('../testing/featureExposureTargetMatrix');
+} = require('../testing/capabilityHarness');
 
 describe('server capability gates', () => {
   it('stays disabled for unknown capability keys', () => {

@@ -3,12 +3,7 @@
  */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes } from 'react-router';
-import {
-  assertGatedRoutesAbsent,
-  mockFeatureExposureOnTarget,
-  runWithBuildTarget,
-  singleTargetOn,
-} from '../testing/featureExposure/harness';
+import { runWithBuildTarget, withFlag } from '../testing/flags';
 import { buildFeatureGatedRoutes, getExposedGatedRoutePaths } from './buildFeatureGatedRoutes';
 
 jest.mock('../pages/gated/TropicalWorkspacePage', () => ({
@@ -33,8 +28,6 @@ describe('buildFeatureGatedRoutes', () => {
 
   test('registers the release-approved custom products route while other gated routes remain disabled', () => {
     runWithBuildTarget('beta', () => {
-      assertGatedRoutesAbsent('tropicalWorkspace', ['beta']);
-      assertGatedRoutesAbsent('collaborationRoom', ['beta']);
       expect(getExposedGatedRoutePaths('beta')).toEqual(['/custom-products']);
     });
   });
@@ -52,7 +45,7 @@ describe('buildFeatureGatedRoutes', () => {
   });
 
   test('registers exposed gated routes and lazy-loads their modules', async () => {
-    const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
+    withFlag('tropicalWorkspace', true, 'local');
 
     expect(getExposedGatedRoutePaths('local')).toEqual(['/tropical', '/custom-products']);
 
@@ -63,6 +56,5 @@ describe('buildFeatureGatedRoutes', () => {
     );
 
     expect(await screen.findByText('Tropical workspace page')).toBeInTheDocument();
-    exposureSpy.mockRestore();
   });
 });

@@ -13,7 +13,7 @@ import {
   selectCurrentOutlookOpacity,
   selectCurrentOutlooks,
 } from "../../store/forecastSlice";
-import { isFeatureExposed } from "../../config/featureExposure";
+import { flag } from "../../config/flags";
 import { isCustomWorkspaceActive } from "../../config/forecastWorkspaces";
 import { computeZIndex } from "../../utils/mapStyleUtils";
 import type { EditableOutlookType, OutlookMapLike } from "./openLayersMapStyles";
@@ -27,11 +27,11 @@ const useForecastMapSelections = () => {
   const customEditor = useSelector((state: RootState) => state.forecast.customEditor);
   const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   const customLayers = useSelector(selectCurrentCustomLayers);
-  const customProductsExposed = isFeatureExposed("customProducts");
+  const customProductsExposed = flag("customProducts");
   const customMode = isCustomWorkspaceActive(
     workspaceId,
     customProductsExposed,
-    isFeatureExposed("customWorkspace"),
+    flag("customWorkspace"),
   );
   const showCustomLayers = customProductsExposed
     && (customMode || customLayers.layers.length > 0);

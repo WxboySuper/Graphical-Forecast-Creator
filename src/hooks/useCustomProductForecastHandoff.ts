@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { AddToastFn } from '../components/Layout';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   consumeCustomProductForecastHandoff,
@@ -27,7 +27,7 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
   });
 
   useEffect(() => {
-    if (!ready || !isFeatureExposed('customProducts')) return;
+    if (!ready || !flag('customProducts')) return;
     // The handoff names its workspace. Consuming it from a different editor
     // would inject Custom layers into a workspace that does not own them.
     const stagedLayer = consumeCustomProductForecastHandoff(premiumActive, workspaceId);

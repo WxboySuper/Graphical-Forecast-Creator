@@ -1,9 +1,21 @@
 import { Suspense, type ComponentType, type LazyExoticComponent, type ReactElement } from 'react';
 import { Route } from 'react-router';
 import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
-import { isFeatureExposedOnTarget } from '../config/featureExposure';
-import { GATED_ROUTE_DEFINITIONS, type GatedRouteDefinition } from '../config/featureSurfaces';
+import { flag, type FlagName } from '../config/flags';
 import { lazyWithReload } from './lazyWithReload';
+
+type GatedRouteDefinition = {
+  feature: FlagName;
+  path: string;
+  loadPage: () => Promise<{ default: ComponentType }>;
+};
+
+/** Lazy routes owned by a flag. Core app routes stay outside this list. */
+export const GATED_ROUTE_DEFINITIONS = [
+  { feature: 'tropicalWorkspace', path: 'tropical', loadPage: () => import('../pages/gated/TropicalWorkspacePage') },
+  { feature: 'collaborationRoom', path: 'collaborate', loadPage: () => import('../pages/gated/CollaborationRoomPage') },
+  { feature: 'customProducts', path: 'custom-products', loadPage: () => import('../pages/gated/CustomProductsPage') },
+] as const satisfies readonly GatedRouteDefinition[];
 
 const lazyPageCache = new Map<string, LazyExoticComponent<ComponentType>>();
 
@@ -21,7 +33,7 @@ const getLazyPage = (definition: GatedRouteDefinition): LazyExoticComponent<Comp
 
 /** Returns gated route pathnames that would register for the given deployment target. */
 export const getExposedGatedRoutePaths = (target: BuildTarget = getBuildTarget()): string[] =>
-  GATED_ROUTE_DEFINITIONS.filter((definition) => isFeatureExposedOnTarget(definition.feature, target)).map(
+  GATED_ROUTE_DEFINITIONS.filter((definition) => flag(definition.feature, target)).map(
     (definition) => `/${definition.path}`
   );
 
@@ -32,7 +44,7 @@ const GatedRouteFallback = () => (
 
 /** Registers lazy routes only for features exposed on the current build target. */
 export const buildFeatureGatedRoutes = (target: BuildTarget = getBuildTarget()): ReactElement[] =>
-  GATED_ROUTE_DEFINITIONS.filter((definition) => isFeatureExposedOnTarget(definition.feature, target)).map(
+  GATED_ROUTE_DEFINITIONS.filter((definition) => flag(definition.feature, target)).map(
     (definition) => {
       const Page = getLazyPage(definition);
 

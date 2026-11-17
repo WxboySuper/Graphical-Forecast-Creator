@@ -92,7 +92,7 @@ When a change crosses a boundary, update the relevant doc in the same PR.
 - [Alert banner](./operations/alert-banner.md) · [Emergency feature disable](./operations/emergency-feature-disable.md)
 - [Firestore retention](./operations/firestore-retention.md) · [rules deployment](./operations/firestore-rules-deployment.md) · [rules verification](./firestore-rules-verification.md)
 - [Auto-TSTM operations](./operations/auto-tstm-operations.md) · [beta test plans](./operations/auto-tstm-beta-test-plans.md) · [custom products test plan](./operations/custom-products-beta-test-plan.md)
-- [Feature exposure testing](./operations/feature-exposure-testing.md) · [workstreams](./operations/feature-exposure-workstreams.md) · [v1.7 exposure matrix](./operations/v1.7-exposure-matrix.md)
+- [Feature flags](./agents/feature-exposure.md) · [feature flag guide](./guide/05-feature-gating.md)
 - [OpenCode maintenance](./operations/opencode-maintenance.md) · [GitHub-Todoist sync](./github-todoist-sync.md)
 - [Support and privacy](./operations/v1.7-support-and-privacy.md) · [Telemetry operations](./operations/telemetry.md)
 - [Public status schema](./public-status-schema.md) · [Workflow analytics](./workflow-analytics.md) · [Coverage exclusions](./coverage-exclusions.md)

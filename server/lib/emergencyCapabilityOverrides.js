@@ -4,7 +4,7 @@
  */
 'use strict';
 
-const { KNOWN_SERVER_CAPABILITY_KEYS } = require('./serverFeatureExposure');
+const { KNOWN_SERVER_CAPABILITY_KEYS } = require('./flags');
 
 const EMERGENCY_DISABLED_ENV_KEY = 'EMERGENCY_DISABLED_CAPABILITIES';
 const KNOWN_CAPABILITY_KEY_SET = new Set(KNOWN_SERVER_CAPABILITY_KEYS);

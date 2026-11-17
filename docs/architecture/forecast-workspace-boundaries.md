@@ -117,7 +117,7 @@ routes returned by `getExposedForecastWorkspaceRoutes()`.
 metadata; `src/routing/forecastWorkspaceRoutes.ts` validates them and returns only
 exposed route records. The application shell registers those records without
 loading unexposed workspace pages. Other gated features use
-`src/config/featureSurfaces.ts` and `src/routing/buildFeatureGatedRoutes.tsx`.
+the route table in `src/routing/buildFeatureGatedRoutes.tsx`.
 The planned paths above do not by themselves register pages. Route tests cover
 the workspace definitions and route records.
 

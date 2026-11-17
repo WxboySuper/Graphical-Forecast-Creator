@@ -753,7 +753,7 @@ describe('forecastTransfer', () => {
   });
 
   test('applies the same kmz feature gate in the export API that the transfer UI uses', async () => {
-    const spy = jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    const spy = jest.spyOn(require('../../config/flags'), 'flag').mockReturnValue(false);
 
     await expect(exportForecastTransfer({
       format: 'kml',

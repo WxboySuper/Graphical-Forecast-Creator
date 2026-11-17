@@ -1,21 +1,21 @@
 /**
- * Server feature-exposure test harness. It starts an isolated HTTP app,
- * exercises capability gates, and provides assertions for release metadata.
+ * Server capability test harness. It starts an isolated HTTP app and exercises a capability gate
+ * to prove a disabled route does no work. Per-target baseline checks live in server/lib/flags.test.js.
  */
 'use strict';
 
 const express = require('express');
 const assert = require('node:assert/strict');
-const {
-  CAPABILITY_REASON,
-  getPublicCapabilityStatus,
-  resolveCapabilityAvailability,
-} = require('../lib/capabilityStatus');
+const { CAPABILITY_REASON } = require('../lib/capabilityStatus');
 const {
   DISABLED_CAPABILITY_STATUS,
   createServerCapabilityGate,
 } = require('../lib/featureCapabilities');
-const { allTargetsEnabledRouteOptions } = require('./featureExposureTargetMatrix');
+
+/** Route options that expose every target, so a test exercises only the env and emergency switches. */
+const allTargetsEnabledRouteOptions = () => ({
+  exposureOverride: { local: true, beta: true, staging: true, production: true },
+});
 
 /** Starts a test HTTP server and returns its base URL. */
 const startTestServer = (app) =>
@@ -103,34 +103,9 @@ const disabledCapabilityStatusFixtures = {
   },
 };
 
-/** Asserts capability availability for one capability key and fixture. */
-const assertPublicCapabilityStatus = (capabilityKey, fixture) => {
-  const status = resolveCapabilityAvailability(capabilityKey, {
-    env: fixture.env,
-    exposureOverride: fixture.routeOptions?.exposureOverride,
-  });
-
-  assert.equal(status.available, fixture.reason === CAPABILITY_REASON.AVAILABLE);
-  assert.equal(status.reason, fixture.reason);
-};
-
-/** Asserts registry-exposed capabilities appear in the public status payload. */
-const assertPublicCapabilityStatusSurface = (capabilityKey, fixture) => {
-  const status = getPublicCapabilityStatus({
-    env: fixture.env,
-    exposureOverride: fixture.routeOptions?.exposureOverride,
-  });
-
-  assert.deepEqual(status.capabilities[capabilityKey], {
-    available: fixture.reason === CAPABILITY_REASON.AVAILABLE,
-    reason: fixture.reason,
-  });
-};
-
 module.exports = {
+  allTargetsEnabledRouteOptions,
   assertCapabilityRouteRejectsWithoutWork,
-  assertPublicCapabilityStatus,
-  assertPublicCapabilityStatusSurface,
   createTestAppWithGate,
   disabledCapabilityStatusFixtures,
   getServerUrl,

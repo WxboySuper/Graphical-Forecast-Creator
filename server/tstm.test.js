@@ -20,7 +20,7 @@ const {
   registerTstmRoutes,
   runTstmGenerator,
 } = require('./tstm');
-const { allTargetsEnabledRouteOptions } = require('./testing/featureExposureTargetMatrix');
+const { allTargetsEnabledRouteOptions } = require('./testing/capabilityHarness');
 
 const startServer = (env, routeOptions = {}) => {
   const app = express();

@@ -11,7 +11,7 @@ const { registerTstmRoutes } = require('../tstm');
 const {
   assertCapabilityRouteRejectsWithoutWork,
   disabledCapabilityStatusFixtures,
-} = require('./featureExposureHarness');
+} = require('./capabilityHarness');
 const startServer = (env, runGenerator, routeOptions = {}) => {
   const app = express();
   registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });

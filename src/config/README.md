@@ -1,8 +1,8 @@
 # Configuration and exposure
 
-This boundary owns build targets, the feature-exposure registry and its
+This boundary owns build targets, the feature flag registry reader and its
 selectors, navbar navigation metadata, gated route surfaces, runtime
-server-capability status, exposure diagnostics, and the vendored GeoJSON
+server-capability status, and the vendored GeoJSON
 boundary dataset sources. It also supplies the build-target mesoscale Worker
 URL and the local fixture-mode switch, which remains behind `mesoscaleWorkspace`
 exposure. Firebase and Sentry setup live outside

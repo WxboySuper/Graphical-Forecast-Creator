@@ -43,7 +43,7 @@ You do not need the diff. Ask these five questions of the PR description:
 | Auth and account deletion | Data loss, privacy | `server/firebase-auth.js`, `server/account-lifecycle.js` |
 | Firestore rules | Who can read/write cloud data | `firestore.rules` |
 | Saved file / storage format | Old saves must still open | `src/types/outlooks.ts`, `src/utils/fileUtils.ts`, localStorage keys |
-| Feature exposure registry | Controls what ships to whom | `src/config/featureExposure.ts` |
+| Feature flag registry | Controls what ships to whom | `server/flags.json` (`pnpm flags`) |
 | Release and deploy workflows | Act on the real servers | `.github/workflows/release-*.yml`, `deploy-*.yml` |
 | Privacy / telemetry | Legal and trust | Cloudflare telemetry, Sentry, `privacy_policy.md` |
 
