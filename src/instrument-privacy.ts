@@ -8,13 +8,15 @@ const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const IPV6_PATTERN = /\b(?:[A-F0-9]{1,4}:){2,}[A-F0-9:]{1,}\b/gi;
 const LONG_IDENTIFIER_PATTERN = /\b[A-Za-z0-9_-]{20,}\b/g;
-const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization)(?:$|[_-])/;
+const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:$|[_-])/i;
+const SENSITIVE_TEXT_VALUE_PATTERN = /(\b(?:uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:[_-]?[A-Z][a-zA-Z0-9]*)?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi;
 
 export const redactSensitiveText = (value: string): string => value
   .replace(EMAIL_PATTERN, '[redacted-email]')
   .replace(IPV4_PATTERN, '[redacted-ip]')
   .replace(IPV6_PATTERN, '[redacted-ip]')
-  .replace(LONG_IDENTIFIER_PATTERN, '[redacted-id]');
+  .replace(LONG_IDENTIFIER_PATTERN, '[redacted-id]')
+  .replace(SENSITIVE_TEXT_VALUE_PATTERN, '$1[redacted]');
 
 const removeUrlQuery = (value: string): string => value.split(/[?#]/, 1)[0];
 
@@ -29,6 +31,7 @@ const sanitizeStringValue = (value: string, key: string): string | undefined => 
 
 const sanitizeNestedValue = (value: unknown, key: string): unknown => {
   if (isQueryField(key)) return undefined;
+  if (isSensitiveKey(key)) return value === undefined ? undefined : '[redacted]';
   if (typeof value === 'string') return sanitizeStringValue(value, key);
   if (Array.isArray(value)) return value.map((item) => sanitizeNestedValue(item, key));
   if (value && typeof value === 'object') return sanitizeRecord(value as Record<string, unknown>, key);
@@ -45,12 +48,14 @@ const sanitizeRecord = <T extends Record<string, unknown>>(record: T, contextKey
 type SentryTag = NonNullable<Sentry.Event['tags']>[string];
 
 const sanitizeTag = ([key, value]: [string, SentryTag]): [string, SentryTag] | null => {
-  if (isSensitiveTagKey(key)) return null;
+  if (isSensitiveKey(key)) return null;
   return [key, typeof value === 'string' ? redactSensitiveText(value) : value];
 };
 
-const isSensitiveTagKey = (key: string): boolean => {
-  const normalizedKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+const normalizeSensitiveKey = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
+
+const isSensitiveKey = (key: string): boolean => {
+  const normalizedKey = normalizeSensitiveKey(key);
   return SENSITIVE_TAG_PATTERN.test(normalizedKey);
 };
 

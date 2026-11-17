@@ -32,7 +32,7 @@ test('scrubs identity, addresses, request data, and breadcrumb context from Sent
   expect(scrubbed.breadcrumbs?.[0].data).toBeUndefined();
 });
 
-test('removes sensitive camelCase tag keys', () => {
+test('removes sensitive camelCase and separator-delimited tag keys', () => {
   const event = {
     tags: {
       userId: 'short-id',
@@ -40,6 +40,18 @@ test('removes sensitive camelCase tag keys', () => {
       emailAddress: 'other@example.com',
       accessToken: 'short-token',
       authorizationHeader: 'private-header',
+      password: 'pw',
+      passwd: 'pw2',
+      secret: 's',
+      api_key: 'k1',
+      apikey: 'k2',
+      apiKey: 'k3',
+      sessionId: 'sid',
+      phoneNumber: '555-0100',
+      authToken: 'a',
+      cookieValue: 'c',
+      bearerToken: 'b',
+      credentialType: 'cred',
       section: 'forecast',
     },
   } as unknown as Sentry.ErrorEvent;
@@ -47,6 +59,32 @@ test('removes sensitive camelCase tag keys', () => {
   scrubSensitiveEvent(event);
 
   expect(event.tags).toEqual({ section: 'forecast' });
+});
+
+test('redacts short values attached to sensitive span keys and preserves ordinary error words', () => {
+  const span = {
+    trace_id: 'trace-id',
+    span_id: 'span-id',
+    name: '/forecast',
+    start_timestamp: 1,
+    status: 'ok',
+    is_segment: true,
+    attributes: {
+      password: 'pw',
+      apiKey: 'k3',
+      sessionId: 'sid',
+      phoneNumber: '555-0100',
+      message: 'undefined TypeError',
+    },
+  } as unknown as Parameters<NonNullable<Sentry.BrowserOptions['beforeSendSpan']>>[0];
+
+  expect(sanitizeStreamedSpan(span).attributes).toEqual({
+    password: '[redacted]',
+    apiKey: '[redacted]',
+    sessionId: '[redacted]',
+    phoneNumber: '[redacted]',
+    message: 'undefined TypeError',
+  });
 });
 
 test('scrubs identifiers and query strings from Sentry transactions and static spans', () => {
@@ -82,7 +120,7 @@ test('scrubs identifiers and query strings from Sentry transactions and static s
   expect(scrubbed.spans?.[0].data).toEqual({
     'url.full': 'https://gfcweather.com/forecast/[redacted-id]',
     'user.email': '[redacted-email]',
-    uid: '[redacted-id]',
+    uid: '[redacted]',
   });
   expect(JSON.stringify(scrubbed)).not.toContain(privateUid);
   expect(JSON.stringify(scrubbed)).not.toContain(privateEmail);
@@ -113,7 +151,7 @@ test('scrubs streamed span names and URL, query, email, and UID attributes', () 
   expect(scrubbed.attributes).toEqual({
     'url.full': 'https://gfcweather.com/forecast/[redacted-id]',
     'user.email': '[redacted-email]',
-    uid: '[redacted-id]',
+    uid: '[redacted]',
   });
   expect(JSON.stringify(scrubbed)).not.toContain(privateUid);
   expect(JSON.stringify(scrubbed)).not.toContain(privateEmail);
@@ -131,4 +169,16 @@ test('handles a streamed span with no attributes without throwing', () => {
 
   expect(() => sanitizeStreamedSpan(span)).not.toThrow();
   expect(sanitizeStreamedSpan(span).attributes).toBeUndefined();
+});
+
+test('redacts short sensitive key-value text in messages and exceptions', () => {
+  const event = {
+    message: 'Failure password=pw and apiKey=k3; undefined TypeError',
+    exception: { values: [{ value: 'sessionId=sid; phone=555' }] },
+  } as unknown as Sentry.ErrorEvent;
+
+  scrubSensitiveEvent(event);
+
+  expect(event.message).toBe('Failure password=[redacted] and apiKey=[redacted]; undefined TypeError');
+  expect(event.exception?.values?.[0].value).toBe('sessionId=[redacted]; phone=[redacted]');
 });
