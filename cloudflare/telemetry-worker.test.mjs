@@ -1,8 +1,37 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import worker, { ALLOWED_EVENTS, dailyHash, fetchTelemetry, purgeOldDedupe, recordUnique, validateEvent } from './telemetry-worker.mjs';
+import worker, { ALLOWED_EVENTS, fetchTelemetry, validateEvent } from './telemetry-worker.mjs';
+import { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
+
+function insertDedupe(db, args) {
+  const [kind, day, hash] = args;
+  const key = `${kind}|${day}|${hash}`;
+  if (db.dedupe.has(key)) return { meta: { changes: 0 } };
+  db.dedupe.add(key);
+  // Model the migration trigger as an atomic side effect of this single insert.
+  const countKey = `${kind}|${day}`;
+  db.counts.set(countKey, (db.counts.get(countKey) ?? 0) + 1);
+  return { meta: { changes: 1 } };
+}
+
+function deleteOldDedupe(db, currentDay) {
+  const before = db.dedupe.size;
+  for (const key of db.dedupe) {
+    if (key.split('|')[1] < currentDay) db.dedupe.delete(key);
+  }
+  return { meta: { changes: before - db.dedupe.size } };
+}
+
+async function captureErrors(callback) {
+  const errors = [];
+  const originalError = console.error;
+  console.error = (...values) => errors.push(values);
+  try { await callback(); }
+  finally { console.error = originalError; }
+  return errors;
+}
 
 class FakeD1 {
   dedupe = new Set();
@@ -19,21 +48,8 @@ class FakeD1 {
   }
   async run(sql, args) {
     this.executions.push({ sql, args });
-    if (sql.startsWith('INSERT OR IGNORE INTO telemetry_dedupe')) {
-      const [kind, day, hash] = args;
-      const key = `${kind}|${day}|${hash}`;
-      if (this.dedupe.has(key)) return { meta: { changes: 0 } };
-      this.dedupe.add(key);
-      // The migration's AFTER INSERT trigger changes the count in the same SQLite statement.
-      const countKey = `${kind}|${day}`;
-      this.counts.set(countKey, (this.counts.get(countKey) ?? 0) + 1);
-      return { meta: { changes: 1 } };
-    }
-    if (sql.startsWith('DELETE')) {
-      const before = this.dedupe.size;
-      for (const key of this.dedupe) if (key.split('|')[1] < args[0]) this.dedupe.delete(key);
-      return { meta: { changes: before - this.dedupe.size } };
-    }
+    if (sql.startsWith('INSERT OR IGNORE INTO telemetry_dedupe')) return insertDedupe(this, args);
+    if (sql.startsWith('DELETE')) return deleteOldDedupe(this, args[0]);
     return { meta: { changes: 0 } };
   }
 }
@@ -144,6 +160,16 @@ test('strict CORS, payload caps, and unauthenticated admin paths fail safely', a
   const adminMissing = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/overview'), env);
   assert.equal(adminMissing.status, 503);
   assert.equal(adminMissing.headers.get('cache-control'), 'no-store');
+});
+
+test('public request parsing rejects invalid JSON, invalid UTF-8, and other content types', async () => {
+  const env = baseEnv();
+  const invalidJson = new Request('https://telemetry.gfcweather.com/v1/event', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' });
+  const invalidUtf8 = new Request('https://telemetry.gfcweather.com/v1/event', { method: 'POST', headers: { 'content-type': 'application/json' }, body: new Uint8Array([0xff]) });
+  const wrongType = new Request('https://telemetry.gfcweather.com/v1/event', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' });
+  assert.equal((await fetchTelemetry(invalidJson, env)).status, 400);
+  assert.equal((await fetchTelemetry(invalidUtf8, env)).status, 400);
+  assert.equal((await fetchTelemetry(wrongType, env)).status, 400);
 });
 
 test('admin fails closed when Access configuration is absent', async () => {
@@ -263,19 +289,14 @@ test('scheduled purge retains only the current dedupe day', async () => {
   assert.deepEqual([...env.TELEMETRY_DB.dedupe], ['active|2026-11-17|current']);
 });
 
-test('scheduled purge logs an unbound database without hiding bound purge failures', async () => {
-  const errors = [];
-  const originalError = console.error;
-  console.error = (...values) => errors.push(values);
-  try {
-    await worker.scheduled({}, {});
-    assert.deepEqual(errors, [['Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured']]);
+test('scheduled purge logs when the database binding is unconfigured', async () => {
+  const errors = await captureErrors(() => worker.scheduled({}, {}));
+  assert.deepEqual(errors, [['Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured']]);
+});
 
-    const env = baseEnv();
-    env.TELEMETRY_DB.prepare = () => ({ bind() { return this; }, async run() { throw new Error('private failure details'); } });
-    await assert.rejects(worker.scheduled({}, env), { message: 'Telemetry dedupe purge failed' });
-    assert.deepEqual(errors[1], ['Telemetry dedupe purge failed']);
-  } finally {
-    console.error = originalError;
-  }
+test('scheduled purge reports bound database failures without logging details', async () => {
+  const env = baseEnv();
+  env.TELEMETRY_DB.prepare = () => ({ bind() { return this; }, async run() { throw new Error('private failure details'); } });
+  const errors = await captureErrors(() => assert.rejects(worker.scheduled({}, env), { message: 'Telemetry dedupe purge failed' }));
+  assert.deepEqual(errors, [['Telemetry dedupe purge failed']]);
 });
