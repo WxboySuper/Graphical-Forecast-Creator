@@ -53,11 +53,12 @@ export async function countActive(request, env, headers, now) {
   const err = requestError(request, headers);
   if (err) return err;
   if (!activeCounterConfigured(env)) return json({ error: 'Telemetry unavailable' }, 503, headers);
-  const auth = await activeClaims(request, env, headers);
-  if (auth.response) return auth.response;
   const payloadError = await acceptEmptyPayload(request, headers);
   if (payloadError) return payloadError;
+  // Throttle before the costly Firebase token verification so unauthenticated floods cannot force it.
   if (!(await takeRateToken(request, env))) return limited(headers);
+  const auth = await activeClaims(request, env, headers);
+  if (auth.response) return auth.response;
   const day = utcDay(now);
   const hash = await dailyHash(env.TELEMETRY_HASH_SECRET, day, 'active', auth.claims.sub);
   await recordUnique(env.TELEMETRY_DB, 'active', day, hash);

@@ -317,3 +317,10 @@ test('request failures are logged by error type only and answered with a service
   assert.ok(response.status >= 500);
   assert.deepEqual(errors, [['Telemetry request failed', 'TypeError']]);
 });
+
+test('active throttles unauthenticated bursts before verifying any token', async () => {
+  const env = Object.assign(baseEnv(), { FIREBASE_PROJECT_ID: 'gfc-test' });
+  let last;
+  for (let index = 0; index < 61; index += 1) last = await post('/v1/active', { env, headers: { 'cf-connecting-ip': '192.0.2.77' } });
+  assert.equal(last.status, 429);
+});
