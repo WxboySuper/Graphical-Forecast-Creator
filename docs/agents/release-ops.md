@@ -16,6 +16,14 @@ Beta tags keep their semver prerelease form and share one increasing counter. Th
 
 ## Workflows
 
+### Feedback Worker
+
+The standalone `gfc-feedback` Worker is deployed manually with `.github/workflows/deploy-feedback-worker.yml` (Actions → Deploy feedback Worker → Run workflow). The workflow installs dependencies, applies pending D1 migrations to the remote `gfc-feedback` database, then deploys `cloudflare/wrangler.feedback.jsonc`. It does not create the D1 database, configure Cloudflare Access, or set Worker secrets.
+
+Before the first run, the owner must verify the `gfc-feedback` D1 `database_id` and `FIREBASE_PROJECT_ID` in `cloudflare/wrangler.feedback.jsonc`, set `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` to the values from the Cloudflare Access application, and add GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The Cloudflare API token needs Workers Scripts edit and D1 edit for that account. Set Worker secrets `FEEDBACK_HASH_SALT` and `FEEDBACK_ADMIN_TOKEN` in the Cloudflare dashboard. `FEEDBACK_ADMIN_ORIGIN` is the dashboard CORS allowlist and defaults to `https://admin.gfcweather.com`; change it only if the dashboard origin changes. Never put secret values in this repository.
+
+Run the deploy workflow after the bindings and GitHub secrets are set. It runs `pnpm dlx wrangler@4 d1 migrations apply gfc-feedback --remote --config cloudflare/wrangler.feedback.jsonc` before `pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.feedback.jsonc`. For a local preview of unapplied migration SQL, use `pnpm dlx wrangler@4 d1 migrations list gfc-feedback --remote --config cloudflare/wrangler.feedback.jsonc`; do not manually apply migrations out of order. Configure a Cloudflare Access self-hosted application for `feedback.gfcweather.com/admin*` and allow only the owner. The `/admin/api/*` inbox checks the Access JWT itself. The admin dashboard origin must be permitted by `FEEDBACK_ADMIN_ORIGIN`.
+
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
 | `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional version (`2.0.0-beta.N`), `previous_tag` |
@@ -54,6 +62,28 @@ GitHub Release notes: beta = native PR list + changelog link; stable = curated c
 
 ## Production Worker and rollback
 
+### Telemetry Worker
+
+`gfc-telemetry` runs at `https://telemetry.gfcweather.com`. Deploy it manually with the **Deploy telemetry Worker** GitHub Actions workflow after the owner creates the Worker, D1 database, Analytics Engine dataset, and Cloudflare Access application. The Worker has `workers_dev` disabled, a custom-domain route, observability enabled, and a daily UTC cron that removes dedupe hashes from earlier days. Its Cloudflare rate-limiting binding allows 60 requests per IP per minute per Cloudflare location. Cloudflare documents this limiter as approximate and eventually consistent. It does not write its keys to the telemetry datasets.
+
+D1 stores daily visit and active counts plus their temporary daily dedupe hashes. D1 is used for these counters because exact daily uniqueness needs an atomic dedupe key and count update. The key contains only a daily salted hash, is namespaced by counter type, and the cron deletes every key before the current UTC day. Hash salts are derived daily from `TELEMETRY_HASH_SECRET`; previous daily salts are not persisted. D1 counts contain no identity data and are retained for the admin overview. Feature events go to the `gfc_telemetry_events` Workers Analytics Engine dataset. Its raw retention window is 90 days, per Cloudflare's [Analytics Engine limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/).
+
+For first-time setup, create the D1 database with `pnpm dlx wrangler@4 d1 create gfc-telemetry`, put the returned ID in `cloudflare/wrangler.telemetry.jsonc`, configure the Worker vars and secrets below, and create a Cloudflare Access application for the `/admin/*` paths at `telemetry.gfcweather.com`. The Analytics Engine dataset is created on the first event write. Apply the schema with:
+
+```sh
+pnpm dlx wrangler@4 d1 migrations apply gfc-telemetry --remote --config cloudflare/wrangler.telemetry.jsonc
+```
+
+The manual deploy workflow applies this migration before deploying. The rate-limit namespace ID `61717` must remain unique within the Cloudflare account. Set the secret values interactively with `pnpm dlx wrangler@4 secret put <NAME> --config cloudflare/wrangler.telemetry.jsonc`, once per name. Never put secret values in the repository or logs:
+
+- `TELEMETRY_HASH_SECRET`, used to derive the daily visit and active salts.
+- `CF_ANALYTICS_API_TOKEN`, restricted to Account Analytics Read for the account.
+- `CF_ACCOUNT_ID`, used by the Admin API to query Analytics Engine.
+
+Set the `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` vars to the Cloudflare Access team domain and admin application audience. Keep `TELEMETRY_ALLOWED_ORIGINS` aligned with the app origins. `FIREBASE_PROJECT_ID` validates active-user ID tokens. The Wrangler file's `account_id` is the same deployment account used by the other Workers. The admin overview reports total accounts as `null` because this Worker has no account-count source. Rough MAU is the sum of daily unique visitor counts across the latest `min(days, 30)` UTC days in the requested overview range. One visitor can appear on several days, so it overcounts distinct visitors across that window; the response includes `roughMauWindowDays` and an overlap caveat.
+
+The public visit endpoint never accepts cookies. It combines the request IP and user agent with the day's salt, then stores only a daily count and a temporary dedupe hash. Active-user hashes use a separate namespace. Neither hash is written to feature-event rows or country aggregates. Feature event rows contain only event, detail, app version, Cloudflare country (or `XX`), and the numeric count.
+
 `release-stable.yml` publishes a stable release. `deploy-main-to-vps.yml` then builds the app, deploys the VPS API, deploys `gfc-production` to `app.gfcweather.com`, builds and deploys `gfc-marketing` to the apex and `www`, then smoke-tests both Workers. It skips marketing steps for older refs without marketing files. `action=stage` still prepares the VPS staging preview and timed VPS rollout. The VPS cron cannot activate a Worker, so Workers change only when the production workflow runs with `action=live`.
 
 The app Worker serves `/assets/*` with immutable caching, serves SPA routes from its asset binding, and proxies `/api/*` and `/api/sentry-tunnel` through `https://gfc.weatherboysuper.com` to the existing VPS API. The marketing Worker serves static pages, redirects legacy app paths to `app.gfcweather.com`, and forwards `/api/*` through its service binding to `gfc-production`. It sends other `www` requests to the apex. Both workers apply security headers. Install [`server/nginx-legacy-redirect.conf`](../../server/nginx-legacy-redirect.conf) after cutover so the VPS sends page requests to the app hostname and leaves API paths on the VPS.
@@ -78,7 +108,7 @@ Troubleshooting: [hosted-rollout](../operations/hosted-rollout.md).
 
 ## Secrets (names only)
 
-`GH_PAT`, `OPENCODE_API_KEY`, `VITE_FIREBASE_*`, `VITE_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (web project), `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BETA_SSH_*`, `PROD_SSH_*`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `STRIPE_*`, `FIREBASE_ADMIN_*`, `BETA_WORKER_SHARED_SECRET`, `PRODUCTION_WORKER_SHARED_SECRET` (same GitHub Actions and Worker value, copied into the VPS API environment), `TODOIST_API_TOKEN`. Never print or commit values. Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the VPS for `/api/sentry-tunnel`.
+`GH_PAT`, `OPENCODE_API_KEY`, `VITE_FIREBASE_*`, `VITE_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (web project), `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT_ID`, `CF_ANALYTICS_API_TOKEN`, `TELEMETRY_HASH_SECRET`, `BETA_SSH_*`, `PROD_SSH_*`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `STRIPE_*`, `FIREBASE_ADMIN_*`, `BETA_WORKER_SHARED_SECRET`, `PRODUCTION_WORKER_SHARED_SECRET` (same GitHub Actions and Worker value, copied into the VPS API environment), `TODOIST_API_TOKEN`. Never print or commit values. Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the VPS for `/api/sentry-tunnel`.
 
 ## Other ops references
 

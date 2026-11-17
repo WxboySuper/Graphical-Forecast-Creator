@@ -3,10 +3,29 @@ import { authorizeViewer } from './access.mjs';
 import { json } from './response.mjs';
 import { renderViewerPage } from './viewer-page.mjs';
 
-const statuses = ['new', 'triaged', 'resolved', 'wontfix'];
+const statuses = ['new', 'read', 'handled'];
 const targets = ['beta', 'production'];
 const categories = ['bug', 'idea', 'praise', 'question', 'other'];
 const corsFreeHeaders = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
+
+/** True when the request Origin is the configured dashboard origin (ignores case and a trailing slash in the setting). */
+function isAdminOrigin(origin, env) {
+  const normalize = (value) => (value ?? '').trim().replace(/\/+$/, '').toLowerCase();
+  return Boolean(origin) && normalize(origin) === normalize(env.FEEDBACK_ADMIN_ORIGIN) && normalize(env.FEEDBACK_ADMIN_ORIGIN) !== '';
+}
+
+function adminCorsHeaders(request, env) {
+  const origin = request.headers.get('origin');
+  if (!isAdminOrigin(origin, env)) return {};
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-credentials': 'true',
+    'access-control-allow-methods': 'GET, PATCH, DELETE, OPTIONS',
+    'access-control-allow-headers': 'Content-Type, CF-Access-JWT-Assertion, X-GFC-Viewer',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
 
 function nonce() {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
@@ -52,8 +71,9 @@ async function summary(db) {
   }, 200, corsFreeHeaders);
 }
 
-function isMutationAllowed(request, url) {
-  if (request.headers.get('origin') !== url.origin) return false;
+function isMutationAllowed(request, url, env) {
+  const origin = request.headers.get('origin');
+  if (origin !== url.origin && !isAdminOrigin(origin, env)) return false;
   return request.headers.get('x-gfc-viewer') === '1';
 }
 
@@ -66,14 +86,14 @@ function feedbackId(pathname) {
 const feedbackRoutes = [
   { method: 'GET', withId: false, mutating: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', withId: true, mutating: false, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
-  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now()) },
   { method: 'DELETE', withId: true, mutating: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 
 async function runFeedbackRoute(request, url, env, id) {
   const route = feedbackRoutes.find((item) => item.method === request.method && item.withId === (id !== null));
   if (!route) return json({ error: 'Not found' }, 404);
-  if (route.mutating && !isMutationAllowed(request, url)) return json({ error: 'Same-origin request required' }, 403);
+  if (route.mutating && !isMutationAllowed(request, url, env)) return json({ error: 'Allowed dashboard origin required' }, 403);
   return route.run({ request, url, env, id });
 }
 
@@ -95,7 +115,13 @@ function withViewerHeaders(response) {
 }
 
 export async function handleViewer(request, env, url) {
+  if (url.pathname.startsWith('/admin/api/') && request.method === 'OPTIONS') {
+    const headers = adminCorsHeaders(request, env);
+    return new Response(null, { status: headers['access-control-allow-origin'] ? 204 : 403, headers: { ...corsFreeHeaders, ...headers } });
+  }
   const auth = await authorizeViewer(request, env);
-  if (auth.response) return withViewerHeaders(auth.response);
-  return withViewerHeaders(await dispatch(request, url, env));
+  const response = withViewerHeaders(auth.response ?? await dispatch(request, url, env));
+  // Denied responses carry the dashboard CORS headers too, so the page can read the 401/403 instead of an opaque block.
+  for (const [name, value] of Object.entries(adminCorsHeaders(request, env))) response.headers.set(name, value);
+  return response;
 }

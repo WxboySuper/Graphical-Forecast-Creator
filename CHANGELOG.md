@@ -18,10 +18,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Population and cities:** A beta WorldPop estimate for the active day's outlook polygons, including the cities inside them from a bundled public-domain places dataset.
 - **KMZ/KML export:** A beta export prototype for forecast products.
 - **Send feedback:** Signed-in users can send bugs, ideas, and questions from the Resources menu. The beta site also shows a beta notice with an always-visible feedback button.
+- **Feedback inbox:** Owners can read feedback through the Cloudflare Access protected admin API, filter by `new`, `read`, or `handled`, and page through newest submissions first.
 
 #### Changed
 
-- **Telemetry:** Replace self-hosted Umami with opt-in product events and consent-free visit and daily-active counters. Product event payloads contain only an allowlisted event, a short detail, and app version.
+- **Privacy-first telemetry:** Replaces self-hosted Umami with a client that sends consent-free visit and daily-active counts and opt-in allowlisted product events to the `gfc-telemetry` Worker. Feature events carry only the event name, optional short detail, and app version.
 - **Pricing and What's new:** These pages now live on the marketing site. Old `/pricing` and `/updates` links in the app redirect there, and upgrading to Premium happens from your Account page.
 - **Release and policy versions:** GFC now uses flat release labels such as v2 and v2.1, with padded semver for packages and tags. The Terms of Service and Privacy Policy now use flat Version 2 labels, so you will be asked to accept both updated policies.
 - **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a beta Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
