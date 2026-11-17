@@ -1,7 +1,7 @@
 /**
  * Overlay slice tests. Verify overlay actions and reducers preserve map overlay state.
  */
-import reducer, { applyOverlaySettings, normalizeBaseMapStyle, setBaseMapStyle } from './overlaysSlice';
+import reducer, { applyOverlaySettings, normalizeBaseMapStyle, resetOverlays, setBaseMapStyle } from './overlaysSlice';
 
 describe('overlaysSlice', () => {
   test('defaults ghost outlook overlays to off', () => {
@@ -19,5 +19,14 @@ describe('overlaysSlice', () => {
       expect(reducer(undefined, setBaseMapStyle(legacyStyle)).baseMapStyle).toBe('osm');
       expect(reducer(undefined, applyOverlaySettings({ baseMapStyle: legacyStyle })).baseMapStyle).toBe('osm');
     }
+  });
+
+  test('creates fresh defaults when resetting overlay state', () => {
+    const first = reducer(undefined, resetOverlays());
+    const second = reducer(first, resetOverlays());
+
+    expect(second).toEqual(first);
+    expect(second).not.toBe(first);
+    expect(second.ghostOutlooks).not.toBe(first.ghostOutlooks);
   });
 });

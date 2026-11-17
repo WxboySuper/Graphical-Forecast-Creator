@@ -8,6 +8,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 ### Next major / beta
 
 #### Added
+- **Beta Clerk and D1 migration:** Add an opt-in beta-only Clerk sign-in and Cloudflare D1 API path, with verified-email Firestore account migration and a retained R2 snapshot source. Firebase remains the beta release default; production auth and the VPS API are unchanged.
 
 - **Marketing site:** gfcweather.com becomes the public home of Graphical Forecast Creator, with Features, Learn (a beginner walkthrough and an experienced-forecaster guide), Pricing, What's new, About, Contact, Terms of Service, and Privacy Policy pages. The app moves to app.gfcweather.com.
 - **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It is available on beta for early-access testing and has a matching panel in Monitor.

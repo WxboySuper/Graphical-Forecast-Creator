@@ -29,6 +29,9 @@ import {
 import type { RootState } from '../store';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
+import { isBetaClerkD1Mode } from '../lib/betaApi';
+import { ClerkAuthContextProvider } from './ClerkAuthContextProvider';
+import { useFirebaseBetaAccess } from './useFirebaseBetaAccess';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
@@ -67,7 +70,7 @@ export {
   readRemoteSettings,
 } from './userSettingsDocument';
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
-export { createProfilePayload } from './authSettings';
+export { createProfilePayload, readProfileBetaAccess } from './authSettings';
 export {
   applySettingsToState,
   areOverlaySettingsEqual,
@@ -105,13 +108,16 @@ import {
   localUpdateSyncedSettings,
 } from './localAuthClient';
 
-type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
-type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
+export type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
+export type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
-interface AuthContextValue {
+export interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
   user: User | null;
+  authProvider: 'firebase' | 'clerk' | 'local';
+  betaAccess: boolean;
+  betaAccessLoading: boolean;
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
   hostedAuthEnabled: boolean;
@@ -121,9 +127,10 @@ interface AuthContextValue {
   signOutUser: () => Promise<void>;
   deleteAccount: (password?: string) => Promise<void>;
   updateSyncedSettings: (settings: Partial<UserSettingsDocument>) => Promise<void>;
+  refreshBetaAccess: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 const INITIAL_PROFILE_SYNC_STATUS: SettingsSyncStatus = isHostedAuthEnabled ? 'idle' : 'disabled';
 
 /** Rejects hosted-auth actions when the current deployment intentionally runs in local-only mode. */
@@ -265,7 +272,7 @@ const writeHostedSettingsDocument = async (
 };
 
 /** Builds a full settings snapshot from local UI state when hosted sync has no baseline yet. */
-const buildHostedAccountFallbackSettings = (
+export const buildHostedAccountFallbackSettings = (
   darkMode: boolean,
   overlays: OverlaysState,
   displayName: string,
@@ -352,6 +359,9 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
   settingsSyncStatus: 'disabled',
   user: null,
+  authProvider: 'local',
+  betaAccess: false,
+  betaAccessLoading: false,
   syncedSettings: null,
   error: null,
   hostedAuthEnabled: false,
@@ -361,6 +371,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   signOutUser: disabledAuthAction,
   deleteAccount: disabledAuthAction,
   updateSyncedSettings: disabledAuthAction,
+  refreshBetaAccess: disabledAuthAction,
 });
 
 /** Owns the hosted-auth state machine, Firestore sync, and account actions used by the provider. */
@@ -487,6 +498,9 @@ const useLocalAuthState = (): AuthContextValue => {
     status,
     settingsSyncStatus,
     user,
+    authProvider: 'local',
+    betaAccess: false,
+    betaAccessLoading: false,
     syncedSettings,
     error,
     hostedAuthEnabled: true,
@@ -496,6 +510,7 @@ const useLocalAuthState = (): AuthContextValue => {
     signOutUser,
     deleteAccount: disabledAuthAction,
     updateSyncedSettings,
+    refreshBetaAccess: async () => undefined,
   }), [
     status,
     settingsSyncStatus,
@@ -536,6 +551,7 @@ const useHostedAuthState = (): AuthContextValue => {
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
   const [user, setUser] = useState<User | null>(null);
+  const { betaAccess, betaAccessLoading, refreshBetaAccess } = useFirebaseBetaAccess(status, user);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -788,6 +804,9 @@ const useHostedAuthState = (): AuthContextValue => {
       status,
       settingsSyncStatus,
       user,
+      authProvider: 'firebase',
+      betaAccess,
+      betaAccessLoading,
       syncedSettings,
       error,
       hostedAuthEnabled: true,
@@ -826,8 +845,9 @@ const useHostedAuthState = (): AuthContextValue => {
         });
       },
       updateSyncedSettings,
+      refreshBetaAccess,
     };
-  }, [error, settingsSyncStatus, status, syncedSettings, updateSyncedSettings, user]);
+  }, [betaAccess, betaAccessLoading, error, refreshBetaAccess, settingsSyncStatus, status, syncedSettings, updateSyncedSettings, user]);
 
   return value;
 };
@@ -848,11 +868,12 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 };
 
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  readLocalTestAccount()
-    ? <LocalAuthContextProvider>{children}</LocalAuthContextProvider>
-    : <HostedAuthContextProvider>{children}</HostedAuthContextProvider>
-);
+/** Selects one auth backend while keeping local fixtures isolated from hosted listeners. */
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (readLocalTestAccount()) return <LocalAuthContextProvider>{children}</LocalAuthContextProvider>;
+  if (isBetaClerkD1Mode()) return <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>;
+  return <HostedAuthContextProvider>{children}</HostedAuthContextProvider>;
+};
 
 /** Reads the current hosted-auth state and actions for the app. */
 export const useAuth = (): AuthContextValue => {
