@@ -57,9 +57,10 @@ async function queryAnalytics(env, query) {
   return result.data;
 }
 
-function configured(env) {
-  return Boolean(env.TELEMETRY_DB && env.CF_ACCOUNT_ID && env.CF_ANALYTICS_API_TOKEN);
-}
+const hasDatabase = (env) => Boolean(env.TELEMETRY_DB);
+const hasAnalyticsAccess = (env) => Boolean(env.CF_ACCOUNT_ID && env.CF_ANALYTICS_API_TOKEN);
+// The overview reads only D1 counts; the other routes also query Analytics Engine.
+const configuredFor = (path, env) => hasDatabase(env) && (path === '/admin/overview' || hasAnalyticsAccess(env));
 
 function dateFrom(now, days) {
   return utcDay(now - (days - 1) * DAY_MS);
@@ -116,7 +117,7 @@ const GET_ROUTES = new Map([
 ]);
 
 export async function readAdminData(path, url, env, now) {
-  if (!configured(env)) return json({ error: 'Telemetry admin API is not configured' }, 503, { 'cache-control': 'no-store' });
+  if (!configuredFor(path, env)) return json({ error: 'Telemetry admin API is not configured' }, 503, { 'cache-control': 'no-store' });
   const days = parseDays(url);
   if (!days) return json({ error: 'days must be an integer from 1 to 90' }, 400, { 'cache-control': 'no-store' });
   const handler = GET_ROUTES.get(path);

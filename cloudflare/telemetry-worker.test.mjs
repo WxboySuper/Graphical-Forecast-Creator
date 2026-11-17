@@ -324,3 +324,17 @@ test('active throttles unauthenticated bursts before verifying any token', async
   for (let index = 0; index < 61; index += 1) last = await post('/v1/active', { env, headers: { 'cf-connecting-ip': '192.0.2.77' } });
   assert.equal(last.status, 429);
 });
+
+test('event and visit requests are throttled before their bodies are read', async () => {
+  const env = baseEnv();
+  const badEvent = () => post('/v1/event', { env, body: { event: 'nope' }, headers: { 'cf-connecting-ip': '192.0.2.88' } });
+  let last;
+  for (let index = 0; index < 61; index += 1) last = await badEvent();
+  assert.equal(last.status, 429, 'invalid payloads count against the limiter');
+});
+
+test('analytics-backed admin routes stay unavailable without analytics credentials', async () => {
+  const env = { TELEMETRY_DB: new FakeD1() };
+  const response = await readAdminData('/admin/events', new URL('https://telemetry.gfcweather.com/admin/events'), env, Date.UTC(2026, 10, 17));
+  assert.equal(response.status, 503);
+});

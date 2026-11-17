@@ -26,9 +26,10 @@ export async function countVisit(request, env, headers, now) {
   if (err) return err;
   if (request.headers.has('cookie')) return json({ error: 'Cookies are not accepted' }, 400, headers);
   if (!env.TELEMETRY_HASH_SECRET || !env.TELEMETRY_DB) return json({ error: 'Telemetry unavailable' }, 503, headers);
+  // Throttle before reading or verifying anything so malformed floods are limited too.
+  if (!(await takeRateToken(request, env))) return limited(headers);
   const payloadError = await acceptEmptyPayload(request, headers);
   if (payloadError) return payloadError;
-  if (!(await takeRateToken(request, env))) return limited(headers);
   const day = utcDay(now);
   // Behind Cloudflare the IP is always present; a missing one only happens off-platform, where visits share one bucket.
   const visitor = JSON.stringify([request.headers.get('cf-connecting-ip'), request.headers.get('user-agent') ?? '']);
@@ -54,10 +55,10 @@ export async function countActive(request, env, headers, now) {
   const err = requestError(request, headers);
   if (err) return err;
   if (!activeCounterConfigured(env)) return json({ error: 'Telemetry unavailable' }, 503, headers);
+  // Throttle before reading the payload or verifying the Firebase token so unauthenticated floods stay cheap.
+  if (!(await takeRateToken(request, env))) return limited(headers);
   const payloadError = await acceptEmptyPayload(request, headers);
   if (payloadError) return payloadError;
-  // Throttle before the costly Firebase token verification so unauthenticated floods cannot force it.
-  if (!(await takeRateToken(request, env))) return limited(headers);
   const auth = await activeClaims(request, env, headers);
   if (auth.response) return auth.response;
   const day = utcDay(now);

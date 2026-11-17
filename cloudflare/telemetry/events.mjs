@@ -26,11 +26,11 @@ export async function countEvent(request, env, headers) {
   const err = requestError(request, headers);
   if (err) return err;
   if (!env.TELEMETRY_EVENTS) return json({ error: 'Telemetry unavailable' }, 503, headers);
+  if (!(await takeRateToken(request, env))) return json({ error: 'Rate limit exceeded' }, 429, { ...headers, 'retry-after': '60' });
   const parsed = await parseJson(request, headers);
   if (parsed.response) return parsed.response;
   const accepted = validateEvent(parsed.body);
   if (!accepted) return json({ error: 'Invalid event' }, 400, headers);
-  if (!(await takeRateToken(request, env))) return json({ error: 'Rate limit exceeded' }, 429, { ...headers, 'retry-after': '60' });
   env.TELEMETRY_EVENTS.writeDataPoint({
     blobs: [accepted.event, accepted.detail, accepted.version, request.cf?.country ?? 'XX'],
     doubles: [1],
