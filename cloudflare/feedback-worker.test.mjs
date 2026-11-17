@@ -174,7 +174,8 @@ async function viewerRequest(env, ctx, path, { method = 'GET', auth, headers = {
     headers: { ...(auth ? { 'cf-access-jwt-assertion': auth } : {}), ...headers, ...(body ? { 'content-type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   }), env, ctx);
-  if (headers.origin !== env.FEEDBACK_ADMIN_ORIGIN) assert.ok(![...response.headers.keys()].some((name) => name.startsWith('access-control-')), `admin response must omit CORS headers: ${path}`);
+  const normalizeOrigin = (value) => (value ?? '').trim().replace(/\/+$/, '').toLowerCase();
+  if (normalizeOrigin(headers.origin) !== normalizeOrigin(env.FEEDBACK_ADMIN_ORIGIN)) assert.ok(![...response.headers.keys()].some((name) => name.startsWith('access-control-')), `admin response must omit CORS headers: ${path}`);
   return response;
 }
 async function post(env, ctx, { body = validBody(), auth = null, origin = 'https://beta.gfcweather.com' } = {}) {
