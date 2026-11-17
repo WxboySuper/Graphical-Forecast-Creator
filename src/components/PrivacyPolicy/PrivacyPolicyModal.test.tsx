@@ -86,7 +86,7 @@ describe('PrivacyPolicyModal component', () => {
   test('shows last updated date and whats new when upgrading from an older policy', () => {
     localStorage.setItem('gfc-privacy-policy-accepted', '1.0.0');
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
-    expect(screen.getByText(/Last updated November 17, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Last updated November 18, 2026/u)).toBeInTheDocument();
     const note = screen.getByRole('note');
     expect(note).toBeInTheDocument();
     expect(within(note).getByText(/What's new in version 3/u)).toBeInTheDocument();
@@ -128,14 +128,14 @@ describe('PrivacyPolicyModal component', () => {
 
   test('hides whats new for first-time users in acceptance mode', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
-    expect(screen.getByText(/Last updated November 17, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Last updated November 18, 2026/u)).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.queryByText(/What's new in version/u)).not.toBeInTheDocument();
   });
 
   test('hides whats new in view-only mode but shows version date', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
-    expect(screen.getByText(/Version 3 — Last updated November 17, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Version 3 — Last updated November 18, 2026/u)).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.queryByText(/What's new in version/i)).not.toBeInTheDocument();
   });
