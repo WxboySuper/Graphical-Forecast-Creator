@@ -151,6 +151,13 @@ describe('marketing site build', () => {
     assert.doesNotMatch(read('index.html'), /v1\.7\.8/);
   });
 
+  it('shows the user testimonial with its attribution on the home page', () => {
+    const home = read('index.html');
+    assert.match(home, /<blockquote class="voice-q">/);
+    assert.match(home, /<strong>Chris Ward<\/strong>/);
+    assert.ok(home.includes('GFC has opened many doors for me'));
+  });
+
   it('renders legal pages from the repository policy files', () => {
     assert.match(read('terms/index.html'), /Terms of Service/);
     assert.match(read('privacy/index.html'), /Privacy/i);
