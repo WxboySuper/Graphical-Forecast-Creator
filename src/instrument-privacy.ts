@@ -11,51 +11,53 @@ const LONG_IDENTIFIER_PATTERN = /\b[A-Za-z0-9_-]{20,}\b/g;
 const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:$|[_-])/i;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(\b(?:uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:[_-]?[A-Z][a-zA-Z0-9]*)?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi;
 
-export const redactSensitiveText = (value: string): string => value
+type TextOptions = { value: string };
+type KeyOptions = { key: string };
+type KeyedTextOptions = TextOptions & KeyOptions;
+
+export const redactSensitiveText = ({ value }: TextOptions): string => value
   .replace(EMAIL_PATTERN, '[redacted-email]')
   .replace(IPV4_PATTERN, '[redacted-ip]')
   .replace(IPV6_PATTERN, '[redacted-ip]')
   .replace(LONG_IDENTIFIER_PATTERN, '[redacted-id]')
   .replace(SENSITIVE_TEXT_VALUE_PATTERN, '$1[redacted]');
 
-const removeUrlQuery = (value: string): string => value.split(/[?#]/, 1)[0];
+const removeUrlQuery = ({ value }: TextOptions): string => value.split(/[?#]/, 1)[0];
 
-const isQueryField = (key: string): boolean => /(?:^|[._-])(query|query_string)(?:$|[._-])/i.test(key);
-const isUrlField = (key: string): boolean => /(?:^|[._-])url(?:$|[._-])/i.test(key);
+const isQueryField = ({ key }: KeyOptions): boolean => /(?:^|[._-])(query|query_string)(?:$|[._-])/i.test(key);
+const isUrlField = ({ key }: KeyOptions): boolean => /(?:^|[._-])url(?:$|[._-])/i.test(key);
 
-const sanitizeStringValue = (value: string, key: string): string | undefined => {
-  if (isQueryField(key)) return undefined;
-  const safeValue = isUrlField(key) ? removeUrlQuery(value) : value;
-  return redactSensitiveText(safeValue);
+const sanitizeStringValue = ({ value, key }: KeyedTextOptions): string | undefined => {
+  if (isQueryField({ key })) return undefined;
+  const safeValue = isUrlField({ key }) ? removeUrlQuery({ value }) : value;
+  return redactSensitiveText({ value: safeValue });
 };
 
-const sanitizeNestedValue = (value: unknown, key: string): unknown => {
-  if (isQueryField(key)) return undefined;
-  if (isSensitiveKey(key)) return value === undefined ? undefined : '[redacted]';
-  if (typeof value === 'string') return sanitizeStringValue(value, key);
-  if (Array.isArray(value)) return value.map((item) => sanitizeNestedValue(item, key));
-  if (value && typeof value === 'object') return sanitizeRecord(value as Record<string, unknown>, key);
+const sanitizeNestedValue = ({ value, key }: { value: unknown; key: string }): unknown => {
+  if (isQueryField({ key })) return undefined;
+  if (isSensitiveKey({ key })) return value === undefined ? undefined : '[redacted]';
+  if (typeof value === 'string') return sanitizeStringValue({ value, key });
+  if (Array.isArray(value)) return value.map((item) => sanitizeNestedValue({ value: item, key }));
+  if (value && typeof value === 'object') return sanitizeRecord({ record: value as Record<string, unknown>, contextKey: key });
   return value;
 };
 
-const sanitizeRecord = <T extends Record<string, unknown>>(record: T, contextKey = ''): T =>
+const sanitizeRecord = <T extends Record<string, unknown>>({ record, contextKey = '' }: { record: T; contextKey?: string }): T =>
   Object.fromEntries(Object.entries(record).flatMap(([key, value]) => {
-    const inheritedContext = isUrlField(contextKey) || isQueryField(contextKey);
-    const sanitized = sanitizeNestedValue(value, inheritedContext ? contextKey : key);
+    const inheritedContext = isUrlField({ key: contextKey }) || isQueryField({ key: contextKey });
+    const sanitized = sanitizeNestedValue({ value, key: inheritedContext ? contextKey : key });
     return sanitized === undefined ? [] : [[key, sanitized]];
   })) as T;
 
 type SentryTag = NonNullable<Sentry.Event['tags']>[string];
 
 const sanitizeTag = ([key, value]: [string, SentryTag]): [string, SentryTag] | null => {
-  if (isSensitiveKey(key)) return null;
-  return [key, typeof value === 'string' ? redactSensitiveText(value) : value];
+  if (isSensitiveKey({ key })) return null;
+  return [key, typeof value === 'string' ? redactSensitiveText({ value }) : value];
 };
 
-const normalizeSensitiveKey = (key: string): string => key.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
-
-const isSensitiveKey = (key: string): boolean => {
-  const normalizedKey = normalizeSensitiveKey(key);
+const isSensitiveKey = ({ key }: KeyOptions): boolean => {
+  const normalizedKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2');
   return SENSITIVE_TAG_PATTERN.test(normalizedKey);
 };
 
@@ -70,45 +72,46 @@ export const sanitizeBreadcrumb = (breadcrumb: Sentry.Breadcrumb): Sentry.Breadc
   category: breadcrumb.category,
   level: breadcrumb.level,
   timestamp: breadcrumb.timestamp,
-  message: breadcrumb.message ? redactSensitiveText(breadcrumb.message) : undefined,
+  message: breadcrumb.message ? redactSensitiveText({ value: breadcrumb.message }) : undefined,
 });
 
 const redactExceptionValues = (event: Sentry.Event): void => {
   for (const exception of event.exception?.values ?? []) {
-    if (exception.value) exception.value = redactSensitiveText(exception.value);
+    if (exception.value) exception.value = redactSensitiveText({ value: exception.value });
   }
 };
 
 const redactEventText = (event: Sentry.Event): void => {
-  if (event.message) event.message = redactSensitiveText(event.message);
+  if (event.message) event.message = redactSensitiveText({ value: event.message });
   if (event.transaction) {
-    event.transaction = redactSensitiveText(event.transaction.split(/[?#]/, 1)[0]);
+    const transaction = event.transaction.split(/[?#]/, 1)[0];
+    event.transaction = redactSensitiveText({ value: transaction });
   }
-  if (event.fingerprint) event.fingerprint = event.fingerprint.map(redactSensitiveText);
+  if (event.fingerprint) event.fingerprint = event.fingerprint.map((value) => redactSensitiveText({ value }));
   redactExceptionValues(event);
 };
 
 const sanitizeRequest = (request: NonNullable<Sentry.Event['request']>): NonNullable<Sentry.Event['request']> => ({
   method: request.method,
-  url: request.url ? redactSensitiveText(removeUrlQuery(request.url)) : undefined,
+  url: request.url ? redactSensitiveText({ value: removeUrlQuery({ value: request.url }) }) : undefined,
 });
 
-const sanitizeSpanDescription = (description: string | undefined): string | undefined =>
-  description ? redactSensitiveText(removeUrlQuery(description)) : undefined;
+const sanitizeSpanDescription = ({ description }: { description: string | undefined }): string | undefined =>
+  description ? redactSensitiveText({ value: removeUrlQuery({ value: description }) }) : undefined;
 
 const sanitizeStaticSpan = (span: SentryStaticSpan): SentryStaticSpan => ({
   ...span,
-  description: sanitizeSpanDescription(span.description),
-  data: span.data ? sanitizeRecord(span.data) : span.data,
+  description: sanitizeSpanDescription({ description: span.description }),
+  data: span.data ? sanitizeRecord({ record: span.data }) : span.data,
 });
 
 export const sanitizeStreamedSpan = (span: SentryStreamedSpan): SentryStreamedSpan => ({
   ...span,
-  name: sanitizeSpanDescription(span.name) ?? '',
-  attributes: span.attributes ? sanitizeRecord(span.attributes) : span.attributes,
+  name: sanitizeSpanDescription({ description: span.name }) ?? '',
+  attributes: span.attributes ? sanitizeRecord({ record: span.attributes }) : span.attributes,
   links: span.links?.map((link) => ({
     ...link,
-    attributes: link.attributes ? sanitizeRecord(link.attributes) : link.attributes,
+    attributes: link.attributes ? sanitizeRecord({ record: link.attributes }) : link.attributes,
   })),
 });
 
