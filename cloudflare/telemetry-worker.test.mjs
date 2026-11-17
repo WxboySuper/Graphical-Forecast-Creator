@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, dailyHash, fetchTelemetry, purgeOldDedupe, recordUnique, validateEvent } from './telemetry-worker.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
@@ -6,32 +7,32 @@ import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, pars
 class FakeD1 {
   dedupe = new Set();
   counts = new Map();
+  executions = [];
   prepare(sql) {
-    const run = this.run.bind(this);
     const statement = {
       args: [],
       bind(...values) { statement.args = values; return statement; },
-      run: async () => run(sql, statement.args),
-      all: async () => ({ results: [...this.counts].map(([key, count]) => { const [kind, day] = key.split('|'); return { kind, day, count }; }) }),
+      run: async () => this.run(sql, statement.args),
+      all: async () => ({ results: [...this.counts].map(([key, count]) => { const [kind, day] = key.split('|'); return { kind, day, count }; }).filter((row) => row.day >= statement.args[0]) }),
     };
     return statement;
   }
-  async batch(statements) {
-    const [insert, increment] = statements;
-    const [kind, day, hash] = insert.args;
-    const key = `${kind}|${day}|${hash}`;
-    const inserted = !this.dedupe.has(key);
-    if (inserted) this.dedupe.add(key);
-    if (inserted) {
-      const countKey = `${increment.args[0]}|${increment.args[1]}`;
-      this.counts.set(countKey, (this.counts.get(countKey) ?? 0) + 1);
-    }
-    return [{ meta: { changes: inserted ? 1 : 0 } }, { meta: { changes: inserted ? 1 : 0 } }];
-  }
   async run(sql, args) {
-    if (sql.startsWith('DELETE')) {
-      for (const key of this.dedupe) if (key.split('|')[1] < args[0]) this.dedupe.delete(key);
+    this.executions.push({ sql, args });
+    if (sql.startsWith('INSERT OR IGNORE INTO telemetry_dedupe')) {
+      const [kind, day, hash] = args;
+      const key = `${kind}|${day}|${hash}`;
+      if (this.dedupe.has(key)) return { meta: { changes: 0 } };
+      this.dedupe.add(key);
+      // The migration's AFTER INSERT trigger changes the count in the same SQLite statement.
+      const countKey = `${kind}|${day}`;
+      this.counts.set(countKey, (this.counts.get(countKey) ?? 0) + 1);
       return { meta: { changes: 1 } };
+    }
+    if (sql.startsWith('DELETE')) {
+      const before = this.dedupe.size;
+      for (const key of this.dedupe) if (key.split('|')[1] < args[0]) this.dedupe.delete(key);
+      return { meta: { changes: before - this.dedupe.size } };
     }
     return { meta: { changes: 0 } };
   }
@@ -81,6 +82,11 @@ test('dedupe increments a daily count once and purge removes prior-day hashes', 
   assert.equal(await recordUnique(db, 'visit', '2026-11-16', 'hash-a'), false);
   assert.equal(await recordUnique(db, 'visit', '2026-11-17', 'hash-b'), true);
   assert.equal(db.counts.get('visit|2026-11-16'), 1);
+  assert.equal(db.executions.length, 3);
+  assert.ok(db.executions.every(({ sql }) => sql.startsWith('INSERT OR IGNORE INTO telemetry_dedupe')));
+  const migration = await readFile(new URL('./telemetry/migrations/0001_telemetry.sql', import.meta.url), 'utf8');
+  assert.match(migration, /CREATE TRIGGER telemetry_dedupe_counts_after_insert\s+AFTER INSERT ON telemetry_dedupe/i);
+  assert.match(migration, /ON CONFLICT\(kind, day\) DO UPDATE SET count = count \+ 1/i);
   await purgeOldDedupe(db, '2026-11-17');
   assert.deepEqual([...db.dedupe], ['visit|2026-11-17|hash-b']);
 });
@@ -157,6 +163,20 @@ test('per-IP throttling rejects a burst while allowing a separate IP', async () 
   assert.equal(separateIp.status, 204);
 });
 
+test('telemetry stays available when IP or rate limiter is unavailable', async () => {
+  const eventBody = { event: 'error_shown', version: '2.1.0' };
+  const noBinding = baseEnv();
+  delete noBinding.TELEMETRY_RATE_LIMITER;
+  assert.equal((await post('/v1/event', { env: noBinding, body: eventBody })).status, 204);
+
+  const noIp = baseEnv();
+  assert.equal((await post('/v1/event', { env: noIp, body: eventBody, headers: { 'cf-connecting-ip': '' } })).status, 204);
+
+  const brokenBinding = baseEnv();
+  brokenBinding.TELEMETRY_RATE_LIMITER = { async limit() { throw new Error('unavailable'); } };
+  assert.equal((await post('/v1/event', { env: brokenBinding, body: eventBody })).status, 204);
+});
+
 test('admin verifies Access JWT and queries Analytics Engine with mocked secrets', async () => {
   const env = Object.assign(baseEnv(), {
     CF_ACCESS_TEAM_DOMAIN: accessDomain,
@@ -192,6 +212,8 @@ test('admin query builders validate filters and keep the endpoint queries separa
 test('admin overview and each analytics route preserve their response shapes', async () => {
   const env = Object.assign(baseEnv(), { CF_ACCOUNT_ID: 'mock-account', CF_ANALYTICS_API_TOKEN: 'mock-token' });
   env.TELEMETRY_DB.counts.set('visit|2026-11-16', 4);
+  env.TELEMETRY_DB.counts.set('visit|2026-10-18', 50);
+  env.TELEMETRY_DB.counts.set('visit|2026-10-20', 6);
   env.TELEMETRY_DB.counts.set('active|2026-11-16', 2);
   env.FETCH = async (_url, options) => {
     const query = options.body;
@@ -207,8 +229,16 @@ test('admin overview and each analytics route preserve their response shapes', a
   assert.deepEqual(summary.dailyVisitors, [{ kind: 'visit', day: '2026-11-16', count: 4 }]);
   assert.deepEqual(summary.dau, [{ kind: 'active', day: '2026-11-16', count: 2 }]);
   assert.equal(summary.roughMau, 4);
+  assert.equal(summary.roughMauWindowDays, 7);
   assert.equal(summary.totalAccounts, null);
-  assert.ok(summary.overlapCaveat);
+  assert.match(summary.overlapCaveat, /last 7 UTC days/);
+
+  const ninetyDays = await readAdminData('/admin/overview', new URL('https://telemetry.gfcweather.com/admin/overview?days=90'), env, NOW);
+  const ninetyDaySummary = await ninetyDays.json();
+  assert.equal(ninetyDaySummary.roughMau, 10);
+  assert.equal(ninetyDaySummary.roughMauWindowDays, 30);
+  assert.ok(ninetyDaySummary.dailyVisitors.some((row) => row.day === '2026-10-18' && row.count === 50));
+  assert.match(ninetyDaySummary.overlapCaveat, /last 30 UTC days/);
 
   const routes = [
     ['/admin/events', 'event'],
@@ -226,8 +256,26 @@ test('admin overview and each analytics route preserve their response shapes', a
 
 test('scheduled purge retains only the current dedupe day', async () => {
   const env = baseEnv();
+  env.NOW = () => NOW;
   await recordUnique(env.TELEMETRY_DB, 'active', '2026-11-16', 'old');
   await recordUnique(env.TELEMETRY_DB, 'active', '2026-11-17', 'current');
   await worker.scheduled({}, env);
   assert.deepEqual([...env.TELEMETRY_DB.dedupe], ['active|2026-11-17|current']);
+});
+
+test('scheduled purge logs an unbound database without hiding bound purge failures', async () => {
+  const errors = [];
+  const originalError = console.error;
+  console.error = (...values) => errors.push(values);
+  try {
+    await worker.scheduled({}, {});
+    assert.deepEqual(errors, [['Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured']]);
+
+    const env = baseEnv();
+    env.TELEMETRY_DB.prepare = () => ({ bind() { return this; }, async run() { throw new Error('private failure details'); } });
+    await assert.rejects(worker.scheduled({}, env), { message: 'Telemetry dedupe purge failed' });
+    assert.deepEqual(errors[1], ['Telemetry dedupe purge failed']);
+  } finally {
+    console.error = originalError;
+  }
 });

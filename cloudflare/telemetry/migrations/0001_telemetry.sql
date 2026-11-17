@@ -13,3 +13,11 @@ CREATE TABLE telemetry_dedupe (
 );
 
 CREATE INDEX telemetry_dedupe_day_idx ON telemetry_dedupe(day);
+
+CREATE TRIGGER telemetry_dedupe_counts_after_insert
+AFTER INSERT ON telemetry_dedupe
+BEGIN
+  INSERT INTO telemetry_daily_counts (kind, day, count)
+  VALUES (NEW.kind, NEW.day, 1)
+  ON CONFLICT(kind, day) DO UPDATE SET count = count + 1;
+END;

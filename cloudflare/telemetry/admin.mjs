@@ -68,17 +68,21 @@ function dateFrom(now, days) {
   return today(now - (days - 1) * DAY_MS);
 }
 
-function buildOverview(daily, now) {
+function buildOverview(daily, now, from, days) {
   const visitors = daily.filter((row) => row.kind === 'visit');
   const active = daily.filter((row) => row.kind === 'active');
-  const recentVisitors = visitors.filter((row) => row.day >= today(now - 29 * DAY_MS));
+  const roughMauWindowDays = Math.min(days, 30);
+  const mauFrom = today(now - (roughMauWindowDays - 1) * DAY_MS);
+  const mauCutoff = from > mauFrom ? from : mauFrom;
+  const recentVisitors = visitors.filter((row) => row.day >= mauCutoff);
   const roughMau = recentVisitors.reduce((sum, row) => sum + row.count, 0);
   return {
     dailyVisitors: visitors,
     dau: active,
     roughMau,
+    roughMauWindowDays,
     totalAccounts: null,
-    overlapCaveat: 'Rough MAU is the sum of daily unique visitors. The same person can count on several days, so it is not a unique 30-day account or person count.',
+    overlapCaveat: `Rough MAU is the sum of daily unique visitors over the last ${roughMauWindowDays} UTC days. The same person can count on several days, so it is not a unique account or person count for that window.`,
   };
 }
 
@@ -87,7 +91,7 @@ async function overview({ env, now, days }) {
     .prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? ORDER BY day ASC')
     .bind(dateFrom(now, days))
     .all();
-  return json(buildOverview(result.results ?? [], now), 200, { 'cache-control': 'no-store' });
+  return json(buildOverview(result.results ?? [], now, dateFrom(now, days), days), 200, { 'cache-control': 'no-store' });
 }
 
 async function events({ url, env, days }) {

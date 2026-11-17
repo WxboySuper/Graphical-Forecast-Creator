@@ -16,11 +16,11 @@ export async function dailyHash(secret, day, namespace, value) {
 }
 
 export async function recordUnique(db, kind, day, hash) {
-  const results = await db.batch([
-    db.prepare('INSERT OR IGNORE INTO telemetry_dedupe (kind, day, hash) VALUES (?, ?, ?)').bind(kind, day, hash),
-    db.prepare('INSERT INTO telemetry_daily_counts (kind, day, count) SELECT ?, ?, 1 WHERE changes() = 1 ON CONFLICT(kind, day) DO UPDATE SET count = count + 1').bind(kind, day),
-  ]);
-  return (results?.[1]?.meta?.changes ?? 0) > 0;
+  const result = await db
+    .prepare('INSERT OR IGNORE INTO telemetry_dedupe (kind, day, hash) VALUES (?, ?, ?)')
+    .bind(kind, day, hash)
+    .run();
+  return (result?.meta?.changes ?? 0) > 0;
 }
 
 export async function purgeOldDedupe(db, currentDay) {
@@ -81,8 +81,9 @@ async function parseJson(request, headers) {
 
 async function takeRateToken(request, env) {
   const ip = request.headers.get('cf-connecting-ip');
-  if (!ip || !env.TELEMETRY_RATE_LIMITER) return false;
-  return (await env.TELEMETRY_RATE_LIMITER.limit({ key: ip })).success;
+  if (!ip || !env.TELEMETRY_RATE_LIMITER) return true;
+  try { return (await env.TELEMETRY_RATE_LIMITER.limit({ key: ip })).success; }
+  catch { return true; }
 }
 
 function dailyConfigured(env) {
@@ -174,5 +175,15 @@ export async function fetchTelemetry(request, env) {
 
 export default {
   fetch: fetchTelemetry,
-  async scheduled(_controller, env) { await purgeOldDedupe(env.TELEMETRY_DB, today(env.NOW?.() ?? Date.now())); },
+  async scheduled(_controller, env) {
+    if (!env.TELEMETRY_DB) {
+      console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
+      return;
+    }
+    try { await purgeOldDedupe(env.TELEMETRY_DB, today(env.NOW?.() ?? Date.now())); }
+    catch {
+      console.error('Telemetry dedupe purge failed');
+      throw new Error('Telemetry dedupe purge failed');
+    }
+  },
 };
