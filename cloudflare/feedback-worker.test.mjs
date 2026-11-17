@@ -291,7 +291,11 @@ test('admin read and patch require the configured token', async () => {
   assert.equal((await request('GET', `/v1/feedback/${id}`)).status, 200);
   const list = await (await request('GET', '/v1/feedback?limit=1')).json(); assert.equal(list.items.length, 1);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'read' })).status, 200);
+  assert.equal(db.rows[0].handled_at, null);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'handled' })).status, 200);
+  assert.equal(typeof db.rows[0].handled_at, 'number');
+  assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'read' })).status, 200);
+  assert.equal(db.rows[0].handled_at, null);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'other' })).status, 400);
   assert.equal((await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: 'Bearer wrong' } }), env, ctx)).status, 401);
   const unavailable = harness();
@@ -660,6 +664,7 @@ test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', a
   assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/missing', { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'handled' } })).status, 404);
   assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'handled' } })).status, 200);
   assert.equal(db.rows[0].status, 'handled');
+  assert.equal(typeof db.rows[0].handled_at, 'number');
   const dashboardCors = await viewerRequest(env, ctx, '/admin/api/feedback?limit=1', { auth, headers: { origin: 'https://admin.gfcweather.com' } });
   assert.equal(dashboardCors.headers.get('access-control-allow-origin'), 'https://admin.gfcweather.com');
   assert.equal(dashboardCors.headers.get('access-control-allow-credentials'), 'true');
