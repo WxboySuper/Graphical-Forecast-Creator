@@ -55,7 +55,7 @@ Set the app's catalog base to `PUBLIC_BASE_URL` using the build-target
 environment variables `VITE_MESOSCALE_WORKER_URL_LOCAL`,
 `VITE_MESOSCALE_WORKER_URL_BETA`, `VITE_MESOSCALE_WORKER_URL_STAGING`, and
 `VITE_MESOSCALE_WORKER_URL_PRODUCTION`. `VITE_MESOSCALE_WORKER_URL` can supply
-one common fallback. Then use `{base}/catalog/{model}/{cycle}.json` and
+one common fallback. The beta, staging, and production build workflows (`release-beta.yml`, `deploy-beta-workers.yml`, `deploy-staging.yml`, and `deploy-main-to-vps.yml`) all pass the `MESOSCALE_WORKER_URL` repository variable to their target, so a build for any target gets a catalog URL; without it the workspace has no data even when its exposure flag is on. Then use `{base}/catalog/{model}/{cycle}.json` and
 `{base}/latest/{model}.json`. The Worker rewrites valid `xyz-raster`
 `urlTemplate` values in catalogs to that base and returns a matching
 `catalogUrl` from latest pointers. The app should use the catalog's
