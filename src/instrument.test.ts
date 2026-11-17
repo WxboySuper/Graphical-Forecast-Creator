@@ -59,6 +59,8 @@ describe('instrument', () => {
           },
           normalizeDepth: 10,
           beforeSend: expect.any(Function),
+          beforeSendTransaction: expect.any(Function),
+          beforeSendSpan: expect.any(Function),
           beforeBreadcrumb: expect.any(Function),
           tracesSampleRate: 0.1,
           tracePropagationTargets: expect.arrayContaining([
