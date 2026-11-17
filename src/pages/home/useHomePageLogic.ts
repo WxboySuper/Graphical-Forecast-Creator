@@ -24,6 +24,7 @@ import type { WorkflowMetadata } from '../../types/workflow';
 import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
+import { trackEvent } from '../../lib/telemetry';
 import { isFeatureExposed } from '../../config/featureExposure';
 import { DEFAULT_FORECAST_WORKSPACE, getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
@@ -80,6 +81,7 @@ const useHomePageLogic = () => {
     }
     clearAutoSave(user?.uid, workspaceId);
     dispatch(resetForecasts());
+    trackEvent('forecast_created');
     addToast('Started new forecast cycle', 'success');
   };
 
@@ -107,6 +109,7 @@ const useHomePageLogic = () => {
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
     }));
+    trackEvent('forecast_created');
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
     navigate(getForecastWorkspacePath(workspaceId));
   };
@@ -178,6 +181,7 @@ const useHomePageLogic = () => {
         workflowTemplate: pendingWorkflow,
         cycleDate: getLocalCalendarDate(),
       }));
+      trackEvent('forecast_created');
       setPendingWorkflow(null);
       setConfirmNewCycle(false);
       addToast(`Started ${pendingWorkflow.label} workflow`, 'success');
@@ -185,6 +189,7 @@ const useHomePageLogic = () => {
       return;
     }
     dispatch(resetForecasts());
+    trackEvent('forecast_created');
     addToast('Started new forecast cycle', 'success');
     setConfirmNewCycle(false);
   };

@@ -28,10 +28,10 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
-import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
+import { TelemetryRouteTracker } from './components/TelemetryRouteTracker';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
-import { initProductAnalytics } from './lib/productAnalytics';
+import { pingDailyActive, pingVisit } from './lib/telemetry';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { lazyWithReload } from './routing/lazyWithReload';
 import { ExternalRedirect } from './routing/ExternalRedirect';
@@ -117,6 +117,9 @@ const AppHooks = () => {
   const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
+  useEffect(() => {
+    pingDailyActive(user);
+  }, [user]);
   const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   // Forecast routes and exposed discussion or Monitor handoff links own workspace identity.
   const routeWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
@@ -233,7 +236,7 @@ const getAgreementState = (localBetaBypass: boolean) => ({
 const AcceptedApplication: React.FC = () => (
   <AppProviders>
     <AppHooks />
-    <ProductAnalyticsRouteTracker />
+    <TelemetryRouteTracker />
     <AppRoutes />
   </AppProviders>
 );
@@ -244,9 +247,6 @@ const useAgreementState = () => {
   const initial = getAgreementState(localBetaBypass);
   const [tosAccepted, setTosAccepted] = useState(initial.tosAccepted);
   const [privacyAccepted, setPrivacyAccepted] = useState(initial.privacyAccepted);
-  useEffect(() => {
-    if (privacyAccepted) initProductAnalytics();
-  }, [privacyAccepted]);
   useEffect(() => {
     const next = getAgreementState(localBetaBypass);
     setTosAccepted(next.tosAccepted);
@@ -287,9 +287,15 @@ const AppContent: React.FC = () => (
   </BrowserRouter>
 );
 
+/** Starts the consent-free visit counter before the agreement gate. */
+const VisitPing: React.FC = () => {
+  useEffect(() => pingVisit(), []);
+  return null;
+};
+
 /** Renders the authenticated application shell and route tree. */
 function App() {
-  return <AppContent />;
+  return <><VisitPing /><AppContent /></>;
 }
 
 export default App;

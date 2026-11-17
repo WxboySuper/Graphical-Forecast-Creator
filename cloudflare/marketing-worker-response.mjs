@@ -26,7 +26,7 @@ export const MARKETING_CSP = [
   "script-src 'self'",
   "worker-src 'self' blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https://tiles.openfreemap.org",
+  "connect-src 'self' https://tiles.openfreemap.org https://telemetry.gfcweather.com",
   "form-action 'self'",
 ].join('; ');
 

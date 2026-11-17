@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import type { MesoscaleCatalogParameter } from '../../mesoscale';
 import { groupParameters } from './layerGroups';
 import { filterExposedMesoscaleParameters } from './layerExposure';
+import { trackEvent } from '../../lib/telemetry';
 import { addLayer, moveLayer, removeLayer, setOpacity, type ActiveLayers } from './layerOrdering';
 
 interface LayerPanelProps {
@@ -99,7 +100,11 @@ const AvailableFields: React.FC<LayerPanelProps> = ({ parameters, layers, onChan
         <ul className="mesoscale-group__list">
           {group.parameters.map(parameter => {
             const active = layers.some(layer => layer.id === parameter.id);
-            const toggle = () => onChange(active ? removeLayer(layers, parameter.id) : addLayer(layers, parameter.id));
+            const toggle = () => {
+              if (!active) trackEvent('mesoscale_layer_opened', 'mesoscale');
+              trackEvent('map_layer_changed', 'mesoscale');
+              onChange(active ? removeLayer(layers, parameter.id) : addLayer(layers, parameter.id));
+            };
             return <li key={parameter.id}><FieldButton parameter={parameter} active={active} onToggle={toggle} /></li>;
           })}
         </ul>

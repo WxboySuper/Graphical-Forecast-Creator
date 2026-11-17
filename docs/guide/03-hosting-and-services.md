@@ -27,7 +27,6 @@ flowchart LR
     prodApi["/opt/gfc-analytics<br/>prod API"]
     stgApi["/opt/gfc-staging-analytics<br/>staging API :3008"]
     betaApi["/opt/gfc-beta-analytics<br/>beta API"]
-    umami[Umami analytics]
   end
   W -->|/api/*| betaApi
   P -->|/api/* and Sentry tunnel| prodApi
@@ -43,7 +42,7 @@ Each VPS app directory uses `releases/<version>/` plus a `current` symlink, so a
 | **Firebase Auth + Firestore** | Accounts, settings sync, cloud cycles, saved products | Rules live in `firestore.rules`. TTL policies must be set by hand (see below). |
 | **Stripe** | Premium subscriptions | The server validates webhooks before changing entitlements. |
 | **Sentry** | Errors + performance | Web project and API project. No session replay; PII collection off. Inert without a DSN. |
-| **Umami** (self-hosted) | Privacy-conscious usage analytics | One instance, separate website records for prod and beta. Never mix them. |
+| **Cloudflare Workers** | App API and privacy-first telemetry | Product events require opt-in; visit counts do not. |
 | **NOAA / NWS / SPC / radar** | Monitor and verification data | Fetched from the browser, normalised before reaching UI. |
 | **WorldPop** | Beta population estimate | On-demand, informational only. |
 | **Cloudflare** | App, marketing, beta, and feedback sites, plus the feedback Worker (D1) at `feedback.gfcweather.com` | `gfc-production` serves the app and proxies API requests to the VPS. `gfc-marketing` serves the apex and forwards API requests to the app Worker. Deploys run through GitHub Actions. See [beta feedback](../operations/beta-feedback.md). |
@@ -54,7 +53,7 @@ Each VPS app directory uses `releases/<version>/` plus a `current` symlink, so a
 - **Firestore rules**: deploy and verify per [`firestore-rules-deployment.md`](../operations/firestore-rules-deployment.md).
 - **Sentry secrets**: `VITE_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` as GitHub Actions secrets.
 - **Beta rate limits**: set the same `BETA_WORKER_SHARED_SECRET` in GitHub secrets and the Worker so per-client limits work.
-- **Production Worker cutover**: add the new site to Firebase, Google OAuth, Stripe, Sentry, and Umami settings, then follow the ordered [production cutover checklist](../operations/release-workflow.md#production-cloudflare-cutover). The old hostname's page paths redirect at nginx while `/api/*` stays on the VPS.
+- **Production Worker cutover**: add the new site to Firebase, Google OAuth, Stripe, and Sentry settings, then follow the ordered [production cutover checklist](../operations/release-workflow.md#production-cloudflare-cutover). The old hostname's page paths redirect at nginx while `/api/*` stays on the VPS.
 
 ## Site-wide alert banner
 
@@ -65,5 +64,5 @@ Production Worker assets receive security headers from `public/_headers`. Finger
 ## Privacy and legal
 
 - Policy and terms: [`privacy_policy.md`](../../privacy_policy.md), [`tos.md`](../../tos.md), plus the in-app privacy modal.
-- Engineering privacy record for telemetry: [`umami-telemetry-privacy-operations.md`](../operations/umami-telemetry-privacy-operations.md). It is not legal advice.
+- Telemetry endpoints and data rules: [telemetry operations](../operations/telemetry.md).
 - Support and privacy-request handling: [`v1.7-support-and-privacy.md`](../operations/v1.7-support-and-privacy.md).

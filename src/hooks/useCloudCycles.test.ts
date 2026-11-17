@@ -46,9 +46,7 @@ jest.mock('../utils/productMetrics', () => ({
   queueProductMetric: jest.fn(),
 }));
 
-jest.mock('../lib/productAnalytics', () => ({
-  trackProductEvent: jest.fn(),
-}));
+jest.mock('../lib/telemetry', () => ({ trackEvent: jest.fn() }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseEntitlement = useEntitlement as jest.MockedFunction<typeof useEntitlement>;

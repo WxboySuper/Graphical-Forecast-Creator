@@ -25,6 +25,7 @@ import {
 } from '../../utils/forecastTransfer';
 import { getForecastImportWorkspaceError } from '../../utils/forecastTransfer/importPolicy';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { trackEvent } from '../../lib/telemetry';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 export type ForecastTransferDirection = 'import' | 'export';
@@ -154,6 +155,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
         workspaceId,
       });
+      trackEvent('forecast_exported', effectiveFormat);
       onExported(effectiveFormat, scope);
       onClose();
     } catch (error) {

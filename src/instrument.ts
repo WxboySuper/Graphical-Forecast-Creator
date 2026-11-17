@@ -222,7 +222,41 @@ function getSafeMonitorReferenceError(error: unknown): Record<string, boolean | 
 
 /** Drops known no-stack browser noise while preserving actionable stacked errors. */
 export function beforeSend(event: Sentry.ErrorEvent, _hint: Sentry.EventHint): Sentry.ErrorEvent | null {
-  return isKnownBrowserNoise(event) || isExpectedMonitorReferenceOutage(event) ? null : event;
+  if (isKnownBrowserNoise(event) || isExpectedMonitorReferenceOutage(event)) return null;
+  event.user = undefined;
+  event.request = undefined;
+  event.contexts = undefined;
+  event.extra = undefined;
+  if (event.message) event.message = redactSensitiveText(event.message);
+  if (event.transaction) event.transaction = redactSensitiveText(event.transaction.split(/[?#]/, 1)[0]);
+  if (event.fingerprint) event.fingerprint = event.fingerprint.map((part) => redactSensitiveText(part));
+  for (const exception of event.exception?.values ?? []) {
+    if (exception.value) exception.value = redactSensitiveText(exception.value);
+  }
+  if (event.breadcrumbs) event.breadcrumbs = event.breadcrumbs.map(sanitizeBreadcrumb);
+  if (event.tags) {
+    event.tags = Object.fromEntries(Object.entries(event.tags)
+      .filter(([key]) => !/(?:^|[_-])(uid|user|email|token|authorization)(?:$|[_-])/i.test(key))
+      .map(([key, value]) => [key, typeof value === 'string' ? redactSensitiveText(value) : value]));
+  }
+  return event;
+}
+
+const redactSensitiveText = (value: string): string => value
+  .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+  .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[redacted-ip]')
+  .replace(/\b(?:[A-F0-9]{1,4}:){2,}[A-F0-9:]{1,}\b/gi, '[redacted-ip]')
+  .replace(/\b[A-Za-z0-9_-]{20,}\b/g, '[redacted-id]');
+
+/** Keeps breadcrumb category and severity while dropping user-controlled context. */
+export function sanitizeBreadcrumb(breadcrumb: Sentry.Breadcrumb): Sentry.Breadcrumb {
+  return {
+    type: breadcrumb.type,
+    category: breadcrumb.category,
+    level: breadcrumb.level,
+    timestamp: breadcrumb.timestamp,
+    message: breadcrumb.message ? redactSensitiveText(breadcrumb.message) : undefined,
+  };
 }
 
 /** Records expected Monitor upstream failures without creating a dropped error event. */
@@ -272,6 +306,7 @@ export function initSentry(): void {
     },
     normalizeDepth: 10,
     beforeSend,
+    beforeBreadcrumb: sanitizeBreadcrumb,
     integrations: [
       Sentry.reactRouterV7BrowserTracingIntegration({
         useEffect: React.useEffect,

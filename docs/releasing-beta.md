@@ -64,7 +64,7 @@ The git tag is created **before** deploy (when the draft release is created), so
 | `OPENCODE_API_KEY` | Final changelog audit |
 | `VITE_FIREBASE_*` | Beta frontend build |
 | `VITE_SENTRY_DSN` | Beta frontend build |
-| `VITE_UMAMI_*` | Beta analytics build |
+| `VITE_TELEMETRY_BASE_URL` | Optional telemetry Worker URL override |
 | `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` | Deploy build source maps (not dry-run pre-build) |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Wrangler deploy |
 | `BETA_SSH_KEY`, `BETA_SSH_HOST`, `BETA_SSH_KNOWN_HOSTS` | VPS API deploy (`deploy_api`) |

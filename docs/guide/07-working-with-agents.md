@@ -45,7 +45,7 @@ You do not need the diff. Ask these five questions of the PR description:
 | Saved file / storage format | Old saves must still open | `src/types/outlooks.ts`, `src/utils/fileUtils.ts`, localStorage keys |
 | Feature exposure registry | Controls what ships to whom | `src/config/featureExposure.ts` |
 | Release and deploy workflows | Act on the real servers | `.github/workflows/release-*.yml`, `deploy-*.yml` |
-| Privacy / telemetry | Legal and trust | Umami, Sentry, `privacy_policy.md` |
+| Privacy / telemetry | Legal and trust | Cloudflare telemetry, Sentry, `privacy_policy.md` |
 
 Everything else (UI polish, map behaviour, tests) is low blast radius and easy to undo.
 

@@ -78,7 +78,7 @@ Troubleshooting: [hosted-rollout](../operations/hosted-rollout.md).
 
 ## Secrets (names only)
 
-`GH_PAT`, `OPENCODE_API_KEY`, `VITE_FIREBASE_*`, `VITE_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (web project), `VITE_UMAMI_*`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BETA_SSH_*`, `PROD_SSH_*`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `STRIPE_*`, `FIREBASE_ADMIN_*`, `BETA_WORKER_SHARED_SECRET`, `PRODUCTION_WORKER_SHARED_SECRET` (same GitHub Actions and Worker value, copied into the VPS API environment), `TODOIST_API_TOKEN`. Never print or commit values. Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the VPS for `/api/sentry-tunnel`.
+`GH_PAT`, `OPENCODE_API_KEY`, `VITE_FIREBASE_*`, `VITE_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` (web project), `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `BETA_SSH_*`, `PROD_SSH_*`, `ADMIN_UID_ALLOWLIST`, `METRICS_HASH_SALT`, `STRIPE_*`, `FIREBASE_ADMIN_*`, `BETA_WORKER_SHARED_SECRET`, `PRODUCTION_WORKER_SHARED_SECRET` (same GitHub Actions and Worker value, copied into the VPS API environment), `TODOIST_API_TOKEN`. Never print or commit values. Deploy workflows copy `VITE_SENTRY_DSN` to `SENTRY_BROWSER_DSN` on the VPS for `/api/sentry-tunnel`.
 
 ## Other ops references
 
@@ -90,6 +90,6 @@ Troubleshooting: [hosted-rollout](../operations/hosted-rollout.md).
 | Emergency disable | [emergency-feature-disable](../operations/emergency-feature-disable.md) |
 | OpenCode bots (schedules, limits, turning off) | [opencode-maintenance](../operations/opencode-maintenance.md) |
 | Todoist sync | [github-todoist-sync](../github-todoist-sync.md) |
-| Umami | [umami-telemetry](../operations/umami-telemetry.md), [privacy ops](../operations/umami-telemetry-privacy-operations.md) |
+| Telemetry | [telemetry operations](../operations/telemetry.md) |
 | Support/privacy requests | [v1.7-support-and-privacy](../operations/v1.7-support-and-privacy.md) |
 | Full release procedure | [release-workflow](../operations/release-workflow.md), [releasing-beta](../releasing-beta.md) |

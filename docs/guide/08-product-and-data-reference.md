@@ -49,7 +49,7 @@ Price shown in the public billing schema example is $3/month or $30/year; the li
 | Cloud cycles | Firestore (metadata + separate payload doc, <= 750 KB each) | The owner |
 | Premium status | Stripe -> server -> Firestore entitlement | Server-written only |
 | Usage counts | Server metrics (hashed device/account ids per day) | Admins |
-| Page analytics | Self-hosted Umami | Admins |
+| Page analytics | Privacy-first Cloudflare Worker | Admins |
 | Errors | Sentry (no PII, no replay) | Admins |
 
 Account deletion is a server route that removes the user's data.
@@ -58,7 +58,7 @@ Account deletion is a server route that removes the user's data.
 
 | Item | Notes |
 |------|-------|
-| VPS | Hosts production, staging, beta API, Umami. "Expected expense"; premium tries to offset part of it. |
+| VPS | Hosts production, staging, and beta API. "Expected expense"; premium tries to offset part of it. |
 | Cloudflare Worker | Beta site only |
 | Firebase | Firestore reads/writes grow with cloud users. This is why cloud storage is premium. |
 | Stripe | Fees on subscriptions |

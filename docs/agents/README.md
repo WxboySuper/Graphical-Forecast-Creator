@@ -29,7 +29,7 @@ Entry point is [`/AGENTS.md`](../../AGENTS.md). Load only what the task needs:
 | Mesoscale providers | [mesoscale-provider-contract](../architecture/mesoscale-provider-contract.md) |
 | Mesoscale ingest catalog and operations | [mesoscale-catalog-contract](../architecture/mesoscale-catalog-contract.md), [mesoscale-ingest-operations](../architecture/mesoscale-ingest-operations.md) |
 | Outlook rules, styles, exports | [outlook-info](../product/outlook-info.md), [specialty-style-policy](../product/specialty-style-policy.md), [kmz-export](../product/kmz-export.md), [custom-products](../custom-products.md) |
-| Telemetry | [workflow-analytics](../workflow-analytics.md), [umami-telemetry](../operations/umami-telemetry.md), [umami privacy](../operations/umami-telemetry-privacy-operations.md) |
+| Telemetry | [workflow-analytics](../workflow-analytics.md), [telemetry operations](../operations/telemetry.md) |
 | Public API schema | [public-status-schema](../public-status-schema.md) |
 | Datasets / research | [geo-boundary-datasets](../geo-boundary-datasets.md), [noaa-dat](../data/noaa-dat.md), [monitor-reference-sources](../operations/monitor-reference-sources.md), [622 WorldPop](../research/622-worldpop-evaluation.md) |
 
