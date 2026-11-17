@@ -1,11 +1,9 @@
 import { KeysUnavailableError, verifyToken, digest } from './feedback/auth.mjs';
-import { authorizeViewer } from './feedback/access.mjs';
 import { json } from './feedback/response.mjs';
+import { handleAdmin } from './telemetry/admin.mjs';
+import { validateEvent } from './telemetry/events.mjs';
 
-export const ALLOWED_EVENTS = Object.freeze([
-  'page_view', 'forecast_created', 'forecast_exported', 'forecast_shared', 'forecast_saved_cloud',
-  'mesoscale_layer_opened', 'verification_used', 'map_layer_changed', 'premium_feature_used', 'error_shown',
-]);
+export { ALLOWED_EVENTS, validateEvent } from './telemetry/events.mjs';
 
 const BODY_LIMIT = 2048;
 
@@ -136,16 +134,6 @@ async function countActive(request, env, headers, now) {
   return new Response(null, { status: 204, headers });
 }
 
-const validDetail = (value) => typeof value === 'string' && value.length <= 80 && /^[A-Za-z0-9 _:./-]*$/.test(value);
-const validVersion = (value) => typeof value === 'string' && value.length <= 40 && /^\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9.-]+)?$/.test(value);
-
-export function validateEvent(body) {
-  if (Object.keys(body).some((key) => !['event', 'detail', 'version'].includes(key))) return null;
-  if (!ALLOWED_EVENTS.includes(body.event) || !validVersion(body.version)) return null;
-  if (body.detail !== undefined && !validDetail(body.detail)) return null;
-  return { event: body.event, detail: body.detail ?? '', version: body.version };
-}
-
 async function event(request, env, headers) {
   const err = requestError(request, headers);
   if (err) return err;
@@ -162,71 +150,13 @@ async function event(request, env, headers) {
   return new Response(null, { status: 204, headers });
 }
 
-function sqlQuote(value) { return `'${String(value).replaceAll("'", "''")}'`; }
-function sqlApi(env, query) {
-  if (!env.CF_ACCOUNT_ID || !env.CF_ANALYTICS_API_TOKEN) throw new Error('Analytics API is not configured');
-  const fetcher = env.FETCH ?? fetch;
-  return fetcher(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${env.CF_ANALYTICS_API_TOKEN}`, 'content-type': 'text/plain' },
-    body: query,
-  });
-}
-
-async function analyticsQuery(env, query) {
-  const response = await sqlApi(env, query);
-  if (!response.ok) throw new Error('Analytics query failed');
-  const result = await response.json();
-  if (!Array.isArray(result.data)) throw new Error('Invalid analytics response');
-  return result.data;
-}
-
-const daysParam = (url) => {
-  const value = Number(url.searchParams.get('days') ?? 30);
-  return Number.isInteger(value) && value >= 1 && value <= 90 ? value : null;
-};
-const since = (days) => `timestamp >= NOW() - INTERVAL '${days}' DAY`;
-const dataset = 'events.analyticsEngine.gfc_telemetry_events';
-
-async function adminRead(path, url, env, now) {
-  if (!env.TELEMETRY_DB || !env.CF_ACCOUNT_ID || !env.CF_ANALYTICS_API_TOKEN) return json({ error: 'Telemetry admin API is not configured' }, 503, { 'cache-control': 'no-store' });
-  const days = daysParam(url);
-  if (!days) return json({ error: 'days must be an integer from 1 to 90' }, 400, { 'cache-control': 'no-store' });
-  const from = today(now - (days - 1) * 86_400_000);
-  if (path === '/admin/overview') {
-    const result = await env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? ORDER BY day ASC').bind(from).all();
-    const daily = result.results ?? [];
-    return json({ dailyVisitors: daily.filter((row) => row.kind === 'visit'), dau: daily.filter((row) => row.kind === 'active'), roughMau: daily.filter((row) => row.kind === 'visit' && row.day >= today(now - 29 * 86_400_000)).reduce((sum, row) => sum + row.count, 0), totalAccounts: null, overlapCaveat: 'Rough MAU is the sum of daily unique visitors. The same person can count on several days, so it is not a unique 30-day account or person count.' }, 200, { 'cache-control': 'no-store' });
-  }
-  let query;
-  if (path === '/admin/events') {
-    const eventName = url.searchParams.get('event'); const version = url.searchParams.get('version');
-    const filters = [since(days)];
-    if (eventName) { if (!ALLOWED_EVENTS.includes(eventName)) return json({ error: 'Unknown event' }, 400, { 'cache-control': 'no-store' }); filters.push(`blob1 = ${sqlQuote(eventName)}`); }
-    if (version) { if (!validVersion(version)) return json({ error: 'Invalid version' }, 400, { 'cache-control': 'no-store' }); filters.push(`blob3 = ${sqlQuote(version)}`); }
-    query = `SELECT blob1 AS event, blob2 AS detail, blob3 AS version, toDate(timestamp) AS day, SUM(double1) AS count FROM ${dataset} WHERE ${filters.join(' AND ')} GROUP BY event, detail, version, day ORDER BY day ASC LIMIT 10000`;
-  } else if (path === '/admin/pages') {
-    query = `SELECT blob2 AS page, blob3 AS version, toDate(timestamp) AS day, SUM(double1) AS count FROM ${dataset} WHERE ${since(days)} AND blob1 = 'page_view' GROUP BY page, version, day ORDER BY day ASC LIMIT 10000`;
-  } else if (path === '/admin/locations') {
-    query = `SELECT blob4 AS country, toDate(timestamp) AS day, SUM(double1) AS count FROM ${dataset} WHERE ${since(days)} GROUP BY country, day ORDER BY day ASC LIMIT 10000`;
-  } else return json({ error: 'Not found' }, 404, { 'cache-control': 'no-store' });
-  const data = await analyticsQuery(env, query);
-  return json({ days, data }, 200, { 'cache-control': 'no-store' });
-}
-
-async function admin(request, env, url, now) {
-  const auth = await authorizeViewer(request, env);
-  if (auth.response) return new Response(auth.response.body, { status: auth.response.status, headers: { ...Object.fromEntries(auth.response.headers), 'cache-control': 'no-store' } });
-  return adminRead(url.pathname, url, env, now);
-}
-
 export async function fetchTelemetry(request, env) {
   const url = new URL(request.url);
   const now = env.NOW?.() ?? Date.now();
   try {
     if (url.pathname.startsWith('/admin/')) {
       if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, { 'cache-control': 'no-store' });
-      return await admin(request, env, url, now);
+      return await handleAdmin(request, url, env, now);
     }
     const headers = corsHeaders(request, env);
     const publicPaths = ['/v1/visit', '/v1/active', '/v1/event'];

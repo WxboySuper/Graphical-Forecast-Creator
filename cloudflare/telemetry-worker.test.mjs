@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, dailyHash, fetchTelemetry, purgeOldDedupe, recordUnique, validateEvent } from './telemetry-worker.mjs';
+import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
 
 class FakeD1 {
   dedupe = new Set();
@@ -176,6 +177,51 @@ test('admin verifies Access JWT and queries Analytics Engine with mocked secrets
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data, [{ event: 'page_view', detail: '/forecast', version: '2.1.0', day: '2026-11-17', count: 3 }]);
   assert.equal(response.headers.get('cache-control'), 'no-store');
+});
+
+test('admin query builders validate filters and keep the endpoint queries separated', () => {
+  assert.equal(parseDays(new URL('https://telemetry.gfcweather.com/admin/pages?days=14')), 14);
+  assert.equal(parseDays(new URL('https://telemetry.gfcweather.com/admin/pages?days=91')), null);
+  assert.deepEqual(parseEventFilters(new URL('https://telemetry.gfcweather.com/admin/events?event=page_view&version=2.1.0')), { event: 'page_view', version: '2.1.0' });
+  assert.deepEqual(parseEventFilters(new URL('https://telemetry.gfcweather.com/admin/events?event=unknown')), { error: 'Unknown event' });
+  assert.match(buildEventsQuery(7, 'page_view', '2.1.0'), /blob1 = 'page_view'.*blob3 = '2\.1\.0'/);
+  assert.match(buildPagesQuery(7), /blob1 = 'page_view'/);
+  assert.match(buildLocationsQuery(7), /blob4 AS country/);
+});
+
+test('admin overview and each analytics route preserve their response shapes', async () => {
+  const env = Object.assign(baseEnv(), { CF_ACCOUNT_ID: 'mock-account', CF_ANALYTICS_API_TOKEN: 'mock-token' });
+  env.TELEMETRY_DB.counts.set('visit|2026-11-16', 4);
+  env.TELEMETRY_DB.counts.set('active|2026-11-16', 2);
+  env.FETCH = async (_url, options) => {
+    const query = options.body;
+    let values;
+    if (query.includes('blob4 AS country')) values = [{ country: 'US', day: '2026-11-17', count: 5 }];
+    else if (query.includes('blob2 AS page')) values = [{ page: '/forecast', version: '2.1.0', day: '2026-11-17', count: 3 }];
+    else values = [{ event: 'page_view', detail: '/forecast', version: '2.1.0', day: '2026-11-17', count: 3 }];
+    return Response.json({ data: values });
+  };
+
+  const overview = await readAdminData('/admin/overview', new URL('https://telemetry.gfcweather.com/admin/overview?days=7'), env, NOW);
+  const summary = await overview.json();
+  assert.deepEqual(summary.dailyVisitors, [{ kind: 'visit', day: '2026-11-16', count: 4 }]);
+  assert.deepEqual(summary.dau, [{ kind: 'active', day: '2026-11-16', count: 2 }]);
+  assert.equal(summary.roughMau, 4);
+  assert.equal(summary.totalAccounts, null);
+  assert.ok(summary.overlapCaveat);
+
+  const routes = [
+    ['/admin/events', 'event'],
+    ['/admin/pages', 'page'],
+    ['/admin/locations', 'country'],
+  ];
+  for (const [path, key] of routes) {
+    const response = await readAdminData(path, new URL(`https://telemetry.gfcweather.com${path}?days=7`), env, NOW);
+    assert.equal(response.status, 200, path);
+    const body = await response.json();
+    assert.equal(body.days, 7);
+    assert.equal(body.data[0][key], key === 'page' ? '/forecast' : key === 'country' ? 'US' : 'page_view');
+  }
 });
 
 test('scheduled purge retains only the current dedupe day', async () => {
