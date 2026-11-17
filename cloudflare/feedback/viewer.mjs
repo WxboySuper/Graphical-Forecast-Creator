@@ -120,8 +120,8 @@ export async function handleViewer(request, env, url) {
     return new Response(null, { status: headers['access-control-allow-origin'] ? 204 : 403, headers: { ...corsFreeHeaders, ...headers } });
   }
   const auth = await authorizeViewer(request, env);
-  if (auth.response) return withViewerHeaders(auth.response);
-  const response = withViewerHeaders(await dispatch(request, url, env));
+  const response = withViewerHeaders(auth.response ?? await dispatch(request, url, env));
+  // Denied responses carry the dashboard CORS headers too, so the page can read the 401/403 instead of an opaque block.
   for (const [name, value] of Object.entries(adminCorsHeaders(request, env))) response.headers.set(name, value);
   return response;
 }

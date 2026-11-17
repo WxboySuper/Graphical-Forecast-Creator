@@ -678,6 +678,9 @@ test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', a
   assert.match(preflight.headers.get('access-control-allow-methods') ?? '', /DELETE/);
   const slashed = await worker.fetch(new Request('https://feedback.gfcweather.com/admin/api/feedback', { method: 'OPTIONS', headers: { origin: 'https://admin.gfcweather.com' } }), { ...env, FEEDBACK_ADMIN_ORIGIN: 'https://Admin.gfcweather.com/' }, ctx);
   assert.equal(slashed.headers.get('access-control-allow-origin'), 'https://admin.gfcweather.com', 'admin origin setting ignores case and a trailing slash');
+  const denied = await worker.fetch(new Request('https://feedback.gfcweather.com/admin/api/feedback', { headers: { origin: 'https://admin.gfcweather.com' } }), env, ctx);
+  assert.ok(denied.status === 401 || denied.status === 403, 'unauthenticated dashboard request is denied');
+  assert.equal(denied.headers.get('access-control-allow-origin'), 'https://admin.gfcweather.com', 'denials stay readable by the dashboard');
   const deleted = await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders });
   assert.deepStrictEqual(await deleted.json(), { id: ids[0], deleted: true });
   assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders })).status, 404);
