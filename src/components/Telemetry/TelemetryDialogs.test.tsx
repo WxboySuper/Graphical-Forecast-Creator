@@ -1,4 +1,3 @@
-import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { TelemetryConsentPrompt, TelemetrySettingsDialog } from './TelemetryDialogs';
 import { getTelemetryConsent, setTelemetryConsent } from '../../lib/telemetry';
