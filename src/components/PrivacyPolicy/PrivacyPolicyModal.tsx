@@ -12,7 +12,7 @@ import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
 const PRIVACY_POLICY_VERSION = '3';
-const PRIVACY_POLICY_LAST_UPDATED = 'November 17, 2026';
+const PRIVACY_POLICY_LAST_UPDATED = 'November 18, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -187,7 +187,7 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       We collect usage information in three separate layers so you can see exactly what each one does.
     </p>
     <p>
-      <em>Always on (no cookies, nothing stored on your device).</em> GFC counts how many people use it each day. When
+      <em>Always on (no cookies and no identifier stored on your device).</em> GFC counts how many people use it each day. When
       GFC opens, it sends a request to our telemetry service, which runs on Cloudflare. The service combines your IP
       address and browser user-agent with a secret value tied to the current date, turns that into a one-way
       fingerprint, and uses it only to count each browser once per UTC day. If you are signed in, GFC also sends a
@@ -196,7 +196,8 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       totals. The one-way fingerprints used to avoid double counting are kept only for the current UTC day and are
       deleted by a scheduled job at the start of the next day. We do not store your IP address, user-agent, or account
       identifier in these counts, and the counts are not linked to your forecasts, your account, or the optional
-      statistics below. Cloudflare may also keep routine technical logs, such as IP address and timestamps, for
+      statistics below. Your browser keeps only the date of the last daily signal it sent, so the signal is not sent
+      twice in a day. Cloudflare may also keep routine technical logs, such as IP address and timestamps, for
       requests to this service under its own policies.
     </p>
     <p>
@@ -232,7 +233,13 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       If you are signed in, we also store limited progress metrics tied to your account so we can show you your own
       activity inside GFC. This may include values such as active-day streak, total active days, forecast saves, cloud
       saves, discussions written, and verification sessions run. These account metrics are visible only to you inside
-      your account view.
+      your account view. To avoid counting the same device twice for the same account, the hosted app keeps a random
+      device identifier in your browser&apos;s local storage. When you are signed in, our server stores short daily
+      de-duplication records for your account to count active devices (up to five per day). They contain your account
+      identifier, the date, and either a one-way hash that combines the device identifier with your account
+      identifier or the number of devices active that day. These records are intended to expire automatically after about 35 days, and they are removed with your
+      account data when you delete your account. When you are not signed in, the device identifier is not stored on
+      our server.
     </p>
     <p>
       For a privacy question or an access or deletion request about usage data, contact us at the address in section
