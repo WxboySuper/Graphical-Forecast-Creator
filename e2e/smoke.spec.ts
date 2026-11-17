@@ -82,6 +82,7 @@ test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
     await page.addInitScript(() => {
       localStorage.setItem('gfc-local-beta-bypass', 'true');
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     });
   };
 
