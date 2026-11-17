@@ -1,6 +1,6 @@
 # Workflow analytics event dictionary
 
-Opt-in product events use `trackEvent` in [`src/lib/telemetry`](../src/lib/telemetry). The client accepts only the shared event allowlist and optional short, validated details. It sends nothing until consent is `granted`. Tracker errors do not interrupt forecast editing, saving, completion, export, or rollover.
+Opt-in product events use `trackEvent` exported from [`src/lib/telemetry/index.ts`](../src/lib/telemetry/index.ts). The client accepts only the shared event allowlist in [`events.ts`](../src/lib/telemetry/events.ts) and optional short, validated details. It sends nothing until consent is `granted`. Tracker errors do not interrupt forecast editing, saving, completion, export, or rollover.
 
 ## Events
 

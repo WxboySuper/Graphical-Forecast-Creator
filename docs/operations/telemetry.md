@@ -2,7 +2,7 @@
 
 The web app sends privacy-gated product events to the `gfc-telemetry` Cloudflare Worker. The marketing site sends only the consent-free visit counter. The app also sends a consent-free visit counter and one authenticated daily-active ping per browser day.
 
-The client contract and event allowlist live in [`src/lib/telemetry`](../../src/lib/telemetry). `VITE_TELEMETRY_BASE_URL` sets the build-time API base URL and defaults to `https://telemetry.gfcweather.com`.
+The client contract lives in [`src/lib/telemetry/index.ts`](../../src/lib/telemetry/index.ts), with the event allowlist in [`events.ts`](../../src/lib/telemetry/events.ts). `VITE_TELEMETRY_BASE_URL` sets the build-time API base URL and defaults to `https://telemetry.gfcweather.com`.
 
 ## Data boundaries
 
