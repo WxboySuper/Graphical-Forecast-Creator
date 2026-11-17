@@ -14,7 +14,7 @@ function adminCorsHeaders(request, env) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET, PATCH, OPTIONS',
+    'access-control-allow-methods': 'GET, PATCH, DELETE, OPTIONS',
     'access-control-allow-headers': 'Content-Type, CF-Access-JWT-Assertion, X-GFC-Viewer',
     'access-control-max-age': '600',
     vary: 'Origin',

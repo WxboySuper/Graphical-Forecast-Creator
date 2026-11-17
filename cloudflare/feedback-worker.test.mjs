@@ -672,6 +672,7 @@ test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', a
   assert.equal(deniedCors.headers.get('access-control-allow-origin'), null);
   const preflight = await viewerRequest(env, ctx, '/admin/api/feedback', { method: 'OPTIONS', headers: { origin: 'https://admin.gfcweather.com' } });
   assert.equal(preflight.status, 204);
+  assert.match(preflight.headers.get('access-control-allow-methods') ?? '', /DELETE/);
   const deleted = await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders });
   assert.deepStrictEqual(await deleted.json(), { id: ids[0], deleted: true });
   assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders })).status, 404);
