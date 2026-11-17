@@ -93,7 +93,7 @@ const walk = (directory, files = []) => {
 
 /** Finds code that names a flag as a quoted string, skipping tests and the registry itself. */
 export const findReferences = (name, root = ROOT) => {
-  const pattern = new RegExp(`(['"])${name}\\1`);
+  const quoted = [`'${name}'`, `"${name}"`];
   const hits = [];
   for (const directory of SOURCE_DIRS) {
     const base = path.join(root, directory);
@@ -101,7 +101,7 @@ export const findReferences = (name, root = ROOT) => {
     for (const file of walk(base)) {
       if (/\.test\.[cm]?[jt]sx?$/.test(file) || file.includes(`${path.sep}testing${path.sep}`)) continue;
       readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
-        if (pattern.test(line)) hits.push(`${path.relative(root, file).split(path.sep).join('/')}:${index + 1}`);
+        if (quoted.some((text) => line.includes(text))) hits.push(`${path.relative(root, file).split(path.sep).join('/')}:${index + 1}`);
       });
     }
   }
@@ -227,6 +227,7 @@ const main = async () => {
   if (command === 'list') return printList(registry);
   if (command === 'check') return runCheck(registry);
   if (!name) throw new Error(`Usage: pnpm flags ${command} <name>`);
+  if (!NAME.test(name)) throw new Error(`${name} is not a valid flag name (camelCase).`);
 
   if (command === 'add') {
     const [major, minor] = parseVersion(packageVersion());

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { addFlag, compareVersions, isPastRemoveBy, keepFlag, retireFlag, serialize, validate } from './flags.mjs';
+import { addFlag, compareVersions, findReferences, isPastRemoveBy, keepFlag, retireFlag, serialize, validate } from './flags.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY_TEXT = readFileSync(path.join(ROOT, 'server', 'flags.json'), 'utf8');
@@ -36,6 +36,14 @@ describe('flags registry', () => {
     assert.match(problems, /sw: a switch needs a runbook/);
     assert.match(problems, /cap: a dev flag cannot have a runbook or capability/);
     assert.match(problems, /fresh: unknown target "nowhere"/);
+  });
+});
+
+describe('references', () => {
+  it('matches names literally, so a pattern-like argument cannot match everything or throw', () => {
+    assert.ok(findReferences('mesoscaleWorkspace').length > 0);
+    assert.deepEqual(findReferences('.*'), []);
+    assert.deepEqual(findReferences('('), []);
   });
 });
 
