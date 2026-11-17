@@ -1,5 +1,5 @@
 import { getTelemetryConsent, pageNameForPath, pingDailyActive, pingVisit, setTelemetryConsent, TELEMETRY_CONSENT_KEY, trackEvent, useTelemetryConsent } from './index';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { User } from 'firebase/auth';
 
 const fetchMock = jest.fn().mockResolvedValue({ ok: true });
@@ -29,15 +29,18 @@ test('keeps opt-in events silent until consent is granted', () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('migrates an old opt-in and leaves old opt-outs unset', () => {
+test('migrates an old opt-in, preserves an opt-out, and leaves unanswered consent unset', () => {
   localStorage.setItem('gfc-analytics-enabled', 'true');
   expect(getTelemetryConsent()).toBe('granted');
   expect(localStorage.getItem(TELEMETRY_CONSENT_KEY)).toBe('granted');
   expect(localStorage.getItem('gfc-analytics-enabled')).toBeNull();
   localStorage.clear();
   localStorage.setItem('gfc-analytics-enabled', 'false');
-  expect(getTelemetryConsent()).toBe('unset');
+  expect(getTelemetryConsent()).toBe('denied');
+  expect(localStorage.getItem(TELEMETRY_CONSENT_KEY)).toBe('denied');
   expect(localStorage.getItem('gfc-analytics-enabled')).toBeNull();
+  localStorage.clear();
+  expect(getTelemetryConsent()).toBe('unset');
 });
 
 test('syncs consent changes from another tab', () => {
@@ -64,17 +67,46 @@ test('rejects unsupported events and unsafe details without attaching arbitrary 
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('omits cookies and user identity from daily active telemetry', async () => {
+test('omits cookies and user identity from daily active telemetry and stores only the successful day', async () => {
   const user = { uid: 'private-user-id', getIdToken: jest.fn().mockResolvedValue('firebase-token') } as unknown as User;
   pingDailyActive(user);
   pingDailyActive(user);
-  await Promise.resolve();
+  await waitFor(() => expect(localStorage.getItem('gfc-telemetry-active-day')).toMatch(/^\d{4}-\d{2}-\d{2}$/));
   expect(user.getIdToken).toHaveBeenCalledTimes(1);
   expect(fetchMock).toHaveBeenCalledWith('https://telemetry.gfcweather.com/v1/active', expect.objectContaining({
     method: 'POST', keepalive: true, credentials: 'omit', body: undefined,
     headers: { Authorization: 'Bearer firebase-token' },
   }));
-  expect(localStorage.getItem('gfc-telemetry-active-day')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(localStorage.getItem('gfc-telemetry-active-day')).not.toContain('private-user-id');
+});
+
+test('retries daily active telemetry when token acquisition fails', async () => {
+  const getIdToken = jest.fn()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce('firebase-token');
+  const user = { getIdToken } as unknown as User;
+
+  pingDailyActive(user);
+  await waitFor(() => {
+    pingDailyActive(user);
+    expect(getIdToken).toHaveBeenCalledTimes(2);
+  });
+  await waitFor(() => expect(localStorage.getItem('gfc-telemetry-active-day')).toMatch(/^\d{4}-\d{2}-\d{2}$/));
+
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test('retries daily active telemetry when the Worker request fails', async () => {
+  fetchMock.mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce({ ok: true });
+  const user = { getIdToken: jest.fn().mockResolvedValue('firebase-token') } as unknown as User;
+
+  pingDailyActive(user);
+  await waitFor(() => {
+    pingDailyActive(user);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  await waitFor(() => expect(localStorage.getItem('gfc-telemetry-active-day')).toMatch(/^\d{4}-\d{2}-\d{2}$/));
+
   expect(localStorage.getItem('gfc-telemetry-active-day')).not.toContain('private-user-id');
 });
 

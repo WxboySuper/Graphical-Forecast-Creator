@@ -16,20 +16,21 @@ const getTelemetryBaseUrl = (): string => {
   }
 };
 
-export const postTelemetry = (path: string, body?: string, token?: string): void => {
+export const postTelemetry = (path: string, body?: string, token?: string): Promise<boolean> => {
   try {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
-    void fetch(`${getTelemetryBaseUrl()}${path}`, {
+    return fetch(`${getTelemetryBaseUrl()}${path}`, {
       method: 'POST',
       headers,
       body,
       keepalive: true,
       credentials: 'omit',
-    }).catch(() => undefined);
+    }).then((response) => response.ok).catch(() => false);
   } catch {
     // Telemetry never blocks product work.
+    return Promise.resolve(false);
   }
 };
 
@@ -38,7 +39,7 @@ let visitPingSent = false;
 export const pingVisit = (): void => {
   if (visitPingSent) return;
   visitPingSent = true;
-  postTelemetry('/v1/visit');
+  void postTelemetry('/v1/visit');
 };
 
 const getUtcDay = (): string => new Date().toISOString().slice(0, 10);
@@ -46,14 +47,30 @@ const getUtcDay = (): string => new Date().toISOString().slice(0, 10);
 const isAlreadyCountedToday = (today: string): boolean =>
   localStorage.getItem(ACTIVE_DAY_KEY) === today;
 
+let activePingInFlight = false;
+
+const requestDailyActivePing = async (user: User, day: string): Promise<void> => {
+  try {
+    const token = await user.getIdToken();
+    const sent = await postTelemetry('/v1/active', undefined, token);
+    if (sent) localStorage.setItem(ACTIVE_DAY_KEY, day);
+  } catch {
+    // A later app load retries if authentication or storage fails.
+  } finally {
+    activePingInFlight = false;
+  }
+};
+
 export const pingDailyActive = (user: User | null | undefined): void => {
   if (!user) return;
   try {
     const day = getUtcDay();
     if (isAlreadyCountedToday(day)) return;
-    localStorage.setItem(ACTIVE_DAY_KEY, day);
-    void user.getIdToken().then((token) => postTelemetry('/v1/active', undefined, token)).catch(() => undefined);
+    if (activePingInFlight) return;
+    activePingInFlight = true;
+    void requestDailyActivePing(user, day);
   } catch {
+    activePingInFlight = false;
     // No token or no local storage means no active ping.
   }
 };

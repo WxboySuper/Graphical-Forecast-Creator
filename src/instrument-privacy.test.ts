@@ -32,6 +32,23 @@ test('scrubs identity, addresses, request data, and breadcrumb context from Sent
   expect(scrubbed.breadcrumbs?.[0].data).toBeUndefined();
 });
 
+test('removes sensitive camelCase tag keys', () => {
+  const event = {
+    tags: {
+      userId: 'short-id',
+      userEmail: 'private@example.com',
+      emailAddress: 'other@example.com',
+      accessToken: 'short-token',
+      authorizationHeader: 'private-header',
+      section: 'forecast',
+    },
+  } as unknown as Sentry.ErrorEvent;
+
+  scrubSensitiveEvent(event);
+
+  expect(event.tags).toEqual({ section: 'forecast' });
+});
+
 test('scrubs identifiers and query strings from Sentry transactions and static spans', () => {
   const privateUid = 'firebase-user-id-123456789';
   const privateEmail = 'forecaster@example.com';
@@ -100,4 +117,18 @@ test('scrubs streamed span names and URL, query, email, and UID attributes', () 
   });
   expect(JSON.stringify(scrubbed)).not.toContain(privateUid);
   expect(JSON.stringify(scrubbed)).not.toContain(privateEmail);
+});
+
+test('handles a streamed span with no attributes without throwing', () => {
+  const span = {
+    trace_id: 'trace-id',
+    span_id: 'span-id',
+    name: '/forecast',
+    start_timestamp: 1,
+    status: 'ok',
+    is_segment: true,
+  } as unknown as Parameters<NonNullable<Sentry.BrowserOptions['beforeSendSpan']>>[0];
+
+  expect(() => sanitizeStreamedSpan(span)).not.toThrow();
+  expect(sanitizeStreamedSpan(span).attributes).toBeUndefined();
 });

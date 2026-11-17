@@ -19,7 +19,7 @@ const readCurrentConsent = (): TelemetryConsent | null => {
 const migrateLegacyConsent = (): TelemetryConsent => {
   const legacy = localStorage.getItem(LEGACY_CONSENT_KEY);
   if (legacy === null) return 'unset';
-  const migrated: TelemetryConsent = legacy === 'true' ? 'granted' : 'unset';
+  const migrated: TelemetryConsent = legacy === 'true' ? 'granted' : 'denied';
   localStorage.setItem(TELEMETRY_CONSENT_KEY, migrated);
   localStorage.removeItem(LEGACY_CONSENT_KEY);
   return migrated;

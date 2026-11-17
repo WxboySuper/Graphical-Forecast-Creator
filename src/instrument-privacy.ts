@@ -8,7 +8,7 @@ const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const IPV6_PATTERN = /\b(?:[A-F0-9]{1,4}:){2,}[A-F0-9:]{1,}\b/gi;
 const LONG_IDENTIFIER_PATTERN = /\b[A-Za-z0-9_-]{20,}\b/g;
-const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization)(?:$|[_-])/i;
+const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization)(?:$|[_-])/;
 
 export const redactSensitiveText = (value: string): string => value
   .replace(EMAIL_PATTERN, '[redacted-email]')
@@ -45,8 +45,13 @@ const sanitizeRecord = <T extends Record<string, unknown>>(record: T, contextKey
 type SentryTag = NonNullable<Sentry.Event['tags']>[string];
 
 const sanitizeTag = ([key, value]: [string, SentryTag]): [string, SentryTag] | null => {
-  if (SENSITIVE_TAG_PATTERN.test(key)) return null;
+  if (isSensitiveTagKey(key)) return null;
   return [key, typeof value === 'string' ? redactSensitiveText(value) : value];
+};
+
+const isSensitiveTagKey = (key: string): boolean => {
+  const normalizedKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+  return SENSITIVE_TAG_PATTERN.test(normalizedKey);
 };
 
 const sanitizeTags = (tags: NonNullable<Sentry.Event['tags']>): NonNullable<Sentry.Event['tags']> =>
@@ -95,7 +100,7 @@ const sanitizeStaticSpan = (span: SentryStaticSpan): SentryStaticSpan => ({
 export const sanitizeStreamedSpan = (span: SentryStreamedSpan): SentryStreamedSpan => ({
   ...span,
   name: sanitizeSpanDescription(span.name) ?? '',
-  attributes: sanitizeRecord(span.attributes),
+  attributes: span.attributes ? sanitizeRecord(span.attributes) : span.attributes,
   links: span.links?.map((link) => ({
     ...link,
     attributes: link.attributes ? sanitizeRecord(link.attributes) : link.attributes,
