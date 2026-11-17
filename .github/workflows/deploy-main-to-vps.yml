@@ -189,6 +189,7 @@ jobs:
         env:
           PUBLIC_URL: https://app.gfcweather.com
           VITE_BUILD_TARGET: production
+          VITE_MESOSCALE_WORKER_URL_PRODUCTION: ${{ vars.MESOSCALE_WORKER_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -226,6 +227,7 @@ jobs:
           mv "build-production-${GITHUB_RUN_ID}" build
         env:
           VITE_BUILD_TARGET: staging
+          VITE_MESOSCALE_WORKER_URL_STAGING: ${{ vars.MESOSCALE_WORKER_URL }}
           PUBLIC_URL: https://staging-gfc.weatherboysuper.com
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}

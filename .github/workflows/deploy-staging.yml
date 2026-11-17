@@ -77,6 +77,7 @@ jobs:
         env:
           PUBLIC_URL: https://staging-gfc.weatherboysuper.com
           VITE_BUILD_TARGET: staging
+          VITE_MESOSCALE_WORKER_URL_STAGING: ${{ vars.MESOSCALE_WORKER_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
