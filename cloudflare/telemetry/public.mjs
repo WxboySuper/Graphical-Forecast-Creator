@@ -19,6 +19,6 @@ export function handlePublic(request, url, env, now) {
   if (request.method === 'OPTIONS' && handler) {
     return new Response(null, { status: headers['access-control-allow-origin'] ? 204 : 403, headers });
   }
-  if (request.method !== 'POST' || !handler) return json({ error: 'Not found' }, 404);
+  if (request.method !== 'POST' || !handler) return json({ error: 'Not found' }, 404, headers);
   return handler(request, env, headers, now);
 }

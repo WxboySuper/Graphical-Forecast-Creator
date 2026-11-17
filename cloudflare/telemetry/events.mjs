@@ -11,6 +11,7 @@ export const validDetail = (value) => typeof value === 'string' && value.length 
 export const validVersion = (value) => typeof value === 'string' && value.length <= 40 && /^\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9.-]+)?$/.test(value);
 
 export function validateEvent(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
   if (Object.keys(body).some((key) => !['event', 'detail', 'version'].includes(key))) return null;
   if (!ALLOWED_EVENTS.includes(body.event) || !validVersion(body.version)) return null;
   if (body.detail !== undefined && !validDetail(body.detail)) return null;

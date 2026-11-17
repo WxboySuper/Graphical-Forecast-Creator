@@ -135,6 +135,9 @@ test('event allowlist rejects unknown names and fields', () => {
     { event: 'page_view', detail: 'bad?query', version: '2.1.0' },
     { event: 'page_view', detail: 'x'.repeat(81), version: '2.1.0' },
     { event: 'page_view', version: 'latest' },
+    null,
+    [],
+    'page_view',
   ]) assert.equal(validateEvent(body), null);
 });
 
@@ -160,6 +163,9 @@ test('strict CORS, payload caps, and unauthenticated admin paths fail safely', a
   const adminMissing = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/overview'), env);
   assert.equal(adminMissing.status, 503);
   assert.equal(adminMissing.headers.get('cache-control'), 'no-store');
+  const unknown = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/v1/nope', { method: 'POST', headers: { origin: 'https://app.gfcweather.com' } }), env);
+  assert.equal(unknown.status, 404);
+  assert.equal(unknown.headers.get('access-control-allow-origin'), 'https://app.gfcweather.com', 'unknown routes stay readable by allowed origins');
 });
 
 test('public request parsing rejects invalid JSON, invalid UTF-8, and other content types', async () => {
@@ -187,6 +193,8 @@ test('per-IP throttling rejects a burst while allowing a separate IP', async () 
   assert.equal(limited.status, 429);
   const separateIp = await post('/v1/event', { env, body: { event: 'error_shown', version: '2.1.0' }, headers: { 'cf-connecting-ip': '192.0.2.51' } });
   assert.equal(separateIp.status, 204);
+  const otherRoute = await post('/v1/visit', { env, headers: { 'cf-connecting-ip': '192.0.2.50' } });
+  assert.equal(otherRoute.status, 204, 'a burst on one route does not starve the others');
 });
 
 test('telemetry stays available when IP or rate limiter is unavailable', async () => {
