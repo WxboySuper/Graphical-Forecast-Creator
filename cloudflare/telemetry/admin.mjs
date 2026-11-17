@@ -1,6 +1,7 @@
 import { authorizeViewer } from '../feedback/access.mjs';
 import { json } from '../feedback/response.mjs';
 import { utcDay } from './daily-counts.mjs';
+import { renderUsagePage } from './admin-page.mjs';
 import { ALLOWED_EVENTS, validVersion } from './events.mjs';
 
 const DATASET = 'events.analyticsEngine.gfc_telemetry_events';
@@ -125,11 +126,29 @@ export async function readAdminData(path, url, env, now) {
   return handler({ url, env, now, days });
 }
 
+function nonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function usagePageResponse() {
+  const value = nonce();
+  const csp = `default-src 'none'; script-src 'nonce-${value}'; style-src 'nonce-${value}'; connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`;
+  return new Response(renderUsagePage(value), { headers: {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
+    'referrer-policy': 'no-referrer',
+    'content-security-policy': csp,
+  } });
+}
+
 export async function handleAdmin(request, url, env, now) {
   const auth = await authorizeViewer(request, env);
   if (auth.response) {
     const headers = Object.fromEntries(auth.response.headers);
     return new Response(auth.response.body, { status: auth.response.status, headers: { ...headers, 'cache-control': 'no-store' } });
   }
+  if (url.pathname === '/admin/') return usagePageResponse();
   return readAdminData(url.pathname, url, env, now);
 }

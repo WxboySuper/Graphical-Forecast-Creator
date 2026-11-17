@@ -19,6 +19,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **KMZ/KML export:** A beta export prototype for forecast products.
 - **Send feedback:** Signed-in users can send bugs, ideas, and questions from the Resources menu. The beta site also shows a beta notice with an always-visible feedback button.
 - **Feedback inbox:** Owners can read feedback through the Cloudflare Access protected admin API, filter by `new`, `read`, or `handled`, and page through newest submissions first.
+- **Usage dashboard:** Owners get a private usage page behind Cloudflare Access with daily visitors and active accounts, feature usage by event, page, country, and app version, and a link to the feedback inbox.
 
 #### Changed
 
