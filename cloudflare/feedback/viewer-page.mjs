@@ -34,7 +34,7 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,420px) 
 .badge{display:inline-block;padding:0 7px;border-radius:999px;border:1px solid currentColor;font-size:11px;font-weight:600;line-height:18px;text-transform:capitalize}
 .badge.bug{color:var(--bug)}.badge.idea{color:var(--idea)}.badge.praise{color:var(--praise)}.badge.question{color:var(--question)}.badge.other{color:var(--other)}
 .badge.beta{color:var(--question)}.badge.production{color:var(--accent)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}.dot.new{background:var(--accent)}.dot.triaged{background:var(--question)}.dot.resolved{background:var(--praise)}.dot.wontfix{background:var(--other)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}.dot.new{background:var(--accent)}.dot.read{background:var(--question)}.dot.handled{background:var(--praise)}
 #detail{overflow:auto;padding:20px 28px}
 #detail .empty{color:var(--muted);margin-top:40px;text-align:center}
 .msg{margin:14px 0 18px;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px}
@@ -54,7 +54,7 @@ main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,420px) 
 const SCRIPT = `
 (function(){
 'use strict';
-let STATUSES=[['new','New'],['triaged','Triaged'],['resolved','Resolved'],['wontfix',"Won't fix"]];
+let STATUSES=[['new','New'],['read','Read'],['handled','Handled']];
 let state={items:[],selected:null,cursor:null,summary:null,filters:{status:'',target:'',category:'',q:''},loading:false,seq:0};
 let $=function(id){return document.getElementById(id);};
 function el(tag,props,kids){let n=document.createElement(tag);Object.keys(props||{}).forEach(function(k){if(k==='text')n.textContent=props[k];else if(k==='class')n.className=props[k];else if(k.slice(0,2)==='on')n.addEventListener(k.slice(2),props[k]);else n.setAttribute(k,props[k]);});(kids||[]).forEach(function(c){if(c)n.appendChild(c);});return n;}
@@ -135,7 +135,7 @@ export function renderViewerPage(nonce) {
   <div class="tiles" id="tiles" aria-label="Summary"></div>
 </header>
 <div class="bar" role="search">
-  <select id="f-status" aria-label="Status"><option value="">All statuses</option><option value="new">New</option><option value="triaged">Triaged</option><option value="resolved">Resolved</option><option value="wontfix">Won't fix</option></select>
+  <select id="f-status" aria-label="Status"><option value="">All statuses</option><option value="new">New</option><option value="read">Read</option><option value="handled">Handled</option></select>
   <select id="f-target" aria-label="Build"><option value="">Beta + production</option><option value="beta">Beta</option><option value="production">Production</option></select>
   <select id="f-category" aria-label="Type"><option value="">All types</option><option value="bug">Bug</option><option value="idea">Idea</option><option value="praise">Praise</option><option value="question">Question</option><option value="other">Other</option></select>
   <input id="f-q" type="search" placeholder="Search loaded feedback" aria-label="Search loaded feedback" autocomplete="off">

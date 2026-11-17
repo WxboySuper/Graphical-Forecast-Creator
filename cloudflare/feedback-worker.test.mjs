@@ -99,8 +99,8 @@ class FakeD1 {
       return { meta: { changes: row ? 1 : 0 } };
     } },
     { matches: (sql) => sql.startsWith('UPDATE feedback SET status'), run: (db, args) => {
-      const row = db.rows.find((item) => item.id === args[1]);
-      if (row) row.status = args[0];
+      const row = db.rows.find((item) => item.id === args[3]);
+      if (row) { row.status = args[0]; row.handled_at = args[0] === 'handled' ? args[2] : null; }
       return { meta: { changes: row ? 1 : 0 } };
     } },
   ];
@@ -174,7 +174,7 @@ async function viewerRequest(env, ctx, path, { method = 'GET', auth, headers = {
     headers: { ...(auth ? { 'cf-access-jwt-assertion': auth } : {}), ...headers, ...(body ? { 'content-type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   }), env, ctx);
-  assert.ok(![...response.headers.keys()].some((name) => name.startsWith('access-control-')), `admin response must omit CORS headers: ${path}`);
+  if (headers.origin !== env.FEEDBACK_ADMIN_ORIGIN) assert.ok(![...response.headers.keys()].some((name) => name.startsWith('access-control-')), `admin response must omit CORS headers: ${path}`);
   return response;
 }
 async function post(env, ctx, { body = validBody(), auth = null, origin = 'https://beta.gfcweather.com' } = {}) {
@@ -290,7 +290,8 @@ test('admin read and patch require the configured token', async () => {
   const request = (method, path, body) => worker.fetch(new Request(`https://feedback.gfcweather.com${path}`, { method, headers: { authorization: 'Bearer admin-secret', ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) }), env, ctx);
   assert.equal((await request('GET', `/v1/feedback/${id}`)).status, 200);
   const list = await (await request('GET', '/v1/feedback?limit=1')).json(); assert.equal(list.items.length, 1);
-  assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'triaged' })).status, 200);
+  assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'read' })).status, 200);
+  assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'handled' })).status, 200);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'other' })).status, 400);
   assert.equal((await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: 'Bearer wrong' } }), env, ctx)).status, 401);
   const unavailable = harness();
@@ -629,18 +630,18 @@ test('the bearer-token API cannot delete feedback; deletion is viewer-only', asy
 });
 
 test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', async () => {
-  const { db, env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud } });
+  const { db, env, ctx } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud, FEEDBACK_ADMIN_ORIGIN: 'https://admin.gfcweather.com' } });
   const auth = await accessToken();
   const ids = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'];
   db.rows = ids.map((id, index) => ({
     id, created_at: 2000 - index * 100, uid_hash: 'private-hash', email: index ? null : 'opted-in@example.com',
     category: index ? 'idea' : 'bug', message: `viewer feedback ${index}`, page: '/forecast', app_version: '1.2.3',
-    build_target: index ? 'production' : 'beta', plan: null, viewport: null, user_agent: 'test-agent', status: index ? 'triaged' : 'new', discord_status: 'disabled',
+    build_target: index ? 'production' : 'beta', plan: null, viewport: null, user_agent: 'test-agent', status: index ? 'read' : 'new', handled_at: null, discord_status: 'disabled',
   }));
   const summaryResponse = await viewerRequest(env, ctx, '/admin/api/summary', { auth });
   assert.deepStrictEqual(await summaryResponse.json(), {
     total: 2,
-    byStatus: { new: 1, triaged: 1, resolved: 0, wontfix: 0 },
+    byStatus: { new: 1, read: 1, handled: 0 },
     byTarget: { beta: 1, production: 1 },
     byCategory: { bug: 1, idea: 1, praise: 0, question: 0, other: 0 },
   });
@@ -653,12 +654,19 @@ test('Access viewer summary, list, get, patch, delete, 404s, and CSRF checks', a
   assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/no-such-id', { auth })).status, 404);
   assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/%E0%A4%A', { auth })).status, 404);
   const updatePath = `/admin/api/feedback/${ids[0]}`;
-  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, body: { status: 'resolved' } })).status, 403);
-  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: { origin: 'https://feedback.gfcweather.com' }, body: { status: 'resolved' } })).status, 403);
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, body: { status: 'handled' } })).status, 403);
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: { origin: 'https://feedback.gfcweather.com' }, body: { status: 'handled' } })).status, 403);
   const csrfHeaders = { origin: 'https://feedback.gfcweather.com', 'x-gfc-viewer': '1' };
-  assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/missing', { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'resolved' } })).status, 404);
-  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'resolved' } })).status, 200);
-  assert.equal(db.rows[0].status, 'resolved');
+  assert.equal((await viewerRequest(env, ctx, '/admin/api/feedback/missing', { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'handled' } })).status, 404);
+  assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'PATCH', auth, headers: csrfHeaders, body: { status: 'handled' } })).status, 200);
+  assert.equal(db.rows[0].status, 'handled');
+  const dashboardCors = await viewerRequest(env, ctx, '/admin/api/feedback?limit=1', { auth, headers: { origin: 'https://admin.gfcweather.com' } });
+  assert.equal(dashboardCors.headers.get('access-control-allow-origin'), 'https://admin.gfcweather.com');
+  assert.equal(dashboardCors.headers.get('access-control-allow-credentials'), 'true');
+  const deniedCors = await viewerRequest(env, ctx, '/admin/api/feedback', { auth, headers: { origin: 'https://evil.example' } });
+  assert.equal(deniedCors.headers.get('access-control-allow-origin'), null);
+  const preflight = await viewerRequest(env, ctx, '/admin/api/feedback', { method: 'OPTIONS', headers: { origin: 'https://admin.gfcweather.com' } });
+  assert.equal(preflight.status, 204);
   const deleted = await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders });
   assert.deepStrictEqual(await deleted.json(), { id: ids[0], deleted: true });
   assert.equal((await viewerRequest(env, ctx, updatePath, { method: 'DELETE', auth, headers: csrfHeaders })).status, 404);

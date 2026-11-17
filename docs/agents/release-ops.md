@@ -16,6 +16,14 @@ Beta tags keep their semver prerelease form and share one increasing counter. Th
 
 ## Workflows
 
+### Feedback Worker
+
+The standalone `gfc-feedback` Worker is deployed manually with `.github/workflows/deploy-feedback-worker.yml` (Actions → Deploy feedback Worker → Run workflow). The workflow installs dependencies, applies pending D1 migrations to the remote `gfc-feedback` database, then deploys `cloudflare/wrangler.feedback.jsonc`. It does not create the D1 database, configure Cloudflare Access, or set Worker secrets.
+
+Before the first run, the owner must verify the `gfc-feedback` D1 `database_id` and `FIREBASE_PROJECT_ID` in `cloudflare/wrangler.feedback.jsonc`, set `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` to the values from the Cloudflare Access application, and add GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. The Cloudflare API token needs Workers Scripts edit and D1 edit for that account. Set Worker secrets `FEEDBACK_HASH_SALT` and `FEEDBACK_ADMIN_TOKEN` in the Cloudflare dashboard. `FEEDBACK_ADMIN_ORIGIN` is the dashboard CORS allowlist and defaults to `https://admin.gfcweather.com`; change it only if the dashboard origin changes. Never put secret values in this repository.
+
+Run the deploy workflow after the bindings and GitHub secrets are set. It runs `pnpm dlx wrangler@4 d1 migrations apply gfc-feedback --remote --config cloudflare/wrangler.feedback.jsonc` before `pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.feedback.jsonc`. For a local preview of unapplied migration SQL, use `pnpm dlx wrangler@4 d1 migrations list gfc-feedback --remote --config cloudflare/wrangler.feedback.jsonc`; do not manually apply migrations out of order. Configure a Cloudflare Access self-hosted application for `feedback.gfcweather.com/admin*` and allow only the owner. The `/admin/api/*` inbox checks the Access JWT itself. The admin dashboard origin must be permitted by `FEEDBACK_ADMIN_ORIGIN`.
+
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
 | `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional version (`2.0.0-beta.N`), `previous_tag` |

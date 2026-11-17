@@ -3,9 +3,9 @@ import { json } from './response.mjs';
 import { isCategory, isTarget, validateCursor, validatePageLimit, validateSince } from './validate.mjs';
 
 // Explicit columns: the salted user hash is never exposed; email is present only when the user consented to contact.
-const PUBLIC_COLUMNS = 'id, created_at, email, category, message, page, app_version, build_target, plan, viewport, status, discord_status, user_agent';
+const PUBLIC_COLUMNS = 'id, created_at, email, category, message, page, app_version, build_target, plan, viewport, status, handled_at, discord_status, user_agent';
 const ATTEMPT_WINDOW_MS = 600000;
-const STATUSES = new Set(['new', 'triaged', 'resolved', 'wontfix']);
+const STATUSES = new Set(['new', 'read', 'handled']);
 const unauthorized = () => json({ error: 'Authentication required' }, 401);
 const badQuery = () => json({ error: 'Invalid query parameters' }, 400);
 
@@ -124,7 +124,7 @@ export async function patchFeedback(request, id, db) {
   if (!body) return json({ error: 'Invalid status' }, 400);
   if (Object.keys(body).length !== 1) return json({ error: 'Invalid status' }, 400);
   if (!STATUSES.has(body.status)) return json({ error: 'Invalid status' }, 400);
-  const result = await db.prepare('UPDATE feedback SET status = ? WHERE id = ?').bind(body.status, id).run();
+  const result = await db.prepare("UPDATE feedback SET status = ?, handled_at = CASE WHEN ? = 'handled' THEN COALESCE(handled_at, ?) ELSE NULL END WHERE id = ?").bind(body.status, body.status, Date.now(), id).run();
   return result.meta?.changes ? json({ id, status: body.status }) : json({ error: 'Feedback not found' }, 404);
 }
 
