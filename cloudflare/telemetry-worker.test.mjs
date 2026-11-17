@@ -351,10 +351,12 @@ test('the usage dashboard sits behind Access and /admin redirects to /admin/', a
   const redirect = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin'), usageEnv());
   assert.equal(redirect.status, 308);
   assert.equal(new URL(redirect.headers.get('location')).pathname, '/admin/');
+  const withQuery = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin?days=7'), usageEnv());
+  assert.equal(new URL(withQuery.headers.get('location')).search, '?days=7', 'the redirect keeps the query string');
   const anonymous = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/'), usageEnv());
   assert.ok([401, 403].includes(anonymous.status), 'the page is not served without an Access token');
   const unconfigured = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/'), baseEnv());
-  assert.ok(unconfigured.status >= 400, 'the page fails closed without Access configuration');
+  assert.equal(unconfigured.status, 503, 'the page fails closed without Access configuration');
 });
 
 test('the usage dashboard is a self-contained page with a strict content security policy', async () => {
@@ -374,5 +376,5 @@ test('the usage dashboard is a self-contained page with a strict content securit
   assert.doesNotMatch(html, /\sstyle=/, 'inline style attributes would be blocked by the policy');
   assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+href=|@import|innerHTML|insertAdjacentHTML/);
   const other = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/', { headers: { 'cf-access-jwt-assertion': token } }), usageEnv());
-  assert.notEqual(/script-src 'nonce-([^']+)'/.exec(other.headers.get('content-security-policy'))[1], nonce, 'nonce changes per response');
+  assert.notEqual(/script-src 'nonce-([^']+)'/.exec(other.headers.get('content-security-policy') ?? '')?.[1], nonce, 'nonce changes per response');
 });

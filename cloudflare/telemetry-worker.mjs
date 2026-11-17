@@ -20,7 +20,7 @@ export async function fetchTelemetry(request, env) {
   const url = new URL(request.url);
   const now = env.NOW?.() ?? Date.now();
   try {
-    if (url.pathname === '/admin') return Response.redirect(new URL('/admin/', url).href, 308);
+    if (url.pathname === '/admin') return Response.redirect(new URL(`/admin/${url.search}`, url).href, 308);
     if (url.pathname.startsWith('/admin/')) return await adminResponse(request, url, env, now);
     return await handlePublic(request, url, env, now);
   } catch (error) {

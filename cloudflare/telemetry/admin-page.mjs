@@ -62,10 +62,12 @@ function el(tag,props,kids){let n=document.createElement(tag);Object.keys(props|
 function sv(tag,attrs){let n=document.createElementNS(SVGNS,tag);Object.keys(attrs||{}).forEach(function(k){if(k==='text')n.textContent=attrs[k];else n.setAttribute(k,attrs[k]);});return n;}
 function fmt(n){return Number(n||0).toLocaleString();}
 function words(s){return String(s).replace(/_/g,' ').replace(/^./,function(c){return c.toUpperCase();});}
-function api(path){return fetch(path+(path.indexOf('?')<0?'?':'&')+'days='+state.days,{credentials:'same-origin',headers:{accept:'application/json'}}).then(function(r){return r.json().catch(function(){return {};}).then(function(b){
-  if(r.status===401||r.status===403)throw new Error('Your Access session ended or you are not allowed here. Reload the page to sign in again.');
-  if(r.status===503)throw new Error('Not configured yet: '+(b.error||'the service needs its Cloudflare settings.'));
-  if(!r.ok)throw new Error(b.error||('Request failed ('+r.status+')'));return b;});});}
+let KNOWN_FAILURES={401:'Your Access session ended or you are not allowed here. Reload the page to sign in again.',403:'Your Access session ended or you are not allowed here. Reload the page to sign in again.'};
+function failure(status,body){if(KNOWN_FAILURES[status])return new Error(KNOWN_FAILURES[status]);
+  if(status===503)return new Error('Not configured yet: '+(body.error||'the service needs its Cloudflare settings.'));
+  return new Error(body.error||('Request failed ('+status+')'));}
+function api(path){let url=path+(path.indexOf('?')<0?'?':'&')+'days='+state.days;
+  return fetch(url,{credentials:'same-origin',headers:{accept:'application/json'}}).then(function(r){return r.json().catch(function(){return {};}).then(function(b){if(!r.ok)throw failure(r.status,b);return b;});});}
 function sum(rows,key){return rows.reduce(function(t,r){return t+Number(r[key||'count']||0);},0);}
 function group(rows,keyFn){let m={};rows.forEach(function(r){let k=keyFn(r);m[k]=(m[k]||0)+Number(r.count||0);});return Object.keys(m).map(function(k){return {name:k,count:m[k]};}).sort(function(a,b){return b.count-a.count;});}
 function fillBar(ratio){let f=el('span',{class:'fill'});f.style.width=Math.max(2,Math.round(ratio*100))+'%';return f;}
