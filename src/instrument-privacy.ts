@@ -8,7 +8,7 @@ const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const IPV4_PATTERN = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const IPV6_PATTERN = /\b(?:[A-F0-9]{1,4}:){2,}[A-F0-9:]{1,}\b/gi;
 const LONG_IDENTIFIER_PATTERN = /\b[A-Za-z0-9_-]{20,}\b/g;
-const SENSITIVE_TAG_PATTERN = /(?:^|[_-])(uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:$|[_-])/i;
+const SENSITIVE_TAG_PATTERN = /(?:^|[._-])(uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:$|[._-])/i;
 const SENSITIVE_TEXT_VALUE_PATTERN = /(\b(?:uid|user|email|token|authorization|password|passwd|secret|api[_-]?key|session|phone|auth|cookie|bearer|credential)(?:[_-]?[A-Z][a-zA-Z0-9]*)?\s*[=:]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi;
 
 type TextOptions = { value: string };

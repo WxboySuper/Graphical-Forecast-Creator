@@ -119,7 +119,7 @@ test('scrubs identifiers and query strings from Sentry transactions and static s
   expect(scrubbed.spans?.[0].description).toBe('GET https://gfcweather.com/forecast/[redacted-id]');
   expect(scrubbed.spans?.[0].data).toEqual({
     'url.full': 'https://gfcweather.com/forecast/[redacted-id]',
-    'user.email': '[redacted-email]',
+    'user.email': '[redacted]',
     uid: '[redacted]',
   });
   expect(JSON.stringify(scrubbed)).not.toContain(privateUid);
@@ -150,7 +150,7 @@ test('scrubs streamed span names and URL, query, email, and UID attributes', () 
   expect(scrubbed.name).toBe('/forecast/[redacted-id]');
   expect(scrubbed.attributes).toEqual({
     'url.full': 'https://gfcweather.com/forecast/[redacted-id]',
-    'user.email': '[redacted-email]',
+    'user.email': '[redacted]',
     uid: '[redacted]',
   });
   expect(JSON.stringify(scrubbed)).not.toContain(privateUid);
@@ -181,4 +181,12 @@ test('redacts short sensitive key-value text in messages and exceptions', () => 
 
   expect(event.message).toBe('Failure password=[redacted] and apiKey=[redacted]; undefined TypeError');
   expect(event.exception?.values?.[0].value).toBe('sessionId=[redacted]; phone=[redacted]');
+});
+
+test('redacts dotted sensitive keys in tags regardless of how short the value is', () => {
+  const event = {
+    tags: { 'user.id': 'abc', 'http.session': 'xy', 'user.email': 'a', section: 'forecast' },
+  } as unknown as Sentry.ErrorEvent;
+
+  expect(scrubSensitiveEvent(event).tags).toEqual({ section: 'forecast' });
 });
