@@ -10,11 +10,15 @@ export const ALLOWED_EVENTS = Object.freeze([
 export const validDetail = (value) => typeof value === 'string' && value.length <= 80 && /^[A-Za-z0-9 _:./-]*$/.test(value);
 export const validVersion = (value) => typeof value === 'string' && value.length <= 40 && /^\d+\.\d+(?:\.\d+)?(?:-[A-Za-z0-9.-]+)?$/.test(value);
 
+const EVENT_KEYS = new Set(['event', 'detail', 'version']);
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const hasOnlyEventKeys = (body) => Object.keys(body).every((key) => EVENT_KEYS.has(key));
+const hasValidDetail = (body) => body.detail === undefined || validDetail(body.detail);
+const hasValidName = (body) => ALLOWED_EVENTS.includes(body.event) && validVersion(body.version);
+
 export function validateEvent(body) {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (Object.keys(body).some((key) => !['event', 'detail', 'version'].includes(key))) return null;
-  if (!ALLOWED_EVENTS.includes(body.event) || !validVersion(body.version)) return null;
-  if (body.detail !== undefined && !validDetail(body.detail)) return null;
+  if (!isPlainObject(body) || !hasOnlyEventKeys(body)) return null;
+  if (!hasValidName(body) || !hasValidDetail(body)) return null;
   return { event: body.event, detail: body.detail ?? '', version: body.version };
 }
 
