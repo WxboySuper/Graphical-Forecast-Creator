@@ -30,6 +30,7 @@ export async function countVisit(request, env, headers, now) {
   if (payloadError) return payloadError;
   if (!(await takeRateToken(request, env))) return limited(headers);
   const day = utcDay(now);
+  // Behind Cloudflare the IP is always present; a missing one only happens off-platform, where visits share one bucket.
   const visitor = JSON.stringify([request.headers.get('cf-connecting-ip'), request.headers.get('user-agent') ?? '']);
   const hash = await dailyHash(env.TELEMETRY_HASH_SECRET, day, 'visit', visitor);
   await recordUnique(env.TELEMETRY_DB, 'visit', day, hash);

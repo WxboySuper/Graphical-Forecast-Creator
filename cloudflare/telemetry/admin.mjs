@@ -1,13 +1,10 @@
 import { authorizeViewer } from '../feedback/access.mjs';
 import { json } from '../feedback/response.mjs';
+import { utcDay } from './daily-counts.mjs';
 import { ALLOWED_EVENTS, validVersion } from './events.mjs';
 
 const DATASET = 'events.analyticsEngine.gfc_telemetry_events';
 const DAY_MS = 86_400_000;
-
-function today(now) {
-  return new Date(now).toISOString().slice(0, 10);
-}
 
 export function parseDays(url) {
   const value = Number(url.searchParams.get('days') ?? 30);
@@ -65,14 +62,14 @@ function configured(env) {
 }
 
 function dateFrom(now, days) {
-  return today(now - (days - 1) * DAY_MS);
+  return utcDay(now - (days - 1) * DAY_MS);
 }
 
 function buildOverview(daily, now, from, days) {
   const visitors = daily.filter((row) => row.kind === 'visit');
   const active = daily.filter((row) => row.kind === 'active');
   const roughMauWindowDays = Math.min(days, 30);
-  const mauFrom = today(now - (roughMauWindowDays - 1) * DAY_MS);
+  const mauFrom = utcDay(now - (roughMauWindowDays - 1) * DAY_MS);
   const mauCutoff = from > mauFrom ? from : mauFrom;
   const recentVisitors = visitors.filter((row) => row.day >= mauCutoff);
   const roughMau = recentVisitors.reduce((sum, row) => sum + row.count, 0);
