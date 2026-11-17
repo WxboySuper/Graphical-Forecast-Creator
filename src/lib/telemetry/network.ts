@@ -4,6 +4,7 @@ const ACTIVE_DAY_KEY = 'gfc-telemetry-active-day';
 const DEFAULT_TELEMETRY_BASE_URL = 'https://telemetry.gfcweather.com';
 
 declare const __GFC_TELEMETRY_BASE_URL__: string;
+declare const __GFC_DEV_MODE__: boolean;
 
 const getTelemetryBaseUrl = (): string => {
   try {
@@ -16,7 +17,18 @@ const getTelemetryBaseUrl = (): string => {
   }
 };
 
+/** Local development builds stay out of the real counts unless a telemetry base URL is configured. */
+const isUnconfiguredLocalDev = (): boolean => {
+  try {
+    const configured = typeof __GFC_TELEMETRY_BASE_URL__ === 'string' && __GFC_TELEMETRY_BASE_URL__ !== '';
+    return !configured && typeof __GFC_DEV_MODE__ !== 'undefined' && __GFC_DEV_MODE__ === true;
+  } catch {
+    return false;
+  }
+};
+
 export const postTelemetry = (path: string, body?: string, token?: string): Promise<boolean> => {
+  if (isUnconfiguredLocalDev()) return Promise.resolve(false);
   try {
     const headers: Record<string, string> = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';

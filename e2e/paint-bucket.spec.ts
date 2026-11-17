@@ -11,7 +11,8 @@ const startForecast = async (page: Page): Promise<void> => {
     sessionStorage.clear();
     localStorage.setItem('gfc-local-beta-bypass', 'true');
     localStorage.setItem('gfc-tos-accepted', '2');
-    localStorage.setItem('gfc-privacy-policy-accepted', '2');
+    localStorage.setItem('gfc-privacy-policy-accepted', '3');
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
   });
   await page.goto('/?localTestAccount=premium', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Day 1', exact: true }).click();

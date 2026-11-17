@@ -132,3 +132,17 @@ test('swallows synchronous and asynchronous transport failures', async () => {
   fetchMock.mockImplementationOnce(() => { throw new Error('offline'); });
   expect(() => trackEvent('forecast_created')).not.toThrow();
 });
+
+test('local development builds never send telemetry to the real service', async () => {
+  const scope = globalThis as unknown as { __GFC_DEV_MODE__?: boolean };
+  const previous = scope.__GFC_DEV_MODE__;
+  scope.__GFC_DEV_MODE__ = true;
+  try {
+    setTelemetryConsent('granted');
+    trackEvent('page_view', 'home');
+    await Promise.resolve();
+    expect(fetchMock).not.toHaveBeenCalled();
+  } finally {
+    scope.__GFC_DEV_MODE__ = previous;
+  }
+});
