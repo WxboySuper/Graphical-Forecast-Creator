@@ -16,7 +16,7 @@ import {
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { cn } from '../../lib/utils';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 
 export interface TabbedToolbarActionItem {
@@ -110,7 +110,7 @@ export const getTabbedToolbarActionItems = (
     tone: 'utility',
     accentClass: 'bg-teal-500/15 text-teal-700',
   },
-  ...(isFeatureExposed('forecastWorkflowV2')
+  ...(flag('forecastWorkflowV2')
     ? [{
         key: 'complete',
         label: 'Complete',

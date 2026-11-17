@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { isCustomWorkspaceActive } from '../../config/forecastWorkspaces';
 import { selectCurrentCustomLayers } from '../../store/forecastSlice';
 import type { RootState } from '../../store';
@@ -11,8 +11,8 @@ export const useCustomLegendMode = (activeOutlookTypeOverride?: string): boolean
   const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   return !activeOutlookTypeOverride && isCustomWorkspaceActive(
     workspaceId,
-    isFeatureExposed('customProducts'),
-    isFeatureExposed('customWorkspace'),
+    flag('customProducts'),
+    flag('customWorkspace'),
   );
 };
 

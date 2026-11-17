@@ -25,7 +25,7 @@ import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
 import { trackEvent } from '../../lib/telemetry';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { DEFAULT_FORECAST_WORKSPACE, getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
@@ -52,7 +52,7 @@ const useHomePageLogic = () => {
   const workspaceId = getExposedForecastWorkspaces().some(({ id }) => id === persistedWorkspaceId)
     ? persistedWorkspaceId
     : DEFAULT_FORECAST_WORKSPACE;
-  const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
+  const workflowEnabled = flag('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [confirmNewCycle, setConfirmNewCycle] = useState(false);

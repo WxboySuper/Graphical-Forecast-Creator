@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../ui/dialog';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { addCustomLayer, selectCustomLayer } from '../../store/forecastSlice';
 import type { RootState } from '../../store';
 import { CUSTOM_PRODUCT_LIMITS, type OneOffCustomLayer } from '../../types/customProducts';
@@ -27,7 +27,7 @@ const CustomProductsDialog = () => {
   const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
   const layerCount = useSelector((state: RootState) => state.forecast.forecastCycle.days[state.forecast.forecastCycle.currentDay]?.customLayers?.layers.length ?? 0);
-  if (!isFeatureExposed('customProducts')) return null;
+  if (!flag('customProducts')) return null;
 
   const useProduct = (layer: OneOffCustomLayer) => {
     if (layerCount >= CUSTOM_PRODUCT_LIMITS.layersPerCollection) return false;

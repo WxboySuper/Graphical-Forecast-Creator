@@ -168,8 +168,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate feature exposure policy
-        run: pnpm run validate:feature-exposure
+      - name: Validate feature flags
+        run: pnpm flags check
 
   firestore-rules:
     runs-on: ubuntu-latest

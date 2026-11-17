@@ -1,39 +1,45 @@
-# Feature exposure and capabilities
+# Feature flags
 
-Source of truth: `src/config/featureExposure.ts` (registry), `src/config/featureExposure.acknowledgements.json`, `server/lib/serverFeatureExposure.js`, `deploy/*-deployment-config.json`.
+Source of truth: `server/flags.json`, read by the client (`src/config/flags.ts`) and the server (`server/lib/flags.js`). Lifecycle script: `pnpm flags`. Deployment env switches live in `deploy/*-deployment-config.json`.
 
 ## Model
 
-A feature is live iff: registry exposure for the build target (`local|beta|staging|production`) is on, AND for server-backed features the deployment env switch is on (e.g. `TSTM_GENERATION_ENABLED=true`), AND it is not in `EMERGENCY_DISABLED_CAPABILITIES`. Fail closed everywhere.
+A flag is a named value per build target (`local`, `beta`, `staging`, `production`). Read it with `flag('name')` on the client (the compiler rejects unknown names) or `resolveFlag('name', target)` on the server. A target with no value written gets the flag's `default`, so production is on only when the entry says so; turning production on is a one-line reviewed diff.
 
-Capability `reason` values: `available`, `registry_disabled`, `deployment_disabled`, `emergency_disabled`, `unknown`. Public endpoint `GET /api/capabilities/status` returns only `{capabilities:{KEY:{available,reason}}}`; never add fields (see [public-status-schema](../public-status-schema.md)). `GET /api/billing/config` is the other public schema.
+Two kinds, same file:
 
-## Adding a gated feature
+| Kind | Purpose | Rules |
+|------|---------|-------|
+| `dev` | Hide unfinished work from production | `default: false`, required `removeBy` version, temporary |
+| `switch` | Long-lived kill switch | `default: true` (or a fallback variant), `owner`, one-line `runbook`, permanent |
 
-1. Add a registry key with a per-target exposure matrix. Unreleased targets stay **off** until enablement criteria pass.
-2. Declare lifecycle: permanent = `temporary: false`, no `removalCondition`; temporary = `temporary: true` + `removalCondition`; optional `trackingIssue`.
-3. Gate **before the first exposed slice merges**: routes, nav items, shortcuts, lazy chunks, side-effect modules (`FEATURE_SIDE_EFFECT_MODULES`), `FeatureBoundary` / `useFeatureEffect` / `ServerBackedFeatureBoundary`.
-4. Server-backed: `serverCapabilityKey`, server capability gate (return `404`, zero work when disabled), add key to `serverFeatureExposure.js`, set deployment config switch in the config file *on the ref that will be deployed*.
-5. Add a disabled-side-effect test or acknowledgement.
-6. Mark the PR template exposure checkbox; flipping a target on is its own reviewed change. Removing a temporary feature requires updating `removalCondition` metadata.
+A value is `true`/`false`, or a string for a variant (the value types must match `default`). A flag with `capability` is server-backed: it is live only if the registry value is on **and** the deployment env switch (`<capability>=true`) is on **and** it is not in `EMERGENCY_DISABLED_CAPABILITIES`. The override can only disable; if it cannot be read, the baked-in value stands. A Workers/KV runtime override is not built yet: `capabilityStatus.js` is the seam.
 
-Premium rule: if operating the feature costs money (e.g. cloud storage), it is a premium candidate; otherwise free. Core features are always free. Client exposure never bypasses server-owned entitlement checks (`/userEntitlements/{uid}.premiumActive`, Firestore capability flags).
+`GET /api/capabilities/status` returns only `{capabilities:{KEY:{available,reason}}}`; reasons are `available`, `registry_disabled`, `deployment_disabled`, `emergency_disabled`, `unknown`. Never add fields (see [public-status-schema](../public-status-schema.md)).
 
-## Required disabled-state proofs
+## Lifecycle
 
-Client-only, for every target: gated routes absent (`assertGatedRoutesAbsent`), nav + shortcuts hidden (`assertNavigationHidden`), lazy chunks not loaded, boundary children/effects not run, no timers/workers/subscriptions/fetches.
+```
+pnpm flags                 list flags: kind, owner, per-target values, removeBy, code references, overrides
+pnpm flags add <name>      scaffold a dev flag (off except local); adding by hand is one registry line
+pnpm flags keep <name>     promote a dev flag to a permanent switch (needs --owner and --runbook, and the flag on everywhere)
+pnpm flags retire <name>   remove the flag; the compiler and the printed list show what still names it
+pnpm flags check           validate the registry; fails when a dev flag is past its removeBy (CI)
+```
 
-Server-backed, additionally: `/api/capabilities/status` not fetched while compile-time exposure is off; routes `404` with zero handler/generator work; emergency, registry, and deployment disables all fail closed.
+## Adding a flag
 
-Harness: `src/testing/featureExposure/` (`targetMatrix.ts`, `harness.tsx`, `exemplar.exposure.test.tsx`) and `server/testing/` (`featureExposureTargetMatrix.js`, `featureExposureHarness.js`, `autoTstm.exposure.test.js`). Filename convention: `src/features/<key>.exposure.test.ts(x)` or `src/features/<key>/<key>.exposure.test.ts(x)`; server-backed features also add a Node test in `server/testing/` using `assertCapabilityRouteRejectsWithoutWork`.
+1. Add one entry to `server/flags.json` (or `pnpm flags add <name>`), then guard the code with `flag('name')`, `<FeatureBoundary feature="name">`, or `useFeatureEffect`. Gate routes, nav, lazy chunks, timers, and fetches before the first slice merges.
+2. Gated page routes go in the table in `src/routing/buildFeatureGatedRoutes.tsx`; navigation items carry `feature: 'name'`; workspaces carry `exposureKey`.
+3. Server-backed: add `capability` and `label`, gate the route with `createServerCapabilityGate`, and set the deployment switch in `deploy/*-deployment-config.json` on the ref you deploy.
+4. Baseline per-target tests are derived from the registry (`src/config/flags.baseline.test.tsx`, `server/lib/flags.test.js`). Write a test only for feature-specific behavior, using `withFlag('name', value, target?)` from `src/testing/flags.ts`.
+5. Flipping a target on is its own reviewed change. Retire or promote the flag before its `removeBy` release.
 
-Template and details: [feature-exposure-testing](../operations/feature-exposure-testing.md). Registered workstreams: [feature-exposure-workstreams](../operations/feature-exposure-workstreams.md). Cross-feature matrix (validated by `scripts/validate-feature-exposure.mjs`, do not move): [v1.7-exposure-matrix](../operations/v1.7-exposure-matrix.md).
-
-Commands: `pnpm test:exposure`, `pnpm validate:feature-exposure` (CI job `feature-exposure-policy`), `pnpm exposure:report`, `pnpm exposure:diagnostics`.
+Premium rule: if operating the feature costs money (for example cloud storage) it is a premium candidate; otherwise free. Core features are always free. A client flag never bypasses server-owned entitlement checks (`/userEntitlements/{uid}.premiumActive`, Firestore capability flags).
 
 ## Auto-TSTM (only current server-backed capability)
 
-- Key `autoTstm`, env `TSTM_GENERATION_ENABLED`, ingestion `TSTM_INGESTION_ENABLED`.
+- Flag `autoTstm`, env `TSTM_GENERATION_ENABLED`, ingestion `TSTM_INGESTION_ENABLED`.
 - Routes `GET /api/tstm/latest`, `/api/tstm/status`: no auth, 120/min/client, cache-only. Interactive requests never start generators.
 - Error `reason`s: `cache_miss`, `cache_stale`, `cache_corrupt` (404), `unavailable` (503). Never leak paths/stderr/stacks.
 - Emergency disable: set `EMERGENCY_DISABLED_CAPABILITIES=TSTM_GENERATION_ENABLED` in the host `.env` and restart pm2 (beta: `/opt/gfc-beta-analytics`, process `gfc-beta-analytics`). Disable-only. Stop ingestion with `TSTM_INGESTION_ENABLED=false`. Runbook: [emergency-feature-disable](../operations/emergency-feature-disable.md), ops: [auto-tstm-operations](../operations/auto-tstm-operations.md).

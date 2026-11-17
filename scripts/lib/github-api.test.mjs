@@ -4,8 +4,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { githubRequest } from './github-api.mjs';
-import { GITHUB_PAGE_SIZE } from './github-paginate.mjs';
-import { upsertPromotionExposureComment } from './pr-exposure-comment.mjs';
 import { githubRequest as staleBranchGithubRequest } from './stale-branch-github.mjs';
 
 /**
@@ -101,41 +99,6 @@ describe('githubRequest', () => {
         /GitHub API 500 for \/issues: server down/
       );
       assert.equal(fetchMock.requests.length, 1);
-    } finally {
-      fetchMock.restore();
-    }
-  });
-});
-
-describe('upsertPromotionExposureComment', () => {
-  it('lists existing comments before creating a report comment', async () => {
-    const fetchMock = mockFetchQueue([
-      response({ ok: true, status: 200, json: [] }),
-      response({ ok: true, status: 201, json: { id: 88 } }),
-    ]);
-
-    try {
-      const result = await upsertPromotionExposureComment({
-        repository: 'owner/repo',
-        token: 'token',
-        prNumber: 42,
-        body: 'exposure report',
-      });
-
-      assert.deepStrictEqual(result, { action: 'created', commentId: 88 });
-      assert.equal(fetchMock.requests.length, 2);
-
-      const [list, create] = fetchMock.requests;
-      assert.equal(
-        list.url,
-        `https://api.github.com/repos/owner/repo/issues/42/comments?per_page=${GITHUB_PAGE_SIZE}&page=1`
-      );
-      assert.equal(list.options.method, 'GET');
-      assert.equal(typeof list.options.body, 'undefined');
-
-      assert.equal(create.url, 'https://api.github.com/repos/owner/repo/issues/42/comments');
-      assert.equal(create.options.method, 'POST');
-      assert.deepStrictEqual(JSON.parse(create.options.body), { body: 'exposure report' });
     } finally {
       fetchMock.restore();
     }

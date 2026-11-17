@@ -5,10 +5,10 @@ Use this when a server-backed beta capability must be turned off immediately wit
 ## Scope
 
 - **Disable-only:** `EMERGENCY_DISABLED_CAPABILITIES` can never enable a feature.
-- **Server-backed only:** only keys declared in `server/lib/serverFeatureExposure.js` are accepted.
+- **Server-backed only:** only a `capability` declared on a flag in `server/flags.json` is accepted.
 - **Current capability keys:** `TSTM_GENERATION_ENABLED` (Auto-TSTM).
 
-Normal rollout still comes from the checked-in registry in `src/config/featureExposure.ts` plus deployment env switches such as `TSTM_GENERATION_ENABLED=true`.
+Normal rollout still comes from the checked-in registry in `server/flags.json` plus deployment env switches such as `TSTM_GENERATION_ENABLED=true`.
 
 ## Disable Auto-TSTM routes (beta)
 
@@ -73,7 +73,7 @@ No frontend rebuild or redeploy is required.
 
 ## Verification
 
-Prerequisite: the capability must be registry-exposed on the deployment target you are testing. Today that means `autoTstm.exposure.beta` is `true` in both `src/config/featureExposure.ts` and `server/lib/serverFeatureExposure.js`. Emergency disable only appears in `/api/capabilities/status` for capabilities the registry already exposes on that target.
+Prerequisite: the capability must be registry-exposed on the deployment target you are testing. Today that means `autoTstm` resolves to on for the beta target in `server/flags.json` (run `pnpm flags` to see it). Emergency disable only appears in `/api/capabilities/status` for capabilities the registry already exposes on that target.
 
 From a shell with access to the beta site:
 
@@ -103,7 +103,7 @@ Already-open beta sessions should stop showing server-backed controls after the 
 
 ## Ownership and audit
 
-- **Registry owner:** see the feature entry in `src/config/featureExposure.ts` (`owner` field).
+- **Registry owner:** see the flag entry in `server/flags.json` (`owner` and `runbook` fields).
 - **On-call maintainer:** repository maintainer with VPS access.
 - **Audit trail:** pm2/server logs record startup disable state and per-request emergency rejections. No secrets are logged.
 
@@ -119,7 +119,7 @@ node --test server/tstm.test.js
 
 Manual server drill (requires registry exposure on the target):
 
-1. Confirm `autoTstm.exposure.beta` is `true` in `server/lib/serverFeatureExposure.js`, or run this drill against a deployment where Auto-TSTM is already live on beta.
+1. Confirm `autoTstm` is on for beta in `server/flags.json` (`pnpm flags`), or run this drill against a deployment where Auto-TSTM is already live on beta.
 2. Start the analytics server locally with emergency disable enabled:
 
 ```powershell

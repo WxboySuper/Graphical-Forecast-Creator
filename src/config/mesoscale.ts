@@ -1,5 +1,5 @@
 import { getBuildTarget, type BuildTarget } from './buildTarget';
-import { isFeatureExposed } from './featureExposure';
+import { flag } from './flags';
 
 declare const __MESOSCALE_WORKER_URLS__: Record<BuildTarget, string>;
 declare const __MESOSCALE_FIXTURES__: boolean;
@@ -36,6 +36,6 @@ export const getMesoscaleClientConfig = (): MesoscaleClientConfig => {
   return {
     baseUrl,
     fixtures,
-    enabled: isFeatureExposed('mesoscaleWorkspace') && (fixtures || isValidWorkerUrl(baseUrl)),
+    enabled: flag('mesoscaleWorkspace') && (fixtures || isValidWorkerUrl(baseUrl)),
   };
 };

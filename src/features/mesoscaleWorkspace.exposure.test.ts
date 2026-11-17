@@ -1,7 +1,7 @@
 import { fetchMesoscaleLatest } from '../mesoscale/client';
 import { BUILD_TARGETS } from '../config/buildTarget';
 import { getMesoscaleClientConfig } from '../config/mesoscale';
-import { runWithBuildTarget } from '../testing/featureExposure/harness';
+import { runWithBuildTarget } from '../testing/flags';
 
 describe('mesoscaleWorkspace exposure', () => {
   afterEach(() => {

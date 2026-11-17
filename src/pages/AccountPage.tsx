@@ -34,7 +34,7 @@ import { useUserMetrics } from "../metrics/useUserMetrics";
 import type { RootState } from "../store";
 import { selectForecastCycle, selectSavedCyclesForActiveWorkspace } from "../store/forecastSlice";
 import { computeHomeStats } from "./homeUtils";
-import { isFeatureExposed } from "../config/featureExposure";
+import { flag } from "../config/flags";
 import {
   formatLastActiveDate,
   getProviderLabel,
@@ -296,7 +296,7 @@ const CloudLibraryCard: React.FC = () => {
 /** Local-only entry to the reusable product library; absent from every hosted build. */
 const CustomProductsCard: React.FC = () => {
   const { premiumActive } = useEntitlement();
-  if (!isFeatureExposed('customProducts') || !premiumActive) return null;
+  if (!flag('customProducts') || !premiumActive) return null;
 
   return (
     <Card>

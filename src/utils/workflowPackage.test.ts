@@ -56,7 +56,7 @@ test('attaches custom geometry and appearance to its workflow grouping with comp
 });
 
 test('does not attach custom content to workflow groupings outside the local feature gate', () => {
-  jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+  jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
   const forecast = {
     version: '1.0.0', type: 'forecast-cycle', timestamp: '2026-07-15T00:00:00.000Z',
     forecastCycle: {

@@ -7,7 +7,7 @@ import type { DayType, GFCForecastSaveData } from '../types/outlooks';
 // @codescene(disable:"Lines of Code in a Single File", disable:"Number of Functions in a Single Module", disable:"Code Duplication")
 import { WORKFLOW_SCHEMA_VERSION, type CycleMetadata, type SerializedOutlookVersionData, type SerializedWorkflowPackage } from '../types/workflow';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import { requireForecastWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   createForecastWorkspaceSave,
@@ -140,7 +140,7 @@ const applyPackageStyleSnapshots = (pkg: WorkflowExportPackage, styleSnapshots?:
 
 /** Attaches the compatibility disclosure for embedded custom content. */
 const applyPackageCustomContent = (pkg: WorkflowExportPackage, scopedForecast: GFCForecastSaveData): void => {
-  if (!isFeatureExposed('customProducts') || !hasCustomContent(scopedForecast)) return;
+  if (!flag('customProducts') || !hasCustomContent(scopedForecast)) return;
   pkg.customContent = {
     included: true,
     severeAnalytics: 'excluded',
@@ -209,7 +209,7 @@ const getSerializedPackageVersion = (metadata: NonNullable<WorkflowExportPackage
 
 /** Strips detached custom layers when the custom-products surface is hidden. */
 const toSerializedGroupingValue = <T>(value: T): T =>
-  (isFeatureExposed('customProducts') ? value : { ...(value as Record<string, unknown>), customLayers: undefined }) as T;
+  (flag('customProducts') ? value : { ...(value as Record<string, unknown>), customLayers: undefined }) as T;
 
 /** Keys serialized day payloads by workflow grouping, day, and outlook version. */
 const buildSerializedGroupingData = <T>(

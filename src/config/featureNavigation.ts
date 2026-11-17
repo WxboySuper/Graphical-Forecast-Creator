@@ -4,7 +4,7 @@
  * This module maps feature identifiers to the navigation metadata used by GFC surfaces. Route components own rendering and access decisions; this file defines the shared configuration.
  */
 import { getBuildTarget, type BuildTarget } from './buildTarget';
-import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { flag, type FlagName } from './flags';
 import { getDefaultForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../routing/forecastWorkspaceRoutes';
 
 const SHORTCUT_PRESERVED_PARAMS = ['group', 'discussionLayout'] as const;
@@ -29,7 +29,7 @@ export type AppNavigationItem = {
   shortcutKey?: string;
   shortcutLabel?: string;
   end?: boolean;
-  feature?: FeatureKey;
+  feature?: FlagName;
 };
 
 /** Navigation and shortcut metadata. Items with a feature key are included only when exposed. */
@@ -67,7 +67,7 @@ export const getVisibleNavigationItems = (
   target: BuildTarget = getBuildTarget()
 ): AppNavigationItemWithId[] =>
   APP_NAVIGATION_ITEMS.filter(
-    (item) => !item.feature || isFeatureExposedOnTarget(item.feature, target)
+    (item) => !item.feature || flag(item.feature, target)
   ) as AppNavigationItemWithId[];
 
 /** Builds Ctrl/Cmd navigation shortcuts for visible navbar destinations. */

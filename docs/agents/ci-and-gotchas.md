@@ -8,7 +8,7 @@
 | `package-version-policy` | script tests; package version valid for target branch | `pnpm run test:scripts` |
 | `typecheck` | app, tooling, test-type regression baseline, e2e | `pnpm run typecheck`, `typecheck:tooling`, `typecheck:test`, `typecheck:e2e` |
 | `lint` | ESLint | `pnpm run lint` |
-| `feature-exposure-policy` | static exposure registry validation | `pnpm validate:feature-exposure` |
+| `feature-exposure-policy` | flag registry validation, dev flags past `removeBy` | `pnpm flags check` |
 | `firestore-rules` | hostile-client rules tests (needs Java emulator) | `pnpm run test:firestore-rules` |
 | `license-policy` | third-party license check | `node scripts/check-third-party-licenses.mjs` |
 | `dependency-maintenance` | `pnpm audit` root + server | `pnpm audit` |

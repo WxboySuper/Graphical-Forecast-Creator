@@ -27,7 +27,7 @@ import {
 } from '../ui/tooltip';
 import { Input } from '../ui/input';
 import { cn } from '../../lib/utils';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { isCustomWorkspaceActive } from '../../config/forecastWorkspaces';
 import PopulationEstimateBeta from '../PopulationEstimate/PopulationEstimateBeta';
 import { getCategoricalRiskDisplayName, getOutlookColor } from '../../utils/outlookUtils';
@@ -247,8 +247,8 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
 const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController; workspaceId?: ForecastWorkspaceId }> = ({ controller, workspaceId = 'severe' }) => {
   const customExposed = isCustomWorkspaceActive(
     workspaceId,
-    isFeatureExposed('customProducts'),
-    isFeatureExposed('customWorkspace'),
+    flag('customProducts'),
+    flag('customWorkspace'),
   );
 
   if (!customExposed) {
@@ -537,7 +537,7 @@ const getTabbedToolbarActionItems = (
     tone: 'utility',
     accentClass: 'bg-teal-500/15 text-teal-700',
   },
-  ...(isFeatureExposed('forecastWorkflowV2')
+  ...(flag('forecastWorkflowV2')
     ? [{
         key: 'complete',
         label: 'Complete',
@@ -644,7 +644,7 @@ const TabbedToolbarToolsTab: React.FC<{
           )}
         </div>
       </TabbedToolbarStripSection>
-      {isFeatureExposed('populationEstimate') ? (
+      {flag('populationEstimate') ? (
         <TabbedToolbarStripSection label="Beta research" className="min-w-[300px] shrink-0">
           <PopulationEstimateBeta />
         </TabbedToolbarStripSection>

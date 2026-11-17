@@ -4,7 +4,7 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { BUILD_TARGETS } from '../config/buildTarget';
-import { assertNoFetchTo, withNoAsyncSideEffects } from '../testing/featureExposure/harness';
+import { assertNoFetchTo, withNoAsyncSideEffects } from '../testing/flags';
 
 // Track whether the lazily loaded v2 dashboard module factory ever runs. The
 // prefix `mock` is required for jest.mock factories to reference it.
@@ -40,7 +40,7 @@ describe('verificationRelaunch route gate', () => {
   });
 
   test('renders classic VerificationMode and never boots the v2 module while disabled', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
 
     await assertNoFetchTo('spc.noaa.gov', () => {
       withNoAsyncSideEffects(() => {
@@ -54,7 +54,7 @@ describe('verificationRelaunch route gate', () => {
   });
 
   test('mounts the v2 dashboard only when the flag is exposed', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
 
     renderPage();
 
@@ -63,9 +63,9 @@ describe('verificationRelaunch route gate', () => {
   });
 
   test('exposes verificationRelaunch on every release target', () => {
-    const { isFeatureExposedOnTarget } = require('../config/featureExposure');
+    const { flag } = require('../config/flags');
     for (const target of BUILD_TARGETS) {
-      expect(isFeatureExposedOnTarget('verificationRelaunch', target)).toBe(true);
+      expect(flag('verificationRelaunch', target)).toBe(true);
     }
   });
 });

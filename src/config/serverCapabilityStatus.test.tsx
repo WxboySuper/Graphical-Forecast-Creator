@@ -279,7 +279,7 @@ describe('serverCapabilityStatus', () => {
   });
 
   test('multiple mounted server-backed boundaries share one status fetch', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

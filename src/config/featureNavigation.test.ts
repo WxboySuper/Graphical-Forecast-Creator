@@ -1,12 +1,7 @@
 /**
  * Feature navigation tests. Verify exposed feature keys map to navigation behavior and unavailable features stay hidden.
  */
-import {
-  assertNavigationHidden,
-  mockFeatureExposureOnTarget,
-  runWithBuildTarget,
-  singleTargetOn,
-} from '../testing/featureExposure/harness';
+import { runWithBuildTarget, withFlag } from '../testing/flags';
 import {
   APP_NAVIGATION_ITEMS,
   getNavigationKeyboardShortcuts,
@@ -27,20 +22,17 @@ describe('featureNavigation', () => {
         'verification',
         'monitor',
       ]);
-      assertNavigationHidden('tropicalWorkspace', ['production']);
-      assertNavigationHidden('collaborationRoom', ['production']);
     });
   });
 
   test('includes gated navigation only when the feature is exposed on the target', () => {
-    const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
+    withFlag('tropicalWorkspace', true, 'local');
 
     expect(getVisibleNavigationItems('local').map((item) => item.id)).toContain('tropical-workspace');
     expect(getVisibleNavigationItems('production').map((item) => item.id)).not.toContain(
       'tropical-workspace'
     );
 
-    exposureSpy.mockRestore();
   });
 
   test('omits keyboard shortcuts for hidden gated destinations', () => {

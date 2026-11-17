@@ -10,8 +10,8 @@ import { Map as MapIcon, MessageSquare } from 'lucide-react';
 import { ForecastNavigationMenu } from './ForecastMenu';
 import type { AppNavigationItemId, AppNavigationItemWithId } from '../../config/featureNavigation';
 import {
-  FORECAST_WORKSPACES,
   getExposedForecastWorkspaces,
+  getUpcomingForecastWorkspaces,
 } from '../../config/forecastWorkspaces';
 
 jest.mock('../ui/dropdown-menu', () => ({
@@ -59,7 +59,7 @@ describe('ForecastNavigationMenu', () => {
   test('previews unreleased workspaces as disabled rows without links', () => {
     renderMenu('/forecast/severe');
 
-    const futureWorkspaces = FORECAST_WORKSPACES.filter((workspace) => workspace.status === 'future');
+    const futureWorkspaces = getUpcomingForecastWorkspaces();
     expect(futureWorkspaces.length).toBeGreaterThan(0);
     for (const workspace of futureWorkspaces) {
       const row = screen.getByRole('menuitem', { name: `${workspace.label}, coming soon` });

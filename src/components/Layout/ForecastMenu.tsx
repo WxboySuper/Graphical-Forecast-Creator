@@ -28,9 +28,8 @@ import {
 import { cn } from '../../lib/utils';
 import type { AppNavigationItemId, AppNavigationItemWithId } from '../../config/featureNavigation';
 import {
-  FORECAST_WORKSPACES,
   getExposedForecastWorkspaces,
-  isForecastWorkspaceExposed,
+  getUpcomingForecastWorkspaces,
   type ForecastWorkspaceDefinition,
   type ForecastWorkspaceId,
 } from '../../config/forecastWorkspaces';
@@ -167,9 +166,7 @@ export const ForecastNavigationMenu: FC<{
   icons: Record<AppNavigationItemId, LucideIcon>;
 }> = ({ item, pathname, search, otherItems, icons }) => {
   const workspaces = getExposedForecastWorkspaces();
-  const comingSoon = FORECAST_WORKSPACES.filter(
-    (workspace) => workspace.status === 'future' && !isForecastWorkspaceExposed(workspace),
-  );
+  const comingSoon = getUpcomingForecastWorkspaces();
   const currentWorkspace = getCurrentForecastWorkspace(pathname, workspaces);
   const currentDiscussion = isDiscussionRoute(pathname, search);
   const isActive = isNavigationItemActive(pathname, item.to, item.end) || currentDiscussion;

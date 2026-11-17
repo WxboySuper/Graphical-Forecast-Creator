@@ -118,7 +118,7 @@ describe('computePrLabels', () => {
   it('includes exposure labels when exposure files are changed', () => {
     const labels = computePrLabels(makeComputeArgs({
       head: 'feature/exposure',
-      changedFiles: ['src/config/featureExposure.ts'],
+      changedFiles: ['server/flags.json'],
     }));
     assert.ok(labels.includes('exposure:registry-change'));
     assert.ok(labels.includes('exposure:production'));

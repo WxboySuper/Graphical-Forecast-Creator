@@ -2,7 +2,7 @@
  * Verification page tests. Cover feature-exposure routing between classic verification and Forecast Grade.
  */
 import { render, screen, waitFor } from '@testing-library/react';
-import * as featureExposure from '../config/featureExposure';
+import * as flagsModule from '../config/flags';
 
 jest.mock('../components/VerificationMode/VerificationMode', () => () => (
   <div data-testid="verification-mode">Verification Mode</div>
@@ -24,13 +24,13 @@ describe('VerificationPage', () => {
   });
 
   it('renders classic verification mode when verificationRelaunch is off', () => {
-    jest.spyOn(featureExposure, 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(flagsModule, 'flag').mockReturnValue(false);
     renderPage();
     expect(screen.getByTestId('verification-mode')).toHaveTextContent('Verification Mode');
   });
 
   it('renders the Forecast Grade dashboard when verificationRelaunch is on', async () => {
-    jest.spyOn(featureExposure, 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(flagsModule, 'flag').mockReturnValue(true);
     renderPage();
     expect(await screen.findByTestId('forecast-grade-dashboard')).toBeInTheDocument();
     await waitFor(() => {

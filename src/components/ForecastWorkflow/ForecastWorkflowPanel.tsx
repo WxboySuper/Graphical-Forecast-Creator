@@ -8,7 +8,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { trackEvent } from '../../lib/telemetry';
 import { resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 import { getForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../../routing/forecastWorkspaceRoutes';
@@ -72,7 +72,7 @@ interface PreviousOutlookSuggestion {
 const dayHasMapWork = (day: NonNullable<ReturnType<typeof selectForecastCycle>['days'][DayType]>): boolean => {
   const hasMapData = Object.values(day.data).some((outlookMap) => (outlookMap?.size ?? 0) > 0);
   const hasLowProbability = (day.metadata.lowProbabilityOutlooks?.length ?? 0) > 0;
-  const hasCustomLayers = isFeatureExposed('customProducts') && (day.customLayers?.layers.length ?? 0) > 0;
+  const hasCustomLayers = flag('customProducts') && (day.customLayers?.layers.length ?? 0) > 0;
   return hasMapData || hasLowProbability || hasCustomLayers;
 };
 
@@ -455,7 +455,7 @@ const dayHasCustomContent = (
 
 /** Discloses custom workflow ownership only on builds where the custom editor is exposed. */
 const CustomWorkflowDisclosure: React.FC<{ hasCustomContent: boolean }> = ({ hasCustomContent }) => {
-  if (!isFeatureExposed('customProducts') || !hasCustomContent) return null;
+  if (!flag('customProducts') || !hasCustomContent) return null;
   return (
     <p className="forecast-workflow-panel__custom-disclosure" role="note">
       Custom layers belong to this workflow grouping and are included in copies, updates, cloud saves, and packages. They are excluded from severe analytics and Auto-Categorical.
@@ -640,7 +640,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
   }, [handoffEligibility.showHandoff, handoffIdentity]);
 
   if (shouldHideWorkflowPanel(
-    isFeatureExposed('forecastWorkflowV2'),
+    flag('forecastWorkflowV2'),
     hasActiveWorkflow,
     workflowMetadata,
     Boolean(routeWorkspace && routeWorkspace.id !== normalizedReduxWorkspaceId),
