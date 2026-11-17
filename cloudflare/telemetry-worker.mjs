@@ -22,7 +22,11 @@ export async function fetchTelemetry(request, env) {
   try {
     if (url.pathname.startsWith('/admin/')) return await adminResponse(request, url, env, now);
     return await handlePublic(request, url, env, now);
-  } catch { return serviceError(request, url, env); }
+  } catch (error) {
+    // Only the error type is logged: request data and error messages could carry user-supplied values.
+    console.error('Telemetry request failed', error?.name ?? 'Error');
+    return serviceError(request, url, env);
+  }
 }
 
 export default {
@@ -33,9 +37,9 @@ export default {
       return;
     }
     try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(env.NOW?.() ?? Date.now())); }
-    catch {
+    catch (error) {
       console.error('Telemetry dedupe purge failed');
-      throw new Error('Telemetry dedupe purge failed');
+      throw new Error('Telemetry dedupe purge failed', { cause: error });
     }
   },
 };

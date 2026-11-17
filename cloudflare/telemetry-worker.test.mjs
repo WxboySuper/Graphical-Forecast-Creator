@@ -308,3 +308,12 @@ test('scheduled purge reports bound database failures without logging details', 
   const errors = await captureErrors(() => assert.rejects(worker.scheduled({}, env), { message: 'Telemetry dedupe purge failed' }));
   assert.deepEqual(errors, [['Telemetry dedupe purge failed']]);
 });
+
+test('request failures are logged by error type only and answered with a service error', async () => {
+  const env = baseEnv();
+  env.TELEMETRY_EVENTS = { writeDataPoint() { throw new TypeError('secret detail 203.0.113.9'); } };
+  let response;
+  const errors = await captureErrors(async () => { response = await post('/v1/event', { env, body: { event: 'page_view', version: '2.1.0' } }); });
+  assert.ok(response.status >= 500);
+  assert.deepEqual(errors, [['Telemetry request failed', 'TypeError']]);
+});
