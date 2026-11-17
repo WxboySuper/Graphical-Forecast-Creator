@@ -8,7 +8,7 @@ A readable tour of Graphical Forecast Creator: what it is, how the code is laid 
 |---|------|---------|
 | 1 | [What GFC is](01-what-is-gfc.md) | What does the app do? What are the four modes? What's free vs premium? |
 | 2 | [How the code is organised](02-architecture.md) | Where does a feature live? How does data flow? |
-| 3 | [Hosting and services](03-hosting-and-services.md) | What runs where (Cloudflare, VPS, Firebase, Stripe, Sentry, Umami)? |
+| 3 | [Hosting and services](03-hosting-and-services.md) | What runs where (Cloudflare, VPS, Firebase, Stripe, Sentry, telemetry)? |
 | 4 | [Shipping code](04-shipping-code.md) | Branches, PRs, changelog rules, beta, stable, hotfix. |
 | 5 | [Feature gating](05-feature-gating.md) | How features are switched on/off per environment, plus the emergency kill switch. |
 | 6 | [Automation](06-automation.md) | The bots and workflows that work on the repo for you. |

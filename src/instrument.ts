@@ -7,6 +7,12 @@
 import * as Sentry from '@sentry/react';
 import React from 'react';
 import {
+  sanitizeBreadcrumb,
+  sanitizeStreamedSpan,
+  scrubSensitiveEvent,
+  scrubTransactionEvent,
+} from './instrument-privacy';
+import {
   useLocation,
   useNavigationType,
   createRoutesFromChildren,
@@ -222,8 +228,22 @@ function getSafeMonitorReferenceError(error: unknown): Record<string, boolean | 
 
 /** Drops known no-stack browser noise while preserving actionable stacked errors. */
 export function beforeSend(event: Sentry.ErrorEvent, _hint: Sentry.EventHint): Sentry.ErrorEvent | null {
-  return isKnownBrowserNoise(event) || isExpectedMonitorReferenceOutage(event) ? null : event;
+  if (isKnownBrowserNoise(event)) return null;
+  if (isExpectedMonitorReferenceOutage(event)) return null;
+  return scrubSensitiveEvent(event);
 }
+
+export const beforeSendTransaction = (
+  event: Parameters<NonNullable<Sentry.BrowserOptions['beforeSendTransaction']>>[0],
+): typeof event =>
+  scrubTransactionEvent(event);
+
+export const beforeSendSpan = (
+  span: Parameters<NonNullable<Sentry.BrowserOptions['beforeSendSpan']>>[0],
+): typeof span =>
+  sanitizeStreamedSpan(span);
+
+export { sanitizeBreadcrumb } from './instrument-privacy';
 
 /** Records expected Monitor upstream failures without creating a dropped error event. */
 export function captureExpectedMonitorReferenceFailure(
@@ -272,6 +292,9 @@ export function initSentry(): void {
     },
     normalizeDepth: 10,
     beforeSend,
+    beforeSendTransaction,
+    beforeSendSpan,
+    beforeBreadcrumb: sanitizeBreadcrumb,
     integrations: [
       Sentry.reactRouterV7BrowserTracingIntegration({
         useEffect: React.useEffect,

@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router';
 import { Archive, CheckCircle2, Clock3, FileText, GitBranch, Map, RefreshCw } from 'lucide-react';
 import { isFeatureExposed } from '../../config/featureExposure';
+import { trackEvent } from '../../lib/telemetry';
 import { resolveForecastWorkspaceId, type ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 import { getForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../../routing/forecastWorkspaceRoutes';
 import type { RootState } from '../../store';
@@ -703,6 +704,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         'workflow',
         exportWorkspaceId,
       );
+      trackEvent('forecast_exported', 'workflow');
     } catch {
       setExportError('Unable to export the workflow package. Please try again.');
     } finally {
@@ -721,6 +723,7 @@ export const ForecastWorkflowPanel: React.FC<ForecastWorkflowPanelProps> = ({ co
         'cycle',
         exportWorkspaceId,
       );
+      trackEvent('forecast_exported', 'cycle');
     } catch {
       setExportError('Unable to export the forecast cycle. Please try again.');
     } finally {

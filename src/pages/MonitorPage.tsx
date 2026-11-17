@@ -51,6 +51,7 @@ import { useRadarSiteOptions } from '../monitor/useRadarSiteOptions';
 import { getLocalCalendarDate } from '../utils/localDate';
 import { FeatureBoundary } from '../features/FeatureBoundary';
 import { isFeatureExposed } from '../config/featureExposure';
+import { trackEvent } from '../lib/telemetry';
 import type { MesoscaleCatalogParameter, MesoscaleLayerSpec } from '../mesoscale';
 import type { MonitorMesoscaleView } from '../monitor/components/MonitorMesoscaleIntegration';
 import { setMonitorMesoscaleSettings } from '../store/monitorSlice';
@@ -343,13 +344,13 @@ const MonitorPageWorkspaceView: React.FC<MonitorPageWorkspaceViewProps> = ({
         statusMessage={statusMessage}
         syncLabel={syncLabel}
         onRadarModeChange={(mode) => dispatch(setRadarMode(mode))}
-        onRadarProductChange={(product) => dispatch(setRadarProduct(product))}
+        onRadarProductChange={(product) => { trackEvent('map_layer_changed', 'radar'); dispatch(setRadarProduct(product)); }}
         onRadarSiteChange={(site) => dispatch(setRadarSite(site))}
         onRadarOpacityChange={(opacity) => dispatch(setRadarOpacity(opacity))}
-        onSatelliteProductChange={(product) => dispatch(setSatelliteProduct(product))}
+        onSatelliteProductChange={(product) => { trackEvent('map_layer_changed', 'satellite'); dispatch(setSatelliteProduct(product)); }}
         onSatelliteOpacityChange={(opacity) => dispatch(setSatelliteOpacity(opacity))}
         onOutlookSourceChange={onOutlookSourceChange}
-        onOutlookTypeChange={onOutlookTypeChange}
+        onOutlookTypeChange={(type) => { trackEvent('map_layer_changed', 'outlook'); onOutlookTypeChange(type); }}
         stormReportsMeta={stormReportState}
         onStormReportsEnabledChange={(enabled) => dispatch(setStormReportsEnabled(enabled))}
         onStormReportsFilterTornadoChange={(enabled) => dispatch(setStormReportsFilterTornado(enabled))}

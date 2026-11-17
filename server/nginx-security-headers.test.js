@@ -44,7 +44,8 @@ for (const filename of ['nginx.conf', 'nginx-staging.conf']) {
     assert.match(securityHeaders, /https:\/\/identitytoolkit\.googleapis\.com/);
     assert.match(securityHeaders, /https:\/\/tiles\.openfreemap\.org/);
     assert.match(securityHeaders, /https:\/\/opengeo\.ncep\.noaa\.gov/);
-    assert.match(securityHeaders, /https:\/\/telemetry\.gfc\.weatherboysuper\.com/);
+    assert.match(securityHeaders, /https:\/\/telemetry\.gfcweather\.com/);
+    assert.doesNotMatch(securityHeaders, /telemetry\.gfc\.weatherboysuper\.com/);
     const nginxPolicy = extractContentSecurityPolicy(securityHeaders);
     assert.ok(scriptSrcAllowsSource(nginxPolicy, GOOGLE_SIGN_IN_SCRIPT_HOST));
     assert.doesNotMatch(securityHeaders, /report-only/i);

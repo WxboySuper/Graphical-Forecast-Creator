@@ -59,6 +59,9 @@ describe('instrument', () => {
           },
           normalizeDepth: 10,
           beforeSend: expect.any(Function),
+          beforeSendTransaction: expect.any(Function),
+          beforeSendSpan: expect.any(Function),
+          beforeBreadcrumb: expect.any(Function),
           tracesSampleRate: 0.1,
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
@@ -70,6 +73,34 @@ describe('instrument', () => {
       );
       const initCall = (Sentry.init as jest.Mock).mock.calls[0][0];
       expect(initCall.integrations).toHaveLength(1);
+      expect(initCall.dataCollection.userInfo).toBe(false);
+      expect(initCall.dataCollection.httpHeaders).toEqual({ request: false, response: false });
+    });
+  });
+
+  it('removes account, request, context, and breadcrumb data before sending errors', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = {
+        message: 'Failure for meteor@example.com, 192.0.2.18 and abcdefghijklmnopqrstuvwxyz12',
+        user: { id: 'full-firebase-user-id', email: 'meteor@example.com' },
+        request: { url: 'https://app.gfcweather.com/forecast/private-cycle?uid=full-firebase-user-id', headers: { Authorization: 'Bearer secret' } },
+        contexts: { account: { uid: 'full-firebase-user-id' } },
+        extra: { email: 'meteor@example.com' },
+        tags: { uid: 'full-firebase-user-id', area: 'forecast' },
+        breadcrumbs: [{ category: 'console', message: 'User meteor@example.com', data: { uid: 'full-firebase-user-id' } }],
+        exception: { values: [{ value: 'Failure for meteor@example.com abcdefghijklmnopqrstuvwxyz12', stacktrace: { frames: [{ filename: 'src/App.tsx' }] } }] },
+      };
+      beforeSend(event as never, {});
+      expect(event.user).toBeUndefined();
+      expect(event.request).toBeUndefined();
+      expect(event.contexts).toBeUndefined();
+      expect(event.extra).toBeUndefined();
+      expect(event.tags).toEqual({ area: 'forecast' });
+      expect(event.message).not.toMatch(/meteor@example.com|192\.0\.2\.18|abcdefghijklmnopqrstuvwxyz12/);
+      expect(event.exception.values[0].value).not.toMatch(/meteor@example.com|abcdefghijklmnopqrstuvwxyz12/);
+      expect(event.breadcrumbs[0]).toEqual(expect.objectContaining({ category: 'console', message: 'User [redacted-email]' }));
+      expect(event.breadcrumbs[0].data).toBeUndefined();
     });
   });
 

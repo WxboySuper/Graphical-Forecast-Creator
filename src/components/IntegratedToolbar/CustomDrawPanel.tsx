@@ -25,7 +25,6 @@ import {
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION, type CustomCategoryTemplate, type CustomHatchPattern, type OneOffCustomLayer } from '../../types/customProducts';
 import { asCustomLayerId } from '../../lib/customProducts';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { trackProductEvent } from '../../lib/productAnalytics';
 
 const colors = ['#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7', '#3b82f6'];
 const colorChoices = ['#22c55e', '#0ea5e9', '#2563eb', '#a855f7', '#ef4444', '#f97316', '#eab308', '#64748b'];
@@ -170,7 +169,6 @@ const CustomLayerActionRow: React.FC<{
   const layerOptions = layers.map((layer) => ({ id: layer.id, label: layer.label }));
   const addLayer = () => {
     dispatch(addCustomLayer(makeLayer(layers.length)));
-    trackProductEvent('custom_layer_created', { layer_count: layers.length + 1 });
   };
   return <div className="custom-draw-panel__row custom-draw-panel__layer-row">
     {activeLayer ? <div className="custom-draw-panel__name-control">

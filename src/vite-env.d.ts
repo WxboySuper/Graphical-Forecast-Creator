@@ -10,9 +10,7 @@ declare const __GFC_FIREBASE_PROJECT_ID__: string;
 declare const __GFC_FIREBASE_APP_ID__: string;
 declare const __GFC_SENTRY_DSN__: string;
 declare const __GFC_SENTRY_ENVIRONMENT__: string;
-declare const __GFC_UMAMI_HOST__: string;
-declare const __GFC_UMAMI_PRODUCTION_WEBSITE_ID__: string;
-declare const __GFC_UMAMI_BETA_WEBSITE_ID__: string;
+declare const __GFC_TELEMETRY_BASE_URL__: string;
 
 interface ImportMetaEnv {
   readonly VITE_BUILD_TARGET?: import('./config/buildTarget').BuildTarget;
@@ -22,10 +20,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID?: string;
   readonly VITE_SENTRY_DSN?: string;
   readonly VITE_SENTRY_ENVIRONMENT?: string;
-  readonly VITE_UMAMI_HOST?: string;
+  readonly VITE_TELEMETRY_BASE_URL?: string;
   readonly VITE_FEEDBACK_API_URL?: string;
-  readonly VITE_UMAMI_PRODUCTION_WEBSITE_ID?: string;
-  readonly VITE_UMAMI_BETA_WEBSITE_ID?: string;
 }
 
 interface ImportMeta {
@@ -43,9 +39,7 @@ declare global {
   var __GFC_FIREBASE_APP_ID__: string;
   var __GFC_SENTRY_DSN__: string;
   var __GFC_SENTRY_ENVIRONMENT__: string;
-  var __GFC_UMAMI_HOST__: string;
-  var __GFC_UMAMI_PRODUCTION_WEBSITE_ID__: string;
-  var __GFC_UMAMI_BETA_WEBSITE_ID__: string;
+  var __GFC_TELEMETRY_BASE_URL__: string;
 }
 
 export {};

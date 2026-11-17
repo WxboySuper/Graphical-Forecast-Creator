@@ -123,7 +123,7 @@ test('serves the asset 404 and sets marketing security and cache headers', async
   assert.doesNotMatch(response.headers.get('content-security-policy'), /unpkg/i);
   assert.match(response.headers.get('content-security-policy'), /script-src 'self'(;|$)/);
   assert.match(response.headers.get('content-security-policy'), /style-src 'self' 'unsafe-inline'/);
-  assert.ok(response.headers.get('content-security-policy').includes("connect-src 'self' https://tiles.openfreemap.org"));
+  assert.ok(response.headers.get('content-security-policy').includes("connect-src 'self' https://tiles.openfreemap.org https://telemetry.gfcweather.com"));
   assert.match(response.headers.get('content-security-policy'), /worker-src 'self' blob:/);
 });
 

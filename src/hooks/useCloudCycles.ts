@@ -24,7 +24,7 @@ import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
 import { getForecastDataFromWorkspacePayload, isRecord, isWorkspaceSaveEnvelope, type ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { readLocalTestAccount } from '../lib/localTestAccount';
-import { trackProductEvent } from '../lib/productAnalytics';
+import { trackEvent } from '../lib/telemetry';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export interface UseCloudCyclesResult {
@@ -419,7 +419,8 @@ function applyCloudSaveSuccess({
     updateSyncState('saved', undefined, savedCycleId);
   }
   queueProductMetric({ event: 'cloud_cycle_saved', user });
-  trackProductEvent('cloud_save_completed');
+  trackEvent('forecast_saved_cloud');
+  trackEvent('premium_feature_used', 'cloud_storage');
   return true;
 }
 

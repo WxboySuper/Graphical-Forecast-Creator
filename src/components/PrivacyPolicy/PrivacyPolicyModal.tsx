@@ -8,7 +8,7 @@ import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
-import { isProductAnalyticsEnabled, setProductAnalyticsEnabled, trackProductPageView } from '../../lib/productAnalytics';
+import { useTelemetryConsent } from '../../lib/telemetry';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
@@ -137,14 +137,10 @@ const PrivacyPolicyWhatsNew: React.FC<{ items: string[] }> = ({ items }) => (
 
 /** Lets people change the local, non-essential telemetry preference without creating an account. */
 const ProductAnalyticsPreference: React.FC = () => {
-  const [enabled, setEnabled] = useState(() => isProductAnalyticsEnabled());
+  const [consent, setConsent] = useTelemetryConsent();
+  const enabled = consent === 'granted';
   const handleChange = () => {
-    const nextEnabled = !enabled;
-    const effectiveEnabled = setProductAnalyticsEnabled(nextEnabled);
-    // A consent action is the earliest permitted point to initialize analytics.
-    // Record the page the person explicitly chose from; nothing is injected or queued beforehand.
-    if (effectiveEnabled) trackProductPageView();
-    setEnabled(effectiveEnabled);
+    setConsent(enabled ? 'denied' : 'granted');
   };
 
   return (

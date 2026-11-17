@@ -165,7 +165,7 @@ when the stable changelog entry is carried forward.
 
 ## Production Cloudflare cutover
 
-Complete these owner-side steps before publishing the first v2 stable release, currently targeted for Saturday, 2026-11-21. This repo does not change DNS, Cloudflare account settings, Firebase, Stripe, Google OAuth, Sentry, or Umami.
+Complete these owner-side steps before publishing the first v2 stable release, currently targeted for Saturday, 2026-11-21. This repo does not change DNS, Cloudflare account settings, Firebase, Stripe, Google OAuth, or Sentry.
 
 1. In Cloudflare, confirm the `gfcweather.com` zone and DNS records cover `app.gfcweather.com`, the apex, and `www`. Confirm TLS for all three names.
 2. Configure the `gfc-production` custom domain for `app.gfcweather.com`, and the `gfc-marketing` custom domains for `gfcweather.com` and `www.gfcweather.com`. Check [`cloudflare/wrangler.production.jsonc`](../../cloudflare/wrangler.production.jsonc) and [`cloudflare/wrangler.marketing.jsonc`](../../cloudflare/wrangler.marketing.jsonc). The marketing Worker sends `www` to the apex and legacy app routes to `app.gfcweather.com`.
@@ -173,13 +173,13 @@ Complete these owner-side steps before publishing the first v2 stable release, c
 4. In Google OAuth, authorize the app origin `https://app.gfcweather.com` and the marketing origins `https://gfcweather.com` and `https://www.gfcweather.com` as needed. Keep the Firebase handler redirect URI authorized.
 5. In Stripe, set checkout and billing portal return URLs to `https://app.gfcweather.com`. Verify webhook delivery still reaches the VPS API through the apex `/api/*` service binding or the configured legacy endpoint. Keep any old return URLs needed during transition.
 6. Set production API `APP_BASE_URL=https://app.gfcweather.com`. Confirm `CORS_ALLOWED_ORIGINS` on the mesoscale Worker and `FEEDBACK_ALLOWED_ORIGINS` on the feedback Worker both include `https://app.gfcweather.com` and `https://gfcweather.com` during transition. The Express API has no browser CORS allowlist; browser API calls use the same-origin app Worker. The marketing Worker forwards apex `/api/*` through its `APP_WORKER` binding to `gfc-production`.
-7. Add `app.gfcweather.com` and `gfcweather.com` to Sentry and Umami domain settings. Keep `telemetry.gfc.weatherboysuper.com` and the `/api/sentry-tunnel` route available.
+7. Add `app.gfcweather.com` and `gfcweather.com` to Sentry domain settings. Keep `https://telemetry.gfcweather.com` available for the app and marketing site.
 8. Set GitHub Actions secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `PRODUCTION_WORKER_SHARED_SECRET`. The deploy workflow installs the same shared secret on the app Worker, marketing Worker, and VPS API. Do not copy secret values into the repo.
 9. Rehearse the app and marketing Workers on non-production hosts with production build settings and a safe API target. Check app routes, pricing/updates pages, 404 handling, assets, caches, API status, sentry tunnel, Firebase sign-in, Stripe returns, webhooks, and version marker.
 10. Install [`server/nginx-legacy-redirect.conf`](../../server/nginx-legacy-redirect.conf) on the VPS. Keep valid TLS for `gfc.weatherboysuper.com`. It sends old page requests to `app.gfcweather.com` and preserves `/api/*` and `/api/sentry-tunnel` for API traffic.
 11. Run **Create Stable Release** from `stable/2.x`. The deploy workflow updates `gfc-production` before building and deploying `gfc-marketing`, then checks `https://app.gfcweather.com/version.json` and both public hosts.
 12. Roll back the app Worker with `wrangler rollback --config cloudflare/wrangler.production.jsonc` and marketing with `wrangler rollback --config cloudflare/wrangler.marketing.jsonc`. To roll back the API, dispatch `deploy-main-to-vps.yml` with the previous stable tag and `deploy_action=live`. Older tags without marketing files skip marketing build/deploy steps. Serving a VPS frontend still requires an owner-side route change and disabling the nginx legacy redirect.
-13. Verify the app hostname, apex `www` redirect, legacy app redirects with queries, apex API forwarding, auth callbacks, Stripe checkout/portal/webhooks, Sentry and Umami events, marketing 404s and caching, and the API status route.
+13. Verify the app hostname, apex `www` redirect, legacy app redirects with queries, apex API forwarding, auth callbacks, Stripe checkout/portal/webhooks, Sentry and telemetry events, marketing 404s and caching, and the API status route.
 
 Open decisions before cutover:
 

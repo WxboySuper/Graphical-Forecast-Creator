@@ -94,7 +94,7 @@ When a change crosses a boundary, update the relevant doc in the same PR.
 - [Auto-TSTM operations](./operations/auto-tstm-operations.md) · [beta test plans](./operations/auto-tstm-beta-test-plans.md) · [custom products test plan](./operations/custom-products-beta-test-plan.md)
 - [Feature exposure testing](./operations/feature-exposure-testing.md) · [workstreams](./operations/feature-exposure-workstreams.md) · [v1.7 exposure matrix](./operations/v1.7-exposure-matrix.md)
 - [OpenCode maintenance](./operations/opencode-maintenance.md) · [GitHub-Todoist sync](./github-todoist-sync.md)
-- [Support and privacy](./operations/v1.7-support-and-privacy.md) · [Umami](./operations/umami-telemetry.md) · [Umami privacy](./operations/umami-telemetry-privacy-operations.md)
+- [Support and privacy](./operations/v1.7-support-and-privacy.md) · [Telemetry operations](./operations/telemetry.md)
 - [Public status schema](./public-status-schema.md) · [Workflow analytics](./workflow-analytics.md) · [Coverage exclusions](./coverage-exclusions.md)
 
 ### Data and research

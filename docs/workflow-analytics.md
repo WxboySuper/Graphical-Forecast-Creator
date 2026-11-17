@@ -1,13 +1,13 @@
 # Workflow analytics event dictionary
 
-Workflow events use `trackProductEvent` in `src/lib/productAnalytics.ts`. It checks event names and permitted workflow properties before sending or queuing an event. Unknown dimensions, invalid enum values, and nested content are rejected. Tracker errors do not interrupt forecast editing, saving, completion, export, or rollover.
+Opt-in product events use `trackEvent` exported from [`src/lib/telemetry/index.ts`](../src/lib/telemetry/index.ts). The client accepts only the shared event allowlist in [`events.ts`](../src/lib/telemetry/events.ts) and optional short, validated details. It sends nothing until consent is `granted`. Tracker errors do not interrupt forecast editing, saving, completion, export, or rollover.
 
 ## Events
 
-The workflow event names are `workflow_start`, `workflow_continue`, `workflow_derive`, `workflow_revise`, `workflow_complete`, `workflow_complete_with_omissions`, `forecast_exported`, and `workflow_rollover_action`. Export events may carry a normalized `failure` result. The same product analytics module also handles its registered non-workflow events.
+The product event names are `page_view`, `forecast_created`, `forecast_exported`, `forecast_shared`, `forecast_saved_cloud`, `mesoscale_layer_opened`, `verification_used`, `map_layer_changed`, `premium_feature_used`, and `error_shown`.
 
 ## Dimensions
 
-Permitted dimensions are `dayGrouping`, `accountTier`, `entryPath`, `result`, `packageScope`, and `action`. Values are closed enums. Coordinates, geometry, discussions, labels, filenames, images, package contents, map/layer state, raw errors, and arbitrary metadata are prohibited.
+`detail`, when present, is limited to a short page, layer, feature, or error type name. Coordinates, geometry, discussions, labels, filenames, images, package contents, map/layer state, raw errors, identity, and arbitrary metadata are prohibited.
 
-Tracking requires an explicit local opt-in, including for signed-out visitors. Only the production and beta GFC hostnames enable telemetry, with separate configured website IDs. Localhost and other hosts do not emit events. Disabling tracking removes the injected script and clears queued telemetry. The configured retention period is not verified in this repository.
+The client also sends `/v1/visit` without consent and `/v1/active` after sign-in. These are separate counters from opt-in product events. See [telemetry operations](./operations/telemetry.md) for the data and endpoint contract.

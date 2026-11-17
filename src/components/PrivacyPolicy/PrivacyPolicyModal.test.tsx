@@ -8,9 +8,11 @@ import PrivacyPolicyModal, {
   hasAcceptedPrivacyPolicy,
   isPrivacyPolicyUpgrade,
 } from './PrivacyPolicyModal';
+import { setTelemetryConsent } from '../../lib/telemetry';
 
 describe('PrivacyPolicyModal Utils', () => {
   beforeEach(() => {
+    setTelemetryConsent('unset');
     localStorage.clear();
     jest.clearAllMocks();
   });
@@ -66,6 +68,7 @@ describe('PrivacyPolicyModal component', () => {
   const onCloseMock = jest.fn();
 
   beforeEach(() => {
+    setTelemetryConsent('unset');
     localStorage.clear();
     jest.clearAllMocks();
   });
@@ -199,8 +202,8 @@ describe('PrivacyPolicyModal component', () => {
   expect(toggle).toHaveAttribute('aria-checked', 'false');
 });
 
-test('reflects storage failure when disabling analytics — UI shows disabled after teardown', () => {
-  localStorage.setItem('gfc-analytics-enabled', 'true');
+test('reflects storage failure when disabling telemetry and fails closed', () => {
+  localStorage.setItem('gfc-telemetry-consent', 'granted');
   render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
 
   jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage error'); });

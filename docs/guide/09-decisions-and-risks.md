@@ -17,7 +17,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 | Custom layers carry a snapshot of their style | Old maps never change when a product is edited or a subscription ends | - |
 | Verification state is separate from the forecast | Reviewing old forecasts can't damage current work | - |
 | Weather data fetched straight from NOAA in the browser | No proxy to run or pay for | Rate limits or CORS problems |
-| Self-hosted Umami, Sentry without PII/replay | Privacy-first telemetry | Legal review |
+| Opt-in Cloudflare telemetry, Sentry without user details or replay | Privacy-first telemetry | Legal review |
 | Cloudflare Worker deployed only via GitHub Actions | One audited deploy path | - |
 | Maintenance bots (OpenCode) get no GitHub token; humans merge everything | Limits blast radius of an AI mistake | Trust grows |
 | Structure changes are gradual, behaviour-preserving PRs | Avoid a risky big-bang refactor | - |

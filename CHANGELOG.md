@@ -9,7 +9,6 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
-- **Privacy-first telemetry:** Adds a Cloudflare Workers telemetry backend for daily visit and active-user counts and opt-in feature events (allowlisted events with detail, version, and country only).
 - **Marketing site:** gfcweather.com becomes the public home of Graphical Forecast Creator, with Features, Learn (a beginner walkthrough and an experienced-forecaster guide), Pricing, What's new, About, Contact, Terms of Service, and Privacy Policy pages. The app moves to app.gfcweather.com.
 - **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It is available on beta for early-access testing and has a matching panel in Monitor.
 - **Mesoscale areas and discussion:** Draw polygons, circles, ellipses, and rectangles with forecaster hazard styling, reshape them vertex by vertex with the mouse or keyboard (stepping, arrow-key nudging, add and delete), and write a mesoscale discussion alongside them. Areas and discussion save on your device and keep working when model data is unavailable.
@@ -23,6 +22,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Privacy-first telemetry:** Replaces self-hosted Umami with a client that sends consent-free visit and daily-active counts and opt-in allowlisted product events to the `gfc-telemetry` Worker. Feature events carry only the event name, optional short detail, and app version.
 - **Pricing and What's new:** These pages now live on the marketing site. Old `/pricing` and `/updates` links in the app redirect there, and upgrading to Premium happens from your Account page.
 - **Release and policy versions:** GFC now uses flat release labels such as v2 and v2.1, with padded semver for packages and tags. The Terms of Service and Privacy Policy now use flat Version 2 labels, so you will be asked to accept both updated policies.
 - **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a beta Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
