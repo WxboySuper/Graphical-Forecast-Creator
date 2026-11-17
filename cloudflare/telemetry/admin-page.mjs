@@ -67,7 +67,9 @@ function failure(status,body){if(KNOWN_FAILURES[status])return new Error(KNOWN_F
   if(status===503)return new Error('Not configured yet: '+(body.error||'the service needs its Cloudflare settings.'));
   return new Error(body.error||('Request failed ('+status+')'));}
 function api(path){let url=path+(path.indexOf('?')<0?'?':'&')+'days='+state.days;
-  return fetch(url,{credentials:'same-origin',headers:{accept:'application/json'}}).then(function(r){return r.json().catch(function(){return {};}).then(function(b){if(!r.ok)throw failure(r.status,b);return b;});});}
+  return fetch(url,{credentials:'same-origin',headers:{accept:'application/json'}}).then(function(r){return r.json().then(function(b){return {r:r,b:b};},function(){return {r:r,b:null};});}).then(function(x){
+    if(x.b===null)throw new Error(x.r.ok?'Unexpected response. Reload the page to sign in again.':failure(x.r.status,{}).message);
+    if(!x.r.ok)throw failure(x.r.status,x.b);return x.b;});}
 function sum(rows,key){return rows.reduce(function(t,r){return t+Number(r[key||'count']||0);},0);}
 function group(rows,keyFn){let m={};rows.forEach(function(r){let k=keyFn(r);m[k]=(m[k]||0)+Number(r.count||0);});return Object.keys(m).map(function(k){return {name:k,count:m[k]};}).sort(function(a,b){return b.count-a.count;});}
 function fillBar(ratio){let f=el('span',{class:'fill'});f.style.width=Math.max(2,Math.round(ratio*100))+'%';return f;}
@@ -113,7 +115,7 @@ function load(){setError('');let jobs=[
   ['/admin/pages',function(b){renderPages(b.data||[]);},'pages'],
   ['/admin/locations',function(b){renderLocations(b.data||[]);},'locations']];
   jobs.forEach(function(j){api(j[0]).then(j[1]).catch(function(e){if(j[2]==='tiles'){setError(e.message);}else{note($(j[2]),e.message);}});});}
-function init(){$('days').addEventListener('change',function(e){state.days=Number(e.target.value);load();});
+function init(){$('days').addEventListener('change',function(e){let d=Number(e.target.value);state.days=[7,30,90].indexOf(d)>=0?d:30;load();});
   $('version').addEventListener('change',function(e){state.version=e.target.value;load();});
   $('refresh').addEventListener('click',load);load();}
 init();
