@@ -4,7 +4,7 @@
     "label": "v2",
     "date": "",
     "title": "A bigger forecast desk.",
-    "summary": "v2 adds a mesoscale workspace, a workspace-based forecast menu, a cleaner severe-discussion editor, and a new home for pricing and release notes.",
+    "summary": "v2 adds a mesoscale workspace, a workspace-based forecast menu, a severe discussion you write beside the map, and a new home for pricing and release notes.",
     "sections": [
       {
         "title": "The Mesoscale workspace",
@@ -43,7 +43,7 @@
         ]
       },
       {
-        "title": "A calmer severe discussion",
+        "title": "Write it beside the map",
         "eyebrow": "Map and words, together",
         "kind": "support",
         "body": "Edit the severe map and your discussion side by side. Switch between Map, Discussion, and Review / Export, open the discussion full width or in a resizable side panel, and flip between Edit and Preview on narrow screens.",
@@ -97,7 +97,7 @@
     "heroImage": {
       "src": "/assets/img/updates/v2/hero.jpg",
       "alt": "GFC v2 over a drawn severe weather outlook",
-      "caption": "v2 brings mesoscale analysis, forecast workspaces, and a calmer severe discussion."
+      "caption": "v2 brings mesoscale analysis, forecast workspaces, and a severe discussion you write beside the map."
     }
   },
   {
