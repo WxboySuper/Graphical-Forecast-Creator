@@ -9,6 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Privacy-first telemetry:** Adds a Cloudflare Workers telemetry backend for daily visit and active-user counts and opt-in feature events (allowlisted events with detail, version, and country only).
 - **Marketing site:** gfcweather.com becomes the public home of Graphical Forecast Creator, with Features, Learn (a beginner walkthrough and an experienced-forecaster guide), Pricing, What's new, About, Contact, Terms of Service, and Privacy Policy pages. The app moves to app.gfcweather.com.
 - **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It is available on beta for early-access testing and has a matching panel in Monitor.
 - **Mesoscale areas and discussion:** Draw polygons, circles, ellipses, and rectangles with forecaster hazard styling, reshape them vertex by vertex with the mouse or keyboard (stepping, arrow-key nudging, add and delete), and write a mesoscale discussion alongside them. Areas and discussion save on your device and keep working when model data is unavailable.

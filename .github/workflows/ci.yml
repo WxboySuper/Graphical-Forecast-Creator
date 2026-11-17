@@ -317,6 +317,9 @@ jobs:
         env:
           CI: true
 
+      - name: Run Cloudflare Worker tests
+        run: pnpm run test:cloudflare
+
       - name: Verify toolbar dates in a US timezone
         run: pnpm run test:toolbar:timezone -- --runInBand
 
