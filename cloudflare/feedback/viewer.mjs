@@ -8,9 +8,15 @@ const targets = ['beta', 'production'];
 const categories = ['bug', 'idea', 'praise', 'question', 'other'];
 const corsFreeHeaders = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
 
+/** True when the request Origin is the configured dashboard origin (ignores case and a trailing slash in the setting). */
+function isAdminOrigin(origin, env) {
+  const normalize = (value) => (value ?? '').trim().replace(/\/+$/, '').toLowerCase();
+  return Boolean(origin) && normalize(origin) === normalize(env.FEEDBACK_ADMIN_ORIGIN) && normalize(env.FEEDBACK_ADMIN_ORIGIN) !== '';
+}
+
 function adminCorsHeaders(request, env) {
   const origin = request.headers.get('origin');
-  if (!origin || origin !== env.FEEDBACK_ADMIN_ORIGIN) return {};
+  if (!isAdminOrigin(origin, env)) return {};
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
@@ -67,7 +73,7 @@ async function summary(db) {
 
 function isMutationAllowed(request, url, env) {
   const origin = request.headers.get('origin');
-  if (origin !== url.origin && origin !== env.FEEDBACK_ADMIN_ORIGIN) return false;
+  if (origin !== url.origin && !isAdminOrigin(origin, env)) return false;
   return request.headers.get('x-gfc-viewer') === '1';
 }
 
@@ -80,7 +86,7 @@ function feedbackId(pathname) {
 const feedbackRoutes = [
   { method: 'GET', withId: false, mutating: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', withId: true, mutating: false, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
-  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now()) },
   { method: 'DELETE', withId: true, mutating: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 

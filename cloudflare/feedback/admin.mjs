@@ -118,13 +118,14 @@ export async function getFeedback(id, db) {
   return item ? json(item) : json({ error: 'Feedback not found' }, 404);
 }
 
-export async function patchFeedback(request, id, db) {
+export async function patchFeedback(request, id, db, now = Date.now()) {
   let body;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
   if (!body) return json({ error: 'Invalid status' }, 400);
   if (Object.keys(body).length !== 1) return json({ error: 'Invalid status' }, 400);
   if (!STATUSES.has(body.status)) return json({ error: 'Invalid status' }, 400);
-  const result = await db.prepare("UPDATE feedback SET status = ?, handled_at = CASE WHEN ? = 'handled' THEN COALESCE(handled_at, ?) ELSE NULL END WHERE id = ?").bind(body.status, body.status, Date.now(), id).run();
+  // COALESCE keeps the first handled time when an item is marked handled again.
+  const result = await db.prepare("UPDATE feedback SET status = ?, handled_at = CASE WHEN ? = 'handled' THEN COALESCE(handled_at, ?) ELSE NULL END WHERE id = ?").bind(body.status, body.status, now, id).run();
   return result.meta?.changes ? json({ id, status: body.status }) : json({ error: 'Feedback not found' }, 404);
 }
 
@@ -139,7 +140,7 @@ const isAdminConfigured = (env) => ADMIN_BINDINGS.every((name) => Boolean(env[na
 const adminRoutes = [
   { method: 'GET', hasId: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', hasId: true, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
-  { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB) },
+  { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now()) },
 ];
 
 export async function handleAdmin(request, env, url, id) {

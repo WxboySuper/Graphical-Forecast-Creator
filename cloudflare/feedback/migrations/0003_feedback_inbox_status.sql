@@ -17,9 +17,10 @@ CREATE TABLE feedback_inbox (
   user_agent TEXT NOT NULL DEFAULT ''
 );
 
-INSERT INTO feedback_inbox (id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, status, discord_status, user_agent)
+INSERT INTO feedback_inbox (id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport, status, handled_at, discord_status, user_agent)
 SELECT id, created_at, uid_hash, email, category, message, page, app_version, build_target, plan, viewport,
-  CASE WHEN status IN ('new', 'read', 'handled') THEN status ELSE 'read' END,
+  CASE WHEN status IN ('new', 'read', 'handled') THEN status WHEN status IN ('resolved', 'wontfix') THEN 'handled' ELSE 'read' END,
+  CASE WHEN status IN ('handled', 'resolved', 'wontfix') THEN created_at ELSE NULL END,
   discord_status, user_agent
 FROM feedback;
 
