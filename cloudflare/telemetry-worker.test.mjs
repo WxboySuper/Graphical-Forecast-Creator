@@ -338,3 +338,43 @@ test('analytics-backed admin routes stay unavailable without analytics credentia
   const response = await readAdminData('/admin/events', new URL('https://telemetry.gfcweather.com/admin/events'), env, Date.UTC(2026, 10, 17));
   assert.equal(response.status, 503);
 });
+
+function usageEnv() {
+  return Object.assign(baseEnv(), {
+    CF_ACCESS_TEAM_DOMAIN: accessDomain,
+    CF_ACCESS_AUD: accessAud,
+    JWKS_FETCH: async () => Response.json({ keys: [accessJwk] }, { headers: { 'cache-control': 'max-age=300' } }),
+  });
+}
+
+test('the usage dashboard sits behind Access and /admin redirects to /admin/', async () => {
+  const redirect = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin'), usageEnv());
+  assert.equal(redirect.status, 308);
+  assert.equal(new URL(redirect.headers.get('location')).pathname, '/admin/');
+  const withQuery = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin?days=7'), usageEnv());
+  assert.equal(new URL(withQuery.headers.get('location')).search, '?days=7', 'the redirect keeps the query string');
+  const anonymous = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/'), usageEnv());
+  assert.ok([401, 403].includes(anonymous.status), 'the page is not served without an Access token');
+  const unconfigured = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/'), baseEnv());
+  assert.equal(unconfigured.status, 503, 'the page fails closed without Access configuration');
+});
+
+test('the usage dashboard is a self-contained page with a strict content security policy', async () => {
+  const token = await makeAccessToken();
+  const response = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/', { headers: { 'cf-access-jwt-assertion': token } }), usageEnv());
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /text\/html/);
+  const csp = response.headers.get('content-security-policy');
+  const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1];
+  assert.ok(nonce, 'a per-response script nonce is set');
+  assert.match(csp, /default-src 'none'/);
+  assert.match(csp, /connect-src 'self'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  const html = await response.text();
+  assert.ok(html.includes(`<script nonce="${nonce}">`));
+  assert.ok(html.includes('GFC Usage'));
+  assert.doesNotMatch(html, /\sstyle=/, 'inline style attributes would be blocked by the policy');
+  assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+href=|@import|innerHTML|insertAdjacentHTML/);
+  const other = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/', { headers: { 'cf-access-jwt-assertion': token } }), usageEnv());
+  assert.notEqual(/script-src 'nonce-([^']+)'/.exec(other.headers.get('content-security-policy') ?? '')?.[1], nonce, 'nonce changes per response');
+});

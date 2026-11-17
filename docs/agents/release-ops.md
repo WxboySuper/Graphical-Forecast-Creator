@@ -74,6 +74,8 @@ For first-time setup, create the D1 database with `pnpm dlx wrangler@4 d1 create
 pnpm dlx wrangler@4 d1 migrations apply gfc-telemetry --remote --config cloudflare/wrangler.telemetry.jsonc
 ```
 
+The usage dashboard is served by the same Worker at `https://telemetry.gfcweather.com/admin/` (`/admin` redirects there). It sits behind the same Cloudflare Access application as the `/admin/*` JSON routes and shows daily visitors and active accounts, feature usage by event, page, location, and app version, and a link to the feedback inbox at `https://feedback.gfcweather.com/admin`. The usage panels that read Analytics Engine show a "not configured" note until `CF_ACCOUNT_ID` and `CF_ANALYTICS_API_TOKEN` are set; the visitor and account panels need only D1. "Total accounts" stays blank until a Firebase account count is wired in.
+
 The manual deploy workflow applies this migration before deploying. The rate-limit namespace ID `61717` must remain unique within the Cloudflare account. Set the secret values interactively with `pnpm dlx wrangler@4 secret put <NAME> --config cloudflare/wrangler.telemetry.jsonc`, once per name. Never put secret values in the repository or logs:
 
 - `TELEMETRY_HASH_SECRET`, used to derive the daily visit and active salts.
