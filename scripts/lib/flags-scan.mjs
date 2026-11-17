@@ -43,11 +43,11 @@ export const findReferences = (name, root) => {
     );
 };
 
-const unknownCallsOn = (registry, root, file, line, index) =>
+const unknownCallsOn = (scan, line, index) =>
   [...line.matchAll(FLAG_CALL)]
-    .filter((match) => !registry.flags[match[1]])
-    .map((match) => `${location(root, file, index)} flag('${match[1]}')`);
+    .filter((match) => !scan.registry.flags[match[1]])
+    .map((match) => `${location(scan.root, scan.file, index)} flag('${match[1]}')`);
 
 /** Returns flag('name') calls in code that name a flag the registry does not have. */
 export const findUnknownReferences = (registry, root) =>
-  sourceFiles(root).flatMap((file) => linesOf(file).flatMap((line, index) => unknownCallsOn(registry, root, file, line, index)));
+  sourceFiles(root).flatMap((file) => linesOf(file).flatMap((line, index) => unknownCallsOn({ registry, root, file }, line, index)));

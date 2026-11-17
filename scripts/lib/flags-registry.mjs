@@ -100,15 +100,28 @@ export const addFlag = (registry, name, { owner, removeBy, issue }) => {
   return assertValid(withFlag(registry, name, entry));
 };
 
-const assertKeepable = (registry, name, { owner, runbook, force }) => {
-  const entry = registry.flags[name];
+const assertDevFlag = (name, entry) => {
   if (!entry) throw new Error(`No flag named ${name}.`);
   if (entry.kind !== 'dev') throw new Error(`${name} is already a switch.`);
+};
+
+const assertKeepFields = ({ owner, runbook }) => {
   if (!owner?.trim() || !runbook?.trim()) throw new Error('keep needs --owner and --runbook (what to do when this switch is thrown).');
-  const offTargets = registry.targets.filter((target) => (entry.values?.[target] ?? entry.default) !== true);
-  if (offTargets.length > 0 && !force) {
-    throw new Error(`${name} is still off on ${offTargets.join(', ')}. Turn it on there first, or pass --force to make it default on everywhere.`);
-  }
+};
+
+const targetsOffFor = (registry, entry) => registry.targets.filter((target) => (entry.values?.[target] ?? entry.default) !== true);
+
+const assertOnEverywhere = (registry, name, entry, force) => {
+  const offTargets = targetsOffFor(registry, entry);
+  if (offTargets.length === 0 || force) return;
+  throw new Error(`${name} is still off on ${offTargets.join(', ')}. Turn it on there first, or pass --force to make it default on everywhere.`);
+};
+
+const assertKeepable = (registry, name, fields) => {
+  const entry = registry.flags[name];
+  assertDevFlag(name, entry);
+  assertKeepFields(fields);
+  assertOnEverywhere(registry, name, entry, fields.force);
 };
 
 /** Promotes a dev flag to a permanent kill switch, refusing while it is still off somewhere it should be on. */
