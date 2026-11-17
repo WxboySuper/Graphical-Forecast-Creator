@@ -100,7 +100,7 @@ class FakeD1 {
     } },
     { matches: (sql) => sql.startsWith('UPDATE feedback SET status'), run: (db, args) => {
       const row = db.rows.find((item) => item.id === args[3]);
-      if (row) { row.status = args[0]; row.handled_at = args[0] === 'handled' ? args[2] : null; }
+      if (row) { row.status = args[0]; row.handled_at = args[0] === 'handled' ? (row.handled_at ?? args[2]) : null; }
       return { meta: { changes: row ? 1 : 0 } };
     } },
   ];
@@ -294,6 +294,9 @@ test('admin read and patch require the configured token', async () => {
   assert.equal(db.rows[0].handled_at, null);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'handled' })).status, 200);
   assert.equal(typeof db.rows[0].handled_at, 'number');
+  db.rows[0].handled_at = 1;
+  assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'handled' })).status, 200);
+  assert.equal(db.rows[0].handled_at, 1, 're-handling keeps the first handled time');
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'read' })).status, 200);
   assert.equal(db.rows[0].handled_at, null);
   assert.equal((await request('PATCH', `/v1/feedback/${id}`, { status: 'other' })).status, 400);
