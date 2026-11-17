@@ -14,7 +14,7 @@ const PRIVACY_POLICY_URL = 'https://gfcweather.com/privacy/';
 const ConsentExplanation: React.FC = () => (
   <>
     <DialogDescription>
-      Help improve GFC? Share anonymous counts of which features get used. No personal info, ever.
+      Share anonymous counts of which features get used. No personal info, ever.
     </DialogDescription>
     <p className="text-sm text-muted-foreground">
       GFC only counts what happens, such as which tools get used, with your country and the app version. It never

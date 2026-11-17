@@ -61,3 +61,25 @@ describe('TelemetrySettingsDialog', () => {
     expect(getTelemetryConsent()).toBe('granted');
   });
 });
+
+describe('TelemetrySettingsDialog storage failures', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('keeps the switch off when enabling cannot be saved', () => {
+    setTelemetryConsent('denied');
+    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage error'); });
+    render(<TelemetrySettingsDialog open onOpenChange={() => undefined} />);
+    const toggle = screen.getByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('fails closed when turning sharing off cannot be saved', () => {
+    setTelemetryConsent('granted');
+    render(<TelemetrySettingsDialog open onOpenChange={() => undefined} />);
+    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage error'); });
+    fireEvent.click(screen.getByRole('switch'));
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+  });
+});

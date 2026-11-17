@@ -51,6 +51,7 @@
     --color-white: #fff;
     --spacing: 0.25rem;
     --container-sm: 24rem;
+    --container-md: 28rem;
     --container-lg: 32rem;
     --container-xl: 36rem;
     --container-2xl: 42rem;
@@ -2103,6 +2104,9 @@
     .sm\:max-w-lg {
       max-width: var(--container-lg);
     }
+    .sm\:max-w-md {
+      max-width: var(--container-md);
+    }
     .sm\:flex-row {
       flex-direction: row;
     }
@@ -2111,6 +2115,9 @@
     }
     .sm\:gap-0 {
       gap: 0px;
+    }
+    .sm\:gap-2 {
+      gap: calc(var(--spacing) * 2);
     }
     :where(.sm\:space-x-2 > :not(:last-child)) {
       --tw-space-x-reverse: 0;
