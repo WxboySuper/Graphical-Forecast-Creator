@@ -4,6 +4,7 @@
  * feature-exposure checks. It supplies presentation metadata and does not own
  * route registration or authorization policy.
  */
+import { useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import {
@@ -25,6 +26,7 @@ import {
   Sparkles,
   MessageSquarePlus,
   Mail,
+  Activity,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -45,6 +47,7 @@ import { formatDisplayVersion } from '../../lib/displayVersion';
 import { useAuth } from '../../auth/AuthProvider';
 import { isFeedbackEnabled } from '../../config/feedback';
 import { useFeedback } from '../Feedback/FeedbackContext';
+import { TelemetrySettingsDialog } from '../Telemetry/TelemetryDialogs';
 import { CONTACT_EMAIL, CONTACT_MAILTO } from '../../config/contact';
 import {
   getVisibleNavigationItems,
@@ -241,8 +244,10 @@ const MoreActionsMenu: FC<{
     window.open(href, '_blank', 'noopener,noreferrer');
   };
   const { openFeedback } = useFeedback();
+  const [usageDataOpen, setUsageDataOpen] = useState(false);
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -282,6 +287,10 @@ const MoreActionsMenu: FC<{
           <Shield className="h-4 w-4" />
           Privacy Policy
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setUsageDataOpen(true)}>
+          <Activity className="h-4 w-4" />
+          Usage data
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <a href={MARKETING_PRICING_URL} target="_blank" rel="noreferrer">
             <Crown className="h-4 w-4" />
@@ -308,6 +317,8 @@ const MoreActionsMenu: FC<{
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    <TelemetrySettingsDialog open={usageDataOpen} onOpenChange={setUsageDataOpen} />
+    </>
   );
 };
 

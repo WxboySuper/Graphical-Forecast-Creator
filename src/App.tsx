@@ -29,6 +29,7 @@ import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
 import { TelemetryRouteTracker } from './components/TelemetryRouteTracker';
+import { TelemetryConsentPrompt } from './components/Telemetry/TelemetryDialogs';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
 import { pingDailyActive, pingVisit } from './lib/telemetry';
@@ -237,6 +238,7 @@ const AcceptedApplication: React.FC = () => (
   <AppProviders>
     <AppHooks />
     <TelemetryRouteTracker />
+    <TelemetryConsentPrompt />
     <AppRoutes />
   </AppProviders>
 );

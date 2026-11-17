@@ -103,6 +103,8 @@ const renderAppAt = (path: string) => {
 describe('App forecast workspace gating', () => {
   beforeEach(() => {
     localStorage.clear();
+    // An answered consent choice keeps the one-time telemetry prompt from covering the page under test.
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     sessionStorage.clear();
     window.history.pushState({}, '', '/');
     seedActiveSevereDocument();

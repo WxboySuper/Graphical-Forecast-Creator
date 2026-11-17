@@ -56,6 +56,7 @@ const openStaleSession = async (page: import('@playwright/test').Page) => {
     localStorage.setItem('gfc-local-beta-bypass', 'true');
     localStorage.setItem('gfc-tos-accepted', '2');
     localStorage.setItem('gfc-privacy-policy-accepted', '2');
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     localStorage.setItem('forecastData', JSON.stringify(sessionData.forecastData));
     localStorage.setItem('gfc-last-active-local-day', sessionData.previousDay);
   }, { sessionData: session });
