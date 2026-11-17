@@ -14,6 +14,13 @@ async function acceptEmptyPayload(request, headers) {
   return null;
 }
 
+function activeCounterConfigured(env) {
+  if (!env.TELEMETRY_HASH_SECRET) return false;
+  if (!env.TELEMETRY_DB) return false;
+  if (!env.FIREBASE_PROJECT_ID) return false;
+  return true;
+}
+
 export async function countVisit(request, env, headers, now) {
   const err = requestError(request, headers);
   if (err) return err;
@@ -45,7 +52,7 @@ async function activeClaims(request, env, headers) {
 export async function countActive(request, env, headers, now) {
   const err = requestError(request, headers);
   if (err) return err;
-  if (!env.TELEMETRY_HASH_SECRET || !env.TELEMETRY_DB || !env.FIREBASE_PROJECT_ID) return json({ error: 'Telemetry unavailable' }, 503, headers);
+  if (!activeCounterConfigured(env)) return json({ error: 'Telemetry unavailable' }, 503, headers);
   const auth = await activeClaims(request, env, headers);
   if (auth.response) return auth.response;
   const payloadError = await acceptEmptyPayload(request, headers);

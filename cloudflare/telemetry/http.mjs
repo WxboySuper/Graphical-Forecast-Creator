@@ -52,15 +52,29 @@ function decodeChunks(chunks, size, headers) {
   catch { return { response: json({ error: 'Invalid JSON' }, 400, headers) }; }
 }
 
+function invalidJson(headers) {
+  return { response: json({ error: 'Invalid JSON' }, 400, headers) };
+}
+
+function validJsonObject(body) {
+  if (body === null) return false;
+  if (Array.isArray(body)) return false;
+  return typeof body === 'object';
+}
+
+function parseObject(text, headers) {
+  let body;
+  try {
+    body = JSON.parse(text || '{}');
+  } catch { return invalidJson(headers); }
+  if (!validJsonObject(body)) return invalidJson(headers);
+  return { body };
+}
+
 export async function parseJson(request, headers) {
   const limited = await readLimitedBody(request, headers);
   if (limited.response) return limited;
-  const text = limited.text;
-  try {
-    const body = JSON.parse(text || '{}');
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return { response: json({ error: 'Invalid JSON' }, 400, headers) };
-    return { body };
-  } catch { return { response: json({ error: 'Invalid JSON' }, 400, headers) }; }
+  return parseObject(limited.text, headers);
 }
 
 export async function emptyObject(request, headers) {
