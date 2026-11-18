@@ -21,8 +21,8 @@ const browser = await chromium.launch();
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1.5, colorScheme: 'light' });
   await context.addInitScript(() => {
-    localStorage.setItem('gfc-tos-accepted', '2');
-    localStorage.setItem('gfc-privacy-policy-accepted', '2');
+    localStorage.setItem('gfc-tos-accepted', '3');
+    localStorage.setItem('gfc-privacy-policy-accepted', '4');
   });
   const page = await context.newPage();
   await page.goto(`${SITE}/forecast/mesoscale`, { waitUntil: 'load', timeout: 60000 });
