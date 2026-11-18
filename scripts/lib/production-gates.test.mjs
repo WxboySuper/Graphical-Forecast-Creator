@@ -20,3 +20,9 @@ test('the production deploy gates the release-triggered path too, not only manua
   assert.match(deploy, /release:\n\s+types:/);
   assert.match(deploy, /\n {2}deploy:\n[\s\S]*?\n {4}environment: production-promote\n/);
 });
+
+test('release-stable refuses a package.json on another major than the stable branch', () => {
+  const release = workflow('release-stable.yml');
+  assert.match(release, /LINE_MAJOR="\$\{BASH_REMATCH\[1\]\}"/);
+  assert.match(release, /is not on the \$\{RELEASE_REF\} major/);
+});

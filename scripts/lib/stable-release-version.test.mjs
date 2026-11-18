@@ -31,3 +31,10 @@ test('the release manifest follows the version and keeps its rollout settings', 
   });
   assert.deepEqual(updateProductionReleaseManifest(manifest, '2.0.0'), manifest);
 });
+
+test('refuses to strip a beta version whose stable tag already exists', () => {
+  assert.throws(
+    () => decideStableReleaseVersion({ currentVersion: '2.0.0-beta.25', tagExists: true }),
+    /Tag v2\.0\.0 already exists/,
+  );
+});

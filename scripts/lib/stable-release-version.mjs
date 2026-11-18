@@ -5,7 +5,9 @@ const STABLE_VERSION_PATTERN = /^(\d+)\.(\d+)\.0$/;
 export const decideStableReleaseVersion = ({ currentVersion, tagExists }) => {
   const beta = currentVersion.match(BETA_VERSION_PATTERN);
   if (beta) {
-    return { version: `${beta[1]}.${beta[2]}.0`, strategy: 'strip-beta', bump: false };
+    const version = `${beta[1]}.${beta[2]}.0`;
+    if (tagExists) throw new Error(`Tag v${version} already exists for package version ${currentVersion}; refusing to release it again.`);
+    return { version, strategy: 'strip-beta', bump: false };
   }
 
   const stable = currentVersion.match(STABLE_VERSION_PATTERN);
