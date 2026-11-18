@@ -36,7 +36,7 @@ on:
       only_if_changed:
         description: 'Skip the release when main has no commits since the latest beta tag (used by the Cloudflare scheduler)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 concurrency:

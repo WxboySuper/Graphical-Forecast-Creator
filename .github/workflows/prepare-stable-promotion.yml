@@ -86,22 +86,26 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
-          PR_BODY: |-
-            ## Main → stable promotion
-
-            Prepare the reviewed `main` next-major line for stable release `v${{ inputs.version }}`.
-
-            Source ref: `${{ inputs.source_ref }}`
-
-            This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into `main`, bootstrap `stable/<flat-major>.x` from that exact main commit, then use the manual stable release workflow.
-
-            Changelog-Impact: beta
+          PROMOTION_BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
+          set -euo pipefail
           echo "::add-mask::$GH_PAT"
+          PR_BODY_FILE=$(mktemp)
+          cat > "$PR_BODY_FILE" <<EOF
+          ## Main → stable promotion
+
+          Prepare the reviewed \`main\` next-major line for stable release \`v${TARGET_VERSION}\`.
+
+          Source ref: \`${SOURCE_REF}\`
+
+          This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into \`main\`, bootstrap \`stable/<flat-major>.x\` from that exact main commit, then use the manual stable release workflow.
+
+          Changelog-Impact: beta
+          EOF
           gh pr create \
             --repo "$GITHUB_REPOSITORY" \
             --base main \
-            --head "${{ steps.branch.outputs.branch }}" \
+            --head "$PROMOTION_BRANCH" \
             --draft \
-            --title "release: prepare v${{ inputs.version }} stable promotion" \
-            --body "$PR_BODY"
+            --title "release: prepare v${TARGET_VERSION} stable promotion" \
+            --body-file "$PR_BODY_FILE"
