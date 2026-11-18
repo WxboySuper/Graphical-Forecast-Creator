@@ -9,7 +9,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 | Core features are always free; premium only where operating the feature costs money | Mission: GFC is a learning tool | A core feature starts costing real money |
 | Open source, MIT | Owner can't maintain alone; learners can fork | Abuse or licensing issue |
 | Everything works with no account or server | Low barrier; resilient | Never, without a strong reason |
-| `main` is next-major; `stable/X.x` is production; beta is a prerelease, not a branch | Lets big work continue while production stays frozen and hotfixable | Release pain grows |
+| `main` is the fast trunk and beta source; `stable/X.x` is production | Every fix and feature lands on main first; selected changes are backported to production | Release pain grows |
 | Nothing deploys on merge | Deploys are owner-initiated | You want continuous deploy |
 | Features hidden by a registry per environment, fail closed | Ship unfinished work safely; server can be killed instantly | Registry becomes too heavy |
 | Stripe is the source of truth for premium | One billing authority; webhooks update Firestore | Moving billing provider |
@@ -52,7 +52,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 | Term | Meaning |
 |------|---------|
 | Lane | Section of the changelog a PR adds to |
-| Forward-port | Copy of a stable hotfix onto `main` |
+| Backport | Cherry-pick of a merged `main` change onto a stable production line |
 | Capability | A server-side feature switch reported by `/api/capabilities/status` |
 | Exposure | Which environments can see a feature |
 | Ingestion | Server loop that fetches and caches Auto-TSTM guidance |

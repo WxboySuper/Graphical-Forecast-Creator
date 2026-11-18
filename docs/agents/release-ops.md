@@ -4,7 +4,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 ## Model
 
-- `main` = next-major line. `stable/2.x` = v2 production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
+- `main` = fast trunk and beta source. `stable/2.x` = v2 production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
 - Targets: `local`, `beta` (`beta.gfcweather.com`, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (`staging-gfc.weatherboysuper.com`), `production` (`app.gfcweather.com`, Cloudflare Worker `gfc-production` + VPS API at `/opt/gfc-analytics`). The apex and `www` hostnames serve the separate `gfc-marketing` Worker.
 - Old docs/comments may say `beta-gfc.weatherboysuper.com`; the Cloudflare config uses `beta.gfcweather.com`.
 
@@ -33,7 +33,7 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 | `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
 | `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | |
-| `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
+| `backport.yml` | `backport-2.x` label -> PR against `stable/2.x`; conflicts create a draft PR | PR number and optional line for manual runs |
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
 
 Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v2 changelog belongs to the stable release (`changelog-and-prs`).
@@ -56,7 +56,7 @@ lint+test -> resolve version, validate next-major lane has real content -> pre-b
 
 ### Stable and hotfix
 
-Stable: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Create Stable Release (from stable branch). Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Create Stable Release -> forward-port PR appears. Forward-port PRs use `Changelog-Impact: inherited` + `Port of #N`.
+Stable: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Create Stable Release (from stable branch). Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Create Stable Release. A production-only fix stays on stable. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR. See [workflow rules](workflow.md#backports).
 
 GitHub Release notes: beta = native PR list + changelog link; stable = curated changelog + PR list; hotfix = curated hotfix entry + short PR list.
 
