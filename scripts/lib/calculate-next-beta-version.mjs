@@ -140,12 +140,8 @@ export const calculateNextBetaVersion = ({
   }
 
   const tagSet = taggedVersions ?? new Set(betaTags);
+  // The counter belongs to its base version: 3.0.0 betas start at beta.1 however many 2.0.0 betas exist.
   const lastTaggedForBase = lastBetaNumberForBase(betaTags, base);
-  const lastTagged = lastTaggedForBase ?? betaTags
-    .map((tag) => parseBetaVersion(tag.startsWith('v') ? tag.slice(1) : tag)?.beta)
-    .filter((value) => value !== undefined)
-    .sort((left, right) => left - right)
-    .at(-1);
 
   if (explicit) {
     validateExplicitBetaVersion({ explicit, packageVersion, tagSet, betaTags, base });
@@ -159,6 +155,6 @@ export const calculateNextBetaVersion = ({
     return { version: retry, strategy: 'retry-unpublished' };
   }
 
-  const next = (lastTagged ?? 0) + 1;
+  const next = (lastTaggedForBase ?? 0) + 1;
   return { version: `${base}-beta.${next}`, strategy: 'increment' };
 };

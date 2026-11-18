@@ -12,7 +12,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 GFC release labels use a flat major version. The next major is `v2`, followed by `v3`; a minor such as `v2.1` maps to the package and tag version `2.1.0` / `v2.1.0`. The patch slot stays `0`. Use short labels (`v2`, `v2.1`) in UI, docs, release titles, changelog prose, and PR text. Use padded semver (`2.0.0`, `2.1.0`) in `package.json`, and `v2.0.0`, `v2.1.0` for git tags.
 
-Beta tags keep their semver prerelease form and share one increasing counter. The next beta for v2 is `2.0.0-beta.16`, tagged `v2.0.0-beta.16`. Production branches use `stable/2.x`; a hotfix for the current v2 line is labeled `v2.1` and tagged `v2.1.0`. Existing `stable/1.x` branches, tags, and v1.x changelog entries remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
+Beta tags keep their semver prerelease form. The counter belongs to its base version and restarts at `beta.1` for each new major: the first v3 beta is `3.0.0-beta.1`, tagged `v3.0.0-beta.1`. Production branches use `stable/2.x`; a hotfix for the current v2 line is labeled `v2.1` and tagged `v2.1.0`. Existing `stable/1.x` branches, tags, and v1.x changelog entries remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
 
 ## Workflows
 
