@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { FLAG_NAME, VERSION, addFlag, isPastRemoveBy, keepFlag, parseVersion, retireFlag, serialize, validate } from './lib/flags-registry.mjs';
+import { FLAG_NAME, addFlag, isPastRemoveBy, isStableLineRef, isValidRemoveBy, keepFlag, parseVersion, retireFlag, serialize, validate } from './lib/flags-registry.mjs';
 import { findReferences, findUnknownReferences } from './lib/flags-scan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -19,6 +19,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const registryPath = () => process.env.FLAGS_FILE ?? path.join(ROOT, 'server', 'flags.json');
 const loadRegistry = () => JSON.parse(readFileSync(registryPath(), 'utf8'));
 const saveRegistry = (registry) => writeFileSync(registryPath(), serialize(registry));
+/** The branch CI is checking: the PR base, else the pushed branch. Stable lines do not enforce removeBy. */
+const checkedBranch = () => process.env.GITHUB_BASE_REF || process.env.GITHUB_REF_NAME || '';
+
 const packageVersion = () => JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 
 const parseArgs = (argv) => {
@@ -84,7 +87,7 @@ const printList = (registry) => {
 };
 
 const dueProblem = ([name, entry], version) =>
-  entry.kind === 'dev' && VERSION.test(entry.removeBy ?? '') && isPastRemoveBy(entry.removeBy, version)
+  entry.kind === 'dev' && !isStableLineRef(checkedBranch()) && isValidRemoveBy(entry.removeBy) && isPastRemoveBy(entry.removeBy, version)
     ? [`${name}: past its removeBy ${entry.removeBy} (package is ${version}). Retire it with \`pnpm flags retire ${name}\` or promote it with \`pnpm flags keep ${name}\`.`]
     : [];
 
