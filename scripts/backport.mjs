@@ -10,6 +10,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { backportBody, backportBranch, backportTitle, linesFromLabels, stableBranchForLine } from './lib/backport.mjs';
+import { pickWithoutChangelog } from './lib/backport-git.mjs';
 
 const repository = process.env.REPOSITORY ?? '';
 const sourcePr = Number(process.env.SOURCE_PR ?? 0);
@@ -50,50 +51,55 @@ const comment = (text) => gh('pr', 'comment', String(sourcePr), '--repo', reposi
 const ensureLabel = (name, color, description) => run('gh', ['label', 'create', name, '--repo', repository, '--color', color, '--description', description], { allowFailure: true });
 const remoteBranchExists = (name) => run('git', ['ls-remote', '--exit-code', '--heads', 'origin', name], { allowFailure: true }) !== null;
 
+/** Returns { message, notify } when this line should be skipped (notify = tell the source PR), or null to go ahead. */
+const skipReason = (line, stable, branch) => {
+  if (!remoteBranchExists(stable)) return { message: `No \`${stable}\` branch exists, so \`backport-${line}\` was skipped.`, notify: true };
+  const existing = JSON.parse(gh('pr', 'list', '--repo', repository, '--head', branch, '--state', 'all', '--json', 'number,url'));
+  if (existing.length) return { message: `${branch} already has #${existing[0].number}; leaving it unchanged.`, notify: false };
+  if (remoteBranchExists(branch)) throw new Error(`${branch} already exists without a matching PR; refusing to overwrite it.`);
+  return null;
+};
+
+const openPr = ({ line, stable, branch, title, conflicts }) => {
+  const bodyFile = path.join(dir, `${branch.replace('/', '-')}.md`);
+  writeFileSync(bodyFile, backportBody({ sourcePr, sourceUrl: pr.url, line, sourceBody: pr.body ?? '', conflicts }));
+  ensureLabel('backport', 'c5def5', 'Backport of a main PR to a stable line');
+  if (conflicts.length) ensureLabel('backport-conflict', 'B60205', 'Backport has conflicts to resolve on its branch');
+  return gh(
+    'pr', 'create', '--repo', repository, '--base', stable, '--head', branch, '--title', title, '--body-file', bodyFile,
+    '--label', conflicts.length ? 'backport,backport-conflict' : 'backport',
+    ...(conflicts.length ? ['--draft'] : []),
+  );
+};
+
+const announce = (stable, url, conflicts) => comment(conflicts.length
+  ? `Backport to \`${stable}\` opened as a draft with conflicts in ${conflicts.map((file) => `\`${file}\``).join(', ')}: ${url}`
+  : `Backport to \`${stable}\` opened: ${url}`);
+
 const backportOne = (line) => {
   const stable = stableBranchForLine(line);
   const branch = backportBranch(sourcePr, line);
-  if (!remoteBranchExists(stable)) {
-    comment(`No \`${stable}\` branch exists, so \`backport-${line}\` was skipped.`);
+  const skip = skipReason(line, stable, branch);
+  if (skip) {
+    console.log(skip.message);
+    if (skip.notify) comment(skip.message);
     return;
-  }
-  const existing = JSON.parse(gh('pr', 'list', '--repo', repository, '--head', branch, '--state', 'all', '--json', 'number,url'));
-  if (existing.length) {
-    console.log(`${branch} already has #${existing[0].number}; leaving it unchanged.`);
-    return;
-  }
-  if (remoteBranchExists(branch)) {
-    throw new Error(`${branch} already exists without a matching PR; refusing to overwrite it.`);
   }
 
   git('fetch', 'origin', stable);
   git('switch', '--create', branch, `origin/${stable}`);
-  run('git', ['cherry-pick', '--no-commit', ...(parents > 1 ? ['-m', '1'] : []), sha], { allowFailure: true });
-  // Each backport carries its own stable-lane changelog entry, so the main entry is never part of the pick.
-  git('checkout', 'HEAD', '--', 'CHANGELOG.md');
-  const conflicts = git('diff', '--name-only', '--diff-filter=U').split('\n').filter(Boolean);
-  git('add', '--all');
-  if (run('git', ['diff', '--cached', '--quiet'], { allowFailure: true }) !== null) {
+  const { conflicts, empty } = pickWithoutChangelog(run, sha, parents);
+  if (empty) {
     comment(`Nothing to backport to \`${stable}\`: the change is already there or touches only \`CHANGELOG.md\`.`);
     return;
   }
 
   const title = backportTitle(pr.title, sourcePr, line);
-  git('commit', '--message', `${title}\n\n(cherry picked from commit ${sha})`);
-  git('push', '--set-upstream', 'origin', branch);
+  git('commit', '--message', `${title}
 
-  const bodyFile = path.join(dir, `${branch.replace('/', '-')}.md`);
-  writeFileSync(bodyFile, backportBody({ sourcePr, sourceUrl: pr.url, line, sourceBody: pr.body ?? '', conflicts }));
-  ensureLabel('backport', 'c5def5', 'Backport of a main PR to a stable line');
-  if (conflicts.length) ensureLabel('backport-conflict', 'B60205', 'Backport has conflicts to resolve on its branch');
-  const url = gh(
-    'pr', 'create', '--repo', repository, '--base', stable, '--head', branch, '--title', title, '--body-file', bodyFile,
-    '--label', conflicts.length ? 'backport,backport-conflict' : 'backport',
-    ...(conflicts.length ? ['--draft'] : []),
-  );
-  comment(conflicts.length
-    ? `Backport to \`${stable}\` opened as a draft with conflicts in ${conflicts.map((file) => `\`${file}\``).join(', ')}: ${url}`
-    : `Backport to \`${stable}\` opened: ${url}`);
+(cherry picked from commit ${sha})`);
+  git('push', '--set-upstream', 'origin', branch);
+  announce(stable, openPr({ line, stable, branch, title, conflicts }), conflicts);
 };
 
 let failed = false;
