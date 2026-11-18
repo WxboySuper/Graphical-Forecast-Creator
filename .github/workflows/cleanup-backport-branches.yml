@@ -1,0 +1,23 @@
+name: Maintenance | Cleanup Backport Branches
+
+on:
+  pull_request_target:
+    types: [closed]
+
+jobs:
+  delete-closed-backport-branch:
+    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.event.pull_request.head.ref, 'backport/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Delete closed backport branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKPORT_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "Cleaning up remote backport branch $BACKPORT_BRANCH from PR #$PR_NUMBER"
+          gh api -X DELETE repos/${{ github.repository }}/git/refs/heads/"$BACKPORT_BRANCH" || \
+            echo "Backport branch $BACKPORT_BRANCH was already removed or is protected."

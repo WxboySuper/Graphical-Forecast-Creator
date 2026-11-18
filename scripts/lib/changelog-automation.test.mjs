@@ -32,17 +32,12 @@ test('replaces an existing automated declaration without duplicates', () => {
   assert.doesNotMatch(next, /old answer/);
 });
 
-test('writes a reason and source reference for automated no-impact and port decisions', () => {
+test('writes a reason for automated no-impact decisions', () => {
   const none = upsertManagedChangelogDeclaration('Original body', {
     impact: 'none',
     reason: 'CI-only update.',
   });
-  const inherited = upsertManagedChangelogDeclaration('Original body', {
-    impact: 'inherited',
-    sourcePr: 123,
-  });
 
+  assert.match(none, /Changelog-Impact: none/);
   assert.match(none, /Changelog-Reason: CI-only update\./);
-  assert.match(inherited, /Changelog-Impact: inherited/);
-  assert.match(inherited, /Port of #123/);
 });

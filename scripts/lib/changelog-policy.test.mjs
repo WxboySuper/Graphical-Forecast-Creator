@@ -42,12 +42,14 @@ test('allows beta impact on the next-major main changelog lane', () => {
   assert.equal(result.ok, true);
 });
 
-test('allows a forward port to inherit its source changelog entry', () => {
+test('rejects the retired inherited impact', () => {
   const result = evaluateChangelogPolicy({
     baseRef: 'main',
     changedFiles: ['src/App.tsx'],
-    body: 'Changelog-Impact: inherited\nPort of #123',
+    body: 'Changelog-Impact: inherited',
   });
+  assert.equal(result.ok, false);
+});
   assert.equal(result.ok, true);
 });
 test('requires beta entries in the next-major lane on main', () => {
@@ -98,9 +100,8 @@ test('exposes the impact on a successful evaluation', () => {
   assert.equal(isChangelogSkip(result.impact), false);
 });
 
-test('classifies waived and inherited impacts as changelog skips', () => {
+test('classifies waived impacts as changelog skips', () => {
   assert.equal(isChangelogSkip('none'), true);
-  assert.equal(isChangelogSkip('inherited'), true);
   assert.equal(isChangelogSkip('beta'), false);
   assert.equal(isChangelogSkip('hotfix'), false);
   assert.equal(isChangelogSkip(undefined), false);
