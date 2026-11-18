@@ -56,6 +56,8 @@ lint+test -> resolve version, validate next-major lane has real content -> pre-b
 
 ### Stable and hotfix
 
+Production gate: every workflow that changes production waits for an approval click on the `production-promote` environment (reviewer: the maintainer): promotion, bootstrap, `release-stable.yml`, `deploy-main-to-vps.yml` (manual and release-triggered runs), and the feedback and telemetry Worker deploys. Agents run `gh` as the maintainer, so an ungated workflow could deploy production without the maintainer seeing it. Staging and beta stay ungated. The separate `production` environment (15-minute wait timer, no reviewer) is not used.
+
 Stable promotion: click Prepare Main Stable Promotion, review and merge its PR, then click Bootstrap Stable Release Line. Bootstrap creates `stable/N.x` at the approved commit and opens a reviewed PR that starts `main` at `(N+1).0.0-beta.1`. Create the stable release from the stable branch after rehearsal. Hotfix: branch from stable -> PR into stable with a hotfix changelog entry -> rehearse through Deploy Staging -> merge -> Create Stable Release. Backports use the label-driven backport workflow. A production-only fix stays on stable and is not carried to `main`. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR. See [workflow rules](workflow.md#backports).
 
 GitHub Release notes: beta = native PR list + changelog link; stable = curated changelog + PR list; hotfix = curated hotfix entry + short PR list.
