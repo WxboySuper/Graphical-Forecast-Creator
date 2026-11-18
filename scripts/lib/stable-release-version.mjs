@@ -16,3 +16,15 @@ export const decideStableReleaseVersion = ({ currentVersion, tagExists }) => {
   const nextMinor = Number(stable[2]) + 1;
   return { version: `${stable[1]}.${nextMinor}.0`, strategy: 'next-minor', bump: true };
 };
+
+/**
+ * The release manifest describes the release being deployed: its id and version follow the package version,
+ * and the rollout settings (action, status, strategy) are left as they are.
+ * @param {Record<string, unknown>} manifest
+ * @param {string} version
+ */
+export const updateProductionReleaseManifest = (manifest, version) => ({
+  ...manifest,
+  releaseId: `v${version}`,
+  version,
+});
