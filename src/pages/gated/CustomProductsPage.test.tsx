@@ -9,6 +9,7 @@ import { MemoryRouter } from 'react-router';
 import type { CustomCategoryId, HostedCustomProduct } from '../../types/customProducts';
 import { CUSTOM_PRODUCT_HANDOFF_KEY } from '../../lib/customProductHandoff';
 import CustomProductsPage from './CustomProductsPage';
+import { runWithBuildTarget, withFlag } from '../../testing/flags';
 
 const mockUseAuth = jest.fn();
 const mockUseCustomProducts = jest.fn();
@@ -56,6 +57,8 @@ const result = (overrides = {}) => ({
 });
 
 describe('CustomProductsPage', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({ user: { uid: 'user-1' } });
@@ -123,14 +126,12 @@ describe('CustomProductsPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/forecast/custom');
   });
 
-  test('refuses to stage a product when the Custom workspace route is unavailable', async () => {
+  test('refuses to stage a product when the Custom workspace flag is off', async () => {
     const user = userEvent.setup();
     const customProducts = result({ products: [product], useProduct: jest.fn().mockReturnValue({ id: 'layer-1' }) });
     mockUseCustomProducts.mockReturnValue(customProducts);
-    const originalTarget = globalThis.__GFC_BUILD_TARGET__;
-    globalThis.__GFC_BUILD_TARGET__ = 'production';
-
-    try {
+    withFlag('customWorkspace', false, 'production');
+    await runWithBuildTarget('production', async () => {
       render(<MemoryRouter><CustomProductsPage /></MemoryRouter>);
 
       await user.click(screen.getByRole('button', { name: /Use in Forecast/i }));
@@ -140,9 +141,7 @@ describe('CustomProductsPage', () => {
       expect(mockNavigate).not.toHaveBeenCalled();
       expect(screen.getByRole('alert')).toHaveTextContent(/Custom forecast is not available yet/i);
       expect(sessionStorage.getItem(CUSTOM_PRODUCT_HANDOFF_KEY)).toBeNull();
-    } finally {
-      globalThis.__GFC_BUILD_TARGET__ = originalTarget;
-    }
+    });
   });
 
   test('keeps editing and new-map use unavailable without premium while retaining deletion', async () => {

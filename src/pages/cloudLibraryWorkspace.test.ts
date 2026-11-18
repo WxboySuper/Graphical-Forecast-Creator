@@ -1,6 +1,9 @@
 import { getCloudLibraryTabs, getCloudCycleWorkspaceId, getCloudCycleWorkspaceLabel, filterCloudCyclesByWorkspace, getNextCloudLibraryTabId, getCloudLibraryTabFromSearchParams, getCloudLibraryTabLabel, getCloudLibraryWorkspacePath, type CloudLibraryTabId } from './cloudLibraryWorkspace';
 import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
 import type { CloudCycleMetadata } from '../types/cloudCycles';
+import { withFlag } from '../testing/flags';
+
+afterEach(() => jest.restoreAllMocks());
 
 const makeCycle = (id: string, workspaceId?: CloudCycleMetadata['workspaceId']): CloudCycleMetadata => ({
   id,
@@ -63,7 +66,19 @@ describe('cloud library workspace boundaries', () => {
     makeCycle('winter-1', 'winter'),
   ];
 
-  it('keeps gated and future saves in All without dedicated tabs on production', () => {
+  it('shows exposed product tabs on production and keeps future saves in All', () => {
+    const cycles = mixedCycles();
+
+    expect(getCloudLibraryTabs(cycles, 'production')).toEqual([
+      { id: 'all', label: 'All', cycleCount: 6 },
+      { id: 'severe', label: 'Severe', cycleCount: 2 },
+      { id: 'custom', label: 'Custom', cycleCount: 1 },
+    ]);
+    expect(filterCloudCyclesByWorkspace(cycles, 'all')).toHaveLength(6);
+  });
+
+  it('keeps gated workspace saves in All without dedicated tabs when their flags are off', () => {
+    withFlag('customWorkspace', false, 'production');
     const cycles = mixedCycles();
 
     expect(getCloudLibraryTabs(cycles, 'production')).toEqual([
@@ -108,8 +123,8 @@ describe('cloud library workspace boundaries', () => {
     expect(getCloudLibraryWorkspacePath('all')).toBe(getDefaultForecastWorkspacePath());
     expect(getCloudLibraryWorkspacePath('severe')).toBe('/forecast/severe');
     expect(getCloudLibraryWorkspacePath('custom', 'local')).toBe('/forecast/custom');
-    expect(getCloudLibraryWorkspacePath('custom', 'production')).toBe(getDefaultForecastWorkspacePath());
-    expect(getCloudLibraryWorkspacePath('mesoscale', 'production')).toBe(getDefaultForecastWorkspacePath());
+    expect(getCloudLibraryWorkspacePath('custom', 'production')).toBe('/forecast/custom');
+    expect(getCloudLibraryWorkspacePath('mesoscale', 'production')).toBe('/forecast/mesoscale');
     expect(getCloudLibraryWorkspacePath('winter', 'production')).toBe(getDefaultForecastWorkspacePath());
   });
 
@@ -141,6 +156,7 @@ describe('cloud library workspace boundaries', () => {
   });
 
   it('accepts only tabs present in the current exposed tab set', () => {
+    withFlag('customWorkspace', false, 'production');
     const productionTabs = getCloudLibraryTabs([makeCycle('legacy')], 'production');
     const localTabs = getCloudLibraryTabs([makeCycle('legacy')], 'local');
 

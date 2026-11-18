@@ -47,13 +47,13 @@ describe('forecast workspace product contract', () => {
   });
 
   const EXPECTED_EXPOSED: Record<BuildTarget, string[]> = {
-    production: ['severe'],
-    staging: ['severe'],
+    production: ['severe', 'mesoscale', 'custom'],
+    staging: ['severe', 'mesoscale', 'custom'],
     beta: ['severe', 'mesoscale', 'custom'],
     local: ['severe', 'mesoscale', 'custom'],
   };
 
-  test.each(BUILD_TARGETS)('exposes Severe and gates Custom and Mesoscale on the %s target', (target: BuildTarget) => {
+  test.each(BUILD_TARGETS)('exposes the configured workspaces on the %s target', (target: BuildTarget) => {
     const expected = EXPECTED_EXPOSED[target];
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(expected);
   });
@@ -94,11 +94,10 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('severe')?.productType).toBe('severe');
     expect(getForecastWorkspace('custom')?.productType).toBe('custom');
     expect(isForecastWorkspaceExposed(getForecastWorkspace('severe')!, 'production')).toBe(true);
-    expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('mesoscale')!, 'production')).toBe(true);
     expect(isForecastWorkspaceExposed(getForecastWorkspace('winter')!, 'production')).toBe(false);
-    // #914 ships the route contract only: no future workspace opens on a release target.
-    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'production')).toBe(false);
-    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'staging')).toBe(false);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'production')).toBe(true);
+    expect(isForecastWorkspaceExposed(getForecastWorkspace('custom')!, 'staging')).toBe(true);
     expect(getForecastWorkspace('custom')?.exposureKey).toBe('customWorkspace');
     // The library feature gate must not decide whether the editor route registers.
     expect(getForecastWorkspace('custom')?.exposureKey).not.toBe('customProducts');
