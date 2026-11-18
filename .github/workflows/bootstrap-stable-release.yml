@@ -117,6 +117,8 @@ jobs:
           NEXT_MAJOR=$((MAJOR + 1))
           git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" fetch origin main
           git switch --create "advance-main-v${NEXT_MAJOR}" origin/main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           node -e "const fs=require('fs'); const p=require('./package.json'); p.version=process.argv[1]; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\\n')" "${NEXT_MAJOR}.0.0-beta.1"
           git add package.json
           git commit -m "chore(release): start v${NEXT_MAJOR} beta line"
