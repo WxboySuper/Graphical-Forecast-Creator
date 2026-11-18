@@ -23,18 +23,21 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: stable-promotion
+      cancel-in-progress: false
     environment: production-promote
     env:
       SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_VERSION: ${{ inputs.version }}
-      GH_TOKEN: ${{ secrets.GH_PAT }}
     steps:
       - name: Checkout source main ref
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          persist-credentials: false
 
       - name: Configure Git identity
         run: |
@@ -69,14 +72,20 @@ jobs:
         run: node scripts/prepare-stable-promotion.mjs "$TARGET_VERSION"
 
       - name: Commit and push promotion branch
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           git add package.json deploy/production-release.json CHANGELOG.md
           git commit -m "release: prepare v${TARGET_VERSION} stable promotion"
-          git push --set-upstream origin "${{ steps.branch.outputs.branch }}"
+          GIT_AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_PAT" | base64 -w0)"
+          echo "::add-mask::$GIT_AUTH_HEADER"
+          git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" push --set-upstream origin "${{ steps.branch.outputs.branch }}"
 
       - name: Open draft promotion PR
         env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
           PR_BODY: |-
             ## Main → stable promotion
 
@@ -88,6 +97,7 @@ jobs:
 
             Changelog-Impact: beta
         run: |
+          echo "::add-mask::$GH_PAT"
           gh pr create \
             --repo "$GITHUB_REPOSITORY" \
             --base main \

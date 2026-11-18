@@ -22,11 +22,14 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: stable-bootstrap
+      cancel-in-progress: false
     environment: production-promote
     env:
       SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_VERSION: ${{ inputs.version }}
-      GH_TOKEN: ${{ secrets.GH_PAT }}
 
     steps:
       - name: Checkout approved source
@@ -34,8 +37,7 @@ jobs:
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
-          # The repository ruleset covers stable/*, so creating the branch needs the admin PAT (bypass), not the default token.
-          token: ${{ secrets.GH_PAT }}
+          persist-credentials: false
 
       - name: Validate source and stable branch contract
         id: validate
@@ -80,18 +82,26 @@ jobs:
         env:
           STABLE_BRANCH: ${{ steps.validate.outputs.stable_branch }}
           SOURCE_SHA: ${{ steps.validate.outputs.source_sha }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
+          GIT_AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_PAT" | base64 -w0)"
+          echo "::add-mask::$GIT_AUTH_HEADER"
           git switch --create "$STABLE_BRANCH" "$SOURCE_SHA"
-          git push --set-upstream origin "$STABLE_BRANCH"
+          git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" push --set-upstream origin "$STABLE_BRANCH"
           echo "Created $STABLE_BRANCH at $SOURCE_SHA."
 
       - name: Prepare next-major version on main
         id: next_major
         env:
           STABLE_MAJOR: ${{ steps.validate.outputs.stable_branch }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
+          if ! printf '%s' "$STABLE_MAJOR" | grep -Eq '^stable/[0-9]+\.x$'; then
+            echo "::error::Stable branch must match stable/X.x, got $STABLE_MAJOR."
+            exit 1
+          fi
           MAJOR=$(printf '%s' "$STABLE_MAJOR" | sed -E 's#stable/([0-9]+)\.x#\1#')
           NEXT_MAJOR=$((MAJOR + 1))
           git fetch origin main
@@ -99,12 +109,16 @@ jobs:
           node -e "const fs=require('fs'); const p=require('./package.json'); p.version=process.argv[1]; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\\n')" "${NEXT_MAJOR}.0.0-beta.1"
           git add package.json
           git commit -m "chore(release): start v${NEXT_MAJOR} beta line"
-          git push --set-upstream origin HEAD
+          GIT_AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_PAT" | base64 -w0)"
+          echo "::add-mask::$GIT_AUTH_HEADER"
+          git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" push --set-upstream origin HEAD
           echo "version=${NEXT_MAJOR}.0.0-beta.1" >> "$GITHUB_OUTPUT"
 
       - name: Open next-major version PR
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_PAT: ${{ secrets.GH_PAT }}
           NEXT_VERSION: ${{ steps.next_major.outputs.version }}
         run: |
+          echo "::add-mask::$GH_PAT"
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "advance-main-v${NEXT_VERSION%%.*}" --title "chore(release): start v${NEXT_VERSION%%.*} beta line" --body $'Set package.json to '"${NEXT_VERSION}"$' after bootstrapping stable/${{ steps.validate.outputs.stable_branch }}. The promotion PR already reset the next-major changelog lane.\n\nChangelog-Impact: none\nChangelog-Reason: Start the next major beta version after the stable line is cut.'
