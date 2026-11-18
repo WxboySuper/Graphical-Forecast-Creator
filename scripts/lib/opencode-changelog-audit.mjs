@@ -1,6 +1,6 @@
 import { parseOpenCodeChangelogResult } from './opencode-changelog.mjs';
 
-const TARGET_REF_PATTERN = /^(main|stable\/\d+\.\d+\.x)$/;
+const TARGET_REF_PATTERN = /^(main|stable\/\d+(?:\.\d+)?\.x)$/;
 const COMMIT_SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const BASELINE_REF_PATTERN = /^(?:[a-f0-9]{40}|v\d+\.\d+\.\d+(?:-beta\.\d+)?)$/i;
 
@@ -32,8 +32,9 @@ const isManualBaselineForTarget = (baselineRef, targetRef) => {
 const isBetaTag = (tag) => Boolean(tag[4]);
 
 const isStableTagForTarget = (tag, targetRef) => {
-  const line = /^stable\/(\d+)\.(\d+)\.x$/.exec(targetRef);
-  return Boolean(line && !tag[4] && tag[1] === line[1] && tag[2] === line[2]);
+  const line = /^stable\/(\d+)(?:\.(\d+))?\.x$/.exec(targetRef);
+  if (!line || tag[4] || tag[1] !== line[1]) return false;
+  return line[2] === undefined || tag[2] === line[2];
 };
 
 const validateManualBaselineRef = (baselineRef, targetRef) => {
