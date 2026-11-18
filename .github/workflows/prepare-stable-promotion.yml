@@ -59,6 +59,10 @@ jobs:
             echo "::error::Stable promotion source must be main or an immutable commit SHA."
             exit 1
           fi
+          if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.0$'; then
+            echo "::error::Stable version must be a padded flat X.Y.0 version, got $TARGET_VERSION."
+            exit 1
+          fi
           BRANCH="promotion/v${TARGET_VERSION}"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "::error::Promotion branch $BRANCH already exists; refusing to overwrite it."
