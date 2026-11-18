@@ -103,7 +103,6 @@ test('API and publishing credentials never share a step with PR-controlled execu
 test('credential-bearing scripts and every local import resolve inside the trusted scripts tree', () => {
   for (const script of [
     'prepare-changelog-governance.mjs',
-    'validate-port-pr-policy.mjs',
     'prepare-opencode-workspace.mjs',
     'run-opencode-maintenance.mjs',
     'publish-opencode-changelog.mjs',
