@@ -1,122 +1,35 @@
 /**
- * Stable-hotfix pull-request validator. It checks changed files, release
- * metadata, and policy trailers before a hotfix can be promoted.
+ * Stable-line pull-request check. It is deliberately loose: a PR into a stable branch (a backport or a
+ * hotfix) does not need to bump the version, update the release manifest or touch the changelog, because
+ * the release workflow does that. It only fails when the PR would leave package.json or
+ * deploy/production-release.json in a state that breaks a production release.
  */
-import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import {
-  normalizeProductionReleaseConfig,
-  validateProductionReleaseForDeploy,
-} from '../server/lib/production-release.mjs';
+import { readFileSync } from 'node:fs';
+import { evaluateStableHotfixPolicy } from './lib/stable-hotfix-policy.mjs';
 
 const baseRef = process.env.GITHUB_BASE_REF ?? '';
 const headRef = process.env.GITHUB_HEAD_REF ?? '';
 
 if (!/^stable\/\d+(?:\.\d+)?\.x$/.test(baseRef)) {
-  console.log('Not a stable-line PR; skipping stable hotfix policy.');
+  console.log('Not a stable-line PR; skipping the stable-line policy.');
   process.exit(0);
 }
 
-/**
- * @param {string} ref
- * @param {string} path
- * @returns {Record<string, unknown>}
- */
-const readJsonAtRef = (ref, path) => {
-  const output = execFileSync('git', ['show', ['origin/', ref, ':', path].join('')], {
-    encoding: 'utf8',
-  });
-  return JSON.parse(output);
-};
+const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
+const basePackage = JSON.parse(execFileSync('git', ['show', `origin/${baseRef}:package.json`], { encoding: 'utf8' }));
+const manifestReleaseId = JSON.parse(readFileSync('deploy/production-release.json', 'utf8')).releaseId;
 
-const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
-const basePackage = readJsonAtRef(baseRef, 'package.json');
-const versionPattern = /^(\d+)\.(\d+)\.(\d+)$/;
-const current = String(packageJson.version).match(versionPattern);
-const previous = String(basePackage.version).match(versionPattern);
-
-if (!current || !previous) {
-  console.error(
-    ['Stable hotfixes require stable semver in package.json; got ', packageJson.version, '.'].join(''),
-  );
-  process.exit(1);
-}
-
-const flatStableVersion = baseRef.match(/^stable\/(\d+)\.x$/);
-const legacyStableLine = baseRef.match(/^stable\/(\d+)\.(\d+)\.x$/);
-const sameMajor = current[1] === previous[1] &&
-  (!flatStableVersion || current[1] === flatStableVersion[1]) &&
-  (!legacyStableLine || (current[1] === legacyStableLine[1] && current[2] === legacyStableLine[2]));
-const advancesFlatMinor = flatStableVersion
-  ? Number(current[2]) > Number(previous[2]) && current[3] === '0'
-  : current[1] === previous[1] && current[2] === previous[2] && Number(current[3]) > Number(previous[3]);
-if (!sameMajor || !advancesFlatMinor) {
-  console.error(
-    [
-      'Stable hotfix PRs must advance the flat version from ',
-      basePackage.version,
-      ' to a newer ',
-      current[1],
-      '.',
-      current[2],
-      '.Y.0 version on the same flat major.',
-    ].join(''),
-  );
-  process.exit(1);
-}
-
-const changedFiles = execFileSync(
-  'git',
-  ['diff', '--name-only', ['origin/', baseRef, '...HEAD'].join('')],
-  { encoding: 'utf8' },
-)
-  .split(/\r?\n/)
-  .filter(Boolean);
-
-for (const required of ['package.json', 'deploy/production-release.json', 'CHANGELOG.md']) {
-  if (!changedFiles.includes(required)) {
-    console.error(['Stable hotfix PRs must update ', required, '.'].join(''));
-    process.exit(1);
-  }
-}
-
-const manifest = normalizeProductionReleaseConfig(
-  JSON.parse(readFileSync('deploy/production-release.json', 'utf8')),
-);
-if (manifest.releaseId !== ['v', packageJson.version].join('')) {
-  console.error(
-    [
-      'deploy/production-release.json releaseId must be v',
-      packageJson.version,
-      ', got ',
-      manifest.releaseId,
-      '.',
-    ].join(''),
-  );
-  process.exit(1);
-}
-
-const validation = validateProductionReleaseForDeploy({
-  config: manifest,
-  packageVersion: packageJson.version,
-  deployAction: manifest.action,
+const { ok, problems } = evaluateStableHotfixPolicy({
+  baseRef,
+  basePackageVersion: basePackage.version,
+  packageVersion,
+  manifestReleaseId,
 });
-if (!validation.ok) {
-  console.error('Stable hotfix release manifest is invalid:');
-  for (const error of validation.errors) {
-    console.error(['  - ', error].join(''));
-  }
+
+if (!ok) {
+  for (const problem of problems) console.error(problem);
   process.exit(1);
 }
 
-console.log(
-  [
-    'Stable hotfix policy OK: ',
-    headRef || 'head',
-    ' advances ',
-    basePackage.version,
-    ' -> ',
-    packageJson.version,
-    '.',
-  ].join(''),
-);
+console.log(`Stable-line policy OK: ${headRef || 'head'} -> ${baseRef} (package ${packageVersion}).`);
