@@ -40,14 +40,14 @@ const directionProblems = (basePackageVersion, packageVersion, current) => {
   return [`package.json goes backwards from ${basePackageVersion} to ${packageVersion}.`];
 };
 
-/** The release manifest has to keep describing the package version. */
+/** The release manifest has to keep describing the package version; a missing releaseId fails. */
 const manifestProblems = (manifestReleaseId, packageVersion) => {
-  if (manifestReleaseId === undefined || manifestReleaseId === `v${packageVersion}`) return [];
-  return [`deploy/production-release.json releaseId must be v${packageVersion}, got ${manifestReleaseId}.`];
+  if (manifestReleaseId === `v${packageVersion}`) return [];
+  return [`deploy/production-release.json releaseId must be v${packageVersion}, got ${manifestReleaseId ?? 'nothing'}.`];
 };
 
 /**
- * @param {{ baseRef: string; basePackageVersion: string; packageVersion: string; manifestReleaseId?: string }} input
+ * @param {{ baseRef: string; basePackageVersion: string; packageVersion: string; manifestReleaseId: string | undefined }} input
  * @returns {{ ok: boolean; problems: string[] }}
  */
 export const evaluateStableHotfixPolicy = ({ baseRef, basePackageVersion, packageVersion, manifestReleaseId }) => {

@@ -46,3 +46,9 @@ test('legacy stable/X.Y.x lines stay on their major.minor', () => {
   assert.equal(evaluateStableHotfixPolicy(legacy).ok, true);
   assert.equal(evaluateStableHotfixPolicy({ ...legacy, packageVersion: '1.8.0', manifestReleaseId: 'v1.8.0' }).ok, false);
 });
+
+test('a manifest with no releaseId fails instead of being skipped', () => {
+  const result = evaluateStableHotfixPolicy({ ...base, manifestReleaseId: undefined });
+  assert.equal(result.ok, false);
+  assert.match(result.problems.join(' '), /releaseId must be v2\.0\.0, got nothing/);
+});
