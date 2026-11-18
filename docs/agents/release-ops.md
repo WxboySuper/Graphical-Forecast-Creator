@@ -30,7 +30,7 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 | `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=v2.0.0-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
 | `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
-| `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
+| `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | `line=auto` or `N.x`, `dry_run`, optional `previous_tag`; production environment approval |
 | `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | |
 | `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
@@ -56,7 +56,7 @@ lint+test -> resolve version, validate next-major lane has real content -> pre-b
 
 ### Stable and hotfix
 
-Stable: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Create Stable Release (from stable branch). Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Create Stable Release -> forward-port PR appears. Forward-port PRs use `Changelog-Impact: inherited` + `Port of #N`.
+One-time setup: in repository Settings -> Environments -> New environment, create `production` and set Required reviewers to the maintainer. Without required reviewers, the environment gate does not pause for approval. Stable release: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Actions -> Release | Stable -> Run workflow. Choose `auto` or a stable line such as `2.x`. Approve the audit job and then the publishing job, since both can write to GitHub. Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Actions -> Release | Stable -> Run workflow -> approve both gated jobs -> forward-port PR appears. Forward-port PRs use `Changelog-Impact: inherited` + `Port of #N`.
 
 GitHub Release notes: beta = native PR list + changelog link; stable = curated changelog + PR list; hotfix = curated hotfix entry + short PR list.
 

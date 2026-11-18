@@ -43,3 +43,28 @@ export const extractLaneReleaseNotes = (changelog, version, lane) => {
   const body = laneSection.slice(heading.length).trim();
   return body ? `## v${version}\n\n${body}`.trim() : null;
 };
+
+/** @param {string} changelog @param {string} version @param {'next-major' | 'stable-hotfix'} lane */
+export const moveLaneToReleaseSection = (changelog, version, lane) => {
+  const heading = changelogLaneHeading(lane);
+  const bounds = findChangelogLaneBounds(changelog, lane);
+  if (!bounds) throw new Error(`CHANGELOG.md must include ${heading}.`);
+
+  const releaseHeading = `## v${version}`;
+  if (new RegExp(`^${releaseHeading.replaceAll('.', '\\.')}\\s*$`, 'm').test(changelog)) {
+    return { changelog, moved: false };
+  }
+
+  const body = changelog.slice(bounds.start + heading.length, bounds.end).trim();
+  const bodyWithoutComments = body.replace(/<!--[\s\S]*?-->/g, '').trim();
+  if (!bodyWithoutComments || !/^\s*(?:[-*]|\d+\.)\s+\S/m.test(bodyWithoutComments)) {
+    throw new Error(`The stable changelog lane is empty; release ${version} requires release notes.`);
+  }
+
+  const releaseSection = `${releaseHeading}\n\n${body}\n\n`;
+  const laneReset = `${heading}\n\n#### Added\n\n<!-- Add stable-line changes here. -->\n`;
+  return {
+    changelog: `${changelog.slice(0, bounds.start)}${releaseSection}${laneReset}${changelog.slice(bounds.end).replace(/^\s*/, '')}`,
+    moved: true,
+  };
+};

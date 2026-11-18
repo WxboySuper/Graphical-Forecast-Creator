@@ -84,7 +84,7 @@ To promote the next-major line to production:
 1. Run **Prepare Main Stable Promotion** with the reviewed `main` ref and target version.
 2. Review and merge the generated promotion PR into `main`.
 3. Run **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit.
-4. Run **Create Stable Release** manually from the stable branch. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`, commits that package update to the stable branch, and creates tag `v2.0.0` with the short display label `v2`.
+4. In Actions, open **Release | Stable**, choose **Run workflow**, select `auto` or a stable line such as `2.x`, then approve the production environment request. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`. If the current `X.Y.0` tag already exists, it prepares `X.(Y+1).0`. The workflow commits the version and changelog update to the stable branch before creating the release. Use `dry_run` to inspect the decision without pushing or publishing.
 
 The stable GitHub Release title uses the short label, such as `v2` or `v2.1`; its git tag uses padded semver, such as `v2.0.0` or `v2.1.0`. The release starts with the curated changelog entry and may include GitHub's generated merged-PR notes. Publishing triggers the production workflow. For a live manifest action, it deploys the VPS API and `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected stable branch, such as `stable/2.x`; any corrective changelog update is proposed through a separate PR.
 
@@ -99,7 +99,7 @@ For an urgent production fix:
 3. Add the fix to the current stable-line hotfix changelog lane.
 4. Run **Deploy Staging** with the hotfix branch, commit, or PR ref.
 5. After staging verification, merge the hotfix PR.
-6. Run **Create Stable Release** for the stable line.
+6. In Actions, open **Release | Stable**, choose **Run workflow**, select the stable line, then approve the production environment request.
 
 The hotfix release uses the curated hotfix entry first, followed by the merged-PR traceability notes. Publishing it activates production deployment.
 
