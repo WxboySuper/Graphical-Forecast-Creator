@@ -42,6 +42,9 @@ jobs:
       - name: Validate source and stable branch contract
         id: validate
         shell: bash
+        env:
+          # Read-only default token, so the existence check is authenticated without exposing the admin PAT to this step.
+          READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -71,7 +74,9 @@ jobs:
           fi
 
           STABLE_BRANCH="stable/${TARGET_VERSION%%.*}.x"
-          if git ls-remote --exit-code --heads origin "$STABLE_BRANCH" >/dev/null 2>&1; then
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
+          echo "::add-mask::$AUTH_HEADER"
+          if git -c "http.https://github.com/.extraheader=$AUTH_HEADER" ls-remote --exit-code --heads origin "$STABLE_BRANCH" >/dev/null 2>&1; then
             echo "::error::Stable branch $STABLE_BRANCH already exists; refusing to overwrite it."
             exit 1
           fi

@@ -53,6 +53,9 @@ jobs:
 
       - name: Create promotion branch
         id: branch
+        env:
+          # Read-only default token, so the existence check is authenticated without exposing the admin PAT to this step.
+          READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if ! printf '%s' "$SOURCE_REF" | grep -Eq '^(main|[0-9a-f]{7,40})$'; then
@@ -64,7 +67,9 @@ jobs:
             exit 1
           fi
           BRANCH="promotion/v${TARGET_VERSION}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
+          echo "::add-mask::$AUTH_HEADER"
+          if git -c "http.https://github.com/.extraheader=$AUTH_HEADER" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "::error::Promotion branch $BRANCH already exists; refusing to overwrite it."
             exit 1
           fi
