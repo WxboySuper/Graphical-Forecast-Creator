@@ -36,7 +36,7 @@ test('stable release requires a clean final audit; beta does not run one', () =>
   assert.match(stableWf, /Create GitHub stable release[\s\S]*?GH_TOKEN: \$\{\{ secrets\.GH_PAT \}\}/);
   assert.match(stableWf, /line:[\s\S]*?default: auto/);
   assert.match(stableWf, /dry_run:[\s\S]*?type: boolean/);
-  assert.equal(stableWf.match(/environment: production/g).length, 1, 'one approval click gates the whole release');
+  assert.equal(stableWf.match(/environment: production-promote/g).length, 1, 'one approval click gates the whole release');
   assert.doesNotMatch(stableWf, /confirmation:|RELEASE-STABLE|inputs\.ref/);
   const beta = readFileSync(new URL('../../.github/workflows/release-beta.yml', import.meta.url), 'utf8');
   assert.doesNotMatch(beta, /final_changelog_audit|changelog_gate|opencode-changelog-audit/);

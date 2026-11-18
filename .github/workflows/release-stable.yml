@@ -1,6 +1,6 @@
 name: Release | Stable
 
-# Stable releases resolve a stable line, then publish after one production environment approval.
+# Stable releases resolve a stable line, then publish after one `production-promote` environment approval.
 # The approval job gates the audit, and the release job needs the audit, so one click covers the whole run.
 # Publishing triggers the app Worker, marketing Worker, and VPS API deploy workflow.
 on:
@@ -61,7 +61,7 @@ jobs:
     needs: resolve_line
     name: Approve production release
     runs-on: ubuntu-latest
-    environment: production
+    environment: production-promote
     steps:
       - run: echo "Approved production release for ${{ needs.resolve_line.outputs.ref }}"
 
