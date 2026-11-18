@@ -18,8 +18,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Stable branch or padded semver release tag to deploy (default: stable/2.x)'
+        description: 'Stable branch or padded semver release tag to deploy (auto selects highest stable branch)'
         required: false
+        default: auto
         type: string
       deploy_action:
         description: 'Override manifest action (auto = use deploy/production-release.json)'
@@ -58,6 +59,12 @@ jobs:
       RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
     steps:
+      - name: Checkout repository metadata
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Resolve checkout ref
         id: checkout_ref
         env:
@@ -67,14 +74,16 @@ jobs:
         run: |
           if [ "$GHA_EVENT_NAME" = "release" ]; then
             echo "ref=${GHA_TAG_NAME}" >> "$GITHUB_OUTPUT"
-          elif [ -n "$GHA_INPUT_REF" ]; then
+          elif [ -n "$GHA_INPUT_REF" ] && [ "$GHA_INPUT_REF" != auto ]; then
             if ! printf '%s' "$GHA_INPUT_REF" | grep -Eq '^(stable/[0-9]+(\.[0-9]+)?\.x|v[0-9]+\.[0-9]+\.[0-9]+)$'; then
-              echo "::error::Manual production deploys must target a stable/X.x branch or padded stable tag such as v2.0.0." >&2
+              echo "::error::Manual production deploys must target a stable/X.x branch or padded semver release tag." >&2
               exit 1
             fi
             echo "ref=${GHA_INPUT_REF}" >> "$GITHUB_OUTPUT"
           else
-            echo "ref=stable/2.x" >> "$GITHUB_OUTPUT"
+            git ls-remote --heads origin 'stable/*' | awk '{sub("refs/heads/", "", $2); print $2}' | sort -V | tail -n1 > stable-ref
+            test -s stable-ref || { echo '::error::No stable branch exists.'; exit 1; }
+            echo "ref=$(cat stable-ref)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout

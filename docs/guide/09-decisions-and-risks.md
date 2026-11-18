@@ -27,7 +27,7 @@ Why things are the way they are, so you can change them on purpose. This is a li
 
 | Question | Context |
 |----------|---------|
-| Turn on GitHub branch protection / required checks? | Currently off, so merges rely on habit ([page 7](07-working-with-agents.md)) |
+| Keep the GitHub ruleset current? | `main` and `stable/*` require checks and PRs; admins can bypass. |
 | Which hostname is canonical for beta? | Config says `beta.gfcweather.com`; old text says `beta-gfc.weatherboysuper.com`. The production app uses `app.gfcweather.com`, and the marketing site uses `gfcweather.com`. |
 | What ships in v2? | 6 open issues in the `v2` milestone (128 closed). Direction: independent forecast workspaces, explicit persistence ownership. |
 | Tropical workspace and collaboration room | Gated off. Each needs its own product decision and exposure key before work starts. |
@@ -52,7 +52,6 @@ Why things are the way they are, so you can change them on purpose. This is a li
 | Term | Meaning |
 |------|---------|
 | Lane | Section of the changelog a PR adds to |
-| Forward-port | Copy of a stable hotfix onto `main` |
 | Capability | A server-side feature switch reported by `/api/capabilities/status` |
 | Exposure | Which environments can see a feature |
 | Ingestion | Server loop that fetches and caches Auto-TSTM guidance |

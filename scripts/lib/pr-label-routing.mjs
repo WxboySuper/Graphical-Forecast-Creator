@@ -6,7 +6,6 @@ const BRANCH_KIND_LABELS = [
   ['fix/', 'fix'],
   ['hotfix/', 'hotfix'],
   ['release/', 'release'],
-  ['port/', 'port'],
   ['refactor/', 'refactor'],
 ];
 

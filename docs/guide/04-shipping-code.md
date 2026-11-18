@@ -18,7 +18,6 @@ gitGraph
   checkout stable/2.x
   merge hotfix/crash id: "v2.1"
   checkout main
-  commit id: "forward-port"
 ```
 
 | Branch | Role |
@@ -30,7 +29,7 @@ gitGraph
 
 "Beta" is **not a branch**; it is a prerelease cut from `main`.
 
-GFC displays flat release labels such as `v2` and `v2.1`. Package versions and git tags use padded semver (`2.0.0` and `v2.0.0`); the patch slot stays `0`. Beta versions use `2.0.0-beta.N` with a continuing counter. Hotfixes use the next flat minor label, such as `v2.1`. See [release operations](../agents/release-ops.md#versioning).
+After the v2 cut, `main` carries v3 beta releases (`3.0.0-beta.N`), while `stable/2.x` is the production line. Beta numbering starts at 1 for each new base version. GFC displays flat release labels such as `v2` and `v2.1`; package versions and tags use padded semver (`2.0.0` and `v2.0.0`). See [release operations](../agents/release-ops.md#versioning).
 
 ## Every PR
 
@@ -42,7 +41,6 @@ GFC displays flat release labels such as `v2` and `v2.1`. Package versions and g
 | `beta` | User-visible change landing on `main` | Add an entry under `### Next major / beta` in `CHANGELOG.md` |
 | `hotfix` | User-visible change on a stable line | Add an entry under the current stable-line hotfix lane |
 | `none` | No public impact | Add `Changelog-Reason:` |
-| `inherited` | Forward-port of a stable fix | Add `Port of #123` |
 
 For eligible same-repo PRs, a bot drafts the `beta`/`hotfix` entry for you (see [Automation](06-automation.md)). Dependabot PRs are handled automatically.
 
@@ -53,7 +51,7 @@ For eligible same-repo PRs, a bot drafts the `beta`/`hotfix` entry for you (see 
 ```mermaid
 flowchart TD
   subgraph Beta
-    B1["Run 'Release | Beta' on main<br/>(type RELEASE-BETA)"] --> B2[Lint + test + changelog audit]
+    B1["Click 'Release | Beta' on main"] --> B2[Lint + test + changelog audit]
     B2 --> B3[Bump package.json, tag vX.Y.Z-beta.N, draft prerelease]
     B3 --> B4[Deploy Worker + beta API]
     B4 --> B5[Smoke tests] --> B6[Publish prerelease]
@@ -68,12 +66,11 @@ flowchart TD
     H1[hotfix/* from stable] --> H2[PR into stable + hotfix changelog lane]
     H2 --> H3[Deploy Staging with the hotfix ref]
     H3 --> H4[Merge, then Create Stable Release]
-    H4 --> H5[Auto forward-port PR into main]
   end
 ```
 
-- **Staging** (`Deploy Staging`) is manual, takes any branch/tag/commit, and never runs automatically.
-- **Forward-ports**: when a stable PR merges, a bot opens a draft `port/<pr>-to-main` PR. If the diff does not apply, it opens a `porting/conflicts` issue instead. It never merges anything.
+- **Staging** (`Deploy Staging`) rehearses a stable branch, tag, or commit. `auto` selects the highest stable branch.
+- After a stable major is bootstrapped, the workflow opens a reviewed PR to start `main` on the next major's `.0.0-beta.1` version.
 - **Beta failures**: do **not** re-run `Release | Beta` (that cuts a new version). Redeploy the existing tag with `Deploy beta to Cloudflare Workers`. Recovery table: [`releasing-beta.md`](../releasing-beta.md).
 - **Emergency**: setting `"action": "live"` in `deploy/production-release.json` skips staging.
 
@@ -96,6 +93,5 @@ flowchart TD
 | `release-stable.yml` | Create stable or hotfix release (triggers prod deploy) |
 | `deploy-staging.yml` | Rehearsal deploy |
 | `deploy-main-to-vps.yml` | Production/staging VPS deploy |
-| `forward-port-stable-fix.yml` | Stable fix to `main` PR |
 
 Full procedures: [`release-workflow.md`](../operations/release-workflow.md), [`hosted-rollout.md`](../operations/hosted-rollout.md).

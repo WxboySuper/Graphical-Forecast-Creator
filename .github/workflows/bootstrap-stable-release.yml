@@ -11,12 +11,9 @@ on:
         default: main
         type: string
       version:
-        description: 'Flat stable release version, for example 2.0.0 or 2.1.0'
+        description: 'Stable version (auto reads package.json)'
         required: true
-        type: string
-      confirmation:
-        description: 'Type BOOTSTRAP-STABLE to create the stable branch'
-        required: true
+        default: auto
         type: string
 
 permissions:
@@ -24,11 +21,12 @@ permissions:
 
 jobs:
   bootstrap:
-    if: inputs.confirmation == 'BOOTSTRAP-STABLE'
     runs-on: ubuntu-latest
+    environment: production-promote
     env:
       SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
 
     steps:
       - name: Checkout approved source
@@ -44,6 +42,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [ "$TARGET_VERSION" = "auto" ]; then
+            TARGET_VERSION=$(node -p "require('./package.json').version")
+            echo "TARGET_VERSION=$TARGET_VERSION" >> "$GITHUB_ENV"
+          fi
 
           if ! printf '%s' "$SOURCE_REF" | grep -Eq '^(main|[0-9a-f]{7,40})$'; then
             echo "::error::Stable source must be main or an immutable commit SHA."
@@ -82,3 +85,26 @@ jobs:
           git switch --create "$STABLE_BRANCH" "$SOURCE_SHA"
           git push --set-upstream origin "$STABLE_BRANCH"
           echo "Created $STABLE_BRANCH at $SOURCE_SHA."
+
+      - name: Prepare next-major version on main
+        id: next_major
+        env:
+          STABLE_MAJOR: ${{ steps.validate.outputs.stable_branch }}
+        run: |
+          set -euo pipefail
+          MAJOR=$(printf '%s' "$STABLE_MAJOR" | sed -E 's#stable/([0-9]+)\.x#\1#')
+          NEXT_MAJOR=$((MAJOR + 1))
+          git fetch origin main
+          git switch --create "advance-main-v${NEXT_MAJOR}" origin/main
+          node -e "const fs=require('fs'); const p=require('./package.json'); p.version=process.argv[1]; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\\n')" "${NEXT_MAJOR}.0.0-beta.1"
+          git add package.json
+          git commit -m "chore(release): start v${NEXT_MAJOR} beta line"
+          git push --set-upstream origin HEAD
+          echo "version=${NEXT_MAJOR}.0.0-beta.1" >> "$GITHUB_OUTPUT"
+
+      - name: Open next-major version PR
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          NEXT_VERSION: ${{ steps.next_major.outputs.version }}
+        run: |
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "advance-main-v${NEXT_VERSION%%.*}" --title "chore(release): start v${NEXT_VERSION%%.*} beta line" --body $'Set package.json to '"${NEXT_VERSION}"$' after bootstrapping stable/${{ steps.validate.outputs.stable_branch }}. The promotion PR already reset the next-major changelog lane.\n\nChangelog-Impact: none\nChangelog-Reason: Start the next major beta version after the stable line is cut.'

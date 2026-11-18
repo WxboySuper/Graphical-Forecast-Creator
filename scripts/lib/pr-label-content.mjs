@@ -53,7 +53,6 @@ const CONTENT_LABEL_RULES = [
   { label: 'Documentation', patterns: ['docs/**', '**/*.md', 'src/components/Documentation/**'] },
   { label: 'dependencies', patterns: ['package.json', 'pnpm-lock.yaml', 'server/package.json', 'server/package-lock.json'] },
   { label: 'e2e-validated', patterns: ['e2e/**'] },
-  { label: 'porting', patterns: ['.github/workflows/forward-port-stable-fix.yml', 'scripts/lib/port-targets.mjs', 'scripts/lib/port-conflicts.mjs'] },
   { label: 'quality', patterns: ['.github/workflows/**', 'scripts/**', '**/*.test.*', '**/*.spec.*', '**/__tests__/**'] },
   { label: 'javascript', patterns: ['src/**', 'server/**', 'vite.config.*', 'tsconfig*.json', 'playwright.config.*'] },
 ];
@@ -104,7 +103,7 @@ export const descriptiveLabels = ({ changedFiles, head }) => {
   const typeLabel = branchTypeLabel(head);
   if (typeLabel) labels.add(typeLabel);
 
-  if (head.startsWith('feature/release-') || head.startsWith('port/')) {
+  if (head.startsWith('feature/release-')) {
     labels.add('quality');
   }
 

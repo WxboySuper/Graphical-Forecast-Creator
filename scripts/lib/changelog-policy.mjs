@@ -4,12 +4,11 @@
  */
 import { CHANGELOG_LANE_HEADINGS } from './changelog-lanes.mjs';
 
-const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none|inherited)\s*$/gim;
+const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none)\s*$/gim;
 const REASON_PATTERN = /^Changelog-Reason:\s*(\S.*)$/im;
-const SOURCE_PATTERN = /(?:port|backport|forward[- ]port|inherited)\s+(?:of\s+)?#(\d+)/i;
 const PREVIOUS_STABLE_LANE_HEADING = '### Stable 1.7.x hotfixes';
 
-/** @typedef {'beta' | 'hotfix' | 'none' | 'inherited'} ChangelogImpact */
+/** @typedef {'beta' | 'hotfix' | 'none'} ChangelogImpact */
 
 export { CHANGELOG_LANE_HEADINGS };
 
@@ -93,10 +92,6 @@ const validateImpactFile = ({ declaration, changedFiles, changelog, baseChangelo
       : { ok: true, reason: `Changelog impact explicitly waived: ${declaration.reason}` };
   }
 
-  if (declaration.impact === 'inherited') {
-    return { ok: true, reason: `Changelog entry inherited from PR #${declaration.sourcePr}.` };
-  }
-
   if (!hasChangedChangelog(changedFiles, path)) {
     return {
       ok: false,
@@ -122,18 +117,12 @@ const impactMatches = (body) => [...body.matchAll(IMPACT_PATTERN)].map((match) =
 const parseDeclarationValues = (body, impact) => ({
   impact,
   reason: body.match(REASON_PATTERN)?.[1]?.trim(),
-  sourcePr: Number(body.match(SOURCE_PATTERN)?.[1] ?? 0) || undefined,
 });
 
 /** @param {{ impact: ChangelogImpact; reason?: string; sourcePr?: number }} values */
-const validateDeclarationValues = ({ impact, reason, sourcePr }) => {
+const validateDeclarationValues = ({ impact, reason }) => {
   if (impact === 'none' && !reason) {
     return declarationError('Changelog-Impact: none requires a non-empty Changelog-Reason declaration.');
-  }
-  if (impact === 'inherited' && !sourcePr) {
-    return declarationError(
-      'Changelog-Impact: inherited requires a port/backport/forward-port reference such as "Port of #123".',
-    );
   }
   return null;
 };
@@ -146,7 +135,7 @@ export const parseChangelogDeclaration = (body = '') => {
   const matches = impactMatches(body);
   if (matches.length !== 1) {
     return declarationError(
-      'PR body must contain exactly one Changelog-Impact: beta|hotfix|none|inherited declaration.',
+      'PR body must contain exactly one Changelog-Impact: beta|hotfix|none declaration.',
     );
   }
 
@@ -174,4 +163,4 @@ export const evaluateChangelogPolicy = ({ baseRef = '', changedFiles, body, chan
  * @param {ChangelogImpact | undefined} impact
  * @returns {boolean}
  */
-export const isChangelogSkip = (impact) => impact === 'none' || impact === 'inherited';
+export const isChangelogSkip = (impact) => impact === 'none';

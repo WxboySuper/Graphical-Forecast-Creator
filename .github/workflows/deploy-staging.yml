@@ -6,13 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Branch, tag, or commit to test on staging'
+        description: 'Stable branch, tag, or commit to rehearse (auto selects highest stable branch)'
         required: true
-        default: main
-        type: string
-      confirmation:
-        description: 'Type DEPLOY-STAGING to deploy the selected ref'
-        required: true
+        default: auto
         type: string
 
 permissions:
@@ -24,32 +20,44 @@ concurrency:
 
 jobs:
   deploy:
-    if: inputs.confirmation == 'DEPLOY-STAGING'
     runs-on: ubuntu-latest
     env:
       RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
       DEPLOY_REF: ${{ inputs.ref }}
       STAGING_HOST: ${{ secrets.PROD_SSH_HOST }}
     steps:
+      - name: Checkout repository metadata
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+
       - name: Reject an empty ref
         run: test -n "$DEPLOY_REF"
 
+      - name: Resolve auto stable ref
+        if: inputs.ref == 'auto'
+        run: |
+          git ls-remote --heads origin 'stable/*' | awk '{sub("refs/heads/", "", $2); print $2}' | sort -V | tail -n1 > stable-ref
+          test -s stable-ref || { echo '::error::No stable branch exists.'; exit 1; }
+          echo "DEPLOY_REF=$(cat stable-ref)" >> "$GITHUB_ENV"
+
       - name: Validate selected ref
         env:
-          STAGING_REF: ${{ inputs.ref }}
+          STAGING_REF: ${{ env.DEPLOY_REF }}
         run: |
           set -euo pipefail
-          if [ "$STAGING_REF" = "main" ] || printf '%s' "$STAGING_REF" | grep -Eq '^stable/[0-9]+(\.[0-9]+)?\.x$'; then
+          if printf '%s' "$STAGING_REF" | grep -Eq '^(stable/[0-9]+(\.[0-9]+)?\.x|v[0-9]+\.[0-9]+\.[0-9]+|[0-9a-f]{7,40})$'; then
             exit 0
           fi
 
-          echo "::error::Staging deploys must target main or a stable/* release line." >&2
+          echo "::error::Staging deploys must target a stable branch, version tag, or commit SHA." >&2
           exit 1
 
       - name: Checkout selected ref
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ env.DEPLOY_REF }}
           fetch-depth: 0
 
       - name: Setup pnpm

@@ -41,7 +41,7 @@ Actually exercise user-visible changes (browser/Playwright), not just static tes
 | `hotfix/*` | From the current stable line, PR into it |
 | `fix/*`, others | Descriptive only; not merge gates |
 
-Forward-ports into `main` are automation-opened draft PRs (`port/<pr>-to-main`); review them, resolve rewrite-specific differences, never auto-merge.
+Backport fixes to production by labeling the source PR `backport-N.x`; the backport workflow creates the reviewed PR against that stable line. There is no automatic forward-porting from stable to `main`.
 
 ## Commits
 
@@ -57,7 +57,6 @@ Conventional Commits: `feat|fix|chore|docs|style|refactor(scope): message`. Exam
 | `beta` | Entry in `CHANGELOG.md` under `### Next major / beta` (the check diffs that lane) |
 | `hotfix` | Entry under the current stable-line hotfix lane |
 | `none` | `Changelog-Reason:` |
-| `inherited` | `Port of #<n>`; no second entry |
 
 - Changelog sections: Added, Changed, Deprecated, Removed, Fixed, Security, Dependencies. Write for users, not maintainers.
 - Eligible same-repo PRs with `beta`/`hotfix` and no changelog edit get a bot-drafted entry pushed to the branch. Pull before pushing again.

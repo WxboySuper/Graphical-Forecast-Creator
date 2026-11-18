@@ -74,7 +74,7 @@ Read [`docs/agents/README.md`](docs/agents/README.md) for the index; load only w
 - **pnpm only.** Never `npm`/`yarn` for dependencies.
 - **Versions**: User-facing release labels are flat (`v2`, `v2.1`). Pad package and tag semver with a trailing `.0` (`2.0.0`, tag `v2.0.0`); the patch slot stays `0`. Beta tags use `v<base>-beta.N`; the counter restarts at 1 for each new base version (`v3.0.0-beta.1`). Production uses `stable/2.x`; hotfix labels use `v2.1`. Terms and Privacy versions are independent flat integers.
 - **Branches**: PRs target `main`. Production lives on `stable/X.x`; hotfixes branch from the current stable line. Use Conventional Commits.
-- **Every PR** declares exactly one `Changelog-Impact: beta|hotfix|none|inherited` (CI-enforced). See [`docs/agents/workflow.md`](docs/agents/workflow.md).
+- **Every PR** declares exactly one `Changelog-Impact: beta|hotfix|none` (CI-enforced). See [`docs/agents/workflow.md`](docs/agents/workflow.md).
 - **Feature flags** fail closed; one registry, `pnpm flags`: [`docs/agents/feature-exposure.md`](docs/agents/feature-exposure.md).
 - **Where code goes**: [`docs/agents/codebase.md`](docs/agents/codebase.md) and the `README.md` in the target folder.
 - **Releases/deploys** are manual and owner-initiated: [`docs/agents/release-ops.md`](docs/agents/release-ops.md).

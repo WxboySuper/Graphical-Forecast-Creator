@@ -7,6 +7,6 @@ This PR targets a `stable/X.Y.x` branch and is eligible to become a production r
 - [ ] `CHANGELOG.md` contains the stable hotfix entry.
 - [ ] I ran **Deploy Staging** against this exact branch or commit.
 - [ ] I recorded the staging smoke-test result in this PR.
-- [ ] The forward-port PR to `main` will be reviewed after this merges.
+- [ ] If this fix also belongs on `main`, I will open a separate PR there.
 
 Changelog-Impact: hotfix

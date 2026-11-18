@@ -11,7 +11,7 @@
 
 export const STALE_BRANCH_PREFIXES = ['feature/', 'fix/', 'research/'];
 export const PROTECTED_BRANCHES = new Set(['main']);
-export const EXCLUDED_PREFIXES = ['port/', 'dependabot/', 'release/', 'hotfix/'];
+export const EXCLUDED_PREFIXES = ['dependabot/', 'release/', 'hotfix/'];
 export const EXCLUDED_BRANCH_PATTERNS = [/^feature\/release-/];
 export const GRACE_PERIOD_DAYS = 14;
 export const REPORT_ISSUE_MARKER = '<!-- gfc-stale-branch-report -->';
