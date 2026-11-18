@@ -1,15 +1,16 @@
 import { render, screen } from '@testing-library/react';
 import { FeatureBoundary } from './FeatureBoundary';
-import { BUILD_TARGETS, runWithBuildTarget } from '../testing/flags';
+import { BUILD_TARGETS, runWithBuildTarget, withFlag } from '../testing/flags';
 import { MonitorMesoscaleIntegration } from '../monitor/components/MonitorMesoscaleIntegration';
 import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
 
 describe('Monitor mesoscale exposure', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it.each(BUILD_TARGETS.filter((target) => target === 'staging' || target === 'production'))('does not mount Monitor data hooks on %s', async (target) => {
+  it.each(BUILD_TARGETS.filter((target) => target === 'staging' || target === 'production'))('does not mount Monitor data hooks when the flag is off on %s', async (target) => {
     const fetchSpy = jest.spyOn(global, 'fetch');
     const intervalSpy = jest.spyOn(window, 'setInterval');
+    withFlag('mesoscaleWorkspace', false, target);
     await runWithBuildTarget(target, async () => {
       render(
         <FeatureBoundary feature="mesoscaleWorkspace">
@@ -24,7 +25,7 @@ describe('Monitor mesoscale exposure', () => {
     expect(intervalSpy).not.toHaveBeenCalled();
   });
 
-  it.each(BUILD_TARGETS.filter((target) => target === 'beta' || target === 'local'))('mounts the Monitor mesoscale slot on %s', async (target) => {
+  it.each(BUILD_TARGETS)('mounts the Monitor mesoscale slot on %s', async (target) => {
     await runWithBuildTarget(target, async () => {
       render(<FeatureBoundary feature="mesoscaleWorkspace"><p>Mesoscale slot</p></FeatureBoundary>);
       expect(screen.getByText('Mesoscale slot')).toBeInTheDocument();
