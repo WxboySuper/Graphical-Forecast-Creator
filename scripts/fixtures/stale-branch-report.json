@@ -95,7 +95,7 @@
       "behindBy": 99
     },
     {
-      "name": "port/123-to-main",
+      "name": "automation/retired-branch",
       "commit": {
         "sha": "ccc1234567890abcdef1234567890abcdef12345678",
         "commit": {

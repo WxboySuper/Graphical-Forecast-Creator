@@ -13,10 +13,6 @@ on:
     - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: 'Type RELEASE-BETA to create the prerelease'
-        required: true
-        type: string
       version:
         description: 'Optional explicit beta version (X.Y.Z-beta.N); leave blank to auto-increment'
         required: false
@@ -38,9 +34,9 @@ on:
         default: true
         type: boolean
       only_if_changed:
-        description: 'Skip the release when main has no commits since the latest beta tag (used by the Cloudflare scheduler)'
+        description: 'Skip the release when main has no commits since the latest beta tag (ignored when an explicit version or dry run is requested)'
         required: false
-        default: false
+        default: true
         type: boolean
 
 concurrency:
@@ -55,6 +51,7 @@ jobs:
     name: Detect changes since last beta
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       proceed: ${{ steps.detect.outputs.proceed }}
     steps:
@@ -69,9 +66,13 @@ jobs:
         id: detect
         env:
           ONLY_IF_CHANGED: ${{ inputs.only_if_changed }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" != "schedule" ] && [ "$ONLY_IF_CHANGED" != "true" ]; then
+          # A manual run always proceeds when the caller asked for something specific: an explicit version, a dry run,
+          # or the box unticked. Only a plain manual click and the scheduled cuts are skipped when nothing changed.
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ] && { [ "$ONLY_IF_CHANGED" != "true" ] || [ -n "$EXPLICIT_VERSION" ] || [ "$DRY_RUN" = "true" ]; }; then
             echo "proceed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -91,9 +92,10 @@ jobs:
 
   quality:
     needs: changes
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.proceed == 'true' && (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA')
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.proceed == 'true'
     name: Lint and test main
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -126,24 +128,15 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.quality.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
-      CONFIRMATION: ${{ inputs.confirmation }}
       DRY_RUN: ${{ inputs.dry_run }}
       EXPLICIT_VERSION: ${{ inputs.version }}
     steps:
-      - name: Require explicit confirmation
-        if: github.event_name != 'schedule'
-        run: |
-          if [ "$CONFIRMATION" != "RELEASE-BETA" ]; then
-            echo "::error::Type RELEASE-BETA to create a beta release."
-            exit 1
-          fi
-
       - name: Checkout main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -214,9 +207,9 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.version_gate.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       RELEASE_VERSION: ${{ needs.version_gate.outputs.version }}
     steps:
@@ -262,11 +255,11 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.version_gate.result == 'success' &&
       needs.pre_build.result == 'success' &&
       !inputs.dry_run
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: write
     outputs:
@@ -342,6 +335,7 @@ jobs:
     needs: release
     if: ${{ !cancelled() && needs.release.result == 'success' && !inputs.dry_run }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -423,6 +417,7 @@ jobs:
     # https origin) and the R2_BUCKET secret to enable. See docs/operations/mesoscale-worker.md.
     if: ${{ !cancelled() && needs.release.result == 'success' && !inputs.dry_run && vars.MESOSCALE_WORKER_URL != '' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -504,6 +499,7 @@ jobs:
       !inputs.dry_run &&
       (github.event_name == 'schedule' || inputs.deploy_api)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -627,6 +623,7 @@ jobs:
       (needs.deploy_beta_api.result == 'success' || needs.deploy_beta_api.result == 'skipped') &&
       !inputs.dry_run
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       RELEASE_VERSION: ${{ needs.release.outputs.version }}
     steps:
@@ -659,6 +656,7 @@ jobs:
       needs.smoke_test.result == 'success' &&
       !inputs.dry_run
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     env:

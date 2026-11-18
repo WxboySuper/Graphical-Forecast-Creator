@@ -77,14 +77,14 @@ Beta is a release channel on `main`, not a branch. Use **Release | Beta** (`rele
 
 For redeploying an existing ref without a new version, use **Deploy beta to Cloudflare Workers**.
 
-## Stable major promotion
+## Stable promotion
 
 To promote the next-major line to production:
 
-1. Run **Prepare Main Stable Promotion** with the reviewed `main` ref and target version.
+1. Click **Prepare Main Stable Promotion**. The default source is `main`, and `auto` reads the package version. The `production-promote` environment gates the workflow once.
 2. Review and merge the generated promotion PR into `main`.
-3. Run **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit.
-4. Run **Create Stable Release** manually from the stable branch. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`, commits that package update to the stable branch, and creates tag `v2.0.0` with the short display label `v2`.
+3. Click **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit. The workflow opens a `GH_PAT`-authenticated PR that starts `main` at `(X+1).0.0-beta.1`; the promotion PR has already emptied the next-major changelog lane.
+4. Rehearse the stable branch with **Deploy Staging**, using `auto` to select the highest stable branch or choosing a tag or commit. Click **Create Stable Release** from the stable branch. If it still has a beta package version, the workflow converts it to its stable version, commits that update, and creates the padded tag.
 
 The stable GitHub Release title uses the short label, such as `v2` or `v2.1`; its git tag uses padded semver, such as `v2.0.0` or `v2.1.0`. The release starts with the curated changelog entry and may include GitHub's generated merged-PR notes. Publishing triggers the production workflow. For a live manifest action, it deploys the VPS API and `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected stable branch, such as `stable/2.x`; any corrective changelog update is proposed through a separate PR.
 
@@ -97,7 +97,7 @@ For an urgent production fix:
 1. Create a `hotfix/*` branch from the current `stable/X.x` line.
 2. Open a reviewed PR into that stable branch.
 3. Add the fix to the current stable-line hotfix changelog lane.
-4. Run **Deploy Staging** with the hotfix branch, commit, or PR ref.
+4. Run **Deploy Staging** with the hotfix commit SHA.
 5. After staging verification, merge the hotfix PR.
 6. Run **Create Stable Release** for the stable line.
 
@@ -115,7 +115,9 @@ A fix that only applies to production goes directly to `stable/X.x` as a `hotfix
 
 ## Staging
 
-**Deploy Staging** is manual and accepts a branch, tag, or commit. It is the rehearsal surface for both `main` next-major work and stable hotfixes. It never runs on ordinary pushes, merges, or release creation.
+**Deploy Staging** is a manual rehearsal of stable code before production. Its `auto` ref selects the highest `stable/N.x`; operators can also choose a `vX.Y.Z` tag or commit SHA. It never runs on ordinary pushes, merges, or release creation.
+
+After the v2 cut, `main` is the v3 beta line. Beta tags use `3.0.0-beta.N`, and the counter restarts at 1 for each new base version. Production deployments accept stable branches or version tags only. The production release-published trigger is unchanged.
 
 ## Release-note audience
 

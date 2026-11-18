@@ -10,9 +10,9 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 
 ## Versioning
 
-GFC release labels use a flat major version. The next major is `v2`, followed by `v3`; a minor such as `v2.1` maps to the package and tag version `2.1.0` / `v2.1.0`. The patch slot stays `0`. Use short labels (`v2`, `v2.1`) in UI, docs, release titles, changelog prose, and PR text. Use padded semver (`2.0.0`, `2.1.0`) in `package.json`, and `v2.0.0`, `v2.1.0` for git tags.
+GFC release labels use a flat major version. After the v2 cut, `main` carries v3 as `3.0.0-beta.N`; production remains on `stable/2.x`. A minor such as `v2.1` maps to package and tag version `2.1.0` / `v2.1.0`. The patch slot stays `0`. Use short labels (`v2`, `v2.1`) in UI, docs, release titles, changelog prose, and PR text. Use padded semver in `package.json` and git tags.
 
-Beta tags keep their semver prerelease form. The counter belongs to its base version and restarts at `beta.1` for each new major: the first v3 beta is `3.0.0-beta.1`, tagged `v3.0.0-beta.1`. Production branches use `stable/2.x`; a hotfix for the current v2 line is labeled `v2.1` and tagged `v2.1.0`. Existing `stable/1.x` branches, tags, and v1.x changelog entries remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
+Beta tags keep their semver prerelease form. The counter belongs to its base version and restarts at `beta.1` for each new major. The first v3 beta is `3.0.0-beta.1`, tagged `v3.0.0-beta.1`. Hotfixes for v2 use the stable line and tags such as `v2.1.0`. Existing stable branches and tags remain historical records. The Terms of Service and Privacy Policy use independent flat integer versions, such as `Version 2`, rather than app semver.
 
 ## Workflows
 
@@ -26,29 +26,29 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 
 | Workflow | Purpose | Key inputs |
 |----------|---------|-----------|
-| `release-beta.yml` | Full beta cut, run on `main`; also runs every six hours (started by the `gfc-mesoscale-scheduler` Cloudflare cron with `only_if_changed`, with GitHub's own schedule as a backup) and only proceeds when `main` has commits since the last beta tag. Deploys the `gfc-mesoscale` Worker when `MESOSCALE_WORKER_URL` is set | `confirmation=RELEASE-BETA`, `dry_run`, `deploy_api`, `only_if_changed`, optional version (`2.0.0-beta.N`), `previous_tag` |
-| `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=v2.0.0-beta.N` |
-| `prepare-stable-promotion.yml` | Promotion PR into `main` | reviewed `main` ref, target version |
+| `release-beta.yml` | Full beta cut from `main`; scheduled every six hours and manually started with a click. It skips when main has no new commits since the latest beta. | `dry_run`, `deploy_api`, `only_if_changed`, optional version (`X.Y.Z-beta.N`), `previous_tag` |
+| `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
+| `prepare-stable-promotion.yml` | Promotion PR into `main` | `source_ref=main`, `version=auto` |
 | `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
 | `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
-| `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
-| `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | |
+| `deploy-staging.yml` | Manual stable branch/tag/commit rehearsal. `auto` selects the highest stable branch. | `ref=auto` |
+| `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | `ref=auto` selects the highest stable branch |
 | `backport.yml` | `backport-2.x` label -> PR against `stable/2.x`; conflicts create a draft PR | PR number and optional line for manual runs |
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
 
-Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog; the full v2 changelog belongs to the stable release (`changelog-and-prs`).
+Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog. The stable release owns the corresponding major changelog.
 
-Beta example: `gh workflow run release-beta.yml --ref main -f confirmation=RELEASE-BETA -f dry_run=false -f deploy_api=true`. Concurrency group `beta-release`. Beta cuts only bump `package.json`; `CHANGELOG.md` is not rewritten.
+Manual beta runs are a click in Actions, or `gh workflow run release-beta.yml --ref main -f dry_run=false -f deploy_api=true`. Concurrency group `beta-release`. Beta cuts only bump `package.json`; `CHANGELOG.md` is not rewritten.
 
 ### Beta sequence
 
-lint+test -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `v2.0.0-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
+lint+test -> resolve version, validate next-major lane has real content -> pre-build -> commit only `package.json`, push `main`, tag `vX.Y.Z-beta.N`, **draft** prerelease -> build with Sentry maps, deploy Worker, deploy VPS API (rsync `server/` excluding `.env`, `.env` mode 600, pm2 restart) -> smoke `/`, `/version.json`, `/api/capabilities/status` -> publish.
 
 ### Beta failure recovery
 
 | Situation | Action |
 |-----------|--------|
-| Worker deploy failed, tag exists | `deploy-beta-workers.yml ref=v2.0.0-beta.N` or `wrangler rollback` |
+| Worker deploy failed, tag exists | `deploy-beta-workers.yml ref=vX.Y.Z-beta.N` or `wrangler rollback` |
 | VPS API deploy failed | Redo API steps manually. **Do not rerun the Release Beta workflow** (cuts a new version). Worker-only redeploy does not update the API. |
 | Smoke failed | Fix, redeploy by tag, then publish the draft |
 | Draft left open | Redeploy by tag, confirm smoke, publish draft in GitHub or delete it |
@@ -56,7 +56,9 @@ lint+test -> resolve version, validate next-major lane has real content -> pre-b
 
 ### Stable and hotfix
 
-Stable: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Create Stable Release (from stable branch). Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Create Stable Release. A production-only fix stays on stable. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR. See [workflow rules](workflow.md#backports).
+Production gate: every workflow that changes production waits for an approval click on the `production-promote` environment (reviewer: the maintainer): promotion, bootstrap, `release-stable.yml`, `deploy-main-to-vps.yml` (manual and release-triggered runs), and the feedback and telemetry Worker deploys. Agents run `gh` as the maintainer, so an ungated workflow could deploy production without the maintainer seeing it. Staging and beta stay ungated. The separate `production` environment (15-minute wait timer, no reviewer) is not used.
+
+Stable promotion: click Prepare Main Stable Promotion, review and merge its PR, then click Bootstrap Stable Release Line. Bootstrap creates `stable/N.x` at the approved commit and opens a reviewed PR that starts `main` at `(N+1).0.0-beta.1`. Create the stable release from the stable branch after rehearsal. Hotfix: branch from stable -> PR into stable with a hotfix changelog entry -> rehearse through Deploy Staging -> merge -> Create Stable Release. Backports use the label-driven backport workflow. A production-only fix stays on stable and is not carried to `main`. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR. See [workflow rules](workflow.md#backports).
 
 GitHub Release notes: beta = native PR list + changelog link; stable = curated changelog + PR list; hotfix = curated hotfix entry + short PR list.
 
