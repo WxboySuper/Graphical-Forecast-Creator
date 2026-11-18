@@ -13,10 +13,6 @@ on:
     - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: 'Type RELEASE-BETA to create the prerelease'
-        required: true
-        type: string
       version:
         description: 'Optional explicit beta version (X.Y.Z-beta.N); leave blank to auto-increment'
         required: false
@@ -91,7 +87,7 @@ jobs:
 
   quality:
     needs: changes
-    if: github.ref == 'refs/heads/main' && needs.changes.outputs.proceed == 'true' && (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA')
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.proceed == 'true'
     name: Lint and test main
     runs-on: ubuntu-latest
     steps:
@@ -126,24 +122,14 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.quality.result == 'success'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
-      CONFIRMATION: ${{ inputs.confirmation }}
       DRY_RUN: ${{ inputs.dry_run }}
       EXPLICIT_VERSION: ${{ inputs.version }}
     steps:
-      - name: Require explicit confirmation
-        if: github.event_name != 'schedule'
-        run: |
-          if [ "$CONFIRMATION" != "RELEASE-BETA" ]; then
-            echo "::error::Type RELEASE-BETA to create a beta release."
-            exit 1
-          fi
-
       - name: Checkout main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -214,7 +200,6 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.version_gate.result == 'success'
     runs-on: ubuntu-latest
     env:
@@ -262,7 +247,6 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' || inputs.confirmation == 'RELEASE-BETA') &&
       needs.version_gate.result == 'success' &&
       needs.pre_build.result == 'success' &&
       !inputs.dry_run

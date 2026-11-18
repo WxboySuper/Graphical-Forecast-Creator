@@ -2,7 +2,7 @@ name: Checks | CI
 
 on:
   push:
-    branches: [main, 'stable/**']
+    branches: [main, 'stable/**', 'backport/**']
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
 

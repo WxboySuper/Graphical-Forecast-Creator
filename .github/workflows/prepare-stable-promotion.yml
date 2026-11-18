@@ -11,12 +11,9 @@ on:
         default: main
         type: string
       version:
-        description: 'Flat stable version, for example 2.0.0 or 2.1.0'
+        description: 'Stable version (auto reads package.json)'
         required: true
-        type: string
-      confirmation:
-        description: 'Type PREPARE-STABLE-PROMOTION to open the review PR'
-        required: true
+        default: auto
         type: string
 
 permissions:
@@ -25,23 +22,32 @@ permissions:
 
 jobs:
   prepare:
-    if: inputs.confirmation == 'PREPARE-STABLE-PROMOTION'
     runs-on: ubuntu-latest
+    environment: production-promote
     env:
       SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_VERSION: ${{ inputs.version }}
-      GH_TOKEN: ${{ github.token }}
+      GH_TOKEN: ${{ secrets.GH_PAT }}
     steps:
       - name: Checkout source main ref
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
 
       - name: Configure Git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve target version
+        run: |
+          if [ "$TARGET_VERSION" = "auto" ]; then
+            VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; import { deriveStableVersion } from './scripts/lib/package-version.mjs'; console.log(deriveStableVersion(JSON.parse(readFileSync('package.json')).version) ?? '')")
+            test -n "$VERSION" || { echo '::error::Cannot derive a stable version from package.json.'; exit 1; }
+            echo "TARGET_VERSION=$VERSION" >> "$GITHUB_ENV"
+          fi
 
       - name: Create promotion branch
         id: branch
