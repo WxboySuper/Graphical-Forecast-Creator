@@ -77,4 +77,25 @@ describe('pickWithoutChangelog', () => {
     assert.equal(repo.run('git', ['show', ':app.txt']), 'two');
     cleanup(repo);
   });
+
+  it('leaves no cherry-pick state behind, so the next line in a multi-line run still works', () => {
+    const repo = setup({ stableFiles: { 'app.txt': 'stable\n' }, mainFiles: { 'app.txt': 'two\n' } });
+    // The same cleanup scripts/backport.mjs runs between lines.
+    const cleanBetweenLines = () => {
+      repo.run('git', ['reset', '--hard'], { allowFailure: true });
+      repo.run('git', ['switch', '--detach', 'main'], { allowFailure: true });
+    };
+    repo.run('git', ['branch', 'stable-2', 'stable']);
+
+    const first = pickWithoutChangelog(repo.run, repo.sha, 1);
+    assert.deepEqual(first.conflicts, ['app.txt']);
+    cleanBetweenLines();
+    assert.equal(repo.run('git', ['rev-parse', '--verify', '-q', 'CHERRY_PICK_HEAD'], { allowFailure: true }), null);
+
+    repo.run('git', ['switch', '-q', 'stable-2']);
+    const second = pickWithoutChangelog(repo.run, repo.sha, 1);
+    assert.deepEqual(second.conflicts, ['app.txt']);
+    assert.equal(second.empty, false);
+    cleanup(repo);
+  });
 });
