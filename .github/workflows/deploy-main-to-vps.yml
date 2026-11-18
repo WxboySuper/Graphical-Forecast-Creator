@@ -55,6 +55,8 @@ jobs:
       startsWith(github.event.release.target_commitish, 'stable/')
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Every production deploy, manual or release-triggered, waits for an approval click.
+    environment: production-promote
     env:
       RSYNC_RSH: ssh -o StrictHostKeyChecking=yes
 
