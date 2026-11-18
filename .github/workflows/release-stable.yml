@@ -1,19 +1,21 @@
 name: Release | Stable
 
-# Stable releases are created only from an approved stable/* release line.
-# The published release then deploys the app Worker, marketing Worker, and VPS API.
+# Stable releases resolve a stable line, then publish after one `production-promote` environment approval.
+# The approval job gates the audit, and the release job needs the audit, so one click covers the whole run.
+# Publishing triggers the app Worker, marketing Worker, and VPS API deploy workflow.
 on:
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'Stable branch, tag, or commit to release'
+      line:
+        description: 'Stable line to release, or auto for the highest existing stable/N.x branch'
         required: true
-        default: stable/2.x
+        default: auto
         type: string
-      confirmation:
-        description: 'Type RELEASE-STABLE to create the production release'
+      dry_run:
+        description: 'Show the release decision without changing or publishing anything'
         required: true
-        type: string
+        default: false
+        type: boolean
       previous_tag:
         description: 'Optional previous stable tag; leave blank to detect it'
         required: false
@@ -24,12 +26,53 @@ permissions:
   contents: read
 
 jobs:
+  resolve_line:
+    name: Resolve stable line
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      ref: ${{ steps.line.outputs.ref }}
+    steps:
+      - name: Resolve requested line
+        id: line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          LINE: ${{ inputs.line }}
+        run: |
+          set -euo pipefail
+          BRANCHES=$(gh api "repos/${REPOSITORY}/branches?per_page=100" --paginate --jq '.[].name')
+          if [[ "$LINE" == auto ]]; then
+            STABLE_BRANCHES=$(printf '%s\n' "$BRANCHES" | grep -E '^stable/[0-9]+\.x$' || true)
+            REF=$(printf '%s\n' "$STABLE_BRANCHES" | sed -E 's#stable/([0-9]+)\.x#\1#' | sort -n | tail -1)
+            if [ -z "$REF" ]; then echo '::error::No stable/N.x branches exist.'; exit 1; fi
+            REF="stable/${REF}.x"
+          elif [[ "$LINE" =~ ^([0-9]+)\.x$ ]]; then
+            REF="stable/${LINE}"
+          else
+            echo "::error::line must be auto or N.x, got $LINE"; exit 1
+          fi
+          if ! printf '%s\n' "$BRANCHES" | grep -Fxq "$REF"; then
+            echo "::error::Stable branch ${REF} does not exist."; exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Resolved stable line: $REF"
+
+  production_approval:
+    needs: resolve_line
+    name: Approve production release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production-promote
+    steps:
+      - run: echo "Approved production release for ${{ needs.resolve_line.outputs.ref }}"
+
   final_changelog_audit:
-    if: inputs.confirmation == 'RELEASE-STABLE' && startsWith(inputs.ref, 'stable/')
+    needs: [resolve_line, production_approval]
     name: Final changelog audit
     uses: ./.github/workflows/opencode-changelog-audit.yml
     with:
-      target_ref: ${{ inputs.ref }}
+      target_ref: ${{ needs.resolve_line.outputs.ref }}
       force: true
       trigger_reason: stable-pre-release
     secrets:
@@ -42,9 +85,10 @@ jobs:
 
   changelog_gate:
     name: Require clean changelog
-    needs: final_changelog_audit
+    needs: [resolve_line, final_changelog_audit]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -58,12 +102,12 @@ jobs:
         env:
           AUDIT_RESULT: ${{ needs.final_changelog_audit.result }}
           AUDIT_STATUS: ${{ needs.final_changelog_audit.outputs.status }}
-          TARGET_REF: ${{ inputs.ref }}
+          TARGET_REF: ${{ needs.resolve_line.outputs.ref }}
           AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
         run: node scripts/require-opencode-changelog-clean.mjs
 
   release:
-    needs: [final_changelog_audit, changelog_gate]
+    needs: [resolve_line, final_changelog_audit, changelog_gate]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -71,21 +115,13 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
-      RELEASE_REF: ${{ inputs.ref }}
-      CONFIRMATION: ${{ inputs.confirmation }}
+      RELEASE_REF: ${{ needs.resolve_line.outputs.ref }}
       AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
     steps:
-      - name: Require explicit confirmation
-        run: |
-          if [ "$CONFIRMATION" != "RELEASE-STABLE" ]; then
-            echo "::error::Type RELEASE-STABLE to create a production release."
-            exit 1
-          fi
-
-      - name: Checkout release ref
+      - name: Checkout release line
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ needs.resolve_line.outputs.ref }}
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
 
@@ -94,39 +130,58 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: Prepare stable package version
+      - name: Resolve version and prepare release files
         id: version
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          REQUESTED_PREVIOUS_TAG: ${{ inputs.previous_tag }}
         run: |
           set -euo pipefail
+          if [[ ! "$RELEASE_REF" =~ ^stable/([0-9]+)\.x$ ]]; then
+            echo "::error::Stable releases must come from stable/N.x, got $RELEASE_REF"; exit 1
+          fi
+          LINE_MAJOR="${BASH_REMATCH[1]}"
           if [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
             echo "::error::${RELEASE_REF} moved after the final changelog audit; rerun the release workflow." >&2
             exit 1
           fi
-          case "$RELEASE_REF" in
-            stable/*) ;;
-            *) echo "::error::Stable releases must come from stable/*, got $RELEASE_REF" >&2; exit 1 ;;
-          esac
-
           CURRENT=$(node -p "require('./package.json').version")
-          if [[ "$CURRENT" =~ ^([0-9]+\.[0-9]+)\.0-beta\.[0-9]+$ ]]; then
-            VERSION="${BASH_REMATCH[1]}.0"
-            npm version "$VERSION" --no-git-tag-version --allow-same-version
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add package.json
+          if [ "${CURRENT%%.*}" != "$LINE_MAJOR" ]; then
+            echo "::error::package.json ${CURRENT} is not on the ${RELEASE_REF} major; refusing to release."; exit 1
+          fi
+          TARGET_VERSION=$(printf '%s' "$CURRENT" | sed -E 's/-beta\.[0-9]+$//')
+          TAG="v${TARGET_VERSION}"
+          TAG_ARGS=()
+          git fetch --tags origin
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then TAG_ARGS+=(--tag-exists); fi
+          MODE_ARGS=()
+          if [ "$DRY_RUN" = true ]; then MODE_ARGS+=(--dry-run); fi
+          node scripts/prepare-stable-release.mjs "${TAG_ARGS[@]}" "${MODE_ARGS[@]}"
+          PREVIOUS_TAG="$REQUESTED_PREVIOUS_TAG"
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # Only tags of this line's major: the first release of a major has none, and the release script then detects its own.
+            PREVIOUS_TAG=$(git tag --list "v${LINE_MAJOR}.*" | grep -E "^v${LINE_MAJOR}\.[0-9]+\.0$" | sort -Vr | head -1 || true)
+          fi
+          echo "Resolved line: $RELEASE_REF"
+          echo "Current version: $CURRENT"
+          echo "Previous tag: ${PREVIOUS_TAG:-none}"
+          echo "previous_tag=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          if [ "$DRY_RUN" = true ]; then exit 0; fi
+          VERSION=$(node -p "require('./package.json').version")
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add package.json CHANGELOG.md deploy/production-release.json
+          if ! git diff --cached --quiet; then
             git commit -m "chore(release): prepare ${VERSION}"
             git push origin "HEAD:${RELEASE_REF}"
-          elif printf '%s' "$CURRENT" | grep -Eq -- '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            VERSION="$CURRENT"
-          else
-            echo "::error::Stable release requires a stable semver or a beta prerelease package version, got $CURRENT" >&2
-            exit 1
           fi
 
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Releasing stable version $VERSION from $RELEASE_REF"
+      - name: Stop after dry run
+        if: inputs.dry_run
+        run: echo 'Dry run complete. No push, tag, or release was created.'
 
       - name: Create GitHub stable release
+        if: ${{ !inputs.dry_run }}
         env:
           # A PAT is required so publishing this release triggers the production deploy workflow.
           GH_TOKEN: ${{ secrets.GH_PAT }}
@@ -134,6 +189,6 @@ jobs:
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: stable-hotfix
           RELEASE_NOTES_MODE: changelog-and-prs
-          PREVIOUS_TAG: ${{ inputs.previous_tag }}
+          PREVIOUS_TAG: ${{ steps.version.outputs.previous_tag }}
           NOTES_FILE: stable-release-notes.md
         run: node scripts/create-github-release.mjs "${{ steps.version.outputs.version }}" "$RELEASE_REF"
