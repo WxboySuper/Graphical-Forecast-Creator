@@ -35,8 +35,9 @@ const lineProblems = (baseRef, current, packageVersion) => {
 /** A PR may leave the version alone or raise it, never lower it. */
 const directionProblems = (basePackageVersion, packageVersion, current) => {
   const previous = parse(basePackageVersion);
-  const unchanged = packageVersion === basePackageVersion;
-  if (!previous || unchanged || isNewer(current, previous)) return [];
+  if (!previous) return [];
+  if (packageVersion === basePackageVersion) return [];
+  if (isNewer(current, previous)) return [];
   return [`package.json goes backwards from ${basePackageVersion} to ${packageVersion}.`];
 };
 
