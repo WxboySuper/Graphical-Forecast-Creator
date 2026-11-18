@@ -36,6 +36,8 @@ jobs:
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
+          # The repository ruleset covers stable/*, so creating the branch needs the admin PAT (bypass), not the default token.
+          token: ${{ secrets.GH_PAT }}
 
       - name: Validate source and stable branch contract
         id: validate
