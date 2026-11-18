@@ -5,7 +5,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ## [Unreleased]
 
-### Next major / beta
+## v2.0.0
 
 #### Added
 
@@ -87,6 +87,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Server libraries:** Sentry Node 11.11, Firebase Admin 14.5, Stripe 23.1, Express 5.3, and express-rate-limit 8.7.
 <!-- dependabot-automation -->
 
+### Next major / beta
+
+#### Added
+
+<!-- Continue next-major work here after this stable line is cut. -->
 ### Stable v2.x hotfixes
 
 <!-- Add production fixes for the next stable 1.7.x release here. -->

@@ -1,0 +1,73 @@
+name: Maintenance | Backport
+
+# Label a merged main PR `backport-2.x` and this opens a PR that cherry-picks it onto stable/2.x.
+# It fires when a labelled PR merges and when the label is added after the merge. Conflicts open a
+# draft PR with the conflicts committed so they are resolved on the backport branch. To retry or
+# backport an older PR, run it by hand (Actions -> Backport -> Run workflow) with the PR number.
+# It operates on the trusted main merge commit and never executes code from a pull-request head.
+on:
+  pull_request_target:
+    types: [closed, labeled]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'Merged main PR number to backport'
+        required: true
+        type: string
+      line:
+        description: 'Stable line, for example 2.x (blank = every backport-N.x label on the PR)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backport-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  backport:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       (github.event.action == 'closed' ||
+        startsWith(github.event.label.name, 'backport-')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout trusted main history
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+          # A PAT so the pushed branch and PR trigger CI.
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Open backport PRs
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPOSITORY: ${{ github.repository }}
+          SOURCE_PR: ${{ github.event.pull_request.number || inputs.pr }}
+          INPUT_LINE: ${{ inputs.line }}
+          LABEL_NAME: ${{ github.event.label.name }}
+        run: |
+          set -euo pipefail
+          LINES="$INPUT_LINE"
+          if [[ "$LABEL_NAME" =~ ^backport-([0-9]+)\.x$ ]]; then
+            LINES="${BASH_REMATCH[1]}.x"
+          fi
+          export LINES
+          node scripts/backport.mjs

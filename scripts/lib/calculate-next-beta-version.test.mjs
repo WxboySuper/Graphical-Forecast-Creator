@@ -10,11 +10,17 @@ for (const { name, packageVersion, betaTags, targetBase, expectedVersion } of [
     expectedVersion: '1.8.0-beta.6',
   },
   {
-    name: 'continues the beta counter while moving from v1.8 to flat v2',
-    packageVersion: '1.8.0-beta.15',
-    betaTags: ['v1.8.0-beta.14', 'v1.8.0-beta.15'],
-    targetBase: '2.0.0',
-    expectedVersion: '2.0.0-beta.16',
+    name: 'restarts the beta counter at 1 for a new base version',
+    packageVersion: '2.0.0',
+    betaTags: ['v2.0.0-beta.24', 'v2.0.0-beta.25'],
+    targetBase: '3.0.0',
+    expectedVersion: '3.0.0-beta.1',
+  },
+  {
+    name: 'keeps counting within the same base after the counter restarts',
+    packageVersion: '3.0.0-beta.1',
+    betaTags: ['v2.0.0-beta.25', 'v3.0.0-beta.1', 'v3.0.0-beta.2'],
+    expectedVersion: '3.0.0-beta.3',
   },
 ]) {
   test(`calculateNextBetaVersion ${name}`, () => {

@@ -36,12 +36,18 @@ Actually exercise user-visible changes (browser/Playwright), not just static tes
 
 | Branch | Rule |
 |--------|------|
-| `main` | Next-major integration; default PR target |
+| `main` | Fast trunk; all fixes and features land here first, and beta deploys from here |
 | `stable/X.x` | Production line. Hotfixes start here. Never merge `main` into it. |
 | `hotfix/*` | From the current stable line, PR into it |
 | `fix/*`, others | Descriptive only; not merge gates |
 
-Forward-ports into `main` are automation-opened draft PRs (`port/<pr>-to-main`); review them, resolve rewrite-specific differences, never auto-merge.
+### Backports
+
+Every fix and feature lands on `main` first. To ship a change in a minor release of the current production line, add `backport-2.x` to its PR before or after merge. The `Maintenance | Backport` workflow opens `backport/<pr>-to-2.x` against `stable/2.x`, cherry-picking the main merge commit without `CHANGELOG.md`. Backport PRs use `Changelog-Impact: hotfix`, or `none` with the same `Changelog-Reason` as the source PR when it waived a changelog entry. Foundations and refactors may be backported; major features are a maintainer decision.
+
+Conflicts produce a draft PR labelled `backport-conflict`, with conflict markers committed on the backport branch. Resolve them there. To retry or backport an older PR, run **Maintenance | Backport** from Actions with the PR number and optional stable line.
+
+A fix that only applies to production goes directly to `stable/X.x` as a `hotfix/*` PR and stays there. If it applies to both, merge it to `main` first and backport it.
 
 ## Commits
 
@@ -57,7 +63,6 @@ Conventional Commits: `feat|fix|chore|docs|style|refactor(scope): message`. Exam
 | `beta` | Entry in `CHANGELOG.md` under `### Next major / beta` (the check diffs that lane) |
 | `hotfix` | Entry under the current stable-line hotfix lane |
 | `none` | `Changelog-Reason:` |
-| `inherited` | `Port of #<n>`; no second entry |
 
 - Changelog sections: Added, Changed, Deprecated, Removed, Fixed, Security, Dependencies. Write for users, not maintainers.
 - Eligible same-repo PRs with `beta`/`hotfix` and no changelog edit get a bot-drafted entry pushed to the branch. Pull before pushing again.

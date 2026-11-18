@@ -35,6 +35,13 @@ describe('branch policy', () => {
     assert.equal(result.kind, 'hotfix');
   });
 
+  it('accepts a backport branch on a stable line and no longer routes ports into main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'stable/2.x', headRef: 'backport/1861-to-2.x' });
+    assert.equal(result.ok, true);
+    assert.equal(result.kind, 'backport');
+    assert.equal(evaluateBranchPolicy({ baseRef: 'main', headRef: 'port/1-to-main' }).kind, 'main-integration');
+  });
+
   it('allows arbitrary source branch names to main', () => {
     const result = evaluateBranchPolicy({ baseRef: 'main', headRef: 'anything-at-all' });
     assert.equal(result.ok, true);

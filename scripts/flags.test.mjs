@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { addFlag, compareVersions, isPastRemoveBy, keepFlag, retireFlag, serialize, validate } from './lib/flags-registry.mjs';
+import { addFlag, compareVersions, isPastRemoveBy, isStableLineRef, isValidRemoveBy, keepFlag, retireFlag, serialize, validate } from './lib/flags-registry.mjs';
 import { findReferences } from './lib/flags-scan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,6 +56,23 @@ describe('removeBy', () => {
     assert.equal(isPastRemoveBy('2.1.0', '2.1.0-beta.1'), false);
     assert.equal(isPastRemoveBy('2.1.0', '2.1.0'), true);
     assert.equal(isPastRemoveBy('2.1.0', '2.2.0-beta.1'), true);
+  });
+
+  it('lets a line removeBy such as 2.x outlive every 2.y release and expire with the next major', () => {
+    assert.equal(isPastRemoveBy('2.x', '2.0.0'), false);
+    assert.equal(isPastRemoveBy('2.x', '2.7.0'), false);
+    assert.equal(isPastRemoveBy('2.x', '3.0.0-beta.26'), false);
+    assert.equal(isPastRemoveBy('2.x', '3.0.0'), true);
+    assert.equal(isValidRemoveBy('2.x'), true);
+    assert.equal(isValidRemoveBy('2.1.0'), true);
+    assert.equal(isValidRemoveBy('soon'), false);
+  });
+
+  it('recognises stable lines, where expiry is not enforced', () => {
+    assert.equal(isStableLineRef('stable/2.x'), true);
+    assert.equal(isStableLineRef('stable/1.7.x'), true);
+    assert.equal(isStableLineRef('main'), false);
+    assert.equal(isStableLineRef('feat/stable/2.x'), false);
   });
 });
 

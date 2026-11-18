@@ -104,7 +104,7 @@ export const descriptiveLabels = ({ changedFiles, head }) => {
   const typeLabel = branchTypeLabel(head);
   if (typeLabel) labels.add(typeLabel);
 
-  if (head.startsWith('feature/release-') || head.startsWith('port/')) {
+  if (head.startsWith('feature/release-') || head.startsWith('backport/')) {
     labels.add('quality');
   }
 

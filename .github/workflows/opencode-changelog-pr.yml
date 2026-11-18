@@ -16,7 +16,7 @@ jobs:
   prepare-automated-changelog:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.pull_request.user.login == 'dependabot[bot]' || startsWith(github.head_ref, 'port/'))
+      github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,16 +39,6 @@ jobs:
           persist-credentials: false
           token: ${{ github.token }}
 
-      - name: Validate port PR with trusted tooling
-        if: startsWith(github.head_ref, 'port/')
-        working-directory: _pr
-        env:
-          GITHUB_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          GITHUB_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-        run: node "$GITHUB_WORKSPACE/_trusted/scripts/validate-port-pr-policy.mjs"
-
       - name: Prepare automated changelog metadata with trusted tooling
         working-directory: _pr
         env:
@@ -67,7 +57,7 @@ jobs:
       always() &&
       (needs.prepare-automated-changelog.result == 'success' || needs.prepare-automated-changelog.result == 'skipped') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.pull_request.user.login == 'dependabot[bot]' || (!github.event.pull_request.draft && !startsWith(github.head_ref, 'port/')))
+      (github.event.pull_request.user.login == 'dependabot[bot]' || !github.event.pull_request.draft)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -115,7 +105,7 @@ jobs:
               core.setOutput('run', 'false')
               return
             }
-            const declarations = [...(pull.body ?? '').matchAll(/^Changelog-Impact:\s*(beta|hotfix|none|inherited)\s*$/gim)]
+            const declarations = [...(pull.body ?? '').matchAll(/^Changelog-Impact:\s*(beta|hotfix|none)\s*$/gim)]
             const allowedImpacts = isDependabot ? ['beta', 'hotfix', 'none'] : ['beta', 'hotfix']
             if (declarations.length !== 1 || !allowedImpacts.includes(declarations[0][1].toLowerCase())) {
               core.notice('OpenCode changelog generation requires one eligible impact declaration.')

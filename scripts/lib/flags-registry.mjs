@@ -5,6 +5,9 @@
 
 export const FLAG_NAME = /^[a-z][A-Za-z0-9]*$/;
 export const VERSION = /^\d+\.\d+\.\d+$/;
+/** A release-line removeBy such as 2.x: the flag lives until that major line ends (the next major's release). */
+export const LINE_VERSION = /^\d+\.x$/;
+export const isValidRemoveBy = (removeBy) => VERSION.test(removeBy ?? '') || LINE_VERSION.test(removeBy ?? '');
 const KINDS = ['dev', 'switch'];
 const VALUE_TYPES = ['boolean', 'string'];
 
@@ -24,8 +27,14 @@ export const compareVersions = (left, right) => {
   return Number(a[3] === false) - Number(b[3] === false);
 };
 
+/** The release a removeBy waits for: 2.1.0 is itself, and 2.x is the next major (3.0.0), so 2.1 and 2.2 do not trip it. */
+const removeByRelease = (removeBy) => (LINE_VERSION.test(removeBy) ? `${Number.parseInt(removeBy, 10) + 1}.0.0` : removeBy);
+
 /** A dev flag is past its removeBy once the package version reaches that release. */
-export const isPastRemoveBy = (removeBy, packageVersion) => compareVersions(packageVersion, removeBy) >= 0;
+export const isPastRemoveBy = (removeBy, packageVersion) => compareVersions(packageVersion, removeByRelease(removeBy)) >= 0;
+
+/** Stable lines (stable/2.x) only carry backports of main's flags, so expiry is enforced on main and not there. */
+export const isStableLineRef = (ref) => /^stable\/\d+(\.\d+)?\.x$/.test(ref ?? '');
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -59,7 +68,7 @@ const valueProblems = (entry, targets, [target, value]) => {
 
 const devProblems = (entry) => [
   ...when(entry.default !== false, 'a dev flag must default to off (fail closed)'),
-  ...when(!VERSION.test(entry.removeBy ?? ''), 'a dev flag needs removeBy as a version like 2.1.0'),
+  ...when(!isValidRemoveBy(entry.removeBy), 'a dev flag needs removeBy as a version like 2.1.0, or a line like 2.x'),
   ...when(Boolean(entry.runbook || entry.capability), 'a dev flag cannot have a runbook or capability; run `pnpm flags keep` to make it a switch'),
 ];
 

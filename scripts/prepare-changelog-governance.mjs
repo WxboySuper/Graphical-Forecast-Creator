@@ -1,11 +1,10 @@
 /**
  * Pull request changelog governance preparation.
  *
- * This script reads pull request metadata, applies dependency and port policy rules, and updates the managed changelog declaration. Release publication stays elsewhere.
+ * This script reads pull request metadata, applies dependency policy rules, and updates the managed changelog declaration. Release publication stays elsewhere.
  */
 import { execFileSync } from 'node:child_process';
 import { dependabotChangelogDeclaration, listDependencyBumpsBetweenRefs } from './lib/dependabot-changelog.mjs';
-import { parsePortBranch } from './lib/port-pr-policy.mjs';
 import { upsertManagedChangelogDeclaration } from './lib/changelog-automation.mjs';
 import { githubHttpExtraHeader } from './lib/opencode-git-auth.mjs';
 
@@ -16,14 +15,13 @@ const prNumber = Number(process.env.PR_NUMBER ?? 0);
 const authorLogin = process.env.PR_AUTHOR_LOGIN ?? '';
 const body = process.env.PR_BODY ?? '';
 const isDependabot = authorLogin === 'dependabot[bot]' && headRef.startsWith('dependabot/');
-const port = parsePortBranch(headRef);
 
 if (!baseRef || !headRef || !repository || !prNumber) {
   console.error('GITHUB_BASE_REF, GITHUB_HEAD_REF, GITHUB_REPOSITORY, and PR_NUMBER are required.');
   process.exit(1);
 }
 
-if (!isDependabot && !port) {
+if (!isDependabot) {
   console.log('No automated changelog preparation required for this PR.');
   process.exit(0);
 }
@@ -37,16 +35,8 @@ const gitAuth = githubHttpExtraHeader(token);
 execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`, `refs/heads/${headRef}:refs/remotes/origin/${headRef}`], { stdio: 'inherit' });
 
 const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);
-let declaration = null;
-if (isDependabot) {
-  const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
-  declaration = dependabotChangelogDeclaration(bumps, stableLine);
-} else {
-  declaration = {
-    impact: 'inherited',
-    sourcePr: port.sourcePrNumber,
-  };
-}
+const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
+const declaration = dependabotChangelogDeclaration(bumps, stableLine);
 
 const nextBody = upsertManagedChangelogDeclaration(body, declaration);
 

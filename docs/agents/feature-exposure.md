@@ -10,7 +10,7 @@ Two kinds, same file:
 
 | Kind | Purpose | Rules |
 |------|---------|-------|
-| `dev` | Hide unfinished work from production | `default: false`, required `removeBy` version, temporary |
+| `dev` | Hide unfinished work from production | `default: false`, required `removeBy` (a version like `2.1.0`, or a line like `2.x`), temporary |
 | `switch` | Long-lived kill switch | `default: true` (or a fallback variant), `owner`, one-line `runbook`, permanent |
 
 A value is `true`/`false`, or a string for a variant (the value types must match `default`). A flag with `capability` is server-backed: it is live only if the registry value is on **and** the deployment env switch (`<capability>=true`) is on **and** it is not in `EMERGENCY_DISABLED_CAPABILITIES`. The override can only disable; if it cannot be read, the baked-in value stands. A Workers/KV runtime override is not built yet: `capabilityStatus.js` is the seam.
@@ -34,6 +34,8 @@ pnpm flags check           validate the registry; fails when a dev flag is past 
 3. Server-backed: add `capability` and `label`, gate the route with `createServerCapabilityGate`, and set the deployment switch in `deploy/*-deployment-config.json` on the ref you deploy.
 4. Baseline per-target tests are derived from the registry (`src/config/flags.baseline.test.tsx`, `server/lib/flags.test.js`). Write a test only for feature-specific behavior, using `withFlag('name', value, target?)` from `src/testing/flags.ts`.
 5. Flipping a target on is its own reviewed change. Retire or promote the flag before its `removeBy` release.
+
+`removeBy: "2.x"` means the flag lives until the 2.x line ends: it is past due only once the package reaches the next major's release (`3.0.0`), so it never trips on a 2.1 or 2.2 minor. Use it for flags on features that may ship in a minor release. `pnpm flags check` does not enforce `removeBy` on `stable/*` branches, which only carry backports of `main`'s flags; expiry is enforced on `main`.
 
 Premium rule: if operating the feature costs money (for example cloud storage) it is a premium candidate; otherwise free. Core features are always free. A client flag never bypasses server-owned entitlement checks (`/userEntitlements/{uid}.premiumActive`, Firestore capability flags).
 

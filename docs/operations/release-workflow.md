@@ -46,7 +46,7 @@ title, description, bounded diff, and read-only repository checkout. It returns 
 deterministic code validates their format, section, size, selected lane, and
 current PR head before adding them and pushing a normal commit to the PR branch.
 The normal changelog policy then validates the generated entry. Setting `none`
-with a reason or `inherited` skips generation. PRs from forks, oversized diffs,
+with a reason skips generation. PRs from forks, oversized diffs,
 inconclusive model results, stale revisions, or branch-protection push failures
 still require a human-authored entry or a corrected decision.
 
@@ -77,14 +77,14 @@ Beta is a release channel on `main`, not a branch. Use **Release | Beta** (`rele
 
 For redeploying an existing ref without a new version, use **Deploy beta to Cloudflare Workers**.
 
-## Stable major promotion
+## Stable promotion
 
 To promote the next-major line to production:
 
-1. Run **Prepare Main Stable Promotion** with the reviewed `main` ref and target version.
+1. Click **Prepare Main Stable Promotion**. The default source is `main`, and `auto` reads the package version. The `production-promote` environment gates the workflow once.
 2. Review and merge the generated promotion PR into `main`.
-3. Run **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit.
-4. In Actions, open **Release | Stable**, choose **Run workflow**, select `auto` or a stable line such as `2.x`, then approve the `production-promote` environment request. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`. If the current `X.Y.0` tag already exists, it prepares `X.(Y+1).0`. The workflow commits the version and changelog update to the stable branch before creating the release. Use `dry_run` to inspect the decision without pushing or publishing.
+3. Click **Bootstrap Stable Release Line** to create `stable/X.x` at that exact approved main commit. The workflow opens a `GH_PAT`-authenticated PR that starts `main` at `(X+1).0.0-beta.1`; the promotion PR has already emptied the next-major changelog lane.
+4. Rehearse the stable branch with **Deploy Staging**, using `auto` to select the highest stable branch or choosing a tag or commit. Then, in Actions, open **Release | Stable**, choose **Run workflow**, select `auto` or a stable line such as `2.x`, and approve the `production-promote` environment request. If the branch still has a beta package version (for example `2.0.0-beta.16`), the workflow converts it to `2.0.0`. If the current `X.Y.0` tag already exists, it prepares `X.(Y+1).0`. The workflow commits the version and changelog update to the stable branch before creating the release. Use `dry_run` to inspect the decision without pushing or publishing.
 
 The stable GitHub Release title uses the short label, such as `v2` or `v2.1`; its git tag uses padded semver, such as `v2.0.0` or `v2.1.0`. The release starts with the curated changelog entry and may include GitHub's generated merged-PR notes. Publishing triggers the production workflow. For a live manifest action, it deploys the VPS API and `gfc-production` Cloudflare Worker frontend, then smoke-checks the production hostname and version marker. The VPS frontend is not deployed by default. After publication, the workflow dispatches the same changelog audit against the selected stable branch, such as `stable/2.x`; any corrective changelog update is proposed through a separate PR.
 
@@ -97,30 +97,27 @@ For an urgent production fix:
 1. Create a `hotfix/*` branch from the current `stable/X.x` line.
 2. Open a reviewed PR into that stable branch.
 3. Add the fix to the current stable-line hotfix changelog lane.
-4. Run **Deploy Staging** with the hotfix branch, commit, or PR ref.
+4. Run **Deploy Staging** with the hotfix commit SHA.
 5. After staging verification, merge the hotfix PR.
 6. In Actions, open **Release | Stable**, choose **Run workflow**, select the stable line, then approve the `production-promote` environment request.
 
 The hotfix release uses the curated hotfix entry first, followed by the merged-PR traceability notes. Publishing it activates production deployment.
 
-## Stable fix forward-porting
+## Backports
 
-When a stable PR merges, **Forward-port Stable Fix** attempts to express the production fix on `main` using the stable merge diff. It creates a normal reviewed `port/<pr>-to-main` PR and never merges it automatically.
+`main` is the fast trunk and deploys to beta. Land every fix and feature on `main` first. To ship a change in a minor release of the current production line, add `backport-2.x` to its PR before or after merge. **Maintenance | Backport** opens `backport/<pr>-to-2.x` against `stable/2.x` and cherry-picks the main merge commit without `CHANGELOG.md`.
 
-If the diff cannot be applied safely because `main` has moved substantially, the workflow opens a tracking issue instead of forcing a misleading PR. The issue explains the stable source, merge commit, affected files, and the need to re-express the behavior in the next-major architecture.
+The backport PR uses `Changelog-Impact: hotfix` so the changelog bot drafts the stable-lane entry. If the source PR used `none`, the backport also uses `none` with the same `Changelog-Reason`. Foundations and refactors may be backported; the maintainer decides per PR whether a major feature should be.
 
-A successful manual forward-port uses:
+If the cherry-pick conflicts, the workflow opens a draft PR labelled `backport-conflict` with the conflict markers committed on that branch. Resolve the conflicts there. To retry or handle an older PR, run **Maintenance | Backport** from Actions with the PR number and optional stable line.
 
-```md
-Changelog-Impact: inherited
-Port of #123
-```
-
-The forward-port does not create a second public changelog entry.
+A fix that only applies to production goes directly to `stable/X.x` as a `hotfix/*` PR and stays there. When a fix applies to both production and `main`, land it on `main` first and backport it. Do not put a fix on stable so it can be carried forward.
 
 ## Staging
 
-**Deploy Staging** is manual and accepts a branch, tag, or commit. It is the rehearsal surface for both `main` next-major work and stable hotfixes. It never runs on ordinary pushes, merges, or release creation.
+**Deploy Staging** is a manual rehearsal of stable code before production. Its `auto` ref selects the highest `stable/N.x`; operators can also choose a `vX.Y.Z` tag or commit SHA. It never runs on ordinary pushes, merges, or release creation.
+
+After the v2 cut, `main` is the v3 beta line. Beta tags use `3.0.0-beta.N`, and the counter restarts at 1 for each new base version. Production deployments accept stable branches or version tags only. The production release-published trigger is unchanged.
 
 ## Release-note audience
 
@@ -136,20 +133,6 @@ GitHub Release notes are for people who want repository-level traceability:
 
 The release script resolves the previous tag from the same release history, or accepts an operator-provided override. GitHub's generated notes therefore describe the exact release range rather than a time window.
 
-## Stable fixes forward-port into main
-
-When a reviewed PR merges into a `stable/X.x` branch, the
-`Forward-port Stable Fix` workflow prepares a normal draft PR from the stable
-merge into `main`. It applies the trusted merge commit's diff to the current
-`main` branch; it never checks out or executes code from the original PR head,
-and it never merges the port automatically.
-
-If the diff applies cleanly, review the generated `port/<pr>-to-main` PR like
-any other change. If the architectures have diverged, the workflow creates a
-`porting/conflicts` issue instead. Re-express the stable behavior manually on
-`main`, then include `Changelog-Impact: inherited` and `Port of #<stable-pr>`
-when the stable changelog entry is carried forward.
-
 ## Manual workflows
 
 | Workflow | Purpose |
@@ -161,7 +144,7 @@ when the stable changelog entry is carried forward.
 | `opencode-changelog-audit.yml` | Manually or weekly compare code changes with the Unreleased changelog and open a corrective PR when needed; manual runs can set `baseline_ref` to bound the range |
 | `deploy-staging.yml` | Manually deploy a rehearsal ref |
 | `deploy-main-to-vps.yml` | Deploy the production Worker frontend and VPS API, or manually deploy a selected stable ref; VPS frontend is an opt-in rollback path |
-| `forward-port-stable-fix.yml` | Carry stable fixes forward into `main` |
+| `backport.yml` | Open a stable PR from a labelled merged `main` PR |
 
 ## Production Cloudflare cutover
 
