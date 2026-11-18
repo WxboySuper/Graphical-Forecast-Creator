@@ -31,10 +31,13 @@ const isManualBaselineForTarget = (baselineRef, targetRef) => {
 
 const isBetaTag = (tag) => Boolean(tag[4]);
 
+/** A flat line (stable/2.x) has no minor to match; a three-part line (stable/1.7.x) does. */
+const minorMatches = (lineMinor, tagMinor) => lineMinor === undefined || lineMinor === tagMinor;
+
 const isStableTagForTarget = (tag, targetRef) => {
   const line = /^stable\/(\d+)(?:\.(\d+))?\.x$/.exec(targetRef);
-  if (!line || tag[4] || tag[1] !== line[1]) return false;
-  return line[2] === undefined || tag[2] === line[2];
+  if (!line || tag[4]) return false;
+  return tag[1] === line[1] && minorMatches(line[2], tag[2]);
 };
 
 const validateManualBaselineRef = (baselineRef, targetRef) => {
