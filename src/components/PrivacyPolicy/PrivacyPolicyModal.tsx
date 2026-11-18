@@ -11,8 +11,8 @@ import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '3';
-const PRIVACY_POLICY_LAST_UPDATED = 'November 18, 2026';
+const PRIVACY_POLICY_VERSION = '4';
+const PRIVACY_POLICY_LAST_UPDATED = 'November 21, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -57,6 +57,12 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
     'Daily visitor and active-account totals are counted without cookies. Only the totals are kept, and the one-way fingerprints used to avoid double counting are deleted at the end of each day.',
     'A new one-time "Help improve GFC?" prompt replaces the setting that used to sit at the top of this policy. Optional feature statistics stay off until you allow them, and you can change the choice any time from the More menu under Usage data.',
     'Optional statistics are stored by Cloudflare and expire automatically after about 90 days. Error reports are now scrubbed more thoroughly, including performance traces.',
+  ],
+  '4': [
+    'We now explain that your browser loads map tiles and public weather data directly from providers such as OpenFreeMap, Esri, NOAA/National Weather Service, and WorldPop, which see your IP address but not your forecasts.',
+    'Feedback you send is stored with Cloudflare only; we removed the mention of a Discord copy because that feature is not turned on.',
+    'We now list every service provider we use: Google Firebase, Stripe, Cloudflare, Sentry, Hostinger, and PurelyMail.',
+    'We added your privacy rights (access, correction, deletion), a statement that we do not sell or share personal information for advertising, and a 30-day response target.',
   ],
 };
 
@@ -153,6 +159,10 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     <p>
       If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences,
       and cycle history remain stored locally on your device. We do not have access to this data.
+      To show maps and weather data, your browser loads map tiles and public data directly from providers such as
+      OpenFreeMap, Esri, NOAA/National Weather Service, and (for population estimates) WorldPop. Those providers
+      receive your IP address and normal browser request information under their own privacy policies; they do not
+      receive your forecasts.
     </p>
 
     <h3>2. Account &amp; Authentication Data</h3>
@@ -270,9 +280,8 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
     <p>
       Please do not put passwords, payment details, or other sensitive personal information in your message. We use
       feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored
-      with Cloudflare (our feedback service and database), and a copy of each submission is posted to a private
-      channel in our Discord server, where Discord&apos;s own privacy policy applies. Only GFC maintainers can read
-      these. Cloudflare also processes requests to the feedback service and may keep routine technical logs, such as
+      with Cloudflare (our feedback service and database). Only GFC maintainers can read it. Cloudflare also processes
+      requests to the feedback service and may keep routine technical logs, such as
       IP address and timestamps, under its own policies.
     </p>
     <p>
@@ -308,15 +317,21 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
 
     <h3>9. Security &amp; Breach Notification</h3>
     <p>
-      We rely on enterprise-grade infrastructure from Google (Firebase), Stripe, and Cloudflare to keep your data safe. In the
-      unlikely event of a data breach that compromises your account information, we will notify affected users via
+      We rely on established service providers to run GFC and keep your data safe: Google (Firebase Authentication
+      and Firestore) for accounts and cloud saves, Stripe for payments, Cloudflare for hosting, the feedback service,
+      anonymous counts, and optional analytics, Sentry for error monitoring, Hostinger for the server that runs the
+      GFC API, and PurelyMail for our email address. These providers are based in or process data in the United States
+      and other countries. In the unlikely event of a data breach that compromises your account information, we will notify affected users via
       email as quickly as legally and technically possible.
     </p>
 
     <h3>10. Policy Changes &amp; Contact</h3>
     <p>
       We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email.
-      For privacy questions, or to request manual data deletion, contact us at{' '}
+      We do not sell or share your personal information for advertising. You can ask us for a copy of your account
+      data, to correct it, or to delete it, and you can turn optional feature statistics off at any time from the
+      More (&hellip;) menu under Usage data; we aim to respond within 30 days. For privacy questions, or to request
+      manual data deletion, contact us at{' '}
       <ContactEmailLink />.
     </p>
   </>

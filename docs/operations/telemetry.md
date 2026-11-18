@@ -12,7 +12,7 @@ The client contract lives in [`src/lib/telemetry/index.ts`](../../src/lib/teleme
 - Product events must not include account identifiers, hashes, IP addresses, session identifiers, forecast content, free text, raw URLs, or error messages.
 - Account progress metrics remain a separate feature using `/api/metrics/event`.
 
-The app migrates `gfc-analytics-enabled=true` to consent `granted`. A previous `false` value becomes `unset` and is removed, so the user can make a fresh choice. Consent changes sync between open tabs through the browser storage event.
+The app resets legacy `gfc-analytics-enabled=true` to `unset` because the old Umami opt-in does not carry over. A previous `false` value becomes `denied`, preserving the explicit opt-out. Both legacy values are removed after migration. Consent changes sync between open tabs through the browser storage event.
 
 ## Verification
 

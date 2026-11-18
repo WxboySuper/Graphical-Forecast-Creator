@@ -4,8 +4,8 @@ import type { Page } from '@playwright/test';
 export const prepareAppState = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     localStorage.setItem('gfc-local-beta-bypass', 'true');
-    localStorage.setItem('gfc-tos-accepted', '2');
-    localStorage.setItem('gfc-privacy-policy-accepted', '3');
+    localStorage.setItem('gfc-tos-accepted', '3');
+    localStorage.setItem('gfc-privacy-policy-accepted', '4');
     localStorage.setItem('gfc-telemetry-consent', 'denied');
   });
 };

@@ -1,5 +1,5 @@
 # Privacy Policy
-**Version 3 — Last Updated: November 18, 2026**
+**Version 4 — Last Updated: November 21, 2026**
 
 This file mirrors the in-app Privacy Policy (`src/components/PrivacyPolicy/PrivacyPolicyModal.tsx`), which is the version users accept. Keep the two in sync.
 
@@ -8,7 +8,7 @@ This file mirrors the in-app Privacy Policy (`src/components/PrivacyPolicy/Priva
 **Usage data:** GFC counts daily visitors and active accounts without storing who they are, and offers an optional, anonymous feature-statistics setting that is off until you choose it. See section 5.
 
 **1. Local-First by Default**
-If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences, and cycle history remain stored locally on your device. We do not have access to this data.
+If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences, and cycle history remain stored locally on your device. We do not have access to this data. To show maps and weather data, your browser loads map tiles and public data directly from providers such as OpenFreeMap, Esri, NOAA/National Weather Service, and (for population estimates) WorldPop. Those providers receive your IP address and normal browser request information under their own privacy policies; they do not receive your forecasts.
 
 **2. Account & Authentication Data**
 If you choose to create an account to sync your settings or use premium features, we authenticate you via Firebase Auth. We use essential session cookies strictly to keep you logged in and we store:
@@ -45,7 +45,7 @@ The Send feedback form is optional and available to signed-in users; you can sha
 * A one-way hash of your account identifier, created with a secret value. We use it only to limit spam and duplicate submissions; it is not your account identifier.
 * Your email address, only if you tick "You can email me about this feedback" and your email address is verified. We contact you only if you opted in.
 
-Please do not put passwords, payment details, or other sensitive personal information in your message. We use feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored with Cloudflare (our feedback service and database), and a copy of each submission is posted to a private channel in our Discord server, where Discord's own privacy policy applies. Only GFC maintainers can read these. Cloudflare also processes requests to the feedback service and may keep routine technical logs, such as IP address and timestamps, under its own policies.
+Please do not put passwords, payment details, or other sensitive personal information in your message. We use feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored with Cloudflare (our feedback service and database). Only GFC maintainers can read it. Cloudflare also processes requests to the feedback service and may keep routine technical logs, such as IP address and timestamps, under its own policies.
 
 We keep feedback until we delete it, and we may keep useful feedback after you delete your account because it is stored without your profile (it includes your email only if you opted in). Deleting your account does not automatically remove feedback you sent. To have specific feedback deleted, contact us at the address in section 10 and describe roughly when you sent it and what it said; we will remove it.
 
@@ -58,7 +58,7 @@ Daily visitor and active-account totals are kept as non-user-specific aggregates
 GFC is intended for general audiences and is not directed at children under the age of 13. By creating an account, you confirm you are 13 years of age or older.
 
 **9. Security & Breach Notification**
-We rely on enterprise-grade infrastructure from Google (Firebase), Stripe, and Cloudflare to keep your data safe. In the unlikely event of a data breach that compromises your account information, we will notify affected users via email as quickly as legally and technically possible.
+We rely on established service providers to run GFC and keep your data safe: Google (Firebase Authentication and Firestore) for accounts and cloud saves, Stripe for payments, Cloudflare for hosting, the feedback service, anonymous counts, and optional analytics, Sentry for error monitoring, Hostinger for the server that runs the GFC API, and PurelyMail for our email address. These providers are based in or process data in the United States and other countries. In the unlikely event of a data breach that compromises your account information, we will notify affected users via email as quickly as legally and technically possible.
 
 **10. Policy Changes & Contact**
-We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. For privacy questions, or to request manual data deletion, contact us at: contact@gfcweather.com.
+We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. We do not sell or share your personal information for advertising. You can ask us for a copy of your account data, to correct it, or to delete it, and you can turn optional feature statistics off at any time from the More (…) menu under Usage data; we aim to respond within 30 days. For privacy questions, or to request manual data deletion, contact us at: contact@gfcweather.com.

@@ -29,10 +29,10 @@ test('keeps opt-in events silent until consent is granted', () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('migrates an old opt-in, preserves an opt-out, and leaves unanswered consent unset', () => {
+test('resets an old opt-in, preserves an opt-out, and leaves unanswered consent unset', () => {
   localStorage.setItem('gfc-analytics-enabled', 'true');
-  expect(getTelemetryConsent()).toBe('granted');
-  expect(localStorage.getItem(TELEMETRY_CONSENT_KEY)).toBe('granted');
+  expect(getTelemetryConsent()).toBe('unset');
+  expect(localStorage.getItem(TELEMETRY_CONSENT_KEY)).toBeNull();
   expect(localStorage.getItem('gfc-analytics-enabled')).toBeNull();
   localStorage.clear();
   localStorage.setItem('gfc-analytics-enabled', 'false');

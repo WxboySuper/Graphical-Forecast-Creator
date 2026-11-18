@@ -26,7 +26,7 @@ describe('PrivacyPolicyModal Utils', () => {
   });
 
   test('hasAcceptedPrivacyPolicy returns true when accepted current version', () => {
-    localStorage.setItem('gfc-privacy-policy-accepted', '3');
+    localStorage.setItem('gfc-privacy-policy-accepted', '4');
     expect(hasAcceptedPrivacyPolicy()).toBe(true);
   });
 
@@ -51,14 +51,14 @@ describe('PrivacyPolicyModal Utils', () => {
     expect(isPrivacyPolicyUpgrade()).toBe(true);
   });
 
-  test('requires users with the previous semver version to accept flat Version 2', () => {
+  test('requires users with the previous semver version to accept Version 4', () => {
     localStorage.setItem('gfc-privacy-policy-accepted', '1.8.0');
     expect(hasAcceptedPrivacyPolicy()).toBe(false);
     expect(isPrivacyPolicyUpgrade()).toBe(true);
   });
 
   test('isPrivacyPolicyUpgrade returns false when current version was accepted', () => {
-    localStorage.setItem('gfc-privacy-policy-accepted', '3');
+    localStorage.setItem('gfc-privacy-policy-accepted', '4');
     expect(isPrivacyPolicyUpgrade()).toBe(false);
   });
 });
@@ -86,10 +86,10 @@ describe('PrivacyPolicyModal component', () => {
   test('shows last updated date and whats new when upgrading from an older policy', () => {
     localStorage.setItem('gfc-privacy-policy-accepted', '1.0.0');
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
-    expect(screen.getByText(/Last updated November 18, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Last updated November 21, 2026/u)).toBeInTheDocument();
     const note = screen.getByRole('note');
     expect(note).toBeInTheDocument();
-    expect(within(note).getByText(/What's new in version 3/u)).toBeInTheDocument();
+    expect(within(note).getByText(/What's new in version 4/u)).toBeInTheDocument();
     expect(within(note).getByText(/hosted error monitoring \(Sentry\)/u)).toBeInTheDocument();
     expect(within(note).getByText(/Google Analytics \(GA4\)/u)).toBeInTheDocument();
   });
@@ -128,14 +128,14 @@ describe('PrivacyPolicyModal component', () => {
 
   test('hides whats new for first-time users in acceptance mode', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} />);
-    expect(screen.getByText(/Last updated November 18, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Last updated November 21, 2026/u)).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.queryByText(/What's new in version/u)).not.toBeInTheDocument();
   });
 
   test('hides whats new in view-only mode but shows version date', () => {
     render(<PrivacyPolicyModal onAccept={onAcceptMock} viewOnly onClose={onCloseMock} />);
-    expect(screen.getByText(/Version 3 — Last updated November 18, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Version 4 — Last updated November 21, 2026/u)).toBeInTheDocument();
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
     expect(screen.queryByText(/What's new in version/i)).not.toBeInTheDocument();
   });
@@ -164,7 +164,7 @@ describe('PrivacyPolicyModal component', () => {
     fireEvent.click(acceptButton);
 
     expect(onAcceptMock).toHaveBeenCalled();
-    expect(localStorage.getItem('gfc-privacy-policy-accepted')).toBe('3');
+    expect(localStorage.getItem('gfc-privacy-policy-accepted')).toBe('4');
   });
 
   test('renders view-only mode when specified', () => {

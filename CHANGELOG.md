@@ -23,6 +23,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Legal policies and telemetry consent:** Terms of Service version 3 and Privacy Policy version 4 take effect November 21, 2026 and require existing acceptors to re-accept after material changes. Legacy Umami opt-ins now reset to unset so users receive the new optional statistics prompt; explicit legacy opt-outs remain denied. The policies clarify weather-data providers and safety limits, billing terms, feedback handling, service providers, and privacy rights.
 - **Privacy-first telemetry:** Replaces self-hosted Umami with a client that sends consent-free visit and daily-active counts and opt-in allowlisted product events to the `gfc-telemetry` Worker. Feature events carry only the event name, optional short detail, and app version.
 - **Usage data prompt and Privacy Policy version 3:** A one-time "Help improve GFC?" prompt asks whether to share anonymous feature counts, with equal Allow and No thanks choices, and the choice can be changed any time from More > Usage data. The Privacy Policy is rewritten to match the Cloudflare telemetry, Sentry scrubbing, the device identifier and short-lived records behind account activity counts, and retention, and you will be asked to accept the new version.
 - **Pricing and What's new:** These pages now live on the marketing site. Old `/pricing` and `/updates` links in the app redirect there, and upgrading to Premium happens from your Account page.
