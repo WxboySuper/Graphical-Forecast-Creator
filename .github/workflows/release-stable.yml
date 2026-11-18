@@ -1,6 +1,7 @@
 name: Release | Stable
 
-# Stable releases resolve a stable line, then publish after production environment approval.
+# Stable releases resolve a stable line, then publish after one production environment approval.
+# The approval job gates the audit, and the release job needs the audit, so one click covers the whole run.
 # Publishing triggers the app Worker, marketing Worker, and VPS API deploy workflow.
 on:
   workflow_dispatch:
@@ -104,7 +105,6 @@ jobs:
 
   release:
     needs: [resolve_line, final_changelog_audit, changelog_gate]
-    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
