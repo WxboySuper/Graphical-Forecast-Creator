@@ -44,6 +44,24 @@ export const extractLaneReleaseNotes = (changelog, version, lane) => {
   return body ? `## v${version}\n\n${body}`.trim() : null;
 };
 
+/**
+ * Drops HTML comments by scanning for their delimiters. It only feeds an emptiness check, never output,
+ * and an unterminated comment drops the rest of the text.
+ * @param {string} text
+ */
+const withoutHtmlComments = (text) => {
+  let result = '';
+  let rest = text;
+  for (;;) {
+    const start = rest.indexOf('<!--');
+    if (start === -1) return result + rest;
+    result += rest.slice(0, start);
+    const end = rest.indexOf('-->', start + 4);
+    if (end === -1) return result;
+    rest = rest.slice(end + 3);
+  }
+};
+
 /** @param {string} changelog @param {string} version @param {'next-major' | 'stable-hotfix'} lane */
 export const moveLaneToReleaseSection = (changelog, version, lane) => {
   const heading = changelogLaneHeading(lane);
@@ -56,7 +74,7 @@ export const moveLaneToReleaseSection = (changelog, version, lane) => {
   }
 
   const body = changelog.slice(bounds.start + heading.length, bounds.end).trim();
-  const bodyWithoutComments = body.replace(/<!--[\s\S]*?-->/g, '').trim();
+  const bodyWithoutComments = withoutHtmlComments(body).trim();
   if (!bodyWithoutComments || !/^\s*(?:[-*]|\d+\.)\s+\S/m.test(bodyWithoutComments)) {
     throw new Error(`The stable changelog lane is empty; release ${version} requires release notes.`);
   }
