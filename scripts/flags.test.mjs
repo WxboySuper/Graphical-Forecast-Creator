@@ -7,7 +7,8 @@ import { addFlag, compareVersions, isPastRemoveBy, keepFlag, retireFlag, seriali
 import { findReferences } from './lib/flags-scan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const REGISTRY_TEXT = readFileSync(path.join(ROOT, 'server', 'flags.json'), 'utf8');
+// The file format is LF; Windows checkouts may convert line endings.
+const REGISTRY_TEXT = readFileSync(path.join(ROOT, 'server', 'flags.json'), 'utf8').replace(/\r\n/g, '\n');
 const registry = () => JSON.parse(REGISTRY_TEXT);
 
 const base = () => ({
