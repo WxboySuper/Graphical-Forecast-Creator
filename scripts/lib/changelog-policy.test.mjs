@@ -50,8 +50,7 @@ test('rejects the retired inherited impact', () => {
   });
   assert.equal(result.ok, false);
 });
-  assert.equal(result.ok, true);
-});
+
 test('requires beta entries in the next-major lane on main', () => {
   const result = evaluateLane('beta', '# Changelog\n\n### Stable v2.x hotfixes\n');
   assert.equal(result.ok, false);
