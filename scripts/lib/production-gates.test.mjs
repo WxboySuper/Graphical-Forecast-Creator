@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const workflow = (name) => readFileSync(new URL(`../../.github/workflows/${name}`, import.meta.url), 'utf8');
+// Normalised so the checks hold for CRLF checkouts as well as LF.
+const workflow = (name) => readFileSync(new URL(`../../.github/workflows/${name}`, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
 
 for (const name of ['deploy-main-to-vps.yml', 'deploy-feedback-worker.yml', 'deploy-telemetry-worker.yml', 'bootstrap-stable-release.yml', 'prepare-stable-promotion.yml']) {
   test(`${name} is gated on production-promote`, () => {
