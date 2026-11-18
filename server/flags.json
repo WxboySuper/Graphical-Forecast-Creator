@@ -12,15 +12,15 @@
     "forecastWorkflowV2": { "kind": "switch", "owner": "WxboySuper", "issue": 429, "default": true, "runbook": "Build-time only: set values.<target> to false and redeploy." },
     "verificationRelaunch": { "kind": "switch", "owner": "WxboySuper", "issue": 430, "default": true, "runbook": "Build-time only: set values.<target> to false and redeploy." },
     "customProducts": { "kind": "switch", "owner": "WxboySuper", "issue": 431, "default": true, "runbook": "Build-time only: set values.<target> to false and redeploy." },
-    "outlookLandMasking": { "kind": "dev", "owner": "WxboySuper", "issue": 619, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true, "staging": true } },
+    "outlookLandMasking": { "kind": "dev", "owner": "WxboySuper", "issue": 619, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
     "tropicalWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 432, "removeBy": "3.0.0", "default": false },
-    "customWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 915, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } },
-    "mesoscaleWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 919, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } },
-    "mesoscaleDerivedParameters": { "kind": "dev", "owner": "WxboySuper", "issue": 1801, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } },
+    "customWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 915, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
+    "mesoscaleWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 919, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
+    "mesoscaleDerivedParameters": { "kind": "dev", "owner": "WxboySuper", "issue": 1801, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
     "winterWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 913, "removeBy": "3.0.0", "default": false },
     "collaborationRoom": { "kind": "dev", "owner": "WxboySuper", "issue": 433, "removeBy": "3.0.0", "default": false },
-    "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } },
-    "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true, "staging": true } },
-    "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } }
+    "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
+    "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
+    "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } }
   }
 }
