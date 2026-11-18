@@ -8,6 +8,7 @@
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
+/** @returns {number[] | null} [major, minor, patch] */
 const parse = (version) => {
   const match = String(version).match(SEMVER);
   return match ? match.slice(1).map(Number) : null;
@@ -15,10 +16,34 @@ const parse = (version) => {
 
 /** True when `next` is a newer version than `previous` (both parsed). */
 const isNewer = (next, previous) => {
-  for (let index = 0; index < 3; index += 1) {
-    if (next[index] !== previous[index]) return next[index] > previous[index];
+  const index = [0, 1, 2].find((position) => next[position] !== previous[position]);
+  return index !== undefined && next[index] > previous[index];
+};
+
+/** The version has to sit on the stable branch's line: its major for stable/N.x, major.minor for stable/N.M.x. */
+const lineProblems = (baseRef, current, packageVersion) => {
+  const flatLine = baseRef.match(/^stable\/(\d+)\.x$/);
+  if (flatLine) {
+    return current[0] === Number(flatLine[1]) ? [] : [`package.json ${packageVersion} is not on the ${baseRef} major (${flatLine[1]}).`];
   }
-  return false;
+  const legacyLine = baseRef.match(/^stable\/(\d+)\.(\d+)\.x$/);
+  if (!legacyLine) return [];
+  const onLine = current[0] === Number(legacyLine[1]) && current[1] === Number(legacyLine[2]);
+  return onLine ? [] : [`package.json ${packageVersion} is not on the ${baseRef} line.`];
+};
+
+/** A PR may leave the version alone or raise it, never lower it. */
+const directionProblems = (basePackageVersion, packageVersion, current) => {
+  const previous = parse(basePackageVersion);
+  const unchanged = packageVersion === basePackageVersion;
+  if (!previous || unchanged || isNewer(current, previous)) return [];
+  return [`package.json goes backwards from ${basePackageVersion} to ${packageVersion}.`];
+};
+
+/** The release manifest has to keep describing the package version. */
+const manifestProblems = (manifestReleaseId, packageVersion) => {
+  if (manifestReleaseId === undefined || manifestReleaseId === `v${packageVersion}`) return [];
+  return [`deploy/production-release.json releaseId must be v${packageVersion}, got ${manifestReleaseId}.`];
 };
 
 /**
@@ -26,31 +51,14 @@ const isNewer = (next, previous) => {
  * @returns {{ ok: boolean; problems: string[] }}
  */
 export const evaluateStableHotfixPolicy = ({ baseRef, basePackageVersion, packageVersion, manifestReleaseId }) => {
-  const problems = [];
   const current = parse(packageVersion);
-  const previous = parse(basePackageVersion);
-
   if (!current) {
-    problems.push(`Stable lines need a stable semver in package.json, got ${packageVersion}.`);
-    return { ok: false, problems };
+    return { ok: false, problems: [`Stable lines need a stable semver in package.json, got ${packageVersion}.`] };
   }
-
-  const flatLine = baseRef.match(/^stable\/(\d+)\.x$/);
-  const legacyLine = baseRef.match(/^stable\/(\d+)\.(\d+)\.x$/);
-  if (flatLine && current[0] !== Number(flatLine[1])) {
-    problems.push(`package.json ${packageVersion} is not on the ${baseRef} major (${flatLine[1]}).`);
-  }
-  if (legacyLine && (current[0] !== Number(legacyLine[1]) || current[1] !== Number(legacyLine[2]))) {
-    problems.push(`package.json ${packageVersion} is not on the ${baseRef} line.`);
-  }
-
-  if (previous && packageVersion !== basePackageVersion && !isNewer(current, previous)) {
-    problems.push(`package.json goes backwards from ${basePackageVersion} to ${packageVersion}.`);
-  }
-
-  if (manifestReleaseId !== undefined && manifestReleaseId !== `v${packageVersion}`) {
-    problems.push(`deploy/production-release.json releaseId must be v${packageVersion}, got ${manifestReleaseId}.`);
-  }
-
+  const problems = [
+    ...lineProblems(baseRef, current, packageVersion),
+    ...directionProblems(basePackageVersion, packageVersion, current),
+    ...manifestProblems(manifestReleaseId, packageVersion),
+  ];
   return { ok: problems.length === 0, problems };
 };
