@@ -31,15 +31,9 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | `source_ref=main`, `version=auto` |
 | `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
 | `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | run from the stable branch; converts `-beta.N` package version to stable |
-<<<<<<< HEAD
-| `deploy-staging.yml` | Manual rehearsal of any branch/tag/commit | |
-| `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | |
-| `forward-port-stable-fix.yml` | Stable merge -> draft `port/<pr>-to-main` PR or `porting/conflicts` issue | |
-=======
 | `deploy-staging.yml` | Manual stable branch/tag/commit rehearsal. `auto` selects the highest stable branch. | `ref=auto` |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | `ref=auto` selects the highest stable branch |
 | `backport.yml` | `backport-2.x` label -> PR against `stable/2.x`; conflicts create a draft PR | PR number and optional line for manual runs |
->>>>>>> 8b9ec1a6 (feat(release): one-click promotion, bootstrap, beta and deploy workflows (#1865))
 | `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
 
 Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog. The stable release owns the corresponding major changelog.
@@ -62,13 +56,9 @@ lint+test -> resolve version, validate next-major lane has real content -> pre-b
 
 ### Stable and hotfix
 
-<<<<<<< HEAD
-Stable: Prepare Main Stable Promotion -> merge PR -> Bootstrap Stable Release Line -> Create Stable Release (from stable branch). Hotfix: `hotfix/*` from stable -> PR into stable + hotfix changelog lane -> Deploy Staging with that ref -> merge -> Create Stable Release -> forward-port PR appears. Forward-port PRs use `Changelog-Impact: inherited` + `Port of #N`.
-=======
 Production gate: every workflow that changes production waits for an approval click on the `production-promote` environment (reviewer: the maintainer): promotion, bootstrap, `release-stable.yml`, `deploy-main-to-vps.yml` (manual and release-triggered runs), and the feedback and telemetry Worker deploys. Agents run `gh` as the maintainer, so an ungated workflow could deploy production without the maintainer seeing it. Staging and beta stay ungated. The separate `production` environment (15-minute wait timer, no reviewer) is not used.
 
-Stable promotion: click Prepare Main Stable Promotion, review and merge its PR, then click Bootstrap Stable Release Line. Bootstrap creates `stable/N.x` at the approved commit and opens a reviewed PR that starts `main` at `(N+1).0.0-beta.1`. Create the stable release from the stable branch after rehearsal. Hotfix: branch from stable -> PR into stable with a hotfix changelog entry -> rehearse through Deploy Staging -> merge -> Create Stable Release. Backports use the label-driven backport workflow. A production-only fix stays on stable and is not carried to `main`. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR. See [workflow rules](workflow.md#backports).
->>>>>>> 8b9ec1a6 (feat(release): one-click promotion, bootstrap, beta and deploy workflows (#1865))
+Stable promotion: click Prepare Main Stable Promotion, review and merge its PR, then click Bootstrap Stable Release Line. Bootstrap creates `stable/N.x` at the approved commit and opens a reviewed PR that starts `main` at `(N+1).0.0-beta.1`. Create the stable release from the stable branch after rehearsal. Hotfix: branch from stable -> PR into stable with a hotfix changelog entry -> rehearse through Deploy Staging -> merge -> Create Stable Release. Backports use the label-driven backport workflow. A production-only fix stays on stable and is not carried to `main`. For a fix that applies to both, merge to `main` first and use `backport-2.x` to open its stable PR.
 
 GitHub Release notes: beta = native PR list + changelog link; stable = curated changelog + PR list; hotfix = curated hotfix entry + short PR list.
 

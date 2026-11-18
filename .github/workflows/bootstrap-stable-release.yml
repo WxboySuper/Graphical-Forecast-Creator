@@ -37,10 +37,7 @@ jobs:
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
-<<<<<<< HEAD
-=======
           persist-credentials: false
->>>>>>> 8b9ec1a6 (feat(release): one-click promotion, bootstrap, beta and deploy workflows (#1865))
 
       - name: Validate source and stable branch contract
         id: validate
