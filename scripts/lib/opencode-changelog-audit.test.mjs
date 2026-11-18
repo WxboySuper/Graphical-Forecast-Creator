@@ -18,6 +18,7 @@ test('publisher target validation excludes protected release branches and stale 
   const sha = 'a'.repeat(40);
   assert.deepEqual(validateChangelogAuditTarget('main', sha), { targetRef: 'main', headSha: sha });
   assert.deepEqual(validateChangelogAuditTarget('stable/1.6.x', sha), { targetRef: 'stable/1.6.x', headSha: sha });
+  assert.deepEqual(validateChangelogAuditTarget('stable/2.x', sha), { targetRef: 'stable/2.x', headSha: sha });
   for (const target of ['beta', 'stable/1.6.0', 'refs/heads/main', 'feature/test']) {
     assert.throws(() => validateChangelogAuditTarget(target, sha), /target is invalid/);
   }
@@ -43,6 +44,9 @@ test('manual audit baseline resolves only a full ancestor SHA or version tag', (
   assert.equal(resolveManualChangelogAuditBaseline({
     ...common, baselineRef: 'v1.8.3', targetRef: 'stable/1.8.x',
   }), baseline);
+  assert.equal(resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v2.1.0', targetRef: 'stable/2.x' }), baseline);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v1.9.0', targetRef: 'stable/2.x' }), /match the selected release line/);
+  assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: 'v2.1.0-beta.1', targetRef: 'stable/2.x' }), /match the selected release line/);
   assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline, resolveCommit: () => null }), /did not resolve/);
   assert.throws(() => resolveManualChangelogAuditBaseline({ ...common, baselineRef: baseline, isAncestor: () => false }), /must be an ancestor/);
 });

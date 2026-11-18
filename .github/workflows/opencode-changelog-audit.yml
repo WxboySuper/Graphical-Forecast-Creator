@@ -118,7 +118,7 @@ jobs:
             const fs = require('fs')
             const { execFileSync } = require('child_process')
             const targetRef = process.env.TARGET_REF
-            if (!/^(main|stable\/\d+\.\d+\.x)$/.test(targetRef)) throw new Error(`Unsupported changelog release line: ${targetRef}`)
+            if (!/^(main|stable\/\d+(?:\.\d+)?\.x)$/.test(targetRef)) throw new Error(`Unsupported changelog release line: ${targetRef}`)
             const { data: branch } = await github.rest.repos.getBranch({ owner: context.repo.owner, repo: context.repo.repo, branch: targetRef })
             const headSha = branch.commit.sha
             core.setOutput('head_sha', headSha)
@@ -184,11 +184,12 @@ jobs:
             }
 
             let baselineSha = manualBaselineSha ?? (audit.lastInspectedHead && ancestor(audit.lastInspectedHead) ? audit.lastInspectedHead : null)
-            const line = targetRef === 'main' ? null : targetRef.match(/^stable\/(\d+\.\d+)\.x$/)[1]
+            const line = targetRef === 'main' ? null : targetRef.match(/^stable\/(\d+(?:\.\d+)?)\.x$/)[1]
+            const flatLine = line !== null && !line.includes('.')
             if (!baselineSha) {
               const tags = targetRef === 'main'
                 ? git(['tag', '--merged', headSha, '--list', 'v*-beta.*', '--sort=-version:refname']).split(/\r?\n/).filter((tag) => /^v\d+\.\d+\.\d+-beta\.\d+$/.test(tag))
-                : git(['tag', '--merged', headSha, '--list', `v${line}.*`, '--sort=-version:refname']).split(/\r?\n/).filter((tag) => new RegExp(`^v${line.replace('.', '\\.')}\\.\\d+$`).test(tag))
+                : git(['tag', '--merged', headSha, '--list', `v${line}.*`, '--sort=-version:refname']).split(/\r?\n/).filter((tag) => (flatLine ? new RegExp(`^v${line}\\.\\d+\\.\\d+$`) : new RegExp(`^v${line.replace('.', '\\.')}\\.\\d+$`)).test(tag))
               const releaseTag = process.env.RELEASE_TAG
               if (releaseTag) {
                 const index = tags.indexOf(releaseTag)
@@ -201,7 +202,7 @@ jobs:
               baselineSha = recent.length > 50 ? recent[50] : '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
             }
 
-            const laneHeading = targetRef === 'main' ? '### Next major / beta' : `### Stable ${line}.x hotfixes`
+            const laneHeading = targetRef === 'main' ? '### Next major / beta' : `### Stable ${flatLine ? 'v' : ''}${line}.x hotfixes`
             const contextData = {
               trackerNumber: tracker.number,
               stateCommentId: stateComment?.id ?? null,
