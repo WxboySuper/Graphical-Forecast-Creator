@@ -115,6 +115,11 @@ jobs:
           fi
           MAJOR=$(printf '%s' "$STABLE_MAJOR" | sed -E 's#stable/([0-9]+)\.x#\1#')
           NEXT_MAJOR=$((MAJOR + 1))
+          # A leftover branch from an earlier run would make the push fail halfway; stop with a clear message instead.
+          if git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" ls-remote --exit-code --heads origin "advance-main-v${NEXT_MAJOR}" >/dev/null 2>&1; then
+            echo "::error::advance-main-v${NEXT_MAJOR} already exists on origin; merge or delete it, then bump main by hand or re-run."
+            exit 1
+          fi
           git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" fetch origin main
           git switch --create "advance-main-v${NEXT_MAJOR}" origin/main
           git config user.name "github-actions[bot]"
