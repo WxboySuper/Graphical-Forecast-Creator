@@ -5,38 +5,46 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ## [Unreleased]
 
+### Next major / beta
+
+#### Added
+
+<!-- Next-major work goes here. -->
+
+### Stable v2.x hotfixes
+
+#### Fixed
+
+<!-- Production fixes for the stable v2.x line go here. -->
+
 ## v2.0.0
 
 #### Added
 
 - **Marketing site:** gfcweather.com becomes the public home of Graphical Forecast Creator, with Features, Learn (a beginner walkthrough and an experienced-forecaster guide), Pricing, What's new, About, Contact, Terms of Service, and Privacy Policy pages. The app moves to app.gfcweather.com.
-- **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It is available on beta for early-access testing and has a matching panel in Monitor.
+- **Mesoscale workspace:** A new Forecast workspace for mesoscale analysis. Browse HRRR, RAP, and RRFS model fields (CAPE, helicity, composite reflectivity, and more) by run and forecast hour with readable names, then draw and style your own areas on top. It has a matching panel in Monitor.
 - **Mesoscale areas and discussion:** Draw polygons, circles, ellipses, and rectangles with forecaster hazard styling, reshape them vertex by vertex with the mouse or keyboard (stepping, arrow-key nudging, add and delete), and write a mesoscale discussion alongside them. Areas and discussion save on your device and keep working when model data is unavailable.
 - **Mesoscale radar and satellite context:** Overlay MRMS reflectivity and GOES satellite imagery beneath drawn areas, with per-layer opacity and freshness labels.
-- **Fixed-layer Significant Tornado Parameter:** A derived HRRR and RRFS index calculated from verified model fields. It stays hidden from production until it is approved there.
-- **Outlook editing:** Beta paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
-- **Population and cities:** A beta WorldPop estimate for the active day's outlook polygons, including the cities inside them from a bundled public-domain places dataset.
-- **KMZ/KML export:** A beta export prototype for forecast products.
+- **Fixed-layer Significant Tornado Parameter:** A derived HRRR and RRFS index calculated from verified model fields. It appears alongside the other mesoscale model fields.
+- **Outlook editing:** Paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
+- **Population and cities:** A WorldPop estimate for the active day's outlook polygons, including the cities inside them from a bundled public-domain places dataset.
+- **KMZ/KML export:** Export forecast products as KMZ or KML files for use in Google Earth and other mapping tools.
 - **Send feedback:** Signed-in users can send bugs, ideas, and questions from the Resources menu. The beta site also shows a beta notice with an always-visible feedback button.
-- **Feedback inbox:** Owners can read feedback through the Cloudflare Access protected admin API, filter by `new`, `read`, or `handled`, and page through newest submissions first.
-- **Usage dashboard:** Owners get a private usage page behind Cloudflare Access with daily visitors and active accounts, feature usage by event, page, country, and app version, and a link to the feedback inbox.
 
 #### Changed
 
-- **Legal policies and telemetry consent:** Terms of Service version 3 and Privacy Policy version 4 take effect November 21, 2026 and require existing acceptors to re-accept after material changes. Legacy Umami opt-ins now reset to unset so users receive the new optional statistics prompt; explicit legacy opt-outs remain denied. The policies clarify weather-data providers and safety limits, billing terms, feedback handling, service providers, and privacy rights.
-- **Privacy-first telemetry:** Replaces self-hosted Umami with a client that sends consent-free visit and daily-active counts and opt-in allowlisted product events to the `gfc-telemetry` Worker. Feature events carry only the event name, optional short detail, and app version.
-- **Usage data prompt and Privacy Policy version 3:** A one-time "Help improve GFC?" prompt asks whether to share anonymous feature counts, with equal Allow and No thanks choices, and the choice can be changed any time from More > Usage data. The Privacy Policy is rewritten to match the Cloudflare telemetry, Sentry scrubbing, the device identifier and short-lived records behind account activity counts, and retention, and you will be asked to accept the new version.
+- **Legal policies and telemetry consent:** Terms of Service version 3 and Privacy Policy version 4 take effect November 21, 2026, and existing users are asked to accept them again. The policies describe the Cloudflare telemetry, Sentry scrubbing, the Send feedback form, the device identifier and short-lived records behind daily active counts, retention, weather-data providers and safety limits, billing terms, service providers, and your privacy rights. Earlier Umami opt-ins are reset so you see the new prompt; explicit opt-outs stay denied.
+- **Privacy-first telemetry:** Replaces self-hosted Umami with a Cloudflare-hosted client that sends consent-free visit and daily-active counts and, only if you allow it, allowlisted feature events with the event name, an optional short detail, your country, and the app version. A one-time "Help improve GFC?" prompt offers equal Allow and No thanks choices, and you can change your choice any time from More > Usage data.
 - **Pricing and What's new:** These pages now live on the marketing site. Old `/pricing` and `/updates` links in the app redirect there, and upgrading to Premium happens from your Account page.
-- **Release and policy versions:** GFC now uses flat release labels such as v2 and v2.1, with padded semver for packages and tags. The Terms of Service and Privacy Policy now use flat Version 2 labels, so you will be asked to accept both updated policies.
-- **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a beta Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
+- **Forecast workspaces:** Forecast routes, autosave, session restore, and cloud saves now belong to the active workspace, including a Custom workspace at `/forecast/custom` where custom layers and reusable products now live. Existing saved cycles, layers, and exports keep working. The Cloud Library organizes saved forecasts with workspace tabs and shareable links.
 - **Forecast menu:** The header Forecast tab opens a workspace showcase with an icon, description, and focus chips for each workspace, marks the current one, previews upcoming workspaces, and keeps Discussion one click away.
 - **Severe discussion workspace:** Edit the severe forecast map and discussion together with a Map, Discussion, and Review / Export switcher. Discussion opens full width or in a resizable side panel, the choice is remembered, and narrow panels switch between Edit and Preview. Existing `/discussion` links open here with their query parameters and hash preserved.
 - **Open beta:** `beta.gfcweather.com` is open to everyone. Sign in with your existing account and your current plan applies. Old beta sign-in and invite links redirect to the home page.
 - **Verification:** Archived dates are graded against SPC-filtered storm reports only, with an unavailable message when the filtered archive cannot be used.
 - **Monitor NWS alerts:** After a refresh fails, the Monitor shows when the displayed alert polygons were last fetched and keeps the retry action clear.
 - **Map basemaps:** Forecast, verification, and monitor maps use OpenStreetMap instead of CARTO tiles; saved Carto styles select OpenStreetMap.
-- **Auto-TSTM:** Automatic thunderstorm guidance is temporarily disabled while the SPC HREF source is retired. The forecast page explains the planned replacement.
-- **Contact and privacy:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy. Privacy Policy Version 2 describes the Send feedback form (what it collects, where it is stored, how long it is kept), notes that feedback is not removed automatically when an account is deleted, and lists Cloudflare among infrastructure providers. You will be asked to accept the updated policy.
+- **Auto-TSTM:** Automatic thunderstorm guidance is temporarily off while the SPC HREF source is retired. The forecast page explains the planned replacement.
+- **Contact:** GFC has one contact address, contact@gfcweather.com, shown in the menu and in the Terms of Service and Privacy Policy.
 
 #### Fixed
 
@@ -81,24 +89,9 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Dependencies
 
-- **App libraries:** Updated to Firebase 13.3, Sentry React 11.12, Lucide icons 1.72, and current build and test tools for compatibility and maintenance.
-- **Server dependencies:** Updated server error reporting, request rate limiting, and Firebase Admin libraries to compatible maintenance releases to keep billing, monitoring, and authentication reliable.
-- **App libraries:** React and React DOM 19.3, Firebase 13.2, Sentry React 11.11, Redux Toolkit 2.14, Vite 8.3, Lucide icons 1.70, React Router 8.5, OpenLayers 10.11, Radix UI primitives, and related build and test tools.
-- **Server libraries:** Sentry Node 11.11, Firebase Admin 14.5, Stripe 23.1, Express 5.3, and express-rate-limit 8.7.
+- **App libraries:** React and React DOM 19.3, Firebase 13.3, Sentry React 11.12, Redux Toolkit 2.14, Vite 8.3, Lucide icons 1.72, React Router 8.5, OpenLayers 10.11, Radix UI primitives, and related build and test tools.
+- **Server libraries:** Sentry Node 11.12, Firebase Admin 14.5, Stripe 23.1, Express 5.3, and express-rate-limit 8.7.
 <!-- dependabot-automation -->
-
-### Next major / beta
-
-#### Added
-
-<!-- Continue next-major work here after this stable line is cut. -->
-### Stable v2.x hotfixes
-
-<!-- Add production fixes for the next stable 1.7.x release here. -->
-
-#### Fixed
-
-<!-- The lane is empty after v1.7.7. -->
 
 ## v1.7.7
 
