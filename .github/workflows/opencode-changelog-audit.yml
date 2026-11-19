@@ -58,7 +58,6 @@ on:
         type: string
 permissions:
   contents: read
-  issues: write
   pull-requests: read
 
 concurrency:
@@ -71,7 +70,6 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
-      issues: write
       pull-requests: read
     outputs:
       status: ${{ steps.context.outputs.run == 'true' && steps.persist.outputs.status || steps.context.outputs.status }}
@@ -82,8 +80,6 @@ jobs:
       TRIGGER_REASON: ${{ inputs.trigger_reason || github.event.inputs.trigger_reason || github.event_name }}
       RELEASE_TAG: ${{ inputs.release_tag || github.event.inputs.release_tag || '' }}
       BASELINE_REF: ${{ inputs.baseline_ref || github.event.inputs.baseline_ref || '' }}
-      STATE_MARKER: '<!-- gfc-opencode-maintenance-state:v1 -->'
-      STATE_TITLE: '[Maintenance state] OpenCode job history'
     steps:
       - name: Check out trusted maintenance tools
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -99,20 +95,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prepare bounded changelog audit context and state
+      - name: Prepare bounded changelog audit context
         id: context
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         env:
           CONTEXT_PATH: ${{ runner.temp }}/opencode-changelog-audit-context.json
           SOURCE_PATH: ${{ github.workspace }}/target-source
-          STATE_PATH: ${{ runner.temp }}/opencode-changelog-audit-state.json
           TARGET_REF: ${{ env.TARGET_REF }}
           FORCE_AUDIT: ${{ env.FORCE_AUDIT }}
           TRIGGER_REASON: ${{ env.TRIGGER_REASON }}
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
           BASELINE_REF: ${{ env.BASELINE_REF }}
-          STATE_MARKER: ${{ env.STATE_MARKER }}
-          STATE_TITLE: ${{ env.STATE_TITLE }}
         with:
           script: |
             const fs = require('fs')
@@ -126,26 +119,6 @@ jobs:
             const head = execFileSync('git', ['rev-parse', 'HEAD'], gitOptions).trim()
             const checkedOut = head
             if (headSha !== checkedOut) throw new Error('Target branch moved before checkout completed; retry against the current revision.')
-
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner, repo: context.repo.repo, state: 'all', per_page: 100,
-            })
-            let tracker = issues.find((item) => !item.pull_request && item.title === process.env.STATE_TITLE)
-            if (!tracker) tracker = (await github.rest.issues.create({
-              owner: context.repo.owner, repo: context.repo.repo, title: process.env.STATE_TITLE,
-              body: 'Machine-readable state for bounded OpenCode maintenance workflows. Keep open. State is stored in the hidden comment below.',
-            })).data
-            if (tracker.state !== 'open') throw new Error(`Maintenance state issue #${tracker.number} is closed.`)
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner, repo: context.repo.repo, issue_number: tracker.number, per_page: 100,
-            })
-            const stateComment = comments.find((item) => item.user?.login === 'github-actions[bot]' && item.body?.startsWith(process.env.STATE_MARKER))
-            const state = stateComment
-              ? JSON.parse(stateComment.body.slice(process.env.STATE_MARKER.length).trim())
-              : { version: 2, jobs: {}, reported: {}, changelogAudits: {} }
-            state.version = 2
-            state.changelogAudits ??= {}
-            const audit = state.changelogAudits[targetRef] ?? {}
 
             const git = (args) => execFileSync('git', args, gitOptions).trim()
             const ancestor = (candidate) => {
@@ -163,27 +136,7 @@ jobs:
               isAncestor: ancestor,
             })
 
-            if (audit.pendingPR?.number) {
-              const { data: pending } = await github.rest.pulls.get({
-                owner: context.repo.owner, repo: context.repo.repo, pull_number: audit.pendingPR.number,
-              })
-              if (pending.state === 'open') {
-                core.notice(`Changelog audit PR #${pending.number} is already open.`)
-                core.setOutput('run', 'false')
-                core.setOutput('status', 'pr-opened')
-                return
-              }
-              audit.pendingPR = null
-              state.changelogAudits[targetRef] = audit
-            }
-            if (audit.lastInspectedHead === headSha && process.env.FORCE_AUDIT !== 'true' && !manualBaselineSha) {
-              core.notice(`Changelog audit already completed for ${targetRef}@${headSha.slice(0, 10)}.`)
-              core.setOutput('run', 'false')
-              core.setOutput('status', 'clean')
-              return
-            }
-
-            let baselineSha = manualBaselineSha ?? (audit.lastInspectedHead && ancestor(audit.lastInspectedHead) ? audit.lastInspectedHead : null)
+            let baselineSha = manualBaselineSha
             const line = targetRef === 'main' ? null : targetRef.match(/^stable\/(\d+(?:\.\d+)?)\.x$/)[1]
             const flatLine = line !== null && !line.includes('.')
             if (!baselineSha) {
@@ -204,9 +157,6 @@ jobs:
 
             const laneHeading = targetRef === 'main' ? '### Next major / beta' : `### Stable ${flatLine ? 'v' : ''}${line}.x hotfixes`
             const contextData = {
-              trackerNumber: tracker.number,
-              stateCommentId: stateComment?.id ?? null,
-              state,
               targetRef,
               headSha,
               baselineSha,
@@ -214,17 +164,7 @@ jobs:
               impact: targetRef === 'main' ? 'beta' : 'hotfix',
               triggerReason: process.env.TRIGGER_REASON,
             }
-            state.lastAttempt = { category: 'changelog-audit', targetRef, baseline: baselineSha, head: headSha, at: new Date().toISOString(), status: 'started' }
-            const body = `${process.env.STATE_MARKER}\n${JSON.stringify(state)}`
-            if (contextData.stateCommentId) {
-              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: contextData.stateCommentId, body })
-            } else {
-              contextData.stateCommentId = (await github.rest.issues.createComment({
-                owner: context.repo.owner, repo: context.repo.repo, issue_number: tracker.number, body,
-              })).data.id
-            }
             fs.writeFileSync(process.env.CONTEXT_PATH, JSON.stringify(contextData), 'utf8')
-            fs.writeFileSync(process.env.STATE_PATH, JSON.stringify(contextData), 'utf8')
             core.setOutput('run', 'true')
             core.setOutput('status', 'running')
 
@@ -278,31 +218,10 @@ jobs:
         env:
           CONTEXT_PATH: ${{ runner.temp }}/opencode-changelog-audit-context.json
           RESULT_PATH: ${{ runner.temp }}/opencode-changelog-audit-result.json
-          STATE_PATH: ${{ runner.temp }}/opencode-changelog-audit-state.json
-          STATE_MARKER: ${{ env.STATE_MARKER }}
         with:
           script: |
             const fs = require('fs')
-            const prepared = JSON.parse(fs.readFileSync(process.env.CONTEXT_PATH, 'utf8'))
             const result = JSON.parse(fs.readFileSync(process.env.RESULT_PATH, 'utf8'))
-            const state = prepared.state
-            state.changelogAudits ??= {}
-            const audit = state.changelogAudits[prepared.targetRef] ?? {}
-            if (result.status === 'pr-opened') {
-              audit.pendingPR = { number: result.number, url: result.url, head: prepared.headSha, branch: result.branch }
-            } else if (result.status === 'clean') {
-              audit.lastInspectedHead = prepared.headSha
-              audit.lastSuccessAt = new Date().toISOString()
-              audit.pendingPR = null
-            }
-            state.changelogAudits[prepared.targetRef] = audit
-            state.lastAttempt = {
-              category: 'changelog-audit', targetRef: prepared.targetRef, head: prepared.headSha,
-              baseline: prepared.baselineSha, at: new Date().toISOString(), status: result.status, pullRequest: result.url ?? null,
-            }
-            const body = `${process.env.STATE_MARKER}\n${JSON.stringify(state)}`
-            await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: prepared.stateCommentId, body })
-            fs.writeFileSync(process.env.STATE_PATH, JSON.stringify(prepared), 'utf8')
             core.setOutput('status', result.status)
             const summary = result.status === 'pr-opened'
               ? `Opened [PR #${result.number}](${result.url}) for human review.`
@@ -310,21 +229,4 @@ jobs:
                 ? 'The changelog could not be verified; a later run may retry.'
                 : 'Changelog is current for this revision.'
             await core.summary.addHeading('OpenCode changelog audit').addRaw(summary).write()
-            if (result.status === 'inconclusive') core.setFailed('Changelog audit was inconclusive; state records the result for a later retry.')
-
-      - name: Record failed or inconclusive audit attempt
-        if: failure() && steps.context.outputs.run == 'true'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
-        env:
-          STATE_PATH: ${{ runner.temp }}/opencode-changelog-audit-state.json
-          STATE_MARKER: ${{ env.STATE_MARKER }}
-        with:
-          script: |
-            const fs = require('fs')
-            if (!fs.existsSync(process.env.STATE_PATH)) return
-            const prepared = JSON.parse(fs.readFileSync(process.env.STATE_PATH, 'utf8'))
-            if (prepared.state.lastAttempt?.status !== 'started') return
-            prepared.state.lastAttempt.status = 'failed'
-            prepared.state.lastAttempt.at = new Date().toISOString()
-            const body = `${process.env.STATE_MARKER}\n${JSON.stringify(prepared.state)}`
-            await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: prepared.stateCommentId, body })
+            if (result.status === 'inconclusive') core.setFailed('Changelog audit was inconclusive; a later run may retry.')
