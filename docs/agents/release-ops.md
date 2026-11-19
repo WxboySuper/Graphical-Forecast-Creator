@@ -34,7 +34,7 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 | `deploy-staging.yml` | Manual stable branch/tag/commit rehearsal. `auto` selects the highest stable branch. | `ref=auto` |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | `ref=auto` selects the highest stable branch |
 | `backport.yml` | `backport-2.x` label -> PR against `stable/2.x`; conflicts create a draft PR | PR number and optional line for manual runs |
-| `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight) | `baseline_ref` bounds range |
+| `opencode-changelog-audit.yml` | Changelog vs code audit (weekly + release preflight; stateless, baseline = last release tag or `baseline_ref`) | `baseline_ref` bounds range |
 
 Beta release notes list only the pull requests merged since the previous beta tag (`RELEASE_NOTES_MODE: prs`, previous beta found automatically or from `previous_tag`) and link to the full changelog. The stable release owns the corresponding major changelog.
 
