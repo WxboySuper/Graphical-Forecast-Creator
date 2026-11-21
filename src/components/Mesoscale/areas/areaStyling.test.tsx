@@ -8,7 +8,7 @@ import { withFlag } from '../../../testing/flags';
 import { AreaLegend } from './AreaLegend';
 import { AreasPanel } from './AreasPanel';
 import { areaStyle } from './areaStyle';
-import { haloColor, luminance } from './areaStyleModel';
+import { haloColor, luminance, rgbOf } from './areaStyleModel';
 import { useMesoscaleAreas } from './useMesoscaleAreas';
 
 const polygon = { type: 'Polygon' as const, coordinates: [[[-100, 35], [-98, 35], [-98, 37], [-100, 35]]] };
@@ -55,9 +55,9 @@ describe('map style', () => {
   it('puts a dark halo under a light outline and a light one under a dark outline', () => {
     withFlag('mesoscaleAreaStyling', true);
     const halo = (hex: string) => String(areaStyle(feature({ outlineColor: hex }), false)[0].getStroke()?.getColor());
-    expect(halo('#ffffff')).toBe(haloColor('#ffffff'));
+    expect(halo('#ffffff')).toBe(haloColor(rgbOf('#ffffff')));
     expect(halo('#ffffff')).not.toBe(halo('#111827'));
-    expect(luminance('#ffffff')).toBeGreaterThan(0.9);
+    expect(luminance(rgbOf('#ffffff'))).toBeGreaterThan(0.9);
   });
 
   it('draws the selected area one pixel heavier than its chosen width', () => {
@@ -145,7 +145,7 @@ describe('style editing', () => {
     act(() => result.current.addPolygon(polygon));
     act(() => result.current.addPolygon(polygon));
     const [first, second] = result.current.areas;
-    act(() => result.current.setAreaStyle(first.id, { outlineColor: '#d55e00', outlineWidth: 6 }));
+    act(() => result.current.setAreaStyle(first.id, { style: { outlineColor: '#d55e00', outlineWidth: 6 } }));
     const Panel = () => <AreasPanel areas={{ ...result.current, selectedId: second.id }} />;
     render(<Panel />, { wrapper });
     fireEvent.click(screen.getByText('Appearance'));

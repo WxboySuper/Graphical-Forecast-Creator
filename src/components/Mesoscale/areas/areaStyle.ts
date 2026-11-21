@@ -9,9 +9,12 @@ import { Fill, Stroke, Style, Text } from 'ol/style';
 import type { MesoscaleAreaStyle } from '../../../store/mesoscaleSlice';
 import { hazardHue } from './areaModel';
 import {
-  DEFAULT_HATCH_OPACITY, DEFAULT_OUTLINE_WIDTH, activeAreaStyle, dashArray, fullAreaStyle, haloColor,
-  hasCustomFill, usesRoundCap, withAlpha,
+  DEFAULT_HATCH_OPACITY, DEFAULT_OUTLINE_WIDTH, activeAreaStyle, dashPattern, fullAreaStyle, haloColor,
+  hasCustomFill, rgbOf, withAlpha, type AreaLookSource,
 } from './areaStyleModel';
+
+/** Everything the map style needs about one area, resolved once per draw. */
+interface AreaLook extends AreaLookSource { hue: number; selected: boolean }
 
 const HATCH_SIZE = 12;
 const HATCH_CACHE_LIMIT = 120;
@@ -50,7 +53,7 @@ const hatchPattern = ({ background, line, lineWidth }: HatchPaint): CanvasPatter
 };
 
 /** The hazard hatch, drawn exactly as it always has been. */
-const hazardFill = (hue: number, selected: boolean): string | CanvasPattern =>
+const hazardFill = ({ hue, selected }: AreaLook): string | CanvasPattern =>
   hatchPattern({
     background: `hsl(${hue} 80% 50% / ${selected ? 0.22 : 0.1})`,
     line: `hsl(${hue} 85% ${selected ? 34 : 40}% / ${selected ? 0.85 : 0.6})`,
@@ -58,29 +61,26 @@ const hazardFill = (hue: number, selected: boolean): string | CanvasPattern =>
   }) ?? `hsl(${hue} 80% 50% / ${selected ? 0.28 : 0.16})`;
 
 /** The fill for a customized area, or null for outline only. */
-const customFill = (hazard: string, style: MesoscaleAreaStyle, selected: boolean): string | CanvasPattern | null => {
-  const full = fullAreaStyle(hazard, style);
+const customFill = (look: AreaLook): string | CanvasPattern | null => {
+  const full = fullAreaStyle(look);
+  const tint = (alpha: number): string => withAlpha({ hex: full.fillColor, alpha });
   if (full.fillPattern === 'none') return null;
-  if (full.fillPattern === 'solid') return withAlpha(full.fillColor, full.fillOpacity);
-  const opacity = style.fillOpacity ?? DEFAULT_HATCH_OPACITY;
-  return hatchPattern({
-    background: withAlpha(full.fillColor, opacity * 0.25),
-    line: withAlpha(full.fillColor, opacity),
-    lineWidth: selected ? 2 : 1.5,
-  }) ?? withAlpha(full.fillColor, opacity * 0.3);
+  if (full.fillPattern === 'solid') return tint(full.fillOpacity);
+  const opacity = look.style?.fillOpacity ?? DEFAULT_HATCH_OPACITY;
+  return hatchPattern({ background: tint(opacity * 0.25), line: tint(opacity), lineWidth: look.selected ? 2 : 1.5 }) ?? tint(opacity * 0.3);
 };
 
-const pad = (value: number): string => String(value).padStart(2, '0');
-const hourZ = (iso: string): string => `${pad(new Date(iso).getUTCHours())}Z`;
+const hourZ = (date: Date): string => `${String(date.getUTCHours()).padStart(2, '0')}Z`;
 
 /** "13Z to 16Z", the label's second line. */
-export const windowLabel = (validStart: string, validEnd: string): string => `${hourZ(validStart)} to ${hourZ(validEnd)}`;
+export const windowLabel = ({ validStart, validEnd }: { validStart: string; validEnd: string }): string =>
+  `${hourZ(new Date(validStart))} to ${hourZ(new Date(validEnd))}`;
 
 const labelText = (feature: Feature<Geometry>): string => {
   const title = String(feature.get('title') ?? '');
   const start = feature.get('validStart') as string | undefined;
   const end = feature.get('validEnd') as string | undefined;
-  return start && end ? `${title}\n${windowLabel(start, end)}` : title;
+  return start && end ? `${title}\n${windowLabel({ validStart: start, validEnd: end })}` : title;
 };
 
 const labelStyle = (feature: Feature<Geometry>): Text => new Text({
@@ -92,24 +92,31 @@ const labelStyle = (feature: Feature<Geometry>): Text => new Text({
 });
 
 /** The outline: customized fields win, the rest follows the hazard and selection as before. */
-const outlineStroke = (hue: number, style: MesoscaleAreaStyle | undefined, selected: boolean): Stroke => {
+const outlineStroke = ({ hue, style, selected }: AreaLook): Stroke => {
   const width = (style?.outlineWidth ?? DEFAULT_OUTLINE_WIDTH) + (selected ? 1 : 0);
   const color = style?.outlineColor ?? `hsl(${hue} 85% ${selected ? 34 : 40}%)`;
   const dash = style?.outlineDash;
   if (dash === undefined) return new Stroke({ color, width, lineDash: selected ? undefined : [10, 5] });
-  return new Stroke({ color, width, lineDash: dashArray(dash, width), lineCap: usesRoundCap(dash) ? 'round' : 'butt' });
+  const { lineDash, round } = dashPattern({ dash, width });
+  return new Stroke({ color, width, lineDash, lineCap: round ? 'round' : 'butt' });
+};
+
+const haloStroke = (look: AreaLook, outline: Stroke): Stroke => {
+  const customColor = look.style?.outlineColor;
+  return new Stroke({
+    color: customColor ? haloColor(rgbOf(customColor)) : 'rgba(255, 255, 255, 0.9)',
+    width: (outline.getWidth() ?? 0) + (look.selected ? 3.5 : 2.5),
+  });
 };
 
 export const areaStyle = (feature: Feature<Geometry>, selected: boolean): Style[] => {
   const hazard = String(feature.get('hazard') ?? '');
-  const hue = hazardHue(hazard);
   const style = activeAreaStyle(feature.get('areaStyle') as MesoscaleAreaStyle | undefined);
-  const fill = hasCustomFill(style) ? customFill(hazard, style as MesoscaleAreaStyle, selected) : hazardFill(hue, selected);
-  const stroke = outlineStroke(hue, style, selected);
-  const haloWidth = (stroke.getWidth() ?? 0) + (selected ? 3.5 : 2.5);
-  const haloPaint = style?.outlineColor ? haloColor(style.outlineColor) : 'rgba(255, 255, 255, 0.9)';
+  const look: AreaLook = { hazard, style, hue: hazardHue(hazard), selected };
+  const fill = hasCustomFill(style) ? customFill(look) : hazardFill(look);
+  const stroke = outlineStroke(look);
   return [
-    new Style({ stroke: new Stroke({ color: haloPaint, width: haloWidth }) }),
+    new Style({ stroke: haloStroke(look, stroke) }),
     new Style({ stroke, fill: fill ? new Fill({ color: fill }) : undefined, text: labelStyle(feature) }),
   ];
 };

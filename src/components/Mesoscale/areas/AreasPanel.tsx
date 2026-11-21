@@ -59,7 +59,7 @@ export const AreasPanel: React.FC<{ areas: MesoscaleAreasController }> = ({ area
         </ul>
       )}
       <AreaNotices areas={areas} />
-      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} onGeometry={geometry => areas.setGeometry(selected.id, geometry)} onVertexChange={(geometry, coalesce) => areas.setGeometry(selected.id, geometry, coalesce)} onActiveVertex={areas.setActiveVertex} others={areas.areas.filter(area => area.id !== selected.id)} onStyle={(style, key) => areas.setAreaStyle(selected.id, style, key)} /> : null}
+      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} onGeometry={geometry => areas.setGeometry(selected.id, geometry)} onVertexChange={(geometry, coalesce) => areas.setGeometry(selected.id, geometry, coalesce)} onActiveVertex={areas.setActiveVertex} others={areas.areas.filter(area => area.id !== selected.id)} onStyle={(style, key) => areas.setAreaStyle(selected.id, { style, coalesceKey: key })} /> : null}
     </section>
   );
 };

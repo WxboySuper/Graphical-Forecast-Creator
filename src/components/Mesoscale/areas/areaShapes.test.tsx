@@ -84,7 +84,7 @@ describe('hazard colors', () => {
 
 describe('area presentation', () => {
   it('labels the valid window in UTC hours', () => {
-    expect(windowLabel('2026-11-09T13:00:00.000Z', '2026-11-09T16:00:00.000Z')).toBe('13Z to 16Z');
+    expect(windowLabel({ validStart: '2026-11-09T13:00:00.000Z', validEnd: '2026-11-09T16:00:00.000Z' })).toBe('13Z to 16Z');
   });
 
   it('lists each hazard once and summarizes overflow', () => {

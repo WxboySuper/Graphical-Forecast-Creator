@@ -21,19 +21,24 @@ const isFiniteNumber = (value: unknown): value is number => typeof value === 'nu
 const inRange = (value: unknown, min: number, max: number): boolean => isFiniteNumber(value) && value >= min && value <= max;
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
+const hasOnlyStyleKeys = (value: Record<string, unknown>): boolean => Object.keys(value).every((key) => STYLE_KEYS.includes(key));
+const isOptionalEnum = (value: unknown, allowed: readonly string[]): boolean => value === undefined || allowed.includes(value as string);
+const isOptionalColor = (value: unknown): boolean => value === undefined || isHexColor(value);
+const isOptionalRange = (value: unknown, range: [number, number]): boolean => value === undefined || inRange(value, range[0], range[1]);
+
+/** The per-field rules, so each field has one small check. */
+const STYLE_FIELD_RULES: Array<(style: Record<string, unknown>) => boolean> = [
+  (style) => isOptionalEnum(style.fillPattern, FILL_PATTERNS),
+  (style) => isOptionalEnum(style.outlineDash, OUTLINE_DASHES),
+  (style) => isOptionalColor(style.fillColor),
+  (style) => isOptionalColor(style.outlineColor),
+  (style) => isOptionalRange(style.fillOpacity, [MIN_FILL_OPACITY, MAX_FILL_OPACITY]),
+  (style) => isOptionalRange(style.outlineWidth, [MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH]),
+];
+
 /** Strict check: only known fields, each within its limits. */
-export const isAreaStyle = (value: unknown): value is MesoscaleAreaStyle => {
-  if (!isRecord(value)) return false;
-  if (!Object.keys(value).every((key) => STYLE_KEYS.includes(key))) return false;
-  return [
-    value.fillPattern === undefined || FILL_PATTERNS.includes(value.fillPattern as MesoscaleFillPattern),
-    value.outlineDash === undefined || OUTLINE_DASHES.includes(value.outlineDash as MesoscaleOutlineDash),
-    value.fillColor === undefined || isHexColor(value.fillColor),
-    value.outlineColor === undefined || isHexColor(value.outlineColor),
-    value.fillOpacity === undefined || inRange(value.fillOpacity, MIN_FILL_OPACITY, MAX_FILL_OPACITY),
-    value.outlineWidth === undefined || inRange(value.outlineWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH),
-  ].every(Boolean);
-};
+export const isAreaStyle = (value: unknown): value is MesoscaleAreaStyle =>
+  isRecord(value) && hasOnlyStyleKeys(value) && STYLE_FIELD_RULES.every((rule) => rule(value));
 
 const pickEnum = <T extends string>(value: unknown, allowed: readonly T[]): T | undefined =>
   allowed.includes(value as T) ? (value as T) : undefined;

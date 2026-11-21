@@ -10,7 +10,7 @@ import {
   FILL_PATTERNS, MAX_FILL_OPACITY, MAX_OUTLINE_WIDTH, MIN_FILL_OPACITY, MIN_OUTLINE_WIDTH,
 } from '../../../utils/mesoscaleAreaStyleValidation';
 import { AreaSwatch } from './AreaSwatch';
-import { dashArray, fullAreaStyle, isStyled } from './areaStyleModel';
+import { dashPattern, fullAreaStyle, isStyled } from './areaStyleModel';
 
 interface Props {
   area: MesoscaleArea;
@@ -99,11 +99,14 @@ const Slider: React.FC<SliderProps> = ({ label, value, min, max, step, format, o
   );
 };
 
-const DashPreview: React.FC<{ dash: MesoscaleOutlineDash }> = ({ dash }) => (
-  <svg width="30" height="10" viewBox="0 0 30 10" aria-hidden="true" focusable="false">
-    <line x1="2" y1="5" x2="28" y2="5" stroke="currentColor" strokeWidth="2.2" strokeLinecap={dash === 'dotted' || dash === 'dash-dot' ? 'round' : 'butt'} strokeDasharray={dashArray(dash, 2.2, 0.8)?.join(' ')} />
-  </svg>
-);
+const DashPreview: React.FC<{ dash: MesoscaleOutlineDash }> = ({ dash }) => {
+  const { lineDash, round } = dashPattern({ dash, width: 2.2, scale: 0.8 });
+  return (
+    <svg width="30" height="10" viewBox="0 0 30 10" aria-hidden="true" focusable="false">
+      <line x1="2" y1="5" x2="28" y2="5" stroke="currentColor" strokeWidth="2.2" strokeLinecap={round ? 'round' : 'butt'} strokeDasharray={lineDash?.join(' ')} />
+    </svg>
+  );
+};
 
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
 const pixels = (value: number): string => `${value} px`;
@@ -132,12 +135,12 @@ const OutlineControls: React.FC<{ full: ReturnType<typeof fullAreaStyle>; apply:
 );
 
 export const AreaStyleControls: React.FC<Props> = ({ area, others, onStyle }) => {
-  const full = fullAreaStyle(area.hazard, area.style);
+  const full = fullAreaStyle(area);
   // Changing one field keeps the rest of the custom style; other fields stay on the hazard default.
   const apply = (changes: MesoscaleAreaStyle, key?: string): void => onStyle({ ...area.style, ...changes }, key);
   const copyFrom = (id: string): void => {
     const source = others.find(other => other.id === id);
-    if (source) onStyle(fullAreaStyle(source.hazard, source.style));
+    if (source) onStyle(fullAreaStyle(source));
   };
   return (
     <details className="mesoscale-style">

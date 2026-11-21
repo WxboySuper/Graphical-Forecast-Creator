@@ -10,7 +10,7 @@ const MAX_ENTRIES = 5;
 
 interface Entry { key: string; hazard: string; label: string; area: MesoscaleArea }
 
-const lookKey = (area: MesoscaleArea): string => JSON.stringify(fullAreaStyle(area.hazard, activeAreaStyle(area.style)));
+const lookKey = (area: MesoscaleArea): string => JSON.stringify(fullAreaStyle({ hazard: area.hazard, style: activeAreaStyle(area.style) }));
 
 /**
  * One entry per distinct hazard and look. When a hazard is drawn with more than one look, each

@@ -20,10 +20,18 @@ export const hasCustomFill = (style: MesoscaleAreaStyle | undefined): boolean =>
 
 export const isStyled = (style: MesoscaleAreaStyle | undefined): boolean => Boolean(style && Object.keys(style).length > 0);
 
-const hexByte = (value: number): string => Math.round(value * 255).toString(16).padStart(2, '0');
+export interface Hsl { hue: number; saturation: number; lightness: number }
+export interface Rgb { r: number; g: number; b: number }
+/** A `#rrggbb` color with an opacity, the one way colors are turned into CSS `rgba()`. */
+export interface Tint { hex: string; alpha: number }
+/** What the look of an area is derived from: its hazard (default colors) and its custom style. */
+export interface AreaLookSource { hazard: string; style?: MesoscaleAreaStyle }
+export interface DashSpec { dash: MesoscaleOutlineDash; width: number; scale?: number }
+
+const toHexByte = (channel: number): string => Math.round(channel * 255).toString(16).padStart(2, '0');
 
 /** `#rrggbb` for an HSL color (hue in degrees, saturation and lightness 0 to 100). */
-export const hslToHex = (hue: number, saturation: number, lightness: number): string => {
+export const hslToHex = ({ hue, saturation, lightness }: Hsl): string => {
   const s = saturation / 100;
   const l = lightness / 100;
   const a = s * Math.min(l, 1 - l);
@@ -31,28 +39,31 @@ export const hslToHex = (hue: number, saturation: number, lightness: number): st
     const k = (n + hue / 30) % 12;
     return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
   };
-  return `#${hexByte(channel(0))}${hexByte(channel(8))}${hexByte(channel(4))}`;
+  return `#${toHexByte(channel(0))}${toHexByte(channel(8))}${toHexByte(channel(4))}`;
 };
 
-const rgbOf = (hex: string): [number, number, number] => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+export const rgbOf = (hex: string): Rgb => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  return { r, g, b };
+};
 
-export const withAlpha = (hex: string, alpha: number): string => {
-  const [r, g, b] = rgbOf(hex);
+export const withAlpha = ({ hex, alpha }: Tint): string => {
+  const { r, g, b } = rgbOf(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-/** WCAG relative luminance, 0 (black) to 1 (white). */
-export const luminance = (hex: string): number => {
-  const [r, g, b] = rgbOf(hex).map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+const linearChannel = (value: number): number => {
+  const c = value / 255;
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 };
 
+/** WCAG relative luminance, 0 (black) to 1 (white). */
+export const luminance = ({ r, g, b }: Rgb): number =>
+  0.2126 * linearChannel(r) + 0.7152 * linearChannel(g) + 0.0722 * linearChannel(b);
+
 /** A halo that separates an outline from the map: light under dark outlines, dark under light ones. */
-export const haloColor = (outlineHex: string): string =>
-  (luminance(outlineHex) > 0.5 ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)');
+export const haloColor = (outline: Rgb): string =>
+  (luminance(outline) > 0.5 ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)');
 
 export interface FullAreaStyle {
   fillPattern: MesoscaleFillPattern;
@@ -64,14 +75,15 @@ export interface FullAreaStyle {
 }
 
 /** Hazard-derived colors in hex, as the controls and the legend show them. */
-export const hazardColors = (hazard: string): { fill: string; outline: string } => {
+export const hazardColors = ({ hazard }: AreaLookSource): { fill: string; outline: string } => {
   const hue = hazardHue(hazard);
-  return { fill: hslToHex(hue, 80, 50), outline: hslToHex(hue, 85, 40) };
+  return { fill: hslToHex({ hue, saturation: 80, lightness: 50 }), outline: hslToHex({ hue, saturation: 85, lightness: 40 }) };
 };
 
 /** Every field filled in: the customized value, else what the hazard default looks like. */
-export const fullAreaStyle = (hazard: string, style: MesoscaleAreaStyle | undefined): FullAreaStyle => {
-  const colors = hazardColors(hazard);
+export const fullAreaStyle = (look: AreaLookSource): FullAreaStyle => {
+  const { style } = look;
+  const colors = hazardColors(look);
   const fillPattern = style?.fillPattern ?? 'hatch';
   return {
     fillPattern,
@@ -83,8 +95,8 @@ export const fullAreaStyle = (hazard: string, style: MesoscaleAreaStyle | undefi
   };
 };
 
-/** Dash lengths in pixels for a line width; dots and dash-dots use a round cap, so dots are short. */
-export const dashArray = (dash: MesoscaleOutlineDash, width: number, scale = 1): number[] | undefined => {
+/** The dash array and line cap for an outline; dots and dash-dots use a round cap, so their dots are short. */
+export const dashPattern = ({ dash, width, scale = 1 }: DashSpec): { lineDash: number[] | undefined; round: boolean } => {
   const w = Math.max(width, 1.5);
   const sizes: Record<MesoscaleOutlineDash, number[] | undefined> = {
     solid: undefined,
@@ -92,7 +104,5 @@ export const dashArray = (dash: MesoscaleOutlineDash, width: number, scale = 1):
     dotted: [0.1, w * 2 + 2],
     'dash-dot': [w * 3 + 4, w * 1.4 + 3, 0.1, w * 1.4 + 3],
   };
-  return sizes[dash]?.map(v => v * scale);
+  return { lineDash: sizes[dash]?.map(v => v * scale), round: dash === 'dotted' || dash === 'dash-dot' };
 };
-
-export const usesRoundCap = (dash: MesoscaleOutlineDash): boolean => dash === 'dotted' || dash === 'dash-dot';
