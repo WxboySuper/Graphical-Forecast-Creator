@@ -1117,3 +1117,255 @@
 .mesoscale-context__note--warn {
   color: var(--warning-text);
 }
+
+/* Area appearance (flag: mesoscaleAreaStyling) */
+.mesoscale-area__picture,
+.mesoscale-area-legend__picture {
+  flex: 0 0 auto;
+}
+
+.mesoscale-style {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+}
+
+.mesoscale-style__summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.mesoscale-style__summary::-webkit-details-marker {
+  display: none;
+}
+
+.mesoscale-style__summary::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border-right: 2px solid var(--text-tertiary);
+  border-bottom: 2px solid var(--text-tertiary);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.mesoscale-style[open] > .mesoscale-style__summary::after {
+  transform: rotate(-135deg);
+}
+
+.mesoscale-style__title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.mesoscale-style__state {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.mesoscale-style__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 12px 14px;
+}
+
+.mesoscale-style__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mesoscale-style__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mesoscale-style__label output {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.mesoscale-style__segments .mesoscale-segment {
+  min-width: 0;
+  padding: 4px 2px;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.mesoscale-style__dash-name {
+  font-size: 11px;
+}
+
+.mesoscale-colors {
+  display: grid;
+  grid-template-columns: repeat(5, 30px);
+  justify-content: space-between;
+  gap: 10px 8px;
+}
+
+.mesoscale-color {
+  position: relative;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  /* !important: the global dark-mode button rule would otherwise paint every swatch the same gray. */
+  background: var(--swatch) !important;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.25);
+}
+
+.mesoscale-color svg {
+  width: 15px;
+  height: 15px;
+  color: #fff;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+}
+
+.mesoscale-color[aria-pressed='true'],
+.mesoscale-color.is-active {
+  border-color: var(--text-primary);
+}
+
+.mesoscale-color--custom {
+  background: conic-gradient(from 0deg, #d55e00, #f0e442, #009e73, #56b4e9, #cc79a7, #d55e00) !important;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+.mesoscale-color--custom.is-active {
+  background: var(--swatch) !important;
+}
+
+.mesoscale-color--custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mesoscale-color--custom:focus-within,
+.mesoscale-color:focus-visible,
+.mesoscale-style__summary:focus-visible,
+.mesoscale-style__range:focus-visible,
+.mesoscale-style__reset:focus-visible,
+.mesoscale-style__copy select:focus-visible {
+  outline: 2px solid rgb(37, 99, 235);
+  outline-offset: 2px;
+}
+
+.dark-mode .mesoscale-color--custom:focus-within,
+.dark-mode .mesoscale-color:focus-visible,
+.dark-mode .mesoscale-style__summary:focus-visible,
+.dark-mode .mesoscale-style__range:focus-visible,
+.dark-mode .mesoscale-style__reset:focus-visible,
+.dark-mode .mesoscale-style__copy select:focus-visible {
+  outline-color: rgb(96, 165, 250);
+}
+
+.mesoscale-style__range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.mesoscale-style__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.mesoscale-style__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mesoscale-style__copy select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 500;
+}
+
+.mesoscale-style__reset {
+  display: inline-flex;
+  align-self: flex-start;
+  min-height: 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mesoscale-style__reset svg {
+  width: 15px;
+  height: 15px;
+}
+
+.mesoscale-style__reset:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+}
+
+.mesoscale-style__reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mesoscale-style__summary::after {
+    transition: none;
+  }
+}
+
+/* The global dark-mode button rule flattens the segmented controls, so the chosen option needs its own look there. */
+.dark-mode .mesoscale-style__segments .mesoscale-segment {
+  background-color: transparent !important;
+}
+
+.dark-mode .mesoscale-style__segments .mesoscale-segment[aria-pressed='true'] {
+  background-color: rgb(37, 99, 235) !important;
+  border-color: rgb(147, 197, 253);
+  color: #fff;
+}
+
+.dark-mode .mesoscale-style__reset {
+  background-color: var(--bg-primary);
+}

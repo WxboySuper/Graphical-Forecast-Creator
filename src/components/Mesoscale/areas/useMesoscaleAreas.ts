@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { Polygon } from 'geojson';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
-import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
+import type { MesoscaleArea, MesoscaleAreaStyle } from '../../../store/mesoscaleSlice';
 import { createArea, newAreaId, nextAreaTitle } from './areaModel';
 import type { AreaTool } from './MesoscaleAreaLayer';
 import { useAreaHistory, type AreaHistory } from './useAreaHistory';
@@ -14,6 +14,11 @@ export interface MesoscaleAreasController extends AreaHistory {
   atLimit: boolean;
   addPolygon: (polygon: Polygon) => void;
   updateArea: (id: string, changes: Partial<MesoscaleArea>, coalesceKey?: string) => void;
+  /**
+   * Sets or (with undefined) clears an area's custom style as one undo step. A `coalesceKey` merges
+   * a run of changes to one control, such as a slider drag, into that single step.
+   */
+  setAreaStyle: (id: string, style: MesoscaleAreaStyle | undefined, coalesceKey?: string) => void;
   /** `coalesce` merges a run of vertex nudges into one undo step. */
   setGeometry: (id: string, polygon: Polygon, coalesce?: boolean) => void;
   /** The vertex being edited from the keyboard, highlighted on the map. */
@@ -55,11 +60,20 @@ export const useMesoscaleAreas = (): MesoscaleAreasController => {
     [updateArea],
   );
 
+  const setAreaStyle = useCallback((id: string, style: MesoscaleAreaStyle | undefined, coalesceKey?: string) => {
+    const updatedAt = new Date().toISOString();
+    commit((current) => current.map((area) => {
+      if (area.id !== id) return area;
+      const { style: _previous, ...rest } = area;
+      return style ? { ...rest, style, updatedAt } : { ...rest, updatedAt };
+    }), coalesceKey ? `${id}:style:${coalesceKey}` : undefined);
+  }, [commit]);
+
   const removeArea = useCallback((id: string) => {
     commit((current) => current.filter(area => area.id !== id));
     setSelectedId(current => (current === id ? null : current));
   }, [commit]);
 
   const select = useCallback((id: string | null) => setSelectedId(id), []);
-  return { ...history, tool, setTool, selectedId, select, atLimit, addPolygon, updateArea, setGeometry, activeVertex, setActiveVertex, removeArea };
+  return { ...history, tool, setTool, selectedId, select, atLimit, addPolygon, updateArea, setAreaStyle, setGeometry, activeVertex, setActiveVertex, removeArea };
 };

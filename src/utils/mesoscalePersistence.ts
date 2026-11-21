@@ -4,6 +4,7 @@ import { createInitialMesoscaleState } from '../store/mesoscaleSlice';
 import { getScopedStorageKey, getStorageScope } from './storageScope';
 import { getMesoscaleValidationError } from './mesoscaleValidation';
 import { isRecord } from './forecastWorkspaceEnvelope';
+import { sanitizeSavedAreaStyles } from './mesoscaleAreaStyleValidation';
 
 export const MESOSCALE_SAVE_SCHEMA_VERSION = 1 as const;
 export interface MesoscaleSaveEnvelope {
@@ -33,7 +34,8 @@ export const createMesoscaleSave = (product: MesoscaleState): MesoscaleSaveEnvel
 
 export const classifyMesoscaleSave = (value: unknown): MesoscaleClassification => {
   if (!isRecord(value)) return { ok: false, reason: 'Mesoscale save must be an object.' };
-  const record = value;
+  // Loaded styles are clamped or dropped rather than failing the whole save.
+  const record = { ...value, ...('product' in value ? { product: sanitizeSavedAreaStyles(value.product) } : {}) };
   const error = getEnvelopeError(record);
   return error ? { ok: false, reason: error } : { ok: true, payload: record as unknown as MesoscaleSaveEnvelope };
 };

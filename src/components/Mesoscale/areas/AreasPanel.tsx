@@ -1,6 +1,8 @@
 /** Areas tab: the list of drawn areas with an editor for the selected one. */
 import React from 'react';
+import { flag } from '../../../config/flags';
 import { hazardHue } from './areaModel';
+import { AreaSwatch } from './AreaSwatch';
 import { AreaEditor } from './AreaEditor';
 import { MAX_MESOSCALE_AREAS } from '../../../utils/mesoscaleValidationLimits';
 import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
@@ -25,7 +27,9 @@ const EmptyAreas: React.FC<{ onDraw: () => void }> = ({ onDraw }) => (
 const AreaRow: React.FC<{ area: MesoscaleArea; selected: boolean; onSelect: () => void }> = ({ area, selected, onSelect }) => (
   <li>
     <button type="button" className="mesoscale-area" aria-pressed={selected} onClick={onSelect}>
-      <span className="mesoscale-area__swatch" style={{ background: `hsl(${hazardHue(area.hazard)} 80% 45%)` }} aria-hidden="true" />
+      {flag('mesoscaleAreaStyling')
+        ? <AreaSwatch className="mesoscale-area__picture" hazard={area.hazard} style={area.style} />
+        : <span className="mesoscale-area__swatch" style={{ background: `hsl(${hazardHue(area.hazard)} 80% 45%)` }} aria-hidden="true" />}
       <span className="mesoscale-area__text">
         <span className="mesoscale-area__title">{area.title}</span>
         <span className="mesoscale-area__meta">{area.hazard} · {short(area.validStart)} to {short(area.validEnd)}</span>
@@ -55,7 +59,7 @@ export const AreasPanel: React.FC<{ areas: MesoscaleAreasController }> = ({ area
         </ul>
       )}
       <AreaNotices areas={areas} />
-      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} onGeometry={geometry => areas.setGeometry(selected.id, geometry)} onVertexChange={(geometry, coalesce) => areas.setGeometry(selected.id, geometry, coalesce)} onActiveVertex={areas.setActiveVertex} /> : null}
+      {selected ? <AreaEditor area={selected} onChange={changes => areas.updateArea(selected.id, changes)} onDelete={() => areas.removeArea(selected.id)} onGeometry={geometry => areas.setGeometry(selected.id, geometry)} onVertexChange={(geometry, coalesce) => areas.setGeometry(selected.id, geometry, coalesce)} onActiveVertex={areas.setActiveVertex} others={areas.areas.filter(area => area.id !== selected.id)} onStyle={(style, key) => areas.setAreaStyle(selected.id, style, key)} /> : null}
     </section>
   );
 };

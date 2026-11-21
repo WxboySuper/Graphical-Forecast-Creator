@@ -13,7 +13,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
-<!-- Next-major work goes here. -->
+- **Mesoscale area styling:** Choose how each Mesoscale area looks. Pick the fill (none, hatch, or solid), its color and strength, and the outline color, width, and style (solid, dashed, dotted, or dash-dot) from colorblind-friendly swatches or any custom color. The legend and area list follow your choices, and **Reset to hazard default** returns an area to the color its hazard gives it. Areas you do not change look exactly as before.
 
 ### Stable v2.x hotfixes
 

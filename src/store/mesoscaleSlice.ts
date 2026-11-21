@@ -1,6 +1,26 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { Polygon } from 'geojson';
 
+export type MesoscaleFillPattern = 'none' | 'hatch' | 'solid';
+export type MesoscaleOutlineDash = 'solid' | 'dashed' | 'dotted' | 'dash-dot';
+
+/**
+ * Forecaster-chosen look of one area. Every field is optional: a missing field keeps the look
+ * derived from the hazard, so an area with no `style` renders exactly as before.
+ */
+export interface MesoscaleAreaStyle {
+  fillPattern?: MesoscaleFillPattern;
+  /** `#rrggbb` */
+  fillColor?: string;
+  /** Fill strength, 0.05 to 1. */
+  fillOpacity?: number;
+  /** `#rrggbb` */
+  outlineColor?: string;
+  /** Pixels, 1 to 8. */
+  outlineWidth?: number;
+  outlineDash?: MesoscaleOutlineDash;
+}
+
 export interface MesoscaleArea {
   id: string;
   title: string;
@@ -9,6 +29,7 @@ export interface MesoscaleArea {
   validStart: string;
   validEnd: string;
   geometry: Polygon;
+  style?: MesoscaleAreaStyle;
   createdAt: string;
   updatedAt: string;
 }
