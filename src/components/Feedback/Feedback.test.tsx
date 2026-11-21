@@ -9,6 +9,7 @@ import FeedbackDialog from './FeedbackDialog';
 import { BetaFeedbackBanner, BetaFeedbackButton } from './BetaFeedbackChrome';
 import { FeedbackProvider } from './FeedbackContext';
 import { FeedbackSubmitError } from '../../lib/feedbackClient';
+import { isFeedbackEnabled } from '../../config/feedback';
 
 const mockUseAuth = jest.fn();
 jest.mock('../../auth/AuthProvider', () => ({ useAuth: () => mockUseAuth() }));
@@ -181,5 +182,34 @@ describe('beta chrome', () => {
     expect(sessionStorage.getItem('gfc-beta-banner-dismissed')).toBe('1');
     expect(document.documentElement.style.getPropertyValue('--beta-banner-height')).toBe('0px');
     expect(screen.getByRole('button', { name: 'Send beta feedback' })).toBeInTheDocument();
+  });
+});
+
+describe('isFeedbackEnabled', () => {
+  const scope = globalThis as typeof globalThis & { __GFC_FEEDBACK_API_URL__?: string };
+
+  test('follows the feedback flag per build target when a service is configured', () => {
+    const original = scope.__GFC_FEEDBACK_API_URL__;
+    scope.__GFC_FEEDBACK_API_URL__ = 'https://feedback.example.test';
+    try {
+      const enabled = (['local', 'beta', 'staging', 'production'] as const).filter((target) => {
+        globals.__GFC_BUILD_TARGET__ = target;
+        return isFeedbackEnabled();
+      });
+      expect(enabled).toEqual(['beta']);
+    } finally {
+      scope.__GFC_FEEDBACK_API_URL__ = original;
+    }
+  });
+
+  test('stays off on beta when no feedback service is configured', () => {
+    const original = scope.__GFC_FEEDBACK_API_URL__;
+    scope.__GFC_FEEDBACK_API_URL__ = '';
+    globals.__GFC_BUILD_TARGET__ = 'beta';
+    try {
+      expect(isFeedbackEnabled()).toBe(false);
+    } finally {
+      scope.__GFC_FEEDBACK_API_URL__ = original;
+    }
   });
 });

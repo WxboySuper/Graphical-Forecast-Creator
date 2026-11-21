@@ -21,6 +21,11 @@ on:
         required: false
         default: ''
         type: string
+      baseline_ref:
+        description: 'Full commit SHA or version tag the final changelog audit starts from. It must be an ancestor of the release line. The default is the last clean audit of stable/2.x; the first v2 release has no earlier v2.x tag to fall back to.'
+        required: false
+        default: '237df100ff54bb373b730e9bac084b8830247310'
+        type: string
 
 permissions:
   contents: read
@@ -74,6 +79,7 @@ jobs:
     with:
       target_ref: ${{ needs.resolve_line.outputs.ref }}
       force: true
+      baseline_ref: ${{ inputs.baseline_ref }}
       trigger_reason: stable-pre-release
     secrets:
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
