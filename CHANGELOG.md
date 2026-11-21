@@ -19,6 +19,9 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Monitor alerts:** Monitor again loads active weather alerts instead of failing the refresh.
+- **Mesoscale session:** Opening the Mesoscale page restores the saved areas and discussion and keeps saving edits on this device.
+
 <!-- Production fixes for the stable v2.x line go here. -->
 
 ## v2.0.0
