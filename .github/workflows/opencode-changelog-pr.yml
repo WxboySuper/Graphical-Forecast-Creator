@@ -94,7 +94,7 @@ jobs:
               core.setOutput('run', 'false')
               return
             }
-            if (pull.head.ref === 'main' || pull.head.ref === 'beta' || /^stable\/\d+\.\d+\.x$/.test(pull.head.ref)) {
+            if (pull.head.ref === 'main' || pull.head.ref === 'beta' || /^stable\/\d+(?:\.\d+)?\.x$/.test(pull.head.ref)) {
               core.notice('OpenCode changelog publishing will not write to a protected source branch.')
               core.setOutput('run', 'false')
               return
@@ -112,7 +112,7 @@ jobs:
               core.setOutput('run', 'false')
               return
             }
-            if (!/^(main|stable\/\d+\.\d+\.x)$/.test(pull.base.ref)) {
+            if (!/^(main|stable\/\d+(?:\.\d+)?\.x)$/.test(pull.base.ref)) {
               core.notice(`No automatic changelog lane is configured for ${pull.base.ref}.`)
               core.setOutput('run', 'false')
               return

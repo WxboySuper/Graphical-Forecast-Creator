@@ -11,8 +11,8 @@ const { GITHUB_REPOSITORY: repository, PR_NUMBER: numberText, BASE_REF: baseRef,
 const prNumber = Number(numberText);
 if (!Number.isInteger(prNumber) || prNumber < 1 || !/^[a-f0-9]{40}$/i.test(expectedSha)) throw new Error('PR number or expected head SHA is invalid.');
 if (!/^[A-Za-z0-9._/-]+$/.test(headRef) || headRef.includes('..') || headRef.includes('//') || headRef.startsWith('/') || headRef.endsWith('/') || headRef.endsWith('.lock')) throw new Error('PR head branch name is invalid.');
-if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+\.\d+\.x$/.test(headRef)) throw new Error('Refusing to write a protected source branch.');
-if (!/^(main|stable\/\d+\.\d+\.x)$/.test(baseRef)) throw new Error('Changelog generation only supports main and stable release branches.');
+if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+(?:\.\d+)?\.x$/.test(headRef)) throw new Error('Refusing to write a protected source branch.');
+if (!/^(main|stable\/\d+(?:\.\d+)?\.x)$/.test(baseRef)) throw new Error('Changelog generation only supports main and stable release branches.');
 
 const apiEnv = { ...process.env, GH_TOKEN: token };
 const pull = JSON.parse(execFileSync('gh', ['api', `repos/${repository}/pulls/${prNumber}`], { encoding: 'utf8', env: apiEnv }));
@@ -34,7 +34,7 @@ if (result.status === 'no-change') {
 }
 
 const fetchRef = (ref) => {
-  if (!/^(main|stable\/\d+\.\d+\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');
+  if (!/^(main|stable\/\d+(?:\.\d+)?\.x)$/.test(ref) && ref !== headRef) throw new Error('Invalid Git ref.');
   return `refs/heads/${ref}:refs/remotes/origin/${ref}`;
 };
 const gitAuth = githubHttpExtraHeader(token);
