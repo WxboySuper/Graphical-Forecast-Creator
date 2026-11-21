@@ -62,7 +62,7 @@ const useAreaSource = (map: OLMap, areas: MesoscaleArea[], selectedId: string | 
     source.addFeatures(areas.flatMap((area) => {
       const geometry = polygonToGeometry(area.geometry);
       if (!geometry) return [];
-      const feature = new Feature({ geometry, title: area.title, hazard: area.hazard, validStart: area.validStart, validEnd: area.validEnd });
+      const feature = new Feature({ geometry, title: area.title, hazard: area.hazard, validStart: area.validStart, validEnd: area.validEnd, areaStyle: area.style });
       feature.setId(area.id);
       return [feature];
     }));

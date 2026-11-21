@@ -1,8 +1,9 @@
 import type { MesoscaleArea } from '../store/mesoscaleSlice';
 import { isRecord } from './forecastWorkspaceEnvelope';
 import { isMesoscalePolygon } from './mesoscaleGeometryValidation';
+import { isAreaStyle } from './mesoscaleAreaStyleValidation';
 
-const AREA_KEYS = ['id', 'title', 'hazard', 'confidence', 'validStart', 'validEnd', 'geometry', 'createdAt', 'updatedAt'];
+const AREA_KEYS = ['id', 'title', 'hazard', 'confidence', 'validStart', 'validEnd', 'geometry', 'style', 'createdAt', 'updatedAt'];
 const hasOnlyKeys = (value: Record<string, unknown>): boolean => Object.keys(value).every((key) => AREA_KEYS.includes(key));
 const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const isIsoTime = (value: unknown): value is string =>
@@ -29,6 +30,7 @@ export const isMesoscaleArea = (value: unknown): value is MesoscaleArea => {
   if (!hasOnlyKeys(value)) return false;
   if (!isAreaIdentity(value)) return false;
   if (!isOptionalConfidence(value.confidence)) return false;
+  if (value.style !== undefined && !isAreaStyle(value.style)) return false;
   if (!isAreaTimeWindow(value)) return false;
   return isMesoscalePolygon(value.geometry);
 };

@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { HAZARD_SUGGESTIONS, isoToUtcInput, utcInputToIso, validateAreaFields } from './areaModel';
 import type { Polygon } from 'geojson';
-import type { MesoscaleArea } from '../../../store/mesoscaleSlice';
+import type { MesoscaleArea, MesoscaleAreaStyle } from '../../../store/mesoscaleSlice';
 import { ShapeControls } from './ShapeControls';
 import { VertexEditor } from './VertexEditor';
+import { AreaStyleControls } from './AreaStyleControls';
+import { flag } from '../../../config/flags';
 
 interface Props {
   area: MesoscaleArea;
@@ -14,6 +16,9 @@ interface Props {
   /** Vertex nudges; `coalesce` merges a run of them into one undo step. */
   onVertexChange: (geometry: Polygon, coalesce: boolean) => void;
   onActiveVertex: (index: number | null) => void;
+  /** Other areas to copy a look from, and the style setter; both are used only while area styling is on. */
+  others?: MesoscaleArea[];
+  onStyle?: (style: MesoscaleAreaStyle | undefined, coalesceKey?: string) => void;
 }
 
 const FieldError: React.FC<{ message?: string }> = ({ message }) =>
@@ -69,7 +74,7 @@ const WindowFields: React.FC<{ area: MesoscaleArea; error?: string; onChange: Pr
   </fieldset>
 );
 
-export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeometry, onVertexChange, onActiveVertex }) => {
+export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeometry, onVertexChange, onActiveVertex, others = [], onStyle }) => {
   const errors = validateAreaFields(area);
   return (
     <form className="mesoscale-form" aria-label={`Edit ${area.title}`} onSubmit={(event) => event.preventDefault()}>
@@ -81,6 +86,7 @@ export const AreaEditor: React.FC<Props> = ({ area, onChange, onDelete, onGeomet
         <input type="number" min={0} max={100} step={5} inputMode="numeric" value={area.confidence ?? ''} aria-invalid={Boolean(errors.confidence)} onChange={confidenceChange(onChange)} />
         <FieldError message={errors.confidence} />
       </label>
+      {onStyle && flag('mesoscaleAreaStyling') ? <AreaStyleControls area={area} others={others} onStyle={onStyle} /> : null}
       <ShapeControls geometry={area.geometry} onChange={onGeometry} />
       <VertexEditor areaId={area.id} geometry={area.geometry} onChange={onVertexChange} onActiveVertex={onActiveVertex} />
       <WindowFields area={area} error={errors.window} onChange={onChange} />

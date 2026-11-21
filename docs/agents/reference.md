@@ -52,6 +52,8 @@ Python Auto-TSTM generator: `server/weather/` (tests: `python -m unittest discov
 
 `forecastData` (+ `:user-<id>`, `:custom`, `:mesoscale` variants), `gfc-cycle-history` (+ user-scoped, `-claim`), `gfc-active-forecast-workflow`, `gfc-monitor-settings`, `gfc-forecast-ui-variant`, `gfc-last-active-local-day`, `gfc-completion-handoff-handled`, `darkMode`, `gfcInstallationId`, `gfc-telemetry-consent`, `gfc-telemetry-active-day`, `gfc-privacy-policy-accepted`, `gfc-tos-accepted`, dev-only `gfc-local-beta-bypass`, `gfc-local-test-account`. Changing a key or its shape needs migration/compat handling and a note in the relevant doc.
 
+Mesoscale areas (`forecastData:mesoscale`, JSON export/import) may carry an optional `style` (fill pattern, colors, strength, outline width and dash); `schemaVersion` stays 1 and an area without `style` is unchanged. Loading runs `sanitizeSavedAreaStyles` (`src/utils/mesoscaleAreaStyleValidation.ts`), which clamps or drops bad style fields instead of rejecting the save. Older builds reject a save that contains `style`, so a rollback of the `mesoscaleAreaStyling` flag must not precede a rollback of the code.
+
 ## Environment variables (names only)
 
 Client (build-time, `VITE_*`): `VITE_BUILD_TARGET`, `VITE_FEEDBACK_API_URL`, `VITE_TELEMETRY_BASE_URL`, `VITE_MESOSCALE_WORKER_URL` or `VITE_MESOSCALE_WORKER_URL_{LOCAL,BETA,STAGING,PRODUCTION}`, `VITE_MESOSCALE_FIXTURES`, `VITE_MESOSCALE_DEMO` (local only), `VITE_FIREBASE_{API_KEY,AUTH_DOMAIN,PROJECT_ID,APP_ID}`, `VITE_SENTRY_DSN`, `VITE_SENTRY_ENVIRONMENT`. Anything `VITE_*` ships to the browser: never put secrets there.
