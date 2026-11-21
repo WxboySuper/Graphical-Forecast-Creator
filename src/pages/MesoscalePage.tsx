@@ -4,8 +4,10 @@
  * data, map, and controls live in the Mesoscale workspace components.
  */
 import React from 'react';
+import { useAuth } from '../auth/AuthProvider';
 import { MesoscaleWorkspace } from '../components/Mesoscale/MesoscaleWorkspace';
 import { getMesoscaleClientConfig } from '../config/mesoscale';
+import { useMesoscaleAutoSave } from '../hooks/useMesoscaleAutoSave';
 import '../components/Mesoscale/Mesoscale.css';
 
 const NotConfigured: React.FC = () => (
@@ -18,10 +20,15 @@ const NotConfigured: React.FC = () => (
   </div>
 );
 
-export const MesoscalePage: React.FC = () => (
-  <div className="mesoscale-page" data-testid="mesoscale-page">
-    {getMesoscaleClientConfig().enabled ? <MesoscaleWorkspace /> : <NotConfigured />}
-  </div>
-);
+export const MesoscalePage: React.FC = () => {
+  const { user } = useAuth();
+  // The route renders this page directly, so it owns restoring and saving the on-device Mesoscale session.
+  useMesoscaleAutoSave(user?.uid);
+  return (
+    <div className="mesoscale-page" data-testid="mesoscale-page">
+      {getMesoscaleClientConfig().enabled ? <MesoscaleWorkspace /> : <NotConfigured />}
+    </div>
+  );
+};
 
 export default MesoscalePage;
