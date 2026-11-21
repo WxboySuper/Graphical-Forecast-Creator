@@ -43,3 +43,46 @@ export const extractLaneReleaseNotes = (changelog, version, lane) => {
   const body = laneSection.slice(heading.length).trim();
   return body ? `## v${version}\n\n${body}`.trim() : null;
 };
+
+/**
+ * Drops HTML comments by scanning for their delimiters. It only feeds an emptiness check, never output,
+ * and an unterminated comment drops the rest of the text.
+ * @param {string} text
+ */
+const withoutHtmlComments = (text) => {
+  let result = '';
+  let rest = text;
+  for (;;) {
+    const start = rest.indexOf('<!--');
+    if (start === -1) return result + rest;
+    result += rest.slice(0, start);
+    const end = rest.indexOf('-->', start + 4);
+    if (end === -1) return result;
+    rest = rest.slice(end + 3);
+  }
+};
+
+/** @param {string} changelog @param {string} version @param {'next-major' | 'stable-hotfix'} lane */
+export const moveLaneToReleaseSection = (changelog, version, lane) => {
+  const heading = changelogLaneHeading(lane);
+  const bounds = findChangelogLaneBounds(changelog, lane);
+  if (!bounds) throw new Error(`CHANGELOG.md must include ${heading}.`);
+
+  const releaseHeading = `## v${version}`;
+  if (new RegExp(`^${releaseHeading.replaceAll('.', '\\.')}\\s*$`, 'm').test(changelog)) {
+    return { changelog, moved: false };
+  }
+
+  const body = changelog.slice(bounds.start + heading.length, bounds.end).trim();
+  const bodyWithoutComments = withoutHtmlComments(body).trim();
+  if (!bodyWithoutComments || !/^\s*(?:[-*]|\d+\.)\s+\S/m.test(bodyWithoutComments)) {
+    throw new Error(`The stable changelog lane is empty; release ${version} requires release notes.`);
+  }
+
+  const releaseSection = `${releaseHeading}\n\n${body}\n\n`;
+  const laneReset = `${heading}\n\n#### Added\n\n<!-- Add stable-line changes here. -->\n`;
+  return {
+    changelog: `${changelog.slice(0, bounds.start)}${releaseSection}${laneReset}${changelog.slice(bounds.end).replace(/^\s*/, '')}`,
+    moved: true,
+  };
+};
