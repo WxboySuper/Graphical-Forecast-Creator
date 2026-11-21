@@ -46,12 +46,14 @@ footer .fine{text-align:center;margin:12px 0 0;font-size:.85rem}
 @media(max-width:760px){.foot-grid{grid-template-columns:1fr 1fr}.foot-brand{grid-column:1/-1}}
 /* home additions */
 .voice{padding:clamp(40px,6vw,88px) 0}
-.voice-card{position:relative;margin:0;padding:clamp(28px,4.4vw,64px) clamp(24px,5vw,72px);border-radius:28px;border:1px solid var(--line);background:var(--bg-2)}
+.voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media(max-width:900px){.voice-grid{grid-template-columns:1fr}}
+.voice-card{position:relative;display:flex;flex-direction:column;margin:0;padding:clamp(28px,4.4vw,64px) clamp(24px,5vw,72px);border-radius:28px;border:1px solid var(--line);background:var(--bg-2)}
 .voice-card:before{content:"\201C";position:absolute;left:clamp(18px,3vw,44px);top:clamp(-6px,-.5vw,0px);font-size:clamp(6rem,12vw,10rem);line-height:1;color:var(--brand-blue);opacity:.45;font-family:Georgia,serif;pointer-events:none}
-.voice-q{margin:0;padding-top:clamp(18px,3vw,38px)}
-.voice-q p{margin:0;max-width:880px;font-size:clamp(1.25rem,2.2vw,1.85rem);line-height:1.5;letter-spacing:-.012em;color:var(--ink)}
+.voice-q{flex:1;margin:0;padding-top:clamp(18px,3vw,38px)}
+.voice-q p{margin:0;max-width:880px;font-size:clamp(1.1rem,1.5vw,1.35rem);line-height:1.5;letter-spacing:-.012em;color:var(--ink)}
 .voice-by{display:flex;gap:14px;align-items:baseline;margin-top:30px;padding-top:22px;border-top:1px solid var(--line)}
-.voice-by strong{font-size:1.15rem}.voice-by span{color:var(--ink-soft);font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase}
+.voice-by .voice-handle{text-transform:none;letter-spacing:.02em}.voice-by strong{font-size:1.15rem}.voice-by span{color:var(--ink-soft);font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase}
 .teaser{padding:clamp(24px,4vw,56px) 0}.teaser-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .teaser-card{padding:clamp(24px,3.4vw,44px);border-radius:24px;background:var(--bg-2);border:1px solid var(--line)}
 .teaser-card h2{font-size:clamp(1.7rem,3vw,2.5rem);letter-spacing:-.03em;margin:8px 0 12px}
