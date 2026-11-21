@@ -156,6 +156,8 @@ describe('marketing site build', () => {
     assert.match(home, /<blockquote class="voice-q">/);
     assert.match(home, /<strong>Chris Ward<\/strong>/);
     assert.ok(home.includes('GFC has opened many doors for me'));
+    assert.match(home, /<strong>Adler<\/strong>/);
+    assert.ok(home.includes('far less buggy'));
   });
 
   it('renders legal pages from the repository policy files', () => {
