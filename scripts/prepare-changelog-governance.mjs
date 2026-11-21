@@ -28,13 +28,13 @@ if (!isDependabot) {
 
 const token = process.env.GH_TOKEN ?? '';
 if (!token) throw new Error('GH_TOKEN is required for trusted automated changelog preparation.');
-if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+\.\d+\.x$/.test(headRef)) {
+if (headRef === 'main' || headRef === 'beta' || /^stable\/\d+(?:\.\d+)?\.x$/.test(headRef)) {
   throw new Error('Refusing to write automated changelog metadata to a protected source branch.');
 }
 const gitAuth = githubHttpExtraHeader(token);
 execFileSync('git', ['-c', gitAuth, 'fetch', '--no-tags', 'origin', `refs/heads/${baseRef}:refs/remotes/origin/${baseRef}`, `refs/heads/${headRef}:refs/remotes/origin/${headRef}`], { stdio: 'inherit' });
 
-const stableLine = /^stable\/\d+\.\d+\.x$/.test(baseRef);
+const stableLine = /^stable\/\d+(?:\.\d+)?\.x$/.test(baseRef);
 const bumps = listDependencyBumpsBetweenRefs(baseRef, headRef);
 const declaration = dependabotChangelogDeclaration(bumps, stableLine);
 

@@ -15,7 +15,7 @@ export const evaluateChangelogReleaseGate = ({ auditResult, auditStatus, targetR
       message: statusMessages[auditStatus] ?? `Final changelog audit status was ${auditStatus || 'missing'}; release is blocked.`,
     };
   }
-  if (!/^(main|stable\/\d+\.\d+\.x)$/.test(targetRef ?? '') || !/^[a-f0-9]{40}$/i.test(auditedHead ?? '')) {
+  if (!/^(main|stable\/\d+(?:\.\d+)?\.x)$/.test(targetRef ?? '') || !/^[a-f0-9]{40}$/i.test(auditedHead ?? '')) {
     return { ready: false, message: 'Final changelog audit did not provide a valid target and audited revision; release is blocked.' };
   }
   return { ready: true, message: `Changelog is clean for ${targetRef}@${auditedHead}.` };
