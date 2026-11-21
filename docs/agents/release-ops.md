@@ -30,7 +30,7 @@ Run the deploy workflow after the bindings and GitHub secrets are set. It runs `
 | `deploy-beta-workers.yml` | Redeploy existing ref to Worker | `ref=vX.Y.Z-beta.N` |
 | `prepare-stable-promotion.yml` | Promotion PR into `main` | `source_ref=main`, `version=auto` |
 | `bootstrap-stable-release.yml` | Create `stable/X.x` at the approved main commit | |
-| `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | `line=auto` or `N.x`, `dry_run`, optional `previous_tag`; `production-promote` environment approval |
+| `release-stable.yml` | Stable/hotfix release; publishing triggers production deploy | `line=auto` or `N.x`, `dry_run`, optional `previous_tag`, `baseline_ref` (the final changelog audit start; default is the last clean audit); `production-promote` environment approval |
 | `deploy-staging.yml` | Manual stable branch/tag/commit rehearsal. `auto` selects the highest stable branch. | `ref=auto` |
 | `deploy-main-to-vps.yml` | Production Worker frontend and VPS API deploy; optional VPS frontend for rollback | `ref=auto` selects the highest stable branch |
 | `backport.yml` | `backport-2.x` label -> PR against `stable/2.x`; conflicts create a draft PR | PR number and optional line for manual runs |

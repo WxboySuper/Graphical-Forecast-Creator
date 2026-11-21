@@ -3,6 +3,7 @@
  * where the feedback service lives; it holds no UI or submission logic.
  */
 import { getBuildTarget } from './buildTarget';
+import { flag } from './flags';
 
 export const DISCORD_INVITE_URL = 'https://discord.gg/SGk37rg8sz';
 
@@ -22,11 +23,8 @@ export const FEEDBACK_MAX_LENGTH = 4000;
 /** True for the public open-beta deployment (beta.gfcweather.com). */
 export const isBetaBuild = (): boolean => getBuildTarget() === 'beta';
 
-/** Feedback is offered everywhere the product is hosted; local dev builds keep it hidden. */
-export const isFeedbackEnabled = (): boolean => {
-  const target = getBuildTarget();
-  return (target === 'beta' || target === 'production') && Boolean(getFeedbackApiUrl());
-};
+/** Feedback is offered where the `feedback` flag is on (beta only for now) and a feedback service is configured. */
+export const isFeedbackEnabled = (): boolean => flag('feedback') && Boolean(getFeedbackApiUrl());
 
 /** Base URL of the feedback service, without a trailing slash. */
 export const getFeedbackApiUrl = (): string => {
