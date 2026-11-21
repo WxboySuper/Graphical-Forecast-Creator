@@ -13,6 +13,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Stable v2.x hotfixes
 
+#### Added
+
+- **Home page testimonial:** The home page shows a second GFC user testimonial alongside the existing one.
+
 #### Fixed
 
 - **Monitor alerts:** Monitor again loads active weather alerts instead of failing the refresh.
