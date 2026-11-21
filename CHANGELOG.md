@@ -15,6 +15,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Send feedback:** The production app hides Send feedback until the feedback service is live. The beta site keeps it.
+
 <!-- Production fixes for the stable v2.x line go here. -->
 
 ## v2.0.0
@@ -29,7 +31,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Outlook editing:** Paint-bucket and Step/Set editing for probabilistic outlooks, with undo and redo and geometry copy between hazards.
 - **Population and cities:** A WorldPop estimate for the active day's outlook polygons, including the cities inside them from a bundled public-domain places dataset.
 - **KMZ/KML export:** Export forecast products as KMZ or KML files for use in Google Earth and other mapping tools.
-- **Send feedback:** Signed-in users can send bugs, ideas, and questions from the Resources menu. The beta site also shows a beta notice with an always-visible feedback button.
+- **Send feedback on beta:** On beta.gfcweather.com, signed-in users can send bugs, ideas, and questions from the Resources menu, and the site shows a beta notice with an always-visible feedback button.
 
 #### Changed
 
