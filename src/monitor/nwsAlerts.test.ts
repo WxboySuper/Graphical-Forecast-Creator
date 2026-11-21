@@ -140,8 +140,9 @@ describe('nwsAlerts', () => {
       await expect(fetchActiveNwsAlerts()).resolves.toMatchObject({
         features: { length: MAX_ACTIVE_ALERTS },
       });
+      // The NWS alerts API answers HTTP 400 to a `limit` parameter, so it must never be sent.
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`limit=${MAX_ACTIVE_ALERTS}`),
+        'https://api.weather.gov/alerts/active?status=actual',
         expect.any(Object)
       );
     } finally {
