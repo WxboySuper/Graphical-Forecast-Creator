@@ -19,9 +19,16 @@
     "mesoscaleDerivedParameters": { "kind": "dev", "owner": "WxboySuper", "issue": 1801, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true, "production": true } },
     "winterWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 913, "removeBy": "3.0.0", "default": false },
     "collaborationRoom": { "kind": "dev", "owner": "WxboySuper", "issue": 433, "removeBy": "3.0.0", "default": false },
+<<<<<<< HEAD
     "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true, "production": true } },
     "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true, "production": true } },
     "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true, "production": true } },
     "feedback": { "kind": "dev", "owner": "WxboySuper", "removeBy": "2.x", "default": false, "values": { "beta": true } }
+=======
+    "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
+    "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
+    "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
+    "feedback": { "kind": "dev", "owner": "WxboySuper", "removeBy": "2.x", "default": false, "values": { "beta": true, "production": true } }
+>>>>>>> 465f8b2a (fix(feedback): enable feedback on production (#1893))
   }
 }
