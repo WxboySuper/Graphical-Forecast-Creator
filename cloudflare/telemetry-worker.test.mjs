@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, fetchTelemetry, validateEvent } from './telemetry-worker.mjs';
 import { withPing } from './discord-ping.mjs';
-import { sendDailyDigest } from './telemetry/digest.mjs';
+import { buildEventsDigestQuery, DIGEST_CRON, PURGE_CRON, sendDailyDigest } from './telemetry/digest.mjs';
 import { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
 
@@ -608,4 +608,22 @@ test('the digest links to the configured dashboard URL', async () => {
   const fallback = digestEnv([], { env: { NOW: () => DIGEST_TUESDAY } });
   await worker.scheduled({ cron: '0 13 * * *' }, fallback.env);
   assert.equal(fallback.posts[0].embeds[0].url, 'https://telemetry.gfcweather.com/admin/');
+});
+
+test('the Wrangler cron triggers match the crons the scheduled handler routes', async () => {
+  const config = JSON.parse(await readFile(new URL('./wrangler.telemetry.jsonc', import.meta.url), 'utf8'));
+  assert.deepStrictEqual([...config.triggers.crons].sort(), [PURGE_CRON, DIGEST_CRON].sort());
+});
+
+test('the digest events query only accepts an integer day window', () => {
+  assert.match(buildEventsDigestQuery(15), /INTERVAL '15' DAY/);
+  for (const days of [0, 91, 1.5, '2; DROP', NaN]) assert.throws(() => buildEventsDigestQuery(days), RangeError);
+});
+
+test('a digest 400 about something other than forum fields is not retried', async () => {
+  let attempts = 0;
+  const env = { TELEMETRY_DB: digestDb([]), TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/text', NOW: () => DIGEST_TUESDAY, FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: { 0: { description: { _errors: [{ code: 'BASE_TYPE_MAX_LENGTH' }] } } } } }, { status: 400 }); } };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.equal(attempts, 1);
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 400']]);
 });

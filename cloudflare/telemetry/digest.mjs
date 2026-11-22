@@ -1,8 +1,9 @@
 import { COUNT, DATASET, DAY, queryAnalytics } from './admin.mjs';
 import { DAY_MS, utcDay } from './daily-counts.mjs';
-import { withPing } from '../discord-ping.mjs';
+import { rejectsForumFields, withPing } from '../discord-ping.mjs';
 
 export const DIGEST_CRON = '0 13 * * *';
+export const PURGE_CRON = '0 0 * * *';
 // Matches the custom-domain route in wrangler.telemetry.jsonc; override with TELEMETRY_DASHBOARD_URL.
 export const DEFAULT_DASHBOARD_URL = 'https://telemetry.gfcweather.com/admin/';
 
@@ -45,6 +46,7 @@ export function summarizeKind(rows, kind, yesterday, best) {
 }
 
 export function buildEventsDigestQuery(days) {
+  if (!Number.isInteger(days) || days < 1 || days > 90) throw new RangeError('days must be an integer from 1 to 90');
   return `SELECT blob1 AS event, blob2 AS detail, ${DAY}, ${COUNT} FROM ${DATASET} WHERE timestamp >= NOW() - INTERVAL '${days}' DAY GROUP BY event, detail, day LIMIT 10000`;
 }
 
@@ -121,9 +123,6 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday, dashb
   };
 }
 
-// A 400 means a text-channel webhook refused the forum thread name; auth, missing-webhook and rate-limit errors fail fast.
-const rejectsThreadName = (status) => status === 400;
-
 // Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
 async function loadDigestInputs(env, yesterday, monday) {
   const [result, bests, data] = await Promise.all([
@@ -142,7 +141,8 @@ async function loadDigestInputs(env, yesterday, monday) {
 async function postDigest(env, payload, yesterday) {
   const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
-  if (rejectsThreadName(response.status)) response = await send(payload);
+  // Only a forum-field 400 is retried; auth, missing-webhook, rate-limit and other validation errors fail fast.
+  if (await rejectsForumFields(response)) response = await send(payload);
   if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);
 }
 

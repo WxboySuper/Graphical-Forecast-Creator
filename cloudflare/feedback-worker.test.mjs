@@ -909,3 +909,12 @@ test('handleAdmin still accepts the older positional id forms', async () => {
   const item = await handleAdmin(request(), env, new URL('https://feedback.gfcweather.com/v1/feedback/fb-6'), 'fb-6');
   assert.equal((await item.json()).id, 'fb-6');
 });
+
+test('a new-feedback 400 about something other than forum fields is not retried', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: {} } }, { status: 400 }); } } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_status, 'failed');
+});

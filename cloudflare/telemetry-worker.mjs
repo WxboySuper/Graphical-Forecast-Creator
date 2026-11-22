@@ -2,9 +2,7 @@ import { json } from './feedback/response.mjs';
 import { handleAdmin } from './telemetry/admin.mjs';
 import { handlePublic, publicServiceError } from './telemetry/public.mjs';
 import { purgeOldDedupe, utcDay } from './telemetry/daily-counts.mjs';
-import { DIGEST_CRON, DigestError, sendDailyDigest } from './telemetry/digest.mjs';
-
-const PURGE_CRON = '0 0 * * *';
+import { DIGEST_CRON, DigestError, PURGE_CRON, sendDailyDigest } from './telemetry/digest.mjs';
 
 export { ALLOWED_EVENTS, validateEvent } from './telemetry/events.mjs';
 export { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';

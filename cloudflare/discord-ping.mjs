@@ -12,3 +12,14 @@ export function withPing(env, payload) {
     allowed_mentions: { parse: [], users: [id] },
   };
 }
+
+/**
+ * True when a Discord 400 is the forum-field rejection a text-channel webhook gives for thread_name or applied_tags.
+ * An unreadable body still counts, so the text-channel fallback never regresses; other validation errors are not retried.
+ */
+export async function rejectsForumFields(response) {
+  if (response.status !== 400) return false;
+  let text;
+  try { text = await response.text(); } catch { return true; }
+  return !text || /thread|forum|applied_tags/i.test(text);
+}

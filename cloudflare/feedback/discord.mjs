@@ -1,4 +1,4 @@
-import { withPing } from '../discord-ping.mjs';
+import { rejectsForumFields, withPing } from '../discord-ping.mjs';
 
 // Truncate by code point so an emoji at the boundary is never split into a lone surrogate.
 const truncate = (text, max) => Array.from(text).slice(0, max).join('');
@@ -51,7 +51,7 @@ async function sendWebhook(env, payload) {
   try {
     const response = await post(env, env.FEEDBACK_DISCORD_WEBHOOK_URL, payload);
     if (response.ok) return { status: 'sent', threadId: await threadIdFrom(response) };
-    if (response.status !== 400) return { status: 'failed', threadId: null };
+    if (!(await rejectsForumFields(response))) return { status: 'failed', threadId: null };
     // A text-channel post has no thread of its own, so no thread ID is stored and updates post to the channel.
     const retry = await post(env, env.FEEDBACK_DISCORD_WEBHOOK_URL, textChannelPayload(payload));
     return { status: retry.ok ? 'sent' : 'failed', threadId: null };
