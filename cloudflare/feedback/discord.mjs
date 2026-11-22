@@ -106,10 +106,11 @@ function updateTarget(env, item) {
   return null;
 }
 
-// A threadless forum post is rejected with 400; a deleted or unknown stored thread answers 400 or 404.
-function needsNewThread(httpStatus, threadId) {
-  if (threadId) return httpStatus === 400 || httpStatus === 404;
-  return httpStatus === 400;
+// A deleted stored thread answers 404; otherwise only a thread-related 400 (a forum needing a thread, or an
+// unknown thread) starts a new thread, so payload validation errors are not retried.
+async function needsNewThread(response, threadId) {
+  if (threadId && response.status === 404) return true;
+  return rejectsForumFields(response);
 }
 
 async function rememberThread(env, id, threadId) {
@@ -126,7 +127,7 @@ async function deliverStatusUpdate(env, id, status) {
     const payload = statusUpdatePayload(item, status);
     const response = await post(env, target.url, payload, target.threadId);
     if (response.ok) return 'sent';
-    if (!needsNewThread(response.status, target.threadId)) return 'failed';
+    if (!(await needsNewThread(response, target.threadId))) return 'failed';
     // Start a fresh forum thread: the post was threadless on a forum, or the stored thread is gone.
     const retry = await post(env, target.url, { ...payload, thread_name: truncate(`Update: ${item.category} ${item.id}`, 100) });
     if (!retry.ok) return 'failed';

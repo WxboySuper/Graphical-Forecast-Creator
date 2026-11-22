@@ -45,8 +45,11 @@ export function summarizeKind(rows, kind, yesterday, best) {
   };
 }
 
+// Every whole-day window Analytics Engine retains; anything else never reaches the SQL text.
+const DIGEST_WINDOWS = new Set(Array.from({ length: 90 }, (_, index) => index + 1));
+
 export function buildEventsDigestQuery(days) {
-  if (!Number.isInteger(days) || days < 1 || days > 90) throw new RangeError('days must be an integer from 1 to 90');
+  if (!DIGEST_WINDOWS.has(days)) throw new RangeError('days must be an integer from 1 to 90');
   return `SELECT blob1 AS event, blob2 AS detail, ${DAY}, ${COUNT} FROM ${DATASET} WHERE timestamp >= NOW() - INTERVAL '${days}' DAY GROUP BY event, detail, day LIMIT 10000`;
 }
 

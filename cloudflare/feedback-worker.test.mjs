@@ -918,3 +918,14 @@ test('a new-feedback 400 about something other than forum fields is not retried'
   assert.equal(attempts, 1);
   assert.equal(db.rows[0].discord_status, 'failed');
 });
+
+test('a status update rejected for its payload is not retried as a new thread', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: {} } }, { status: 400 }); } } });
+  db.rows = [{ id: 'fb-8', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'sent', discord_thread_id: '222222222222222222' }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-8', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_thread_id, '222222222222222222');
+});
