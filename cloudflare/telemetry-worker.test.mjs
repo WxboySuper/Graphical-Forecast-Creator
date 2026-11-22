@@ -421,7 +421,14 @@ function digestDb(rows) {
       const statement = {
         args: [],
         bind(...values) { statement.args = values; return statement; },
-        all: async () => ({ results: rows.filter((row) => row.day <= statement.args[0]) }),
+        all: async () => {
+          if (sql.includes('MAX(count)')) {
+            const prior = rows.filter((row) => row.day < statement.args[0]);
+            return { results: ['visit', 'active'].map((kind) => prior.filter((row) => row.kind === kind)).filter((list) => list.length).map((list) => ({ kind: list[0].kind, best: Math.max(...list.map((row) => row.count)), days: list.length })) };
+          }
+          const [from, to] = statement.args;
+          return { results: rows.filter((row) => row.day >= from && row.day <= to) };
+        },
         run: async () => ({ meta: { changes: 0 } }),
       };
       assert.ok(sql.includes('telemetry_daily_counts') || sql.startsWith('DELETE'), sql);
@@ -460,14 +467,14 @@ test('the 13:00 UTC cron posts a daily digest with a 7-day comparison and a new 
   assert.equal(posts.length, 1);
   const [payload] = posts;
   assert.deepStrictEqual(payload.allowed_mentions, { parse: [] });
-  assert.equal('thread_name' in payload, false, 'the digest webhook may be a plain text channel');
+  assert.equal(payload.thread_name, 'Daily usage 2026-11-16', 'forum webhooks get a thread per digest');
   assert.equal('applied_tags' in payload, false);
   assert.equal(payload.content, '🏆 New record: 30 visitors (previous best 20)');
   assert.equal(payload.embeds[0].title, 'GFC daily usage · 2026-11-16 (UTC)');
   const description = payload.embeds[0].description;
   assert.match(description, /\*\*Visitors:\*\* 30 \(\+200% vs 7-day avg 10\)/);
   assert.match(description, /\*\*Active users:\*\* 5 \(\+0% vs 7-day avg 5\)/);
-  assert.match(description, /\*\*Last 7 days:\*\* 90 visitors · 35 active users/);
+  assert.match(description, /\*\*Last 7 days \(summed daily counts\):\*\* 90 visitors · 35 active users/);
   assert.match(description, /Feature and page breakdown unavailable/);
   assert.doesNotMatch(description, /Week over week/, 'trends are Monday-only');
 });
@@ -510,9 +517,40 @@ test('Monday digests add week-over-week trends and feature movers from Analytics
 test('digest failures are logged without the webhook URL and never break the purge cron', async () => {
   const { env } = digestEnv(dayRows('visit', [1], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, FETCH: async () => new Response('no', { status: 500 }) } });
   const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
-  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Error']]);
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 500']]);
   assert.ok(!JSON.stringify(errors).includes('discord.example'));
   const purgeDb = new FakeD1();
   await worker.scheduled({ cron: '0 0 * * *' }, { TELEMETRY_DB: purgeDb, NOW: () => NOW });
   assert.ok(purgeDb.executions.some((item) => item.sql.startsWith('DELETE FROM telemetry_dedupe')));
+  const unknownDb = new FakeD1();
+  const unknown = await captureErrors(() => worker.scheduled({ cron: '5 5 * * *' }, { TELEMETRY_DB: unknownDb, NOW: () => NOW }));
+  assert.deepStrictEqual(unknown, [['Telemetry scheduled run skipped: unknown cron', '5 5 * * *']]);
+  assert.equal(unknownDb.executions.length, 0);
+});
+
+test('records compare against the all-time best, not just the last two weeks', async () => {
+  const rows = [...dayRows('visit', [25, 10, 10], '2026-11-16'), { kind: 'visit', day: '2026-09-01', count: 40 }];
+  const { env, posts } = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].content, '');
+});
+
+test('a text-channel digest webhook that rejects thread_name gets one retry without it', async () => {
+  const posts = [];
+  const env = {
+    TELEMETRY_DB: digestDb(dayRows('visit', [3, 2], '2026-11-16')),
+    TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/text',
+    NOW: () => DIGEST_TUESDAY,
+    FETCH: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      posts.push(body);
+      return 'thread_name' in body ? new Response('thread_name is only for forum channels', { status: 400 }) : new Response(null, { status: 204 });
+    },
+  };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.deepStrictEqual(errors, []);
+  assert.equal(posts.length, 2);
+  assert.equal(posts[0].thread_name, 'Daily usage 2026-11-16');
+  assert.equal('thread_name' in posts[1], false);
+  assert.deepStrictEqual(posts[1].allowed_mentions, { parse: [] });
 });

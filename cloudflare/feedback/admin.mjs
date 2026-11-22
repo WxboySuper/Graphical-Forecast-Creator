@@ -132,10 +132,15 @@ export async function patchFeedback(request, id, db, now = Date.now()) {
 
 /** Applies a status change and, once it is stored, queues a best-effort Discord update that never affects the response. */
 export async function patchFeedbackAndNotify(request, id, env, ctx) {
+  const before = await env.FEEDBACK_DB.prepare('SELECT status FROM feedback WHERE id = ?').bind(id).first();
   const response = await patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now());
-  if (response.ok) {
+  if (!response.ok) return response;
+  try {
     const { status } = await response.clone().json();
-    await notifyStatusUpdate(env, ctx, id, status);
+    // A repeated request for the current status succeeds but is not announced again.
+    if (status !== before?.status) await notifyStatusUpdate(env, ctx, id, status);
+  } catch {
+    // The status change is stored; a notification problem never changes the response.
   }
   return response;
 }

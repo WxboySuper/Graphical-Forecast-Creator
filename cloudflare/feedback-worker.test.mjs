@@ -752,6 +752,26 @@ test('status updates use the updates webhook when set and skip items without a t
   assert.equal(discord.calls[1].url.pathname, '/webhook');
   assert.equal(discord.calls[1].url.searchParams.has('thread_id'), false);
   assert.equal('thread_name' in discord.calls[1].body, false);
+  assert.equal((await patch(threadless)).status, 200, 'repeating the current status still succeeds');
+  await Promise.all(threadless.waits);
+  assert.equal(discord.calls.length, 2, 'an unchanged status is not announced again');
+});
+
+test('a threadless update on a forum webhook retries once as a new thread', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url: new URL(url), body });
+    return 'thread_name' in body ? Response.json({ id: '1', channel_id: '777' }) : new Response('forum needs thread_name', { status: 400 });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: fetcher } });
+  db.rows = [{ id: 'fb-9', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'old item', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-9', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal('thread_name' in calls[0].body, false);
+  assert.equal(calls[1].body.thread_name, 'Update: bug fb-9');
 });
 
 test('a text-channel webhook that rejects forum fields gets one retry without them', async () => {

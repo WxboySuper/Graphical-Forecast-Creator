@@ -2,6 +2,9 @@ import { COUNT, DATASET, DAY, queryAnalytics } from './admin.mjs';
 import { utcDay } from './daily-counts.mjs';
 
 export const DIGEST_CRON = '0 13 * * *';
+
+/** A digest failure whose message holds only safe detail such as an HTTP status. */
+export class DigestError extends Error {}
 const DAY_MS = 86_400_000;
 const KINDS = [['visit', 'Visitors'], ['active', 'Active users']];
 const fmt = (value) => Math.round(value).toLocaleString('en-US');
@@ -23,16 +26,20 @@ function sumRange(series, endDay, length) {
 }
 
 /** Yesterday, the trailing 7-day comparison, records and week-over-week numbers for one D1 count kind. */
-export function summarizeKind(rows, kind, yesterday) {
+export function summarizeKind(rows, kind, yesterday, best) {
   const series = new Map(rows.filter((row) => row.kind === kind && row.day <= yesterday).map((row) => [row.day, row.count]));
   const count = series.get(yesterday) ?? 0;
-  const priorCounts = [...series].filter(([day]) => day < yesterday).map(([, value]) => value);
-  const priorAverage = sumRange(series, dayBefore(yesterday, 1), 7) / 7;
-  const lastWeek = sumRange(series, yesterday, 7);
-  const previousWeek = sumRange(series, dayBefore(yesterday, 7), 7);
+  const previousBest = best?.best ?? 0;
   // Daily counts never change after their UTC day ends, so beating every earlier day is announced exactly once.
-  const record = count > 0 && priorCounts.length > 0 && count > Math.max(...priorCounts);
-  return { count, priorAverage, lastWeek, previousWeek, record, previousBest: priorCounts.length ? Math.max(...priorCounts) : 0 };
+  const record = count > 0 && (best?.days ?? 0) > 0 && count > previousBest;
+  return {
+    count,
+    priorAverage: sumRange(series, dayBefore(yesterday, 1), 7) / 7,
+    lastWeek: sumRange(series, yesterday, 7),
+    previousWeek: sumRange(series, dayBefore(yesterday, 7), 7),
+    record,
+    previousBest,
+  };
 }
 
 export function buildEventsDigestQuery(days) {
@@ -82,17 +89,20 @@ function countLine(label, stats) {
 const listLine = (label, items) => `**${label}:** ${items.length ? items.map(([name, count]) => `${words(name)} ${fmt(count)}`).join(' · ') : 'none'}`;
 
 function trendLines(kinds, events) {
-  const lines = ['', '**Week over week** (last 7 days vs the 7 before)'];
-  for (const [label, stats] of kinds) lines.push(`${label}: ${fmt(stats.lastWeek)} vs ${fmt(stats.previousWeek)}${percentChange(stats.lastWeek, stats.previousWeek) ? ` (${percentChange(stats.lastWeek, stats.previousWeek)})` : ''}`);
+  const lines = ['', '**Week over week** (summed daily counts, last 7 days vs the 7 before)'];
+  for (const [label, stats] of kinds) {
+    const change = percentChange(stats.lastWeek, stats.previousWeek);
+    lines.push(`${label}: ${fmt(stats.lastWeek)} vs ${fmt(stats.previousWeek)}${change ? ` (${change})` : ''}`);
+  }
   if (events?.movers.length) lines.push(`Biggest movers: ${events.movers.map((item) => `${words(item.name)} ${item.delta > 0 ? '+' : ''}${fmt(item.delta)}`).join(' · ')}`);
   return lines;
 }
 
 /** Builds the Discord payload for one daily digest; Mondays add the week-over-week trend section. */
-export function buildDigest({ rows, events, yesterday, monday }) {
-  const kinds = KINDS.map(([kind, label]) => [label, summarizeKind(rows, kind, yesterday)]);
+export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
+  const kinds = KINDS.map(([kind, label]) => [label, summarizeKind(rows, kind, yesterday, bests.find((row) => row.kind === kind))]);
   const lines = kinds.map(([label, stats]) => countLine(label, stats));
-  lines.push(`**Last 7 days:** ${kinds.map(([label, stats]) => `${fmt(stats.lastWeek)} ${label.toLowerCase()}`).join(' · ')}`);
+  lines.push(`**Last 7 days (summed daily counts):** ${kinds.map(([label, stats]) => `${fmt(stats.lastWeek)} ${label.toLowerCase()}`).join(' · ')}`);
   if (events) lines.push('', listLine('Top features', events.features), listLine('Top pages', events.pages));
   else lines.push('', '_Feature and page breakdown unavailable._');
   if (monday) lines.push(...trendLines(kinds, events));
@@ -110,11 +120,16 @@ export async function sendDailyDigest(env, now) {
   if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return 'disabled';
   const yesterday = utcDay(now - DAY_MS);
   const monday = new Date(now).getUTCDay() === 1;
-  const result = await env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day <= ? ORDER BY day ASC').bind(yesterday).all();
+  // Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
+  const result = await env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? AND day <= ? ORDER BY day ASC').bind(dayBefore(yesterday, 13), yesterday).all();
+  const bests = await env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all();
   const data = await loadEvents(env, monday ? 15 : 2);
   const events = data ? summarizeEvents(data, yesterday) : null;
-  const payload = buildDigest({ rows: result.results ?? [], events, yesterday, monday });
-  const response = await (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-  if (!response.ok) throw new Error(`Discord webhook returned ${response.status}`);
+  const payload = buildDigest({ rows: result.results ?? [], bests: bests.results ?? [], events, yesterday, monday });
+  const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  // A forum webhook needs a thread name; a text-channel webhook rejects one with a 4xx, so retry once without it.
+  let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
+  if (response.status >= 400 && response.status < 500 && response.status !== 429) response = await send(payload);
+  if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);
   return 'sent';
 }

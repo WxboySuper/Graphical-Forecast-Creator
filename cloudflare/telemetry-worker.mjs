@@ -2,7 +2,9 @@ import { json } from './feedback/response.mjs';
 import { handleAdmin } from './telemetry/admin.mjs';
 import { handlePublic, publicServiceError } from './telemetry/public.mjs';
 import { purgeOldDedupe, utcDay } from './telemetry/daily-counts.mjs';
-import { DIGEST_CRON, sendDailyDigest } from './telemetry/digest.mjs';
+import { DIGEST_CRON, DigestError, sendDailyDigest } from './telemetry/digest.mjs';
+
+const PURGE_CRON = '0 0 * * *';
 
 export { ALLOWED_EVENTS, validateEvent } from './telemetry/events.mjs';
 export { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
@@ -34,8 +36,9 @@ export async function fetchTelemetry(request, env) {
 async function runDigest(env, now) {
   try { await sendDailyDigest(env, now); }
   catch (error) {
-    // The digest is best effort; log only the failure kind so the webhook URL never reaches logs.
-    console.error('Telemetry Discord digest failed', error?.name ?? 'Error');
+    // The digest is best effort. Its own errors carry only an HTTP status; anything else is logged by type so a URL never reaches logs.
+    const detail = error instanceof DigestError ? error.message : error?.name ?? 'Error';
+    console.error('Telemetry Discord digest failed', detail);
   }
 }
 
@@ -55,7 +58,10 @@ export default {
       return;
     }
     const now = env.NOW?.() ?? controller?.scheduledTime ?? Date.now();
-    if (controller?.cron === DIGEST_CRON) return runDigest(env, now);
-    return purge(env, now);
+    const cron = controller?.cron;
+    if (cron === DIGEST_CRON) return runDigest(env, now);
+    // A missing cron is a direct or test invocation of the original purge job.
+    if (cron === PURGE_CRON || cron === undefined) return purge(env, now);
+    console.error('Telemetry scheduled run skipped: unknown cron', cron);
   },
 };

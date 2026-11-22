@@ -108,8 +108,13 @@ async function deliverStatusUpdate(env, id, status) {
     const item = await env.FEEDBACK_DB.prepare('SELECT id, category, message, build_target, discord_thread_id FROM feedback WHERE id = ?').bind(id).first();
     const target = item && updateTarget(env, item);
     if (!target) return 'skipped';
-    const response = await post(env, target.url, statusUpdatePayload(item, status), target.threadId);
-    return response.ok ? 'sent' : 'failed';
+    const payload = statusUpdatePayload(item, status);
+    const response = await post(env, target.url, payload, target.threadId);
+    if (response.ok) return 'sent';
+    // A forum webhook rejects a threadless post with 400; start a small thread for the update instead.
+    if (response.status !== 400 || target.threadId) return 'failed';
+    const retry = await post(env, target.url, { ...payload, thread_name: truncate(`Update: ${item.category} ${item.id}`, 100) });
+    return retry.ok ? 'sent' : 'failed';
   } catch {
     // Notifications are best effort; the status change is already stored.
     return 'failed';
