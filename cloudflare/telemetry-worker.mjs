@@ -34,6 +34,12 @@ export async function fetchTelemetry(request, env) {
 }
 
 async function runDigest(env, now) {
+  // An unset webhook is a quiet no-op even without a database binding.
+  if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return;
+  if (!env.TELEMETRY_DB) {
+    console.error('Telemetry Discord digest skipped: TELEMETRY_DB binding is not configured');
+    return;
+  }
   try { await sendDailyDigest(env, now); }
   catch (error) {
     // The digest is best effort. Its own errors carry only an HTTP status; anything else is logged by type so a URL never reaches logs.
@@ -43,6 +49,10 @@ async function runDigest(env, now) {
 }
 
 async function purge(env, now) {
+  if (!env.TELEMETRY_DB) {
+    console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
+    return;
+  }
   try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(now)); }
   catch (error) {
     console.error('Telemetry dedupe purge failed');
@@ -53,10 +63,6 @@ async function purge(env, now) {
 export default {
   fetch: fetchTelemetry,
   async scheduled(controller, env) {
-    if (!env.TELEMETRY_DB) {
-      console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
-      return;
-    }
     const now = env.NOW?.() ?? controller?.scheduledTime ?? Date.now();
     const cron = controller?.cron;
     if (cron === DIGEST_CRON) return runDigest(env, now);

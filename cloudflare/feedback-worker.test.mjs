@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
+import { handleAdmin } from './feedback/admin.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
 import { resetKeyCache } from './feedback/auth.mjs';
 
@@ -879,4 +880,32 @@ test('a deleted forum thread is replaced by a new thread for the update', async 
   assert.equal(calls[1].url.searchParams.has('thread_id'), false);
   assert.equal(calls[1].body.thread_name, 'Update: idea fb-7');
   assert.equal(db.rows[0].discord_thread_id, '888888888888888888', 'later updates use the replacement thread');
+});
+
+test('a failed pre-read never blocks the stored status change', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL: 'https://discord.example/updates', FETCH: discord.fetcher } });
+  db.rows = [{ id: 'fb-5', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const original = db.prepare.bind(db);
+  let failed = false;
+  db.prepare = (sql) => {
+    if (sql === 'SELECT status FROM feedback WHERE id = ?' && !failed) { failed = true; return { bind() { return { first: async () => { throw new Error('D1 read failed'); } }; } }; }
+    return original(sql);
+  };
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-5', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(db.rows[0].status, 'handled');
+  assert.equal(discord.calls.length, 1, 'without the previous status the change is still announced');
+});
+
+test('handleAdmin still accepts the older positional id forms', async () => {
+  const { db, env } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+  db.rows = [{ id: 'fb-6', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled' }];
+  const request = () => new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: 'Bearer admin-secret' } });
+  const list = await handleAdmin(request(), env, new URL('https://feedback.gfcweather.com/v1/feedback'), null);
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).items.length, 1);
+  const item = await handleAdmin(request(), env, new URL('https://feedback.gfcweather.com/v1/feedback/fb-6'), 'fb-6');
+  assert.equal((await item.json()).id, 'fb-6');
 });

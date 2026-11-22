@@ -78,7 +78,11 @@ export function summarizeEvents(data, yesterday) {
 async function loadEvents(env, days) {
   if (!env.CF_ACCOUNT_ID || !env.CF_ANALYTICS_API_TOKEN) return null;
   try { return await queryAnalytics(env, buildEventsDigestQuery(days)); }
-  catch { return null; }
+  catch (error) {
+    // queryAnalytics already logs the API status and error text; record that the digest fell back.
+    console.error('Telemetry digest events unavailable', error?.name ?? 'Error');
+    return null;
+  }
 }
 
 function countLine(label, stats) {
@@ -110,7 +114,7 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
     .map(([label, stats]) => `🏆 New record: ${fmt(stats.count)} ${label.toLowerCase()} (previous best ${fmt(stats.previousBest)})`);
   return {
     content: records.length ? records.join('\n') : '',
-    embeds: [{ title: `GFC daily usage · ${yesterday} (UTC)`, description: lines.join('\n').slice(0, 4096), url: 'https://telemetry.gfcweather.com/admin/' }],
+    embeds: [{ title: `GFC daily usage · ${yesterday} (UTC)`, description: Array.from(lines.join('\n')).slice(0, 4096).join(''), url: 'https://telemetry.gfcweather.com/admin/' }],
     allowed_mentions: { parse: [] },
   };
 }
@@ -124,14 +128,16 @@ export async function sendDailyDigest(env, now) {
   const yesterday = utcDay(now - DAY_MS);
   const monday = new Date(now).getUTCDay() === 1;
   // Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
-  const result = await env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? AND day <= ? ORDER BY day ASC').bind(dayBefore(yesterday, 13), yesterday).all();
-  const bests = await env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all();
-  const data = await loadEvents(env, monday ? 15 : 2);
+  const [result, bests, data] = await Promise.all([
+    env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? AND day <= ? ORDER BY day ASC').bind(dayBefore(yesterday, 13), yesterday).all(),
+    env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all(),
+    loadEvents(env, monday ? 15 : 2),
+  ]);
   const events = data ? summarizeEvents(data, yesterday) : null;
   // The digest, and any record line in it, pings DISCORD_PING_USER_ID when set.
-  const payload = withPing(env, buildDigest({ rows: result.results ?? [], bests: bests.results ?? [], events, yesterday, monday }));
+  const payload = withPing(env, buildDigest({ rows: result?.results ?? [], bests: bests?.results ?? [], events, yesterday, monday }));
   const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  // A forum webhook needs a thread name; a text-channel webhook rejects one with a 4xx, so retry once without it.
+  // A forum webhook needs a thread name; a text-channel webhook rejects one with a 400, so retry once without it.
   let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
   if (rejectsThreadName(response.status)) response = await send(payload);
   if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);

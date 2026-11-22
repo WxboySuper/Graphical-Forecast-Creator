@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, fetchTelemetry, validateEvent } from './telemetry-worker.mjs';
+import { withPing } from './discord-ping.mjs';
 import { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
 
@@ -572,4 +573,24 @@ test('a missing or unauthorized digest webhook fails fast without a retry', asyn
   const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
   assert.equal(attempts, 1);
   assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 404']]);
+});
+
+test('the digest cron is a quiet no-op without a webhook and names the missing database otherwise', async () => {
+  assert.deepStrictEqual(await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, {})), []);
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, { TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/telemetry' }));
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest skipped: TELEMETRY_DB binding is not configured']]);
+});
+
+test('an Analytics Engine failure is logged and the digest still posts without the breakdown', async () => {
+  const { env, posts } = digestEnv(dayRows('visit', [2, 1], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, CF_ACCOUNT_ID: 'acct', CF_ANALYTICS_API_TOKEN: 'token' }, analytics: async () => new Response('bad token', { status: 403 }) });
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.ok(errors.some((entry) => entry[0] === 'Telemetry digest events unavailable'));
+  assert.ok(!JSON.stringify(errors).includes('discord.example'));
+  assert.match(posts[0].embeds[0].description, /Feature and page breakdown unavailable/);
+});
+
+test('withPing tolerates a missing env or payload', () => {
+  assert.equal(withPing(undefined, null), null);
+  const payload = { content: 'x', allowed_mentions: { parse: [] } };
+  assert.deepStrictEqual(withPing(undefined, payload), payload);
 });

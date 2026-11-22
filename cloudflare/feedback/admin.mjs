@@ -132,7 +132,9 @@ export async function patchFeedback(request, id, db, now = Date.now()) {
 
 /** Applies a status change and, once it is stored, queues a best-effort Discord update that never affects the response. */
 export async function patchFeedbackAndNotify(request, id, env, ctx) {
-  const before = await env.FEEDBACK_DB.prepare('SELECT status FROM feedback WHERE id = ?').bind(id).first();
+  let before = null;
+  try { before = await env.FEEDBACK_DB.prepare('SELECT status FROM feedback WHERE id = ?').bind(id).first(); }
+  catch { /* Best effort: without the previous status the change is still stored and announced. */ }
   const response = await patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now());
   if (!response.ok) return response;
   try {
@@ -161,7 +163,8 @@ const adminRoutes = [
 
 /** `target` holds the feedback `id` (absent for the list) and the execution `ctx` used for background notifications. */
 export async function handleAdmin(request, env, url, target = {}) {
-  const { id = null, ctx } = target;
+  // Older callers passed the id positionally (null for the list); both forms still work.
+  const { id = null, ctx } = typeof target === 'string' ? { id: target } : target ?? {};
   // The admin API is for curl and server-side agents. It sends no CORS headers, and browsers (which always send Origin) are refused outright.
   if (request.headers.has('origin')) return json({ error: 'Admin API is not available from browsers' }, 403);
   if (!isAdminConfigured(env)) return json({ error: 'Admin API unavailable' }, 503);
