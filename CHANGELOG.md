@@ -9,7 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
-- **Send feedback:** The production app hides Send feedback until the feedback service is live. The beta site keeps it.
+- **Send feedback:** Send feedback is now available in the production app as well as the beta site.
 
 #### Added
 
