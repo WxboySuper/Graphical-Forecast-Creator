@@ -106,6 +106,18 @@ function updateTarget(env, item) {
   return null;
 }
 
+// A threadless forum post is rejected with 400; a deleted or unknown stored thread answers 400 or 404.
+function needsNewThread(httpStatus, threadId) {
+  if (threadId) return httpStatus === 400 || httpStatus === 404;
+  return httpStatus === 400;
+}
+
+async function rememberThread(env, id, threadId) {
+  if (!threadId) return;
+  try { await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_thread_id = ? WHERE id = ?').bind(threadId, id).run(); }
+  catch { /* The update was posted; a later update will simply start another thread. */ }
+}
+
 async function deliverStatusUpdate(env, id, status) {
   try {
     const item = await env.FEEDBACK_DB.prepare('SELECT id, category, message, build_target, discord_thread_id FROM feedback WHERE id = ?').bind(id).first();
@@ -114,10 +126,12 @@ async function deliverStatusUpdate(env, id, status) {
     const payload = statusUpdatePayload(item, status);
     const response = await post(env, target.url, payload, target.threadId);
     if (response.ok) return 'sent';
-    // A forum webhook rejects a threadless post with 400; start a small thread for the update instead.
-    if (response.status !== 400 || target.threadId) return 'failed';
+    if (!needsNewThread(response.status, target.threadId)) return 'failed';
+    // Start a fresh forum thread: the post was threadless on a forum, or the stored thread is gone.
     const retry = await post(env, target.url, { ...payload, thread_name: truncate(`Update: ${item.category} ${item.id}`, 100) });
-    return retry.ok ? 'sent' : 'failed';
+    if (!retry.ok) return 'failed';
+    await rememberThread(env, item.id, await threadIdFrom(retry));
+    return 'sent';
   } catch {
     // Notifications are best effort; the status change is already stored.
     return 'failed';

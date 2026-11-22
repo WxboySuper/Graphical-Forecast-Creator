@@ -1,12 +1,11 @@
 import { COUNT, DATASET, DAY, queryAnalytics } from './admin.mjs';
-import { utcDay } from './daily-counts.mjs';
+import { DAY_MS, utcDay } from './daily-counts.mjs';
 import { withPing } from '../discord-ping.mjs';
 
 export const DIGEST_CRON = '0 13 * * *';
 
 /** A digest failure whose message holds only safe detail such as an HTTP status. */
 export class DigestError extends Error {}
-const DAY_MS = 86_400_000;
 const KINDS = [['visit', 'Visitors'], ['active', 'Active users']];
 const fmt = (value) => Math.round(value).toLocaleString('en-US');
 const words = (name) => name.replaceAll('_', ' ');

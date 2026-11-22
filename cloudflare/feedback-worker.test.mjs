@@ -98,6 +98,11 @@ class FakeD1 {
       if (row) { row.discord_status = args[0]; row.discord_thread_id = args[1]; }
       return { meta: { changes: row ? 1 : 0 } };
     } },
+    { matches: (sql) => sql.startsWith('UPDATE feedback SET discord_thread_id'), run: (db, args) => {
+      const row = db.rows.find((item) => item.id === args[1]);
+      if (row) row.discord_thread_id = args[0];
+      return { meta: { changes: row ? 1 : 0 } };
+    } },
     { matches: (sql) => sql.startsWith('UPDATE feedback SET status'), run: (db, args) => {
       const row = db.rows.find((item) => item.id === args[3]);
       if (row) { row.status = args[0]; row.handled_at = args[0] === 'handled' ? (row.handled_at ?? args[2]) : null; }
@@ -854,4 +859,24 @@ test('an invalid DISCORD_PING_USER_ID is ignored rather than injected', async ()
   await Promise.all(waits);
   assert.equal(discord.calls[0].body.content.startsWith('Feedback '), true);
   assert.deepStrictEqual(discord.calls[0].body.allowed_mentions, { parse: [] });
+});
+
+test('a deleted forum thread is replaced by a new thread for the update', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const parsed = new URL(url);
+    calls.push({ url: parsed, body: JSON.parse(init.body) });
+    if (parsed.searchParams.has('thread_id')) return Response.json({ message: 'Unknown Channel', code: 10003 }, { status: 404 });
+    return Response.json({ id: '2', channel_id: '888888888888888888' });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: fetcher } });
+  db.rows = [{ id: 'fb-7', created_at: 1, uid_hash: 'h', email: null, category: 'idea', message: 'gone thread', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'sent', discord_thread_id: '111111111111111111' }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-7', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url.searchParams.get('thread_id'), '111111111111111111');
+  assert.equal(calls[1].url.searchParams.has('thread_id'), false);
+  assert.equal(calls[1].body.thread_name, 'Update: idea fb-7');
+  assert.equal(db.rows[0].discord_thread_id, '888888888888888888', 'later updates use the replacement thread');
 });

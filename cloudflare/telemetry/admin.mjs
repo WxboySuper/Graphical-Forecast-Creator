@@ -1,6 +1,6 @@
 import { authorizeViewer } from '../feedback/access.mjs';
 import { json } from '../feedback/response.mjs';
-import { utcDay } from './daily-counts.mjs';
+import { DAY_MS, utcDay } from './daily-counts.mjs';
 import { renderUsagePage } from './admin-page.mjs';
 import { ALLOWED_EVENTS, validVersion } from './events.mjs';
 
@@ -11,7 +11,6 @@ export const DATASET = 'gfc_telemetry_events';
 export const DAY = "formatDateTime(timestamp, '%Y-%m-%d') AS day";
 // Analytics Engine samples writes, so weight each row by its sample interval.
 export const COUNT = 'SUM(_sample_interval * double1) AS count';
-const DAY_MS = 86_400_000;
 
 export function parseDays(url) {
   const value = Number(url.searchParams.get('days') ?? 30);
