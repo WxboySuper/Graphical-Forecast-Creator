@@ -460,6 +460,8 @@ test('the 13:00 UTC cron posts a daily digest with a 7-day comparison and a new 
   assert.equal(posts.length, 1);
   const [payload] = posts;
   assert.deepStrictEqual(payload.allowed_mentions, { parse: [] });
+  assert.equal('thread_name' in payload, false, 'the digest webhook may be a plain text channel');
+  assert.equal('applied_tags' in payload, false);
   assert.equal(payload.content, '🏆 New record: 30 visitors (previous best 20)');
   assert.equal(payload.embeds[0].title, 'GFC daily usage · 2026-11-16 (UTC)');
   const description = payload.embeds[0].description;

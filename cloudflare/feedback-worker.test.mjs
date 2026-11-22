@@ -748,7 +748,47 @@ test('status updates use the updates webhook when set and skip items without a t
   const threadless = seeded({ FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook' });
   assert.equal((await patch(threadless)).status, 200);
   await Promise.all(threadless.waits);
-  assert.equal(discord.calls.length, 1, 'no forum thread is known, so nothing is posted');
+  assert.equal(discord.calls.length, 2, 'without a thread the update posts to the main channel');
+  assert.equal(discord.calls[1].url.pathname, '/webhook');
+  assert.equal(discord.calls[1].url.searchParams.has('thread_id'), false);
+  assert.equal('thread_name' in discord.calls[1].body, false);
+});
+
+test('a text-channel webhook that rejects forum fields gets one retry without them', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url: new URL(url), body });
+    // Discord rejects thread_name on non-forum webhooks with a 400.
+    if ('thread_name' in body || 'applied_tags' in body) return Response.json({ code: 220001, message: 'Webhooks posted to forum channels must have a thread_name or thread_id' }, { status: 400 });
+    return Response.json({ id: '9', channel_id: '555555555555555555' });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FEEDBACK_DISCORD_TAG_BETA: '42', FETCH: fetcher } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].body.thread_name.startsWith('[BETA] bug:'), true);
+  assert.deepStrictEqual(calls[0].body.applied_tags, ['42']);
+  assert.equal('thread_name' in calls[1].body, false);
+  assert.equal('applied_tags' in calls[1].body, false);
+  assert.deepStrictEqual(calls[1].body.allowed_mentions, { parse: [] });
+  assert.equal(db.rows[0].discord_status, 'sent');
+  assert.equal(db.rows[0].discord_thread_id, null, 'a text-channel message is not a thread');
+  const { id } = db.rows[0];
+  await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${id}`, { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  await Promise.all(waits);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].url.searchParams.has('thread_id'), false);
+  assert.equal(calls[2].body.content, `Feedback ${id} marked **Read**`);
+});
+
+test('non-400 Discord failures are not retried', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => { attempts += 1; return new Response('slow down', { status: 429 }); } } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_status, 'failed');
 });
 
 test('a failing status-update webhook never fails or rejects the status change', async () => {

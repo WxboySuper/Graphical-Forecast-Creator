@@ -36,11 +36,22 @@ async function post(env, webhookUrl, payload, threadId = null) {
   return (env.FETCH ?? fetch)(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
 }
 
+// Only forum webhooks accept thread_name and applied_tags; a text-channel webhook answers 400, so retry once without them.
+function textChannelPayload(payload) {
+  const rest = { ...payload };
+  delete rest.thread_name;
+  delete rest.applied_tags;
+  return rest;
+}
+
 async function sendWebhook(env, payload) {
   try {
     const response = await post(env, env.FEEDBACK_DISCORD_WEBHOOK_URL, payload);
-    if (!response.ok) return { status: 'failed', threadId: null };
-    return { status: 'sent', threadId: await threadIdFrom(response) };
+    if (response.ok) return { status: 'sent', threadId: await threadIdFrom(response) };
+    if (response.status !== 400) return { status: 'failed', threadId: null };
+    // A text-channel post has no thread of its own, so no thread ID is stored and updates post to the channel.
+    const retry = await post(env, env.FEEDBACK_DISCORD_WEBHOOK_URL, textChannelPayload(payload));
+    return { status: retry.ok ? 'sent' : 'failed', threadId: null };
   } catch {
     return { status: 'failed', threadId: null };
   }
@@ -84,11 +95,11 @@ export function statusUpdatePayload(item, status) {
   };
 }
 
-// A separate updates webhook (an ordinary text channel) takes every update; otherwise the update is
-// posted into the item's original forum thread, and items without a known thread are skipped.
+// A separate updates webhook takes every update. Otherwise the update goes into the item's forum thread when
+// one is known, or straight to the main webhook's channel (a text channel, or an item without a stored thread).
 function updateTarget(env, item) {
   if (env.FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL) return { url: env.FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL, threadId: null };
-  if (env.FEEDBACK_DISCORD_WEBHOOK_URL && item.discord_thread_id) return { url: env.FEEDBACK_DISCORD_WEBHOOK_URL, threadId: item.discord_thread_id };
+  if (env.FEEDBACK_DISCORD_WEBHOOK_URL) return { url: env.FEEDBACK_DISCORD_WEBHOOK_URL, threadId: item.discord_thread_id ?? null };
   return null;
 }
 
