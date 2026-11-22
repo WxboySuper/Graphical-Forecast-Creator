@@ -15,6 +15,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Added
 
+- **Send feedback:** Send feedback is now available in the production app from the Resources menu.
 - **Home page testimonial:** The home page shows a second GFC user testimonial alongside the existing one.
 
 #### Fixed

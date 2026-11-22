@@ -23,7 +23,7 @@ export const FEEDBACK_MAX_LENGTH = 4000;
 /** True for the public open-beta deployment (beta.gfcweather.com). */
 export const isBetaBuild = (): boolean => getBuildTarget() === 'beta';
 
-/** Feedback is offered where the `feedback` flag is on (beta only for now) and a feedback service is configured. */
+/** Feedback is offered where the `feedback` flag is on (beta and production) and a feedback service is configured. */
 export const isFeedbackEnabled = (): boolean => flag('feedback') && Boolean(getFeedbackApiUrl());
 
 /** Base URL of the feedback service, without a trailing slash. */

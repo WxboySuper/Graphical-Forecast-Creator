@@ -196,7 +196,7 @@ describe('isFeedbackEnabled', () => {
         globals.__GFC_BUILD_TARGET__ = target;
         return isFeedbackEnabled();
       });
-      expect(enabled).toEqual(['beta']);
+      expect(enabled).toEqual(['beta', 'production']);
     } finally {
       scope.__GFC_FEEDBACK_API_URL__ = original;
     }
