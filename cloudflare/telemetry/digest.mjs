@@ -3,6 +3,8 @@ import { DAY_MS, utcDay } from './daily-counts.mjs';
 import { withPing } from '../discord-ping.mjs';
 
 export const DIGEST_CRON = '0 13 * * *';
+// Matches the custom-domain route in wrangler.telemetry.jsonc; override with TELEMETRY_DASHBOARD_URL.
+export const DEFAULT_DASHBOARD_URL = 'https://telemetry.gfcweather.com/admin/';
 
 /** A digest failure whose message holds only safe detail such as an HTTP status. */
 export class DigestError extends Error {}
@@ -103,7 +105,7 @@ function trendLines(kinds, events) {
 }
 
 /** Builds the Discord payload for one daily digest; Mondays add the week-over-week trend section. */
-export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
+export function buildDigest({ rows, bests = [], events, yesterday, monday, dashboardUrl }) {
   const kinds = KINDS.map(([kind, label]) => [label, summarizeKind(rows, kind, yesterday, bests.find((row) => row.kind === kind))]);
   const lines = kinds.map(([label, stats]) => countLine(label, stats));
   lines.push(`**Last 7 days (summed daily counts):** ${kinds.map(([label, stats]) => `${fmt(stats.lastWeek)} ${label.toLowerCase()}`).join(' · ')}`);
@@ -114,7 +116,7 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
     .map(([label, stats]) => `🏆 New record: ${fmt(stats.count)} ${label.toLowerCase()} (previous best ${fmt(stats.previousBest)})`);
   return {
     content: records.length ? records.join('\n') : '',
-    embeds: [{ title: `GFC daily usage · ${yesterday} (UTC)`, description: Array.from(lines.join('\n')).slice(0, 4096).join(''), url: 'https://telemetry.gfcweather.com/admin/' }],
+    embeds: [{ title: `GFC daily usage · ${yesterday} (UTC)`, description: Array.from(lines.join('\n')).slice(0, 4096).join(''), url: dashboardUrl ?? DEFAULT_DASHBOARD_URL }],
     allowed_mentions: { parse: [] },
   };
 }
@@ -125,6 +127,7 @@ const rejectsThreadName = (status) => status === 400;
 /** Posts yesterday's usage digest to TELEMETRY_DISCORD_WEBHOOK_URL; a no-op when it is unset. */
 export async function sendDailyDigest(env, now) {
   if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return 'disabled';
+  if (!env.TELEMETRY_DB) throw new DigestError('TELEMETRY_DB binding is not configured');
   const yesterday = utcDay(now - DAY_MS);
   const monday = new Date(now).getUTCDay() === 1;
   // Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
@@ -135,7 +138,7 @@ export async function sendDailyDigest(env, now) {
   ]);
   const events = data ? summarizeEvents(data, yesterday) : null;
   // The digest, and any record line in it, pings DISCORD_PING_USER_ID when set.
-  const payload = withPing(env, buildDigest({ rows: result?.results ?? [], bests: bests?.results ?? [], events, yesterday, monday }));
+  const payload = withPing(env, buildDigest({ rows: result?.results ?? [], bests: bests?.results ?? [], events, yesterday, monday, dashboardUrl: env.TELEMETRY_DASHBOARD_URL }));
   const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   // A forum webhook needs a thread name; a text-channel webhook rejects one with a 400, so retry once without it.
   let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });

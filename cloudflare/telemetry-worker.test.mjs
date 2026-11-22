@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, fetchTelemetry, validateEvent } from './telemetry-worker.mjs';
 import { withPing } from './discord-ping.mjs';
+import { sendDailyDigest } from './telemetry/digest.mjs';
 import { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
 
@@ -593,4 +594,18 @@ test('withPing tolerates a missing env or payload', () => {
   assert.equal(withPing(undefined, null), null);
   const payload = { content: 'x', allowed_mentions: { parse: [] } };
   assert.deepStrictEqual(withPing(undefined, payload), payload);
+});
+
+test('sendDailyDigest called directly without a database fails with a sanitized error', async () => {
+  await assert.rejects(sendDailyDigest({ TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/telemetry' }, DIGEST_TUESDAY), { message: 'TELEMETRY_DB binding is not configured' });
+  assert.equal(await sendDailyDigest({}, DIGEST_TUESDAY), 'disabled');
+});
+
+test('the digest links to the configured dashboard URL', async () => {
+  const { env, posts } = digestEnv([], { env: { NOW: () => DIGEST_TUESDAY, TELEMETRY_DASHBOARD_URL: 'https://example.test/admin/' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].embeds[0].url, 'https://example.test/admin/');
+  const fallback = digestEnv([], { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, fallback.env);
+  assert.equal(fallback.posts[0].embeds[0].url, 'https://telemetry.gfcweather.com/admin/');
 });
