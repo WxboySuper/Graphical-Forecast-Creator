@@ -22,7 +22,7 @@ function activeCounterConfigured(env) {
 }
 
 export async function countVisit(request, env, headers, now) {
-  const err = requestError(request, headers);
+  const err = requestError(request, headers, { allowMissingContentType: true });
   if (err) return err;
   if (request.headers.has('cookie')) return json({ error: 'Cookies are not accepted' }, 400, headers);
   if (!env.TELEMETRY_HASH_SECRET || !env.TELEMETRY_DB) return json({ error: 'Telemetry unavailable' }, 503, headers);
@@ -52,7 +52,7 @@ async function activeClaims(request, env, headers) {
 }
 
 export async function countActive(request, env, headers, now) {
-  const err = requestError(request, headers);
+  const err = requestError(request, headers, { allowMissingContentType: true });
   if (err) return err;
   if (!activeCounterConfigured(env)) return json({ error: 'Telemetry unavailable' }, 503, headers);
   // Throttle before reading the payload or verifying the Firebase token so unauthenticated floods stay cheap.

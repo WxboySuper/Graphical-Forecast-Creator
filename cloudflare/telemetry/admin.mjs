@@ -4,7 +4,13 @@ import { utcDay } from './daily-counts.mjs';
 import { renderUsagePage } from './admin-page.mjs';
 import { ALLOWED_EVENTS, validVersion } from './events.mjs';
 
-const DATASET = 'events.analyticsEngine.gfc_telemetry_events';
+// The /analytics_engine/sql endpoint takes the bare dataset name. The `events.analyticsEngine.<name>` form
+// belongs to the separate Analytics SQL API and is rejected here.
+const DATASET = 'gfc_telemetry_events';
+// toDate() is not in the Analytics Engine SQL dialect; format the UTC day as YYYY-MM-DD instead.
+const DAY = "formatDateTime(timestamp, '%Y-%m-%d') AS day";
+// Analytics Engine samples writes, so weight each row by its sample interval.
+const COUNT = 'SUM(_sample_interval * double1) AS count';
 const DAY_MS = 86_400_000;
 
 export function parseDays(url) {
@@ -32,15 +38,15 @@ export function buildEventsQuery(days, event, version) {
   const filters = [timeFilter(days)];
   if (event) filters.push(`blob1 = ${quote(event)}`);
   if (version) filters.push(`blob3 = ${quote(version)}`);
-  return `SELECT blob1 AS event, blob2 AS detail, blob3 AS version, toDate(timestamp) AS day, SUM(double1) AS count FROM ${DATASET} WHERE ${filters.join(' AND ')} GROUP BY event, detail, version, day ORDER BY day ASC LIMIT 10000`;
+  return `SELECT blob1 AS event, blob2 AS detail, blob3 AS version, ${DAY}, ${COUNT} FROM ${DATASET} WHERE ${filters.join(' AND ')} GROUP BY event, detail, version, day ORDER BY day ASC LIMIT 10000`;
 }
 
 export function buildPagesQuery(days) {
-  return `SELECT blob2 AS page, blob3 AS version, toDate(timestamp) AS day, SUM(double1) AS count FROM ${DATASET} WHERE ${timeFilter(days)} AND blob1 = 'page_view' GROUP BY page, version, day ORDER BY day ASC LIMIT 10000`;
+  return `SELECT blob2 AS page, blob3 AS version, ${DAY}, ${COUNT} FROM ${DATASET} WHERE ${timeFilter(days)} AND blob1 = 'page_view' GROUP BY page, version, day ORDER BY day ASC LIMIT 10000`;
 }
 
 export function buildLocationsQuery(days) {
-  return `SELECT blob4 AS country, toDate(timestamp) AS day, SUM(double1) AS count FROM ${DATASET} WHERE ${timeFilter(days)} GROUP BY country, day ORDER BY day ASC LIMIT 10000`;
+  return `SELECT blob4 AS country, ${DAY}, ${COUNT} FROM ${DATASET} WHERE ${timeFilter(days)} GROUP BY country, day ORDER BY day ASC LIMIT 10000`;
 }
 
 async function queryAnalytics(env, query) {
@@ -52,7 +58,12 @@ async function queryAnalytics(env, query) {
       body: query,
     },
   );
-  if (!response.ok) throw new Error('Analytics query failed');
+  if (!response.ok) {
+    // The API error text is about the query or token, never visitor data, so it is safe to log.
+    const detail = (await response.text().catch(() => '')).slice(0, 500);
+    console.error('Analytics query failed', response.status, detail);
+    throw new Error('Analytics query failed');
+  }
   const result = await response.json();
   if (!Array.isArray(result.data)) throw new Error('Invalid analytics response');
   return result.data;

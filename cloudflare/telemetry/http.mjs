@@ -15,9 +15,13 @@ export function corsHeaders(request, env) {
   };
 }
 
-export function requestError(request, headers) {
+// Body-less pings (/v1/visit, /v1/active) are sent by the app and marketing site without a Content-Type,
+// so those routes accept a missing header; the payload is still checked to be empty.
+export function requestError(request, headers, { allowMissingContentType = false } = {}) {
   if (request.headers.has('origin') && !headers['access-control-allow-origin']) return json({ error: 'Origin not allowed' }, 403);
-  if (!/^application\/json\s*(?:;|$)/i.test((request.headers.get('content-type') ?? '').trim())) return json({ error: 'Content-Type must be application/json' }, 400, headers);
+  const contentType = (request.headers.get('content-type') ?? '').trim();
+  const missingAllowed = allowMissingContentType && contentType === '';
+  if (!missingAllowed && !/^application\/json\s*(?:;|$)/i.test(contentType)) return json({ error: 'Content-Type must be application/json' }, 400, headers);
   const length = Number(request.headers.get('content-length'));
   if (Number.isFinite(length) && length > BODY_LIMIT) return json({ error: 'Request body too large' }, 413, headers);
   return null;

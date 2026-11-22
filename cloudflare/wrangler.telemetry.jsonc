@@ -14,7 +14,7 @@
     "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
     "CF_ACCESS_TEAM_DOMAIN": "mute-pine-62f8.cloudflareaccess.com",
     "CF_ACCESS_AUD": "2e0e479ad9fa1b5c6dec7d24fad6f73cdcf52985bef70e172c8734fe45eb3690",
-    "TELEMETRY_ALLOWED_ORIGINS": "https://beta.gfcweather.com,https://app.gfcweather.com,https://gfcweather.com,https://gfc.weatherboysuper.com,http://localhost:3000,http://localhost:5173"
+    "TELEMETRY_ALLOWED_ORIGINS": "https://beta.gfcweather.com,https://app.gfcweather.com,https://gfcweather.com,https://www.gfcweather.com,https://gfc.weatherboysuper.com,http://localhost:3000,http://localhost:5173"
   },
   "observability": { "enabled": true, "head_sampling_rate": 1 }
 }
