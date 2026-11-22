@@ -118,6 +118,41 @@ test('visit accepts no cookies and returns no content on success', async () => {
   assert.equal(env.TELEMETRY_DB.counts.get('visit|2026-11-17'), 1);
 });
 
+test('visit and active accept the body-less pings the app and marketing site actually send', async () => {
+  // Mirrors fetch(url, { method: 'POST' }) from the browser: no Content-Type, no body.
+  const bare = (path, env, headers = {}) => fetchTelemetry(new Request(`https://telemetry.gfcweather.com${path}`, { method: 'POST', headers: { origin: 'https://app.gfcweather.com', 'cf-connecting-ip': '192.0.2.9', 'user-agent': 'test-agent', ...headers } }), env);
+  const env = baseEnv();
+  const visit = await bare('/v1/visit', env);
+  assert.equal(visit.status, 204);
+  assert.equal(visit.headers.get('access-control-allow-origin'), 'https://app.gfcweather.com');
+  assert.equal(env.TELEMETRY_DB.counts.get('visit|2026-11-17'), 1);
+  const activeEnv = Object.assign(baseEnv(), { FIREBASE_PROJECT_ID: 'gfc-test' });
+  assert.equal((await bare('/v1/active', activeEnv)).status, 401);
+  const wrongType = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/v1/visit', { method: 'POST', headers: { origin: 'https://app.gfcweather.com', 'content-type': 'text/plain' }, body: '{}' }), baseEnv());
+  assert.equal(wrongType.status, 400);
+  const eventNoType = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/v1/event', { method: 'POST', headers: { origin: 'https://app.gfcweather.com' }, body: '{"event":"page_view","version":"2.0.0"}' }), baseEnv());
+  assert.equal(eventNoType.status, 400);
+});
+
+test('admin logs the Analytics Engine error body when a query fails', async () => {
+  const env = Object.assign(baseEnv(), {
+    CF_ACCESS_TEAM_DOMAIN: accessDomain,
+    CF_ACCESS_AUD: accessAud,
+    CF_ACCOUNT_ID: 'mock-account-id',
+    CF_ANALYTICS_API_TOKEN: 'mock-analytics-token',
+    JWKS_FETCH: async () => Response.json({ keys: [accessJwk] }, { headers: { 'cache-control': 'max-age=300' } }),
+    FETCH: async () => new Response('unknown table', { status: 422 }),
+  });
+  const token = await makeAccessToken();
+  let response;
+  const errors = await captureErrors(async () => {
+    response = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/pages?days=7', { headers: { 'cf-access-jwt-assertion': token } }), env);
+  });
+  assert.equal(response.status, 500);
+  assert.ok(errors.some((values) => values[0] === 'Analytics query failed' && values[1] === 422 && values[2] === 'unknown table'));
+  assert.ok(errors.every((values) => !values.join(' ').includes('mock-analytics-token')));
+});
+
 test('active fails closed without Firebase config and rejects missing tokens', async () => {
   const noConfig = await post('/v1/active', { env: baseEnv() });
   assert.equal(noConfig.status, 503);
@@ -221,7 +256,8 @@ test('admin verifies Access JWT and queries Analytics Engine with mocked secrets
     FETCH: async (url, options) => {
       assert.equal(url, 'https://api.cloudflare.com/client/v4/accounts/mock-account-id/analytics_engine/sql');
       assert.equal(options.headers.authorization, 'Bearer mock-analytics-token');
-      assert.match(options.body, /events\.analyticsEngine\.gfc_telemetry_events/);
+      assert.match(options.body, /FROM gfc_telemetry_events /);
+      assert.doesNotMatch(options.body, /events\.analyticsEngine|toDate\(/);
       assert.match(options.body, /blob1 = 'page_view'/);
       return Response.json({ data: [{ event: 'page_view', detail: '/forecast', version: '2.1.0', day: '2026-11-17', count: 3 }] });
     },
