@@ -124,25 +124,37 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday, dashb
 // A 400 means a text-channel webhook refused the forum thread name; auth, missing-webhook and rate-limit errors fail fast.
 const rejectsThreadName = (status) => status === 400;
 
+// Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
+async function loadDigestInputs(env, yesterday, monday) {
+  const [result, bests, data] = await Promise.all([
+    env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? AND day <= ? ORDER BY day ASC').bind(dayBefore(yesterday, 13), yesterday).all(),
+    env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all(),
+    loadEvents(env, monday ? 15 : 2),
+  ]);
+  return {
+    rows: result?.results ?? [],
+    bests: bests?.results ?? [],
+    events: data ? summarizeEvents(data, yesterday) : null,
+  };
+}
+
+// A forum webhook needs a thread name; a text-channel webhook rejects one with a 400, so retry once without it.
+async function postDigest(env, payload, yesterday) {
+  const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
+  if (rejectsThreadName(response.status)) response = await send(payload);
+  if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);
+}
+
 /** Posts yesterday's usage digest to TELEMETRY_DISCORD_WEBHOOK_URL; a no-op when it is unset. */
 export async function sendDailyDigest(env, now) {
   if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return 'disabled';
   if (!env.TELEMETRY_DB) throw new DigestError('TELEMETRY_DB binding is not configured');
   const yesterday = utcDay(now - DAY_MS);
   const monday = new Date(now).getUTCDay() === 1;
-  // Only the last 14 days feed the averages and weekly totals; the all-time best before yesterday comes from one aggregate.
-  const [result, bests, data] = await Promise.all([
-    env.TELEMETRY_DB.prepare('SELECT kind, day, count FROM telemetry_daily_counts WHERE day >= ? AND day <= ? ORDER BY day ASC').bind(dayBefore(yesterday, 13), yesterday).all(),
-    env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all(),
-    loadEvents(env, monday ? 15 : 2),
-  ]);
-  const events = data ? summarizeEvents(data, yesterday) : null;
+  const inputs = await loadDigestInputs(env, yesterday, monday);
   // The digest, and any record line in it, pings DISCORD_PING_USER_ID when set.
-  const payload = withPing(env, buildDigest({ rows: result?.results ?? [], bests: bests?.results ?? [], events, yesterday, monday, dashboardUrl: env.TELEMETRY_DASHBOARD_URL }));
-  const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  // A forum webhook needs a thread name; a text-channel webhook rejects one with a 400, so retry once without it.
-  let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
-  if (rejectsThreadName(response.status)) response = await send(payload);
-  if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);
+  const payload = withPing(env, buildDigest({ ...inputs, yesterday, monday, dashboardUrl: env.TELEMETRY_DASHBOARD_URL }));
+  await postDigest(env, payload, yesterday);
   return 'sent';
 }
