@@ -116,6 +116,9 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
   };
 }
 
+// Client errors other than rate limiting mean the webhook refused the forum thread name.
+const rejectsThreadName = (status) => status >= 400 && status < 500 && status !== 429;
+
 /** Posts yesterday's usage digest to TELEMETRY_DISCORD_WEBHOOK_URL; a no-op when it is unset. */
 export async function sendDailyDigest(env, now) {
   if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return 'disabled';
@@ -131,7 +134,7 @@ export async function sendDailyDigest(env, now) {
   const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   // A forum webhook needs a thread name; a text-channel webhook rejects one with a 4xx, so retry once without it.
   let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });
-  if (response.status >= 400 && response.status < 500 && response.status !== 429) response = await send(payload);
+  if (rejectsThreadName(response.status)) response = await send(payload);
   if (!response.ok) throw new DigestError(`Discord webhook returned ${response.status}`);
   return 'sent';
 }
