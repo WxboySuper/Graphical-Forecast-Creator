@@ -23,6 +23,6 @@
     "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
     "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
     "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
-    "feedback": { "kind": "dev", "owner": "WxboySuper", "removeBy": "2.x", "default": false, "values": { "beta": true } }
+    "feedback": { "kind": "dev", "owner": "WxboySuper", "removeBy": "2.x", "default": false, "values": { "beta": true, "production": true } }
   }
 }
