@@ -3,25 +3,9 @@ import { Cloud, LoaderCircle, Mail } from 'lucide-react';
 import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { useAuth } from '../../auth/AuthProvider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import './BetaAuthCard.css';
-
-/** Card shell for the Clerk sign-in form. */
-const BetaInfoCard: React.FC<{
-  title: React.ReactNode;
-  description?: React.ReactNode;
-  className?: string;
-  children?: React.ReactNode;
-}> = ({ title, description, className, children }) => (
-  <Card className={className}>
-    <CardHeader className="beta-info-card-header">
-      <CardTitle>{title}</CardTitle>
-      {description ? <CardDescription>{description}</CardDescription> : null}
-    </CardHeader>
-    {children ? <CardContent className="beta-info-card-content">{children}</CardContent> : null}
-  </Card>
-);
+import { useAuth } from '../../auth/AuthProvider';
 
 const CLERK_VERIFICATION_SEGMENTS = new Set([
   'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',
@@ -37,6 +21,22 @@ interface BetaAuthCardProps {
   allowSignUp?: boolean;
   googleLabel?: string;
 }
+
+/** Information card shell retained for the beta authentication flow. */
+const BetaInfoCard: React.FC<{
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
+}> = ({ title, description, children, className = 'beta-info-card' }) => (
+  <Card className={className}>
+    <CardHeader className="beta-info-card-header">
+      <CardTitle>{title}</CardTitle>
+      {description ? <CardDescription>{description}</CardDescription> : null}
+    </CardHeader>
+    {children ? <CardContent className="beta-info-card-content">{children}</CardContent> : null}
+  </Card>
+);
 
 /** True when the current form state is in create-account mode. */
 const isCreateAccountMode = (allowSignUp: boolean, mode: AuthMode): boolean =>

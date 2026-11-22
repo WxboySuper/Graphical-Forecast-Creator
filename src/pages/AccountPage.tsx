@@ -883,7 +883,7 @@ type AccountView = 'disabled' | 'signed-in' | 'clerk-signed-out' | 'clerk-loadin
 const resolveAccountView = (
   authProvider: ReturnType<typeof useAuth>['authProvider'],
   hostedAuthEnabled: boolean,
-  status: ReturnType<typeof useAuth>['status']
+  status: ReturnType<typeof useAuth>['status'],
 ): AccountView => {
   if (!hostedAuthEnabled) return 'disabled';
   if (status === 'signed_in') return 'signed-in';

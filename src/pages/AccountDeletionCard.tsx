@@ -86,7 +86,7 @@ const AccountDeletionButtonLabel: React.FC<{ deleting: boolean }> = ({ deleting 
 /** Renders the destructive account lifecycle control and provider reauthentication form. */
 export const AccountDeletionCard: React.FC = () => {
   const { user, authProvider } = useAuth();
-  const reauthentication = getAccountDeletionReauthentication(user, authProvider);
+  const reauthentication = authProvider === 'clerk' ? 'clerk' : getAccountDeletionReauthentication(user);
   const action = useAccountDeletionAction(reauthentication);
 
   return (

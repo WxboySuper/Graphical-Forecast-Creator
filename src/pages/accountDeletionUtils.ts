@@ -1,14 +1,12 @@
 import type { useAuth } from '../auth/AuthProvider';
 
-export type AccountDeletionReauthentication = 'google' | 'password' | 'session' | 'unsupported';
+export type AccountDeletionReauthentication = 'google' | 'password' | 'clerk' | 'unsupported';
 
 /** Matches the providers and credentials supported by deleteHostedAccount. */
 export const getAccountDeletionReauthentication = (
   user: ReturnType<typeof useAuth>['user'],
-  authProvider?: ReturnType<typeof useAuth>['authProvider'],
 ): AccountDeletionReauthentication => {
   if (!user) return 'unsupported';
-  if (authProvider === 'clerk') return 'session';
 
   const providerIds = new Set(user.providerData.map((provider) => provider.providerId));
   if (providerIds.has('google.com')) return 'google';
@@ -23,6 +21,6 @@ export const canSubmitAccountDeletion = (
   password: string,
 ): boolean => {
   if (confirmation !== 'DELETE' || reauthentication === 'unsupported') return false;
-  if (reauthentication === 'google' || reauthentication === 'session') return true;
+  if (reauthentication === 'google' || reauthentication === 'clerk') return true;
   return password.length > 0;
 };

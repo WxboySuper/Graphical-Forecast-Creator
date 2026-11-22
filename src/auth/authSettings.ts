@@ -50,6 +50,11 @@ export interface UserSettingsDocument {
   monitorSettings: MonitorSettings;
 }
 
+/** Beta entitlement flag stored on the Firebase user profile. */
+export interface UserProfileDocument {
+  betaAccess?: boolean;
+}
+
 /** The local state needed to build a normalized settings document. */
 export interface BuildSettingsArgs {
   darkMode: boolean;
@@ -126,6 +131,10 @@ export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boo
   updatedAt: serverTimestamp(),
   ...(opts?.includeCreatedAt ? { createdAt: serverTimestamp() } : {}),
 });
+
+/** Reads the beta-access flag from a Firebase profile snapshot. */
+export const readProfileBetaAccess = (value: Partial<UserProfileDocument> | undefined): boolean =>
+  Boolean(value?.betaAccess);
 
 export { getSettingsSyncError, getSettingsUpdateError } from './authSyncErrors';
 

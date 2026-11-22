@@ -76,7 +76,7 @@
     "test:cloudflare": "node --test \"cloudflare/*.test.mjs\"",
     "test:toolbar:timezone": "cross-env TZ=America/New_York jest src/components/IntegratedToolbar/IntegratedToolbar.test.tsx",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
-    "test:beta-worker": "node --test cloudflare/beta-worker.test.mjs",
+    "test:beta-worker": "node --test cloudflare/beta-worker.test.mjs cloudflare/beta-clerk-d1-worker.test.mjs",
     "test:coverage": "jest --coverage",
     "perf": "cross-env GFC_PERF=1 jest --runInBand src/performance",
     "test:firestore-rules": "pnpm exec firebase emulators:exec --only firestore --project gfc-rules-test \"node --test tests/firestore.rules.test.mjs\"",
