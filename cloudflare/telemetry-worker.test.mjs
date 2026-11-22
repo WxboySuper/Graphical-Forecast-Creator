@@ -565,3 +565,11 @@ test('the daily digest and its record line ping only DISCORD_PING_USER_ID', asyn
   await worker.scheduled({ cron: '0 13 * * *' }, quiet.env);
   assert.equal(quiet.posts[0].content, '<@525942394986823685>', 'a digest without a record still pings');
 });
+
+test('a missing or unauthorized digest webhook fails fast without a retry', async () => {
+  let attempts = 0;
+  const env = { TELEMETRY_DB: digestDb([]), TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/gone', NOW: () => DIGEST_TUESDAY, FETCH: async () => { attempts += 1; return new Response('Unknown Webhook', { status: 404 }); } };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.equal(attempts, 1);
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 404']]);
+});

@@ -116,8 +116,8 @@ export function buildDigest({ rows, bests = [], events, yesterday, monday }) {
   };
 }
 
-// Client errors other than rate limiting mean the webhook refused the forum thread name.
-const rejectsThreadName = (status) => status >= 400 && status < 500 && status !== 429;
+// A 400 means a text-channel webhook refused the forum thread name; auth, missing-webhook and rate-limit errors fail fast.
+const rejectsThreadName = (status) => status === 400;
 
 /** Posts yesterday's usage digest to TELEMETRY_DISCORD_WEBHOOK_URL; a no-op when it is unset. */
 export async function sendDailyDigest(env, now) {
