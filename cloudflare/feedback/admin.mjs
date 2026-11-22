@@ -154,7 +154,9 @@ const adminRoutes = [
   { method: 'PATCH', hasId: true, run: ({ request, id, env, ctx }) => patchFeedbackAndNotify(request, id, env, ctx) },
 ];
 
-export async function handleAdmin(request, env, url, id, ctx) {
+/** `target` holds the feedback `id` (absent for the list) and the execution `ctx` used for background notifications. */
+export async function handleAdmin(request, env, url, target = {}) {
+  const { id = null, ctx } = target;
   // The admin API is for curl and server-side agents. It sends no CORS headers, and browsers (which always send Origin) are refused outright.
   if (request.headers.has('origin')) return json({ error: 'Admin API is not available from browsers' }, 403);
   if (!isAdminConfigured(env)) return json({ error: 'Admin API unavailable' }, 503);

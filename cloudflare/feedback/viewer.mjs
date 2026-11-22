@@ -90,7 +90,9 @@ const feedbackRoutes = [
   { method: 'DELETE', withId: true, mutating: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 
-async function runFeedbackRoute(request, url, env, id, ctx) {
+/** `call` carries the request, url, env and execution context; `id` is the feedback item, or null for the list. */
+async function runFeedbackRoute(call, id) {
+  const { request, url, env, ctx } = call;
   const route = feedbackRoutes.find((item) => item.method === request.method && item.withId === (id !== null));
   if (!route) return json({ error: 'Not found' }, 404);
   if (route.mutating && !isMutationAllowed(request, url, env)) return json({ error: 'Allowed dashboard origin required' }, 403);
@@ -100,11 +102,11 @@ async function runFeedbackRoute(request, url, env, id, ctx) {
 async function dispatch(request, url, env, ctx) {
   if (['/admin', '/admin/'].includes(url.pathname) && request.method === 'GET') return pageResponse();
   if (url.pathname === '/admin/api/summary' && request.method === 'GET') return summary(env.FEEDBACK_DB);
-  if (url.pathname === '/admin/api/feedback') return runFeedbackRoute(request, url, env, null, ctx);
+  if (url.pathname === '/admin/api/feedback') return runFeedbackRoute({ request, url, env, ctx }, null);
   if (url.pathname.startsWith('/admin/api/feedback/')) {
     const id = feedbackId(url.pathname);
     if (id === null) return json({ error: 'Not found' }, 404, corsFreeHeaders);
-    return runFeedbackRoute(request, url, env, id, ctx);
+    return runFeedbackRoute({ request, url, env, ctx }, id);
   }
   return json({ error: 'Not found' }, 404, corsFreeHeaders);
 }
