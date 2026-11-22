@@ -2,6 +2,7 @@ import { json } from './feedback/response.mjs';
 import { handleAdmin } from './telemetry/admin.mjs';
 import { handlePublic, publicServiceError } from './telemetry/public.mjs';
 import { purgeOldDedupe, utcDay } from './telemetry/daily-counts.mjs';
+import { DIGEST_CRON, DigestError, PURGE_CRON, sendDailyDigest } from './telemetry/digest.mjs';
 
 export { ALLOWED_EVENTS, validateEvent } from './telemetry/events.mjs';
 export { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
@@ -30,17 +31,41 @@ export async function fetchTelemetry(request, env) {
   }
 }
 
+async function runDigest(env, now) {
+  // An unset webhook is a quiet no-op even without a database binding.
+  if (!env.TELEMETRY_DISCORD_WEBHOOK_URL) return;
+  if (!env.TELEMETRY_DB) {
+    console.error('Telemetry Discord digest skipped: TELEMETRY_DB binding is not configured');
+    return;
+  }
+  try { await sendDailyDigest(env, now); }
+  catch (error) {
+    // The digest is best effort. Its own errors carry only an HTTP status; anything else is logged by type so a URL never reaches logs.
+    const detail = error instanceof DigestError ? error.message : error?.name ?? 'Error';
+    console.error('Telemetry Discord digest failed', detail);
+  }
+}
+
+async function purge(env, now) {
+  if (!env.TELEMETRY_DB) {
+    console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
+    return;
+  }
+  try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(now)); }
+  catch (error) {
+    console.error('Telemetry dedupe purge failed');
+    throw new Error('Telemetry dedupe purge failed', { cause: error });
+  }
+}
+
 export default {
   fetch: fetchTelemetry,
-  async scheduled(_controller, env) {
-    if (!env.TELEMETRY_DB) {
-      console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
-      return;
-    }
-    try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(env.NOW?.() ?? Date.now())); }
-    catch (error) {
-      console.error('Telemetry dedupe purge failed');
-      throw new Error('Telemetry dedupe purge failed', { cause: error });
-    }
+  async scheduled(controller, env) {
+    const now = env.NOW?.() ?? controller?.scheduledTime ?? Date.now();
+    const cron = controller?.cron;
+    if (cron === DIGEST_CRON) return runDigest(env, now);
+    // A missing cron is a direct or test invocation of the original purge job.
+    if (cron === PURGE_CRON || cron === undefined) return purge(env, now);
+    console.error('Telemetry scheduled run skipped: unknown cron', cron);
   },
 };

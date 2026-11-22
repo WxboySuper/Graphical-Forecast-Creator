@@ -1,17 +1,16 @@
 import { authorizeViewer } from '../feedback/access.mjs';
 import { json } from '../feedback/response.mjs';
-import { utcDay } from './daily-counts.mjs';
+import { DAY_MS, utcDay } from './daily-counts.mjs';
 import { renderUsagePage } from './admin-page.mjs';
 import { ALLOWED_EVENTS, validVersion } from './events.mjs';
 
 // The /analytics_engine/sql endpoint takes the bare dataset name. The `events.analyticsEngine.<name>` form
 // belongs to the separate Analytics SQL API and is rejected here.
-const DATASET = 'gfc_telemetry_events';
+export const DATASET = 'gfc_telemetry_events';
 // toDate() is not in the Analytics Engine SQL dialect; format the UTC day as YYYY-MM-DD instead.
-const DAY = "formatDateTime(timestamp, '%Y-%m-%d') AS day";
+export const DAY = "formatDateTime(timestamp, '%Y-%m-%d') AS day";
 // Analytics Engine samples writes, so weight each row by its sample interval.
-const COUNT = 'SUM(_sample_interval * double1) AS count';
-const DAY_MS = 86_400_000;
+export const COUNT = 'SUM(_sample_interval * double1) AS count';
 
 export function parseDays(url) {
   const value = Number(url.searchParams.get('days') ?? 30);
@@ -49,7 +48,7 @@ export function buildLocationsQuery(days) {
   return `SELECT blob4 AS country, ${DAY}, ${COUNT} FROM ${DATASET} WHERE ${timeFilter(days)} GROUP BY country, day ORDER BY day ASC LIMIT 10000`;
 }
 
-async function queryAnalytics(env, query) {
+export async function queryAnalytics(env, query) {
   const response = await (env.FETCH ?? fetch)(
     `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/analytics_engine/sql`,
     {

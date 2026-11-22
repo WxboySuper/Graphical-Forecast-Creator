@@ -1,5 +1,7 @@
 import { digest } from '../feedback/auth.mjs';
 
+export const DAY_MS = 86_400_000;
+
 export function utcDay(now) {
   return new Date(now).toISOString().slice(0, 10);
 }

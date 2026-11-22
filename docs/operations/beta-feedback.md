@@ -11,7 +11,16 @@ The feedback API runs as a standalone Cloudflare Worker at `feedback.gfcweather.
 7. Confirm `feedback.gfcweather.com` appears under the Worker custom domains and resolves in the Cloudflare zone. Wrangler provisions the configured custom domain during deploy.
 8. Run the **Deploy feedback Worker** workflow. It applies all pending D1 migrations before publishing the Worker.
 
-The Discord webhook must point to a forum channel. Each submission creates a forum thread. The Worker disables mention parsing and limits the message and embed fields before sending.
+The Discord webhook can point to a forum channel or an ordinary text channel. On a forum channel each submission creates a forum thread. The Worker sends the forum fields (`thread_name`, `applied_tags`) first. If Discord answers 400, as a text-channel webhook does, it retries once without them and posts the submission as a plain message. The Worker disables mention parsing and limits the message and embed fields before sending.
+
+Discord secrets on `gfc-feedback`:
+
+- `FEEDBACK_DISCORD_WEBHOOK_URL` (optional): the forum or text-channel webhook for new submissions. Status changes made in the viewer or through `PATCH /v1/feedback/:id` post a short update here, for example `Feedback <id> marked **Handled**`. On a forum channel the Worker stores each new thread's ID (migration `0004`) and posts updates into that thread. On a text channel, or for items without a stored thread, updates post straight to the channel. If a forum webhook rejects that threadless post, or the stored thread was deleted, the update starts a new short thread, and later updates use it. Repeating a status an item already has is not announced again.
+- `FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL` (optional): when set, every status change goes to this webhook instead.
+
+The ordinary var `DISCORD_PING_USER_ID` in `cloudflare/wrangler.feedback.jsonc` is a Discord user ID. When it is set, new-submission posts start with a mention of that user, and `allowed_mentions` allows only that user. Status updates never ping.
+
+Status notifications run in the background. A Discord failure never fails or delays the status change.
 
 ## Read and update feedback
 

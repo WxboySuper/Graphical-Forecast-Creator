@@ -1,4 +1,4 @@
-import { deleteFeedback, getFeedback, listFeedback, patchFeedback } from './admin.mjs';
+import { deleteFeedback, getFeedback, listFeedback, patchFeedbackAndNotify } from './admin.mjs';
 import { authorizeViewer } from './access.mjs';
 import { json } from './response.mjs';
 import { renderViewerPage } from './viewer-page.mjs';
@@ -86,25 +86,27 @@ function feedbackId(pathname) {
 const feedbackRoutes = [
   { method: 'GET', withId: false, mutating: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', withId: true, mutating: false, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
-  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now()) },
+  { method: 'PATCH', withId: true, mutating: true, run: ({ request, id, env, ctx }) => patchFeedbackAndNotify(request, id, env, ctx) },
   { method: 'DELETE', withId: true, mutating: true, run: ({ id, env }) => deleteFeedback(id, env.FEEDBACK_DB) },
 ];
 
-async function runFeedbackRoute(request, url, env, id) {
+/** `call` carries the request, url, env and execution context; `id` is the feedback item, or null for the list. */
+async function runFeedbackRoute(call, id) {
+  const { request, url, env, ctx } = call;
   const route = feedbackRoutes.find((item) => item.method === request.method && item.withId === (id !== null));
   if (!route) return json({ error: 'Not found' }, 404);
   if (route.mutating && !isMutationAllowed(request, url, env)) return json({ error: 'Allowed dashboard origin required' }, 403);
-  return route.run({ request, url, env, id });
+  return route.run({ request, url, env, id, ctx });
 }
 
-async function dispatch(request, url, env) {
+async function dispatch(request, url, env, ctx) {
   if (['/admin', '/admin/'].includes(url.pathname) && request.method === 'GET') return pageResponse();
   if (url.pathname === '/admin/api/summary' && request.method === 'GET') return summary(env.FEEDBACK_DB);
-  if (url.pathname === '/admin/api/feedback') return runFeedbackRoute(request, url, env, null);
+  if (url.pathname === '/admin/api/feedback') return runFeedbackRoute({ request, url, env, ctx }, null);
   if (url.pathname.startsWith('/admin/api/feedback/')) {
     const id = feedbackId(url.pathname);
     if (id === null) return json({ error: 'Not found' }, 404, corsFreeHeaders);
-    return runFeedbackRoute(request, url, env, id);
+    return runFeedbackRoute({ request, url, env, ctx }, id);
   }
   return json({ error: 'Not found' }, 404, corsFreeHeaders);
 }
@@ -114,13 +116,13 @@ function withViewerHeaders(response) {
   return response;
 }
 
-export async function handleViewer(request, env, url) {
+export async function handleViewer(request, env, url, ctx) {
   if (url.pathname.startsWith('/admin/api/') && request.method === 'OPTIONS') {
     const headers = adminCorsHeaders(request, env);
     return new Response(null, { status: headers['access-control-allow-origin'] ? 204 : 403, headers: { ...corsFreeHeaders, ...headers } });
   }
   const auth = await authorizeViewer(request, env);
-  const response = withViewerHeaders(auth.response ?? await dispatch(request, url, env));
+  const response = withViewerHeaders(auth.response ?? await dispatch(request, url, env, ctx));
   // Denied responses carry the dashboard CORS headers too, so the page can read the 401/403 instead of an opaque block.
   for (const [name, value] of Object.entries(adminCorsHeaders(request, env))) response.headers.set(name, value);
   return response;

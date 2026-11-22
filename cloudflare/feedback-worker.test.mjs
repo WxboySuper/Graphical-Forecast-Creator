@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test, { before } from 'node:test';
 import worker from './feedback-worker.mjs';
+import { handleAdmin } from './feedback/admin.mjs';
 import { LIMITS, MAX_BODY_BYTES } from './feedback/store.mjs';
 import { resetKeyCache } from './feedback/auth.mjs';
 
@@ -94,8 +95,13 @@ class FakeD1 {
       return { meta: { changes: 1 } };
     } },
     { matches: (sql) => sql.startsWith('UPDATE feedback SET discord_status'), run: (db, args) => {
+      const row = db.rows.find((item) => item.id === args[2]);
+      if (row) { row.discord_status = args[0]; row.discord_thread_id = args[1]; }
+      return { meta: { changes: row ? 1 : 0 } };
+    } },
+    { matches: (sql) => sql.startsWith('UPDATE feedback SET discord_thread_id'), run: (db, args) => {
       const row = db.rows.find((item) => item.id === args[1]);
-      if (row) row.discord_status = args[0];
+      if (row) row.discord_thread_id = args[0];
       return { meta: { changes: row ? 1 : 0 } };
     } },
     { matches: (sql) => sql.startsWith('UPDATE feedback SET status'), run: (db, args) => {
@@ -699,4 +705,227 @@ test('null optional fields are accepted and stored as empty', async () => {
   assert.equal(db.rows.length, 1);
   assert.equal(db.rows[0].viewport, null);
   assert.equal(db.rows[0].plan, null);
+});
+
+function discordRecorder(responses = {}) {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    calls.push({ url: new URL(url), body: JSON.parse(init.body) });
+    return responses.status ? new Response('no', { status: responses.status }) : Response.json({ id: '1', channel_id: '123456789012345678' });
+  };
+  return { calls, fetcher };
+}
+
+test('status changes post into the original forum thread without blocking the admin request', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: discord.fetcher } });
+  await post(env, ctx, { body: validBody({ message: '@everyone the radar loop froze.' }), auth: await token() });
+  await Promise.all(waits);
+  const { id } = db.rows[0];
+  assert.equal(db.rows[0].discord_thread_id, '123456789012345678');
+  const patch = await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${id}`, { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(patch.status, 200);
+  await Promise.all(waits);
+  const update = discord.calls.at(-1);
+  assert.equal(update.url.searchParams.get('thread_id'), '123456789012345678');
+  assert.equal(update.body.content, `Feedback ${id} marked **Handled**`);
+  assert.equal(update.body.embeds[0].description, '[BETA] bug: @everyone the radar loop froze.');
+  assert.deepStrictEqual(update.body.allowed_mentions, { parse: [] });
+  assert.equal('thread_name' in update.body, false);
+});
+
+test('status updates use the updates webhook when set and skip items without a thread otherwise', async () => {
+  const discord = discordRecorder();
+  const seeded = (env) => {
+    const h = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FETCH: discord.fetcher, ...env } });
+    h.db.rows = [{ id: 'fb-1', created_at: 1, uid_hash: 'h', email: null, category: 'idea', message: 'More colors', page: '/', app_version: '2.0.0', build_target: 'production', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+    return h;
+  };
+  const patch = (h) => worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-1', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), h.env, h.ctx);
+
+  const updates = seeded({ FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL: 'https://discord.example/updates' });
+  assert.equal((await patch(updates)).status, 200);
+  await Promise.all(updates.waits);
+  assert.equal(discord.calls.length, 1);
+  assert.equal(discord.calls[0].url.pathname, '/updates');
+  assert.equal(discord.calls[0].url.searchParams.has('thread_id'), false);
+  assert.equal(discord.calls[0].body.embeds[0].description, '[PROD] idea: More colors');
+
+  const threadless = seeded({ FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook' });
+  assert.equal((await patch(threadless)).status, 200);
+  await Promise.all(threadless.waits);
+  assert.equal(discord.calls.length, 2, 'without a thread the update posts to the main channel');
+  assert.equal(discord.calls[1].url.pathname, '/webhook');
+  assert.equal(discord.calls[1].url.searchParams.has('thread_id'), false);
+  assert.equal('thread_name' in discord.calls[1].body, false);
+  assert.equal((await patch(threadless)).status, 200, 'repeating the current status still succeeds');
+  await Promise.all(threadless.waits);
+  assert.equal(discord.calls.length, 2, 'an unchanged status is not announced again');
+});
+
+test('a threadless update on a forum webhook retries once as a new thread', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url: new URL(url), body });
+    return 'thread_name' in body ? Response.json({ id: '1', channel_id: '777' }) : new Response('forum needs thread_name', { status: 400 });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: fetcher } });
+  db.rows = [{ id: 'fb-9', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'old item', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-9', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal('thread_name' in calls[0].body, false);
+  assert.equal(calls[1].body.thread_name, 'Update: bug fb-9');
+});
+
+test('a text-channel webhook that rejects forum fields gets one retry without them', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ url: new URL(url), body });
+    // Discord rejects thread_name on non-forum webhooks with a 400.
+    if ('thread_name' in body || 'applied_tags' in body) return Response.json({ code: 220001, message: 'Webhooks posted to forum channels must have a thread_name or thread_id' }, { status: 400 });
+    return Response.json({ id: '9', channel_id: '555555555555555555' });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FEEDBACK_DISCORD_TAG_BETA: '42', FETCH: fetcher } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].body.thread_name.startsWith('[BETA] bug:'), true);
+  assert.deepStrictEqual(calls[0].body.applied_tags, ['42']);
+  assert.equal('thread_name' in calls[1].body, false);
+  assert.equal('applied_tags' in calls[1].body, false);
+  assert.deepStrictEqual(calls[1].body.allowed_mentions, { parse: [] });
+  assert.equal(db.rows[0].discord_status, 'sent');
+  assert.equal(db.rows[0].discord_thread_id, null, 'a text-channel message is not a thread');
+  const { id } = db.rows[0];
+  await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${id}`, { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  await Promise.all(waits);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].url.searchParams.has('thread_id'), false);
+  assert.equal(calls[2].body.content, `Feedback ${id} marked **Read**`);
+});
+
+test('non-400 Discord failures are not retried', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => { attempts += 1; return new Response('slow down', { status: 429 }); } } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_status, 'failed');
+});
+
+test('a failing status-update webhook never fails or rejects the status change', async () => {
+  const discord = discordRecorder({ status: 500 });
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL: 'https://discord.example/updates', FETCH: discord.fetcher } });
+  db.rows = [{ id: 'fb-2', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-2', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await assert.doesNotReject(Promise.all(waits));
+  assert.equal(db.rows[0].status, 'handled');
+  assert.equal(discord.calls.length, 1);
+});
+
+test('the Access viewer status change also sends a Discord update', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { CF_ACCESS_TEAM_DOMAIN: accessDomain, CF_ACCESS_AUD: accessAud, FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL: 'https://discord.example/updates', FETCH: discord.fetcher } });
+  db.rows = [{ id: 'fb-3', created_at: 1, uid_hash: 'h', email: null, category: 'question', message: 'How do I export?', page: '/', app_version: '2.0.0', build_target: 'production', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const response = await viewerRequest(env, ctx, '/admin/api/feedback/fb-3', { method: 'PATCH', auth: await accessToken(), headers: { origin: 'https://feedback.gfcweather.com', 'x-gfc-viewer': '1' }, body: { status: 'read' } });
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(discord.calls[0].body.content, 'Feedback fb-3 marked **Read**');
+});
+
+test('new feedback pings only DISCORD_PING_USER_ID, and status updates stay silent', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', DISCORD_PING_USER_ID: '525942394986823685', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: discord.fetcher } });
+  await post(env, ctx, { body: validBody({ message: '@everyone @here <@&123> please look.' }), auth: await token() });
+  await Promise.all(waits);
+  const [created] = discord.calls;
+  assert.equal(created.body.content, `<@525942394986823685> Feedback ${db.rows[0].id}`);
+  assert.deepStrictEqual(created.body.allowed_mentions, { parse: [], users: ['525942394986823685'] });
+  await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${db.rows[0].id}`, { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  await Promise.all(waits);
+  const update = discord.calls.at(-1);
+  assert.equal(update.body.content.includes('<@'), false);
+  assert.deepStrictEqual(update.body.allowed_mentions, { parse: [] });
+});
+
+test('an invalid DISCORD_PING_USER_ID is ignored rather than injected', async () => {
+  const discord = discordRecorder();
+  const { env, ctx, waits } = harness({ env: { DISCORD_PING_USER_ID: '@everyone', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: discord.fetcher } });
+  await post(env, ctx, { auth: await token() });
+  await Promise.all(waits);
+  assert.equal(discord.calls[0].body.content.startsWith('Feedback '), true);
+  assert.deepStrictEqual(discord.calls[0].body.allowed_mentions, { parse: [] });
+});
+
+test('a deleted forum thread is replaced by a new thread for the update', async () => {
+  const calls = [];
+  const fetcher = async (url, init) => {
+    const parsed = new URL(url);
+    calls.push({ url: parsed, body: JSON.parse(init.body) });
+    if (parsed.searchParams.has('thread_id')) return Response.json({ message: 'Unknown Channel', code: 10003 }, { status: 404 });
+    return Response.json({ id: '2', channel_id: '888888888888888888' });
+  };
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: fetcher } });
+  db.rows = [{ id: 'fb-7', created_at: 1, uid_hash: 'h', email: null, category: 'idea', message: 'gone thread', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'sent', discord_thread_id: '111111111111111111' }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-7', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].url.searchParams.get('thread_id'), '111111111111111111');
+  assert.equal(calls[1].url.searchParams.has('thread_id'), false);
+  assert.equal(calls[1].body.thread_name, 'Update: idea fb-7');
+  assert.equal(db.rows[0].discord_thread_id, '888888888888888888', 'later updates use the replacement thread');
+});
+
+test('a failed pre-read never blocks the stored status change', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL: 'https://discord.example/updates', FETCH: discord.fetcher } });
+  db.rows = [{ id: 'fb-5', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled', discord_thread_id: null }];
+  const original = db.prepare.bind(db);
+  let failed = false;
+  db.prepare = (sql) => {
+    if (sql === 'SELECT status FROM feedback WHERE id = ?' && !failed) { failed = true; return { bind() { return { first: async () => { throw new Error('D1 read failed'); } }; } }; }
+    return original(sql);
+  };
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-5', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'handled' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(db.rows[0].status, 'handled');
+  assert.equal(discord.calls.length, 1, 'without the previous status the change is still announced');
+});
+
+test('handleAdmin still accepts the older positional id forms', async () => {
+  const { db, env } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret' } });
+  db.rows = [{ id: 'fb-6', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'disabled' }];
+  const request = () => new Request('https://feedback.gfcweather.com/v1/feedback', { headers: { authorization: 'Bearer admin-secret' } });
+  const list = await handleAdmin(request(), env, new URL('https://feedback.gfcweather.com/v1/feedback'), null);
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).items.length, 1);
+  const item = await handleAdmin(request(), env, new URL('https://feedback.gfcweather.com/v1/feedback/fb-6'), 'fb-6');
+  assert.equal((await item.json()).id, 'fb-6');
+});
+
+test('a new-feedback 400 about something other than forum fields is not retried', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: {} } }, { status: 400 }); } } });
+  assert.equal((await post(env, ctx, { auth: await token() })).status, 201);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_status, 'failed');
+});
+
+test('a status update rejected for its payload is not retried as a new thread', async () => {
+  let attempts = 0;
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/forum', FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: {} } }, { status: 400 }); } } });
+  db.rows = [{ id: 'fb-8', created_at: 1, uid_hash: 'h', email: null, category: 'bug', message: 'x', page: '/', app_version: '2.0.0', build_target: 'beta', plan: null, viewport: null, user_agent: '', status: 'new', handled_at: null, discord_status: 'sent', discord_thread_id: '222222222222222222' }];
+  const response = await worker.fetch(new Request('https://feedback.gfcweather.com/v1/feedback/fb-8', { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  assert.equal(response.status, 200);
+  await Promise.all(waits);
+  assert.equal(attempts, 1);
+  assert.equal(db.rows[0].discord_thread_id, '222222222222222222');
 });

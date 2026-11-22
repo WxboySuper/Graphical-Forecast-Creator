@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import worker, { ALLOWED_EVENTS, fetchTelemetry, validateEvent } from './telemetry-worker.mjs';
+import { withPing } from './discord-ping.mjs';
+import { buildEventsDigestQuery, DIGEST_CRON, PURGE_CRON, sendDailyDigest } from './telemetry/digest.mjs';
 import { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
 import { buildEventsQuery, buildLocationsQuery, buildPagesQuery, parseDays, parseEventFilters, readAdminData } from './telemetry/admin.mjs';
 
@@ -413,4 +415,215 @@ test('the usage dashboard is a self-contained page with a strict content securit
   assert.doesNotMatch(html, /<script[^>]+src=|<link[^>]+href=|@import|innerHTML|insertAdjacentHTML/);
   const other = await fetchTelemetry(new Request('https://telemetry.gfcweather.com/admin/', { headers: { 'cf-access-jwt-assertion': token } }), usageEnv());
   assert.notEqual(/script-src 'nonce-([^']+)'/.exec(other.headers.get('content-security-policy') ?? '')?.[1], nonce, 'nonce changes per response');
+});
+
+function digestDb(rows) {
+  return {
+    prepare(sql) {
+      const statement = {
+        args: [],
+        bind(...values) { statement.args = values; return statement; },
+        all: async () => {
+          if (sql.includes('MAX(count)')) {
+            const prior = rows.filter((row) => row.day < statement.args[0]);
+            return { results: ['visit', 'active'].map((kind) => prior.filter((row) => row.kind === kind)).filter((list) => list.length).map((list) => ({ kind: list[0].kind, best: Math.max(...list.map((row) => row.count)), days: list.length })) };
+          }
+          const [from, to] = statement.args;
+          return { results: rows.filter((row) => row.day >= from && row.day <= to) };
+        },
+        run: async () => ({ meta: { changes: 0 } }),
+      };
+      assert.ok(sql.includes('telemetry_daily_counts') || sql.startsWith('DELETE'), sql);
+      return statement;
+    },
+  };
+}
+
+function dayRows(kind, counts, endDay) {
+  // counts[0] is endDay, counts[1] the day before, and so on.
+  return counts.map((count, offset) => ({ kind, day: new Date(Date.parse(`${endDay}T00:00:00Z`) - offset * 86_400_000).toISOString().slice(0, 10), count }));
+}
+
+function digestEnv(rows, extra = {}) {
+  const posts = [];
+  const env = {
+    TELEMETRY_DB: digestDb(rows),
+    TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/telemetry',
+    FETCH: async (url, init) => {
+      if (String(url).startsWith('https://discord.example/')) { posts.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
+      return extra.analytics ? extra.analytics(url, init) : new Response('no', { status: 500 });
+    },
+    ...extra.env,
+  };
+  return { env, posts };
+}
+
+// Tuesday 2026-11-17 13:00 UTC digests Monday 2026-11-16.
+const DIGEST_TUESDAY = Date.UTC(2026, 10, 17, 13);
+const DIGEST_MONDAY = Date.UTC(2026, 10, 16, 13);
+
+test('the 13:00 UTC cron posts a daily digest with a 7-day comparison and a new record', async () => {
+  const rows = [...dayRows('visit', [30, 10, 10, 10, 10, 10, 10, 10, 20], '2026-11-16'), ...dayRows('active', [5, 5, 5, 5, 5, 5, 5, 5], '2026-11-16')];
+  const { env, posts } = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts.length, 1);
+  const [payload] = posts;
+  assert.deepStrictEqual(payload.allowed_mentions, { parse: [] });
+  assert.equal(payload.thread_name, 'Daily usage 2026-11-16', 'forum webhooks get a thread per digest');
+  assert.equal('applied_tags' in payload, false);
+  assert.equal(payload.content, '🏆 New record: 30 visitors (previous best 20)');
+  assert.equal(payload.embeds[0].title, 'GFC daily usage · 2026-11-16 (UTC)');
+  const description = payload.embeds[0].description;
+  assert.match(description, /\*\*Visitors:\*\* 30 \(\+200% vs 7-day avg 10\)/);
+  assert.match(description, /\*\*Active users:\*\* 5 \(\+0% vs 7-day avg 5\)/);
+  assert.match(description, /\*\*Last 7 days \(summed daily counts\):\*\* 90 visitors · 35 active users/);
+  assert.match(description, /Feature and page breakdown unavailable/);
+  assert.doesNotMatch(description, /Week over week/, 'trends are Monday-only');
+});
+
+test('a day that only ties the best is not a record, and an unset webhook is a no-op', async () => {
+  const rows = dayRows('visit', [20, 20, 5], '2026-11-16');
+  const tie = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, tie.env);
+  assert.equal(tie.posts[0].content, '');
+  const unset = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY, TELEMETRY_DISCORD_WEBHOOK_URL: undefined } });
+  await worker.scheduled({ cron: '0 13 * * *' }, unset.env);
+  assert.equal(unset.posts.length, 0);
+});
+
+test('Monday digests add week-over-week trends and feature movers from Analytics Engine', async () => {
+  const rows = [...dayRows('visit', [...Array(7).fill(20), ...Array(7).fill(10)], '2026-11-15'), ...dayRows('active', [...Array(7).fill(4), ...Array(7).fill(8)], '2026-11-15')];
+  const queries = [];
+  const analytics = async (url, init) => {
+    queries.push(init.body);
+    return Response.json({ data: [
+      { event: 'forecast_created', detail: '', day: '2026-11-15', count: 12 },
+      { event: 'forecast_exported', detail: 'png', day: '2026-11-15', count: 3 },
+      { event: 'page_view', detail: '/forecast', day: '2026-11-15', count: 40 },
+      { event: 'page_view', detail: '/', day: '2026-11-15', count: 9 },
+      { event: 'forecast_exported', detail: 'png', day: '2026-11-05', count: 10 },
+      { event: 'forecast_created', detail: '', day: '2026-11-16', count: 99 },
+    ] });
+  };
+  const { env, posts } = digestEnv(rows, { analytics, env: { NOW: () => DIGEST_MONDAY, CF_ACCOUNT_ID: 'acct', CF_ANALYTICS_API_TOKEN: 'token' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.match(queries[0], /FROM gfc_telemetry_events WHERE timestamp >= NOW\(\) - INTERVAL '15' DAY/);
+  const description = posts[0].embeds[0].description;
+  assert.match(description, /\*\*Top features:\*\* forecast created 12 · forecast exported 3/, 'today\'s partial day is excluded');
+  assert.match(description, /\*\*Top pages:\*\* \/forecast 40 · \/ 9/);
+  assert.match(description, /Visitors: 140 vs 70 \(\+100%\)/);
+  assert.match(description, /Active users: 28 vs 56 \(-50%\)/);
+  assert.match(description, /Biggest movers: forecast created \+12 · forecast exported -7/);
+});
+
+test('digest failures are logged without the webhook URL and never break the purge cron', async () => {
+  const { env } = digestEnv(dayRows('visit', [1], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, FETCH: async () => new Response('no', { status: 500 }) } });
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 500']]);
+  assert.ok(!JSON.stringify(errors).includes('discord.example'));
+  const purgeDb = new FakeD1();
+  await worker.scheduled({ cron: '0 0 * * *' }, { TELEMETRY_DB: purgeDb, NOW: () => NOW });
+  assert.ok(purgeDb.executions.some((item) => item.sql.startsWith('DELETE FROM telemetry_dedupe')));
+  const unknownDb = new FakeD1();
+  const unknown = await captureErrors(() => worker.scheduled({ cron: '5 5 * * *' }, { TELEMETRY_DB: unknownDb, NOW: () => NOW }));
+  assert.deepStrictEqual(unknown, [['Telemetry scheduled run skipped: unknown cron', '5 5 * * *']]);
+  assert.equal(unknownDb.executions.length, 0);
+});
+
+test('records compare against the all-time best, not just the last two weeks', async () => {
+  const rows = [...dayRows('visit', [25, 10, 10], '2026-11-16'), { kind: 'visit', day: '2026-09-01', count: 40 }];
+  const { env, posts } = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].content, '');
+});
+
+test('a text-channel digest webhook that rejects thread_name gets one retry without it', async () => {
+  const posts = [];
+  const env = {
+    TELEMETRY_DB: digestDb(dayRows('visit', [3, 2], '2026-11-16')),
+    TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/text',
+    NOW: () => DIGEST_TUESDAY,
+    FETCH: async (_url, init) => {
+      const body = JSON.parse(init.body);
+      posts.push(body);
+      return 'thread_name' in body ? new Response('thread_name is only for forum channels', { status: 400 }) : new Response(null, { status: 204 });
+    },
+  };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.deepStrictEqual(errors, []);
+  assert.equal(posts.length, 2);
+  assert.equal(posts[0].thread_name, 'Daily usage 2026-11-16');
+  assert.equal('thread_name' in posts[1], false);
+  assert.deepStrictEqual(posts[1].allowed_mentions, { parse: [] });
+});
+
+test('the daily digest and its record line ping only DISCORD_PING_USER_ID', async () => {
+  const rows = dayRows('visit', [9, 4, 3], '2026-11-16');
+  const { env, posts } = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY, DISCORD_PING_USER_ID: '525942394986823685' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].content, '<@525942394986823685> 🏆 New record: 9 visitors (previous best 4)');
+  assert.deepStrictEqual(posts[0].allowed_mentions, { parse: [], users: ['525942394986823685'] });
+  const quiet = digestEnv(dayRows('visit', [1, 4], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, DISCORD_PING_USER_ID: '525942394986823685' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, quiet.env);
+  assert.equal(quiet.posts[0].content, '<@525942394986823685>', 'a digest without a record still pings');
+});
+
+test('a missing or unauthorized digest webhook fails fast without a retry', async () => {
+  let attempts = 0;
+  const env = { TELEMETRY_DB: digestDb([]), TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/gone', NOW: () => DIGEST_TUESDAY, FETCH: async () => { attempts += 1; return new Response('Unknown Webhook', { status: 404 }); } };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.equal(attempts, 1);
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 404']]);
+});
+
+test('the digest cron is a quiet no-op without a webhook and names the missing database otherwise', async () => {
+  assert.deepStrictEqual(await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, {})), []);
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, { TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/telemetry' }));
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest skipped: TELEMETRY_DB binding is not configured']]);
+});
+
+test('an Analytics Engine failure is logged and the digest still posts without the breakdown', async () => {
+  const { env, posts } = digestEnv(dayRows('visit', [2, 1], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, CF_ACCOUNT_ID: 'acct', CF_ANALYTICS_API_TOKEN: 'token' }, analytics: async () => new Response('bad token', { status: 403 }) });
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.ok(errors.some((entry) => entry[0] === 'Telemetry digest events unavailable'));
+  assert.ok(!JSON.stringify(errors).includes('discord.example'));
+  assert.match(posts[0].embeds[0].description, /Feature and page breakdown unavailable/);
+});
+
+test('withPing tolerates a missing env or payload', () => {
+  assert.equal(withPing(undefined, null), null);
+  const payload = { content: 'x', allowed_mentions: { parse: [] } };
+  assert.deepStrictEqual(withPing(undefined, payload), payload);
+});
+
+test('sendDailyDigest called directly without a database fails with a sanitized error', async () => {
+  await assert.rejects(sendDailyDigest({ TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/telemetry' }, DIGEST_TUESDAY), { message: 'TELEMETRY_DB binding is not configured' });
+  assert.equal(await sendDailyDigest({}, DIGEST_TUESDAY), 'disabled');
+});
+
+test('the digest links to the configured dashboard URL', async () => {
+  const { env, posts } = digestEnv([], { env: { NOW: () => DIGEST_TUESDAY, TELEMETRY_DASHBOARD_URL: 'https://example.test/admin/' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].embeds[0].url, 'https://example.test/admin/');
+  const fallback = digestEnv([], { env: { NOW: () => DIGEST_TUESDAY } });
+  await worker.scheduled({ cron: '0 13 * * *' }, fallback.env);
+  assert.equal(fallback.posts[0].embeds[0].url, 'https://telemetry.gfcweather.com/admin/');
+});
+
+test('the Wrangler cron triggers match the crons the scheduled handler routes', async () => {
+  const config = JSON.parse(await readFile(new URL('./wrangler.telemetry.jsonc', import.meta.url), 'utf8'));
+  assert.deepStrictEqual([...config.triggers.crons].sort(), [PURGE_CRON, DIGEST_CRON].sort());
+});
+
+test('the digest events query only accepts an integer day window', () => {
+  assert.match(buildEventsDigestQuery(15), /INTERVAL '15' DAY/);
+  for (const days of [0, 91, 1.5, '2; DROP', NaN]) assert.throws(() => buildEventsDigestQuery(days), RangeError);
+});
+
+test('a digest 400 about something other than forum fields is not retried', async () => {
+  let attempts = 0;
+  const env = { TELEMETRY_DB: digestDb([]), TELEMETRY_DISCORD_WEBHOOK_URL: 'https://discord.example/text', NOW: () => DIGEST_TUESDAY, FETCH: async () => { attempts += 1; return Response.json({ code: 50035, message: 'Invalid Form Body', errors: { embeds: { 0: { description: { _errors: [{ code: 'BASE_TYPE_MAX_LENGTH' }] } } } } }, { status: 400 }); } };
+  const errors = await captureErrors(() => worker.scheduled({ cron: '0 13 * * *' }, env));
+  assert.equal(attempts, 1);
+  assert.deepStrictEqual(errors, [['Telemetry Discord digest failed', 'Discord webhook returned 400']]);
 });

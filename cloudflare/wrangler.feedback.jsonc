@@ -8,6 +8,7 @@
   "routes": [{ "pattern": "feedback.gfcweather.com", "custom_domain": true }],
   "d1_databases": [{ "binding": "FEEDBACK_DB", "database_name": "gfc-feedback", "database_id": "fee363b4-0a32-41a4-887c-2ec7e917e0b0", "migrations_dir": "./feedback/migrations" }],
   "vars": {
+    "DISCORD_PING_USER_ID": "525942394986823685",
     "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
     "CF_ACCESS_TEAM_DOMAIN": "mute-pine-62f8.cloudflareaccess.com",
     "CF_ACCESS_AUD": "a76998abf2df466ed7365845106b88cc51c361aa297f7063e54a09dbd1d07466",
