@@ -1,3 +1,6 @@
+/**
+ * Monitor map feature synchronization tests. Verify forecast features stay aligned with monitor map state.
+ */
 import VectorSource from 'ol/source/Vector';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import {

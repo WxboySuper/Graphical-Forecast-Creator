@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkflow/workflowTemplates.ts
+ * Purpose: Defines the default workflow metadata templates used to initialize forecast cycles.
+ */
+
 import type { WorkflowMetadata } from '../../types/workflow';
 
 /** Default workflow templates for forecast cycles. */

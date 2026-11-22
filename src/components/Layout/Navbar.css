@@ -105,6 +105,14 @@
   min-width: 0;
 }
 
+.app-navbar__forecastTrigger {
+  gap: 6px;
+}
+
+.app-navbar__forecastChevron {
+  flex: none;
+}
+
 .app-navbar__tab {
   position: relative;
   display: inline-flex;
@@ -394,6 +402,11 @@
     padding: 0 8px;
   }
 
+  .app-navbar__forecastTrigger {
+    gap: 4px;
+    padding: 0 6px;
+  }
+
   .app-navbar__utilityCluster {
     gap: 2px;
   }
@@ -422,6 +435,11 @@
   .app-navbar__tab {
     min-width: 32px;
     padding: 0 6px;
+  }
+
+  .app-navbar__forecastTrigger {
+    gap: 3px;
+    padding: 0 4px;
   }
 
   .app-navbar__actionButton--account {

@@ -1,7 +1,11 @@
+/**
+ * Server capability-status helpers. It combines feature exposure, target, and
+ * emergency override state into the capability response consumed by clients.
+ */
 'use strict';
 
 const { isEmergencyDisabledCapability } = require('./emergencyCapabilityOverrides');
-const { SERVER_FEATURE_EXPOSURE_REGISTRY } = require('./serverFeatureExposure');
+const { SERVER_FEATURES } = require('./flags');
 const { getServerTarget } = require('./serverTarget');
 
 const CAPABILITY_REASON = {
@@ -14,7 +18,7 @@ const CAPABILITY_REASON = {
 
 /** Returns the server-backed feature entry for a capability key, if declared. */
 const findFeatureByCapabilityKey = (capabilityKey) => {
-  for (const [featureKey, definition] of Object.entries(SERVER_FEATURE_EXPOSURE_REGISTRY)) {
+  for (const [featureKey, definition] of Object.entries(SERVER_FEATURES)) {
     if (definition.serverCapabilityKey === capabilityKey) {
       return { featureKey, definition };
     }
@@ -79,7 +83,7 @@ const getPublicCapabilityStatus = (options = {}) => {
   const target = options.target ?? getServerTarget(env);
   const capabilities = {};
 
-  for (const definition of Object.values(SERVER_FEATURE_EXPOSURE_REGISTRY)) {
+  for (const definition of Object.values(SERVER_FEATURES)) {
     const exposureOverride = options.exposureOverride?.[target];
     const exposedOnTarget =
       typeof exposureOverride === 'boolean'

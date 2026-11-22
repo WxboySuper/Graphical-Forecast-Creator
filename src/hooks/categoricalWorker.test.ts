@@ -1,3 +1,6 @@
+/**
+ * Categorical worker tests. Verify worker requests, responses, and failure handling for categorical forecast data.
+ */
 import { createDerivationController } from './categoricalWorker';
 import type { OutlookData } from '../types/outlooks';
 import * as processing from './autoCategoricalProcessing';

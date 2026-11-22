@@ -1,3 +1,7 @@
+/**
+ * Reconstructs a forecast cycle from serialized save data and legacy persistence shapes.
+ * This utility owns cycle-data normalization and compatibility defaults; it does not persist, render, or dispatch forecast state.
+ */
 import type {
   GFCForecastSaveData,
   ForecastCycle,
@@ -74,6 +78,30 @@ const deserializeSavedOutlookDay = (savedDay: SerializedDay): OutlookDay => {
       : {}),
     discussion: (savedDay as Partial<{ discussion?: DiscussionData }>).discussion,
   };
+};
+
+/** Returns true when a value is one of the supported forecast days. */
+const isSupportedDay = (value: unknown): value is DayType =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 8;
+
+/** Returns the lowest saved day key, or undefined when no saved day is valid. */
+const firstSavedDay = (days: ForecastCycle['days']): DayType | undefined =>
+  (Object.keys(days) as unknown as string[])
+    .map((key) => Number(key))
+    .filter(isSupportedDay)
+    .sort((a, b) => a - b)[0];
+
+/**
+ * Keeps a deserialized current day inside the 1-8 contract. Payloads that skip
+ * validation (autosave restore, cloud cycles) can otherwise carry a value that
+ * resolves to no day at all, so fall back to the first saved day, then day 1.
+ */
+export const normalizeForecastCurrentDay = (
+  currentDay: unknown,
+  days: ForecastCycle['days'],
+): DayType => {
+  if (isSupportedDay(currentDay)) return currentDay;
+  return firstSavedDay(days) ?? 1;
 };
 
 /** Rehydrates all saved outlook days from serialized forecast JSON. */

@@ -1,3 +1,8 @@
+/**
+ * Forecast Grade verification constants.
+ *
+ * These versioned values define geometry and thresholds used by the verification engine. The grade contract owns interpretation and release review owns changes.
+ */
 import type { HazardKind } from './gradeContract';
 
 /**

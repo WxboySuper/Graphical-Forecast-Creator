@@ -1,6 +1,7 @@
 import {
   getExposedForecastWorkspaces,
   getForecastWorkspace,
+  hasCloudStorage,
   isForecastWorkspaceExposed,
   resolveStoredWorkspaceId,
   type ForecastWorkspaceId,
@@ -106,15 +107,14 @@ export const getNextCloudLibraryTabId = (
   return getCloudLibraryArrowTabId(tabs, currentId, key);
 };
 
-/** Builds stable library tabs from the exposed, non-future workspace registry. */
+/** Builds stable library tabs from the exposed workspace registry. */
 export const getCloudLibraryTabs = (
   cycles: CloudCycleMetadata[],
   target: BuildTarget,
 ): CloudLibraryTab[] => {
   const tabs: CloudLibraryTab[] = [{ id: 'all', label: 'All', cycleCount: cycles.length }];
 
-  for (const workspace of getExposedForecastWorkspaces(target)) {
-    if (workspace.status === 'future') continue;
+  for (const workspace of getExposedForecastWorkspaces(target).filter((candidate) => hasCloudStorage(candidate.id))) {
     tabs.push({
       id: workspace.id,
       label: workspace.label,

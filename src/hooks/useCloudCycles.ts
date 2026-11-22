@@ -1,3 +1,11 @@
+/**
+ * Cloud-cycle persistence and selection state for the forecast workspace.
+ *
+ * This hook owns the current cycle reference, list subscription, save/load/
+ * rename/delete commands, and their user-visible sync status. It keeps hosted
+ * service calls behind the cloud-cycle service and leaves forecast mutations
+ * to the page/store consumers.
+ */
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -14,9 +22,9 @@ import { GFCForecastSaveData } from '../types/outlooks';
 import type { CycleMetadata } from '../types/workflow';
 import { SavedCycleStats } from '../store/forecastSlice';
 import { queueProductMetric } from '../utils/productMetrics';
-import { getForecastDataFromWorkspacePayload, isWorkspaceSaveEnvelope, type ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
+import { getForecastDataFromWorkspacePayload, isRecord, isWorkspaceSaveEnvelope, type ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { readLocalTestAccount } from '../lib/localTestAccount';
-import { trackProductEvent } from '../lib/productAnalytics';
+import { trackEvent } from '../lib/telemetry';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
 
 export interface UseCloudCyclesResult {
@@ -292,7 +300,7 @@ function useCloudCycleMutation<TArgs extends unknown[]>({
     async (...args: TArgs): Promise<boolean> => {
       if (!isCloudMutationAllowed({ userId, canWrite, localFixtureActive })) {
         setError(blockedMessage);
-        return false;
+        return Promise.resolve(false);
       }
 
       setError(null);
@@ -411,7 +419,8 @@ function applyCloudSaveSuccess({
     updateSyncState('saved', undefined, savedCycleId);
   }
   queueProductMetric({ event: 'cloud_cycle_saved', user });
-  trackProductEvent('cloud_save_completed');
+  trackEvent('forecast_saved_cloud');
+  trackEvent('premium_feature_used', 'cloud_storage');
   return true;
 }
 
@@ -634,6 +643,9 @@ export const buildLoadedCloudForecastPayload = (
   record: Pick<import('../types/cloudCycles').CloudCycle, 'payload' | 'workflowMetadata'>,
 ): ForecastWorkspacePayload => {
   const stored = record.payload;
+  if (isRecord(stored) && stored.workspaceId === 'mesoscale') {
+    throw new Error('Cloud storage is not supported for Mesoscale forecasts.');
+  }
   const inner = getForecastDataFromWorkspacePayload(stored);
   let merged: GFCForecastSaveData;
   if (record.workflowMetadata) {
@@ -708,6 +720,9 @@ function applyCloudLoadSuccess({
   return buildLoadedCloudForecastPayload(data);
 }
 
+const isMesoscaleCloudPayload = (payload: unknown): boolean =>
+  isRecord(payload) && payload.workspaceId === 'mesoscale';
+
 /** Resolves one finished load request into selection-scoped state updates and payload. */
 function finishCloudLoadRequest({
   result,
@@ -747,6 +762,15 @@ function finishCloudLoadRequest({
   }
   if (!canApply) {
     return null;
+  }
+  if (isMesoscaleCloudPayload(result.data.payload)) {
+    return applyCloudLoadFailure({
+      resultError: 'Cloud storage is not supported for Mesoscale forecasts.',
+      cycleId,
+      canApply,
+      setError,
+      updateSyncState,
+    });
   }
   return applyCloudLoadSuccess({ cycles, cycleId, setCurrentCloud, updateSyncState, user, data: result.data });
 }

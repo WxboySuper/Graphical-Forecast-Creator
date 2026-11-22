@@ -1,7 +1,6 @@
 /**
- * Focused tests for the extracted OpenLayers map styling/geometry seam.
- * These helpers were moved out of OpenLayersForecastMap.tsx so map styling
- * concerns can be reviewed and tested without loading the React component.
+ * File: src/components/Map/openLayersMapStyles.test.ts
+ * Purpose: Tests OpenLayers map style construction and style-state edge cases.
  */
 import { apply } from 'ol-mapbox-style';
 import LayerGroup from 'ol/layer/Group';
@@ -27,10 +26,13 @@ import {
   getFeatureIdentity,
   applyBlankLayerStyle,
   isDrawableOutlookType,
+  isPolygonOrMultiPolygon,
+  toUpdatedGeoJsonFeature,
   toOlStyle,
   createCustomFill,
   toCustomOlStyle,
   getCustomFeatureIdentity,
+  toUpdatedCustomFeature,
   toTstmPreviewOlStyle,
   toGhostOlStyle,
   createLabelOverlaySource,
@@ -162,6 +164,64 @@ describe('openLayersMapStyles', () => {
     const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
     const feature = { get: (key: string) => values[key], getGeometry: () => null };
     expect(getCustomFeatureIdentity(feature as never)).toEqual({ featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' });
+  });
+
+  test('toUpdatedCustomFeature preserves MultiPolygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = {
+      writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [] }),
+    };
+    const result = toUpdatedCustomFeature(feature as never, format as never);
+    expect(result?.geometry.type).toBe('MultiPolygon');
+    expect(result?.properties).toEqual({ customLayerId: 'l1', categoryId: 'c1', title: 'T' });
+  });
+
+  test('toUpdatedCustomFeature returns null for non-polygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', customLayerId: 'l1', categoryId: 'c1', title: 'T' };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = {
+      writeGeometryObject: () => ({ type: 'Point', coordinates: [0, 0] }),
+    };
+    expect(toUpdatedCustomFeature(feature as never, format as never)).toBeNull();
+  });
+
+  test('isPolygonOrMultiPolygon accepts Polygon/MultiPolygon and rejects Point', () => {
+    expect(isPolygonOrMultiPolygon({ type: 'Polygon', coordinates: [] })).toBe(true);
+    expect(isPolygonOrMultiPolygon({ type: 'MultiPolygon', coordinates: [] })).toBe(true);
+    expect(isPolygonOrMultiPolygon({ type: 'Point', coordinates: [0, 0] })).toBe(false);
+    expect(isPolygonOrMultiPolygon(null)).toBe(false);
+  });
+
+  test('toUpdatedGeoJsonFeature keeps Polygon and MultiPolygon geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'tornado', probability: '2%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const polygonFormat = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [] }) };
+    const multiFormat = { writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [] }) };
+
+    expect(toUpdatedGeoJsonFeature(feature as never, polygonFormat as never, false)?.geometry.type).toBe('Polygon');
+    expect(toUpdatedGeoJsonFeature(feature as never, multiFormat as never, false)?.geometry.type).toBe('MultiPolygon');
+  });
+
+  test('toUpdatedGeoJsonFeature returns null for serialized Point geometry', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'tornado', probability: '2%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const format = { writeGeometryObject: () => ({ type: 'Point', coordinates: [0, 0] }) };
+    expect(toUpdatedGeoJsonFeature(feature as never, format as never, false)).toBeNull();
+  });
+
+  test('toUpdatedGeoJsonFeature returns null for polygons with a ring of fewer than 4 positions', () => {
+    const values: Record<string, unknown> = { featureId: 'f1', outlookType: 'hail', probability: '5%', isSignificant: false };
+    const feature = { get: (key: string) => values[key], getGeometry: () => ({}) };
+    const collapsed = [[0, 0], [1, 1], [0, 0]];
+    const valid = [[0, 0], [1, 0], [1, 1], [0, 0]];
+    const polygon = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [collapsed] }) };
+    const multi = { writeGeometryObject: () => ({ type: 'MultiPolygon', coordinates: [[valid], [collapsed]] }) };
+    const ok = { writeGeometryObject: () => ({ type: 'Polygon', coordinates: [valid] }) };
+
+    expect(toUpdatedGeoJsonFeature(feature as never, polygon as never, false)).toBeNull();
+    expect(toUpdatedGeoJsonFeature(feature as never, multi as never, false)).toBeNull();
+    expect(toUpdatedGeoJsonFeature(feature as never, ok as never, false)).not.toBeNull();
   });
 
   test('toTstmPreviewOlStyle and toGhostOlStyle build styles', () => {

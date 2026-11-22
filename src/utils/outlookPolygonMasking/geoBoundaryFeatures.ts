@@ -1,3 +1,7 @@
+/**
+ * Loads and filters geographic boundary features used by outlook polygon land masking.
+ * This utility owns boundary-feature extraction and normalization; mask strategy selection and geometry trimming remain separate utilities.
+ */
 import * as turf from '@turf/turf';
 import type { FeatureCollection } from 'geojson';
 import { CONUS_BBOX, GREAT_LAKE_NAMES } from './constants';

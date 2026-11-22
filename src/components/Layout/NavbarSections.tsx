@@ -1,3 +1,10 @@
+/**
+ * Navigation section definitions: this module builds the grouped navigation
+ * items rendered by the application shell, including route, entitlement, and
+ * feature-exposure checks. It supplies presentation metadata and does not own
+ * route registration or authorization policy.
+ */
+import { useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import {
@@ -17,6 +24,9 @@ import {
   MoreHorizontal,
   Crown,
   Sparkles,
+  MessageSquarePlus,
+  Mail,
+  Activity,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import {
@@ -33,12 +43,23 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { cn } from '../../lib/utils';
+import { formatDisplayVersion } from '../../lib/displayVersion';
 import { useAuth } from '../../auth/AuthProvider';
-import { getVisibleNavigationItems, type AppNavigationItemId } from '../../config/featureNavigation';
+import { isFeedbackEnabled } from '../../config/feedback';
+import { useFeedback } from '../Feedback/FeedbackContext';
+import { TelemetrySettingsDialog } from '../Telemetry/TelemetryDialogs';
+import { CONTACT_EMAIL, CONTACT_MAILTO } from '../../config/contact';
+import {
+  getVisibleNavigationItems,
+  type AppNavigationItemId,
+  type AppNavigationItemWithId,
+} from '../../config/featureNavigation';
+import { ForecastNavigationMenu } from './ForecastMenu';
 import type { LucideIcon } from 'lucide-react';
+import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from '../../config/marketingLinks';
 declare const __GFC_APP_VERSION__: string;
 
-const appVersion = typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev';
+const appVersion = formatDisplayVersion(typeof __GFC_APP_VERSION__ !== 'undefined' ? __GFC_APP_VERSION__ : 'dev');
 
 interface ExternalActionLink {
   href: string;
@@ -64,6 +85,13 @@ const NAV_ITEM_ICONS = {
   'tropical-workspace': Map,
   'collaboration-room': MessageSquare,
 } satisfies Record<AppNavigationItemId, LucideIcon>;
+
+const MAIN_NAVIGATION_IDS: ReadonlySet<AppNavigationItemId> = new Set([
+  'home',
+  'forecast',
+  'verification',
+  'monitor',
+]);
 
 // Define external links for the right action buttons
 const externalLinks: ExternalActionLink[] = [
@@ -117,33 +145,48 @@ export const BrandSection: FC = () => (
   </div>
 );
 
+const isNavigationItemActive = (
+  pathname: string,
+  to: string,
+  end?: boolean,
+): boolean => end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+
+const MainNavigationLink: FC<{
+  item: AppNavigationItemWithId;
+  pathname: string;
+}> = ({ item, pathname }) => {
+  const Icon = NAV_ITEM_ICONS[item.id];
+  const isActive = isNavigationItemActive(pathname, item.to, item.end);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <NavLink to={item.to} end={item.end} className={getNavLinkClassName(isActive)}>
+          <Icon className="app-navbar__tabIcon h-4 w-4" />
+          <span className="app-navbar__tabLabel">{item.label}</span>
+        </NavLink>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{item.label} {item.shortcutLabel ? <span className="text-muted-foreground ml-2">{item.shortcutLabel}</span> : null}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+};
+
 // The MainTabs component keeps primary navigation next to the brand so the header reads left-to-right instead of as separate islands.
 export const MainTabs: FC = () => {
-  const { pathname } = useLocation();
-  const navItems = getVisibleNavigationItems().map((item) => ({
-    ...item,
-    icon: NAV_ITEM_ICONS[item.id],
-  }));
+  const { pathname, search } = useLocation();
+  const visibleItems = getVisibleNavigationItems();
+  const navItems = visibleItems.filter(({ id }) => MAIN_NAVIGATION_IDS.has(id));
+  // Discussion now lives inside the Severe workspace; keep its keyboard
+  // shortcut metadata while removing the duplicate destination from this menu.
+  const otherItems = visibleItems.filter(({ id }) => !MAIN_NAVIGATION_IDS.has(id) && id !== 'discussion');
 
   return (
     <div className="app-navbar__tabs">
-      {navItems.map(({ id, to, label, icon: Icon, shortcutLabel, end }) => {
-        const isActive = end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
-
-        return (
-          <Tooltip key={id}>
-            <TooltipTrigger asChild>
-              <NavLink to={to} end={end} className={getNavLinkClassName(isActive)}>
-                <Icon className="app-navbar__tabIcon h-4 w-4" />
-                <span className="app-navbar__tabLabel">{label}</span>
-              </NavLink>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{label} {shortcutLabel ? <span className="text-muted-foreground ml-2">{shortcutLabel}</span> : null}</p>
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
+      {navItems.map((item) => item.id === 'forecast'
+        ? <ForecastNavigationMenu key={item.id} item={item} pathname={pathname} search={search} otherItems={otherItems} icons={NAV_ITEM_ICONS} />
+        : <MainNavigationLink key={item.id} item={item} pathname={pathname} />)}
     </div>
   );
 };
@@ -160,7 +203,7 @@ const AccountIndicator: FC<{ showSignedInDot: boolean }> = ({ showSignedInDot })
 /** Displays the small status meta block used in the navbar right actions. */
 const StatusMeta: FC = () => (
   <div className="app-navbar__statusMeta">
-    <span className="app-navbar__version">{`v${appVersion}`}</span>
+    <span className="app-navbar__version">{appVersion}</span>
     <span className="app-navbar__utilityDivider" aria-hidden="true" />
   </div>
 );
@@ -200,8 +243,11 @@ const MoreActionsMenu: FC<{
   const openExternalLink = (href: string) => {
     window.open(href, '_blank', 'noopener,noreferrer');
   };
+  const { openFeedback } = useFeedback();
+  const [usageDataOpen, setUsageDataOpen] = useState(false);
 
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
@@ -221,11 +267,17 @@ const MoreActionsMenu: FC<{
           <HelpCircle className="h-4 w-4" />
           Documentation
         </DropdownMenuItem>
+        {isFeedbackEnabled() ? (
+          <DropdownMenuItem onSelect={openFeedback}>
+            <MessageSquarePlus className="h-4 w-4" />
+            Send feedback
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem asChild>
-          <NavLink to="/updates">
+          <a href={MARKETING_UPDATES_URL} target="_blank" rel="noreferrer">
             <Sparkles className="h-4 w-4" />
             What&apos;s New
-          </NavLink>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onViewTerms}>
           <FileText className="h-4 w-4" />
@@ -235,11 +287,24 @@ const MoreActionsMenu: FC<{
           <Shield className="h-4 w-4" />
           Privacy Policy
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setUsageDataOpen(true)}>
+          <Activity className="h-4 w-4" />
+          Usage data
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <NavLink to="/pricing">
+          <a href={MARKETING_PRICING_URL} target="_blank" rel="noreferrer">
             <Crown className="h-4 w-4" />
             Pricing
-          </NavLink>
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={CONTACT_MAILTO} title={`Email ${CONTACT_EMAIL}`}>
+            <Mail className="h-4 w-4" />
+            <span className="flex flex-col leading-tight">
+              Contact us
+              <span className="text-xs text-muted-foreground">{CONTACT_EMAIL}</span>
+            </span>
+          </a>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Community</DropdownMenuLabel>
@@ -252,6 +317,8 @@ const MoreActionsMenu: FC<{
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    <TelemetrySettingsDialog open={usageDataOpen} onOpenChange={setUsageDataOpen} />
+    </>
   );
 };
 

@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersRenderableGeometry.ts
+ * Purpose: Provides geometry normalization and renderability helpers for OpenLayers features.
+ */
+
 import Feature from "ol/Feature";
 import type Geometry from "ol/geom/Geometry";
 

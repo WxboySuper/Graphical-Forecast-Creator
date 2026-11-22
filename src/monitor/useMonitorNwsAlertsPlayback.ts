@@ -1,3 +1,6 @@
+/**
+ * NWS alert playback hook. Controls monitor alert timeline playback and selected frame state.
+ */
 import type { Dispatch, SetStateAction } from 'react';
 import type { NwsAlertFeatureCollection } from './nwsAlerts';
 import { useMonitorNwsAlertsFrameAdvance } from './useMonitorNwsAlertsFrameAdvance';

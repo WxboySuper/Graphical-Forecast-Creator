@@ -1,3 +1,7 @@
+/**
+ * Workflow metadata contract helpers. It defines bounded version, status, and
+ * outlook metadata used by save, import, and cloud synchronization paths.
+ */
 import type { CycleMetadata, CycleStatus, OutlookStatus, OutlookVersion } from '../types/workflow';
 
 /** Firestore's bounded nested metadata contract for one workflow cycle. */

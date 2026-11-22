@@ -1,3 +1,8 @@
+/**
+ * File: server/testing/autoTstm.exposure.test.js
+ * Purpose: Verifies automatic TSTM exposure routes, gating behavior, and emergency-disabled responses.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -6,7 +11,7 @@ const { registerTstmRoutes } = require('../tstm');
 const {
   assertCapabilityRouteRejectsWithoutWork,
   disabledCapabilityStatusFixtures,
-} = require('./featureExposureHarness');
+} = require('./capabilityHarness');
 const startServer = (env, runGenerator, routeOptions = {}) => {
   const app = express();
   registerTstmRoutes(app, express, { env, runGenerator, ...routeOptions });

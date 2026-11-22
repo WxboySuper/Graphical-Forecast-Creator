@@ -1,3 +1,9 @@
+/**
+ * Resolves the user's effective billing entitlement from local feature configuration,
+ * authenticated account state, and the Stripe-backed Firestore document. The provider
+ * exposes normalized status to the UI and owns snapshot cleanup; presentation components
+ * should consume this context instead of reading billing documents directly.
+ */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db, requireDb } from '../lib/firebase';
@@ -217,7 +223,21 @@ const applySignedOutEntitlementState = (
 };
 
 /** Converts a successful entitlement snapshot into provider state. */
-const createEntitlementListenerState = (snapshotData: Partial<UserEntitlementDocument> | undefined): EntitlementListenerState => {
+const createEntitlementListenerState = (
+  snapshotData: Partial<UserEntitlementDocument> | undefined,
+  userId: string
+): EntitlementListenerState => {
+  const documentUid = normalizeNullableString(snapshotData?.uid);
+  // Current writers always include uid, but older documents may predate it. Only a uid that is present
+  // and belongs to someone else is invalid; keep the signed-in user free rather than trusting its flags.
+  if (documentUid && documentUid !== userId) {
+    return {
+      entitlement: DEFAULT_ENTITLEMENT,
+      status: 'free',
+      error: null,
+    };
+  }
+
   const entitlement = readEntitlementDocument(snapshotData);
   return {
     entitlement,
@@ -257,7 +277,8 @@ const subscribeToEntitlements = (
       }
 
       const nextState = createEntitlementListenerState(
-        snapshot.data() as Partial<UserEntitlementDocument> | undefined
+        snapshot.data() as Partial<UserEntitlementDocument> | undefined,
+        userId
       );
       handlers.setEntitlement(nextState.entitlement);
       handlers.setEntitlementStatus(nextState.status);
@@ -301,6 +322,7 @@ const startSignedInEntitlementSubscription = (
 };
 
 const startBetaEntitlementSubscription = (
+  userId: string,
   handlers: EntitlementEffectHandlers
 ) => {
   let active = true;
@@ -310,7 +332,7 @@ const startBetaEntitlementSubscription = (
 
   const loadEntitlement = async (): Promise<void> => {
     try {
-      const state = await fetchBetaEntitlementState();
+      const state = await fetchBetaEntitlementState(userId);
       if (!active) return;
       applyBetaEntitlementState(state, handlers);
     } catch (nextError) {
@@ -328,13 +350,13 @@ const startBetaEntitlementSubscription = (
   return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
 };
 
-const fetchBetaEntitlementState = async (): Promise<EntitlementListenerState> => {
+const fetchBetaEntitlementState = async (userId: string): Promise<EntitlementListenerState> => {
   const response = await fetchBetaApi('/api/user/entitlement');
   const body = await readBetaEntitlementBody(response);
-  return normalizeBetaEntitlementState(body.entitlement);
+  return normalizeBetaEntitlementState(body.entitlement, userId);
 };
 
-const normalizeBetaEntitlementState = (raw: Record<string, unknown> | null): EntitlementListenerState => {
+const normalizeBetaEntitlementState = (raw: Record<string, unknown> | null, userId: string): EntitlementListenerState => {
   const rawEnd = raw?.currentPeriodEnd;
   if (hasInvalidBetaPeriodEnd(rawEnd)) throw new Error('Account billing status contains an invalid renewal date.');
   const rawValues = { ...(raw ?? {}) };
@@ -342,7 +364,7 @@ const normalizeBetaEntitlementState = (raw: Record<string, unknown> | null): Ent
   const normalized = readEntitlementDocument(rawValues as Partial<UserEntitlementDocument>);
   const endDate = normalizeBetaPeriodEnd(rawEnd);
   if (endDate) normalized.currentPeriodEnd = Timestamp.fromDate(endDate);
-  return createEntitlementListenerState(normalized);
+  return createEntitlementListenerState(normalized, userId);
 };
 
 const readBetaEntitlementBody = async (response: Response): Promise<{ entitlement: Record<string, unknown> | null }> => {
@@ -432,7 +454,7 @@ const resolveEntitlementEffect = (
     return null;
   }
 
-  if (isBetaClerkD1Mode()) return startBetaEntitlementSubscription(handlers);
+  if (isBetaClerkD1Mode()) return startBetaEntitlementSubscription(args.user.uid, handlers);
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 

@@ -1,4 +1,10 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from 'react';
+/**
+ * Application shell: this module composes providers, global lifecycle hooks,
+ * route definitions, lazy page boundaries, and top-level error handling. It
+ * owns application composition but delegates state, feature exposure, auth,
+ * and page behavior to their dedicated modules.
+ */
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import { Provider, useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router';
 import { store, type RootState } from './store';
@@ -22,20 +28,18 @@ import { EntitlementProvider } from './billing/EntitlementProvider';
 import { AppLayout } from './components/Layout';
 import HomePage from './pages/HomePage';
 import AccountPage from './pages/AccountPage';
-import PricingPage from './pages/PricingPage';
-import { UpdatesPage } from './pages/UpdatesPage';
-import BetaLandingPage from './pages/BetaLandingPage';
-import BetaInvitePage from './pages/BetaInvitePage';
-import BetaAccessGuard from './components/Beta/BetaAccessGuard';
-import { ProductAnalyticsRouteTracker } from './components/ProductAnalyticsRouteTracker';
+import { TelemetryRouteTracker } from './components/TelemetryRouteTracker';
+import { TelemetryConsentPrompt } from './components/Telemetry/TelemetryDialogs';
 import ToSModal, { hasAcceptedToS } from './components/ToS/ToSModal';
 import PrivacyPolicyModal, { hasAcceptedPrivacyPolicy } from './components/PrivacyPolicy/PrivacyPolicyModal';
-import { initProductAnalytics } from './lib/productAnalytics';
+import { pingDailyActive, pingVisit } from './lib/telemetry';
 import { buildFeatureGatedRoutes } from './routing/buildFeatureGatedRoutes';
 import { lazyWithReload } from './routing/lazyWithReload';
-import { isFeatureExposureDiagnosticsEnabled } from './config/featureExposureDiagnostics';
+import { ExternalRedirect } from './routing/ExternalRedirect';
+import { MARKETING_PRICING_URL, MARKETING_UPDATES_URL } from './config/marketingLinks';
 import {
   getDefaultForecastWorkspacePath,
+  getForecastWorkspacePath,
   getExposedForecastWorkspaceRoutes,
   getUnavailableForecastWorkspaceRoutes,
   resolveRouteForecastWorkspaceContext,
@@ -48,8 +52,8 @@ import { UnavailableForecastWorkspacePage } from './pages/UnavailableForecastWor
 const ForecastPage = lazyWithReload('forecast', () =>
   import('./pages/ForecastPage').then((module) => ({ default: module.ForecastPage }))
 );
-const DiscussionPage = lazyWithReload('discussion', () =>
-  import('./pages/DiscussionPage').then((module) => ({ default: module.DiscussionPage }))
+const MesoscalePage = lazyWithReload('mesoscale', () =>
+  import('./pages/MesoscalePage').then((module) => ({ default: module.MesoscalePage }))
 );
 const VerificationPage = lazyWithReload('verification', () =>
   import('./pages/VerificationPage').then((module) => ({ default: module.VerificationPage }))
@@ -61,14 +65,6 @@ const CloudLibraryPage = lazyWithReload('cloud', () => import('./pages/CloudLibr
 const AdminPage = lazyWithReload('admin', () =>
   import('./pages/AdminPage').then((module) => ({ default: module.AdminPage }))
 );
-
-const FeatureExposureDiagnosticsPage = __GFC_DEV_MODE__
-  ? lazy(() =>
-      import('./pages/FeatureExposureDiagnosticsPage').then((module) => ({
-        default: module.FeatureExposureDiagnosticsPage,
-      }))
-    )
-  : null;
 
 /** Accessible loading placeholder shown while a lazy route chunk downloads. */
 const RouteFallback = () => (
@@ -92,7 +88,20 @@ export const ForecastLegacyRedirect = () => {
   );
 };
 
-const BETA_MODE = __GFC_BETA_MODE__;
+/**
+ * Sends legacy Discussion links into the matching workspace with their query and
+ * hash intact. The legacy Discussion page had a single URL, so any extra path
+ * after `/discussion` carries no meaning and is intentionally dropped.
+ */
+export const DiscussionLegacyRedirect = () => {
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  params.delete('workspace');
+  params.set('surface', 'discussion');
+  const hintedWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
+  const pathname = hintedWorkspace ? getForecastWorkspacePath(hintedWorkspace.id) : '/forecast/severe';
+  return <Navigate to={{ pathname, search: params.toString() ? `?${params.toString()}` : '', hash: location.hash }} replace />;
+};
 
 // App-level hooks component (runs shared hooks)
 const AppHooks = () => {
@@ -100,6 +109,9 @@ const AppHooks = () => {
   const location = useLocation();
   const { user } = useAuth();
   const userId = user?.uid;
+  useEffect(() => {
+    pingDailyActive(user);
+  }, [user]);
   const activeWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
   // Forecast routes and exposed discussion or Monitor handoff links own workspace identity.
   const routeWorkspace = resolveRouteForecastWorkspaceContext(location.pathname, location.search);
@@ -158,14 +170,15 @@ const AppProviders: React.FC<React.PropsWithChildren> = ({ children }) => (
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      <Route path="beta" element={<BetaLandingPage />} />
-      <Route path="beta-access/:invitePath?" element={<BetaInvitePage />} />
+      {/* The closed-beta gate is gone; keep old bookmarks and invite links working. */}
+      <Route path="beta" element={<Navigate to="/" replace />} />
+      <Route path="beta-access/*" element={<Navigate to="/" replace />} />
       <Route element={<AppLayout />}>
-        <Route path="updates" element={<UpdatesPage />} />
-        <Route element={<BetaAccessGuard />}>
+        {/* Pricing and release notes now live on the marketing site. */}
+        <Route path="updates" element={<ExternalRedirect to={MARKETING_UPDATES_URL} label="what's new" />} />
         <Route index element={<HomePage />} />
         <Route path="account" element={<AccountPage />} />
-        <Route path="pricing" element={<PricingPage />} />
+        <Route path="pricing" element={<ExternalRedirect to={MARKETING_PRICING_URL} label="pricing" />} />
         <Route path="admin" element={<Suspense fallback={<RouteFallback />}><AdminPage /></Suspense>} />
         <Route path="cloud" element={<Suspense fallback={<RouteFallback />}><CloudLibraryPage /></Suspense>} />
         <Route path="forecast">
@@ -174,7 +187,7 @@ const AppRoutes: React.FC = () => {
             <Route
               key={route.id}
               path={route.routePath}
-              element={<Suspense fallback={<RouteFallback />}><ForecastPage workspaceId={route.id} /></Suspense>}
+              element={<Suspense fallback={<RouteFallback />}>{route.id === 'mesoscale' ? <MesoscalePage /> : <ForecastPage workspaceId={route.id} />}</Suspense>}
             />
           ))}
           {getUnavailableForecastWorkspaceRoutes().map((route) => (
@@ -185,23 +198,12 @@ const AppRoutes: React.FC = () => {
             />
           ))}
         </Route>
-        <Route path="discussion" element={<Suspense fallback={<RouteFallback />}><DiscussionPage /></Suspense>} />
+        <Route path="discussion/*" element={<DiscussionLegacyRedirect />} />
         <Route path="verification" element={<Suspense fallback={<RouteFallback />}><VerificationPage /></Suspense>} />
         <Route path="monitor" element={<Suspense fallback={<RouteFallback />}><MonitorPage /></Suspense>} />
-        {__GFC_DEV_MODE__ && isFeatureExposureDiagnosticsEnabled() && FeatureExposureDiagnosticsPage ? (
-          <Route
-            path="dev/feature-exposure"
-            element={
-              <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading diagnostics…</div>}>
-                <FeatureExposureDiagnosticsPage />
-              </Suspense>
-            }
-          />
-        ) : null}
         {buildFeatureGatedRoutes()}
-        </Route>
       </Route>
-      <Route path="*" element={<Navigate to={BETA_MODE ? '/beta' : '/'} replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
@@ -216,7 +218,8 @@ const getAgreementState = (localBetaBypass: boolean) => ({
 const AcceptedApplication: React.FC = () => (
   <AppProviders>
     <AppHooks />
-    <ProductAnalyticsRouteTracker />
+    <TelemetryRouteTracker />
+    <TelemetryConsentPrompt />
     <AppRoutes />
   </AppProviders>
 );
@@ -227,9 +230,6 @@ const useAgreementState = () => {
   const initial = getAgreementState(localBetaBypass);
   const [tosAccepted, setTosAccepted] = useState(initial.tosAccepted);
   const [privacyAccepted, setPrivacyAccepted] = useState(initial.privacyAccepted);
-  useEffect(() => {
-    if (privacyAccepted) initProductAnalytics();
-  }, [privacyAccepted]);
   useEffect(() => {
     const next = getAgreementState(localBetaBypass);
     setTosAccepted(next.tosAccepted);
@@ -270,9 +270,15 @@ const AppContent: React.FC = () => (
   </BrowserRouter>
 );
 
+/** Starts the consent-free visit counter before the agreement gate. */
+const VisitPing: React.FC = () => {
+  useEffect(() => pingVisit(), []);
+  return null;
+};
+
 /** Renders the authenticated application shell and route tree. */
 function App() {
-  return <AppContent />;
+  return <><VisitPing /><AppContent /></>;
 }
 
 export default App;

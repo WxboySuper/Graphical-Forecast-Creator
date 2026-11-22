@@ -288,6 +288,32 @@ describe('tstm-ingestion', () => {
 
       stop();
     });
+
+    it('logs a rejected cycle and keeps ticking instead of leaving an unhandled rejection', async () => {
+      const env = { TSTM_CACHE_DIR: dir, SERVER_TARGET: 'not-a-target' };
+      const logged = [];
+      const log = { info() {}, error(...args) { logged.push(args); } };
+
+      const stop = startIngestionLoop({
+        env,
+        runGenerator: async () => SAMPLE_CACHE_DATA,
+        intervalMs: 20,
+        log,
+      });
+
+      try {
+        const deadline = Date.now() + 2000;
+        while (logged.length < 2 && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+      } finally {
+        stop();
+      }
+
+      assert.ok(logged.length >= 2, `expected repeated cycle failures to be logged, saw ${logged.length}`);
+      assert.match(String(logged[0][0]), /ingestion cycle failed/);
+      assert.match(String(logged[0][1]?.message), /Invalid SERVER_TARGET/);
+    });
   });
 
   describe('buildCacheData', () => {

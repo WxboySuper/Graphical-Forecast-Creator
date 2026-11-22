@@ -1,3 +1,11 @@
+/**
+ * Firestore gateway for hosted forecast cycles.
+ *
+ * This module translates cloud-cycle records to and from the Firestore schema,
+ * scopes every operation to the authenticated user, and exposes save/load/
+ * rename/delete/list/subscribe primitives. UI hooks own permission and status
+ * policy; this service owns transport and record-shape boundaries.
+ */
 import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { auth, db } from './firebase';
@@ -86,6 +94,7 @@ interface SaveCloudCycleParams {
   existingId?: string;
 }
 
+/** Sends a normalized cloud cycle payload to the authenticated API. */
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   const response = isBetaClerkD1Mode() ? await fetchBetaApi('/api/cloud-cycles', {
     method: 'POST',
@@ -100,6 +109,7 @@ const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
   return { success: true };
 };
 
+/** Builds the API request body for a cloud cycle save or update. */
 const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }: { cycleId: string; params: SaveCloudCycleParams; metadata: CloudCycleMetadata; workflowMetadata?: CycleMetadata }) => ({
   id: cycleId,
   userId: params.userId,
@@ -109,6 +119,7 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
   metadata: { ...metadata, ...(params.workspaceId ? { workspaceId: params.workspaceId } : {}), ...(workflowMetadata ? { workflowMetadata } : {}) },
 });
 
+/** Returns a Clerk session marker or the current Firebase token. */
 const getCloudSaveToken = async (): Promise<string | null> => {
   if (isBetaClerkD1Mode()) return 'clerk-session';
   const currentUser = auth?.currentUser;
@@ -505,6 +516,7 @@ const buildFirestoreCloudCycleSaveContext = async (params: SaveCloudCycleParams,
   return { cycleId, metadata, workflowMetadata: getCompatibleWorkflowMetadata(params.workflowMetadata, params.cycleDate) };
 };
 
+/** Performs the authenticated cloud cycle save and converts failures to results. */
 const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> => {
   try {
     const context = await buildCloudCycleSaveContext(params);
@@ -523,6 +535,7 @@ const saveCloudCycleInternal = async (params: SaveCloudCycleParams): Promise<Clo
   }
 };
 
+/** Saves a cloud cycle through the shared cloud persistence flow. */
 export const saveCloudCycle = (params: SaveCloudCycleParams): Promise<CloudOperationResult<string>> =>
   saveCloudCycleInternal(params);
 
@@ -798,8 +811,8 @@ export const subscribeToCloudCycles = (
           return;
         }
 
-        void readLegacyCloudCycles(userId)
-          .then(async (legacyCycles) => {
+        readLegacyCloudCycles(userId)
+          .then((legacyCycles) => {
             if (!active) {
               return;
             }

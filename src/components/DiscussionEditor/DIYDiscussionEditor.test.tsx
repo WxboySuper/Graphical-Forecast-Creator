@@ -1,3 +1,7 @@
+/**
+ * DIY discussion editor tests. Verify text editing, selection formatting, character
+ * counts, and callbacks for the free-form discussion editor.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import DIYDiscussionEditor from './DIYDiscussionEditor';
 

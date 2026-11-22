@@ -1,3 +1,7 @@
+/**
+ * Production-release deployment validation. It checks release actions,
+ * schedule windows, and banner phases before deployment automation proceeds.
+ */
 import { VALID_ACTIONS, ROLLOUT_MIN_LEAD_MS, ROLLOUT_MAX_FUTURE_MS } from './constants.mjs';
 import { parseInstant } from './schedule.mjs';
 import { validateBannerPhases } from './validate-phase.mjs';

@@ -1,3 +1,6 @@
+/**
+ * Custom cloud cycle service tests. Verify persistence and retrieval of custom cloud-cycle data.
+ */
 import type { GFCForecastSaveData } from '../types/outlooks';
 import { createForecastWorkspaceSave, getForecastDataFromWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
 import { getDoc, onSnapshot } from 'firebase/firestore';

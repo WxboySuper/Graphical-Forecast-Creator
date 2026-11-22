@@ -1,3 +1,8 @@
+/**
+ * Custom-product repository test boundary: this suite verifies hosted-product
+ * creation, category normalization, document-slot mapping, and local fallback
+ * behavior at the repository adapter boundary.
+ */
 import type { CustomCategoryId, HostedCustomProduct } from '../types/customProducts';
 import {
   CUSTOM_PRODUCT_DOCUMENT_SLOTS,

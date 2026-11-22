@@ -1,47 +1,64 @@
 # Privacy Policy
-**Last Updated: June 9, 2026**
+**Version 4 — Last Updated: November 21, 2026**
 
-**TL;DR:** Your local forecasts stay on your device. If you choose to make an account, we only collect what is strictly necessary to sync your work and securely manage your subscription. 
+This file mirrors the in-app Privacy Policy (`src/components/PrivacyPolicy/PrivacyPolicyModal.tsx`), which is the version users accept. Keep the two in sync.
+
+**TL;DR:** Your local forecasts stay on your device. If you choose to make an account, we only collect what is strictly necessary to sync your work and securely manage your subscription.
+
+**Usage data:** GFC counts daily visitors and active accounts without storing who they are, and offers an optional, anonymous feature-statistics setting that is off until you choose it. See section 5.
 
 **1. Local-First by Default**
-If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences, and cycle history remain stored locally on your device. We do not have access to this data.
+If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences, and cycle history remain stored locally on your device. We do not have access to this data. To show maps and weather data, your browser loads map tiles and public data directly from providers such as OpenFreeMap, Esri, NOAA/National Weather Service, and (for population estimates) WorldPop. Those providers receive your IP address and normal browser request information under their own privacy policies; they do not receive your forecasts.
 
 **2. Account & Authentication Data**
 If you choose to create an account to sync your settings or use premium features, we authenticate you via Firebase Auth. We use essential session cookies strictly to keep you logged in and we store:
-* Your email address
-* Your authentication provider (Google or Email/Password)
-* Basic profile information (Name/Avatar)
-* Your synced settings needed to keep the hosted account experience working across devices
+* Your email address.
+* Your authentication provider (Google or Email/Password).
+* Basic profile information (name/avatar).
+* Your synced settings needed to keep the hosted account experience working across devices.
 
 **3. Premium Cloud Storage & Encryption**
-If you subscribe to GFC Premium and actively use Cloud Saves, your forecast cycles, metadata, and discussions are stored securely—encrypted in transit and at rest—via Firebase. This data is stored strictly to provide cross-device synchronization. We do not sell this data or use it for advertising.
+If you subscribe to GFC Premium and actively use Cloud Saves, your forecast cycles, metadata, and discussions are stored securely, encrypted in transit and at rest, via Firebase. This data is stored strictly to provide cross-device synchronization. We do not sell this data or use it for advertising.
 
 **4. Payment Information**
 All payments are processed securely by Stripe. GFC does not collect, process, or store your credit card numbers or banking details. To operate subscriptions, we store limited billing metadata such as your subscription status, billing interval, renewal/cancellation state, and Stripe-linked customer or subscription identifiers needed to unlock and manage premium features.
 
-**5. Product Analytics & Progress Metrics**
-To monitor the health of the hosted service, we collect privacy-conscious product telemetry such as signups, sign-ins, cloud saves/loads, verification runs, and aggregate storage usage. **We do not log raw IP addresses for product analytics**, and your forecast payload contents are never exposed to our metrics dashboard.
+**5. Usage Counts, Optional Feature Statistics & Progress Metrics**
+We collect usage information in three separate layers so you can see exactly what each one does.
 
-If you are signed in, we also store limited progress metrics tied to your account so we can show you your own activity inside GFC. This may include values such as active-day streak, total active days, forecast saves, cloud saves, discussions written, and verification sessions run. These account metrics are visible only to you inside your account view.
+*Always on (no cookies and no identifier stored on your device).* GFC counts how many people use it each day. When GFC opens, it sends a request to our telemetry service, which runs on Cloudflare. The service combines your IP address and browser user-agent with a secret value tied to the current date, turns that into a one-way fingerprint, and uses it only to count each browser once per UTC day. If you are signed in, GFC also sends a once-a-day "active" signal that is verified with your sign-in token; the service counts your account the same way, using your account identifier and the same date-based secret. The service keeps only the per-day totals. The one-way fingerprints used to avoid double counting are kept only for the current UTC day and are deleted by a scheduled job at the start of the next day. We do not store your IP address, user-agent, or account identifier in these counts, and the counts are not linked to your forecasts, your account, or the optional statistics below. Your browser keeps only the date of the last daily signal it sent, so the signal is not sent twice in a day. Cloudflare may also keep routine technical logs, such as IP address and timestamps, for requests to this service under its own policies.
 
-We also generate a browser-scoped anonymous installation identifier to help estimate daily active devices without relying on long-term raw IP storage. Where possible, admin metrics are aggregated by day and shown only in aggregate form.
+*Error reports (Sentry).* On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture application errors and limited performance data so we can fix bugs quickly. We do not use Sentry for advertising or the sale of personal data. Reports are designed to be scrubbed before they leave your browser: email addresses, IP addresses, account identifiers, request URLs and query strings, cookies, and similar sensitive values are removed from messages, page names, and performance traces, and forecast map payloads are not attached. We do not use session replay, and events are tagged by environment (production or beta) so staging issues stay separate from production.
 
-Separately from product metrics, the hosted service may keep short operational request logs such as page path, referrer, timestamp, and user-agent for maintenance and debugging. These logs are not used to inspect forecast contents and are kept separate from the product metrics dashboard.
+*Optional feature statistics (off until you choose).* A one-time prompt asks "Help improve GFC?" and offers to share anonymous counts of which features get used. Allow and No thanks are equal choices, nothing is preselected, and closing the prompt without choosing counts as No thanks. Nothing in this layer is sent unless you choose Allow. If you do, when you use certain features (for example opening a page, creating, exporting, or saving a forecast, using verification, opening a mesoscale layer, changing a map layer, using a premium feature, or seeing an error), GFC sends only the name of the event, an optional short non-personal detail (such as a page name, layer name, or error type, never text you typed), and the GFC version. Our service adds your country, taken from Cloudflare. We do not send or store your account identifier, a fingerprint, your IP address, a session identifier, free text, or any forecast contents, coordinates, or filenames with these events. They are stored in Cloudflare's analytics service, which automatically expires them after about 90 days. You can change your choice at any time from the More (…) menu under Usage data. Because these statistics and the daily counts are not linked to you or your account, we cannot find or delete one person's entries; to stop contributing, turn the setting off.
 
-On the public production site (gfc.weatherboysuper.com), we use Google Analytics (GA4) to measure aggregate traffic and navigation patterns in a separate property from other Weatherboy Super sites. GA is loaded only on the hosted production domain, not on localhost development builds. Google's processing is governed by [Google's privacy policy](https://policies.google.com/privacy).
+Neither choice affects access to GFC, and we do not use any of this for advertising, cross-site tracking, or the sale of personal data. Earlier versions of GFC used a self-hosted analytics tool (Umami); it has been replaced by the services described here.
 
-On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude forecast map payloads, do not use session replay, and are configured without sending IP addresses or cookies by default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
+If you are signed in, we also store limited progress metrics tied to your account so we can show you your own activity inside GFC. This may include values such as active-day streak, total active days, forecast saves, cloud saves, discussions written, and verification sessions run. These account metrics are visible only to you inside your account view. To avoid counting the same device twice for the same account, the hosted app keeps a random device identifier in your browser's local storage. When you are signed in, our server stores short daily de-duplication records for your account to count active devices (up to five per day). They contain your account identifier, the date, and either a one-way hash that combines the device identifier with your account identifier or the number of devices active that day. These records are intended to expire automatically after about 35 days, and they are removed with your account data when you delete your account. When you are not signed in, the device identifier is not stored on our server.
 
-**6. Data Retention & Deletion**
-You own your data. You can delete your account from the Account page after confirming the request and authenticating again. The deletion process ends any subscription linked to the account, then permanently removes your cloud-hosted cycles, profile data, synced settings, user-linked progress metrics, billing linkage, and Firebase sign-in. Your local, offline saves remain untouched on your device. If cleanup cannot finish, the sign-in is kept available so you can retry; contact us if the problem continues. We retain a one-way hash of the deleted Firebase identifier as a deletion-safety marker so delayed billing events cannot recreate the account; it contains no email, profile, settings, metrics, or forecast content. Stripe may retain transaction records it is independently required to keep for payment, fraud-prevention, tax, or legal purposes.
+For a privacy question or an access or deletion request about usage data, contact us at the address in section 10 with the approximate date, browser or device, and details of what you want us to locate.
 
-Aggregate admin metrics may be retained in a non-user-specific form for product operations. Short-lived dedupe records used for daily unique counts are intended to expire automatically after a limited retention window.
+**6. Feedback You Send Us**
+The Send feedback form is optional and available to signed-in users; you can share feedback in our Discord instead if you prefer not to use it. When you send feedback we collect:
+* The message you write and the type you choose (bug, idea, praise, question, or other).
+* Technical context added automatically: the page you were on (path only, without query strings or fragments), the GFC version, whether you were using beta or production, your screen size, and your browser user-agent. We do not attach your forecast data.
+* A one-way hash of your account identifier, created with a secret value. We use it only to limit spam and duplicate submissions; it is not your account identifier.
+* Your email address, only if you tick "You can email me about this feedback" and your email address is verified. We contact you only if you opted in.
 
-**7. Age Restrictions**
+Please do not put passwords, payment details, or other sensitive personal information in your message. We use feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored with Cloudflare (our feedback service and database). Only GFC maintainers can read it. Cloudflare also processes requests to the feedback service and may keep routine technical logs, such as IP address and timestamps, under its own policies.
+
+We keep feedback until we delete it, and we may keep useful feedback after you delete your account because it is stored without your profile (it includes your email only if you opted in). Deleting your account does not automatically remove feedback you sent. To have specific feedback deleted, contact us at the address in section 10 and describe roughly when you sent it and what it said; we will remove it.
+
+**7. Data Retention & Deletion**
+You own your data. You can delete your account from the Account page after confirming the request and authenticating again. The deletion process ends any subscription linked to the account, then permanently removes your cloud-hosted cycles, profile data, synced settings, user-linked progress metrics, billing linkage, and Firebase sign-in. Your local, offline saves remain untouched on your device. If cleanup cannot finish, the sign-in is kept available so you can retry. We retain a one-way hash of the deleted Firebase identifier as a deletion-safety marker so delayed billing events cannot recreate the account; it contains no email, profile, settings, metrics, or forecast content. Stripe may retain transaction records it is independently required to keep for payment, fraud-prevention, tax, or legal purposes. Feedback you sent through the feedback form is described in section 6 and is not removed automatically when you delete your account.
+
+Daily visitor and active-account totals are kept as non-user-specific aggregates for product operations. The one-way fingerprints used to count them are deleted at the end of each UTC day. Optional feature statistics expire automatically after about 90 days.
+
+**8. Age Restrictions**
 GFC is intended for general audiences and is not directed at children under the age of 13. By creating an account, you confirm you are 13 years of age or older.
 
-**8. Security & Breach Notification**
-We rely on enterprise-grade infrastructure from Google (Firebase) and Stripe to keep your data safe. In the unlikely event of a data breach that compromises your account information, we will notify affected users via email as quickly as legally and technically possible.
+**9. Security & Breach Notification**
+We rely on established service providers to run GFC and keep your data safe: Google (Firebase Authentication and Firestore) for accounts and cloud saves, Stripe for payments, Cloudflare for hosting, the feedback service, anonymous counts, and optional analytics, Sentry for error monitoring, Hostinger for the server that runs the GFC API, and PurelyMail for our email address. These providers are based in or process data in the United States and other countries. In the unlikely event of a data breach that compromises your account information, we will notify affected users via email as quickly as legally and technically possible.
 
-**9. Policy Changes & Contact**
-We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. For privacy questions, or to request manual data deletion, contact us at: alex@weatherboysuper.com.
+**10. Policy Changes & Contact**
+We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email. We do not sell or share your personal information for advertising. You can ask us for a copy of your account data, to correct it, or to delete it, and you can turn optional feature statistics off at any time from the More (…) menu under Usage data; we aim to respond within 30 days. For privacy questions, or to request manual data deletion, contact us at: contact@gfcweather.com.

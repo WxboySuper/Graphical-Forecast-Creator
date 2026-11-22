@@ -1,3 +1,8 @@
+/**
+ * File: src/components/Map/openLayersBasemap.ts
+ * Purpose: Defines OpenLayers basemap construction and source configuration for map surfaces.
+ */
+
 import type { MutableRefObject } from "react";
 import type LayerGroup from "ol/layer/Group";
 import type TileLayer from "ol/layer/Tile";

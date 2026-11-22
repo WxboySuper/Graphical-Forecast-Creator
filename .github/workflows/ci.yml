@@ -2,7 +2,7 @@ name: Checks | CI
 
 on:
   push:
-    branches: [main, 'stable/**']
+    branches: [main, 'stable/**', 'backport/**']
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
@@ -168,8 +168,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate feature exposure policy
-        run: pnpm run validate:feature-exposure
+      - name: Validate feature flags
+        run: pnpm flags check
 
   firestore-rules:
     runs-on: ubuntu-latest
@@ -316,6 +316,9 @@ jobs:
         run: pnpm run test:coverage --silent
         env:
           CI: true
+
+      - name: Run Cloudflare Worker tests
+        run: pnpm run test:cloudflare
 
       - name: Verify toolbar dates in a US timezone
         run: pnpm run test:toolbar:timezone -- --runInBand

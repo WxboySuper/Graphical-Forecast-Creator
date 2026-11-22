@@ -1,3 +1,7 @@
+/**
+ * Renders storm-report evidence rows in the Forecast Grade report table.
+ * This component owns table presentation and derived display values; report loading, filtering, and grading remain separate responsibilities.
+ */
 import React, { useMemo } from 'react';
 import type { StormReport } from '../../types/stormReports';
 import { relevantReportTypes, type ProductKind } from '../../utils/verificationV2';

@@ -1,3 +1,8 @@
+/**
+ * GFC navigation bar component.
+ *
+ * This component renders the primary application navigation and account actions. Route authorization and data loading come from the supplied hooks and context.
+ */
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toggleDarkMode } from '../../store/themeSlice';
@@ -32,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     <TooltipProvider>
       <header className="app-navbar sticky top-0 z-panel">
         <div className="app-navbar__shine" />
-        <nav className="app-navbar__inner">
+        <nav className="app-navbar__inner" aria-label="Main navigation">
           <div className="app-navbar__left">
             <BrandSection />
           </div>

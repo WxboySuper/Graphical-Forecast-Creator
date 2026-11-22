@@ -1,3 +1,11 @@
+/**
+ * Hosted forecast-cycle library route.
+ *
+ * This page presents the signed-in user's cloud cycles and coordinates load,
+ * rename, delete, and local-export actions. Cloud access checks and persistence
+ * stay in the cloud-cycle hook/service boundary; the page owns route feedback
+ * and the library's interactive presentation.
+ */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AlertCircle, Cloud, CloudOff, Download, Edit2, LoaderCircle, Lock, ShieldCheck, Trash2 } from 'lucide-react';
@@ -35,6 +43,7 @@ import {
   CLOUD_CYCLE_PAYLOAD_KEY,
   getCloudSessionStorageKey,
 } from '../utils/cloudSessionStorage';
+import { MARKETING_PRICING_URL } from '../config/marketingLinks';
 import './CloudLibraryPage.css';
 
 /** Formats cloud-cycle timestamps for the library surface. */
@@ -137,7 +146,7 @@ const CloudLibraryUtilityActions: React.FC<{
       <Link to={getDefaultForecastWorkspacePath()}>Back to Forecast Editor</Link>
     </Button>
     <Button asChild variant={premiumActive ? 'outline' : 'default'}>
-      <Link to="/pricing">{premiumActive ? 'View Pricing' : 'Upgrade to Premium'}</Link>
+      <a href={MARKETING_PRICING_URL}>{premiumActive ? 'View Pricing' : 'Upgrade to Premium'}</a>
     </Button>
     {isExpiredPremium ? (
       <p className="cloud-library-side-note">Renew premium to turn cloud writes back on.</p>
@@ -189,7 +198,7 @@ const EmptyState: React.FC<{
         <Link to={workspacePath}>{premiumActive ? 'Start your first forecast' : 'Open Forecast Editor'}</Link>
       </Button>
       <Button asChild variant={premiumActive ? 'outline' : 'default'}>
-        <Link to="/pricing">{premiumActive ? 'View Pricing' : 'See Premium'}</Link>
+        <a href={MARKETING_PRICING_URL}>{premiumActive ? 'View Pricing' : 'See Premium'}</a>
       </Button>
     </div>
   </div>

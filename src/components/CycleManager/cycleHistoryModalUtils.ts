@@ -1,3 +1,8 @@
+/**
+ * Cycle-history modal helpers.
+ *
+ * This module derives labels, grouping, and display values for the cycle-history modal. Modal rendering and cycle persistence remain in the component and store layers.
+ */
 import type { SavedCycle } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
 

@@ -1,3 +1,7 @@
+/**
+ * Exposes the forecast transfer import, export, and package-download API.
+ * This module owns the public transfer boundary and re-exports; format-specific serialization and validation remain in dedicated helpers.
+ */
 import {
   downloadGfcPackage,
   downloadBlob,
@@ -17,7 +21,7 @@ import {
   toWorkflowScope,
 } from './transferExportUtils';
 import { importTransferFile } from './transferImportUtils';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import { GIS_ENTRY_WORKSPACE } from './importPolicy';
 
 /** Downloads a native JSON transfer with a workspace-specific filename. Ownership comes from the payload, not the filename. */
@@ -43,7 +47,7 @@ const assertSevereKmlExport = (format: ForecastExportRequest['format'], workspac
   if (workspaceId !== GIS_ENTRY_WORKSPACE) {
     throw new Error('KML/KMZ export is only available in the Severe workspace. Switch to Severe to export GIS geometry.');
   }
-  if (!isFeatureExposed('kmzExport')) {
+  if (!flag('kmzExport')) {
     throw new Error('KML/KMZ export is not available in this build.');
   }
 };

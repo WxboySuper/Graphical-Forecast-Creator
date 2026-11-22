@@ -1,3 +1,7 @@
+/**
+ * Provides the shared card UI primitives used to group content across GFC screens.
+ * This module owns presentational card structure and styling hooks; feature state and domain behavior belong to consuming components.
+ */
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 

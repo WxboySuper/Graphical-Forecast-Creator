@@ -1,3 +1,8 @@
+/**
+ * Custom-products test boundary: this suite verifies custom-product IDs,
+ * snapshots, access limits, schema compatibility, and layer conversion at the
+ * shared product-model boundary.
+ */
 import { CUSTOM_PRODUCT_LIMITS, CUSTOM_PRODUCTS_SCHEMA_VERSION, type HostedCustomProduct, type CustomCategoryTemplate, type OneOffCustomLayer } from '../types/customProducts';
 import {
   asCustomLayerId,

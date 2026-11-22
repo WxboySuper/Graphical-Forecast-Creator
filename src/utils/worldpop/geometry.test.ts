@@ -1,3 +1,6 @@
+/**
+ * WorldPop geometry tests. Verify population boundaries are converted into map-ready geometry.
+ */
 import { polygon } from '@turf/turf';
 import type { Feature } from 'geojson';
 import { unionForecastPolygons } from './geometry';

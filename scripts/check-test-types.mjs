@@ -1,3 +1,8 @@
+/**
+ * Test-source type policy check.
+ *
+ * This script validates the type constraints applied to test files and reports violations for CI. It does not execute tests or modify source files.
+ */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

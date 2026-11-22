@@ -161,4 +161,9 @@ describe('forecast workspace persistence contract', () => {
     expect(buildCloudSessionPayload('custom', createForecastWorkspaceSave('custom', forecast), buildCloudLoadValidators('custom')))
       .toEqual(createForecastWorkspaceSave('custom', forecast));
   });
+
+  test('rejects Mesoscale cloud storage explicitly', () => {
+    expect(() => buildCloudLoadValidators('mesoscale')).toThrow(/cloud storage is not supported for mesoscale/i);
+    expect(() => buildCloudSessionPayload('mesoscale', {})).toThrow(/cloud storage is not supported for mesoscale/i);
+  });
 });

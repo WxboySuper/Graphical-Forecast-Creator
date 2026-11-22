@@ -59,7 +59,7 @@ serialized.
 
 The following are NOT exposed on any unauthenticated status route:
 
-- The full `SERVER_FEATURE_EXPOSURE_REGISTRY` and per-target exposure matrix.
+- The full flag registry (`server/flags.json`) and per-target values.
 - Environment variable names and raw deployment switches.
 - Emergency-disable override lists.
 - Stripe price IDs, provider credentials, or Firebase admin config.

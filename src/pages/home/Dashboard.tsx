@@ -1,3 +1,7 @@
+/**
+ * Home dashboard summary. It renders forecast statistics and recent activity
+ * from the values supplied by the home-page controller.
+ */
 import React from 'react';
 import { Card, CardContent } from '../../components/ui/card';
 import type { DayType } from '../../types/outlooks';

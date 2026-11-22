@@ -1,3 +1,8 @@
+/**
+ * File: server/lib/featureCapabilities.test.js
+ * Purpose: Covers feature capability definitions and the server-side exposure decisions they drive.
+ */
+
 'use strict';
 
 const { describe, it } = require('node:test');
@@ -11,13 +16,13 @@ const {
   sendDisabledCapabilityResponse,
 } = require('./featureCapabilities');
 const {
+  allTargetsEnabledRouteOptions,
   assertCapabilityRouteRejectsWithoutWork,
   createTestAppWithGate,
   disabledCapabilityStatusFixtures,
   getServerUrl,
   startTestServer,
-} = require('../testing/featureExposureHarness');
-const { allTargetsEnabledRouteOptions } = require('../testing/featureExposureTargetMatrix');
+} = require('../testing/capabilityHarness');
 
 describe('server capability gates', () => {
   it('stays disabled for unknown capability keys', () => {

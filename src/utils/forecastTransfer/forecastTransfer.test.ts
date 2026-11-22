@@ -1,3 +1,8 @@
+/**
+ * Forecast-transfer test boundary: this suite verifies format detection,
+ * structured and KML export/import, placemark parsing, and transfer validation
+ * across portable forecast packages.
+ */
 import JSZip from 'jszip';
 import type { Feature, Polygon } from 'geojson';
 import type { ForecastCycle } from '../../types/outlooks';
@@ -748,7 +753,7 @@ describe('forecastTransfer', () => {
   });
 
   test('applies the same kmz feature gate in the export API that the transfer UI uses', async () => {
-    const spy = jest.spyOn(require('../../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    const spy = jest.spyOn(require('../../config/flags'), 'flag').mockReturnValue(false);
 
     await expect(exportForecastTransfer({
       format: 'kml',

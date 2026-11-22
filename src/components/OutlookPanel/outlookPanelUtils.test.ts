@@ -1,3 +1,7 @@
+/**
+ * Outlook-panel utility tests. Verify available probabilities, significance rules,
+ * colors, and probability-button styles for each forecast outlook type.
+ */
 import {
   canBeSignificant,
   getAvailableProbabilities,

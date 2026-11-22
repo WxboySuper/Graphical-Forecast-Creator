@@ -1,3 +1,7 @@
+/**
+ * Defines the Vite development and production build configuration for GFC.
+ * This file owns bundler plugins, aliases, environment loading, and build-time policy; application runtime behavior belongs to src/.
+ */
 import path from 'path';
 import fs from 'fs';
 import { defineConfig, loadEnv } from 'vite';
@@ -54,9 +58,16 @@ export default defineConfig(({ mode }) => {
     define: {
       __GFC_APP_VERSION__: JSON.stringify(pkg.version),
       __GFC_BUILD_TARGET__: JSON.stringify(buildTarget),
+      __GFC_FEEDBACK_API_URL__: JSON.stringify(env.VITE_FEEDBACK_API_URL ?? 'https://feedback.gfcweather.com'),
+      __MESOSCALE_WORKER_URLS__: JSON.stringify({
+        local: env.VITE_MESOSCALE_WORKER_URL_LOCAL || env.VITE_MESOSCALE_WORKER_URL || '',
+        beta: env.VITE_MESOSCALE_WORKER_URL_BETA || env.VITE_MESOSCALE_WORKER_URL || '',
+        staging: env.VITE_MESOSCALE_WORKER_URL_STAGING || env.VITE_MESOSCALE_WORKER_URL || '',
+        production: env.VITE_MESOSCALE_WORKER_URL_PRODUCTION || env.VITE_MESOSCALE_WORKER_URL || '',
+      }),
+      __MESOSCALE_FIXTURES__: JSON.stringify(env.VITE_MESOSCALE_FIXTURES === 'true'),
+      __MESOSCALE_DEMO__: JSON.stringify(env.VITE_MESOSCALE_DEMO === 'true' && buildTarget === 'local'),
       __GFC_DEV_MODE__: JSON.stringify(mode === 'development'),
-      __GFC_BETA_MODE__: JSON.stringify(env.VITE_BETA_MODE === 'true'),
-      __GFC_BETA_INVITE_PATH__: JSON.stringify(env.VITE_BETA_INVITE_PATH ?? ''),
       __GFC_FIREBASE_API_KEY__: JSON.stringify(env.VITE_FIREBASE_API_KEY ?? ''),
       __GFC_FIREBASE_AUTH_DOMAIN__: JSON.stringify(env.VITE_FIREBASE_AUTH_DOMAIN ?? ''),
       __GFC_FIREBASE_PROJECT_ID__: JSON.stringify(env.VITE_FIREBASE_PROJECT_ID ?? ''),
@@ -65,9 +76,7 @@ export default defineConfig(({ mode }) => {
       __GFC_CLERK_PUBLISHABLE_KEY__: JSON.stringify(env.VITE_CLERK_PUBLISHABLE_KEY?.trim() ?? ''),
       __GFC_SENTRY_DSN__: JSON.stringify(env.VITE_SENTRY_DSN ?? ''),
       __GFC_SENTRY_ENVIRONMENT__: JSON.stringify(env.VITE_SENTRY_ENVIRONMENT ?? ''),
-      __GFC_UMAMI_HOST__: JSON.stringify(env.VITE_UMAMI_HOST ?? ''),
-      __GFC_UMAMI_PRODUCTION_WEBSITE_ID__: JSON.stringify(env.VITE_UMAMI_PRODUCTION_WEBSITE_ID ?? ''),
-      __GFC_UMAMI_BETA_WEBSITE_ID__: JSON.stringify(env.VITE_UMAMI_BETA_WEBSITE_ID ?? ''),
+      __GFC_TELEMETRY_BASE_URL__: JSON.stringify(env.VITE_TELEMETRY_BASE_URL ?? ''),
     },
     plugins: [
       react(),

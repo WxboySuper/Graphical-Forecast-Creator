@@ -1,12 +1,18 @@
+/**
+ * Privacy-policy modal: this component presents the user-facing privacy
+ * document, consent interaction, and accessible dialog lifecycle. It owns
+ * modal presentation and local acknowledgment state; policy text and account
+ * persistence are supplied by their respective boundaries.
+ */
+import ContactEmailLink from '../ContactEmailLink';
 import React, { useState } from 'react';
 import './PrivacyPolicyModal.css';
 import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
-import { isProductAnalyticsEnabled, setProductAnalyticsEnabled, trackProductPageView } from '../../lib/productAnalytics';
 
 // Bump this version string whenever the Privacy Policy changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const PRIVACY_POLICY_VERSION = '1.7.0';
-const PRIVACY_POLICY_LAST_UPDATED = 'July 21, 2026';
+const PRIVACY_POLICY_VERSION = '4';
+const PRIVACY_POLICY_LAST_UPDATED = 'November 21, 2026';
 const STORAGE_KEY = 'gfc-privacy-policy-accepted';
 
 // Changelog of material privacy-policy changes, keyed by the version that introduced them.
@@ -37,7 +43,42 @@ const PRIVACY_POLICY_CHANGELOG: Record<string, string[]> = {
     'We minimized new product-analytics location collection and documented how to request access or deletion help for pseudonymous telemetry.',
     'We clarified that a fixed event-level telemetry retention period is still an unresolved operational decision.',
   ],
+  '1.8.0': [
+    'We added a section describing the optional Send feedback form: what it collects, where it is stored (Cloudflare and a private Discord channel), and how long it is kept.',
+    'Feedback is kept until we delete it and is not removed automatically when you delete your account; you can ask us to delete it at any time.',
+    'We now list Cloudflare among the infrastructure providers that process requests for the beta site and feedback service.',
+    'Our contact address for privacy questions and deletion requests is now contact@gfcweather.com.',
+  ],
+  '2': [
+    'The Privacy Policy now uses the flat Version 2 label for the v2 release. You will need to accept this updated version before continuing.',
+  ],
+  '3': [
+    'We replaced our self-hosted Umami analytics with Cloudflare-hosted usage counts and optional feature statistics.',
+    'Daily visitor and active-account totals are counted without cookies. Only the totals are kept, and the one-way fingerprints used to avoid double counting are deleted at the end of each day.',
+    'A new one-time "Help improve GFC?" prompt replaces the setting that used to sit at the top of this policy. Optional feature statistics stay off until you allow them, and you can change the choice any time from the More menu under Usage data.',
+    'Optional statistics are stored by Cloudflare and expire automatically after about 90 days. Error reports are now scrubbed more thoroughly, including performance traces.',
+  ],
+  '4': [
+    'We now explain that your browser loads map tiles and public weather data directly from providers such as OpenFreeMap, Esri, NOAA/National Weather Service, and WorldPop, which see your IP address but not your forecasts.',
+    'Feedback you send is stored with Cloudflare only; we removed the mention of a Discord copy because that feature is not turned on.',
+    'We now list every service provider we use: Google Firebase, Stripe, Cloudflare, Sentry, Hostinger, and PurelyMail.',
+    'We added your privacy rights (access, correction, deletion), a statement that we do not sell or share personal information for advertising, and a 30-day response target.',
+  ],
 };
+
+function comparePolicyVersions(left: string, right: string): number {
+  if (!/^\d+(?:\.\d+)*$/.test(left) || !/^\d+(?:\.\d+)*$/.test(right)) return 1;
+  const leftParts = left.split('.').map(Number);
+  const rightParts = right.split('.').map(Number);
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+
+  return 0;
+}
 
 /** Returns true if the user has accepted the current version of the Privacy Policy. */
 export function hasAcceptedPrivacyPolicy(): boolean {
@@ -71,7 +112,7 @@ export function getStoredVersion(): string | null {
 export function getWhatsNewItems(lastAcceptedVersion: string | null): string[] {
   const items: string[] = [];
   for (const [version, entries] of Object.entries(PRIVACY_POLICY_CHANGELOG)) {
-    if (lastAcceptedVersion == null || version > lastAcceptedVersion) {
+    if (lastAcceptedVersion == null || comparePolicyVersions(version, lastAcceptedVersion) > 0) {
       items.push(...entries);
     }
   }
@@ -105,26 +146,6 @@ const PrivacyPolicyWhatsNew: React.FC<{ items: string[] }> = ({ items }) => (
   </aside>
 );
 
-/** Lets people change the local, non-essential telemetry preference without creating an account. */
-const ProductAnalyticsPreference: React.FC = () => {
-  const [enabled, setEnabled] = useState(() => isProductAnalyticsEnabled());
-  const handleChange = () => {
-    const nextEnabled = !enabled;
-    const effectiveEnabled = setProductAnalyticsEnabled(nextEnabled);
-    // A consent action is the earliest permitted point to initialize analytics.
-    // Record the page the person explicitly chose from; nothing is injected or queued beforehand.
-    if (effectiveEnabled) trackProductPageView();
-    setEnabled(effectiveEnabled);
-  };
-
-  return (
-    <button type="button" role="switch" aria-checked={enabled} className="privacy-analytics-preference" onClick={handleChange}>
-      <strong>Non-essential product analytics: {enabled ? 'Enabled' : 'Disabled'}</strong>
-      <span>{enabled ? 'Withdraw telemetry permission' : 'Enable optional pseudonymous telemetry'}</span>
-    </button>
-  );
-};
-
 /** Renders the current in-app Privacy Policy content for both acceptance and view-only modes. */
 const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNewItems }) => (
   <>
@@ -134,21 +155,14 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       collect what is strictly necessary to sync your work and securely manage your subscription.
     </p>
 
-    <section className="privacy-analytics-choice" aria-labelledby="privacy-analytics-choice-title">
-      <div>
-        <h3 id="privacy-analytics-choice-title">Optional product analytics</h3>
-        <p>
-          Help us understand which parts of GFC are useful. This is disabled by default and is a separate choice from
-          accepting this Privacy Policy. It never affects access to GFC and can be changed here at any time.
-        </p>
-      </div>
-      <ProductAnalyticsPreference />
-    </section>
-
     <h3>1. Local-First by Default</h3>
     <p>
       If you use Graphical Forecast Creator (GFC) without creating an account, all of your forecast data, preferences,
       and cycle history remain stored locally on your device. We do not have access to this data.
+      To show maps and weather data, your browser loads map tiles and public data directly from providers such as
+      OpenFreeMap, Esri, NOAA/National Weather Service, and (for population estimates) WorldPop. Those providers
+      receive your IP address and normal browser request information under their own privacy policies; they do not
+      receive your forecasts.
     </p>
 
     <h3>2. Account &amp; Authentication Data</h3>
@@ -178,45 +192,106 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       needed to unlock and manage premium features.
     </p>
 
-    <h3>5. Product Analytics &amp; Progress Metrics</h3>
+    <h3>5. Usage Counts, Optional Feature Statistics &amp; Progress Metrics</h3>
     <p>
-      To understand which hosted GFC workflows need improvement, we use self-hosted, cookie-free Umami product
-      analytics on the production and beta deployments in separate reporting zones. It uses a pseudonymous
-      visitor/session identifier to group activity from the same browser without attaching it to your GFC account. We
-      collect page views, selected milestone events such as completed exports, cloud-save outcomes, workflow outcomes,
-      and custom-layer creation, plus route/page activity, timestamps, and coarse technical information (browser,
-      operating system, and device type). The Umami service can derive approximate location from an IP address, but GFC
-      currently removes visitor IP addresses before they reach Umami, so new GFC telemetry does not include country,
-      region, or city. <strong>We do not use account identity,
-      Firebase UID, email address, forecast contents, coordinates, layer text, filenames, or export contents for
-      product analytics.</strong>
+      We collect usage information in three separate layers so you can see exactly what each one does.
+    </p>
+    <p>
+      <em>Always on (no cookies and no identifier stored on your device).</em> GFC counts how many people use it each day. When
+      GFC opens, it sends a request to our telemetry service, which runs on Cloudflare. The service combines your IP
+      address and browser user-agent with a secret value tied to the current date, turns that into a one-way
+      fingerprint, and uses it only to count each browser once per UTC day. If you are signed in, GFC also sends a
+      once-a-day &quot;active&quot; signal that is verified with your sign-in token; the service counts your account the
+      same way, using your account identifier and the same date-based secret. The service keeps only the per-day
+      totals. The one-way fingerprints used to avoid double counting are kept only for the current UTC day and are
+      deleted by a scheduled job at the start of the next day. We do not store your IP address, user-agent, or account
+      identifier in these counts, and the counts are not linked to your forecasts, your account, or the optional
+      statistics below. Your browser keeps only the date of the last daily signal it sent, so the signal is not sent
+      twice in a day. Cloudflare may also keep routine technical logs, such as IP address and timestamps, for
+      requests to this service under its own policies.
+    </p>
+    <p>
+      <em>Error reports (Sentry).</em> On production and beta hosted deployments, we use Sentry (a third-party error
+      monitoring service) to capture application errors and limited performance data so we can fix bugs quickly. We do
+      not use Sentry for advertising or the sale of personal data. Reports are designed to be scrubbed before they leave
+      your browser: email addresses, IP addresses, account identifiers, request URLs and query strings, cookies, and
+      similar sensitive values are removed from messages, page names, and performance traces, and forecast map
+      payloads are not attached. We do not use session replay, and events are tagged by environment (production or
+      beta) so staging issues stay separate from production.
+    </p>
+    <p>
+      <em>Optional feature statistics (off until you choose).</em> A one-time prompt asks &quot;Help improve GFC?&quot; and
+      offers to share anonymous counts of which features get used. Allow and No thanks are equal choices, nothing is
+      preselected, and closing the prompt without choosing counts as No thanks. Nothing in this layer is sent unless
+      you choose Allow. If you do, when you use certain features (for example opening a page, creating, exporting, or
+      saving a forecast, using verification, opening a mesoscale layer, changing a map layer, using a premium feature,
+      or seeing an error), GFC sends only the name of the event, an optional short non-personal detail (such as a page
+      name, layer name, or error type, never text you typed), and the GFC version. Our service adds your country,
+      taken from Cloudflare. We do not send or store your account identifier, a fingerprint, your IP address, a
+      session identifier, free text, or any forecast contents, coordinates, or filenames with these events. They are
+      stored in Cloudflare&apos;s analytics service, which automatically expires them after about 90 days. You can
+      change your choice at any time from the More (&hellip;) menu under Usage data. Because these statistics and the
+      daily counts are not linked to you or your account, we cannot find or delete one person&apos;s entries; to stop
+      contributing, turn the setting off.
+    </p>
+    <p>
+      Neither choice affects access to GFC, and we do not use any of this for advertising, cross-site tracking, or the
+      sale of personal data. Earlier versions of GFC used a self-hosted analytics tool (Umami); it has been replaced by
+      the services described here.
     </p>
     <p>
       If you are signed in, we also store limited progress metrics tied to your account so we can show you your own
       activity inside GFC. This may include values such as active-day streak, total active days, forecast saves, cloud
       saves, discussions written, and verification sessions run. These account metrics are visible only to you inside
-      your account view.
+      your account view. To avoid counting the same device twice for the same account, the hosted app keeps a random
+      device identifier in your browser&apos;s local storage. When you are signed in, our server stores short daily
+      de-duplication records for your account to count active devices (up to five per day). They contain your account
+      identifier, the date, and either a one-way hash that combines the device identifier with your account
+      identifier or the number of devices active that day. These records are intended to expire automatically after about 35 days, and they are removed with your
+      account data when you delete your account. When you are not signed in, the device identifier is not stored on
+      our server.
     </p>
     <p>
-      Non-essential product analytics are disabled by default. You may optionally enable them using the local telemetry
-      preference at the top of this policy; choosing not to enable them does not affect access to GFC. You can withdraw that permission at
-      any time from the same control. When disabled, GFC does not load the Umami tracker or send product-analytics
-      events. Analytics are hosted by GFC on our VPS and are not used for advertising, cross-site tracking, or sale of
-      personal data. Beta and production are separate analytics zones. Because this telemetry is not linked to a
-      Firebase account, Firebase account deletion does not identify a matching telemetry record. A fixed event-level
-      telemetry retention period has not yet been adopted; we will publish and implement one before representing a
-      fixed deletion schedule. For a telemetry access or deletion request, or any privacy question, contact us at the
-      address in section 9 with the approximate date, browser/device, and route or event details you want us to locate.
-    </p>
-    <p>
-      On production and beta hosted deployments, we use Sentry (a third-party error monitoring service) to capture
-      application errors and limited performance data so we can fix bugs quickly. This is separate from product analytics
-      above. We do not use Sentry for advertising or the sale of personal data. Error reports are designed to exclude
-      forecast map payloads, do not use session replay, and are configured without sending IP addresses or cookies by
-      default. Events are tagged by environment (production or beta) so staging issues stay separate from production.
+      For a privacy question or an access or deletion request about usage data, contact us at the address in section
+      10 with the approximate date, browser or device, and details of what you want us to locate.
     </p>
 
-    <h3>6. Data Retention &amp; Deletion</h3>
+        <h3>6. Feedback You Send Us</h3>
+    <p>
+      The Send feedback form is optional and available to signed-in users; you can share feedback in our Discord
+      instead if you prefer not to use it. When you send feedback we collect:
+    </p>
+    <ul>
+      <li>The message you write and the type you choose (bug, idea, praise, question, or other).</li>
+      <li>
+        Technical context added automatically: the page you were on (path only, without query strings or
+        fragments), the GFC version, whether you were using beta or production, your screen size, and your browser
+        user-agent. We do not attach your forecast data.
+      </li>
+      <li>
+        A one-way hash of your account identifier, created with a secret value. We use it only to limit spam and
+        duplicate submissions; it is not your account identifier.
+      </li>
+      <li>
+        Your email address, only if you tick &quot;You can email me about this feedback&quot; and your email address is
+        verified. We contact you only if you opted in.
+      </li>
+    </ul>
+    <p>
+      Please do not put passwords, payment details, or other sensitive personal information in your message. We use
+      feedback to fix bugs and decide what to build; we do not sell it or use it for advertising. Feedback is stored
+      with Cloudflare (our feedback service and database). Only GFC maintainers can read it. Cloudflare also processes
+      requests to the feedback service and may keep routine technical logs, such as
+      IP address and timestamps, under its own policies.
+    </p>
+    <p>
+      We keep feedback until we delete it, and we may keep useful feedback after you delete your account because it
+      is stored without your profile (it includes your email only if you opted in). Deleting your account does not
+      automatically remove feedback you sent. To have specific feedback deleted, contact us at the address in
+      section 10 and describe roughly when you sent it and what it said; we will remove it.
+    </p>
+
+    <h3>7. Data Retention &amp; Deletion</h3>
     <p>
       You own your data. You can delete your account from the Account page after confirming the request and
       authenticating again. The deletion process ends any subscription linked to the account, then permanently removes
@@ -225,31 +300,39 @@ const PrivacyPolicyContent: React.FC<{ whatsNewItems?: string[] }> = ({ whatsNew
       sign-in is kept available so you can retry. We retain a one-way hash of the deleted Firebase identifier as a
       deletion-safety marker so delayed billing events cannot recreate the account; it contains no email, profile,
       settings, metrics, or forecast content. Stripe may retain transaction records it is independently required to
-      keep for payment, fraud-prevention, tax, or legal purposes.
+      keep for payment, fraud-prevention, tax, or legal purposes. Feedback you sent through the feedback form is
+      described in section 6 and is not removed automatically when you delete your account.
     </p>
     <p>
-      Aggregate admin metrics may be retained in a non-user-specific form for product operations. Short-lived dedupe
-      records used for daily unique counts are intended to expire automatically after a limited retention window.
+      Daily visitor and active-account totals are kept as non-user-specific aggregates for product operations. The
+      one-way fingerprints used to count them are deleted at the end of each UTC day. Optional feature statistics
+      expire automatically after about 90 days.
     </p>
 
-    <h3>7. Age Restrictions</h3>
+    <h3>8. Age Restrictions</h3>
     <p>
       GFC is intended for general audiences and is not directed at children under the age of 13. By creating an
       account, you confirm you are 13 years of age or older.
     </p>
 
-    <h3>8. Security &amp; Breach Notification</h3>
+    <h3>9. Security &amp; Breach Notification</h3>
     <p>
-      We rely on enterprise-grade infrastructure from Google (Firebase) and Stripe to keep your data safe. In the
-      unlikely event of a data breach that compromises your account information, we will notify affected users via
+      We rely on established service providers to run GFC and keep your data safe: Google (Firebase Authentication
+      and Firestore) for accounts and cloud saves, Stripe for payments, Cloudflare for hosting, the feedback service,
+      anonymous counts, and optional analytics, Sentry for error monitoring, Hostinger for the server that runs the
+      GFC API, and PurelyMail for our email address. These providers are based in or process data in the United States
+      and other countries. In the unlikely event of a data breach that compromises your account information, we will notify affected users via
       email as quickly as legally and technically possible.
     </p>
 
-    <h3>9. Policy Changes &amp; Contact</h3>
+    <h3>10. Policy Changes &amp; Contact</h3>
     <p>
       We may update this policy as GFC evolves. Significant changes will be communicated via in-app notices or email.
-      For privacy questions, or to request manual data deletion, contact us at{' '}
-      <a href="mailto:alex@weatherboysuper.com">alex@weatherboysuper.com</a>.
+      We do not sell or share your personal information for advertising. You can ask us for a copy of your account
+      data, to correct it, or to delete it, and you can turn optional feature statistics off at any time from the
+      More (&hellip;) menu under Usage data; we aim to respond within 30 days. For privacy questions, or to request
+      manual data deletion, contact us at{' '}
+      <ContactEmailLink />.
     </p>
   </>
 );

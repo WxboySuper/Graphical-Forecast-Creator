@@ -1,5 +1,26 @@
+/**
+ * Feature navigation configuration.
+ *
+ * This module maps feature identifiers to the navigation metadata used by GFC surfaces. Route components own rendering and access decisions; this file defines the shared configuration.
+ */
 import { getBuildTarget, type BuildTarget } from './buildTarget';
-import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { flag, type FlagName } from './flags';
+import { getDefaultForecastWorkspacePath, resolveRouteForecastWorkspaceContext } from '../routing/forecastWorkspaceRoutes';
+
+const SHORTCUT_PRESERVED_PARAMS = ['group', 'discussionLayout'] as const;
+
+/** Opens Discussion inside the workspace the user is in, keeping only the discussion scope and layout. */
+export const buildDiscussionShortcutPath = (pathname: string, search: string): string => {
+  const workspacePath = resolveRouteForecastWorkspaceContext(pathname, search)?.path ?? getDefaultForecastWorkspacePath();
+  const current = new URLSearchParams(search);
+  const params = new URLSearchParams();
+  for (const key of SHORTCUT_PRESERVED_PARAMS) {
+    const value = current.get(key);
+    if (value) params.set(key, value);
+  }
+  params.set('surface', 'discussion');
+  return `${workspacePath}?${params.toString()}`;
+};
 
 export type AppNavigationItem = {
   id: string;
@@ -8,14 +29,14 @@ export type AppNavigationItem = {
   shortcutKey?: string;
   shortcutLabel?: string;
   end?: boolean;
-  feature?: FeatureKey;
+  feature?: FlagName;
 };
 
-/** Primary navbar destinations. Items with a feature key render only when that feature is exposed. */
+/** Navigation and shortcut metadata. Items with a feature key are included only when exposed. */
 const RAW_APP_NAVIGATION_ITEMS = [
   { id: 'home', to: '/', label: 'Home', shortcutKey: 'h', shortcutLabel: '⌃H', end: true },
   { id: 'forecast', to: '/forecast', label: 'Forecast', shortcutKey: '1', shortcutLabel: '⌃1' },
-  { id: 'discussion', to: '/discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
+  { id: 'discussion', to: '/forecast/severe?surface=discussion', label: 'Discussion', shortcutKey: '2', shortcutLabel: '⌃2' },
   { id: 'verification', to: '/verification', label: 'Verification', shortcutKey: '3', shortcutLabel: '⌃3' },
   { id: 'monitor', to: '/monitor', label: 'Monitor', shortcutKey: '4', shortcutLabel: '⌃4' },
   {
@@ -46,7 +67,7 @@ export const getVisibleNavigationItems = (
   target: BuildTarget = getBuildTarget()
 ): AppNavigationItemWithId[] =>
   APP_NAVIGATION_ITEMS.filter(
-    (item) => !item.feature || isFeatureExposedOnTarget(item.feature, target)
+    (item) => !item.feature || flag(item.feature, target)
   ) as AppNavigationItemWithId[];
 
 /** Builds Ctrl/Cmd navigation shortcuts for visible navbar destinations. */
@@ -60,7 +81,13 @@ export const getNavigationKeyboardShortcuts = (
 
   for (const item of getVisibleNavigationItems(target)) {
     if (item.shortcutKey) {
-      shortcuts[item.shortcutKey] = () => navigate(item.to);
+      shortcuts[item.shortcutKey] = () => {
+        if (item.id === 'discussion' && typeof window !== 'undefined') {
+          navigate(buildDiscussionShortcutPath(window.location.pathname, window.location.search));
+          return;
+        }
+        navigate(item.to);
+      };
     }
   }
 

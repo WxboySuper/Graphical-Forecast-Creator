@@ -1,3 +1,6 @@
+/**
+ * Verification grade history tests. Verify grade history entries are ordered, normalized, and persisted.
+ */
 import {
   GRADE_HISTORY_LIMIT,
   accountScope,
@@ -6,14 +9,7 @@ import {
   loadGradeSnapshot,
   recordGradeResult,
 } from './gradeHistory';
-import {
-  availablePackageSources,
-  buildGradeCard,
-  resolveAccountTier,
-  tierHasHistory,
-  tierHasSnapshots,
-  toArchiveDate,
-} from './sources';
+import { buildGradeCard } from './sources';
 import { gradeForecast } from './gradeForecast';
 import { circleContour, scatterReports, tornadoOutlook } from './testFixtures';
 import type { GradeCard, GradeSnapshot } from '../../types/forecastGrade';
@@ -34,36 +30,24 @@ const sampleCard = (overrides: Partial<GradeCard> = {}): GradeCard => ({
   ...overrides,
 });
 
-beforeEach(() => {
-  window.localStorage.clear();
+const sampleSnapshot = (card: GradeCard): GradeSnapshot => ({
+  card,
+  package: {
+    formulaVersion: 'gfc-ver-4',
+    grade: 82.4,
+    letter: 'B',
+    products: [],
+    dataQuality: 'Good',
+    dataQualityReason: '',
+    hasReports: true,
+    generatedAt: '2026-05-01T00:00:00Z',
+  },
+  forecast: {} as GradeSnapshot['forecast'],
+  reportDate: '2026-05-01',
 });
 
-describe('account tiers and sources', () => {
-  test('resolves tier from auth + entitlement', () => {
-    expect(resolveAccountTier(false, false)).toBe('signed-out');
-    expect(resolveAccountTier(true, false)).toBe('free');
-    expect(resolveAccountTier(true, true)).toBe('premium');
-  });
-
-  test('only premium gets the cloud package source', () => {
-    expect(availablePackageSources('signed-out')).toEqual(['file']);
-    expect(availablePackageSources('free')).toEqual(['file']);
-    expect(availablePackageSources('premium')).toEqual(['file', 'cloud']);
-  });
-
-  test('converts ISO date input to SPC archive YYMMDD', () => {
-    expect(toArchiveDate('2024-05-06')).toBe('240506');
-    expect(toArchiveDate('240506')).toBe('240506');
-    expect(toArchiveDate('2024-99-99')).toBeNull();
-    expect(toArchiveDate('2024-5-6')).toBeNull();
-  });
-
-  test('history and snapshot capability by tier', () => {
-    expect(tierHasHistory('signed-out')).toBe(false);
-    expect(tierHasHistory('free')).toBe(true);
-    expect(tierHasSnapshots('free')).toBe(false);
-    expect(tierHasSnapshots('premium')).toBe(true);
-  });
+beforeEach(() => {
+  window.localStorage.clear();
 });
 
 describe('account scope', () => {
@@ -92,7 +76,7 @@ describe('grade history persistence', () => {
 
   test('stores and restores premium snapshots and evicts them past the limit', () => {
     const card = sampleCard({ id: 'snap', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 82.4 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     recordGradeResult({ scope, card, snapshot });
     expect(loadGradeSnapshot({ scope, cardId: 'snap' })).not.toBeNull();
 
@@ -102,9 +86,55 @@ describe('grade history persistence', () => {
     expect(loadGradeSnapshot({ scope, cardId: 'snap' })).toBeNull();
   });
 
+  test('rejects snapshot entries that do not match the GradeSnapshot shape', () => {
+    const card = sampleCard({ id: 'valid', hasSnapshot: true });
+    window.localStorage.setItem(
+      `gfc-forecast-grade-snapshot-v1:${scope}:valid`,
+      JSON.stringify(sampleSnapshot(card)),
+    );
+    expect(loadGradeSnapshot({ scope, cardId: 'valid' })).not.toBeNull();
+
+    const valid = sampleSnapshot(card);
+    const tampered: Record<string, unknown>[] = [
+      { ...valid, card: { id: 'tampered' } },
+      { ...valid, package: { ...valid.package, products: 'not-an-array' } },
+      { ...valid, package: { ...valid.package, products: [null] } },
+      { ...valid, package: { ...valid.package, dataQuality: 7 } },
+      { ...valid, forecast: 'not-an-object' },
+      { ...valid, reportDate: 123 },
+    ];
+
+    tampered.forEach((snapshot, index) => {
+      const cardId = `tampered-${index}`;
+      window.localStorage.setItem(
+        `gfc-forecast-grade-snapshot-v1:${scope}:${cardId}`,
+        JSON.stringify(snapshot),
+      );
+      expect(loadGradeSnapshot({ scope, cardId })).toBeNull();
+    });
+  });
+
+  test('validates the product rows used when reopening a snapshot', () => {
+    const card = sampleCard({ id: 'product', hasSnapshot: true });
+    const snapshot = sampleSnapshot(card);
+    const component = { key: 'eventCapture', label: 'Event capture', weight: 35, detail: '', applicable: true, score: 80 };
+    const product = { product: 'tornado', label: 'Tornado', grade: 80, letter: 'B', applicable: true, reportCount: 1, components: [component] };
+    const key = `gfc-forecast-grade-snapshot-v1:${scope}:product`;
+    const store = (entry: unknown) => window.localStorage.setItem(key, JSON.stringify({ ...snapshot, package: { ...snapshot.package, products: [entry] } }));
+
+    store(product);
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).not.toBeNull();
+    store({ product: 'tornado', applicable: true });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+    store({ ...product, components: [null] });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+    store({ ...product, diagnostics: 'invalid' });
+    expect(loadGradeSnapshot({ scope, cardId: 'product' })).toBeNull();
+  });
+
   test('flips hasSnapshot to false on the returned card when the snapshot write fails', () => {
     const card = sampleCard({ id: 'quota', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 82.4 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     const setItemSpy = jest
       .spyOn(Storage.prototype, 'setItem')
       .mockImplementation((key: string) => {
@@ -124,7 +154,7 @@ describe('grade history persistence', () => {
 
   test('does not evict snapshots when the card-list write fails', () => {
     const card = sampleCard({ id: 'a', hasSnapshot: true });
-    const snapshot = { card, package: { grade: 1 }, forecast: {}, reportDate: '2026-05-01' } as unknown as GradeSnapshot;
+    const snapshot = sampleSnapshot(card);
     recordGradeResult({ scope, card, snapshot });
     expect(loadGradeSnapshot({ scope, cardId: 'a' })).not.toBeNull();
 

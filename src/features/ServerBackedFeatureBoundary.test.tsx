@@ -1,3 +1,6 @@
+/**
+ * Server-backed feature boundary tests. Verify server entitlement and client exposure jointly control gated UI.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import { resetServerCapabilityStatusState } from '../config/serverCapabilityStatus';
 import { ServerBackedFeatureBoundary } from './ServerBackedFeatureBoundary';
@@ -9,7 +12,7 @@ describe('ServerBackedFeatureBoundary', () => {
   });
 
   test('renders children when compile-time exposure and server status both allow it', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -39,7 +42,7 @@ describe('ServerBackedFeatureBoundary', () => {
   });
 
   test('renders a fallback when the server reports emergency disable', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -70,7 +73,7 @@ describe('ServerBackedFeatureBoundary', () => {
   });
 
   test('does not render children while compile-time exposure is disabled', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
 
     render(
       <ServerBackedFeatureBoundary feature="autoTstm">
@@ -83,7 +86,7 @@ describe('ServerBackedFeatureBoundary', () => {
   });
 
   test('does not render unavailable fallback while server status is loading', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
     const originalFetch = global.fetch;
     global.fetch = jest.fn(() => new Promise(() => {})) as jest.Mock;
 

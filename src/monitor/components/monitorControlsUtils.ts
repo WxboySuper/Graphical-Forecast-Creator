@@ -1,3 +1,8 @@
+/**
+ * Monitor control formatting helpers.
+ *
+ * This module derives display labels and control values for monitor panels. It contains presentation-safe transformations only; monitor state and side effects stay in hooks and components.
+ */
 import type { MonitorOutlookSourceSelection } from '../types';
 
 /** Formats monitor layer timestamps for compact control-panel status text. */

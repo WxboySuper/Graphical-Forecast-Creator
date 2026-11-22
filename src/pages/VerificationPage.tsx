@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import VerificationMode from '../components/VerificationMode/VerificationMode';
 
 // Lazily loaded so the Verification v2 dashboard and its grading engine never
@@ -18,7 +18,7 @@ const DashboardFallback = () => (
  * current build target. Classic remains fully functional when the flag is off.
  */
 export const VerificationPage: React.FC = () => {
-  if (isFeatureExposed('verificationRelaunch')) {
+  if (flag('verificationRelaunch')) {
     return (
       <Suspense fallback={<DashboardFallback />}>
         <ForecastGradeDashboard />

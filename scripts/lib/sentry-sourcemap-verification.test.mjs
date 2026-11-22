@@ -1,3 +1,6 @@
+/**
+ * Covers Sentry readiness, env validation, artifact bundles, release/slug normalization, local maps, and response verification.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {

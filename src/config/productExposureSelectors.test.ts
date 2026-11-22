@@ -1,4 +1,7 @@
-import * as featureExposure from './featureExposure';
+/**
+ * Product exposure selector tests. Verify target-specific product availability decisions remain stable and explicit.
+ */
+import * as flagsModule from './flags';
 import {
   getFirstExposedOutlookType,
   isAnyOutlookExposed,
@@ -26,7 +29,7 @@ describe('productExposureSelectors', () => {
   });
 
   test('getFirstExposedOutlookType follows tornado, wind, hail, then categorical priority', () => {
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockImplementation((_feature, _target) => {
+    jest.spyOn(flagsModule, 'flag').mockImplementation((_feature, _target) => {
       if (_feature === 'windOutlook') {
         return true;
       }
@@ -38,7 +41,7 @@ describe('productExposureSelectors', () => {
   });
 
   test('activates emergency mode when every outlook is disabled', () => {
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockReturnValue(false);
+    jest.spyOn(flagsModule, 'flag').mockReturnValue(false);
 
     expect(isAnyOutlookExposed()).toBe(false);
     expect(getFirstExposedOutlookType()).toBe('categorical');
@@ -46,7 +49,7 @@ describe('productExposureSelectors', () => {
   });
 
   test('disables export and save/load independently from registry exposure', () => {
-    jest.spyOn(featureExposure, 'isFeatureExposedOnTarget').mockImplementation((feature) => {
+    jest.spyOn(flagsModule, 'flag').mockImplementation((feature) => {
       return feature !== 'exportMap' && feature !== 'saveLoad';
     });
 

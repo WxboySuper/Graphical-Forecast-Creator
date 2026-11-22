@@ -1,3 +1,8 @@
+/**
+ * Verification-mode test boundary: this suite verifies mode-level routing,
+ * panel composition, grading state, and user interactions across the full
+ * Verification surface with isolated store and service edges.
+ */
 import { forwardRef as mockForwardRef } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';

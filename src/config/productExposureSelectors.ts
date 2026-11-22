@@ -1,5 +1,9 @@
+/**
+ * Selects product exposure state for the active build target and outlook context.
+ * This module owns pure exposure-query helpers; feature registry configuration and UI rendering remain outside it.
+ */
 import { type BuildTarget, getBuildTarget } from './buildTarget';
-import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { flag, type FlagName } from './flags';
 import type { OutlookType } from '../types/outlooks';
 
 const OUTLOOK_EXPOSURE_BY_TYPE = {
@@ -7,7 +11,7 @@ const OUTLOOK_EXPOSURE_BY_TYPE = {
   wind: 'windOutlook',
   hail: 'hailOutlook',
   categorical: 'categoricalOutlook',
-} as const satisfies Partial<Record<OutlookType, FeatureKey>>;
+} as const satisfies Partial<Record<OutlookType, FlagName>>;
 
 type OutlookExposureFeatureKey = (typeof OUTLOOK_EXPOSURE_BY_TYPE)[keyof typeof OUTLOOK_EXPOSURE_BY_TYPE];
 
@@ -27,11 +31,11 @@ const OUTLOOK_EXPOSURE_PRIORITY = [
 
 /** Returns whether map export is exposed on the current build target. */
 export const isExportMapExposed = (target: BuildTarget = getBuildTarget()): boolean =>
-  isFeatureExposedOnTarget('exportMap', target);
+  flag('exportMap', target);
 
 /** Returns whether forecast save/load is exposed on the current build target. */
 export const isSaveLoadExposed = (target: BuildTarget = getBuildTarget()): boolean =>
-  isFeatureExposedOnTarget('saveLoad', target);
+  flag('saveLoad', target);
 
 /** Returns whether the prototype cross-hazard geometry copy controls are available. */
 export const isOutlookGeometryCopyExposed = (
@@ -40,7 +44,7 @@ export const isOutlookGeometryCopyExposed = (
 
 /** Returns whether significant-threat labels are exposed on the current build target. */
 export const isSignificantThreatsExposed = (target: BuildTarget = getBuildTarget()): boolean =>
-  isFeatureExposedOnTarget('significantThreats', target);
+  flag('significantThreats', target);
 
 /** Returns whether a Day 1/2 outlook type is exposed for the current build target. */
 export const isOutlookTypeExposed = (
@@ -52,12 +56,12 @@ export const isOutlookTypeExposed = (
     return type === 'totalSevere' || type === 'day4-8';
   }
 
-  return isFeatureExposedOnTarget(feature, target);
+  return flag(feature, target);
 };
 
 /** Returns whether any Day 1/2 outlook type is exposed for the current build target. */
 export const isAnyOutlookExposed = (target: BuildTarget = getBuildTarget()): boolean =>
-  OUTLOOK_EXPOSURE_PRIORITY.some((feature) => isFeatureExposedOnTarget(feature, target));
+  OUTLOOK_EXPOSURE_PRIORITY.some((feature) => flag(feature, target));
 
 /**
  * Returns the first exposed Day 1/2 outlook type for the current build target.
@@ -65,7 +69,7 @@ export const isAnyOutlookExposed = (target: BuildTarget = getBuildTarget()): boo
  */
 export const getFirstExposedOutlookType = (target: BuildTarget = getBuildTarget()): OutlookType => {
   for (const feature of OUTLOOK_EXPOSURE_PRIORITY) {
-    if (isFeatureExposedOnTarget(feature, target)) {
+    if (flag(feature, target)) {
       return OUTLOOK_TYPE_BY_FEATURE[feature];
     }
   }

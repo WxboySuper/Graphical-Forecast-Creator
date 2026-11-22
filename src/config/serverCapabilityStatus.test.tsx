@@ -1,3 +1,8 @@
+/**
+ * Server-capability status test boundary: this suite verifies response
+ * validation, availability transitions, shared-status loading, and UI-facing
+ * fallback behavior when the hosted capability endpoint is unavailable.
+ */
 import { render, screen, waitFor } from '@testing-library/react';
 import {
   fetchServerCapabilityStatus,
@@ -274,7 +279,7 @@ describe('serverCapabilityStatus', () => {
   });
 
   test('multiple mounted server-backed boundaries share one status fetch', async () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(true);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(true);
     const originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,

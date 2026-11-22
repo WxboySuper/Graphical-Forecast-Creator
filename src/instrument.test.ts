@@ -1,3 +1,8 @@
+/**
+ * Instrumentation test boundary: this suite verifies Sentry initialization,
+ * route tracing, error capture, redaction, and Redux breadcrumb behavior at
+ * the client observability boundary.
+ */
 import * as Sentry from '@sentry/react';
 
 jest.mock('@sentry/react', () => ({
@@ -54,6 +59,9 @@ describe('instrument', () => {
           },
           normalizeDepth: 10,
           beforeSend: expect.any(Function),
+          beforeSendTransaction: expect.any(Function),
+          beforeSendSpan: expect.any(Function),
+          beforeBreadcrumb: expect.any(Function),
           tracesSampleRate: 0.1,
           tracePropagationTargets: expect.arrayContaining([
             'localhost',
@@ -65,6 +73,34 @@ describe('instrument', () => {
       );
       const initCall = (Sentry.init as jest.Mock).mock.calls[0][0];
       expect(initCall.integrations).toHaveLength(1);
+      expect(initCall.dataCollection.userInfo).toBe(false);
+      expect(initCall.dataCollection.httpHeaders).toEqual({ request: false, response: false });
+    });
+  });
+
+  it('removes account, request, context, and breadcrumb data before sending errors', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = {
+        message: 'Failure for meteor@example.com, 192.0.2.18 and abcdefghijklmnopqrstuvwxyz12',
+        user: { id: 'full-firebase-user-id', email: 'meteor@example.com' },
+        request: { url: 'https://app.gfcweather.com/forecast/private-cycle?uid=full-firebase-user-id', headers: { Authorization: 'Bearer secret' } },
+        contexts: { account: { uid: 'full-firebase-user-id' } },
+        extra: { email: 'meteor@example.com' },
+        tags: { uid: 'full-firebase-user-id', area: 'forecast' },
+        breadcrumbs: [{ category: 'console', message: 'User meteor@example.com', data: { uid: 'full-firebase-user-id' } }],
+        exception: { values: [{ value: 'Failure for meteor@example.com abcdefghijklmnopqrstuvwxyz12', stacktrace: { frames: [{ filename: 'src/App.tsx' }] } }] },
+      };
+      beforeSend(event as never, {});
+      expect(event.user).toBeUndefined();
+      expect(event.request).toBeUndefined();
+      expect(event.contexts).toBeUndefined();
+      expect(event.extra).toBeUndefined();
+      expect(event.tags).toEqual({ area: 'forecast' });
+      expect(event.message).not.toMatch(/meteor@example.com|192\.0\.2\.18|abcdefghijklmnopqrstuvwxyz12/);
+      expect(event.exception.values[0].value).not.toMatch(/meteor@example.com|abcdefghijklmnopqrstuvwxyz12/);
+      expect(event.breadcrumbs[0]).toEqual(expect.objectContaining({ category: 'console', message: 'User [redacted-email]' }));
+      expect(event.breadcrumbs[0].data).toBeUndefined();
     });
   });
 
@@ -140,6 +176,94 @@ describe('instrument', () => {
       ],
     },
   });
+
+  const createKeylessUnhandledRejection = (
+    value: string,
+    options: {
+      type?: string;
+      mechanismType?: string;
+      frameFilename?: string;
+      breadcrumbs?: Array<{ category?: string; message?: string }>;
+    } = {},
+  ) => ({
+    exception: {
+      values: [
+        {
+          type: options.type,
+          value,
+          mechanism: {
+            type: options.mechanismType ?? 'auto.browser.global_handlers.onunhandledrejection',
+            handled: false,
+          },
+          stacktrace: options.frameFilename
+            ? { frames: [{ filename: options.frameFilename, function: 'renderForecast' }] }
+            : undefined,
+        },
+      ],
+    },
+    breadcrumbs: options.breadcrumbs,
+  });
+
+  const customEventRejectionMessage =
+    'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection';
+  const emptyObjectRejectionMessage =
+    'Object captured as promise rejection with keys: [object has no keys]';
+
+  const keylessUnhandledRejectionCases: Array<[
+    string,
+    string,
+    Parameters<typeof createKeylessUnhandledRejection>[1],
+    boolean,
+  ]> = [
+    [
+      'drops the CustomEvent wrapper',
+      customEventRejectionMessage,
+      { type: 'CustomEvent' },
+      true,
+    ],
+    [
+      'drops the empty Object wrapper',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection' },
+      true,
+    ],
+    [
+      'keeps the CustomEvent wrapper with an app frame',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', frameFilename: 'src/App.tsx' },
+      false,
+    ],
+    [
+      'keeps the empty Object wrapper with an app frame',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection', frameFilename: 'src/App.tsx' },
+      false,
+    ],
+    [
+      'keeps the CustomEvent wrapper from another mechanism',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', mechanismType: 'auto.browser.global_handlers.onerror' },
+      false,
+    ],
+    [
+      'keeps the empty Object wrapper from another mechanism',
+      emptyObjectRejectionMessage,
+      { type: 'UnhandledRejection', mechanismType: 'auto.browser.global_handlers.onerror' },
+      false,
+    ],
+    [
+      'keeps wrappers with actionable breadcrumbs',
+      customEventRejectionMessage,
+      { type: 'CustomEvent', breadcrumbs: [{ message: 'forecast route loaded' }] },
+      false,
+    ],
+    [
+      'keeps other unhandled rejection messages',
+      'Object captured as promise rejection with keys: [object has keys: value]',
+      { type: 'UnhandledRejection' },
+      false,
+    ],
+  ];
 
   const loadBeforeSend = () => {
     globalScope.__GFC_SENTRY_DSN__ = 'https://example@o0.ingest.sentry.io/0';
@@ -245,6 +369,57 @@ describe('instrument', () => {
 
   it('drops no-stack opaque global error noise from Firefox', () => {
     expectBeforeSendToDrop(() => createOpaqueGlobalError());
+  });
+
+  it('keeps real Error rejections', () => {
+    expectBeforeSendToKeep(() =>
+      createKeylessUnhandledRejection(customEventRejectionMessage, {
+        type: 'Error',
+      })
+    );
+  });
+
+  it('drops literal Sentry type/value shapes for both keyless wrappers', () => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const mechanism = {
+        type: 'auto.browser.global_handlers.onunhandledrejection',
+        handled: false,
+      };
+      const events = [
+        {
+          exception: {
+            values: [{
+              type: 'CustomEvent',
+              value: 'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection',
+              mechanism,
+            }],
+          },
+        },
+        {
+          exception: {
+            values: [{
+              type: 'UnhandledRejection',
+              value: 'Object captured as promise rejection with keys: [object has no keys]',
+              mechanism,
+            }],
+          },
+        },
+      ];
+
+      events.forEach((event) => {
+        expect(beforeSend(event as Parameters<typeof beforeSend>[0], {})).toBeNull();
+      });
+    });
+  });
+
+  it.each(keylessUnhandledRejectionCases)('%s', (_label, message, options, shouldDrop) => {
+    jest.isolateModules(() => {
+      const beforeSend = loadBeforeSend();
+      const event = createKeylessUnhandledRejection(message, options) as Parameters<typeof beforeSend>[0];
+
+      expect(beforeSend(event, {})).toBe(shouldDrop ? null : event);
+    });
   });
 
   it('keeps opaque global errors when they have application stack frames', () => {

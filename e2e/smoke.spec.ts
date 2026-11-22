@@ -1,3 +1,8 @@
+/**
+ * E2E contract for smoke.spec.
+ *
+ * This file defines browser-level checks for the smoke.spec workflow and its user-visible behavior.
+ */
 import { test, expect } from '@playwright/test';
 
 /**
@@ -77,6 +82,7 @@ test.describe('App smoke tests', () => {
   const bypassLocalBeta = async (page: import('@playwright/test').Page) => {
     await page.addInitScript(() => {
       localStorage.setItem('gfc-local-beta-bypass', 'true');
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     });
   };
 

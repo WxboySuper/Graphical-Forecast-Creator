@@ -1,9 +1,7 @@
-import {
-  assertNavigationHidden,
-  mockFeatureExposureOnTarget,
-  runWithBuildTarget,
-  singleTargetOn,
-} from '../testing/featureExposure/harness';
+/**
+ * Feature navigation tests. Verify exposed feature keys map to navigation behavior and unavailable features stay hidden.
+ */
+import { runWithBuildTarget, withFlag } from '../testing/flags';
 import {
   APP_NAVIGATION_ITEMS,
   getNavigationKeyboardShortcuts,
@@ -24,20 +22,17 @@ describe('featureNavigation', () => {
         'verification',
         'monitor',
       ]);
-      assertNavigationHidden('tropicalWorkspace', ['production']);
-      assertNavigationHidden('collaborationRoom', ['production']);
     });
   });
 
   test('includes gated navigation only when the feature is exposed on the target', () => {
-    const exposureSpy = mockFeatureExposureOnTarget('tropicalWorkspace', singleTargetOn('local'));
+    withFlag('tropicalWorkspace', true, 'local');
 
     expect(getVisibleNavigationItems('local').map((item) => item.id)).toContain('tropical-workspace');
     expect(getVisibleNavigationItems('production').map((item) => item.id)).not.toContain(
       'tropical-workspace'
     );
 
-    exposureSpy.mockRestore();
   });
 
   test('omits keyboard shortcuts for hidden gated destinations', () => {
@@ -47,6 +42,26 @@ describe('featureNavigation', () => {
     expect(Object.keys(shortcuts).sort()).toEqual(['1', '2', '3', '4', 'd', 'h']);
     expect(shortcuts['5']).toBeUndefined();
     expect(shortcuts['6']).toBeUndefined();
+  });
+
+  test('keeps the existing Forecast and Discussion shortcuts reachable', () => {
+    const navigate = jest.fn();
+    const shortcuts = getNavigationKeyboardShortcuts(navigate, 'production');
+
+    shortcuts['1']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast');
+    window.history.replaceState({}, '', '/forecast/severe?group=day2&workspace=custom&unused=1');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day2&surface=discussion');
+    window.history.replaceState({}, '', '/discussion/anything?group=day3&discussionLayout=panel&unused=1');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day3&discussionLayout=panel&surface=discussion');
+    window.history.replaceState({}, '', '/forecast/tropical?group=day2&workspace=tropical&unused=1');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?group=day2&surface=discussion');
+    window.history.replaceState({}, '', '/monitor?layer=radar');
+    shortcuts['2']();
+    expect(navigate).toHaveBeenLastCalledWith('/forecast/severe?surface=discussion');
   });
 
   test('declares every navigation item with a stable id', () => {

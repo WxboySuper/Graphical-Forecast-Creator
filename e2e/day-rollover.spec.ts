@@ -1,3 +1,4 @@
+/** Verifies the new-day prompt offers download, disabled premium cloud save, defer/keep, and replace paths, and that deferring keeps the saved session. */
 import { test, expect } from '@playwright/test';
 
 const localDay = (date: Date) => {
@@ -53,8 +54,9 @@ const openStaleSession = async (page: import('@playwright/test').Page) => {
   await page.addInitScript(({ sessionData }) => {
     localStorage.clear();
     localStorage.setItem('gfc-local-beta-bypass', 'true');
-    localStorage.setItem('gfc-tos-accepted', '2.0.0');
-    localStorage.setItem('gfc-privacy-policy-accepted', '1.2.0');
+    localStorage.setItem('gfc-tos-accepted', '3');
+    localStorage.setItem('gfc-privacy-policy-accepted', '4');
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     localStorage.setItem('forecastData', JSON.stringify(sessionData.forecastData));
     localStorage.setItem('gfc-last-active-local-day', sessionData.previousDay);
   }, { sessionData: session });

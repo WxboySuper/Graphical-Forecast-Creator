@@ -1,3 +1,8 @@
+/**
+ * TSTM-generation test boundary: this suite verifies request identity,
+ * response normalization, feature equality, eligibility, and stale-request
+ * handling for generated thunderstorm outlook geometry.
+ */
 import {
   areTstmFeaturesEqual,
   canGenerateTstmForDay,

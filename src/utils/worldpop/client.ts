@@ -1,3 +1,7 @@
+/**
+ * WorldPop population-data client helpers. It defines request defaults and
+ * converts the service's population responses into map-ready geometry data.
+ */
 import type { MultiPolygon, Polygon } from 'geojson';
 
 export const WORLDPOP_API_BASE_URL = 'https://api.worldpop.org/v2';

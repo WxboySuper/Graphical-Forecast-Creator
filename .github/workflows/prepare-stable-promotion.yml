@@ -11,48 +11,65 @@ on:
         default: main
         type: string
       version:
-        description: 'Stable major release version, for example 2.0.0'
+        description: 'Stable version (auto reads package.json)'
         required: true
-        type: string
-      confirmation:
-        description: 'Type PREPARE-STABLE-PROMOTION to open the review PR'
-        required: true
+        default: auto
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   prepare:
-    if: inputs.confirmation == 'PREPARE-STABLE-PROMOTION'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: stable-promotion
+      cancel-in-progress: false
+    environment: production-promote
     env:
       SOURCE_REF: ${{ inputs.source_ref }}
       TARGET_VERSION: ${{ inputs.version }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout source main ref
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: ${{ inputs.source_ref }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Configure Git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Resolve target version
+        run: |
+          if [ "$TARGET_VERSION" = "auto" ]; then
+            VERSION=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; import { deriveStableVersion } from './scripts/lib/package-version.mjs'; console.log(deriveStableVersion(JSON.parse(readFileSync('package.json')).version) ?? '')")
+            test -n "$VERSION" || { echo '::error::Cannot derive a stable version from package.json.'; exit 1; }
+            echo "TARGET_VERSION=$VERSION" >> "$GITHUB_ENV"
+          fi
+
       - name: Create promotion branch
         id: branch
+        env:
+          # Read-only default token, so the existence check is authenticated without exposing the admin PAT to this step.
+          READ_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if ! printf '%s' "$SOURCE_REF" | grep -Eq '^(main|[0-9a-f]{7,40})$'; then
             echo "::error::Stable promotion source must be main or an immutable commit SHA."
             exit 1
           fi
+          if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.0$'; then
+            echo "::error::Stable version must be a padded flat X.Y.0 version, got $TARGET_VERSION."
+            exit 1
+          fi
           BRANCH="promotion/v${TARGET_VERSION}"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$READ_TOKEN" | base64 -w0)"
+          echo "::add-mask::$AUTH_HEADER"
+          if git -c "http.https://github.com/.extraheader=$AUTH_HEADER" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "::error::Promotion branch $BRANCH already exists; refusing to overwrite it."
             exit 1
           fi
@@ -63,29 +80,40 @@ jobs:
         run: node scripts/prepare-stable-promotion.mjs "$TARGET_VERSION"
 
       - name: Commit and push promotion branch
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           set -euo pipefail
           git add package.json deploy/production-release.json CHANGELOG.md
           git commit -m "release: prepare v${TARGET_VERSION} stable promotion"
-          git push --set-upstream origin "${{ steps.branch.outputs.branch }}"
+          GIT_AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_PAT" | base64 -w0)"
+          echo "::add-mask::$GIT_AUTH_HEADER"
+          git -c "http.https://github.com/.extraheader=$GIT_AUTH_HEADER" push --set-upstream origin "${{ steps.branch.outputs.branch }}"
 
       - name: Open draft promotion PR
         env:
-          PR_BODY: |-
-            ## Main → stable promotion
-
-            Prepare the reviewed `main` next-major line for stable release `v${{ inputs.version }}`.
-
-            Source ref: `${{ inputs.source_ref }}`
-
-            This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into `main`, bootstrap `stable/${{ inputs.version }}.x` from that exact main commit, then use the manual stable release workflow.
-
-            Changelog-Impact: beta
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          PROMOTION_BRANCH: ${{ steps.branch.outputs.branch }}
         run: |
+          set -euo pipefail
+          echo "::add-mask::$GH_PAT"
+          PR_BODY_FILE=$(mktemp)
+          cat > "$PR_BODY_FILE" <<EOF
+          ## Main → stable promotion
+
+          Prepare the reviewed \`main\` next-major line for stable release \`v${TARGET_VERSION}\`.
+
+          Source ref: \`${SOURCE_REF}\`
+
+          This PR only prepares version, production release metadata, and release notes. It does not deploy. After this merges into \`main\`, bootstrap \`stable/<flat-major>.x\` from that exact main commit, then use the manual stable release workflow.
+
+          Changelog-Impact: beta
+          EOF
           gh pr create \
             --repo "$GITHUB_REPOSITORY" \
             --base main \
-            --head "${{ steps.branch.outputs.branch }}" \
+            --head "$PROMOTION_BRANCH" \
             --draft \
-            --title "release: prepare v${{ inputs.version }} stable promotion" \
-            --body "$PR_BODY"
+            --title "release: prepare v${TARGET_VERSION} stable promotion" \
+            --body-file "$PR_BODY_FILE"

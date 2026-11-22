@@ -1,3 +1,7 @@
+/**
+ * Integrated-toolbar selection strip. It renders active tab context and
+ * selection controls while delegating edits to the toolbar controller.
+ */
 import React from 'react';
 import { Button } from '../ui/button';
 import { CheckCircle2 } from 'lucide-react';
@@ -5,7 +9,7 @@ import { cn } from '../../lib/utils';
 import type { ForecastWorkspaceController } from '../ForecastWorkspace/useForecastWorkspaceController';
 import { outlookLabels } from '../ForecastWorkspace/workspaceMeta';
 import OutlookTrimPopover from './OutlookTrimPopover';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
 import OutlookGeometryCopyControls from '../OutlookSelector/OutlookGeometryCopyControls';
 
 /** Small presentational swatch showing outlook label and probability */
@@ -92,7 +96,7 @@ const TabbedToolbarSelectionStrip: React.FC<{
 
 /** Optional land-trimming controls for the layers tab. */
 export const OutlookTrimToolbarSection: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
-  if (!isFeatureExposed('outlookLandMasking')) {
+  if (!flag('outlookLandMasking')) {
     return null;
   }
 

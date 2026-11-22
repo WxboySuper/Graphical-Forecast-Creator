@@ -1,18 +1,22 @@
 import type { BuildTarget } from './buildTarget';
 import { getBuildTarget } from './buildTarget';
-import { isFeatureExposedOnTarget, type FeatureKey } from './featureExposure';
+import { flag, type FlagName } from './flags';
 
 export type ForecastWorkspaceId = 'severe' | 'mesoscale' | 'custom' | 'tropical' | 'winter';
-export type ForecastWorkspaceStatus = 'available' | 'gated' | 'future';
+export type ForecastWorkspaceStatus = 'available' | 'gated';
 export type ForecastWorkspaceProductType = ForecastWorkspaceId;
 
 export interface ForecastWorkspaceDefinition {
   id: ForecastWorkspaceId;
   path: `/forecast/${ForecastWorkspaceId}`;
   label: string;
+  description: string;
+  focus: readonly string[];
   productType: ForecastWorkspaceProductType;
   status: ForecastWorkspaceStatus;
-  exposureKey: FeatureKey | null;
+  exposureKey: FlagName | null;
+  /** Shown in the Forecast menu as upcoming while its flag is off. */
+  upcoming?: boolean;
   legacyPaths: readonly string[];
 }
 
@@ -25,6 +29,8 @@ export const FORECAST_WORKSPACES = [
     id: 'severe',
     path: '/forecast/severe',
     label: 'Severe',
+    description: 'SPC-style outlooks for severe thunderstorm threats.',
+    focus: ['Categorical and probability', 'Tornado, wind, and hail'],
     productType: 'severe',
     status: 'available',
     exposureKey: null,
@@ -34,37 +40,48 @@ export const FORECAST_WORKSPACES = [
     id: 'mesoscale',
     path: '/forecast/mesoscale',
     label: 'Mesoscale',
+    description: 'Short-term forecasts built from live model data.',
+    focus: ['HRRR, RAP, and RRFS', 'Mesoscale discussions'],
     productType: 'mesoscale',
-    status: 'future',
-    exposureKey: null,
+    status: 'gated',
+    // Local only until the Worker is deployed and a production decision is made (#919).
+    exposureKey: 'mesoscaleWorkspace',
     legacyPaths: [],
   },
   {
     id: 'tropical',
     path: '/forecast/tropical',
     label: 'Tropical',
+    description: 'Track and impact forecasts for tropical systems.',
+    focus: ['Track and cone', 'Wind, rain, and surge'],
     productType: 'tropical',
-    status: 'future',
-    exposureKey: null,
+    status: 'gated',
+    upcoming: true,
+    exposureKey: 'tropicalWorkspace',
     legacyPaths: [],
   },
   {
     id: 'winter',
     path: '/forecast/winter',
     label: 'Winter',
+    description: 'Outlooks for snow, ice, and mixed precipitation.',
+    focus: ['Accumulation', 'Impact outlooks'],
     productType: 'winter',
-    status: 'future',
-    exposureKey: null,
+    status: 'gated',
+    upcoming: true,
+    exposureKey: 'winterWorkspace',
     legacyPaths: [],
   },
   {
     id: 'custom',
     path: '/forecast/custom',
     label: 'Custom',
+    description: 'Your own products, layers, and categories.',
+    focus: ['Custom layers', 'Import and export'],
     productType: 'custom',
     status: 'gated',
-    // #914 ships the route contract only: the Custom workspace stays off release
-    // targets until #915 registers it. The library route keeps its own gate.
+    // Custom editing remains limited to local and beta. The library route keeps
+    // its independent customProducts gate.
     exposureKey: 'customWorkspace',
     // /custom-products remains the separate Custom Products library route,
     // not a legacy Forecast editor route.
@@ -73,6 +90,19 @@ export const FORECAST_WORKSPACES = [
 ] as const satisfies readonly ForecastWorkspaceDefinition[];
 
 export const DEFAULT_FORECAST_WORKSPACE: ForecastWorkspaceId = 'severe';
+
+/** Workspaces whose products have no cloud storage (local autosave and file export only). */
+const LOCAL_ONLY_WORKSPACES: ReadonlySet<ForecastWorkspaceId> = new Set(['mesoscale']);
+
+/** Returns whether a workspace's products can be saved to and loaded from cloud storage. */
+export const hasCloudStorage = (workspaceId: ForecastWorkspaceId): boolean => !LOCAL_ONLY_WORKSPACES.has(workspaceId);
+
+/** Custom editing is active only when the route and both rollout flags agree. */
+export const isCustomWorkspaceActive = (
+  workspaceId: string,
+  customProductsExposed: boolean,
+  customWorkspaceExposed: boolean,
+): boolean => workspaceId === 'custom' && customProductsExposed && customWorkspaceExposed;
 
 const WORKSPACES_BY_ID = new Map(
   FORECAST_WORKSPACES.map((workspace) => [workspace.id, workspace] as const),
@@ -136,15 +166,11 @@ export const isForecastWorkspaceExposed = (
   workspace: ForecastWorkspaceDefinition,
   target: BuildTarget = getBuildTarget(),
 ): boolean => {
-  if (workspace.status === 'future') {
-    return false;
-  }
-
   if (workspace.status === 'gated') {
-    return workspace.exposureKey !== null && isFeatureExposedOnTarget(workspace.exposureKey, target);
+    return workspace.exposureKey !== null && flag(workspace.exposureKey, target);
   }
 
-  return workspace.exposureKey === null || isFeatureExposedOnTarget(workspace.exposureKey, target);
+  return workspace.exposureKey === null || flag(workspace.exposureKey, target);
 };
 
 /** Returns only workspaces whose feature exposure permits route registration. */
@@ -157,3 +183,10 @@ export const getExposedForecastWorkspaces = (
 /** Returns the canonical Severe workspace used by legacy Forecast entry points. */
 export const getDefaultForecastWorkspace = (): ForecastWorkspaceDefinition =>
   WORKSPACES_BY_ID.get(DEFAULT_FORECAST_WORKSPACE)!;
+
+/** Returns upcoming workspaces whose flag is still off, for the Forecast menu preview. */
+export const getUpcomingForecastWorkspaces = (
+  target: BuildTarget = getBuildTarget(),
+): ForecastWorkspaceDefinition[] => FORECAST_WORKSPACES.filter(
+  (workspace: ForecastWorkspaceDefinition) => workspace.upcoming === true && !isForecastWorkspaceExposed(workspace, target),
+);

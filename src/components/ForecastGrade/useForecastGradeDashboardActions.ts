@@ -1,3 +1,7 @@
+/**
+ * Provides dashboard actions for Forecast Grade visibility and report controls.
+ * This hook owns page-to-store action wiring; grading calculations, persistence, and rendering remain in their dedicated modules.
+ */
 import { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { setVisibility } from '../../store/stormReportsSlice';

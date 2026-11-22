@@ -1,3 +1,9 @@
+/**
+ * Home route: this page coordinates authentication-aware dashboard data,
+ * saved-cycle history, workflow entry actions, and the home presentation
+ * surfaces. It owns route composition and callback wiring while cycle storage,
+ * forecast state, and feature policy remain in their dedicated modules.
+ */
 import React from 'react';
 import CycleHistoryModal from '../components/CycleManager/CycleHistoryModal';
 import ConfirmationModal from '../components/DrawingTools/ConfirmationModal';
@@ -11,9 +17,9 @@ import useHomePageLogic from './home/useHomePageLogic';
 import AIDisclosure from './home/AIDisclosure';
 import { useWorkflowAwareness } from '../hooks/useWorkflowAwarenessSync';
 import type { WorkflowAwarenessRecommendation } from '../types/workflowAwareness';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 
-const FORECAST_IMPORT_ACCEPT = isFeatureExposed('customProducts') ? '.json,.zip' : '.json';
+const FORECAST_IMPORT_ACCEPT = flag('customProducts') ? '.json,.zip' : '.json';
 
 type HomeLogic = ReturnType<typeof useHomePageLogic>;
 

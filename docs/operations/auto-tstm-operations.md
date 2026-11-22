@@ -2,6 +2,8 @@
 
 Operational notes for the cached Auto-TSTM server API introduced in TSTM-03 (#474) and hardened in TSTM-04 (#475).
 
+> **Currently off everywhere.** NCEP retired the HREF source on 2026-11-03, so `TSTM_GENERATION_ENABLED` and `TSTM_INGESTION_ENABLED` are `"false"` in `deploy/common-deployment-config.json` and `deploy/staging-deployment-config.json`; the client entry point is disabled too. The replacement source is `https://nomads.ncep.noaa.gov/pub/data/nccf/com/spc_post/prod/spc_post.<YYYYMMDD>/refsct/`; restoring Auto-TSTM is tracked in #1852. Set both switches back to `"true"` when that ships.
+
 ## Public read policy
 
 Auto-TSTM exposes only cached, read-only guidance routes once the deployment enables the capability:
@@ -83,6 +85,5 @@ Controls stay absent when registry exposure or the server capability gate is off
 ## Related docs
 
 - [auto-tstm-beta-test-plans.md](./auto-tstm-beta-test-plans.md) — beta tester smoke and workflow plans
-- [auto-tstm-beta-tester-post.md](./auto-tstm-beta-tester-post.md) — concise copy-ready tester instructions
-- [feature-exposure-workstreams.md](./feature-exposure-workstreams.md) — Auto-TSTM registry and beta enablement criteria
+- [feature-exposure.md](../agents/feature-exposure.md) — the flag registry and Auto-TSTM capability
 - [emergency-feature-disable.md](./emergency-feature-disable.md) — incident disable runbook

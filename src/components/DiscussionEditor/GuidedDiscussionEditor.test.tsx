@@ -1,3 +1,7 @@
+/**
+ * Guided discussion editor tests. Verify structured section editing and submission
+ * behavior for the guided meteorological discussion workflow.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import GuidedDiscussionEditor from './GuidedDiscussionEditor';
 import type { GuidedDiscussionData } from '../../types/outlooks';

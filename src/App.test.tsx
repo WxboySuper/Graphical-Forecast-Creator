@@ -1,3 +1,7 @@
+/**
+ * Application-shell tests. Verify route composition, mocked page rendering, and
+ * top-level application state around the main App component.
+ */
 import { render, screen, act } from '@testing-library/react';
 import App, { ForecastLegacyRedirect } from './App';
 import { MemoryRouter, Outlet as MockOutlet, Route, Routes, useLocation } from 'react-router';
@@ -10,21 +14,6 @@ jest.mock('./pages/HomePage', () => ({
 jest.mock('./pages/AccountPage', () => ({
   __esModule: true,
   default: () => <div>AccountPage Mock</div>,
-}));
-jest.mock('./pages/PricingPage', () => ({
-  __esModule: true,
-  default: () => <div>PricingPage Mock</div>,
-}));
-jest.mock('./pages/UpdatesPage', () => ({
-  UpdatesPage: () => <div>UpdatesPage Mock</div>,
-}));
-jest.mock('./pages/BetaLandingPage', () => ({
-  __esModule: true,
-  default: () => <div>BetaLandingPage Mock</div>,
-}));
-jest.mock('./pages/BetaInvitePage', () => ({
-  __esModule: true,
-  default: () => <div>BetaInvitePage Mock</div>,
 }));
 jest.mock('./pages/HomePage', () => ({
   __esModule: true,
@@ -43,7 +32,6 @@ jest.mock('./components/Layout', () => ({
 
 jest.mock('./components/Map/ForecastMap', () => () => <div>ForecastMap Mock</div>);
 jest.mock('./components/Documentation/Documentation', () => () => <div>Documentation Mock</div>);
-jest.mock('./components/Beta/BetaAccessGuard', () => () => <MockOutlet />);
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
   hasAcceptedToS: () => true,
@@ -63,6 +51,17 @@ describe('App Simple', () => {
     });
     expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
   });
+
+  test.each(['/beta', '/beta-access/private-path?t=old-invite-token'])(
+    'sends retired closed-beta link %s to the open home page',
+    (url) => {
+      window.history.pushState({}, '', url);
+      render(<App />);
+      expect(screen.getByText(/HomePage Mock/i)).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
+      window.history.pushState({}, '', '/');
+    },
+  );
 
   test('legacy Forecast redirect preserves search, hash, and existing router state', async () => {
     const DestinationProbe = () => {

@@ -1,9 +1,14 @@
+/**
+ * Defines billing display configuration and environment-derived pricing settings.
+ * This module owns normalized billing configuration values used by server billing flows; it does not process payments or persist subscriptions.
+ */
 'use strict';
 
 const { hasFirebaseAdminConfig } = require('./firebase-admin');
 const { getServerTarget } = require('./lib/serverTarget');
 
 const CLOUDFLARE_BETA_ORIGIN = 'https://beta.gfcweather.com';
+const LEGACY_PRODUCTION_ORIGIN = 'https://gfc.weatherboysuper.com';
 
 const MONTHLY_DISPLAY_PRICE = '$3/month';
 const ANNUAL_PROMO_DISPLAY_PRICE = '$25/year';
@@ -45,6 +50,10 @@ const getAllowedBillingReturnOrigins = (env = process.env) => {
   const configuredOrigin = normalizeOrigin(env.APP_BASE_URL);
   if (configuredOrigin) {
     origins.add(configuredOrigin);
+  }
+
+  if (getServerTarget(env) === 'production') {
+    origins.add(LEGACY_PRODUCTION_ORIGIN);
   }
 
   if (getServerTarget(env) === 'beta') {

@@ -36,4 +36,12 @@ describe('qs dependency (Dependabot #125 DoS fix)', () => {
     );
     assert.equal(encoded, 'tags=a,b,c');
   });
+
+  it('ignores bracket-wrapped prototype keys when parsing flat query strings', () => {
+    const qs = require('qs');
+    assert.deepEqual(
+      qs.parse('[constructor]=bad&[toString]=bad&[__proto__]=bad&name=ok', { depth: 0 }),
+      { name: 'ok' },
+    );
+  });
 });

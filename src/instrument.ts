@@ -1,5 +1,17 @@
+/**
+ * Client instrumentation boundary: this module configures Sentry, error
+ * capture, navigation tracing, and Redux breadcrumbs for supported deployment
+ * targets. It owns observability setup and redaction, not product state,
+ * authentication, or server-side monitoring.
+ */
 import * as Sentry from '@sentry/react';
 import React from 'react';
+import {
+  sanitizeBreadcrumb,
+  sanitizeStreamedSpan,
+  scrubSensitiveEvent,
+  scrubTransactionEvent,
+} from './instrument-privacy';
 import {
   useLocation,
   useNavigationType,
@@ -17,6 +29,11 @@ const OPENLAYERS_CANVAS_MESSAGE = /^null is not an object \(evaluating '[a-z]{1,
 const REQUEST_ANIMATION_FRAME_MECHANISM = 'auto.browser.browserapierrors.requestAnimationFrame';
 const OPAQUE_GLOBAL_ERROR_MESSAGE = /^uncaught exception: undefined$/i;
 const GLOBAL_ERROR_MECHANISM = 'auto.browser.global_handlers.onerror';
+const UNHANDLED_REJECTION_MECHANISM = 'auto.browser.global_handlers.onunhandledrejection';
+const KEYLESS_UNHANDLED_REJECTION_VALUES_BY_TYPE = new Map([
+  ['CustomEvent', 'Event `CustomEvent` (type=unhandledrejection) captured as promise rejection'],
+  ['UnhandledRejection', 'Object captured as promise rejection with keys: [object has no keys]'],
+]);
 const EXPECTED_MONITOR_REFERENCE_OUTAGE_TAG = 'gfc_monitor_reference_outage';
 
 const REQUEST_LIFECYCLE_MESSAGES = [
@@ -64,6 +81,45 @@ function isOpaqueGlobalError(value: SentryExceptionValue): boolean {
     value.mechanism?.type === GLOBAL_ERROR_MECHANISM &&
     value.mechanism.handled === false
   );
+}
+
+function hasKeylessUnhandledRejectionMessage(value: SentryExceptionValue): boolean {
+  return KEYLESS_UNHANDLED_REJECTION_VALUES_BY_TYPE.get(value.type ?? '') === value.value;
+}
+
+function hasUnhandledRejectionMechanism(value: SentryExceptionValue): boolean {
+  return (
+    value.mechanism?.type === UNHANDLED_REJECTION_MECHANISM &&
+    value.mechanism.handled === false
+  );
+}
+
+function isKeylessUnhandledRejectionWrapper(value: SentryExceptionValue): boolean {
+  if (!hasKeylessUnhandledRejectionMessage(value)) {
+    return false;
+  }
+  if (value.type === 'Error') {
+    return false;
+  }
+  return hasUnhandledRejectionMechanism(value);
+}
+
+/** True for one matching browser rejection wrapper with no actionable context. */
+function isKeylessUnhandledRejectionNoise(event: Sentry.Event): boolean {
+  const values = event.exception?.values ?? [];
+  if (values.length !== 1) {
+    return false;
+  }
+  if (!isKeylessUnhandledRejectionWrapper(values[0])) {
+    return false;
+  }
+  if (hasApplicationStackFrame(values)) {
+    return false;
+  }
+
+  // As with opaque global errors, keep stackless wrappers when breadcrumbs show
+  // useful activity. Their exact messages alone do not explain that context.
+  return !hasActionableBreadcrumbs(event);
 }
 
 /** True for a no-stack AbortError DOMException rejection (SDK/browser noise). */
@@ -145,6 +201,10 @@ function isKnownBrowserNoise(event: Sentry.Event): boolean {
     return !(hasApplicationStackFrame(values) || hasActionableBreadcrumbs(event));
   }
 
+  if (isKeylessUnhandledRejectionNoise(event)) {
+    return true;
+  }
+
   return false;
 }
 
@@ -168,8 +228,22 @@ function getSafeMonitorReferenceError(error: unknown): Record<string, boolean | 
 
 /** Drops known no-stack browser noise while preserving actionable stacked errors. */
 export function beforeSend(event: Sentry.ErrorEvent, _hint: Sentry.EventHint): Sentry.ErrorEvent | null {
-  return isKnownBrowserNoise(event) || isExpectedMonitorReferenceOutage(event) ? null : event;
+  if (isKnownBrowserNoise(event)) return null;
+  if (isExpectedMonitorReferenceOutage(event)) return null;
+  return scrubSensitiveEvent(event);
 }
+
+export const beforeSendTransaction = (
+  event: Parameters<NonNullable<Sentry.BrowserOptions['beforeSendTransaction']>>[0],
+): typeof event =>
+  scrubTransactionEvent(event);
+
+export const beforeSendSpan = (
+  span: Parameters<NonNullable<Sentry.BrowserOptions['beforeSendSpan']>>[0],
+): typeof span =>
+  sanitizeStreamedSpan(span);
+
+export { sanitizeBreadcrumb } from './instrument-privacy';
 
 /** Records expected Monitor upstream failures without creating a dropped error event. */
 export function captureExpectedMonitorReferenceFailure(
@@ -218,6 +292,9 @@ export function initSentry(): void {
     },
     normalizeDepth: 10,
     beforeSend,
+    beforeSendTransaction,
+    beforeSendSpan,
+    beforeBreadcrumb: sanitizeBreadcrumb,
     integrations: [
       Sentry.reactRouterV7BrowserTracingIntegration({
         useEffect: React.useEffect,

@@ -10,13 +10,16 @@
 
 <!-- Replace the placeholder with exactly one value. The required CI check blocks merging without it. -->
 
-Changelog-Impact: [beta|hotfix|none|inherited]
+Changelog-Impact: [beta|hotfix|none]
 
-<!-- beta means the Next major / beta lane; hotfix means the Stable X.Y.x lane. -->
+<!-- beta means the Next major / beta lane; hotfix means the current stable-line lane. -->
 
-<!-- Required for none; required for inherited. Remove unused lines. -->
+<!-- Required for none. Remove unused lines. -->
 Changelog-Reason:
-Port of #
+
+## Backport
+
+Should this ship in a minor release of the production line? Add the `backport-2.x` label if yes.
 
 ## Feature exposure
 
@@ -32,7 +35,7 @@ Port of #
 <!-- Does this PR remove or plan to remove a temporary feature? If so, confirm removal metadata is updated. -->
 
 - [ ] N/A — no temporary features affected
-- [ ] Temporary feature removal included (confirm `removalCondition` metadata is present in `src/config/featureExposure.ts`)
+- [ ] Temporary feature removal included (a dev flag has a `removeBy` in `server/flags.json`; `pnpm flags` lists them)
 
 ## Review requests
 

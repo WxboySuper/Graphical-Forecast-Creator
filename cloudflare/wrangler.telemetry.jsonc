@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "gfc-telemetry",
+  "account_id": "3488c751e28fdbb1b31d95deac5e6cfd",
+  "main": "./telemetry-worker.mjs",
+  "compatibility_date": "2026-09-29",
+  "workers_dev": false,
+  "routes": [{ "pattern": "telemetry.gfcweather.com", "custom_domain": true }],
+  "d1_databases": [{ "binding": "TELEMETRY_DB", "database_name": "gfc-telemetry", "database_id": "126a9d1d-0d79-4db8-9a96-11c3c6804094", "migrations_dir": "./telemetry/migrations" }],
+  "analytics_engine_datasets": [{ "binding": "TELEMETRY_EVENTS", "dataset": "gfc_telemetry_events" }],
+  "ratelimits": [{ "name": "TELEMETRY_RATE_LIMITER", "namespace_id": "61717", "simple": { "limit": 60, "period": 60 } }],
+  "triggers": { "crons": ["0 0 * * *"] },
+  "vars": {
+    "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
+    "CF_ACCESS_TEAM_DOMAIN": "mute-pine-62f8.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "2e0e479ad9fa1b5c6dec7d24fad6f73cdcf52985bef70e172c8734fe45eb3690",
+    "TELEMETRY_ALLOWED_ORIGINS": "https://beta.gfcweather.com,https://app.gfcweather.com,https://gfcweather.com,https://www.gfcweather.com,https://gfc.weatherboysuper.com,http://localhost:3000,http://localhost:5173"
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 1 }
+}

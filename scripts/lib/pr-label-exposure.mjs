@@ -1,21 +1,27 @@
+/**
+ * Pull request label exposure helpers.
+ *
+ * This module derives and validates labels used by repository policy workflows. GitHub mutations and workflow exit handling stay with the caller.
+ */
 import { anyFileMatches } from './glob-match.mjs';
 
 /** @typedef {{ changedFiles: string[] }} ExposureContext */
 
-// Exact file paths (no glob) — these are the canonical exposure registry files.
+// Exact file paths (no glob) — the shared flag registry and its client reader.
 const REGISTRY_FILE_PATTERNS = [
-  'src/config/featureExposure.ts',
+  'server/flags.json',
+  'src/config/flags.ts',
 ];
 
 // Test files for the registry — trigger registry-change but not production labels.
 const REGISTRY_TEST_PATTERNS = [
-  'src/config/featureExposure.test.ts',
+  'src/config/flags.baseline.test.tsx',
 ];
 
 // Exact file paths for server-side exposure and capability files.
 const SERVER_EXPOSURE_FILE_PATTERNS = [
   'firestore.rules',
-  'server/lib/serverFeatureExposure.js',
+  'server/lib/flags.js',
   'server/lib/featureCapabilities.js',
   'server/account-lifecycle.js',
 ];
@@ -23,10 +29,9 @@ const SERVER_EXPOSURE_FILE_PATTERNS = [
 // Client-side feature gating and surface configuration.
 // Exact files cover flat-file layout; directory globs cover future index-based modules.
 const FEATURE_GATING_FILE_PATTERNS = [
-  'src/components/FeatureBoundary.tsx',
-  'src/components/FeatureBoundary/**',
-  'src/config/featureSurfaces.ts',
-  'src/config/featureSurfaces/**',
+  'src/features/FeatureBoundary.tsx',
+  'src/features/ServerBackedFeatureBoundary.tsx',
+  'src/routing/buildFeatureGatedRoutes.tsx',
   'src/config/featureNavigation.ts',
   'src/config/featureNavigation/**',
 ];

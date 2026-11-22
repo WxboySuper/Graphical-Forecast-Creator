@@ -1,3 +1,6 @@
+/**
+ * Local date tests. Verify local calendar dates are parsed and formatted without timezone drift.
+ */
 import { getLocalCalendarDate } from './localDate';
 
 describe('getLocalCalendarDate', () => {

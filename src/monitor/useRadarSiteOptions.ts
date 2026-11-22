@@ -1,3 +1,6 @@
+/**
+ * Radar site options hook. Produces the selectable radar site list and current-site metadata for the monitor.
+ */
 import { useEffect, useState } from 'react';
 import { fetchRadarSiteOptions, type RadarSiteOption } from './radarSites';
 

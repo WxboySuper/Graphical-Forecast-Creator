@@ -1,21 +1,24 @@
+/**
+ * Verifies exposure labels derived from registry, registry-test, and server-capability file changes.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { exposureLabels } from './pr-label-exposure.mjs';
 
 describe('exposureLabels', () => {
-  it('applies exposure:registry-change when featureExposure.ts is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.ts'] });
+  it('applies exposure:registry-change when the flag registry is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['server/flags.json'] });
     assert.ok(labels.has('exposure:registry-change'));
   });
 
   it('applies exposure:registry-change but not exposure:production when only the registry test file is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/config/featureExposure.test.ts'] });
+    const labels = exposureLabels({ changedFiles: ['src/config/flags.baseline.test.tsx'] });
     assert.ok(labels.has('exposure:registry-change'));
     assert.ok(!labels.has('exposure:production'));
   });
 
-  it('applies exposure:server-backed when serverFeatureExposure.js is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['server/lib/serverFeatureExposure.js'] });
+  it('applies exposure:server-backed when the server flag reader is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['server/lib/flags.js'] });
     assert.ok(labels.has('exposure:server-backed'));
     assert.ok(labels.has('exposure:production'));
   });
@@ -44,8 +47,8 @@ describe('exposureLabels', () => {
     assert.ok(!labels.has('exposure:production'));
   });
 
-  it('applies exposure:production when feature surfaces are changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/config/featureSurfaces.ts'] });
+  it('applies exposure:production when the gated route table is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['src/routing/buildFeatureGatedRoutes.tsx'] });
     assert.ok(labels.has('exposure:production'));
     assert.ok(!labels.has('exposure:server-backed'));
   });
@@ -56,23 +59,18 @@ describe('exposureLabels', () => {
   });
 
   it('applies exposure:production when FeatureBoundary is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/components/FeatureBoundary.tsx'] });
+    const labels = exposureLabels({ changedFiles: ['src/features/FeatureBoundary.tsx'] });
     assert.ok(labels.has('exposure:production'));
   });
 
-  it('applies exposure:production when FeatureBoundary directory index is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/components/FeatureBoundary/index.tsx'] });
-    assert.ok(labels.has('exposure:production'));
-  });
-
-  it('applies exposure:production when featureSurfaces directory module is changed', () => {
-    const labels = exposureLabels({ changedFiles: ['src/config/featureSurfaces/index.ts'] });
+  it('applies exposure:production when ServerBackedFeatureBoundary is changed', () => {
+    const labels = exposureLabels({ changedFiles: ['src/features/ServerBackedFeatureBoundary.tsx'] });
     assert.ok(labels.has('exposure:production'));
   });
 
   it('applies both exposure:registry-change and exposure:server-backed for combined changes', () => {
     const labels = exposureLabels({
-      changedFiles: ['src/config/featureExposure.ts', 'server/lib/featureCapabilities.js'],
+      changedFiles: ['server/flags.json', 'server/lib/featureCapabilities.js'],
     });
     assert.ok(labels.has('exposure:registry-change'));
     assert.ok(labels.has('exposure:server-backed'));
@@ -91,8 +89,8 @@ describe('exposureLabels', () => {
 
   it('does not apply exposure labels for gating test files', () => {
     const testFiles = [
-      'src/components/FeatureBoundary.test.tsx',
-      'src/config/featureSurfaces.test.ts',
+      'src/features/FeatureBoundary.test.tsx',
+      'src/routing/buildFeatureGatedRoutes.test.tsx',
       'src/config/featureNavigation.test.ts',
     ];
     for (const file of testFiles) {
@@ -103,10 +101,10 @@ describe('exposureLabels', () => {
 
   it('never applies exposure:beta-only for any file pattern', () => {
     const testCases = [
-      ['src/config/featureExposure.ts'],
+      ['server/flags.json'],
       ['server/lib/featureCapabilities.js'],
-      ['src/components/FeatureBoundary.tsx'],
-      ['src/config/featureSurfaces.ts'],
+      ['src/features/FeatureBoundary.tsx'],
+      ['src/routing/buildFeatureGatedRoutes.tsx'],
       ['src/config/featureNavigation.ts'],
     ];
     for (const changedFiles of testCases) {

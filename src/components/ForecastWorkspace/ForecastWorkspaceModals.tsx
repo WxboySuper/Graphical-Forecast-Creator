@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/ForecastWorkspaceModals.tsx
+ * Purpose: Coordinates forecast workspace modal composition, visibility, and dialog actions.
+ */
+
 import React from 'react';
 import {
   Dialog,

@@ -1,3 +1,6 @@
+/**
+ * Cloud cycle hook tests. Verify cloud cycle loading, saving, update state, and failure paths exposed by the hook.
+ */
 import { act, renderHook } from '@testing-library/react';
 import {
   buildLoadedCloudForecastPayload,
@@ -43,9 +46,7 @@ jest.mock('../utils/productMetrics', () => ({
   queueProductMetric: jest.fn(),
 }));
 
-jest.mock('../lib/productAnalytics', () => ({
-  trackProductEvent: jest.fn(),
-}));
+jest.mock('../lib/telemetry', () => ({ trackEvent: jest.fn() }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseEntitlement = useEntitlement as jest.MockedFunction<typeof useEntitlement>;

@@ -1,3 +1,8 @@
+/**
+ * Export-utilities edge-case test boundary: this suite verifies cleanup of
+ * render waits across success and timeout paths, complementing the primary
+ * browser-export pipeline tests.
+ */
 jest.setTimeout(10000);
 
 import { waitForMapRender } from './exportUtils';
@@ -156,7 +161,7 @@ describe('exportUtils additional unit tests', () => {
     });
 
     const clonedRoot = document.createElement('div');
-    clonedRoot.style.cssText = 'position:relative;height:180px;';
+    clonedRoot.style.cssText = 'position:relative;height:180px;visibility:hidden;';
     const ctrl = document.createElement('div');
     ctrl.className = 'ol-control';
     clonedRoot.appendChild(ctrl);
@@ -172,6 +177,7 @@ describe('exportUtils additional unit tests', () => {
     });
     cb(clonedRoot);
 
+    expect(clonedRoot.style.visibility).toBe('visible');
     // original control should be hidden
     expect((ctrl as HTMLElement).style.display).toBe('none');
     // overlays/footer should have been added; look for known footer text

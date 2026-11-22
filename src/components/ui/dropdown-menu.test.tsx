@@ -1,3 +1,7 @@
+/**
+ * Dropdown-menu primitive tests. Verify trigger, menu-item, grouping, and keyboard
+ * behavior through the shared Radix-backed menu boundary.
+ */
 import { render, screen } from '@testing-library/react';
 import {
   createElement as mockCreateElement,

@@ -1,3 +1,7 @@
+/**
+ * Normalizes persisted and Map-backed outlook probability data into the current forecast shape.
+ * This utility owns compatibility coercion at the data boundary; it does not persist, render, or mutate forecast state.
+ */
 import type { Feature as GeoJsonFeature } from 'geojson';
 import type { ForecastCycle, OutlookData } from '../types/outlooks';
 

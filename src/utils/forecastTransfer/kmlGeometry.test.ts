@@ -1,3 +1,6 @@
+/**
+ * KML geometry tests. Verify forecast geometry converts to the KML coordinate contract.
+ */
 import { geometryFromKmlElement } from './kmlGeometry';
 import { parseKmlDocument } from './parseKml';
 

@@ -1,3 +1,6 @@
+/**
+ * Verifies allowed branch targets, including feature, hotfix, stable maintenance, and permissive main defaults.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { evaluateBranchPolicy } from './branch-policy.mjs';
@@ -30,6 +33,13 @@ describe('branch policy', () => {
     const result = evaluateBranchPolicy({ baseRef: 'stable/1.6.x', headRef: 'hotfix/urgent' });
     assert.equal(result.ok, true);
     assert.equal(result.kind, 'hotfix');
+  });
+
+  it('accepts a backport branch on a stable line and no longer routes ports into main', () => {
+    const result = evaluateBranchPolicy({ baseRef: 'stable/2.x', headRef: 'backport/1861-to-2.x' });
+    assert.equal(result.ok, true);
+    assert.equal(result.kind, 'backport');
+    assert.equal(evaluateBranchPolicy({ baseRef: 'main', headRef: 'port/1-to-main' }).kind, 'main-integration');
   });
 
   it('allows arbitrary source branch names to main', () => {

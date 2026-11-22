@@ -1,6 +1,12 @@
+/**
+ * Navbar-section tests. Verifies the brand, main-tab, and right-action sections
+ * render their route and authentication states correctly.
+ */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { BrandSection, MainTabs, RightActions } from './NavbarSections';
+import { getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
+import { getVisibleNavigationItems } from '../../config/featureNavigation';
 
 const mockUseAuth = jest.fn();
 
@@ -39,7 +45,7 @@ describe('NavbarSections', () => {
 
   test('renders brand and active main tabs', () => {
     render(
-      <MemoryRouter initialEntries={['/forecast/day1']}>
+      <MemoryRouter initialEntries={['/forecast/severe/day1']}>
         <BrandSection />
         <MainTabs />
       </MemoryRouter>
@@ -47,8 +53,55 @@ describe('NavbarSections', () => {
 
     expect(screen.getByText('Graphical Forecast Creator')).toBeInTheDocument();
     expect(screen.getByText('GFC')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Forecast' })).toHaveClass('is-active');
+    expect(screen.getByRole('button', { name: /Forecast menu, current page Severe/i }))
+      .toHaveClass('is-active');
     expect(screen.getByRole('link', { name: 'Monitor' })).toHaveAttribute('href', '/monitor');
+    expect(screen.queryByRole('link', { name: 'Tropical forecast workspace' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Winter' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Forecast menu, current page Severe/i }))
+      .toBeInTheDocument();
+
+    const workspaceLinks = getExposedForecastWorkspaces().map((workspace) =>
+      screen.getByRole('link', { name: `${workspace.label} forecast workspace` })
+    );
+    expect(workspaceLinks.map((link) => link.getAttribute('href'))).toEqual(
+      getExposedForecastWorkspaces().map((workspace) => workspace.path)
+    );
+    expect(screen.getByRole('link', { name: 'Severe forecast workspace' })).toHaveAttribute('aria-current', 'page');
+    const otherItems = getVisibleNavigationItems().filter(
+      ({ id }) => !['home', 'forecast', 'discussion', 'verification', 'monitor'].includes(id)
+    );
+    for (const item of otherItems) {
+      const label = item.id === 'tropical-workspace' ? 'Tropical tools' : item.label;
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', item.to);
+    }
+    for (const workspace of getExposedForecastWorkspaces()) {
+      const workspaceLink = screen.getByRole('link', {
+        name: `${workspace.label} forecast workspace`,
+      });
+      expect(screen.getByText(workspace.description)).toBeInTheDocument();
+      expect(workspaceLink.getAttribute('aria-describedby')).toContain(
+        `forecast-workspace-${workspace.id}-description`
+      );
+      expect(workspaceLink.getAttribute('aria-describedby')).toContain(
+        `forecast-workspace-${workspace.id}-focus`
+      );
+      for (const focusPoint of workspace.focus) {
+        expect(screen.getByText(focusPoint)).toBeInTheDocument();
+      }
+    }
+  });
+
+  test('marks the Discussion compatibility route as the current Forecast menu context', () => {
+    render(
+      <MemoryRouter initialEntries={['/discussion/thread/42']}>
+        <MainTabs />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: 'Forecast menu, current page Discussion' }))
+      .toHaveClass('is-active');
+    expect(screen.queryByRole('link', { name: 'Discussion' })).not.toBeInTheDocument();
   });
 
   test('wires account state, theme toggle, legal/docs actions, and external links', () => {
@@ -72,7 +125,6 @@ describe('NavbarSections', () => {
               />
             }
           />
-          <Route path="/updates" element={<div>Updates destination</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -92,10 +144,11 @@ describe('NavbarSections', () => {
       '_blank',
       'noopener,noreferrer'
     );
-    const whatsNewLink = screen.getByRole('link', { name: /What's New/i });
-    expect(whatsNewLink).toHaveAttribute('href', '/updates');
-    fireEvent.click(whatsNewLink);
-    expect(screen.getByText('Updates destination')).toBeInTheDocument();
+    const contactLink = screen.getByRole('link', { name: /Contact us/i });
+    expect(contactLink).toHaveAttribute('href', 'mailto:contact@gfcweather.com');
+    expect(contactLink).toHaveTextContent('contact@gfcweather.com');
+    expect(screen.getByRole('link', { name: /What's New/i })).toHaveAttribute('href', 'https://gfcweather.com/updates/');
+    expect(screen.getByRole('link', { name: /Pricing/i })).toHaveAttribute('href', 'https://gfcweather.com/pricing/');
   });
 
   test('renders signed-out and dark-mode labels', () => {

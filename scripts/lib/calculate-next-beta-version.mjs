@@ -131,26 +131,30 @@ export const calculateNextBetaVersion = ({
   betaTags,
   explicitVersion = '',
   taggedVersions = null,
+  targetBase = undefined,
 }) => {
   const explicit = explicitVersion.trim();
-  const base = resolveBetaVersionBase(packageVersion);
+  const base = targetBase ?? resolveBetaVersionBase(packageVersion);
   if (!base) {
     throw new Error(`Unsupported main package version: ${packageVersion}`);
   }
 
   const tagSet = taggedVersions ?? new Set(betaTags);
-  const lastTagged = lastBetaNumberForBase(betaTags, base);
+  // The counter belongs to its base version: 3.0.0 betas start at beta.1 however many 2.0.0 betas exist.
+  const lastTaggedForBase = lastBetaNumberForBase(betaTags, base);
 
   if (explicit) {
     validateExplicitBetaVersion({ explicit, packageVersion, tagSet, betaTags, base });
     return { version: explicit, strategy: 'explicit' };
   }
 
-  const retry = tryRetryUnpublishedPackageVersion({ packageVersion, tagSet, lastTagged });
+  const retry = base === resolveBetaVersionBase(packageVersion)
+    ? tryRetryUnpublishedPackageVersion({ packageVersion, tagSet, lastTagged: lastTaggedForBase })
+    : null;
   if (retry) {
     return { version: retry, strategy: 'retry-unpublished' };
   }
 
-  const next = (lastTagged ?? 0) + 1;
+  const next = (lastTaggedForBase ?? 0) + 1;
   return { version: `${base}-beta.${next}`, strategy: 'increment' };
 };

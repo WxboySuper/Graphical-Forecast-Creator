@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useEntitlement } from '../billing/EntitlementProvider';
 import type { AddToastFn } from '../components/Layout';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import type { ForecastWorkspaceId } from '../config/forecastWorkspaces';
 import {
   consumeCustomProductForecastHandoff,
   restoreCustomProductForecastHandoff,
 } from '../lib/customProductHandoff';
 import type { RootState } from '../store';
-import { addCustomLayer, setCustomEditorMode } from '../store/forecastSlice';
+import { addCustomLayer } from '../store/forecastSlice';
 import { CUSTOM_PRODUCT_LIMITS } from '../types/customProducts';
 
 const restoreWithError = (message: string, addToast: AddToastFn, layer: Parameters<typeof restoreCustomProductForecastHandoff>[0], workspaceId: ForecastWorkspaceId) => {
@@ -27,7 +27,7 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
   });
 
   useEffect(() => {
-    if (!ready || !isFeatureExposed('customProducts')) return;
+    if (!ready || !flag('customProducts')) return;
     // The handoff names its workspace. Consuming it from a different editor
     // would inject Custom layers into a workspace that does not own them.
     const stagedLayer = consumeCustomProductForecastHandoff(premiumActive, workspaceId);
@@ -46,6 +46,5 @@ export const useCustomProductForecastHandoff = (ready: boolean, addToast: AddToa
       return;
     }
     dispatch(addCustomLayer(stagedLayer));
-    dispatch(setCustomEditorMode('custom'));
   }, [addToast, destinationDay, dispatch, premiumActive, ready, workspaceId]);
 };

@@ -1,3 +1,7 @@
+/**
+ * Forecast Grade map pane. It renders the verification map, synchronizes the
+ * selected evidence and view state, and leaves grade calculation to its caller.
+ */
 import React, { useEffect, useState } from 'react';
 import { fromLonLat } from 'ol/proj';
 import VerificationMap, { type VerificationMapHandle } from '../Map/VerificationMap';

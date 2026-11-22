@@ -1,3 +1,8 @@
+/**
+ * Auto-categorical hook test boundary: this suite verifies derived categorical
+ * risk synchronization, debounce behavior, and dispatch decisions for forecast
+ * geometry without mounting the complete forecast editor.
+ */
 import React from 'react';
 import { Provider } from 'react-redux';
 import { act, render, waitFor } from '@testing-library/react';
@@ -13,10 +18,12 @@ import type { DerivationController, DerivationResult } from '../categoricalWorke
 import { OutlookData } from '../../types/outlooks';
 import { Feature, Polygon } from 'geojson';
 import * as turf from '@turf/turf';
+import { captureException } from '@sentry/react';
 import forecastReducer, { addFeature, undoLastEdit, updateFeature } from '../../store/forecastSlice';
 
 const mockUuid = jest.fn(() => 'mock-uuid');
 
+jest.mock('@sentry/react', () => ({ captureException: jest.fn() }));
 jest.mock('uuid', () => ({
   v4: () => mockUuid(),
 }));
@@ -481,6 +488,29 @@ describe('processOutlooksToCategorical', () => {
 
     expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(CategoricalDerivationError);
     expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(/union/i);
+  });
+
+  test('union failure is reported to Sentry with the polygon count', () => {
+    const outlooks: OutlookData = {
+      tornado: new Map([['30%', [makeFeature('t1'), makeFeature('t2')]]]),
+      wind: new Map(),
+      hail: new Map(),
+      categorical: new Map(),
+    };
+    const unionMock = turf.union as jest.MockedFunction<typeof turf.union>;
+    unionMock.mockImplementationOnce(() => {
+      throw new Error('Unable to complete output ring');
+    });
+    (captureException as jest.Mock).mockClear();
+
+    expect(() => processDay12OutlooksToCategorical(outlooks)).toThrow(CategoricalDerivationError);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(CategoricalDerivationError),
+      expect.objectContaining({
+        tags: { featureOperation: 'derive-categorical' },
+        extra: expect.objectContaining({ polygonCount: 2 }),
+      }),
+    );
   });
 
   test('single-feature union never throws and returns the feature unchanged', () => {

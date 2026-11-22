@@ -1,3 +1,7 @@
+/**
+ * Alert-banner test suite. Verifies configuration loading, visibility, dismissal,
+ * scheduling, and error handling for the site-wide alert component.
+ */
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import AlertBanner from './AlertBanner';

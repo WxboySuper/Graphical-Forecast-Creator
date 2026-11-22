@@ -1,0 +1,113 @@
+/**
+ * Server capability test harness. It starts an isolated HTTP app and exercises a capability gate
+ * to prove a disabled route does no work. Per-target baseline checks live in server/lib/flags.test.js.
+ */
+'use strict';
+
+const express = require('express');
+const assert = require('node:assert/strict');
+const { CAPABILITY_REASON } = require('../lib/capabilityStatus');
+const {
+  DISABLED_CAPABILITY_STATUS,
+  createServerCapabilityGate,
+} = require('../lib/featureCapabilities');
+
+/** Route options that expose every target, so a test exercises only the env and emergency switches. */
+const allTargetsEnabledRouteOptions = () => ({
+  exposureOverride: { local: true, beta: true, staging: true, production: true },
+});
+
+/** Starts a test HTTP server and returns its base URL. */
+const startTestServer = (app) =>
+  new Promise((resolve, reject) => {
+    const server = app.listen(0, '127.0.0.1', () => resolve(server));
+    server.on('error', reject);
+  });
+
+/** Builds the loopback URL used to call a test server endpoint. */
+const getServerUrl = (server, path = '/api/test') => {
+  const address = server.address();
+  return `http://127.0.0.1:${address.port}${path}`;
+};
+
+/** Creates a minimal Express app with one gated route and handler spy. */
+const createTestAppWithGate = (capabilityKey, handlerSpy, options = {}) => {
+  const gate = createServerCapabilityGate(capabilityKey, options);
+  const app = express();
+  app.post(options.path || '/api/test', gate, (_req, res) => {
+    handlerSpy();
+    res.status(200).json({ ok: true });
+  });
+  return app;
+};
+
+/** Asserts a gated route rejects requests without invoking downstream work. */
+const assertCapabilityRouteRejectsWithoutWork = async ({
+  capabilityKey,
+  env,
+  routeOptions = {},
+  path = '/api/test',
+  method = 'POST',
+  expectedStatus = DISABLED_CAPABILITY_STATUS,
+  expectedBody,
+}) => {
+  let calls = 0;
+  const app = createTestAppWithGate(
+    capabilityKey,
+    () => {
+      calls += 1;
+    },
+    { env, path, ...routeOptions }
+  );
+  const server = await startTestServer(app);
+
+  try {
+    const response = await fetch(getServerUrl(server, path), { method });
+    assert.equal(response.status, expectedStatus);
+    if (expectedBody) {
+      assert.deepEqual(await response.json(), expectedBody);
+    }
+    assert.equal(calls, 0);
+  } finally {
+    server.close();
+  }
+};
+
+const disabledCapabilityStatusFixtures = {
+  registry_disabled: {
+    env: { SERVER_TARGET: 'beta' },
+    routeOptions: { exposureOverride: { beta: false } },
+    reason: CAPABILITY_REASON.REGISTRY_DISABLED,
+  },
+  deployment_disabled: {
+    env: { SERVER_TARGET: 'beta' },
+    routeOptions: { exposureOverride: { beta: true } },
+    reason: CAPABILITY_REASON.DEPLOYMENT_DISABLED,
+  },
+  emergency_disabled: {
+    env: {
+      SERVER_TARGET: 'beta',
+      TSTM_GENERATION_ENABLED: 'true',
+      EMERGENCY_DISABLED_CAPABILITIES: 'TSTM_GENERATION_ENABLED',
+    },
+    routeOptions: allTargetsEnabledRouteOptions(),
+    reason: CAPABILITY_REASON.EMERGENCY_DISABLED,
+  },
+  available: {
+    env: {
+      SERVER_TARGET: 'beta',
+      TSTM_GENERATION_ENABLED: 'true',
+    },
+    routeOptions: allTargetsEnabledRouteOptions(),
+    reason: CAPABILITY_REASON.AVAILABLE,
+  },
+};
+
+module.exports = {
+  allTargetsEnabledRouteOptions,
+  assertCapabilityRouteRejectsWithoutWork,
+  createTestAppWithGate,
+  disabledCapabilityStatusFixtures,
+  getServerUrl,
+  startTestServer,
+};

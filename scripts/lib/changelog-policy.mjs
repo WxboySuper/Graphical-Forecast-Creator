@@ -1,10 +1,14 @@
+/**
+ * Changelog metadata policy helpers. The module parses PR impact and reason
+ * trailers, validates lane rules, and reports release-note policy failures.
+ */
 import { CHANGELOG_LANE_HEADINGS } from './changelog-lanes.mjs';
 
-const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none|inherited)\s*$/gim;
+const IMPACT_PATTERN = /^Changelog-Impact:\s*(beta|hotfix|none)\s*$/gim;
 const REASON_PATTERN = /^Changelog-Reason:\s*(\S.*)$/im;
-const SOURCE_PATTERN = /(?:port|backport|forward[- ]port|inherited)\s+(?:of\s+)?#(\d+)/i;
+const PREVIOUS_STABLE_LANE_HEADING = '### Stable 1.7.x hotfixes';
 
-/** @typedef {'beta' | 'hotfix' | 'none' | 'inherited'} ChangelogImpact */
+/** @typedef {'beta' | 'hotfix' | 'none'} ChangelogImpact */
 
 export { CHANGELOG_LANE_HEADINGS };
 
@@ -14,8 +18,8 @@ export { CHANGELOG_LANE_HEADINGS };
  * @returns {string}
  */
 export const changelogLaneHeadingForBase = (baseRef) => {
-  const match = baseRef.match(/^stable\/(\d+\.\d+)\.x$/);
-  return match ? `### Stable ${match[1]}.x hotfixes` : CHANGELOG_LANE_HEADINGS['next-major'];
+  const match = baseRef.match(/^stable\/(\d+)\.x$/);
+  return match ? `### Stable v${match[1]}.x hotfixes` : CHANGELOG_LANE_HEADINGS['next-major'];
 };
 
 /**
@@ -32,6 +36,12 @@ const laneHeadingForImpact = (impact) =>
 
 /** @param {string[]} changedFiles @param {string} path @returns {boolean} */
 const hasChangedChangelog = (changedFiles, path) => changedFiles.includes(path);
+
+/** @param {string} changelog @param {string} baseChangelog */
+const isStableLaneHeadingMigration = (changelog, baseChangelog) =>
+  baseChangelog.includes(PREVIOUS_STABLE_LANE_HEADING) &&
+  changelog.includes(CHANGELOG_LANE_HEADINGS['stable-hotfix']) &&
+  changelog.replace(CHANGELOG_LANE_HEADINGS['stable-hotfix'], PREVIOUS_STABLE_LANE_HEADING) === baseChangelog;
 
 /** @param {string} changelog @param {string} heading */
 const extractLaneBody = (changelog, heading) => {
@@ -74,13 +84,12 @@ const validateLane = ({ declaration, changelog, path, baseRef, baseChangelog }) 
 /** @param {{ declaration: object; changedFiles: string[]; changelog: string; baseChangelog: string; baseRef: string; path: string }} context */
 const validateImpactFile = ({ declaration, changedFiles, changelog, baseChangelog, baseRef, path }) => {
   if (declaration.impact === 'none') {
+    if (hasChangedChangelog(changedFiles, path) && isStableLaneHeadingMigration(changelog, baseChangelog)) {
+      return { ok: true, reason: `Changelog impact explicitly waived: ${declaration.reason}` };
+    }
     return hasChangedChangelog(changedFiles, path)
       ? { ok: false, reason: `Changelog-Impact: none cannot modify ${path}; choose beta or hotfix instead.` }
       : { ok: true, reason: `Changelog impact explicitly waived: ${declaration.reason}` };
-  }
-
-  if (declaration.impact === 'inherited') {
-    return { ok: true, reason: `Changelog entry inherited from PR #${declaration.sourcePr}.` };
   }
 
   if (!hasChangedChangelog(changedFiles, path)) {
@@ -108,31 +117,25 @@ const impactMatches = (body) => [...body.matchAll(IMPACT_PATTERN)].map((match) =
 const parseDeclarationValues = (body, impact) => ({
   impact,
   reason: body.match(REASON_PATTERN)?.[1]?.trim(),
-  sourcePr: Number(body.match(SOURCE_PATTERN)?.[1] ?? 0) || undefined,
 });
 
-/** @param {{ impact: ChangelogImpact; reason?: string; sourcePr?: number }} values */
-const validateDeclarationValues = ({ impact, reason, sourcePr }) => {
+/** @param {{ impact: ChangelogImpact; reason?: string }} values */
+const validateDeclarationValues = ({ impact, reason }) => {
   if (impact === 'none' && !reason) {
     return declarationError('Changelog-Impact: none requires a non-empty Changelog-Reason declaration.');
-  }
-  if (impact === 'inherited' && !sourcePr) {
-    return declarationError(
-      'Changelog-Impact: inherited requires a port/backport/forward-port reference such as "Port of #123".',
-    );
   }
   return null;
 };
 
 /**
  * @param {string} body
- * @returns {{ ok: true; impact: ChangelogImpact; reason?: string; sourcePr?: number } | { ok: false; reason: string }}
+ * @returns {{ ok: true; impact: ChangelogImpact; reason?: string } | { ok: false; reason: string }}
  */
 export const parseChangelogDeclaration = (body = '') => {
   const matches = impactMatches(body);
   if (matches.length !== 1) {
     return declarationError(
-      'PR body must contain exactly one Changelog-Impact: beta|hotfix|none|inherited declaration.',
+      'PR body must contain exactly one Changelog-Impact: beta|hotfix|none declaration.',
     );
   }
 
@@ -160,4 +163,4 @@ export const evaluateChangelogPolicy = ({ baseRef = '', changedFiles, body, chan
  * @param {ChangelogImpact | undefined} impact
  * @returns {boolean}
  */
-export const isChangelogSkip = (impact) => impact === 'none' || impact === 'inherited';
+export const isChangelogSkip = (impact) => impact === 'none';

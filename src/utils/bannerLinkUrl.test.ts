@@ -1,3 +1,6 @@
+/**
+ * Banner link URL tests. Verify banner links are normalized and constrained to supported destinations.
+ */
 import { isSafeBannerLinkUrl, sanitizeBannerLinkUrl } from './bannerLinkUrl';
 
 describe('bannerLinkUrl', () => {

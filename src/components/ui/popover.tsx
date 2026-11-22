@@ -1,3 +1,7 @@
+/**
+ * Popover primitive. Wraps Radix popover parts with the shared styling, layering,
+ * and ref-forwarding behavior used by interactive panels.
+ */
 import * as React from 'react';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { cn } from '../../lib/utils';

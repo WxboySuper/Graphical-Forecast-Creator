@@ -1,3 +1,9 @@
+/**
+ * Verification-mode workspace: this component composes the isolated forecast
+ * review layout, report loading controls, map overlays, and verification
+ * panels. It owns presentation and interaction wiring while spatial analysis,
+ * Redux state, and persistence remain outside the surface.
+ */
 import React, { useRef, useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { Eye, FileUp, Layers3 } from 'lucide-react';
@@ -11,6 +17,7 @@ import { DayType } from '../../types/outlooks';
 import { useAppLayout } from '../Layout/AppLayout';
 import { useAuth } from '../../auth/AuthProvider';
 import { queueProductMetric } from '../../utils/productMetrics';
+import { trackEvent } from '../../lib/telemetry';
 import './VerificationMode.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
 
@@ -311,6 +318,7 @@ const VerificationMode: React.FC = () => {
       setSelectedDay(daysWithData[0] || 1);
       setForecastLoaded(true);
       queueProductMetric({ event: 'verification_run', user });
+      trackEvent('verification_used');
       addToast('Forecast loaded! Load storm reports to begin verification.', 'success');
     } catch (error) {
       const message = error instanceof Error

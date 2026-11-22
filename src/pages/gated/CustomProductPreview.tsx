@@ -1,3 +1,6 @@
+/**
+ * Custom product preview. Renders a styled swatch and fallback label for each configured category.
+ */
 import type { CustomCategoryTemplate } from '../../types/customProducts';
 import { categoryPreviewStyle } from './customProductEditorModel';
 

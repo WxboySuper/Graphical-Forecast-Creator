@@ -4,7 +4,24 @@ import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { useAuth } from '../../auth/AuthProvider';
-import { BetaInfoCard } from './BetaPageLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import './BetaAuthCard.css';
+
+/** Card shell for the Clerk sign-in form. */
+const BetaInfoCard: React.FC<{
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
+}> = ({ title, description, className, children }) => (
+  <Card className={className}>
+    <CardHeader className="beta-info-card-header">
+      <CardTitle>{title}</CardTitle>
+      {description ? <CardDescription>{description}</CardDescription> : null}
+    </CardHeader>
+    {children ? <CardContent className="beta-info-card-content">{children}</CardContent> : null}
+  </Card>
+);
 
 const CLERK_VERIFICATION_SEGMENTS = new Set([
   'verify', 'verify-email-address', 'verify-phone-number', 'factor-one', 'factor-two',

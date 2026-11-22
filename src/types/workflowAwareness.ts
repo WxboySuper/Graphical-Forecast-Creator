@@ -1,3 +1,7 @@
+/**
+ * Defines workflow-awareness consent and metadata types shared by forecast workflow surfaces.
+ * This module owns the awareness contract shape and version constants; persistence, UI, and workflow transitions are implemented elsewhere.
+ */
 import { MAX_OUTLOOK_VERSIONS } from '../lib/workflowMetadataContract';
 import type { CycleMetadata, CycleStatus, OutlookStatus } from './workflow';
 

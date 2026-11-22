@@ -1,3 +1,6 @@
+/**
+ * Store exports. Defines the public Redux store, reducers, and state helpers used by the application.
+ */
 import '../immerSetup';
 import { configureStore } from '@reduxjs/toolkit';
 import { createSentryReduxEnhancer } from './sentryEnhancer';
@@ -9,6 +12,11 @@ import appModeReducer from './appModeSlice';
 import themeReducer from './themeSlice';
 import verificationReducer from './verificationSlice';
 import monitorReducer from './monitorSlice';
+import mesoscaleReducer from './mesoscaleSlice';
+import {
+  SERIALIZABLE_IGNORED_ACTIONS,
+  SERIALIZABLE_IGNORED_PATHS,
+} from './serializableCheckConfig';
 
 export const store = configureStore({
   reducer: {
@@ -19,6 +27,7 @@ export const store = configureStore({
     theme: themeReducer,
     verification: verificationReducer,
     monitor: monitorReducer,
+    mesoscale: mesoscaleReducer,
   },
   enhancers: (getDefaultEnhancers) => {
     const defaults = getDefaultEnhancers();
@@ -29,35 +38,13 @@ export const store = configureStore({
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        // Ignore Map objects in state (used for outlook data structures)
-        // Use regex to match all days and outlook types
-        ignoredPaths: [
-          /^forecast\.forecastCycle\.days\.\d+\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
-          /^forecast\.savedCycles\.\d+\.forecastCycle\.days\.\d+\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
-          /^forecast\.historyByDay\.\d+\.(undoStack|redoStack)\.\d+\.snapshot\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
-          /^verification\.loadedForecast\.days\.\d+\.data\.(categorical|tornado|wind|hail|totalSevere|day4-8)$/,
-          'forecast.outlooks',
-        ],
-        ignoredActions: [
-          'forecast/addFeature',
-          'forecast/removeFeature',
-          'forecast/importForecasts',
-          'forecast/importForecastCycle',
-          'forecast/loadCycleHistory',
-          'forecast/loadSavedCycle',
-          'forecast/restoreForecastCycle',
-          'forecast/setOutlookMap',
-          'forecast/applyAutoCategoricalSync',
-          'forecast/applyPaintBucketEdit',
-          'forecast/resetCategorical',
-          'forecast/undoLastEdit',
-          'forecast/redoLastEdit',
-          'verification/loadVerificationForecast',
-        ],
+        // Map-carrying state paths and action payloads live in one shared
+        // module so the ignore list cannot drift from the reducers silently.
+        ignoredPaths: SERIALIZABLE_IGNORED_PATHS,
+        ignoredActions: SERIALIZABLE_IGNORED_ACTIONS,
       },
     }).concat(createTimestampMiddleware() as never),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
-

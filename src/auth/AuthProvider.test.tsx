@@ -1,3 +1,8 @@
+/**
+ * Auth-provider test boundary: this suite verifies authentication state,
+ * hosted document synchronization, settings restoration, and account cleanup.
+ * Firebase and browser effects are isolated through explicit test doubles.
+ */
 import { renderHook, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -12,13 +17,13 @@ import {
   extractLocalUserFromData,
   getDefaultContextValue,
   initLocalAuthState,
-  localRefreshBetaAccess,
   localSignInWithEmail,
   localSignOutUser,
   localSignUpWithEmail,
   localUpdateSyncedSettings,
   postLocalJson,
   safeParseJson,
+  createHostedAutosyncSnapshot,
   createSettingsSnapshot as createProviderSettingsSnapshot,
   areUserSettingsEqual as areProviderUserSettingsEqual,
   createProfilePayload as createProviderProfilePayload,
@@ -26,7 +31,6 @@ import {
   getSettingsSyncError as getProviderSettingsSyncError,
   getSettingsUpdateError as getProviderSettingsUpdateError,
   mergeUserSettingsDocument as mergeProviderUserSettingsDocument,
-  readProfileBetaAccess as readProviderProfileBetaAccess,
   readRemoteSettings as readProviderRemoteSettings,
   AuthProvider,
   useAuth,
@@ -40,6 +44,12 @@ import {
 } from './hostedSettingsSync';
 import { queueProductMetric } from '../utils/productMetrics';
 import { createSettingsSnapshot } from './authSettings';
+import {
+  asRecord as asRecordDirect,
+  extractLocalUserFromData as extractLocalUserDirect,
+  postLocalJson as postLocalJsonDirect,
+  safeParseJson as safeParseJsonDirect,
+} from './authLocalTransport';
 import themeReducer from '../store/themeSlice';
 import overlaysReducer from '../store/overlaysSlice';
 import monitorReducer from '../store/monitorSlice';
@@ -94,7 +104,7 @@ const waitForAuthEffects = async (delay = 100) => {
 
 describe('AuthProvider Utils', () => {
   test('keeps the existing provider re-export for settings helpers', () => {
-    for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderProfileBetaAccess, readProviderRemoteSettings]) {
+    for (const helper of [createProviderSettingsSnapshot, areProviderUserSettingsEqual, createProviderProfilePayload, getProviderRemoteSeedPayload, getProviderSettingsSyncError, getProviderSettingsUpdateError, mergeProviderUserSettingsDocument, readProviderRemoteSettings]) {
       expect(typeof helper).toBe('function');
     }
   });
@@ -109,31 +119,11 @@ describe('AuthProvider Utils', () => {
     expect(clearLocalState).toHaveBeenCalledTimes(1);
   });
 
-  test('safeParseJson parses valid JSON', async () => {
-    const data = { foo: 'bar' };
-    const resp = { json: () => Promise.resolve(data) } as Response;
-    const result = await safeParseJson<{ foo: string }>(resp);
-    expect(result).toEqual(data);
-  });
-
-  test('safeParseJson returns null on invalid JSON', async () => {
-    const resp = { json: () => Promise.reject(new Error('invalid json')) } as Response;
-    const result = await safeParseJson(resp);
-    expect(result).toBeNull();
-  });
-
-  test('asRecord coerces objects', () => {
-    expect(asRecord({ a: 1 })).toEqual({ a: 1 });
-    expect(asRecord(null)).toEqual({});
-    expect(asRecord('string')).toEqual({});
-  });
-
-  test('extractLocalUserFromData works', () => {
-    const data = { uid: 'user123', email: 'test@example.com', displayName: 'Test User' };
-    const user = extractLocalUserFromData(data);
-    expect(user.uid).toBe('user123');
-    expect(user.email).toBe('test@example.com');
-    expect(user.displayName).toBe('Test User');
+  test('re-exports the local transport seam from the extracted module', () => {
+    expect(asRecord).toBe(asRecordDirect);
+    expect(extractLocalUserFromData).toBe(extractLocalUserDirect);
+    expect(postLocalJson).toBe(postLocalJsonDirect);
+    expect(safeParseJson).toBe(safeParseJsonDirect);
   });
 
   test('overlay comparison and application helpers avoid redundant dispatches', () => {
@@ -180,28 +170,44 @@ describe('AuthProvider Utils', () => {
     expect(setSyncedSettings).toHaveBeenCalledTimes(1);
   });
 
-  test('local post helper and provider auth utilities normalize errors', async () => {
+  test('autosync snapshot uploads live monitor settings instead of stale synced ones', () => {
+    const syncedMonitorSettings = { ...DEFAULT_MONITOR_SETTINGS, radarMode: 'site' as const };
+    const liveMonitorSettings = {
+      ...DEFAULT_MONITOR_SETTINGS,
+      radarMode: 'none' as const,
+      animationEnabled: true,
+    };
+    const syncedSettings = createProviderSettingsSnapshot({
+      darkMode: false,
+      overlays: { ...TEST_OVERLAY_STATE },
+      defaultForecasterName: 'Synced Forecaster',
+      forecastUiVariant: 'workspace_dock',
+      monitorSettings: syncedMonitorSettings,
+    });
+
+    const snapshot = createHostedAutosyncSnapshot({
+      darkMode: false,
+      overlays: { ...TEST_OVERLAY_STATE },
+      displayName: 'Profile Forecaster',
+      syncedForecasterName: syncedSettings.defaultForecasterName,
+      syncedForecastUiVariant: syncedSettings.forecastUiVariant,
+      monitorSettings: liveMonitorSettings,
+    });
+
+    expect(snapshot.monitorSettings.radarMode).toBe('none');
+    expect(snapshot.monitorSettings.animationEnabled).toBe(true);
+    expect(snapshot.monitorSettings).not.toHaveProperty('mesoscale');
+    // A changed monitor setting must not compare equal to the last synced
+    // document, otherwise the debounced write is skipped.
+    expect(areProviderUserSettingsEqual(syncedSettings, snapshot)).toBe(false);
+    expect(snapshot.defaultForecasterName).toBe('Synced Forecaster');
+    expect(snapshot.forecastUiVariant).toBe('workspace_dock');
+  });
+
+  test('auth utility fallbacks normalize errors', () => {
     expect(() => disabledAuthAction()).toThrow(/Hosted accounts are not enabled/);
     expect(getDefaultContextValue()).toEqual(expect.objectContaining({ status: 'disabled', hostedAuthEnabled: false }));
     expect(canSyncHostedUserDocuments(null)).toBe(false);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ ok: true }),
-    });
-    await expect(postLocalJson('/api/local/test', { body: { ok: true }, failureMessage: 'Failed' })).resolves.toEqual({ ok: true });
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      json: () => Promise.resolve({ message: 'Nope' }),
-    });
-    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).rejects.toThrow('Nope');
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.reject(new Error('invalid')),
-    });
-    await expect(postLocalJson('/api/local/test', { failureMessage: 'Failed' })).resolves.toEqual({});
   });
 
   test('local auth action helpers update state and surface failures', async () => {
@@ -215,15 +221,12 @@ describe('AuthProvider Utils', () => {
       setSyncedSettings: jest.fn(),
       setSettingsSyncStatus: jest.fn(),
       lastSyncedSettingsRef: { current: null },
-      setBetaAccess: jest.fn(),
-      setBetaAccessLoading: jest.fn(),
       setError: jest.fn(),
     };
 
     const localPayload = {
       uid: 'user-1',
       email: 'user@example.com',
-      betaAccess: true,
       settings: {
         darkMode: false,
         baseMapStyle: 'osm',
@@ -265,17 +268,6 @@ describe('AuthProvider Utils', () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ betaAccess: true }),
-    });
-    await localRefreshBetaAccess(deps);
-    expect(deps.setBetaAccess).toHaveBeenCalledWith(true);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false });
-    await localRefreshBetaAccess(deps);
-    expect(deps.setBetaAccess).toHaveBeenCalledWith(false);
-
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
       json: () => Promise.resolve({ settings: localPayload.settings }),
     });
     await localUpdateSyncedSettings({ defaultForecasterName: 'Updated' }, deps);
@@ -303,14 +295,11 @@ describe('AuthProvider Utils', () => {
       setSyncedSettings: jest.fn(),
       lastSyncedSettingsRef: { current: null },
       setError: jest.fn(),
-      setBetaAccess: jest.fn(),
-      setBetaAccessLoading: jest.fn(),
     });
 
     const profile = {
       uid: 'local-user',
       email: 'local@example.com',
-      betaAccess: true,
       settings: {
         darkMode: false,
         baseMapStyle: 'osm',
@@ -332,7 +321,6 @@ describe('AuthProvider Utils', () => {
     expect(successDeps.setUser).toHaveBeenCalledWith(expect.objectContaining({ uid: 'local-user' }));
     expect(successDeps.setStatus).toHaveBeenCalledWith('signed_in');
     expect(successDeps.setSettingsSyncStatus).toHaveBeenCalledWith('synced');
-    expect(successDeps.setBetaAccess).toHaveBeenCalledWith(true);
 
     const inactiveDeps = makeDeps(() => false);
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -347,7 +335,6 @@ describe('AuthProvider Utils', () => {
     await initLocalAuthState(signedOutDeps);
     expect(signedOutDeps.setStatus).toHaveBeenCalledWith('signed_out');
     expect(signedOutDeps.setSettingsSyncStatus).toHaveBeenCalledWith('idle');
-    expect(signedOutDeps.setBetaAccessLoading).toHaveBeenCalledWith(false);
 
     const errorDeps = makeDeps();
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
@@ -656,8 +643,6 @@ describe('AuthProvider local credential edge cases', () => {
     setSyncedSettings: jest.fn(),
     setSettingsSyncStatus: jest.fn(),
     lastSyncedSettingsRef: { current: null },
-    setBetaAccess: jest.fn(),
-    setBetaAccessLoading: jest.fn(),
     setError: jest.fn(),
   });
 
@@ -687,21 +672,25 @@ describe('AuthProvider local credential edge cases', () => {
     expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
   });
 
-  test('reports network failures for local sign-in and sign-up', async () => {
+  test('surfaces network failures to user-facing errors for sign-in and sign-up', async () => {
     const signInDeps = makeCredentialDeps();
     const signUpDeps = makeCredentialDeps();
-    fetchMock().mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock().mockRejectedValueOnce(new Error('offline')).mockRejectedValueOnce(new Error('offline'));
 
-    await expect(
-      localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps),
-    ).rejects.toThrow('Sign in failed');
+    await expect(localSignInWithEmail({ email: 'user@example.com', password: 'secret' }, signInDeps)).rejects.toThrow(
+      'Sign in failed',
+    );
     expect(signInDeps.setError).toHaveBeenCalledWith('Sign in failed');
+    expect(signInDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
 
-    await expect(
-      localSignUpWithEmail({ email: 'user@example.com', password: 'secret' }, signUpDeps),
-    ).rejects.toThrow('Sign up failed');
+    await expect(localSignUpWithEmail({ email: 'new@example.com', password: 'secret' }, signUpDeps)).rejects.toThrow(
+      'Sign up failed',
+    );
     expect(signUpDeps.setError).toHaveBeenCalledWith('Sign up failed');
+    expect(signUpDeps.setStatus).not.toHaveBeenCalledWith('signed_in');
+    expect(fetchMock()).toHaveBeenCalledTimes(2);
+    expect(fetchMock()).toHaveBeenNthCalledWith(1, '/api/local/signin', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock()).toHaveBeenNthCalledWith(2, '/api/local/signup', expect.objectContaining({ method: 'POST' }));
   });
 
   test('tolerates malformed JSON on successful sign-in and sign-up', async () => {
@@ -807,7 +796,6 @@ describe('AuthProvider Local Auth', () => {
         forecastUiVariant: 'workspace_dock',
         monitorSettings: DEFAULT_MONITOR_SETTINGS,
       },
-      betaAccess: true,
     };
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -889,5 +877,27 @@ describe('AuthProvider Local Auth', () => {
       '/api/local/profile',
       expect.objectContaining({ method: 'GET' })
     );
+  });
+
+  test('sign-in and sign-up network failures surface hook error state', async () => {
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: false })
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('offline'));
+
+    const { result } = renderAuthHookWithStore(store);
+
+    await waitForAuthEffects(0);
+    expect(result.current.status).toBe('signed_out');
+
+    await act(async () => {
+      await expect(result.current.signInWithEmail('user@example.com', 'secret')).rejects.toThrow('Sign in failed');
+    });
+    expect(result.current.error).toBe('Sign in failed');
+
+    await act(async () => {
+      await expect(result.current.signUpWithEmail('new@example.com', 'secret')).rejects.toThrow('Sign up failed');
+    });
+    expect(result.current.error).toBe('Sign up failed');
   });
 });

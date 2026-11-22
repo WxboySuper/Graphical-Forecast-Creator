@@ -1,5 +1,11 @@
+/**
+ * Server-capability status hook: this module polls and caches hosted capability
+ * availability for exposure-gated client features, including retry and stale
+ * status handling. It reports server state to consumers and does not authorize
+ * requests or own feature rendering.
+ */
 import { useCallback, useEffect, useState } from 'react';
-import { getFeatureExposure, type FeatureKey } from './featureExposure';
+import { flagCapability, type FlagName } from './flags';
 
 export const CAPABILITY_STATUS_ENDPOINT = '/api/capabilities/status';
 
@@ -85,14 +91,7 @@ const scheduleCapabilityStatusRetry = (): void => {
 };
 
 /** Returns the server capability key for a registry feature when server-backed. */
-export const getServerCapabilityKeyForFeature = (feature: FeatureKey): string | null => {
-  const definition = getFeatureExposure(feature);
-  if (!definition.serverBacked) {
-    return null;
-  }
-
-  return definition.serverCapabilityKey;
-};
+export const getServerCapabilityKeyForFeature = (feature: FlagName): string | null => flagCapability(feature);
 
 const isCapabilityStatusReason = (reason: unknown): reason is CapabilityAvailabilityReason =>
   typeof reason === 'string'
@@ -207,15 +206,14 @@ export const isServerCapabilityAvailable = (
 
 /** Resolves runtime UI state for a server-backed registry feature. */
 export const resolveServerBackedFeatureRuntimeState = (
-  feature: FeatureKey,
+  feature: FlagName,
   status: CapabilityStatusSnapshot = EMPTY_STATUS
 ): ServerBackedFeatureRuntimeState => {
-  const definition = getFeatureExposure(feature);
-  if (!definition.serverBacked) {
+  const capabilityKey = flagCapability(feature);
+  if (!capabilityKey) {
     return 'available';
   }
 
-  const capabilityKey = definition.serverCapabilityKey;
   if (unavailableCapabilityKeys.has(capabilityKey)) {
     return 'unavailable';
   }
@@ -255,7 +253,7 @@ export const useServerCapabilityStatus = (): CapabilityStatusSnapshot => {
 };
 
 /** Returns whether a server-backed feature is available at runtime on this deployment. */
-export const useServerCapabilityAvailable = (feature: FeatureKey): boolean => {
+export const useServerCapabilityAvailable = (feature: FlagName): boolean => {
   const capabilityKey = getServerCapabilityKeyForFeature(feature);
   const status = useServerCapabilityStatus();
 
@@ -268,7 +266,7 @@ export const useServerCapabilityAvailable = (feature: FeatureKey): boolean => {
 
 /** Returns runtime UI state for a server-backed registry feature. */
 export const useServerBackedFeatureRuntimeState = (
-  feature: FeatureKey
+  feature: FlagName
 ): ServerBackedFeatureRuntimeState => {
   const status = useServerCapabilityStatus();
   return resolveServerBackedFeatureRuntimeState(feature, status);

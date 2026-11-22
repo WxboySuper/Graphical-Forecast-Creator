@@ -1,3 +1,7 @@
+/**
+ * Monitor radar controls section. It derives available products from monitor
+ * settings and sends the selected radar site and product back to the controller.
+ */
 import React, { useMemo } from 'react';
 import { Radar } from 'lucide-react';
 import type { RadarSiteOption } from '../radarSites';

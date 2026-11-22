@@ -1,3 +1,6 @@
+/**
+ * TSTM request builder tests. Verify generation requests serialize forecast context and options correctly.
+ */
 import { buildTstmRequest } from './buildTstmRequest';
 import { getTstmRequestIdentity } from './tstmGeneration';
 

@@ -1,3 +1,8 @@
+/**
+ * Account-page test boundary: this suite verifies account settings, billing
+ * entitlement presentation, hosted-account actions, and navigation states at
+ * the route surface using isolated authentication and service fixtures.
+ */
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
@@ -145,7 +150,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -173,6 +177,7 @@ describe("AccountPage", () => {
     expect(screen.getAllByText("alex@example.com")).toHaveLength(2);
     expect(screen.getAllByText("Google")).toHaveLength(2);
     expect(screen.getByDisplayValue("Alex")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "contact@gfcweather.com" })).toHaveAttribute("href", "mailto:contact@gfcweather.com");
     expect(
       screen.getByRole("button", { name: /Sign Out/i }),
     ).toBeInTheDocument();
@@ -196,7 +201,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "error",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -299,7 +303,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -374,7 +377,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "loading",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",
@@ -504,7 +506,6 @@ describe("AccountPage", () => {
       hostedAuthEnabled: true,
       status: "signed_in",
       settingsSyncStatus: "synced",
-      betaAccess: false,
       user: {
         email: "alex@example.com",
         displayName: "Alex",

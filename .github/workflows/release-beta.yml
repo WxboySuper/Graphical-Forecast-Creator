@@ -3,14 +3,16 @@ name: Release | Beta
 # Beta releases are intentional snapshots of the next-major main line. Merging
 # into main never creates a release automatically; this workflow versions main,
 # publishes a draft GitHub prerelease, deploys beta.gfcweather.com on Cloudflare
-# Workers, deploys the beta API on the VPS, smoke-tests, then publishes the release.
+# Workers, deploys the mesoscale catalog Worker and the beta API on the VPS,
+# smoke-tests, then publishes the release. A schedule every six hours runs the same pipeline
+# when main has changed since the last beta tag.
 on:
+  schedule:
+    # Beta cut every six hours (03:23, 09:23, 15:23, 21:23 UTC). The `changes` job skips the run when main has nothing new
+    # since the latest beta tag (release-metadata commits do not count).
+    - cron: '23 3,9,15,21 * * *'
   workflow_dispatch:
     inputs:
-      confirmation:
-        description: 'Type RELEASE-BETA to create the prerelease'
-        required: true
-        type: string
       version:
         description: 'Optional explicit beta version (X.Y.Z-beta.N); leave blank to auto-increment'
         required: false
@@ -31,6 +33,11 @@ on:
         required: false
         default: true
         type: boolean
+      only_if_changed:
+        description: 'Skip the release when main has no commits since the latest beta tag (ignored when an explicit version or dry run is requested)'
+        required: false
+        default: true
+        type: boolean
       auth_backend:
         description: 'Keep Firebase until the beta Clerk+D1 migration is explicitly ready'
         required: true
@@ -48,8 +55,52 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes since last beta
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      proceed: ${{ steps.detect.outputs.proceed }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Compare main with the latest beta tag
+        id: detect
+        env:
+          ONLY_IF_CHANGED: ${{ inputs.only_if_changed }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # A manual run always proceeds when the caller asked for something specific: an explicit version, a dry run,
+          # or the box unticked. Only a plain manual click and the scheduled cuts are skipped when nothing changed.
+          if [ "$GITHUB_EVENT_NAME" != "schedule" ] && { [ "$ONLY_IF_CHANGED" != "true" ] || [ -n "$EXPLICIT_VERSION" ] || [ "$DRY_RUN" = "true" ]; }; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          LAST_TAG=$(git tag --list 'v*-beta.*' --sort=-v:refname | head -n 1)
+          if [ -z "$LAST_TAG" ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          NEW=$(git log --format=%s "${LAST_TAG}..HEAD" | grep -vc '^chore(release): prepare' || true)
+          echo "Commits on main since ${LAST_TAG} (excluding release metadata): ${NEW}"
+          if [ "$NEW" -gt 0 ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "No new changes since ${LAST_TAG}; skipping the automatic beta release." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   quality:
-    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RELEASE-BETA'
+    needs: changes
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.proceed == 'true'
     name: Lint and test main
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -59,7 +110,6 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -82,79 +132,22 @@ jobs:
       - name: Test the beta Worker API
         run: pnpm run test:beta-worker
 
-  final_changelog_audit:
-    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RELEASE-BETA' && !inputs.dry_run
-    needs: quality
-    name: Final changelog audit
-    uses: ./.github/workflows/opencode-changelog-audit.yml
-    with:
-      target_ref: main
-      force: true
-      trigger_reason: beta-pre-release
-    secrets:
-      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-      GH_PAT: ${{ secrets.GH_PAT }}
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: read
-
-  changelog_gate:
-    name: Require clean changelog
-    needs: final_changelog_audit
-    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'RELEASE-BETA' && !inputs.dry_run
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Check out trusted release tooling
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-
-      - name: Block release unless the final audit is clean
-        env:
-          AUDIT_RESULT: ${{ needs.final_changelog_audit.result }}
-          AUDIT_STATUS: ${{ needs.final_changelog_audit.outputs.status }}
-          TARGET_REF: main
-          AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
-        run: node scripts/require-opencode-changelog-clean.mjs
-
   version_gate:
     name: Resolve beta version
-    needs: [quality, final_changelog_audit, changelog_gate]
+    needs: quality
     if: >-
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      inputs.confirmation == 'RELEASE-BETA' &&
-      needs.quality.result == 'success' &&
-      (
-        inputs.dry_run ||
-        (
-          needs.final_changelog_audit.result == 'success' &&
-          needs.changelog_gate.result == 'success'
-        )
-      )
+      needs.quality.result == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
-      CONFIRMATION: ${{ inputs.confirmation }}
-      AUDITED_HEAD: ${{ needs.final_changelog_audit.outputs.head_sha }}
       DRY_RUN: ${{ inputs.dry_run }}
       EXPLICIT_VERSION: ${{ inputs.version }}
     steps:
-      - name: Require explicit confirmation
-        run: |
-          if [ "$CONFIRMATION" != "RELEASE-BETA" ]; then
-            echo "::error::Type RELEASE-BETA to create a beta release."
-            exit 1
-          fi
-
       - name: Checkout main
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
@@ -171,10 +164,6 @@ jobs:
         id: version
         run: |
           set -euo pipefail
-          if [ "$DRY_RUN" != "true" ] && [ -n "$AUDITED_HEAD" ] && [ "$(git rev-parse HEAD)" != "$AUDITED_HEAD" ]; then
-            echo "::error::main moved after the final changelog audit; rerun the release workflow." >&2
-            exit 1
-          fi
           node --input-type=module - <<'NODE'
           import { appendFileSync, readFileSync } from 'node:fs';
           import { execFileSync } from 'node:child_process';
@@ -211,7 +200,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: next-major
-          RELEASE_NOTES_MODE: changelog
+          RELEASE_NOTES_MODE: prs
           NOTES_FILE: beta-release-notes.md
           DRY_RUN: true
         run: |
@@ -229,7 +218,6 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      inputs.confirmation == 'RELEASE-BETA' &&
       needs.version_gate.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -276,15 +264,11 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend }}
+          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
-          VITE_BETA_MODE: true
-          VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
-          VITE_UMAMI_HOST: ${{ secrets.VITE_UMAMI_HOST }}
-          VITE_UMAMI_BETA_WEBSITE_ID: ${{ secrets.VITE_UMAMI_BETA_WEBSITE_ID }}
-          VITE_UMAMI_PRODUCTION_WEBSITE_ID: ${{ secrets.VITE_UMAMI_PRODUCTION_WEBSITE_ID }}
+          VITE_MESOSCALE_WORKER_URL_BETA: ${{ vars.MESOSCALE_WORKER_URL }}
           CI: false
 
   release:
@@ -294,12 +278,11 @@ jobs:
       !cancelled() &&
       always() &&
       github.ref == 'refs/heads/main' &&
-      inputs.confirmation == 'RELEASE-BETA' &&
       needs.version_gate.result == 'success' &&
       needs.pre_build.result == 'success' &&
       !inputs.dry_run
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       contents: write
     outputs:
@@ -363,7 +346,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CHANGELOG_FILE: CHANGELOG.md
           CHANGELOG_LANE: next-major
-          RELEASE_NOTES_MODE: changelog-and-prs
+          RELEASE_NOTES_MODE: prs
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
           NOTES_FILE: beta-release-notes.md
           RELEASE_DRAFT: true
@@ -424,15 +407,11 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend }}
+          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
-          VITE_BETA_MODE: true
-          VITE_BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
-          VITE_UMAMI_HOST: ${{ secrets.VITE_UMAMI_HOST }}
-          VITE_UMAMI_BETA_WEBSITE_ID: ${{ secrets.VITE_UMAMI_BETA_WEBSITE_ID }}
-          VITE_UMAMI_PRODUCTION_WEBSITE_ID: ${{ secrets.VITE_UMAMI_PRODUCTION_WEBSITE_ID }}
+          VITE_MESOSCALE_WORKER_URL_BETA: ${{ vars.MESOSCALE_WORKER_URL }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
@@ -448,7 +427,8 @@ jobs:
       - name: Deploy beta Worker and static assets
         id: deploy
         env:
-          AUTH_BACKEND: ${{ inputs.auth_backend }}
+          AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
+          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
           BETA_D1_DATABASE_ID: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_D1_DATABASE_ID || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -456,6 +436,9 @@ jobs:
           EXPECTED_BETA_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
         run: |
           set -euo pipefail
+          if [ -n "$BETA_WORKER_SHARED_SECRET" ]; then
+            printf '%s' "$BETA_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4.149.0 secret put BETA_WORKER_SHARED_SECRET --config cloudflare/wrangler.beta.jsonc
+          fi
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
             if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
               echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
@@ -547,6 +530,86 @@ jobs:
             echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql --config $CONFIG && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
           fi
 
+  deploy_mesoscale_worker:
+    name: Deploy mesoscale catalog Worker
+    needs: release
+    # Opt-in: set the MESOSCALE_WORKER_URL repository variable (the Worker's public
+    # https origin) and the R2_BUCKET secret to enable. See docs/operations/mesoscale-worker.md.
+    if: ${{ !cancelled() && needs.release.result == 'success' && !inputs.dry_run && vars.MESOSCALE_WORKER_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      RELEASE_VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: v${{ needs.release.outputs.version }}
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24.x'
+
+      - name: Test Worker
+        run: node --test "cloudflare/*.test.mjs"
+
+      - name: Render Worker config
+        run: node scripts/render-mesoscale-wrangler.mjs cloudflare/wrangler.mesoscale.jsonc cloudflare/wrangler.mesoscale.rendered.json
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MESOSCALE_R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          MESOSCALE_PUBLIC_BASE_URL: ${{ vars.MESOSCALE_WORKER_URL }}
+
+      - name: Deploy mesoscale Worker
+        id: deploy
+        run: pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale.rendered.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy scheduler Worker
+        # Cloudflare cron that starts the ingest and beta release workflows (GitHub's own schedule is unreliable).
+        # The Worker's GITHUB_DISPATCH_TOKEN secret comes from the MESOSCALE_DISPATCH_TOKEN repository
+        # secret (a fine-grained token with only Actions: read and write on this repository). It is
+        # piped to wrangler, never written to a file or the log. Without the repository secret the
+        # existing Worker secret is left as it is.
+        run: |
+          set -euo pipefail
+          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.mesoscale-scheduler.jsonc
+          if [ -n "$MESOSCALE_DISPATCH_TOKEN" ]; then
+            printf '%s' "$MESOSCALE_DISPATCH_TOKEN" | pnpm dlx wrangler@4 secret put GITHUB_DISPATCH_TOKEN --config cloudflare/wrangler.mesoscale-scheduler.jsonc
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MESOSCALE_DISPATCH_TOKEN: ${{ secrets.MESOSCALE_DISPATCH_TOKEN }}
+
+      - name: Smoke test mesoscale Worker
+        env:
+          MESOSCALE_WORKER_URL: ${{ vars.MESOSCALE_WORKER_URL }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if body=$(curl -fsS --max-time 20 "${MESOSCALE_WORKER_URL%/}/status") && printf '%s' "$body" | node -e 'const v=JSON.parse(require("fs").readFileSync(0,"utf8"));process.exit(Array.isArray(v.models)?0:1)'; then
+              echo "Mesoscale Worker /status: $body"
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::Mesoscale Worker /status did not return a valid response."
+          exit 1
+
+      - name: Print rollback command on failure
+        if: failure()
+        run: echo "pnpm dlx wrangler@4 rollback --name gfc-mesoscale"
+
   # Clerk+D1 requests use the beta hostname's same-origin Worker API. Keep the
   # VPS service untouched as a rollback target; this path does not route traffic to it.
   deploy_beta_api:
@@ -556,7 +619,8 @@ jobs:
       !cancelled() &&
       needs.deploy.result == 'success' &&
       !inputs.dry_run &&
-      inputs.deploy_api && inputs.auth_backend == 'firebase'
+      (github.event_name == 'schedule' || inputs.deploy_api) &&
+      inputs.auth_backend != 'clerk-d1'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -617,10 +681,9 @@ jobs:
         env:
           BETA_SSH_HOST: ${{ secrets.BETA_SSH_HOST }}
           APP_VERSION: ${{ steps.app_version.outputs.value }}
-          BETA_INVITE_TOKEN: ${{ secrets.BETA_INVITE_TOKEN }}
-          BETA_INVITE_PATH: ${{ secrets.BETA_INVITE_PATH }}
           ADMIN_UID_ALLOWLIST: ${{ secrets.ADMIN_UID_ALLOWLIST }}
           METRICS_HASH_SALT: ${{ secrets.METRICS_HASH_SALT }}
+          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           BETA_STRIPE_WEBHOOK_SECRET: ${{ secrets.BETA_STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_MONTHLY: ${{ secrets.STRIPE_PRICE_MONTHLY }}
@@ -637,11 +700,9 @@ jobs:
           LOG_DIR=/opt/gfc-beta-analytics/logs
           APP_BASE_URL=https://beta-gfc.weatherboysuper.com
           SERVER_TARGET=beta
-          BETA_MODE=true
-          BETA_INVITE_TOKEN=${BETA_INVITE_TOKEN}
-          BETA_INVITE_PATH=${BETA_INVITE_PATH}
           ADMIN_UID_ALLOWLIST=${ADMIN_UID_ALLOWLIST}
           METRICS_HASH_SALT=${METRICS_HASH_SALT}
+          BETA_WORKER_SHARED_SECRET=${BETA_WORKER_SHARED_SECRET}
           STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
           STRIPE_WEBHOOK_SECRET=${BETA_STRIPE_WEBHOOK_SECRET}
           STRIPE_PRICE_MONTHLY=${STRIPE_PRICE_MONTHLY}
@@ -676,15 +737,16 @@ jobs:
 
   smoke_test:
     name: Smoke test beta site
-    needs: [release, deploy, deploy_beta_api]
+    needs: [release, deploy, deploy_mesoscale_worker, deploy_beta_api]
     if: >-
       always() &&
       !cancelled() &&
       needs.deploy.result == 'success' &&
+      (needs.deploy_mesoscale_worker.result == 'success' || needs.deploy_mesoscale_worker.result == 'skipped') &&
       (needs.deploy_beta_api.result == 'success' || needs.deploy_beta_api.result == 'skipped') &&
       !inputs.dry_run
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       RELEASE_VERSION: ${{ needs.release.outputs.version }}
     steps:
@@ -747,7 +809,7 @@ jobs:
       - name: Print rollback command on smoke failure
         if: failure()
         env:
-          AUTH_BACKEND: ${{ inputs.auth_backend }}
+          AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
         run: |
           echo "::error::Beta smoke test failed after deploy. Roll back the Worker with:"
           CONFIG="cloudflare/wrangler.beta.jsonc"

@@ -20,21 +20,6 @@ jest.mock('./pages/AccountPage', () => ({
   __esModule: true,
   default: () => <div>AccountPage Mock</div>,
 }));
-jest.mock('./pages/PricingPage', () => ({
-  __esModule: true,
-  default: () => <div>PricingPage Mock</div>,
-}));
-jest.mock('./pages/UpdatesPage', () => ({
-  UpdatesPage: () => <div>UpdatesPage Mock</div>,
-}));
-jest.mock('./pages/BetaLandingPage', () => ({
-  __esModule: true,
-  default: () => <div>BetaLandingPage Mock</div>,
-}));
-jest.mock('./pages/BetaInvitePage', () => ({
-  __esModule: true,
-  default: () => <div>BetaInvitePage Mock</div>,
-}));
 jest.mock('./pages/ForecastPage', () => ({
   __esModule: true,
   ForecastPage: () => <div>Forecast editor mock</div>,
@@ -50,10 +35,6 @@ jest.mock('./components/Layout', () => {
       </div>
     ),
   };
-});
-jest.mock('./components/Beta/BetaAccessGuard', () => {
-  const { Outlet } = jest.requireActual<typeof import('react-router')>('react-router');
-  return () => <Outlet />;
 });
 jest.mock('./components/ToS/ToSModal', () => ({
   __esModule: true,
@@ -122,6 +103,8 @@ const renderAppAt = (path: string) => {
 describe('App forecast workspace gating', () => {
   beforeEach(() => {
     localStorage.clear();
+    // An answered consent choice keeps the one-time telemetry prompt from covering the page under test.
+    localStorage.setItem('gfc-telemetry-consent', 'denied');
     sessionStorage.clear();
     window.history.pushState({}, '', '/');
     seedActiveSevereDocument();

@@ -1,0 +1,72 @@
+.beta-auth-card {
+  border: 1px solid color-mix(in srgb, var(--button-bg) 28%, var(--border-color));
+  border-radius: 1.75rem;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--button-bg) 5%, var(--bg-primary)), var(--bg-primary) 28%);
+  box-shadow: var(--shadow-md);
+}
+
+.beta-auth-card .beta-info-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 2.35rem 2.5rem 1.75rem;
+}
+
+.beta-auth-content,
+.beta-info-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  padding: 0 2.5rem 2.5rem;
+}
+
+.beta-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.beta-auth-mode-toggle {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.beta-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.beta-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.beta-auth-error {
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 1rem;
+  background: rgba(254, 242, 242, 0.9);
+  color: rgb(153, 27, 27);
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .beta-auth-card .beta-info-card-header {
+    padding: 1.6rem 1.6rem 1.2rem;
+  }
+
+  .beta-auth-content,
+  .beta-info-card-content {
+    padding: 0 1.6rem 1.6rem;
+  }
+
+  .beta-auth-mode-toggle {
+    flex-direction: column;
+  }
+}

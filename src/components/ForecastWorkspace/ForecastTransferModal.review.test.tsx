@@ -9,7 +9,7 @@ jest.mock('../../utils/forecastTransfer', () => ({
   importForecastTransfer: jest.fn(),
 }));
 
-jest.mock('../../config/featureExposure', () => ({ isFeatureExposed: () => true }));
+jest.mock('../../config/flags', () => ({ flag: () => true }));
 
 jest.mock('../ui/dialog', () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,

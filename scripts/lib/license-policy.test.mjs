@@ -1,3 +1,6 @@
+/**
+ * Checks permissive and public-domain license acceptance and copyleft review requirements.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { classifyLicense } from './license-policy.mjs';

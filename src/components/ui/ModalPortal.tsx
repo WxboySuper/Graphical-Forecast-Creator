@@ -1,3 +1,7 @@
+/**
+ * Modal portal. Mounts modal content at document.body and safely returns no output
+ * during server-side rendering where document is unavailable.
+ */
 import React from 'react';
 import { createPortal } from 'react-dom';
 
@@ -5,7 +9,6 @@ interface ModalPortalProps {
   children: React.ReactNode;
 }
 
-/** Renders modal UI at document.body so parent re-renders cannot desync fixed overlays. */
 const ModalPortal: React.FC<ModalPortalProps> = ({ children }) => {
   if (typeof document === 'undefined') {
     return null;

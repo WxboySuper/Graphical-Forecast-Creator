@@ -1,3 +1,7 @@
+/**
+ * Forecast-outlook import validation. It checks outlook payload structure and
+ * feature geometry limits before data enters forecast state.
+ */
 import { MAX_ARRAY_ITEMS, fail, type ImportValidationResult } from './forecastValidationTypes';
 import { validateFeature } from './forecastGeometryValidation';
 
@@ -104,6 +108,20 @@ const invalidDayKey = (dayKey: string): ImportValidationResult | null => {
   return null;
 };
 
+/**
+ * Returns a failure when the saved current day is present but outside the
+ * 1-8 contract. A missing value stays accepted so older single-day exports,
+ * which only carried `outlooks`, still load.
+ */
+// @codescene(disable:"Complex Conditional")
+const invalidCurrentDay = (currentDay: unknown): ImportValidationResult | null => {
+  if (currentDay === undefined) return null;
+  if (typeof currentDay !== 'number' || !Number.isInteger(currentDay) || currentDay < 1 || currentDay > 8) {
+    return fail('forecastCycle.currentDay must be a forecast day between 1 and 8.');
+  }
+  return null;
+};
+
 /** Validates every outlook map on one saved day. */
 const validateDayOutlookMaps = (dayKey: string, dayData: unknown): ImportValidationResult | null => {
   for (const field of OUTLOOK_MAP_FIELDS) {
@@ -154,6 +172,9 @@ export const validateForecastCycle = (value: unknown): ImportValidationResult =>
   if (dayKeys.length > 8) {
     return fail('forecastCycle contains more than the supported forecast days.');
   }
+
+  const currentDayError = invalidCurrentDay((value as { currentDay?: unknown }).currentDay);
+  if (currentDayError) return currentDayError;
 
   for (const dayKey of dayKeys) {
     const dayResult = validateForecastDay(dayKey, days[dayKey]);

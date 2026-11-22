@@ -1,3 +1,7 @@
+/**
+ * Renders the saved-cycle list used by the cycle-history manager.
+ * This component owns list presentation and item callbacks; cycle loading, deletion, and persistence are supplied by its parent.
+ */
 import React from 'react';
 import type { SavedCycle } from '../../store/forecastSlice';
 import { getDaySummary } from './cycleHistoryModalUtils';

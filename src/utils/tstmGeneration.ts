@@ -1,3 +1,7 @@
+/**
+ * TSTM generation utilities. The module validates generation requests and
+ * builds storm-feature output from forecast geometry and outlook metadata.
+ */
 import type { Feature } from 'geojson';
 import type { DayType } from '../types/outlooks';
 import type {

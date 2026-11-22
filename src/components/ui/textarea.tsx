@@ -1,3 +1,7 @@
+/**
+ * Textarea primitive. Provides the shared styled, ref-forwarding multiline input
+ * used across forms and editors.
+ */
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 

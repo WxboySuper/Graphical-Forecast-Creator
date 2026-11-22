@@ -1,3 +1,6 @@
+/**
+ * Sentry store enhancer tests. Verify actionable Redux failures are reported with the expected context.
+ */
 import * as Sentry from '@sentry/react';
 import { appendSentryReduxEnhancer } from './sentryEnhancer';
 

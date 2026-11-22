@@ -1,3 +1,6 @@
+/**
+ * Covers stable-promotion routing labels and descriptive PR-label classification.
+ */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { computePrLabels, descriptiveLabels, routingLabels } from './pr-labels.mjs';
@@ -115,7 +118,7 @@ describe('computePrLabels', () => {
   it('includes exposure labels when exposure files are changed', () => {
     const labels = computePrLabels(makeComputeArgs({
       head: 'feature/exposure',
-      changedFiles: ['src/config/featureExposure.ts'],
+      changedFiles: ['server/flags.json'],
     }));
     assert.ok(labels.includes('exposure:registry-change'));
     assert.ok(labels.includes('exposure:production'));

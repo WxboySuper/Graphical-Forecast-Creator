@@ -1,3 +1,6 @@
+/**
+ * Discussion form state tests. Verify draft editing, validation, and submission state transitions.
+ */
 import { act, renderHook } from '@testing-library/react';
 import useDiscussionFormState, { getDiscussionFormDefaults } from './useDiscussionFormState';
 import type { DiscussionData } from '../types/outlooks';
@@ -37,6 +40,56 @@ describe('useDiscussionFormState', () => {
     expect(result.current.hasUnsavedChanges).toBe(true);
     expect(dispatch).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
+  });
+
+  test('reloads imported discussion data without remounting the editor', () => {
+    const importedDiscussion = { ...loadedDiscussion, diyContent: 'Imported discussion text' };
+    const { result, rerender } = renderHook(
+      ({ existingDiscussion, resetToken }: { existingDiscussion?: DiscussionData; resetToken: number }) =>
+        useDiscussionFormState({
+          discussionKey: 'group-a',
+          existingDiscussion,
+          defaultForecasterName: 'Default forecaster',
+          dispatch: jest.fn(),
+          resetToken,
+        }),
+      { initialProps: { existingDiscussion: loadedDiscussion, resetToken: 0 } },
+    );
+
+    act(() => result.current.handleDiy('Unsaved discussion text'));
+    rerender({ existingDiscussion: importedDiscussion, resetToken: 1 });
+
+    expect(result.current.diyContent).toBe('Imported discussion text');
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+
+  test('discards unsaved drafts for every scope when an import also changes discussion scope', () => {
+    const importedDiscussion = { ...loadedDiscussion, diyContent: 'Imported scope text' };
+    const initialProps: { discussionKey: string; existingDiscussion?: DiscussionData; resetToken: number } = {
+      discussionKey: 'group-a',
+      existingDiscussion: undefined,
+      resetToken: 0,
+    };
+    const { result, rerender } = renderHook(
+      ({ discussionKey, existingDiscussion, resetToken }: { discussionKey: string; existingDiscussion?: DiscussionData; resetToken: number }) =>
+        useDiscussionFormState({
+          discussionKey,
+          existingDiscussion,
+          defaultForecasterName: 'Default forecaster',
+          dispatch: jest.fn(),
+          resetToken,
+        }),
+      { initialProps },
+    );
+
+    act(() => result.current.handleDiy('Unsaved original scope text'));
+    rerender({ discussionKey: 'group-b', existingDiscussion: importedDiscussion, resetToken: 1 });
+    expect(result.current.diyContent).toBe('Imported scope text');
+
+    act(() => result.current.handleDiy('Edited imported scope text'));
+    rerender({ discussionKey: 'group-a', existingDiscussion: undefined, resetToken: 1 });
+    // The import replaced the cycle, so the old scope's unsaved text must not resurface.
+    expect(result.current.diyContent).not.toBe('Unsaved original scope text');
   });
 
   test('new discussions default to local wall-clock times with a 24-hour window', () => {

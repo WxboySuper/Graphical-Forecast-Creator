@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/ForecastTransferModal.tsx
+ * Purpose: Renders forecast transfer controls and coordinates import/export transfer actions.
+ */
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
@@ -19,7 +24,8 @@ import {
   type KmlArchiveStrategy,
 } from '../../utils/forecastTransfer';
 import { getForecastImportWorkspaceError } from '../../utils/forecastTransfer/importPolicy';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
+import { trackEvent } from '../../lib/telemetry';
 import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
 
 export type ForecastTransferDirection = 'import' | 'export';
@@ -89,7 +95,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
   onExportImage,
   workspaceId,
 }) => {
-  const kmzEnabled = isFeatureExposed('kmzExport');
+  const kmzEnabled = flag('kmzExport');
   const [format, setFormat] = useState<ForecastTransferFormat>('json');
   const [scope, setScope] = useState<ForecastTransferScope>('cycle');
   const [kmlStrategy, setKmlStrategy] = useState<KmlArchiveStrategy>('structured');
@@ -149,6 +155,7 @@ export const ForecastTransferModal: React.FC<ForecastTransferModalProps> = ({
         outlookTypes: outlookType === 'all' ? undefined : [outlookType],
         workspaceId,
       });
+      trackEvent('forecast_exported', effectiveFormat);
       onExported(effectiveFormat, scope);
       onClose();
     } catch (error) {

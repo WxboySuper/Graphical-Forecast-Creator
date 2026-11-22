@@ -1,3 +1,8 @@
+/**
+ * File: src/components/ForecastWorkspace/forecastWorkspaceActions.tsx
+ * Purpose: Defines forecast workspace action creators and user-driven workspace transitions.
+ */
+
 import React, { useCallback } from 'react';
 import {
   redoLastEdit,

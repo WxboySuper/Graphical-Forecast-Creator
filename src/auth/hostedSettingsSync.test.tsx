@@ -17,6 +17,9 @@ import {
 import { createSettingsSnapshot } from './AuthProvider';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import { setDarkMode } from '../store/themeSlice';
+import { applyMonitorSettings } from '../store/monitorSlice';
+import { DEFAULT_MONITOR_SETTINGS } from '../monitor/types';
+import { writeStoredMonitorSettings } from '../monitor/storage';
 import type { OverlaysState } from '../store/overlaysSlice';
 
 jest.mock('../lib/firebase', () => ({
@@ -56,6 +59,7 @@ const TEST_OVERLAY_STATE: OverlaysState = {
 describe('hosted settings sync', () => {
   afterEach(() => {
     jest.useRealTimers();
+    localStorage.clear();
   });
 
   const buildHostedSettingsFixture = (baseMapStyle: OverlaysState['baseMapStyle']) =>
@@ -375,6 +379,24 @@ describe('hosted settings sync', () => {
     expect(dispatch).toHaveBeenCalledWith(
       applyOverlaySettings(expect.objectContaining({ counties: true })),
     );
+  });
+
+  test('remote settings updates preserve locally stored mesoscale display preferences', () => {
+    const localMesoscale = { model: 'rap' as const, layers: [{ id: 'cape', opacity: 0.4 }] };
+    writeStoredMonitorSettings({ ...DEFAULT_MONITOR_SETTINGS, mesoscale: localMesoscale });
+    const remote = buildHostedSettingsFixture('blank');
+    const dispatch = jest.fn();
+
+    applySettingsToState(remote, {
+      currentDarkModeRef: { current: false },
+      currentOverlaysRef: { current: { ...TEST_OVERLAY_STATE } },
+      dispatch,
+      setSyncedSettings: jest.fn(),
+      lastSyncedSettingsRef: { current: buildHostedSettingsFixture('osm') },
+    });
+
+    const monitorUpdate = dispatch.mock.calls.find(([action]) => action.type === 'monitor/applyMonitorSettings')?.[0];
+    expect(monitorUpdate).toEqual(applyMonitorSettings(expect.objectContaining({ mesoscale: localMesoscale })));
   });
 
   test('applies successive snapshots against the latest local state refs', () => {

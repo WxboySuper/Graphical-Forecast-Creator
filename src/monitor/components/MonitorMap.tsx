@@ -1,4 +1,9 @@
-import React, { useMemo, useRef } from 'react';
+/**
+ * Monitor map composition component.
+ *
+ * This file wires the monitor view, radar and alert layers, and map controls into the OpenLayers map. Hooks provide data; this component owns composition and rendering.
+ */
+import React, { Suspense, useMemo, useRef } from 'react';
 import 'ol/ol.css';
 import type { StormReport } from '../../types/stormReports';
 import type { NwsAlertFeatureCollection } from '../nwsAlerts';
@@ -7,7 +12,10 @@ import type { MonitorMapView, MonitorOutlookLayerType } from '../types';
 import type { MonitorMesoscaleDiscussionCollection } from '../referenceLayers';
 import { flattenMonitorOutlookFeatures } from '../outlookLayers';
 import type { WmsLayerConfig } from '../wms';
+import type { MesoscaleLayerSpec, MesoscaleCatalogParameter } from '../../mesoscale';
 import { useMonitorOlMap } from './useMonitorOlMap';
+
+const MonitorMesoscaleLegend = React.lazy(() => import('./MonitorMesoscaleLegend').then((module) => ({ default: module.MonitorMesoscaleLegend })));
 
 interface MonitorMapProps {
   mapView: MonitorMapView;
@@ -22,6 +30,8 @@ interface MonitorMapProps {
   alertsOpacity: number;
   mesoscaleDiscussions: MonitorMesoscaleDiscussionCollection;
   referenceAttributions: string[];
+  mesoscaleLayers?: MesoscaleLayerSpec[];
+  mesoscaleLegend?: MesoscaleCatalogParameter[];
 }
 
 /** Monitor workspace map shell hosting radar, satellite, outlook, and alert layers. */
@@ -38,6 +48,8 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
   alertsOpacity,
   mesoscaleDiscussions,
   referenceAttributions,
+  mesoscaleLayers = [],
+  mesoscaleLegend = [],
 }) => {
   const mapElementRef = useRef<HTMLDivElement>(null);
   const serializedFeatures = useMemo(
@@ -56,6 +68,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
     alertsCollection,
     alertsOpacity,
     mesoscaleDiscussions,
+    mesoscaleLayers,
     mapElementRef,
   });
 
@@ -68,6 +81,7 @@ const MonitorMap: React.FC<MonitorMapProps> = ({
           {referenceAttributions.join(' · ')}
         </div>
       ) : null}
+      {mesoscaleLegend.length > 0 ? <Suspense fallback={null}><MonitorMesoscaleLegend parameters={mesoscaleLegend} /></Suspense> : null}
     </div>
   );
 };

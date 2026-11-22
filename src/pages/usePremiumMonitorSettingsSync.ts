@@ -1,3 +1,6 @@
+/**
+ * Premium monitor settings synchronization hook. Keeps premium monitor preferences aligned with account state.
+ */
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';

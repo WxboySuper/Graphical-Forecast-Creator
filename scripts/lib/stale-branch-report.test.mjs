@@ -1,3 +1,6 @@
+/**
+ * Covers branch eligibility, exclusions, grace periods, orphan classification, report output, and issue lookup.
+ */
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -33,7 +36,6 @@ describe('stale branch report', () => {
   it('excludes protected and automation-managed branches', () => {
     assert.equal(isTrackedBranch('main'), false);
     assert.equal(isTrackedBranch('stable/1.6.x'), false);
-    assert.equal(isTrackedBranch('port/123-to-main'), false);
     assert.equal(isTrackedBranch('dependabot/npm_foo'), false);
     assert.equal(isTrackedBranch('release/1.7'), false);
     assert.equal(isTrackedBranch('hotfix/urgent'), false);

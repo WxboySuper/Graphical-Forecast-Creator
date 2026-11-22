@@ -103,7 +103,6 @@ test('API and publishing credentials never share a step with PR-controlled execu
 test('credential-bearing scripts and every local import resolve inside the trusted scripts tree', () => {
   for (const script of [
     'prepare-changelog-governance.mjs',
-    'validate-port-pr-policy.mjs',
     'prepare-opencode-workspace.mjs',
     'run-opencode-maintenance.mjs',
     'publish-opencode-changelog.mjs',
@@ -148,9 +147,9 @@ test('manual changelog audits pass an optional bounded baseline through the trus
   assert.equal(workflow.on.workflow_dispatch.inputs.baseline_ref.required, false);
   assert.equal(workflow.on.workflow_dispatch.inputs.baseline_ref.type, 'string');
   assert.equal(workflow.jobs.audit.env.BASELINE_REF, "${{ inputs.baseline_ref || github.event.inputs.baseline_ref || '' }}");
-  const context = allSteps(workflow.jobs.audit).find((step) => step.name === 'Prepare bounded changelog audit context and state');
+  const context = allSteps(workflow.jobs.audit).find((step) => step.name === 'Prepare bounded changelog audit context');
   assert.equal(context.env.BASELINE_REF, '${{ env.BASELINE_REF }}');
   assert.match(context.with.script, /resolveManualChangelogAuditBaseline/);
-  assert.match(context.with.script, /baselineSha = manualBaselineSha/);
-  assert.match(context.with.script, /&& !manualBaselineSha/);
+  assert.match(context.with.script, /let baselineSha = manualBaselineSha/);
+  assert.doesNotMatch(context.with.script, /maintenance-state|STATE_TITLE|lastInspectedHead/);
 });

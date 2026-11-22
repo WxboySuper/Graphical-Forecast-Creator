@@ -1,3 +1,6 @@
+/**
+ * Checks prior-release selection and stable/beta choice between curated and PR-generated notes.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { composeReleaseNotes, selectPreviousReleaseTag } from './release-notes.mjs';

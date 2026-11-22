@@ -1,8 +1,7 @@
 /**
- * Additional unit tests for OpenLayersForecastMap helpers that are safe to run
- * without instantiating a full OpenLayers Map instance.
+ * File: src/components/Map/OpenLayersForecastMap.extra.test.ts
+ * Purpose: Covers supplemental OpenLayers forecast-map paths, overlays, and edge-case cleanup.
  */
-
 
 // Mock ol-mapbox-style to avoid ESM modules during tests
 jest.mock('ol-mapbox-style', () => ({ apply: jest.fn() }));

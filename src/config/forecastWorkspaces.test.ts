@@ -8,11 +8,25 @@ import {
   getForecastWorkspaceByLegacyPath,
   getForecastWorkspaceByPath,
   isForecastWorkspaceExposed,
+  isCustomWorkspaceActive,
   requireForecastWorkspaceId,
   resolveStoredWorkspaceId,
 } from './forecastWorkspaces';
 
 describe('forecast workspace product contract', () => {
+  test.each([
+    [false, false, false],
+    [false, true, false],
+    [true, false, false],
+    [true, true, true],
+  ])('activates Custom only when both feature flags are enabled (%s, %s)', (customProducts, customWorkspace, expected) => {
+    expect(isCustomWorkspaceActive('custom', customProducts, customWorkspace)).toBe(expected);
+  });
+
+  test('does not activate Custom for another workspace even when both flags are enabled', () => {
+    expect(isCustomWorkspaceActive('severe', true, true)).toBe(false);
+  });
+
   test('defines canonical workspace paths in product order', () => {
     expect(FORECAST_WORKSPACES.map((workspace) => workspace.path)).toEqual([
       '/forecast/severe',
@@ -23,10 +37,24 @@ describe('forecast workspace product contract', () => {
     ]);
   });
 
-  test.each(BUILD_TARGETS)('exposes Severe and gates Custom on the %s target', (target: BuildTarget) => {
-    const expected = target === 'production' || target === 'staging'
-      ? ['severe']
-      : ['severe', 'custom'];
+  test('provides a description and focused talking points for every workspace', () => {
+    for (const workspace of FORECAST_WORKSPACES) {
+      expect(workspace.description.trim().length).toBeGreaterThan(0);
+      expect(workspace.focus.length).toBeGreaterThanOrEqual(2);
+      expect(workspace.focus.length).toBeLessThanOrEqual(3);
+      expect(workspace.focus.every((point) => point.trim().length > 0)).toBe(true);
+    }
+  });
+
+  const EXPECTED_EXPOSED: Record<BuildTarget, string[]> = {
+    production: ['severe'],
+    staging: ['severe'],
+    beta: ['severe', 'mesoscale', 'custom'],
+    local: ['severe', 'mesoscale', 'custom'],
+  };
+
+  test.each(BUILD_TARGETS)('exposes Severe and gates Custom and Mesoscale on the %s target', (target: BuildTarget) => {
+    const expected = EXPECTED_EXPOSED[target];
     expect(getExposedForecastWorkspaces(target).map((workspace) => workspace.id)).toEqual(expected);
   });
 
@@ -46,8 +74,8 @@ describe('forecast workspace product contract', () => {
     expect(getForecastWorkspace('mesoscale')).toMatchObject({
       path: '/forecast/mesoscale',
       productType: 'mesoscale',
-      status: 'future',
-      exposureKey: null,
+      status: 'gated',
+      exposureKey: 'mesoscaleWorkspace',
     });
     expect(getForecastWorkspaceByPath('/forecast/custom')).toMatchObject({
       id: 'custom',

@@ -1,3 +1,7 @@
+/**
+ * Auto-TSTM panel. It renders generation status, request controls, and result
+ * actions while delegating generation state to the Auto-TSTM hook.
+ */
 import React from 'react';
 import type { TstmGenerationResponse } from '../../types/tstmGeneration';
 import type { AutoTstmStatus } from '../../hooks/useAutoTstm';

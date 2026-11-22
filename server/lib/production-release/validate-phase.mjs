@@ -1,3 +1,7 @@
+/**
+ * Validates scheduled production-release phase metadata before a release proceeds.
+ * This module owns release-phase input checks and safe-link validation; scheduling, deployment, and publication are handled by neighboring release modules.
+ */
 import { parseInstant } from './schedule.mjs';
 import { isSafeBannerLinkUrl } from './link-url.mjs';
 

@@ -243,3 +243,59 @@
     border-bottom: 1px solid var(--border-color);
   }
 }
+
+/*
+ * Embedded discussion (inside the Severe workspace): size to the panel, not the
+ * viewport. In a narrow panel the metadata fields stack, and the live preview
+ * becomes an Edit/Preview switch instead of a second cramped column.
+ */
+.discussion-page--embedded {
+  container-type: inline-size;
+  container-name: discussion;
+}
+
+.discussion-preview-toggle {
+  display: none;
+}
+
+@container discussion (max-width: 899px) {
+  .discussion-preview-toggle {
+    display: inline-flex;
+  }
+
+  .discussion-layout {
+    flex-direction: column;
+  }
+
+  .discussion-metadata-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .discussion-metadata-grid > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .discussion-editor-pane {
+    flex: 1 1 auto;
+    border-right: none;
+  }
+
+  .discussion-preview-pane {
+    display: none;
+    flex: 1 1 auto;
+  }
+
+  .discussion-layout--preview .discussion-editor-pane {
+    display: none;
+  }
+
+  .discussion-layout--preview .discussion-preview-pane {
+    display: flex;
+  }
+}
+
+@container discussion (max-width: 480px) {
+  .discussion-metadata-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

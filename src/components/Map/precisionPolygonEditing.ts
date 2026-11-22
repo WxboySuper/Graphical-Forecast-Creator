@@ -1,4 +1,8 @@
-/** Pan-mode map toolbar help — keep brief; tier scope comes from the outlook panel. */
+/**
+ * File: src/components/Map/precisionPolygonEditing.ts
+ * Purpose: Provides precision polygon editing operations and geometry normalization.
+ */
+
 export const PAN_MODE_VERTEX_EDIT_HELP =
   'Pan mode: drag map to move, scroll to zoom. Alt or Shift+click a vertex to remove it.';
 

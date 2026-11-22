@@ -1,3 +1,6 @@
+/**
+ * WorldPop client tests. Verify population boundary requests and response handling.
+ */
 import { estimatePopulation } from './client';
 
 const TEST_GEOMETRY = {

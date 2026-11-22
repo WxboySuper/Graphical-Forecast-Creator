@@ -1,3 +1,9 @@
+/**
+ * Owns forecast persistence and interchange boundaries: serialization, legacy hydration,
+ * import validation, discussion grouping, and ZIP/package downloads. Callers use this
+ * module for stable file formats and compatibility behavior; Redux state and UI lifecycle
+ * decisions remain outside this utility layer.
+ */
 import JSZip from 'jszip';
 import { OutlookData, GFCForecastSaveData, ForecastCycle, DayType, OutlookDay, DiscussionData, SerializedOutlookData, OutlookType, CycleMetadata } from '../types/outlooks';
 import { compileDiscussionToText } from './discussionUtils';
@@ -11,11 +17,11 @@ import {
 } from './discussionGrouping';
 import { coerceOutlookProbabilityMap } from './outlookMapCoercion';
 import { completionMetadataFromForecastCycle } from './forecastCompletionMetadata';
-import { deserializeForecastCycleDays } from './forecastCycleDeserialize';
+import { deserializeForecastCycleDays, normalizeForecastCurrentDay } from './forecastCycleDeserialize';
 import { getWorkflowTemplateById } from '../components/ForecastWorkflow/workflowTemplates';
 import { buildWorkflowExportPackage, isWorkflowExportPackage, type WorkflowExportScope } from './workflowPackage';
 import { declaresWorkspaceEnvelope, isWorkspaceSaveEnvelope, getForecastDataFromWorkspacePayload, createForecastWorkspaceSave } from './forecastWorkspaceEnvelope';
-import { isFeatureExposed } from '../config/featureExposure';
+import { flag } from '../config/flags';
 import { MAX_IMPORT_BYTES, validateForecastImport, validateImportFileBytes } from './forecastImportValidation';
 
 export { MAX_IMPORT_BYTES } from './forecastImportValidation';
@@ -162,7 +168,7 @@ export const readForecastImportFile = async (file: File): Promise<unknown> => {
   if (!byteGate.ok) {
     throw new Error(byteGate.reason);
   }
-  if (isFeatureExposed('customProducts') && isZipImport(file, bytes)) return readForecastPackage(file, bytes);
+  if (flag('customProducts') && isZipImport(file, bytes)) return readForecastPackage(file, bytes);
   return readForecastJson(file, bytes);
 };
 
@@ -326,9 +332,10 @@ const deserializeWorkspaceEnvelope = (data: unknown): ForecastCycle => {
 const deserializeForecastData = (forecastData: GFCForecastSaveData): ForecastCycle => {
   if (!forecastData.forecastCycle) return deserializeLegacyForecast(forecastData);
   const cycle = forecastData.forecastCycle;
+  const days = deserializeForecastCycleDays(cycle);
   return {
-    days: deserializeForecastCycleDays(cycle),
-    currentDay: cycle.currentDay,
+    days,
+    currentDay: normalizeForecastCurrentDay(cycle.currentDay, days),
     cycleDate: cycle.cycleDate,
     ...(isValidDiscussionGroupings(cycle.discussionGroupings)
       ? { discussionGroupings: normalizeDiscussionGroupings(cycle.discussionGroupings) }

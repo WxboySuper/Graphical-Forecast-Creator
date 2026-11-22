@@ -1,23 +1,24 @@
+/**
+ * Integrated forecast toolbar: this component composes tabbed editing,
+ * selection, drawing, map-overlay, and workflow actions for the forecast
+ * workspace. It receives state and callbacks from its owner; reducers and map
+ * handlers remain responsible for mutations and OpenLayers lifecycle details.
+ */
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import {
   ArrowDownUp,
-  CalendarDays,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
   Copy,
   History,
   Image as ImageIcon,
-  Layers,
-  PenTool,
   Redo2,
   Trash2,
   Undo2,
-  Wrench,
 } from 'lucide-react';
 import { Button } from '../ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Tabs, TabsContent } from '../ui/tabs';
 import {
   Tooltip,
   TooltipContent,
@@ -26,7 +27,8 @@ import {
 } from '../ui/tooltip';
 import { Input } from '../ui/input';
 import { cn } from '../../lib/utils';
-import { isFeatureExposed } from '../../config/featureExposure';
+import { flag } from '../../config/flags';
+import { isCustomWorkspaceActive } from '../../config/forecastWorkspaces';
 import PopulationEstimateBeta from '../PopulationEstimate/PopulationEstimateBeta';
 import { getCategoricalRiskDisplayName, getOutlookColor } from '../../utils/outlookUtils';
 import type { CategoricalRiskLevel, OutlookType } from '../../types/outlooks';
@@ -42,8 +44,8 @@ import {
 import TabbedToolbarSelectionStrip, { OutlookTrimToolbarSection } from './TabbedToolbarSelectionStrip';
 import CustomDrawPanel from './CustomDrawPanel';
 import CustomProductsDialog from './CustomProductsDialog';
-import type { RootState } from '../../store';
-import { setCustomEditorMode } from '../../store/forecastSlice';
+import type { ForecastWorkspaceId } from '../../config/forecastWorkspaces';
+import { TabbedIntegratedToolbarTabsList, type TabbedToolbarTabKey } from './IntegratedToolbarTabsList';
 import './IntegratedToolbar.css';
 
 /** Returns the display color used for a non-active outlook layer. */
@@ -52,6 +54,7 @@ const getGhostLayerColor = (type: OutlookType) => getOutlookColor({ outlookType:
 interface TabbedIntegratedToolbarProps {
   controller: ForecastWorkspaceController;
   autoTstmTools?: React.ReactNode;
+  workspaceId?: ForecastWorkspaceId;
 }
 
 const tabbedToolbarTypeLabels: Partial<Record<OutlookType, string>> = {
@@ -62,8 +65,6 @@ const tabbedToolbarTypeLabels: Partial<Record<OutlookType, string>> = {
   totalSevere: 'Severe',
   'day4-8': 'D4-8',
 };
-
-type TabbedToolbarTabKey = 'draw' | 'days' | 'layers' | 'tools';
 
 /** Section wrapper used inside tab rows to group related controls. */
 const TabbedToolbarStripSection: React.FC<{
@@ -242,11 +243,13 @@ const SevereDrawControls: React.FC<{ controller: ForecastWorkspaceController }> 
   </>
 );
 
-/** Draw tab with an animated switch between severe and custom layers. */
-const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => {
-  const dispatch = useDispatch();
-  const storedMode = useSelector((state: RootState) => state.forecast.customEditor.mode);
-  const customExposed = isFeatureExposed('customProducts');
+/** Draw tab uses Severe controls in Severe and custom controls in Custom. */
+const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController; workspaceId?: ForecastWorkspaceId }> = ({ controller, workspaceId = 'severe' }) => {
+  const customExposed = isCustomWorkspaceActive(
+    workspaceId,
+    flag('customProducts'),
+    flag('customWorkspace'),
+  );
 
   if (!customExposed) {
     return <TabbedToolbarTabRow><SevereDrawControls controller={controller} /></TabbedToolbarTabRow>;
@@ -254,39 +257,11 @@ const TabbedToolbarDrawTab: React.FC<{ controller: ForecastWorkspaceController }
 
   return (
     <TabbedToolbarTabRow>
-      <TabbedToolbarStripSection label="Draw mode" className="tabbed-integrated-toolbar__section--product-mode shrink-0">
-        <div className={cn('custom-product-toggle', storedMode === 'custom' && 'is-custom-mode')} role="radiogroup" aria-label="Drawing product" data-testid="custom-product-toggle">
-          <span className="custom-product-toggle__indicator" aria-hidden="true" />
-          {(['severe', 'custom'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              role="radio"
-              aria-checked={storedMode === mode}
-              className={cn(
-                'custom-product-toggle__button integrated-toolbar-mode-toggle-btn',
-                mode === 'severe' ? 'custom-product-toggle__button--leading' : 'custom-product-toggle__button--trailing',
-                storedMode === mode && 'is-active',
-              )}
-              style={{ backgroundColor: storedMode === mode ? 'var(--button-bg)' : 'transparent' }}
-              onClick={() => dispatch(setCustomEditorMode(mode))}
-            >
-              {mode === 'severe' ? 'Severe' : 'Custom'}
-            </button>
-          ))}
-        </div>
-      </TabbedToolbarStripSection>
-      <div key={storedMode} className="custom-product-mode-panel flex shrink-0 items-center gap-2">
-        {storedMode === 'severe' ? (
-          <SevereDrawControls controller={controller} />
-        ) : (
-          <>
-            <TabbedToolbarStripSection label="Library" className="min-w-[184px] shrink-0">
-              <CustomProductsDialog />
-            </TabbedToolbarStripSection>
-            <CustomDrawPanel />
-          </>
-        )}
+      <div className="custom-product-mode-panel flex shrink-0 items-center gap-2" data-testid="custom-workspace-controls">
+        <TabbedToolbarStripSection label="Library" className="min-w-[184px] shrink-0">
+          <CustomProductsDialog />
+        </TabbedToolbarStripSection>
+        <CustomDrawPanel />
       </div>
     </TabbedToolbarTabRow>
   );
@@ -562,7 +537,7 @@ const getTabbedToolbarActionItems = (
     tone: 'utility',
     accentClass: 'bg-teal-500/15 text-teal-700',
   },
-  ...(isFeatureExposed('forecastWorkflowV2')
+  ...(flag('forecastWorkflowV2')
     ? [{
         key: 'complete',
         label: 'Complete',
@@ -669,138 +644,12 @@ const TabbedToolbarToolsTab: React.FC<{
           )}
         </div>
       </TabbedToolbarStripSection>
-      {isFeatureExposed('populationEstimate') ? (
+      {flag('populationEstimate') ? (
         <TabbedToolbarStripSection label="Beta research" className="min-w-[300px] shrink-0">
           <PopulationEstimateBeta />
         </TabbedToolbarStripSection>
       ) : null}
     </TabbedToolbarTabRow>
-  );
-};
-
-/** Toolbar tabs list (extracted to reduce nesting depth in the header). */
-const TabbedIntegratedToolbarTabsList: React.FC<{
-  activeTab: TabbedToolbarTabKey;
-  onTabChange: (value: TabbedToolbarTabKey) => void;
-}> = ({ activeTab, onTabChange }) => {
-  const tabsListRef = React.useRef<HTMLDivElement | null>(null);
-  const triggerRefs = React.useRef<Record<TabbedToolbarTabKey, HTMLButtonElement | null>>({
-    draw: null,
-    days: null,
-    layers: null,
-    tools: null,
-  });
-  const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({});
-
-  React.useLayoutEffect(() => {
-    /** Re-measure the active trigger and update the sliding indicator position. */
-    const measure = () => {
-      const tabsList = tabsListRef.current;
-      const trigger = triggerRefs.current[activeTab];
-
-      if (!tabsList || !trigger) {
-        return;
-      }
-
-      const tabsRect = tabsList.getBoundingClientRect();
-      const triggerRect = trigger.getBoundingClientRect();
-
-      setIndicatorStyle({
-        width: triggerRect.width,
-        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
-      });
-    };
-
-    measure();
-  }, [activeTab]);
-
-  React.useEffect(function setupTabIndicatorObserver() {
-    const tabsList = tabsListRef.current;
-    if (!tabsList || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      const trigger = triggerRefs.current[activeTab];
-      if (!tabsList.isConnected || !trigger) {
-        return;
-      }
-
-      const tabsRect = tabsList.getBoundingClientRect();
-      const triggerRect = trigger.getBoundingClientRect();
-
-      setIndicatorStyle({
-        width: triggerRect.width,
-        transform: `translateX(${triggerRect.left - tabsRect.left}px)`,
-      });
-    });
-    observer.observe(tabsList);
-    Object.values(triggerRefs.current).forEach((trigger) => {
-      if (trigger) observer.observe(trigger);
-    });
-
-    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
-    return function cleanup() {
-      observer.disconnect();
-    };
-  }, [activeTab]);
-
-  return (
-    <TabsList
-      ref={tabsListRef}
-      className="tabbed-integrated-toolbar__tabs-list relative z-10 mb-[-1px] h-auto gap-1 bg-transparent p-0"
-      aria-label="Forecast toolbar sections"
-    >
-      <span
-        className="tabbed-integrated-toolbar__tab-indicator pointer-events-none absolute inset-y-0 left-0"
-        style={indicatorStyle}
-        aria-hidden="true"
-      />
-      <TabsTrigger
-        value="draw"
-        ref={(node) => {
-          triggerRefs.current.draw = node;
-        }}
-        onClick={() => onTabChange('draw')}
-        className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-transparent bg-transparent px-3 py-1.5 text-xs font-semibold shadow-none sm:text-sm"
-      >
-        <PenTool className="h-4 w-4" />
-        Draw
-      </TabsTrigger>
-      <TabsTrigger
-        value="days"
-        ref={(node) => {
-          triggerRefs.current.days = node;
-        }}
-        onClick={() => onTabChange('days')}
-        className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-transparent bg-transparent px-3 py-1.5 text-xs font-semibold shadow-none sm:text-sm"
-      >
-        <CalendarDays className="h-4 w-4" />
-        Days
-      </TabsTrigger>
-      <TabsTrigger
-        value="layers"
-        ref={(node) => {
-          triggerRefs.current.layers = node;
-        }}
-        onClick={() => onTabChange('layers')}
-        className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-transparent bg-transparent px-3 py-1.5 text-xs font-semibold shadow-none sm:text-sm"
-      >
-        <Layers className="h-4 w-4" />
-        Layers
-      </TabsTrigger>
-      <TabsTrigger
-        value="tools"
-        ref={(node) => {
-          triggerRefs.current.tools = node;
-        }}
-        onClick={() => onTabChange('tools')}
-        className="tabbed-integrated-toolbar__trigger gap-2 rounded-t-xl rounded-b-none border border-transparent bg-transparent px-3 py-1.5 text-xs font-semibold shadow-none sm:text-sm"
-      >
-        <Wrench className="h-4 w-4" />
-        Tools
-      </TabsTrigger>
-    </TabsList>
   );
 };
 
@@ -837,10 +686,10 @@ const TabbedIntegratedToolbarHeader: React.FC<{
 );
 
 /** Tray area containing the tab panels. */
-const TabbedIntegratedToolbarTray: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
+const TabbedIntegratedToolbarTray: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools, workspaceId }) => (
   <div className="tabbed-integrated-toolbar__tray min-h-0 flex-1 overflow-hidden bg-background px-3 py-2 lg:px-4">
     <TabsContent value="draw" className="tabbed-integrated-toolbar__panel mt-0 h-full">
-      <TabbedToolbarDrawTab controller={controller} />
+      <TabbedToolbarDrawTab controller={controller} workspaceId={workspaceId} />
     </TabsContent>
 
     <TabsContent value="days" className="tabbed-integrated-toolbar__panel mt-0 h-full">
@@ -858,14 +707,14 @@ const TabbedIntegratedToolbarTray: React.FC<TabbedIntegratedToolbarProps> = ({ c
 );
 
 /** Toolbar variant that keeps the original integrated-bar footprint but moves secondary controls behind tabs. */
-const TabbedIntegratedToolbarBody: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => {
+const TabbedIntegratedToolbarBody: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools, workspaceId }) => {
   const [activeTab, setActiveTab] = React.useState<TabbedToolbarTabKey>('draw');
 
   return (
     <div className="tabbed-integrated-toolbar shrink-0 border-t border-border/80 bg-background/95 shadow-lg h-[172px] overflow-hidden backdrop-blur">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabbedToolbarTabKey)} className="flex h-full flex-col">
         <TabbedIntegratedToolbarHeader controller={controller} activeTab={activeTab} onTabChange={setActiveTab} />
-        <TabbedIntegratedToolbarTray controller={controller} autoTstmTools={autoTstmTools} />
+        <TabbedIntegratedToolbarTray controller={controller} autoTstmTools={autoTstmTools} workspaceId={workspaceId} />
       </Tabs>
     </div>
   );
@@ -874,8 +723,8 @@ const TabbedIntegratedToolbarBody: React.FC<TabbedIntegratedToolbarProps> = ({ c
 /**
  * Tabbed variant of the integrated toolbar — keeps primary footprint and moves secondary controls behind tabs.
  */
-export const TabbedIntegratedToolbar: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools }) => (
+export const TabbedIntegratedToolbar: React.FC<TabbedIntegratedToolbarProps> = ({ controller, autoTstmTools, workspaceId }) => (
   <TooltipProvider>
-    <TabbedIntegratedToolbarBody controller={controller} autoTstmTools={autoTstmTools} />
+    <TabbedIntegratedToolbarBody controller={controller} autoTstmTools={autoTstmTools} workspaceId={workspaceId} />
   </TooltipProvider>
 );

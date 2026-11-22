@@ -1,3 +1,7 @@
+/**
+ * Reusable floating panel container. It manages open, close, and collapse UI
+ * around caller-provided content without owning the panel's product state.
+ */
 import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '../ui/button';

@@ -172,3 +172,21 @@ test('ordinary Checkout completion does not run late-deletion cleanup', async ()
   );
   assert.equal(cleaned, false);
 });
+
+test('late unpaid Checkout deletes the Stripe customer without attempting a refund', async () => {
+  const { calls, stripe } = createTrackingStripe();
+
+  const cleaned = await cleanupBlockedCheckoutSession(
+    {
+      id: 'cs_unpaid',
+      client_reference_id: 'deleted-user',
+      customer: 'cus_unpaid',
+      subscription: 'sub_unpaid',
+      payment_status: 'unpaid',
+    },
+    { stripe, canWrite: async () => false }
+  );
+
+  assert.equal(cleaned, true);
+  assert.deepEqual(calls, [['delete', 'cus_unpaid']]);
+});

@@ -1,6 +1,8 @@
 const MAX_OUTPUT_LENGTH = 40_000;
 const MAX_BULLETS = 6;
 const MAX_TEXT_LENGTH = 900;
+export const MAX_REVIEW_THREADS = 20;
+const MAX_REVIEW_THREAD_SUMMARY_LENGTH = 240;
 const ASSESSMENTS = new Set(['addressed', 'still-open', 'unclear']);
 const PRIOR_FINDING_ASSESSMENTS = new Set(['resolved', 'still-open', 'unclear']);
 
@@ -150,7 +152,7 @@ const parseReviewAssessment = (assessment) => {
     return {
       threadId: assessment.threadId,
       status,
-      summary: boundedText(assessment.summary, 'review-comment summary'),
+      summary: boundedText(assessment.summary, 'review-comment summary').slice(0, MAX_REVIEW_THREAD_SUMMARY_LENGTH),
     };
   } catch {
     return null;

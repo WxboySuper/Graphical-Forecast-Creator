@@ -13,7 +13,6 @@ import reducer, {
   selectSavedCyclesForActiveWorkspace,
   selectCustomLayer,
   setActiveProbability,
-  setCustomEditorMode,
   setForecastDay,
   setForecastWorkspace,
   setMapView,
@@ -142,26 +141,24 @@ describe('forecast workspace state', () => {
     let state = reducer(undefined, setMapView({ center: [10, 20], zoom: 9 }));
     state = reducer(state, setActiveProbability('15%'));
     state = reducer(state, toggleSignificant());
-    state = reducer(state, setCustomEditorMode('custom'));
     state = reducer(state, selectCustomLayer('layer-1'));
     state = reducer(state, validateCompletion());
 
     expect(state.currentMapView).toEqual({ center: [10, 20], zoom: 9 });
     expect(state.drawingState).toEqual({ activeOutlookType: 'tornado', activeProbability: '15%', isSignificant: true });
-    expect(state.customEditor.mode).toBe('custom');
     expect(state.completionValidation.showCompletionModal).toBe(true);
 
     state = reducer(state, setForecastWorkspace('custom'));
 
     expect(state.currentMapView).toEqual({ center: [39.8283, -98.5795], zoom: 4 });
     expect(state.drawingState).toEqual({ activeOutlookType: getFirstExposedOutlookType(), activeProbability: '2%', isSignificant: false });
-    // The Custom workspace opens in its own editor instead of Severe's defaults.
-    expect(state.customEditor).toEqual({ mode: 'custom', activeLayerId: null, activeCategoryId: null });
+    // Workspace changes reset selected custom-layer editor state as well.
+    expect(state.customEditor).toEqual({ activeLayerId: null, activeCategoryId: null });
     expect(state.completionValidation).toEqual({ lastResult: null, showCompletionModal: false, omittedDays: {} });
 
     state = reducer(state, setForecastWorkspace('severe'));
 
-    expect(state.customEditor).toEqual({ mode: 'severe', activeLayerId: null, activeCategoryId: null });
+    expect(state.customEditor).toEqual({ activeLayerId: null, activeCategoryId: null });
     expect(state.drawingState).toEqual({ activeOutlookType: getFirstExposedOutlookType(), activeProbability: '2%', isSignificant: false });
   });
 

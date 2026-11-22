@@ -1,3 +1,7 @@
+/**
+ * Grade-trend history. Renders the recent finite grade cards and delegates card
+ * selection to the forecast-grade workspace.
+ */
 import React from 'react';
 import type { GradeCard } from '../../types/forecastGrade';
 import { formatGrade } from './gradeFormat';

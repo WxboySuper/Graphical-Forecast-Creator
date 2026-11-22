@@ -1,3 +1,6 @@
+/**
+ * Verification DAT integration tests. Verify boundary data participates in the V2 verification workflow.
+ */
 import type { DatEvidence } from '../dat';
 import { gradeForecast } from './gradeForecast';
 

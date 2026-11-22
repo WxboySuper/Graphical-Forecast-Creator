@@ -1,4 +1,12 @@
-import React, { useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+/**
+ * Forecast workspace page orchestration.
+ *
+ * This module connects route context, Redux forecast state, map actions, cycle
+ * persistence, imports/exports, and user-facing prompts. Domain reducers and
+ * persistence services stay in their own modules; this page coordinates them
+ * for the active forecast route and translates outcomes into UI feedback.
+ */
+import React, { useRef, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router';
 import { getDefaultForecastWorkspacePath } from '../routing/forecastWorkspaceRoutes';
@@ -45,6 +53,7 @@ import {
 import useAutoCategorical from '../hooks/useAutoCategorical';
 import { useAutoTstm } from '../hooks/useAutoTstm';
 import AutoTstmWorkspaceTools from '../components/AutoTstm/AutoTstmWorkspaceTools';
+import { AUTO_TSTM_DISABLED, AUTO_TSTM_DISABLED_MESSAGE } from '../config/autoTstmDisable';
 import type { AddToastFn } from '../components/Layout';
 import { useAuth } from '../auth/AuthProvider';
 import { useEntitlement } from '../billing/EntitlementProvider';
@@ -56,6 +65,12 @@ import { hasAnyModifierKey, isTypingTarget, keyboardShortcutKey } from '../utils
 import { useCustomProductForecastHandoff } from '../hooks/useCustomProductForecastHandoff';
 import { useLegacyForecastNotice } from '../hooks/useLegacyForecastNotice';
 import { DEFAULT_FORECAST_WORKSPACE, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
+import ForecastWorkflowPanel from '../components/ForecastWorkflow/ForecastWorkflowPanel';
+import { ForecastWorkspaceSurfaces } from '../components/ForecastWorkspace/ForecastWorkspaceSurfaces';
+import { ALL_WORKSPACE_SURFACES, useWorkspaceSurface, type WorkspaceSurface } from '../components/ForecastWorkspace/useWorkspaceSurface';
+
+/** Custom has no Review surface; a stale review link falls back to the map. */
+const CUSTOM_WORKSPACE_SURFACES: readonly WorkspaceSurface[] = ['map', 'discussion'];
 
 export { hasAnyModifierKey, isTypingTarget, clearStoredRolloverPrompt, getRolloverStorageKey, readStoredDayValue, readStoredRolloverPrompt, writeStoredDayValue, writeStoredRolloverPrompt };
 import { ForecastTabbedToolbarLayout } from '../components/ForecastWorkspace/ForecastWorkspaceLayouts';
@@ -71,6 +86,7 @@ import {
 } from './forecastPageController';
 import type { ForecastImportResult, ForecastTransferFormat, ForecastTransferScope } from '../utils/forecastTransfer';
 import { queueProductMetric } from '../utils/productMetrics';
+import { useMesoscaleAutoSave } from '../hooks/useMesoscaleAutoSave';
 export {
   buildMapView,
   dayHasAnyFeatures,
@@ -195,6 +211,7 @@ const DayRolloverDialog: React.FC<{
   </Dialog>
 );
 
+/** Shows the notice displayed when the legacy /forecast route opens. */
 const LegacyForecastNotice: React.FC<{ onDismiss: () => void; noticeRef: React.RefObject<HTMLDivElement | null> }> = ({ onDismiss, noticeRef }) => (
   <div ref={noticeRef} data-testid="legacy-forecast-notice" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
     <span role="status">
@@ -593,6 +610,7 @@ const useForecastPageWorkspace = ({
   navigate,
   mapRef,
   onSaveForecast,
+  onImportSucceeded,
   workspaceId,
 }: {
   dispatch: ShortcutDispatch;
@@ -600,6 +618,7 @@ const useForecastPageWorkspace = ({
   navigate: ReturnType<typeof useNavigate>;
   mapRef: React.RefObject<ForecastMapHandle | null>;
   onSaveForecast: () => void;
+  onImportSucceeded: () => void;
   workspaceId: ForecastWorkspaceId;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
@@ -612,6 +631,7 @@ const useForecastPageWorkspace = ({
   const drawingState = useSelector((state: RootState) => state.forecast.drawingState);
   const workflowMetadata = useSelector((state: RootState) => state.forecast.workflowMetadata);
   const { user } = useAuth();
+  useMesoscaleAutoSave(user?.uid, workspaceId === 'mesoscale');
   const { premiumActive, effectiveSource } = useEntitlement();
   const cloudCycles = useCloudCycles();
   const { currentCloud, saveCycle, markAsCurrent, clearCurrent } = cloudCycles;
@@ -642,11 +662,12 @@ const useForecastPageWorkspace = ({
       addToast(workspaceError, 'error');
       return;
     }
+    onImportSucceeded();
     const warningSuffix = result.warnings.length > 0
       ? ` (${result.warnings.length} import note${result.warnings.length === 1 ? '' : 's'})`
       : '';
     addToast(`Forecast imported from ${result.format.toUpperCase()}!${warningSuffix}`, 'success');
-  }, [addToast, dispatch, mapRef, workspaceId]);
+  }, [addToast, dispatch, mapRef, onImportSucceeded, workspaceId]);
 
   const handleExportComplete = useCallback((format: ForecastTransferFormat, scope: ForecastTransferScope) => {
     if (format === 'json') {
@@ -741,33 +762,47 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     dispatch(setForecastWorkspace(workspaceId));
   }, [dispatch, workspaceId]);
   const navigate = useNavigate();
+  const { surface, selectSurface } = useWorkspaceSurface(workspaceId === 'severe' ? ALL_WORKSPACE_SURFACES : CUSTOM_WORKSPACE_SURFACES);
+  const [discussionImportRevision, setDiscussionImportRevision] = useState(0);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const forecastShellRef = useRef<HTMLDivElement>(null);
   const legacyNoticeRef = useRef<HTMLDivElement>(null);
   const [showLegacyNotice, dismissLegacyNotice] = useLegacyForecastNotice(workspaceRef, workspaceId);
 
-  useLayoutEffect(() => {
-    const shell = forecastShellRef.current;
-    const notice = legacyNoticeRef.current;
-    if (!shell) return;
-    if (!showLegacyNotice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
-    if (!notice) {
-      shell.style.removeProperty('--legacy-forecast-notice-height');
-      return;
-    }
+  useLayoutEffect(
+    /** Measures the notice and tracks its height while it is visible. */
+    function updateLegacyForecastNotice() {
+      const shell = forecastShellRef.current;
+      const notice = legacyNoticeRef.current;
+      let observer: ResizeObserver | undefined;
+      /** Disconnects the notice observer when one was created. */
+      function disconnectNoticeObserver(): void {
+        observer?.disconnect();
+      }
 
-    const updateNoticeHeight = () => {
-      shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
-    };
-    updateNoticeHeight();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(updateNoticeHeight);
-    observer.observe(notice);
-    return () => observer.disconnect();
-  }, [showLegacyNotice]);
+      if (!shell) return disconnectNoticeObserver;
+      if (!showLegacyNotice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return disconnectNoticeObserver;
+      }
+      if (!notice) {
+        shell.style.removeProperty('--legacy-forecast-notice-height');
+        return disconnectNoticeObserver;
+      }
+
+      /** Keeps the forecast shell offset in sync with the notice height. */
+      const updateNoticeHeight = (): void => {
+        shell.style.setProperty('--legacy-forecast-notice-height', `${notice.getBoundingClientRect().height}px`);
+      };
+      updateNoticeHeight();
+      if (typeof ResizeObserver !== 'undefined') {
+        observer = new ResizeObserver(updateNoticeHeight);
+        observer.observe(notice);
+      }
+      return disconnectNoticeObserver;
+    },
+    [showLegacyNotice],
+  );
   const { addToast } = useOutletContext<PageContext>();
   const { user } = useAuth();
   const mapRef = useRef<ForecastMapHandle>(null);
@@ -795,22 +830,49 @@ const ForecastPageContent: React.FC<{ workspaceId: ForecastWorkspaceId }> = ({ w
     navigate,
     mapRef,
     onSaveForecast: handleSave,
+    onImportSucceeded: () => setDiscussionImportRevision((revision) => revision + 1),
     workspaceId,
   });
 
   if (emergencyMode) {
     return <EmergencyModeMessage />;
   }
-
   return (
-    <div ref={forecastShellRef} className={showLegacyNotice ? 'forecast-page-shell forecast-page-shell--legacy-notice' : 'forecast-page-shell'}>
+    <div ref={forecastShellRef} className={`forecast-page-shell${showLegacyNotice ? ' forecast-page-shell--legacy-notice' : ''}${AUTO_TSTM_DISABLED ? ' forecast-page-shell--auto-tstm-disabled' : ''}`}>
       {showLegacyNotice ? <LegacyForecastNotice noticeRef={legacyNoticeRef} onDismiss={dismissLegacyNotice} /> : null}
+      {AUTO_TSTM_DISABLED ? (
+        <div data-testid="auto-tstm-disabled-banner" role="status" className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-foreground">
+          <span>
+            <strong>Auto-TSTM disabled:</strong> {AUTO_TSTM_DISABLED_MESSAGE}
+          </span>
+        </div>
+      ) : null}
       <div ref={workspaceRef} role="region" tabIndex={-1} aria-label="Forecast workspace" className="forecast-page-workspace" data-testid="forecast-page-workspace">
-        <ForecastTabbedToolbarLayout
+        <ForecastWorkspaceSurfaces
+          workspaceId={workspaceId}
+          surface={surface}
+          onSurfaceChange={selectSurface}
           mapRef={mapRef}
-          controller={workspaceController}
-          autoTstmTools={autoTstmTools}
-          tstmPreviewFeatures={tstmPreviewFeatures}
+          discussionRevision={discussionImportRevision}
+          map={(
+            <ForecastTabbedToolbarLayout
+              mapRef={mapRef}
+              controller={workspaceController}
+              autoTstmTools={autoTstmTools}
+              tstmPreviewFeatures={tstmPreviewFeatures}
+              workspaceId={workspaceId}
+            />
+          )}
+          review={workflowMetadata ? <ForecastWorkflowPanel controller={workspaceController} /> : (
+            <section aria-label="Forecast export actions" className="flex flex-wrap items-center gap-3 rounded-lg border p-4">
+              <div className="mr-auto">
+                <h2 className="font-semibold">Review and export</h2>
+                <p className="text-sm text-muted-foreground">Save your forecast or export the current cycle.</p>
+              </div>
+              <Button type="button" onClick={handleSave}>Save forecast</Button>
+              <Button type="button" variant="outline" onClick={workspaceController.onInitiateExport}>Export</Button>
+            </section>
+          )}
         />
       </div>
       <ForecastWorkspaceModals controller={workspaceController} onTransferError={handleTransferError} />

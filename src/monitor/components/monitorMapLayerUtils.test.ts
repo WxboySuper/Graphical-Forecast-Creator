@@ -1,3 +1,6 @@
+/**
+ * Monitor map layer utility tests. Verify layer selection and visibility helpers used by the monitor map.
+ */
 import VectorSource from 'ol/source/Vector';
 import { Style } from 'ol/style';
 import {

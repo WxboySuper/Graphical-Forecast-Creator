@@ -1,4 +1,9 @@
+/**
+ * Toast primitives. Renders timed feedback messages and manages the add, update,
+ * dismissal, and automatic-expiry behavior of the shared toast collection.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { trackEvent } from '../../lib/telemetry';
 import './Toast.css';
 
 const MIN_TOAST_DURATION_MS = 3000;
@@ -116,6 +121,9 @@ export interface ToastManagerProps {
 
 /** Filters and renders one queued toast, dismissing invalid empty copy. */
 function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: string) => void }): React.ReactElement | null {
+  useEffect(() => {
+    if (normalizeToastType(toast.type) === 'error') trackEvent('error_shown', 'error');
+  }, [toast.id, toast.type]);
   const emptyMessage = isEmptyToastMessage(toast.message);
   const emptyDismissedRef = useRef(false);
   const handleClose = useCallback(() => onDismiss(toast.id), [onDismiss, toast.id]);

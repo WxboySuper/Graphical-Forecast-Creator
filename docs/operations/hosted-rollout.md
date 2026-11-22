@@ -4,8 +4,6 @@
 > This page documents the VPS layout only; it no longer defines a beta → main
 > promotion.
 
-Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
-
 ## VPS layout
 
 ```text
@@ -36,7 +34,7 @@ Ops companion to [timed-production-rollout.md](./timed-production-rollout.md).
 1. Run `scripts/setup-vps.sh` on the production VPS (creates dirs + cron).
 2. Point production nginx at `server/nginx.conf` (`root` = `/var/www/gfc/current`).
 3. Enable `server/nginx-staging.conf` for `staging-gfc.weatherboysuper.com`.
-4. Ensure GitHub secrets: `PROD_SSH_*`, `BETA_INVITE_PATH`, `BETA_INVITE_TOKEN` (staging uses same invite gate as beta).
+4. Ensure GitHub secrets: `PROD_SSH_*`.
 
 ## Optional timed rollout
 
@@ -80,4 +78,4 @@ Set `"action": "live"` in `deploy/production-release.json` for immediate full de
 | Live updated early | `action` must be `stage`; verify `current` symlink on VPS |
 | Staging 403 / beta gate | Sign in + beta access; use invite URL |
 | Promote did not run | `config/status`, `rolloutAt`, `/opt/gfc-analytics/logs/rollout-cron.log` |
-| `/updates` or `/updates/` returns **403** on direct URL | `public/updates/` exists for screenshots; nginx must use exact `location = /updates` blocks in `server/nginx.conf` (see repo). In-app NavLink/banner links work without this because React Router never requests the path from nginx. |
+| `/updates` or `/updates/` returns **403** on direct URL | release notes now live on the marketing site; the legacy VPS frontend still needs nginx must use exact `location = /updates` blocks in `server/nginx.conf` (see repo). In-app NavLink/banner links work without this because React Router never requests the path from nginx. |

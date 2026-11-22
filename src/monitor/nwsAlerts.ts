@@ -1,9 +1,13 @@
+/**
+ * National Weather Service alert helpers for Monitor. It defines alert data
+ * types and converts NWS feature collections into normalized monitor records.
+ */
 import type { FeatureCollection } from 'geojson';
 import { Fill, Stroke, Style } from 'ol/style';
 
 export const MAX_ACTIVE_ALERTS = 500;
-export const NWS_ACTIVE_ALERTS_URL =
-  `https://api.weather.gov/alerts/active?status=actual&limit=${MAX_ACTIVE_ALERTS}`;
+/** The alerts API rejects a `limit` query parameter (HTTP 400), so the cap is applied to the response instead. */
+export const NWS_ACTIVE_ALERTS_URL = 'https://api.weather.gov/alerts/active?status=actual';
 
 export type NwsAlertCategory = 'watch' | 'warning' | 'advisory' | 'statement' | 'other';
 

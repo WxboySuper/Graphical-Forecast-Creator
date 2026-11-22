@@ -1,3 +1,7 @@
+/**
+ * Home-page controller hook. It selects forecast and account state, builds the
+ * home view's derived values, and exposes navigation and toast actions.
+ */
 import React, { useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useOutletContext } from 'react-router';
@@ -12,6 +16,7 @@ import {
   selectHasActiveWorkflow,
   startBlankCycle,
   createOutlookUpdate,
+  setForecastWorkspace,
   selectSavedCyclesForActiveWorkspace,
 } from '../../store/forecastSlice';
 import { DayType } from '../../types/outlooks';
@@ -19,8 +24,9 @@ import type { WorkflowMetadata } from '../../types/workflow';
 import { computeHomeStats, formatCycleDate } from '../homeUtils';
 import { createFileHandlers } from '../../hooks/useFileLoader';
 import { useAuth } from '../../auth/AuthProvider';
-import { isFeatureExposed } from '../../config/featureExposure';
-import { DEFAULT_FORECAST_WORKSPACE } from '../../config/forecastWorkspaces';
+import { trackEvent } from '../../lib/telemetry';
+import { flag } from '../../config/flags';
+import { DEFAULT_FORECAST_WORKSPACE, getExposedForecastWorkspaces } from '../../config/forecastWorkspaces';
 import { clearAutoSave } from '../../hooks/useAutoSave';
 import { getLocalCalendarDate } from '../../utils/localDate';
 import { getForecastWorkspacePath } from '../../routing/forecastWorkspaceRoutes';
@@ -42,8 +48,11 @@ const useHomePageLogic = () => {
   const hasActiveWorkflow = useSelector(selectHasActiveWorkflow);
   const savedCycles = useSelector(selectSavedCyclesForActiveWorkspace);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
-  const workspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
-  const workflowEnabled = isFeatureExposed('forecastWorkflowV2');
+  const persistedWorkspaceId = useSelector((state: RootState) => state.forecast.workspaceId);
+  const workspaceId = getExposedForecastWorkspaces().some(({ id }) => id === persistedWorkspaceId)
+    ? persistedWorkspaceId
+    : DEFAULT_FORECAST_WORKSPACE;
+  const workflowEnabled = flag('forecastWorkflowV2');
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [confirmNewCycle, setConfirmNewCycle] = useState(false);
@@ -72,12 +81,16 @@ const useHomePageLogic = () => {
     }
     clearAutoSave(user?.uid, workspaceId);
     dispatch(resetForecasts());
+    trackEvent('forecast_created');
     addToast('Started new forecast cycle', 'success');
   };
 
   /** Quickly navigate to the forecast editor for the given day. */
   const handleQuickStart = (day: DayType) => {
     clearAutoSave(user?.uid, workspaceId);
+    // Move Redux to the resolved workspace first; otherwise the destination route
+    // would switch workspaces on mount and discard the day chosen here.
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(setForecastDay(day));
     navigate(getForecastWorkspacePath(workspaceId));
   };
@@ -91,10 +104,12 @@ const useHomePageLogic = () => {
       return;
     }
     clearAutoSave(user?.uid, workspaceId);
+    dispatch(setForecastWorkspace(workspaceId));
     dispatch(startBlankCycle({
       workflowTemplate,
       cycleDate: getLocalCalendarDate(),
     }));
+    trackEvent('forecast_created');
     addToast(`Started ${workflowTemplate.label} workflow`, 'success');
     navigate(getForecastWorkspacePath(workspaceId));
   };
@@ -161,10 +176,12 @@ const useHomePageLogic = () => {
   const handleConfirmNewCycle = () => {
     clearAutoSave(user?.uid, workspaceId);
     if (pendingWorkflow) {
+      dispatch(setForecastWorkspace(workspaceId));
       dispatch(startBlankCycle({
         workflowTemplate: pendingWorkflow,
         cycleDate: getLocalCalendarDate(),
       }));
+      trackEvent('forecast_created');
       setPendingWorkflow(null);
       setConfirmNewCycle(false);
       addToast(`Started ${pendingWorkflow.label} workflow`, 'success');
@@ -172,6 +189,7 @@ const useHomePageLogic = () => {
       return;
     }
     dispatch(resetForecasts());
+    trackEvent('forecast_created');
     addToast('Started new forecast cycle', 'success');
     setConfirmNewCycle(false);
   };

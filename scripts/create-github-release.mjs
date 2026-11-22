@@ -1,3 +1,7 @@
+/**
+ * GitHub release preparation script. It reads release notes and package
+ * metadata, validates prerelease policy, and creates the release payload.
+ */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -118,6 +122,18 @@ export const resolvePreviousTag = ({ mode, explicitPreviousTag = '', version, re
   });
 };
 
+/**
+ * Notes used when GitHub cannot generate PR notes in `prs` mode (beta releases). They point at the
+ * commit comparison since the previous release instead of falling back to the full curated changelog,
+ * which would repeat every earlier beta's changes.
+ */
+export const fallbackPrNotes = ({ repository, tag, previousTag }) => {
+  const heading = `## ${tag}`;
+  if (!previousTag) return `${heading}\n\nRelease notes could not be generated.`;
+  const compare = `https://github.com/${repository}/compare/${previousTag}...${tag}`;
+  return `${heading}\n\nRelease notes could not be generated. See the changes since ${previousTag}: ${compare}`;
+};
+
 /** Extract the curated changelog section for the release lane. */
 export const buildCuratedNotes = ({ changelog, version, lane }) =>
   extractReleaseNotes(changelog, version, lane) ??
@@ -194,8 +210,8 @@ const run = () => {
       });
       console.log(`Generated GitHub PR notes from ${previousTag ?? 'repository history'}.`);
     } catch (error) {
-      if (mode === 'prs') throw error;
-      console.warn(`GitHub PR note generation failed; continuing with curated notes: ${error.message}`);
+      console.warn(`GitHub PR note generation failed: ${error.message}`);
+      if (mode === 'prs') generatedNotes = fallbackPrNotes({ repository, tag, previousTag });
     }
   }
 

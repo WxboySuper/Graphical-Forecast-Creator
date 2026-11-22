@@ -1,3 +1,6 @@
+/**
+ * Live WMS layer hook tests. Verify live weather layers are refreshed and synchronized with monitor state.
+ */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useLiveWmsLayers } from './useLiveWmsLayers';
 import * as wms from './wms';

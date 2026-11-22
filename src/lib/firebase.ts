@@ -1,3 +1,7 @@
+/**
+ * Initializes and exposes the Firebase app services used by hosted GFC features.
+ * This module owns client initialization and service access; auth flows, Firestore operations, and feature policy remain in their boundaries.
+ */
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import {
   getAuth,

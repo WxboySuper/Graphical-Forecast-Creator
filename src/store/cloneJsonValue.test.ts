@@ -1,3 +1,6 @@
+/**
+ * JSON clone utility tests. Verify structured forecast values are copied without shared object references.
+ */
 import { cloneJsonValue } from './cloneJsonValue';
 
 describe('cloneJsonValue', () => {

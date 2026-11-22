@@ -1,3 +1,7 @@
+/**
+ * Packages structured forecast KML into a downloadable KMZ archive.
+ * This utility owns archive assembly and serialization; feature collection and KML document construction are delegated to export helpers.
+ */
 import JSZip from 'jszip';
 import { buildStructuredKmlDocument } from './buildKml';
 import { collectKmzExportFeatures, getOutlookLabel, groupFeaturesByDay, groupFeaturesByOutlook } from './collectFeatures';

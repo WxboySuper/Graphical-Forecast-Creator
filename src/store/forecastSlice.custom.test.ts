@@ -1,3 +1,8 @@
+/**
+ * Forecast custom-layer test boundary: this suite verifies reducer behavior
+ * for custom products, custom geometry, schema-version handling, and copying
+ * custom features across forecast cycles.
+ */
 import type { Polygon } from 'geojson';
 import { CUSTOM_PRODUCTS_SCHEMA_VERSION, type OneOffCustomLayer, type CustomPolygonFeature } from '../types/customProducts';
 import { asCustomLayerId } from '../lib/customProducts';
@@ -111,7 +116,7 @@ describe('custom layer forecast state', () => {
   });
 
   test('deep-snapshots custom geometry and appearance before a hosted same-cycle update', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
     let state = reducer(undefined, startBlankCycle({
       workflowTemplate: { id: 'severe-day1', label: 'Day 1', groupings: ['day1'] },
       cycleDate: '2026-07-17',
@@ -136,7 +141,7 @@ describe('custom layer forecast state', () => {
   });
 
   test('preserves loaded custom layers through hosted copy transitions while the editor is hidden', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
     let source = reducer(undefined, addCustomLayer(layer()));
     source = reducer(source, addCustomFeature(feature()));
     const copied = reducer(undefined, copyFeaturesFromPrevious({
@@ -152,11 +157,12 @@ describe('custom layer forecast state', () => {
   });
 
   test('preserves loaded custom layers through a hosted previous-cycle rollover', () => {
-    jest.spyOn(require('../config/featureExposure'), 'isFeatureExposed').mockReturnValue(false);
+    jest.spyOn(require('../config/flags'), 'flag').mockReturnValue(false);
     let state = reducer(undefined, addCustomLayer(layer()));
     state = reducer(state, addCustomFeature(feature()));
     state = reducer(state, saveCurrentCycle({ label: 'Custom source' }));
     const sourceLayers = state.savedCycles[0].forecastCycle.days[1]!.customLayers!;
+    const previousGeneration = state.cycleGeneration;
 
     state = reducer(state, startFromPreviousCycle({
       sourceCycleId: state.savedCycles[0].id,
@@ -166,6 +172,7 @@ describe('custom layer forecast state', () => {
     }));
 
     const rolledLayers = state.forecastCycle.days[2]!.customLayers!;
+    expect(state.cycleGeneration).toBe(previousGeneration + 1);
     expect(rolledLayers).toEqual(sourceLayers);
     expect(rolledLayers).not.toBe(sourceLayers);
   });

@@ -1,3 +1,6 @@
+/**
+ * Outlook trimming tests. Verify polygon masking removes unsupported geometry while preserving outlook meaning.
+ */
 import * as turf from '@turf/turf';
 import { buildLandMask } from './buildLandMask';
 import { trimOutlookDataInPlace } from './trimOutlookData';
