@@ -13,6 +13,13 @@ The feedback API runs as a standalone Cloudflare Worker at `feedback.gfcweather.
 
 The Discord webhook must point to a forum channel. Each submission creates a forum thread. The Worker disables mention parsing and limits the message and embed fields before sending.
 
+Discord secrets on `gfc-feedback`:
+
+- `FEEDBACK_DISCORD_WEBHOOK_URL` (optional): the forum webhook for new submissions. The Worker stores each new thread's ID (migration `0004`), and status changes made in the viewer or through `PATCH /v1/feedback/:id` are posted into that thread, for example `Feedback <id> marked **Handled**`.
+- `FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL` (optional): a webhook for an ordinary text channel. When set, every status change goes there instead of into the forum thread. Without it, status changes for items that have no stored thread are not posted. That covers submissions from before the thread ID was recorded or whose Discord delivery failed.
+
+Status notifications run in the background. A Discord failure never fails or delays the status change.
+
 ## Read and update feedback
 
 Use `FEEDBACK_ADMIN_TOKEN` from a secure shell environment. The API returns JSON. Never paste the token into a shared terminal transcript.

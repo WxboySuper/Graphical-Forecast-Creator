@@ -9,7 +9,7 @@
   "d1_databases": [{ "binding": "TELEMETRY_DB", "database_name": "gfc-telemetry", "database_id": "126a9d1d-0d79-4db8-9a96-11c3c6804094", "migrations_dir": "./telemetry/migrations" }],
   "analytics_engine_datasets": [{ "binding": "TELEMETRY_EVENTS", "dataset": "gfc_telemetry_events" }],
   "ratelimits": [{ "name": "TELEMETRY_RATE_LIMITER", "namespace_id": "61717", "simple": { "limit": 60, "period": 60 } }],
-  "triggers": { "crons": ["0 0 * * *"] },
+  "triggers": { "crons": ["0 0 * * *", "0 13 * * *"] },
   "vars": {
     "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
     "CF_ACCESS_TEAM_DOMAIN": "mute-pine-62f8.cloudflareaccess.com",

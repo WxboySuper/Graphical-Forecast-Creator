@@ -66,7 +66,7 @@ GitHub Release notes: beta = native PR list + changelog link; stable = curated c
 
 ### Telemetry Worker
 
-`gfc-telemetry` runs at `https://telemetry.gfcweather.com`. Deploy it manually with the **Deploy telemetry Worker** GitHub Actions workflow after the owner creates the Worker, D1 database, Analytics Engine dataset, and Cloudflare Access application. The Worker has `workers_dev` disabled, a custom-domain route, observability enabled, and a daily UTC cron that removes dedupe hashes from earlier days. Its Cloudflare rate-limiting binding allows 60 requests per IP per minute per Cloudflare location. Cloudflare documents this limiter as approximate and eventually consistent. It does not write its keys to the telemetry datasets.
+`gfc-telemetry` runs at `https://telemetry.gfcweather.com`. Deploy it manually with the **Deploy telemetry Worker** GitHub Actions workflow after the owner creates the Worker, D1 database, Analytics Engine dataset, and Cloudflare Access application. The Worker has `workers_dev` disabled, a custom-domain route, observability enabled, a daily UTC cron that removes dedupe hashes from earlier days, and a 13:00 UTC cron for the optional Discord usage digest. Its Cloudflare rate-limiting binding allows 60 requests per IP per minute per Cloudflare location. Cloudflare documents this limiter as approximate and eventually consistent. It does not write its keys to the telemetry datasets.
 
 D1 stores daily visit and active counts plus their temporary daily dedupe hashes. D1 is used for these counters because exact daily uniqueness needs an atomic dedupe key and count update. The key contains only a daily salted hash, is namespaced by counter type, and the cron deletes every key before the current UTC day. Hash salts are derived daily from `TELEMETRY_HASH_SECRET`; previous daily salts are not persisted. D1 counts contain no identity data and are retained for the admin overview. Feature events go to the `gfc_telemetry_events` Workers Analytics Engine dataset. Its raw retention window is 90 days, per Cloudflare's [Analytics Engine limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/).
 
@@ -83,6 +83,11 @@ The manual deploy workflow applies this migration before deploying. The rate-lim
 - `TELEMETRY_HASH_SECRET`, used to derive the daily visit and active salts.
 - `CF_ANALYTICS_API_TOKEN`, restricted to Account Analytics Read for the account.
 - `CF_ACCOUNT_ID`, used by the Admin API to query Analytics Engine.
+- `TELEMETRY_DISCORD_WEBHOOK_URL` (optional), a Discord webhook for an ordinary text channel. When set, the `0 13 * * *` cron (7 AM Central standard time, 8 AM daylight time) posts the daily usage digest. Without it the cron does nothing.
+
+The daily digest covers the previous UTC day. It shows visitors and active users from D1 against the prior 7-day average, the totals for the last 7 days, and the top features and pages from Analytics Engine. The feature and page section is skipped when `CF_ANALYTICS_API_TOKEN` is unset or the query fails. When a day's visitors or active users beat every earlier day in D1, the digest opens with a new record line. Mondays add a week-over-week comparison and the biggest feature movers. The `0 0 * * *` cron still purges old dedupe hashes. Webhook URLs are never logged.
+
+The feedback Worker's Discord secrets are listed in [beta feedback operations](../operations/beta-feedback.md).
 
 Set the `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` vars to the Cloudflare Access team domain and admin application audience. Keep `TELEMETRY_ALLOWED_ORIGINS` aligned with the app origins. `FIREBASE_PROJECT_ID` validates active-user ID tokens. The Wrangler file's `account_id` is the same deployment account used by the other Workers. The admin overview reports total accounts as `null` because this Worker has no account-count source. Rough MAU is the sum of daily unique visitor counts across the latest `min(days, 30)` UTC days in the requested overview range. One visitor can appear on several days, so it overcounts distinct visitors across that window; the response includes `roughMauWindowDays` and an overlap caveat.
 

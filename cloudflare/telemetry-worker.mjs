@@ -2,6 +2,7 @@ import { json } from './feedback/response.mjs';
 import { handleAdmin } from './telemetry/admin.mjs';
 import { handlePublic, publicServiceError } from './telemetry/public.mjs';
 import { purgeOldDedupe, utcDay } from './telemetry/daily-counts.mjs';
+import { DIGEST_CRON, sendDailyDigest } from './telemetry/digest.mjs';
 
 export { ALLOWED_EVENTS, validateEvent } from './telemetry/events.mjs';
 export { dailyHash, purgeOldDedupe, recordUnique } from './telemetry/daily-counts.mjs';
@@ -30,17 +31,31 @@ export async function fetchTelemetry(request, env) {
   }
 }
 
+async function runDigest(env, now) {
+  try { await sendDailyDigest(env, now); }
+  catch (error) {
+    // The digest is best effort; log only the failure kind so the webhook URL never reaches logs.
+    console.error('Telemetry Discord digest failed', error?.name ?? 'Error');
+  }
+}
+
+async function purge(env, now) {
+  try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(now)); }
+  catch (error) {
+    console.error('Telemetry dedupe purge failed');
+    throw new Error('Telemetry dedupe purge failed', { cause: error });
+  }
+}
+
 export default {
   fetch: fetchTelemetry,
-  async scheduled(_controller, env) {
+  async scheduled(controller, env) {
     if (!env.TELEMETRY_DB) {
       console.error('Telemetry dedupe purge failed: TELEMETRY_DB binding is not configured');
       return;
     }
-    try { await purgeOldDedupe(env.TELEMETRY_DB, utcDay(env.NOW?.() ?? Date.now())); }
-    catch (error) {
-      console.error('Telemetry dedupe purge failed');
-      throw new Error('Telemetry dedupe purge failed', { cause: error });
-    }
+    const now = env.NOW?.() ?? controller?.scheduledTime ?? Date.now();
+    if (controller?.cron === DIGEST_CRON) return runDigest(env, now);
+    return purge(env, now);
   },
 };

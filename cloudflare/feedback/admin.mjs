@@ -1,4 +1,5 @@
 import { constantTimeEqual, digest } from './auth.mjs';
+import { notifyStatusUpdate } from './discord.mjs';
 import { json } from './response.mjs';
 import { isCategory, isTarget, validateCursor, validatePageLimit, validateSince } from './validate.mjs';
 
@@ -129,6 +130,16 @@ export async function patchFeedback(request, id, db, now = Date.now()) {
   return result.meta?.changes ? json({ id, status: body.status }) : json({ error: 'Feedback not found' }, 404);
 }
 
+/** Applies a status change and, once it is stored, queues a best-effort Discord update that never affects the response. */
+export async function patchFeedbackAndNotify(request, id, env, ctx) {
+  const response = await patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now());
+  if (response.ok) {
+    const { status } = await response.clone().json();
+    await notifyStatusUpdate(env, ctx, id, status);
+  }
+  return response;
+}
+
 export async function deleteFeedback(id, db) {
   const result = await db.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
   return result.meta?.changes ? json({ id, deleted: true }) : json({ error: 'Feedback not found' }, 404);
@@ -140,15 +151,15 @@ const isAdminConfigured = (env) => ADMIN_BINDINGS.every((name) => Boolean(env[na
 const adminRoutes = [
   { method: 'GET', hasId: false, run: ({ url, env }) => listFeedback(url, env.FEEDBACK_DB) },
   { method: 'GET', hasId: true, run: ({ id, env }) => getFeedback(id, env.FEEDBACK_DB) },
-  { method: 'PATCH', hasId: true, run: ({ request, id, env }) => patchFeedback(request, id, env.FEEDBACK_DB, env.NOW?.() ?? Date.now()) },
+  { method: 'PATCH', hasId: true, run: ({ request, id, env, ctx }) => patchFeedbackAndNotify(request, id, env, ctx) },
 ];
 
-export async function handleAdmin(request, env, url, id) {
+export async function handleAdmin(request, env, url, id, ctx) {
   // The admin API is for curl and server-side agents. It sends no CORS headers, and browsers (which always send Origin) are refused outright.
   if (request.headers.has('origin')) return json({ error: 'Admin API is not available from browsers' }, 403);
   if (!isAdminConfigured(env)) return json({ error: 'Admin API unavailable' }, 503);
   const auth = await authenticate(request, env);
   if (!auth.ok) return auth.response;
   const route = adminRoutes.find((item) => item.method === request.method && item.hasId === Boolean(id));
-  return route ? route.run({ request, env, url, id }) : json({ error: 'Not found' }, 404);
+  return route ? route.run({ request, env, url, id, ctx }) : json({ error: 'Not found' }, 404);
 }

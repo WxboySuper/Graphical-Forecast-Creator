@@ -19,31 +19,47 @@ function createPayload(env, record) {
   };
 }
 
+// Forum posts answer with the new thread as channel_id; keep it so later status updates land in that thread.
+async function threadIdFrom(response) {
+  try {
+    const message = await response.json();
+    return /^\d{1,25}$/.test(message?.channel_id ?? '') ? message.channel_id : null;
+  } catch {
+    return null;
+  }
+}
+
+async function post(env, webhookUrl, payload, threadId = null) {
+  const url = new URL(webhookUrl);
+  url.searchParams.set('wait', 'true');
+  if (threadId) url.searchParams.set('thread_id', threadId);
+  return (env.FETCH ?? fetch)(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+}
+
 async function sendWebhook(env, payload) {
   try {
-    const url = new URL(env.FEEDBACK_DISCORD_WEBHOOK_URL);
-    url.searchParams.set('wait', 'true');
-    const response = await (env.FETCH ?? fetch)(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-    return response.ok ? 'sent' : 'failed';
+    const response = await post(env, env.FEEDBACK_DISCORD_WEBHOOK_URL, payload);
+    if (!response.ok) return { status: 'failed', threadId: null };
+    return { status: 'sent', threadId: await threadIdFrom(response) };
   } catch {
-    return 'failed';
+    return { status: 'failed', threadId: null };
   }
 }
 
 export async function postDiscord(env, record) {
-  if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return 'disabled';
+  if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return { status: 'disabled', threadId: null };
   return sendWebhook(env, createPayload(env, record));
 }
 
 async function deliver(env, record) {
-  let status = 'failed';
+  let result = { status: 'failed', threadId: null };
   try {
-    status = await postDiscord(env, record);
+    result = await postDiscord(env, record);
   } catch {
     // Building or sending the payload failed; the row is stored and is marked failed below.
   }
   try {
-    await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ? WHERE id = ?').bind(status, record.id).run();
+    await env.FEEDBACK_DB.prepare('UPDATE feedback SET discord_status = ?, discord_thread_id = ? WHERE id = ?').bind(result.status, result.threadId, record.id).run();
   } catch {
     // A failed status update must not surface as an unhandled rejection.
   }
@@ -53,6 +69,45 @@ export async function notifyDiscord(env, ctx, record) {
   if (!env.FEEDBACK_DISCORD_WEBHOOK_URL) return;
   const task = deliver(env, record);
   // Without an execution context (direct calls, tests) wait inline so the work is never dropped.
+  if (ctx?.waitUntil) ctx.waitUntil(task);
+  else await task;
+}
+
+const STATUS_LABELS = { new: 'New', read: 'Read', handled: 'Handled' };
+
+export function statusUpdatePayload(item, status) {
+  const target = item.build_target === 'beta' ? 'BETA' : 'PROD';
+  return {
+    content: `Feedback ${item.id} marked **${STATUS_LABELS[status] ?? status}**`,
+    embeds: [{ description: `[${target}] ${item.category}: ${truncate(item.message, 200)}` }],
+    allowed_mentions: { parse: [] },
+  };
+}
+
+// A separate updates webhook (an ordinary text channel) takes every update; otherwise the update is
+// posted into the item's original forum thread, and items without a known thread are skipped.
+function updateTarget(env, item) {
+  if (env.FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL) return { url: env.FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL, threadId: null };
+  if (env.FEEDBACK_DISCORD_WEBHOOK_URL && item.discord_thread_id) return { url: env.FEEDBACK_DISCORD_WEBHOOK_URL, threadId: item.discord_thread_id };
+  return null;
+}
+
+async function deliverStatusUpdate(env, id, status) {
+  try {
+    const item = await env.FEEDBACK_DB.prepare('SELECT id, category, message, build_target, discord_thread_id FROM feedback WHERE id = ?').bind(id).first();
+    const target = item && updateTarget(env, item);
+    if (!target) return 'skipped';
+    const response = await post(env, target.url, statusUpdatePayload(item, status), target.threadId);
+    return response.ok ? 'sent' : 'failed';
+  } catch {
+    // Notifications are best effort; the status change is already stored.
+    return 'failed';
+  }
+}
+
+export async function notifyStatusUpdate(env, ctx, id, status) {
+  if (!env.FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL && !env.FEEDBACK_DISCORD_WEBHOOK_URL) return;
+  const task = deliverStatusUpdate(env, id, status);
   if (ctx?.waitUntil) ctx.waitUntil(task);
   else await task;
 }

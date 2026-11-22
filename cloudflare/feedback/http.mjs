@@ -88,8 +88,8 @@ const routeTable = [
   } },
   { match: (url, method) => url.pathname === '/v1/feedback' && method === 'POST', run: (request, env, url, ctx) => submit(request, env, ctx, corsHeaders(request, env)) },
   { match: (url, method) => url.pathname === '/v1/feedback' && method === 'GET', run: (request, env, url) => handleAdmin(request, env, url, null) },
-  { match: (url, method) => /^\/v1\/feedback\/[^/]+$/.test(url.pathname) && ['GET', 'PATCH'].includes(method), run: (request, env, url) => {
-    try { return handleAdmin(request, env, url, decodeURIComponent(url.pathname.split('/').at(-1))); }
+  { match: (url, method) => /^\/v1\/feedback\/[^/]+$/.test(url.pathname) && ['GET', 'PATCH'].includes(method), run: (request, env, url, ctx) => {
+    try { return handleAdmin(request, env, url, decodeURIComponent(url.pathname.split('/').at(-1)), ctx); }
     catch { return json({ error: 'Invalid feedback id' }, 400); }
   } },
 ];
