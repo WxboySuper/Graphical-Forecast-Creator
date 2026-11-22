@@ -554,3 +554,14 @@ test('a text-channel digest webhook that rejects thread_name gets one retry with
   assert.equal('thread_name' in posts[1], false);
   assert.deepStrictEqual(posts[1].allowed_mentions, { parse: [] });
 });
+
+test('the daily digest and its record line ping only DISCORD_PING_USER_ID', async () => {
+  const rows = dayRows('visit', [9, 4, 3], '2026-11-16');
+  const { env, posts } = digestEnv(rows, { env: { NOW: () => DIGEST_TUESDAY, DISCORD_PING_USER_ID: '525942394986823685' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, env);
+  assert.equal(posts[0].content, '<@525942394986823685> 🏆 New record: 9 visitors (previous best 4)');
+  assert.deepStrictEqual(posts[0].allowed_mentions, { parse: [], users: ['525942394986823685'] });
+  const quiet = digestEnv(dayRows('visit', [1, 4], '2026-11-16'), { env: { NOW: () => DIGEST_TUESDAY, DISCORD_PING_USER_ID: '525942394986823685' } });
+  await worker.scheduled({ cron: '0 13 * * *' }, quiet.env);
+  assert.equal(quiet.posts[0].content, '<@525942394986823685>', 'a digest without a record still pings');
+});

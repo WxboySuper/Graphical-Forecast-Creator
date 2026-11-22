@@ -11,6 +11,7 @@
   "ratelimits": [{ "name": "TELEMETRY_RATE_LIMITER", "namespace_id": "61717", "simple": { "limit": 60, "period": 60 } }],
   "triggers": { "crons": ["0 0 * * *", "0 13 * * *"] },
   "vars": {
+    "DISCORD_PING_USER_ID": "525942394986823685",
     "FIREBASE_PROJECT_ID": "graphical-forecast-creator",
     "CF_ACCESS_TEAM_DOMAIN": "mute-pine-62f8.cloudflareaccess.com",
     "CF_ACCESS_AUD": "2e0e479ad9fa1b5c6dec7d24fad6f73cdcf52985bef70e172c8734fe45eb3690",

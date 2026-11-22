@@ -1,3 +1,5 @@
+import { withPing } from '../discord-ping.mjs';
+
 // Truncate by code point so an emoji at the boundary is never split into a lone surrogate.
 const truncate = (text, max) => Array.from(text).slice(0, max).join('');
 
@@ -10,13 +12,14 @@ function createPayload(env, record) {
 **ID:** ${record.id}`;
   // Truncate the message, never the trailer, so the ID needed to correlate a thread always survives.
   const description = `**Feedback:** ${truncate(record.message, Math.max(0, 4096 - 14 - trailer.length))}${trailer}`;
-  return {
+  // New submissions ping DISCORD_PING_USER_ID when set; status updates stay silent.
+  return withPing(env, {
     thread_name: truncate(`[${record.build_target === 'beta' ? 'BETA' : 'PROD'}] ${record.category}: ${truncate(record.message, 80)}`, 100),
     content: `Feedback ${record.id}`,
     embeds: [{ description }],
     allowed_mentions: { parse: [] },
     ...(tag ? { applied_tags: [tag] } : {}),
-  };
+  });
 }
 
 // Forum posts answer with the new thread as channel_id; keep it so later status updates land in that thread.

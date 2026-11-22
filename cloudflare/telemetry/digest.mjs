@@ -1,5 +1,6 @@
 import { COUNT, DATASET, DAY, queryAnalytics } from './admin.mjs';
 import { utcDay } from './daily-counts.mjs';
+import { withPing } from '../discord-ping.mjs';
 
 export const DIGEST_CRON = '0 13 * * *';
 
@@ -125,7 +126,8 @@ export async function sendDailyDigest(env, now) {
   const bests = await env.TELEMETRY_DB.prepare('SELECT kind, MAX(count) AS best, COUNT(*) AS days FROM telemetry_daily_counts WHERE day < ? GROUP BY kind').bind(yesterday).all();
   const data = await loadEvents(env, monday ? 15 : 2);
   const events = data ? summarizeEvents(data, yesterday) : null;
-  const payload = buildDigest({ rows: result.results ?? [], bests: bests.results ?? [], events, yesterday, monday });
+  // The digest, and any record line in it, pings DISCORD_PING_USER_ID when set.
+  const payload = withPing(env, buildDigest({ rows: result.results ?? [], bests: bests.results ?? [], events, yesterday, monday }));
   const send = (body) => (env.FETCH ?? fetch)(env.TELEMETRY_DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   // A forum webhook needs a thread name; a text-channel webhook rejects one with a 4xx, so retry once without it.
   let response = await send({ ...payload, thread_name: `Daily usage ${yesterday}` });

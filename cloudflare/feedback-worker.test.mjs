@@ -831,3 +831,27 @@ test('the Access viewer status change also sends a Discord update', async () => 
   await Promise.all(waits);
   assert.equal(discord.calls[0].body.content, 'Feedback fb-3 marked **Read**');
 });
+
+test('new feedback pings only DISCORD_PING_USER_ID, and status updates stay silent', async () => {
+  const discord = discordRecorder();
+  const { db, env, ctx, waits } = harness({ env: { FEEDBACK_ADMIN_TOKEN: 'admin-secret', DISCORD_PING_USER_ID: '525942394986823685', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: discord.fetcher } });
+  await post(env, ctx, { body: validBody({ message: '@everyone @here <@&123> please look.' }), auth: await token() });
+  await Promise.all(waits);
+  const [created] = discord.calls;
+  assert.equal(created.body.content, `<@525942394986823685> Feedback ${db.rows[0].id}`);
+  assert.deepStrictEqual(created.body.allowed_mentions, { parse: [], users: ['525942394986823685'] });
+  await worker.fetch(new Request(`https://feedback.gfcweather.com/v1/feedback/${db.rows[0].id}`, { method: 'PATCH', headers: { authorization: 'Bearer admin-secret', 'content-type': 'application/json' }, body: JSON.stringify({ status: 'read' }) }), env, ctx);
+  await Promise.all(waits);
+  const update = discord.calls.at(-1);
+  assert.equal(update.body.content.includes('<@'), false);
+  assert.deepStrictEqual(update.body.allowed_mentions, { parse: [] });
+});
+
+test('an invalid DISCORD_PING_USER_ID is ignored rather than injected', async () => {
+  const discord = discordRecorder();
+  const { env, ctx, waits } = harness({ env: { DISCORD_PING_USER_ID: '@everyone', FEEDBACK_DISCORD_WEBHOOK_URL: 'https://discord.example/webhook', FETCH: discord.fetcher } });
+  await post(env, ctx, { auth: await token() });
+  await Promise.all(waits);
+  assert.equal(discord.calls[0].body.content.startsWith('Feedback '), true);
+  assert.deepStrictEqual(discord.calls[0].body.allowed_mentions, { parse: [] });
+});

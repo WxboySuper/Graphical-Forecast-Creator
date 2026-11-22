@@ -18,6 +18,8 @@ Discord secrets on `gfc-feedback`:
 - `FEEDBACK_DISCORD_WEBHOOK_URL` (optional): the forum or text-channel webhook for new submissions. Status changes made in the viewer or through `PATCH /v1/feedback/:id` post a short update here, for example `Feedback <id> marked **Handled**`. On a forum channel the Worker stores each new thread's ID (migration `0004`) and posts updates into that thread. On a text channel, or for items without a stored thread, updates post straight to the channel. If a forum webhook rejects that threadless post, the update starts its own short thread. Repeating a status an item already has is not announced again.
 - `FEEDBACK_DISCORD_UPDATES_WEBHOOK_URL` (optional): when set, every status change goes to this webhook instead.
 
+The ordinary var `DISCORD_PING_USER_ID` in `cloudflare/wrangler.feedback.jsonc` is a Discord user ID. When it is set, new-submission posts start with a mention of that user, and `allowed_mentions` allows only that user. Status updates never ping.
+
 Status notifications run in the background. A Discord failure never fails or delays the status change.
 
 ## Read and update feedback
