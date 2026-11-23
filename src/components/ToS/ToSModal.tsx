@@ -11,7 +11,8 @@ import './ToSModal.css';
 
 // Bump this version string whenever the ToS changes materially.
 // Users who accepted an older version will be asked to re-accept.
-const TOS_VERSION = '3';
+const TOS_VERSION = '4';
+const TOS_EFFECTIVE_DATE = 'November 23, 2026';
 const STORAGE_KEY = 'gfc-tos-accepted';
 
 /** Returns true if the user has accepted the current version of the Terms of Service. */
@@ -41,6 +42,13 @@ interface ToSModalProps {
 /** Renders the current in-app Terms of Service content for both acceptance and view-only modes. */
 const ToSTermsContent: React.FC = () => (
   <>
+    <p>
+      Welcome to the Graphical Forecast Creator (&quot;GFC&quot;, &quot;the App&quot;). By clicking &quot;I Agree&quot; or by using
+      this application, you acknowledge that you have read, understood, and agree to be bound by the following terms
+      and conditions. If you do not agree, please refrain from using the service.
+    </p>
+    <p>GFC is operated by Alexander Miller (&quot;Alex,&quot; also known as wxboysuper).</p>
+
     <h3>1. Unofficial Use &amp; Disclaimer (Critical)</h3>
     <p>
       GFC is intended solely as a <strong>creative and educational tool</strong>. It is <strong>NOT</strong> an official
@@ -82,7 +90,7 @@ const ToSTermsContent: React.FC = () => (
 
     <h3>4. Limitation of Liability</h3>
     <p>
-      TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, the creator of GFC (Alex/wxboysuper) shall not be liable
+      TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, the creator of GFC (Alex) shall not be liable
       for any damages of any kind, including direct, indirect, incidental, special, consequential, or punitive
       damages, arising from:
     </p>
@@ -113,7 +121,7 @@ const ToSTermsContent: React.FC = () => (
 
     <h3>6. Indemnification</h3>
     <p>
-      You agree to indemnify, defend, and hold harmless the creator of GFC (Alex/wxboysuper) from and against any
+      You agree to indemnify, defend, and hold harmless the creator of GFC (Alex) from and against any
       and all claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys&apos; fees)
       arising out of or related to your use of the App, any forecasts, graphics, or discussions you create, share, or
       publish with the App (including any reliance others place on them), your violation of these Terms, or your violation of any
@@ -258,7 +266,7 @@ const ToSModal: React.FC<ToSModalProps> = ({ onAccept, viewOnly = false, onClose
           <div className="tos-modal-header-row">
             <div>
               <h2 id="tos-title">Terms of Service</h2>
-              <p>Please read and accept before using Graphical Forecast Creator &mdash; Version {TOS_VERSION}, Effective November 21, 2026</p>
+              <p>Please read and accept before using Graphical Forecast Creator &mdash; Version {TOS_VERSION}, Effective {TOS_EFFECTIVE_DATE}</p>
             </div>
             {viewOnly && (
               <button className="tos-close-view-btn" onClick={onClose} aria-label="Close">
