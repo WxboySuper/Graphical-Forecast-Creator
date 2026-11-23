@@ -14,13 +14,21 @@ const elapsed = (ms: number): string => {
  */
 export default class ProgressReporter implements Reporter {
   private total = 0;
-  private finished = 0;
-  private failed = 0;
+  /** Latest final outcome per test id, so serial suites that re-run passed tests on retry are not counted twice. */
+  private outcomes = new Map<string, boolean>();
   private startedAt = Date.now();
 
   onBegin(_config: unknown, suite: Suite): void {
     this.total = suite.allTests().length;
     this.startedAt = Date.now();
+  }
+
+  private get finished(): number {
+    return this.outcomes.size;
+  }
+
+  private get failed(): number {
+    return [...this.outcomes.values()].filter((ok) => !ok).length;
   }
 
   private prefix(count: number): string {
@@ -42,10 +50,8 @@ export default class ProgressReporter implements Reporter {
   onTestEnd(test: TestCase, result: TestResult): void {
     const passed = result.status === 'passed' || result.status === 'skipped';
     const willRetry = !passed && result.retry < test.retries;
-    if (!willRetry) {
-      this.finished += 1;
-      if (!passed) this.failed += 1;
-    }
+    if (willRetry) this.outcomes.delete(test.id);
+    else this.outcomes.set(test.id, passed);
     const verb = result.status === 'skipped' ? 'SKIP' : passed ? 'PASS' : 'FAIL';
     const note = willRetry ? ' (will retry)' : '';
     console.log(`${this.prefix(this.finished)} ${verb}  ${this.label(test)}  ${seconds(result.duration)}${note}`);
