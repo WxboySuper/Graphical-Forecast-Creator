@@ -75,7 +75,7 @@ export default class ProgressReporter implements Reporter {
     const time = elapsed(Date.now() - this.startedAt);
     const summary = this.failed === 0 && result.status === 'passed'
       ? `all ${this.total} tests passed${this.skipped ? ` (${this.skipped} skipped)` : ''} in ${time}`
-      : `${this.failed} of ${this.total} tests failed (${result.status}) in ${time}`;
+      : `run ${result.status}: ${this.failed} failed, ${this.finished - this.failed - this.skipped} passed, ${this.total - this.finished} not run of ${this.total} tests in ${time}`;
     console.log(`${this.prefix(this.finished)} DONE  ${summary}`);
   }
 
