@@ -24,7 +24,7 @@ function createFakeDb(documents, subcollections = {}) {
   });
   const snapshotOf = (docPath) => ({ id: docPath.split('/').at(-1), ref: docRef(docPath), data: () => documents[docPath] });
   const depth = (collectionPath) => collectionPath.split('/').length + 1;
-  const query = (collectionPath, filter) => {
+  const query = (collectionPath, ownerFilter) => {
     let limitCount = Infinity;
     let after = null;
     const self = {
@@ -35,7 +35,7 @@ function createFakeDb(documents, subcollections = {}) {
         queries.push({ collectionPath, after: after?.ref.path ?? null });
         let docs = Object.keys(documents).sort()
           .filter((docPath) => docPath.startsWith(`${collectionPath}/`) && docPath.split('/').length === depth(collectionPath))
-          .filter((docPath) => !filter || documents[docPath][filter.field] === filter.value)
+          .filter((docPath) => ownerFilter === null || documents[docPath][ownerFilter.field] === ownerFilter.value)
           .map(snapshotOf);
         if (after) docs = docs.slice(docs.findIndex((doc) => doc.ref.path === after.ref.path) + 1);
         return { docs: docs.slice(0, limitCount) };
