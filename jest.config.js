@@ -48,6 +48,8 @@ module.exports = {
     '[/\\\\]src[/\\\\].*[/\\\\]__mocks__[/\\\\].*',
     '[/\\\\]src[/\\\\].*\\.d\\.ts$',
   ],
+  // CI logs get a RUN/PASS/FAIL/DONE progress line per test file; local runs keep Jest's default output.
+  reporters: process.env.CI ? ['default', '<rootDir>/scripts/lib/jest-progress-reporter.cjs'] : ['default'],
   coverageProvider: 'v8',
   coverageReporters: ['text', 'lcov', 'json-summary'],
   // Recycle workers before accumulated jsdom/module state can exhaust CI memory.

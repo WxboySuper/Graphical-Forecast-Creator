@@ -19,6 +19,7 @@
 - Focused run first: `pnpm test --runInBand <path>`. Use the full CI matrix before calling a cross-cutting change done.
 - Timezone-sensitive toolbar test: `pnpm run test:toolbar:timezone`.
 - Coverage exclusions in `jest.config.js` need an owner and justification in [`coverage-exclusions.md`](../coverage-exclusions.md); update both together.
+- CI progress: the Jest (`scripts/lib/jest-progress-reporter.cjs`, only when `CI` is set) and Playwright (`e2e/progressReporter.ts`) reporters print `[ n/total  pct%] RUN|PASS|FAIL|DONE` lines counting completed tests. Keep the two formats aligned.
 - Type-checks for tests: `pnpm run typecheck:test`; e2e: `typecheck:e2e`.
 
 ## Feature flag tests
