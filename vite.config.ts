@@ -118,12 +118,14 @@ export default defineConfig(({ mode }) => {
           configure: env.GFC_E2E_QUIET_PROXY === '1'
             ? (proxy) => {
                 proxy.on('error', (_err, _req, res) => {
+                  // Websocket upgrades pass a raw socket (or nothing) instead of a ServerResponse.
+                  if (!res) return;
                   if ('writeHead' in res && !res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
                   res.end('API unavailable in e2e');
                 });
                 // Vite registers its own logging 'error' listener right after configure(); ignore that one.
                 const registerListener = proxy.on.bind(proxy);
-                proxy.on = ((event: string, listener: never) => (event === 'error' ? proxy : registerListener(event, listener))) as typeof proxy.on;
+                proxy.on = ((event: string, listener: (...args: unknown[]) => void) => (event === 'error' ? proxy : registerListener(event, listener))) as typeof proxy.on;
               }
             : undefined,
         },
