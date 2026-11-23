@@ -80,6 +80,6 @@ export default class ProgressReporter implements Reporter {
   }
 
   printsToStdio(): boolean {
-    return false;
+    return true;
   }
 }

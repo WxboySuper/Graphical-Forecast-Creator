@@ -4,7 +4,7 @@
  */
 import path from 'path';
 import fs from 'fs';
-import { defineConfig, loadEnv } from 'vite';
+import { createLogger, defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { resolveBuildTarget } from './src/config/buildTarget';
@@ -53,7 +53,15 @@ export default defineConfig(({ mode }) => {
         ]
       : [];
 
+  // E2E runs have no API server on 3006, so Vite's proxy would log an ECONNREFUSED stack for every /api call.
+  // Drop only those proxy-error log lines; the proxy still answers 500 exactly as before.
+  const logger = createLogger();
+  const customLogger = env.GFC_E2E_QUIET_PROXY === '1'
+    ? { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!msg.includes('http proxy error')) logger.error(msg, options); } }
+    : undefined;
+
   return {
+    customLogger,
     base,
     define: {
       __GFC_APP_VERSION__: JSON.stringify(pkg.version),
@@ -114,25 +122,6 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: 'http://127.0.0.1:3006',
           changeOrigin: false,
-          // E2E runs have no API server on 3006; keep the same 500 response but skip the per-request ECONNREFUSED log spam.
-          configure: env.GFC_E2E_QUIET_PROXY === '1'
-            ? (proxy) => {
-                proxy.on('error', (_err, _req, res) => {
-                  // Websocket upgrades pass a raw socket (or nothing) instead of a ServerResponse.
-                  if (!res) return;
-                  if (!('writeHead' in res)) {
-                    res.destroy();
-                    return;
-                  }
-                  if (res.writableEnded) return;
-                  if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
-                  res.end('API unavailable in e2e');
-                });
-                // Vite registers its own logging 'error' listener right after configure(); ignore that one.
-                const registerListener = proxy.on.bind(proxy);
-                proxy.on = ((event: string, listener: (...args: unknown[]) => void) => (event === 'error' ? proxy : registerListener(event, listener))) as typeof proxy.on;
-              }
-            : undefined,
         },
       },
     },
