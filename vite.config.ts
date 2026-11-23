@@ -21,6 +21,12 @@ const VENDOR_CHUNK_RULES: Array<{ family: string; markers: string[] }> = [
 /** Maps an import module id to a named vendor chunk family, or undefined to leave it in the default chunk. */
 const vendorChunkFor = (id: string): string | undefined =>
   VENDOR_CHUNK_RULES.find(({ markers }) => markers.some((marker) => id.includes(marker)))?.family;
+/** Builds a Vite logger that drops the log entries `shouldDrop` matches and forwards everything else unchanged. */
+const createQuietProxyLogger = (shouldDrop: (msg: unknown) => boolean) => {
+  const logger = createLogger();
+  return { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!shouldDrop(msg)) logger.error(msg, options); } };
+};
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const buildTarget = resolveBuildTarget(env.VITE_BUILD_TARGET);
@@ -55,10 +61,10 @@ export default defineConfig(({ mode }) => {
 
   // E2E runs have no API server on 3006, so Vite's proxy would log an ECONNREFUSED stack for every /api call.
   // Drop only those ECONNREFUSED proxy-error log lines; the proxy still answers 500 exactly as before.
-  const logger = createLogger();
-  const customLogger = process.env.GFC_E2E_QUIET_PROXY === '1'
-    ? { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!(msg.includes('http proxy error') && msg.includes('ECONNREFUSED 127.0.0.1:3006'))) logger.error(msg, options); } }
-    : undefined;
+  const API_PROXY_TARGET = 'http://127.0.0.1:3006';
+  const isQuietProxyError = (msg: unknown): boolean =>
+    typeof msg === 'string' && msg.includes('http proxy error') && msg.includes(`ECONNREFUSED ${new URL(API_PROXY_TARGET).host}`);
+  const customLogger = process.env.GFC_E2E_QUIET_PROXY === '1' ? createQuietProxyLogger(isQuietProxyError) : undefined;
 
   return {
     customLogger,
@@ -120,7 +126,7 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:3006',
+          target: API_PROXY_TARGET,
           changeOrigin: false,
         },
       },
