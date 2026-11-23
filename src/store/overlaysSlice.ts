@@ -26,7 +26,7 @@ export interface OverlaysState {
   outlookTrimPreviewOnly: boolean;
 }
 
-const initialState: OverlaysState = {
+const createInitialState = (): OverlaysState => ({
   stateBorders: true, // Default to showing state borders
   counties: false,
   baseMapStyle: 'osm',
@@ -41,7 +41,9 @@ const initialState: OverlaysState = {
     totalSevere: false,
     'day4-8': false,
   },
-};
+});
+
+export const initialState: OverlaysState = createInitialState();
 
 /** True when two ghost-outlook visibility maps contain the same values. */
 const areGhostOutlooksEqual = (
@@ -137,7 +139,7 @@ const overlaysSlice = createSlice({
         };
       }
     },
-    resetOverlays: () => initialState,
+    resetOverlays: () => createInitialState(),
   },
 });
 

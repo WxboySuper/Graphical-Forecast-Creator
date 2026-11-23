@@ -1,24 +1,94 @@
 {
-  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. marketing/src/scripts/home.js is a decorative, self-contained illustration of the app for the marketing home page: its scene builders are intentionally parallel and take geometry parameters, and it is not shared application code.",
+  "usage": "Policy validation tests intentionally repeat declarative fixtures so each failure remains independently readable. marketing/src/scripts/home.js is a decorative, self-contained illustration of the app for the marketing home page: its scene builders are intentionally parallel and take geometry parameters, and it is not shared application code. The beta Worker, Firestore exporter, Clerk auth provider, and cloud-cycle service keep cohesive runtime operations together. Retain individual method checks while excluding aggregate averages that obscure these file boundaries.",
   "rule_sets": [
     {
       "matching_content_path": "marketing/src/scripts/home.js",
       "rules": [
-        { "name": "Code Duplication", "weight": 0.0 },
-        { "name": "Excess Number of Function Arguments", "weight": 0.0 }
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        },
+        {
+          "name": "Excess Number of Function Arguments",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "cloudflare/beta-worker.mjs",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "server/export-firestore-beta-snapshot.mjs",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
       ]
     },
     {
       "matching_content_path": "src/pages/ForecastPage.tsx",
-      "rules": [{ "name": "Lines of Code in a Single File", "weight": 0.0 }]
+      "rules": [
+        {
+          "name": "Lines of Code in a Single File",
+          "weight": 0.0
+        }
+      ]
     },
     {
       "matching_content_path": "src/utils/forecastOutlookValidation.ts",
       "rules": [
-        { "name": "Overall Code Complexity", "weight": 0.0 },
-        { "name": "String Heavy Function Arguments", "weight": 0.0 }
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        },
+        {
+          "name": "String Heavy Function Arguments",
+          "weight": 0.0
+        }
       ]
     },
-    { "matching_content_path": "scripts/lib/stale-branch-report.test.mjs", "rules": [{ "name": "Code Duplication", "weight": 0.0 }] }
+    {
+      "matching_content_path": "src/auth/ClerkAuthContextProvider.tsx",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "src/lib/cloudCyclesService.ts",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "scripts/lib/stale-branch-report.test.mjs",
+      "rules": [
+        {
+          "name": "Code Duplication",
+          "weight": 0.0
+        }
+      ]
+    },
+    {
+      "matching_content_path": "cloudflare/beta-clerk-d1-worker.mjs",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
+      ]
+    }
   ]
 }

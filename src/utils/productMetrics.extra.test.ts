@@ -4,6 +4,39 @@
 type FetchMock = jest.Mock<Promise<{ ok: boolean }>, [RequestInfo | URL, RequestInit?]>;
 
 describe('productMetrics extra', () => {
+  afterEach(() => { jest.dontMock('../lib/betaApi'); });
+
+  test('skips Firebase product metrics when hosted Firebase auth is disabled', async () => {
+    jest.resetModules();
+    jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: false }));
+
+    const fetchMock = jest.fn(() => Promise.resolve({ ok: true })) as unknown as FetchMock;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    window.localStorage.removeItem('gfcInstallationId');
+
+    const { recordProductMetric } = await import('./productMetrics');
+    await recordProductMetric({ event: 'cycle_saved' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem('gfcInstallationId')).toBeNull();
+  });
+
+  test('sends Clerk-mode product metrics through the authenticated beta API', async () => {
+    jest.resetModules();
+    jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: false }));
+    const fetchBetaApi = jest.fn(() => Promise.resolve({ ok: true }));
+    jest.doMock('../lib/betaApi', () => ({ isBetaClerkD1Mode: () => true, fetchBetaApi }));
+    window.localStorage.removeItem('gfcInstallationId');
+
+    const { recordProductMetric } = await import('./productMetrics');
+    await recordProductMetric({ event: 'cloud_cycle_saved' });
+
+    expect(fetchBetaApi).toHaveBeenCalledTimes(1);
+    const [path, init] = fetchBetaApi.mock.calls[0] as unknown as [string, RequestInit & { body: string }];
+    expect(path).toBe('/api/metrics/event');
+    expect(JSON.parse(init.body).event).toBe('cloud_cycle_saved');
+  });
+
   test('recordProductMetric stores installation id and calls fetch', async () => {
     jest.resetModules();
     jest.doMock('../lib/firebase', () => ({ isHostedAuthEnabled: true }));

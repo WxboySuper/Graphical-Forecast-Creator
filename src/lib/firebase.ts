@@ -16,6 +16,7 @@ import {
   memoryLocalCache,
   type Firestore,
 } from 'firebase/firestore';
+import { isBetaClerkD1Mode } from './betaApi';
 
 interface FirebaseClientConfig {
   apiKey: string;
@@ -32,7 +33,8 @@ const firebaseClientConfig: FirebaseClientConfig = {
 };
 
 /** True when the hosted auth configuration required for Firebase sign-in is present. */
-export const isHostedAuthEnabled = Object.values(firebaseClientConfig).every(Boolean);
+export const isHostedAuthEnabled = !isBetaClerkD1Mode()
+  && Object.values(firebaseClientConfig).every(Boolean);
 
 let firebaseApp: FirebaseApp | null = null;
 let firebaseAuth: Auth | null = null;

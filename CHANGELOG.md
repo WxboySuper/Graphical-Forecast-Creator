@@ -14,6 +14,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 #### Added
 
 - **Mesoscale area styling:** Choose how each Mesoscale area looks. Pick the fill (none, hatch, or solid), its color and strength, and the outline color, width, and style (solid, dashed, dotted, or dash-dot) from colorblind-friendly swatches or any custom color. The legend and area list follow your choices, and **Reset to hazard default** returns an area to the color its hazard gives it. Areas you do not change look exactly as before.
+- **Beta Clerk and D1 migration:** Add a beta-only Clerk sign-in and Cloudflare D1 API path, with verified-email Firestore account migration and a retained R2 snapshot source. Firebase remains the beta release default until the migration is explicitly selected; production is unchanged.
 
 ### Stable v2.x hotfixes
 

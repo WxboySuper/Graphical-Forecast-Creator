@@ -29,6 +29,8 @@ import {
 import type { RootState } from '../store';
 import type { OverlaysState } from '../store/overlaysSlice';
 import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
+import { isBetaClerkD1Mode } from '../lib/betaApi';
+import { ClerkAuthContextProvider } from './ClerkAuthContextProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import { DEFAULT_MONITOR_SETTINGS, type MonitorSettings } from '../monitor/types';
@@ -105,13 +107,14 @@ import {
   localUpdateSyncedSettings,
 } from './localAuthClient';
 
-type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
-type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
+export type AuthStatus = 'disabled' | 'loading' | 'signed_out' | 'signed_in' | 'error';
+export type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'error';
 
-interface AuthContextValue {
+export interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
   user: User | null;
+  authProvider: 'firebase' | 'clerk' | 'local';
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
   hostedAuthEnabled: boolean;
@@ -123,7 +126,7 @@ interface AuthContextValue {
   updateSyncedSettings: (settings: Partial<UserSettingsDocument>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 const INITIAL_PROFILE_SYNC_STATUS: SettingsSyncStatus = isHostedAuthEnabled ? 'idle' : 'disabled';
 
 /** Rejects hosted-auth actions when the current deployment intentionally runs in local-only mode. */
@@ -265,7 +268,7 @@ const writeHostedSettingsDocument = async (
 };
 
 /** Builds a full settings snapshot from local UI state when hosted sync has no baseline yet. */
-const buildHostedAccountFallbackSettings = (
+export const buildHostedAccountFallbackSettings = (
   darkMode: boolean,
   overlays: OverlaysState,
   displayName: string,
@@ -352,6 +355,7 @@ export const getDefaultContextValue = (): AuthContextValue => ({
   status: 'disabled',
   settingsSyncStatus: 'disabled',
   user: null,
+  authProvider: 'local',
   syncedSettings: null,
   error: null,
   hostedAuthEnabled: false,
@@ -487,6 +491,7 @@ const useLocalAuthState = (): AuthContextValue => {
     status,
     settingsSyncStatus,
     user,
+    authProvider: 'local',
     syncedSettings,
     error,
     hostedAuthEnabled: true,
@@ -788,6 +793,7 @@ const useHostedAuthState = (): AuthContextValue => {
       status,
       settingsSyncStatus,
       user,
+      authProvider: 'firebase',
       syncedSettings,
       error,
       hostedAuthEnabled: true,
@@ -848,11 +854,11 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 };
 
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  readLocalTestAccount()
-    ? <LocalAuthContextProvider>{children}</LocalAuthContextProvider>
-    : <HostedAuthContextProvider>{children}</HostedAuthContextProvider>
-);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (readLocalTestAccount()) return <LocalAuthContextProvider>{children}</LocalAuthContextProvider>;
+  if (isBetaClerkD1Mode()) return <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>;
+  return <HostedAuthContextProvider>{children}</HostedAuthContextProvider>;
+};
 
 /** Reads the current hosted-auth state and actions for the app. */
 export const useAuth = (): AuthContextValue => {

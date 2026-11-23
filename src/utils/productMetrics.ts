@@ -4,6 +4,7 @@
  */
 import type { User } from 'firebase/auth';
 import { isHostedAuthEnabled } from '../lib/firebase';
+import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
 
 export type ProductMetricEvent =
   | 'account_signup'
@@ -21,9 +22,12 @@ interface RecordProductMetricOptions {
 
 const INSTALLATION_ID_STORAGE_KEY = 'gfcInstallationId';
 
+/** True when a hosted backend (Firebase or beta Clerk) can receive product metrics. */
+const isMetricsBackendEnabled = (): boolean => isHostedAuthEnabled || isBetaClerkD1Mode();
+
 /** Returns the browser-scoped anonymous installation id used for daily active-device dedupe. */
 const getInstallationId = (): string | null => {
-  if (!isHostedAuthEnabled || typeof window === 'undefined') {
+  if (!isMetricsBackendEnabled() || typeof window === 'undefined') {
     return null;
   }
 
@@ -52,6 +56,13 @@ export const recordProductMetric = async ({
       return;
     }
 
+    const body = JSON.stringify({ event, installationId });
+    if (isBetaClerkD1Mode()) {
+      // Clerk sessions authenticate through the beta API token source rather than a Firebase user.
+      await fetchBetaApi('/api/metrics/event', { method: 'POST', keepalive: true, body });
+      return;
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -64,10 +75,7 @@ export const recordProductMetric = async ({
       method: 'POST',
       headers,
       keepalive: true,
-      body: JSON.stringify({
-        event,
-        installationId,
-      }),
+      body,
     });
   } catch {
     // Metrics must never break core user flows.

@@ -38,6 +38,14 @@ on:
         required: false
         default: true
         type: boolean
+      auth_backend:
+        description: 'Keep Firebase until the beta Clerk+D1 migration is explicitly ready'
+        required: true
+        default: firebase
+        type: choice
+        options:
+          - firebase
+          - clerk-d1
 
 concurrency:
   group: beta-release
@@ -120,6 +128,9 @@ jobs:
 
       - name: Test
         run: pnpm run test
+
+      - name: Test the beta Worker API
+        run: pnpm run test:beta-worker
 
   version_gate:
     name: Resolve beta version
@@ -234,6 +245,16 @@ jobs:
       - name: Apply target beta version for build validation
         run: npm version "$RELEASE_VERSION" --no-git-tag-version --allow-same-version
 
+      - name: Require Clerk publishable key for Clerk+D1
+        if: inputs.auth_backend == 'clerk-d1'
+        env:
+          CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
+        run: |
+          if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+            echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
+            exit 1
+          fi
+
       - name: Build beta frontend (validation only)
         run: pnpm run build
         env:
@@ -243,6 +264,8 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
           VITE_MESOSCALE_WORKER_URL_BETA: ${{ vars.MESOSCALE_WORKER_URL }}
@@ -368,6 +391,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache the pinned beta migration verifier
+        if: inputs.auth_backend == 'clerk-d1'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/beta-migration-tools
+          key: ${{ runner.os }}-beta-wrangler-4.149.0-node24
+
       - name: Build beta frontend
         run: pnpm run build
         env:
@@ -377,6 +407,8 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_BETA_AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_ENVIRONMENT: beta
           VITE_MESOSCALE_WORKER_URL_BETA: ${{ vars.MESOSCALE_WORKER_URL }}
@@ -394,21 +426,87 @@ jobs:
 
       - name: Deploy beta Worker and static assets
         id: deploy
-        run: |
-          if [ -n "$BETA_WORKER_SHARED_SECRET" ]; then
-            printf '%s' "$BETA_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4 secret put BETA_WORKER_SHARED_SECRET --config cloudflare/wrangler.beta.jsonc
-          fi
-          pnpm dlx wrangler@4 deploy --config cloudflare/wrangler.beta.jsonc
         env:
+          AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
+          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
+          BETA_D1_DATABASE_ID: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_D1_DATABASE_ID || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BETA_WORKER_SHARED_SECRET: ${{ secrets.BETA_WORKER_SHARED_SECRET }}
+          CLERK_PUBLISHABLE_KEY: ${{ inputs.auth_backend == 'clerk-d1' && secrets.BETA_CLERK_PUBLISHABLE_KEY || '' }}
+          EXPECTED_BETA_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -n "$BETA_WORKER_SHARED_SECRET" ]; then
+            printf '%s' "$BETA_WORKER_SHARED_SECRET" | pnpm dlx wrangler@4.149.0 secret put BETA_WORKER_SHARED_SECRET --config cloudflare/wrangler.beta.jsonc
+          fi
+          if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
+            if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+              echo "::error::BETA_CLERK_PUBLISHABLE_KEY is required for clerk-d1" >&2
+              exit 1
+            fi
+            if [ -z "$BETA_D1_DATABASE_ID" ]; then
+              echo "::error::BETA_D1_DATABASE_ID is required for clerk-d1" >&2
+              exit 1
+            fi
+            node scripts/prepare-beta-clerk-d1-config.mjs
+            pnpm dlx wrangler@4.149.0 d1 export gfc-beta --remote --skip-confirmation --output beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
+            pnpm dlx wrangler@4.149.0 r2 object put "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            test -s beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip verification produced an empty file." >&2; exit 1; }
+            cmp --silent beta-d1-backup.sql beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip mismatch." >&2; exit 1; }
+            pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            test -s beta-firestore-full-snapshot.jsonl || { echo "::error::Firestore full snapshot download produced an empty file." >&2; exit 1; }
+            node scripts/verify-beta-snapshot-manifest.mjs manifest beta-firestore-manifest.json beta-firestore-full-snapshot.jsonl beta-firestore-email-hashes.txt
+            SNAPSHOT_VERIFY_DIR=$(mktemp -d)
+            trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
+            WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
+            if [ ! -x "$WRANGLER_BIN" ]; then
+              # One pinned install serves the complete per-email verification batch.
+              for attempt in 1 2 3; do
+                if npm install --prefix "$RUNNER_TEMP/beta-migration-tools" --no-save --no-package-lock wrangler@4.149.0; then break; fi
+                if [ "$attempt" -eq 3 ]; then echo "::error::Unable to install the pinned Wrangler snapshot verifier after three attempts." >&2; exit 1; fi
+                sleep "$((attempt * 3))"
+              done
+            fi
+            export SNAPSHOT_VERIFY_DIR WRANGLER_BIN
+            WRANGLER_CONFIG=cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            export WRANGLER_CONFIG
+            xargs -r -P 4 -I '{}' bash -euo pipefail -c '
+              EMAIL_HASH="$1"
+              attempt=1
+              until "$WRANGLER_BIN" r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --config "$WRANGLER_CONFIG"; do
+                if [[ "$attempt" -ge 3 ]]; then echo "::error::Could not download snapshot for email hash $EMAIL_HASH." >&2; exit 1; fi
+                sleep "$((attempt * 2))"
+                attempt=$((attempt + 1))
+              done
+              test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" || { echo "::error::Snapshot for email hash $EMAIL_HASH is empty." >&2; exit 1; }
+              node scripts/verify-beta-snapshot-manifest.mjs user "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" "$EMAIL_HASH"
+            ' _ '{}' < beta-firestore-email-hashes.txt
+            pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 deploy --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+          else
+            pnpm dlx wrangler@4.149.0 deploy --config cloudflare/wrangler.beta.jsonc
+          fi
 
       - name: Print rollback command on deploy failure
         if: failure() && steps.deploy.outcome == 'failure'
+        env:
+          AUTH_BACKEND: ${{ inputs.auth_backend }}
         run: |
           echo "::error::Worker deploy failed. After fixing the issue, redeploy with deploy-beta-workers.yml and ref=v${RELEASE_VERSION}."
-          echo "pnpm dlx wrangler@4 rollback --config cloudflare/wrangler.beta.jsonc"
+          CONFIG="cloudflare/wrangler.beta.jsonc"
+          if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
+            CONFIG="cloudflare/wrangler.beta.clerk-d1.generated.jsonc"
+            echo "Set BETA_D1_DATABASE_ID in a repository checkout, then run: node scripts/prepare-beta-clerk-d1-config.mjs"
+          fi
+          echo "pnpm dlx wrangler@4.149.0 rollback --config $CONFIG"
+          if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
+            BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
+            echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql --config $CONFIG && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
+          fi
 
   deploy_mesoscale_worker:
     name: Deploy mesoscale catalog Worker
@@ -490,6 +588,8 @@ jobs:
         if: failure()
         run: echo "pnpm dlx wrangler@4 rollback --name gfc-mesoscale"
 
+  # Clerk+D1 requests use the beta hostname's same-origin Worker API. Keep the
+  # VPS service untouched as a rollback target; this path does not route traffic to it.
   deploy_beta_api:
     name: Deploy beta API server (VPS)
     needs: [release, deploy]
@@ -497,7 +597,8 @@ jobs:
       !cancelled() &&
       needs.deploy.result == 'success' &&
       !inputs.dry_run &&
-      (github.event_name == 'schedule' || inputs.deploy_api)
+      (github.event_name == 'schedule' || inputs.deploy_api) &&
+      inputs.auth_backend != 'clerk-d1'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -640,11 +741,61 @@ jobs:
           EXPECTED_VERSION: ${{ needs.release.outputs.version }}
         run: node scripts/smoke-test-beta-site.mjs
 
+      - name: Smoke test the Clerk+D1 API
+        if: inputs.auth_backend == 'clerk-d1'
+        env:
+          BETA_ORIGIN: https://beta.gfcweather.com
+        run: |
+          node --input-type=module - <<'NODE'
+          let lastFailure = 'No response received.';
+          let healthy = false;
+          for (let attempt = 1; attempt <= 3; attempt += 1) {
+            const healthController = new AbortController();
+            const healthTimeout = setTimeout(() => healthController.abort(), 15_000);
+            try {
+              const response = await fetch(`${process.env.BETA_ORIGIN || 'https://beta.gfcweather.com'}/api/health`, {
+                headers: { 'Cache-Control': 'no-cache' }, signal: healthController.signal,
+              });
+              const text = await response.text();
+              let body = {};
+              try { body = JSON.parse(text); } catch { body = { raw: text.slice(0, 500) }; }
+              lastFailure = `HTTP ${response.status}: ${JSON.stringify(body)}`;
+              if (response.ok && body.service === 'gfc-beta-worker' && body.database === true) {
+                const authController = new AbortController();
+                const authTimeout = setTimeout(() => authController.abort(), 15_000);
+                try {
+                  const authProbe = await fetch(`${process.env.BETA_ORIGIN || 'https://beta.gfcweather.com'}/api/me/bootstrap`, {
+                    headers: { 'Cache-Control': 'no-cache' }, signal: authController.signal,
+                  });
+                  if (authProbe.status === 401) healthy = true;
+                  else lastFailure = `Health succeeded but unauthenticated bootstrap returned HTTP ${authProbe.status}.`;
+                } finally { clearTimeout(authTimeout); }
+              }
+              if (healthy) {
+                break;
+              }
+            } catch (error) {
+              lastFailure = error instanceof Error ? error.message : String(error);
+            } finally {
+              clearTimeout(healthTimeout);
+            }
+            if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+          }
+          if (!healthy) throw new Error(`Clerk+D1 API health check failed after 3 attempts: ${lastFailure}`);
+          NODE
+
       - name: Print rollback command on smoke failure
         if: failure()
+        env:
+          AUTH_BACKEND: ${{ inputs.auth_backend || 'firebase' }}
         run: |
           echo "::error::Beta smoke test failed after deploy. Roll back the Worker with:"
-          echo "pnpm dlx wrangler@4 rollback --config cloudflare/wrangler.beta.jsonc"
+          CONFIG="cloudflare/wrangler.beta.jsonc"
+          if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
+            CONFIG="cloudflare/wrangler.beta.clerk-d1.generated.jsonc"
+            echo "Set BETA_D1_DATABASE_ID in a repository checkout, then run: node scripts/prepare-beta-clerk-d1-config.mjs"
+          fi
+          echo "pnpm dlx wrangler@4.149.0 rollback --config $CONFIG"
           echo "To redeploy the tagged release without cutting a new version, run deploy-beta-workers.yml with ref=v${RELEASE_VERSION}."
 
   publish_release:

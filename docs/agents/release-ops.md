@@ -7,6 +7,7 @@ Do not run release/deploy workflows unless the owner asks. Procedures here are c
 - `main` = fast trunk and beta source. `stable/2.x` = v2 production. Beta = prerelease cut from `main` (not a branch). Merging deploys nothing.
 - Targets: `local`, `beta` (`beta.gfcweather.com`, Cloudflare Worker `gfc-beta` + VPS API at `/opt/gfc-beta-analytics`), `staging` (`staging-gfc.weatherboysuper.com`), `production` (`app.gfcweather.com`, Cloudflare Worker `gfc-production` + VPS API at `/opt/gfc-analytics`). The apex and `www` hostnames serve the separate `gfc-marketing` Worker.
 - Old docs/comments may say `beta-gfc.weatherboysuper.com`; the Cloudflare config uses `beta.gfcweather.com`.
+- `release-beta.yml` defaults `auth_backend` to `firebase`. The opt-in `clerk-d1` path uses `cloudflare/wrangler.beta.clerk-d1.jsonc` and its dedicated Worker entry, then skips the beta VPS API deploy. The Firebase/VPS path remains the scheduled and manual default. Do not choose Clerk+D1 until the migration setup and owner go/no-go review are complete; production stays on Firebase and `gfc-production`.
 
 ## Versioning
 

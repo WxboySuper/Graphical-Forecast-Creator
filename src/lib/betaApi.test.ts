@@ -1,0 +1,70 @@
+import { fetchBetaApi, getBetaApiToken, setBetaApiTokenProvider } from './betaApi';
+
+describe('beta Worker token provider lifecycle', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    setBetaApiTokenProvider(null);
+    jest.useRealTimers();
+  });
+
+  it('fails pending API calls immediately when the provider is cleared', async () => {
+    jest.useFakeTimers();
+    const pending = fetchBetaApi('/api/user/settings');
+    const rejection = pending.catch((error: Error) => error);
+    setBetaApiTokenProvider(null);
+    expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+  });
+
+  it('times out while waiting for Clerk to register a token provider', async () => {
+    jest.useFakeTimers();
+    const pending = fetchBetaApi('/api/user/settings');
+    const rejection = pending.catch((error: Error) => error);
+    await jest.advanceTimersByTimeAsync(1_000);
+    expect(await rejection).toEqual(expect.objectContaining({ message: 'The beta session is still initializing.' }));
+  });
+
+  const resolveStaleTokenRequest = async (clearProvider: boolean) => {
+    let resolveToken!: (token: string) => void;
+    const provider = () => new Promise<string>((resolve) => { resolveToken = resolve; });
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));
+    setBetaApiTokenProvider(provider);
+    const pending = fetchBetaApi('/api/user/settings');
+    await Promise.resolve();
+    setBetaApiTokenProvider(clearProvider ? null : provider);
+    resolveToken('stale-clerk-token');
+    const error = await pending.then(() => null, (caught: Error) => caught);
+    return { error, fetchSpy };
+  };
+
+  it('discards a token that resolves after the provider is cleared', async () => {
+    const result = await resolveStaleTokenRequest(true);
+    expect(result.error).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(result.fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('invalidates an in-flight request when the stable provider is re-registered for a new account', async () => {
+    const result = await resolveStaleTokenRequest(false);
+    expect(result.error).toEqual(expect.objectContaining({ message: 'The beta session is signed out.' }));
+    expect(result.fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('shares one bounded token wait and stops polling when aborted', async () => {
+    jest.useFakeTimers();
+    const provider = jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('clerk-token');
+    const pending = getBetaApiToken(provider);
+    await jest.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toBe('clerk-token');
+
+    const controller = new AbortController();
+    const noToken = jest.fn().mockResolvedValue(null);
+    const cancelled = getBetaApiToken(noToken, controller.signal);
+    const rejection = cancelled.catch((error: Error) => error);
+    controller.abort();
+    await expect(rejection).resolves.toEqual(expect.objectContaining({ name: 'AbortError' }));
+  });
+
+  it('preserves Clerk token provider errors for callers', async () => {
+    const providerError = new Error('Clerk session expired.');
+    await expect(getBetaApiToken(jest.fn().mockRejectedValue(providerError))).rejects.toBe(providerError);
+  });
+});
