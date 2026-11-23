@@ -47,6 +47,8 @@ export const serializeFirestoreValue = (value) => {
   // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class). ArrayBuffer.isView is
   // realm-safe, so Buffers, typed arrays and DataViews from any realm are tagged too (no silent data loss).
   if (ArrayBuffer.isView(value)) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
+  // Compatibility: an SDK/emulator that returns a Bytes instance instead of a Buffer.
+  if (typeof value?.toBase64 === 'function') return { __type: 'bytes', base64: value.toBase64() };
   const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
   if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
@@ -264,8 +266,8 @@ const ACCOUNT_ROOT_COLLECTIONS = ['userProfiles', 'userSettings', 'userEntitleme
 // Top-level collections whose account documents are found by an owner field, matching account-lifecycle.js.
 const ACCOUNT_OWNED_QUERIES = [['cloudCycles', 'userId'], ['adminMetricDedupes', 'uid']];
 
-// Equality-only queries return documents in document-name order, so snapshot cursors are stable without an
-// explicit orderBy (the same approach migrateAccount uses for cloudCycles).
+// An equality filter plus orderBy(documentId) is served by the automatic single-field indexes (no composite index
+// needed), and gives snapshot cursors a stable, explicit order.
 async function exportOwnedDocuments({ db, uid, collectionName, ownerField, writeSnapshotLine, exportCollection }) {
   let exportedCount = 0;
   let cursor = null;
@@ -486,7 +488,7 @@ async function main() {
         console.error(`Duplicate beta email hash ${sha256(email)}; skipping profile ${sha256(profileDoc.id)}.`);
         continue;
       }
-      includedUids.push(profileDoc.id);
+      if (includeEmails) includedUids.push(profileDoc.id);
       pageAccounts.push({
         uid: profileDoc.id,
         email,
@@ -542,7 +544,7 @@ async function main() {
     ...includeSummary,
     complete,
   }, null, 2), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-  if (!complete) throw new Error(`Snapshot export incomplete: ${accountFailures.length} account failures, ${skippedNoEmail} profiles without email, and ${malformedLegacyCycles.length} malformed legacy cycles; review manifest.json and rerun into a new output directory.`);
+  if (!complete) throw new Error(`Snapshot export incomplete: ${accountFailures.length} account failures, ${skippedNoEmail} profiles without email, ${malformedLegacyCycles.length} malformed legacy cycles, and ${unmatchedIncludeCount} unmatched include emails; review manifest.json and rerun into a new output directory.`);
   console.log(`Exported ${fullSnapshotCount} Firestore documents and ${count} beta user snapshots from Firebase project ${projectId}; skipped ${skippedNoEmail} profiles without email.`);
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
 }

@@ -25,26 +25,21 @@ function createFakeDb(documents, subcollections = {}) {
   });
   const snapshotOf = (docPath) => ({ id: docPath.split('/').at(-1), ref: docRef(docPath), data: () => documents[docPath] });
   const depth = (collectionPath) => collectionPath.split('/').length + 1;
-  const query = (collectionPath, ownerFilter) => {
-    let limitCount = Infinity;
-    let after = null;
-    let ordered = false;
-    const self = {
-      orderBy: () => { ordered = true; return self; },
-      limit: (count) => { limitCount = count; return self; },
-      startAfter: (cursor) => { after = cursor; return self; },
-      get: async () => {
-        queries.push({ collectionPath, ordered, after: after?.ref.path ?? null });
-        let docs = Object.keys(documents).sort()
-          .filter((docPath) => docPath.startsWith(`${collectionPath}/`) && docPath.split('/').length === depth(collectionPath))
-          .filter((docPath) => ownerFilter === null || documents[docPath][ownerFilter.field] === ownerFilter.value)
-          .map(snapshotOf);
-        if (after) docs = docs.slice(docs.findIndex((doc) => doc.ref.path === after.ref.path) + 1);
-        return { docs: docs.slice(0, limitCount) };
-      },
-    };
-    return self;
-  };
+  // Immutable like real Firestore queries: every builder call returns a new query, so dropped reassignments show up.
+  const query = (collectionPath, ownerFilter, state = { limitCount: Infinity, after: null, ordered: false }) => ({
+    orderBy: () => query(collectionPath, ownerFilter, { ...state, ordered: true }),
+    limit: (count) => query(collectionPath, ownerFilter, { ...state, limitCount: count }),
+    startAfter: (cursor) => query(collectionPath, ownerFilter, { ...state, after: cursor }),
+    get: async () => {
+      queries.push({ collectionPath, ordered: state.ordered, limitCount: state.limitCount, after: state.after?.ref.path ?? null });
+      let docs = Object.keys(documents).sort()
+        .filter((docPath) => docPath.startsWith(`${collectionPath}/`) && docPath.split('/').length === depth(collectionPath))
+        .filter((docPath) => ownerFilter === null || documents[docPath][ownerFilter.field] === ownerFilter.value)
+        .map(snapshotOf);
+      if (state.after) docs = docs.slice(docs.findIndex((doc) => doc.ref.path === state.after.ref.path) + 1);
+      return { docs: docs.slice(0, state.limitCount) };
+    },
+  });
   const collectionRef = (collectionPath) => ({
     path: collectionPath,
     doc: (id) => docRef(`${collectionPath}/${id}`),
@@ -184,7 +179,7 @@ describe('exportIncludedAccountDocuments', () => {
     assert.equal(directCount, 1001);
     assert.equal(new Set(exporter.lines.map((line) => line.path)).size, 1001);
     assert.equal(db.queries.filter((query) => query.collectionPath === 'cloudCycles').length, Math.ceil(1001 / 500));
-    assert.ok(db.queries.every((query) => query.ordered));
+    assert.ok(db.queries.every((query) => query.ordered && query.limitCount === 500));
   });
 
   it('writes nothing when no profile matched the list', async () => {
