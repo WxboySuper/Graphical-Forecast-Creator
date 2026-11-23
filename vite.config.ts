@@ -120,7 +120,11 @@ export default defineConfig(({ mode }) => {
                 proxy.on('error', (_err, _req, res) => {
                   // Websocket upgrades pass a raw socket (or nothing) instead of a ServerResponse.
                   if (!res) return;
-                  if ('writeHead' in res && !res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+                  if (!('writeHead' in res)) {
+                    res.destroy();
+                    return;
+                  }
+                  if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
                   res.end('API unavailable in e2e');
                 });
                 // Vite registers its own logging 'error' listener right after configure(); ignore that one.
