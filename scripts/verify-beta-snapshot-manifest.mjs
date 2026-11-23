@@ -16,27 +16,29 @@ import { fileURLToPath } from 'node:url';
 const EMAIL_HASH_PATTERN = /^[a-f0-9]{64}$/;
 
 const isPositiveInteger = (value) => Number.isInteger(value) && value >= 1;
+const isEmailHash = (hash) => typeof hash === 'string' && EMAIL_HASH_PATTERN.test(hash);
+const emailHashesOf = (manifest) => (Array.isArray(manifest.userSnapshotEmailHashes) ? manifest.userSnapshotEmailHashes : null);
 
-const isCompleteExport = (manifest) => manifest.complete === true
-  && manifest.skippedNoEmailCount === 0
-  && manifest.malformedLegacyCycleCount === 0
-  && Array.isArray(manifest.accountFailures)
-  && manifest.accountFailures.length === 0;
-
-const hasConsistentCounts = (manifest) => isPositiveInteger(manifest.fullSnapshotCount)
-  && isPositiveInteger(manifest.userSnapshotCount);
-
-const hasUniqueEmailHashes = (manifest) => {
-  const hashes = manifest.userSnapshotEmailHashes;
-  if (!Array.isArray(hashes) || hashes.length !== manifest.userSnapshotCount) return false;
-  if (!hashes.every((hash) => typeof hash === 'string' && EMAIL_HASH_PATTERN.test(hash))) return false;
-  return new Set(hashes).size === hashes.length;
-};
+/** Each rule checks one manifest property so a failed release names a single, readable condition. */
+const MANIFEST_RULES = [
+  (manifest) => manifest.complete === true,
+  (manifest) => manifest.skippedNoEmailCount === 0,
+  (manifest) => manifest.malformedLegacyCycleCount === 0,
+  (manifest) => Array.isArray(manifest.accountFailures),
+  (manifest) => manifest.accountFailures.length === 0,
+  (manifest) => isPositiveInteger(manifest.fullSnapshotCount),
+  (manifest) => isPositiveInteger(manifest.userSnapshotCount),
+  (manifest) => emailHashesOf(manifest) !== null,
+  (manifest) => emailHashesOf(manifest).length === manifest.userSnapshotCount,
+  (manifest) => emailHashesOf(manifest).every(isEmailHash),
+  (manifest) => new Set(emailHashesOf(manifest)).size === emailHashesOf(manifest).length,
+];
 
 /** Returns true when the manifest is complete, matches the beta project, and lists unique per-user hashes. */
 export const isValidSnapshotManifest = (manifest, expectedProjectId) => {
-  if (!expectedProjectId || !manifest || manifest.projectId !== expectedProjectId) return false;
-  return [isCompleteExport, hasConsistentCounts, hasUniqueEmailHashes].every((check) => check(manifest));
+  if (!expectedProjectId) return false;
+  if (manifest?.projectId !== expectedProjectId) return false;
+  return MANIFEST_RULES.every((rule) => rule(manifest));
 };
 
 /** Counts non-empty JSONL records, throwing on any line that is not valid JSON. */
@@ -53,11 +55,14 @@ export const countSnapshotRecords = async (snapshotPath) => {
 };
 
 /** Returns true when a per-user snapshot has an identity and its normalized email hashes to the expected value. */
+const normalizedEmailOf = (snapshot) => (typeof snapshot?.email === 'string' ? snapshot.email.trim().toLowerCase() : '');
+const hasIdentity = (snapshot) => [normalizedEmailOf(snapshot), snapshot?.uid, snapshot?.userProfile].every(Boolean);
+
+/** Returns true when a per-user snapshot has an identity and its normalized email hashes to the expected value. */
 export const isValidUserSnapshot = (snapshot, expectedHash) => {
-  if (!EMAIL_HASH_PATTERN.test(expectedHash || '')) return false;
-  const email = typeof snapshot?.email === 'string' ? snapshot.email.trim().toLowerCase() : '';
-  if (!email || !snapshot.uid || !snapshot.userProfile) return false;
-  return crypto.createHash('sha256').update(email).digest('hex') === expectedHash;
+  if (!isEmailHash(expectedHash)) return false;
+  if (!hasIdentity(snapshot)) return false;
+  return crypto.createHash('sha256').update(normalizedEmailOf(snapshot)).digest('hex') === expectedHash;
 };
 
 const verifyManifest = async (manifestPath, snapshotPath, hashesOutPath) => {
