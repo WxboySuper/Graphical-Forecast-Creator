@@ -249,6 +249,7 @@ test('snapshot migration preserves cycles and products beyond new-account quotas
     assert.equal(db.customProducts.has('user_beta_test:product-01'), true);
     assert.equal(db.customProducts.has('user_beta_test:product-16'), true);
     assert.equal(db.customProducts.has('user_beta_test:legacy-17'), true);
+    db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
     const overQuota = await call('/api/custom-products', env, { method: 'POST', body: {
       product: { id: 'new-product', userId: 'user_beta_test', version: 1 },
     } });
@@ -575,6 +576,7 @@ test('workflow awareness rejects invalid and over-quota writes and returns persi
 
 test('custom products validate IDs and support account-scoped CRUD with version checks', async () => {
   const db = new D1Mock();
+  db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
   const env = createEnv(db);
   await withClerkFetch(async () => {
     const invalid = await call('/api/custom-products', env, { method: 'POST', body: {
@@ -606,6 +608,7 @@ test('custom products validate IDs and support account-scoped CRUD with version 
 
 test('custom product creation retries a concurrent slot collision', async () => {
   const db = new D1Mock();
+  db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
   db.failNextCustomProductSlotInsert = true;
   await withClerkFetch(async () => {
     const response = await call('/api/custom-products', createEnv(db), { method: 'POST', body: {
@@ -903,4 +906,62 @@ test('the Sentry tunnel accepts regional hosted DSNs and rejects untrusted hosts
     }), env);
     assert.equal(oversized.status, 413);
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test('custom product creation and edits require premium while reads and deletes stay available', async () => {
+  const db = new D1Mock();
+  db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: true }));
+  const env = createEnv(db);
+  await withClerkFetch(async () => {
+    const created = await call('/api/custom-products', env, { method: 'POST', body: { product: { id: 'owned', userId: 'user_beta_test', version: 1 } } });
+    assert.equal(created.status, 200);
+    db.entitlements.set('user_beta_test', JSON.stringify({ premiumActive: false }));
+    const blockedCreate = await call('/api/custom-products', env, { method: 'POST', body: { product: { id: 'second', userId: 'user_beta_test', version: 1 } } });
+    assert.equal(blockedCreate.status, 403);
+    const blockedPatch = await call('/api/custom-products/owned', env, { method: 'PATCH', body: { product: { id: 'owned', userId: 'user_beta_test', version: 2 }, expectedVersion: 1 } });
+    assert.equal(blockedPatch.status, 403);
+    assert.equal((await call('/api/custom-products', env)).status, 200);
+    assert.equal((await call('/api/custom-products/owned', env, { method: 'DELETE', body: { expectedVersion: 1 } })).status, 200);
+  });
+});
+
+test('snapshot migration keeps premium granted by a beta override', async () => {
+  const db = new D1Mock();
+  const env = createEnv(db, {
+    uid: 'firebase_old_uid',
+    userProfile: { email: 'test@example.com' },
+    userEntitlement: { premiumActive: true, betaOverrideActive: true, uid: 'firebase_old_uid' },
+    cloudCycles: [], workflowAwareness: [], customProducts: [],
+  });
+  await withClerkFetch(async () => {
+    const response = await call('/api/me/bootstrap', env);
+    assert.equal(response.status, 200, await response.clone().text());
+    const { entitlement } = await response.json();
+    assert.equal(entitlement.premiumActive, true);
+    assert.equal(entitlement.betaOverrideActive, true);
+    assert.equal(entitlement.effectiveSource, 'beta_override');
+  });
+});
+
+test('the Stripe entitlement write ignores events older than the last applied one', async () => {
+  const { sqlite } = await createD1SQLite();
+  try {
+    sqlite.prepare('INSERT INTO users (clerk_id, email, email_verified, created_at, updated_at) VALUES (?, ?, 1, ?, ?)')
+      .run('user_stripe', 'stripe@example.com', 'now', 'now');
+    const upsert = sqlite.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
+      ${__test.stripeEventOrderGuard}`);
+    const write = (id, type, created, premiumActive) => upsert.run('user_stripe', JSON.stringify({
+      premiumActive, lastStripeEventId: id, lastStripeEventType: type, lastStripeEventCreated: created,
+    }), 'now');
+    const read = () => JSON.parse(sqlite.prepare('SELECT data_json FROM user_entitlements WHERE user_id = ?').get('user_stripe').data_json);
+    write('evt_created', 'customer.subscription.created', 100, true);
+    write('evt_deleted', 'customer.subscription.deleted', 200, false);
+    write('evt_late_update', 'customer.subscription.updated', 150, true);
+    assert.equal(read().premiumActive, false);
+    write('evt_same_second_update', 'customer.subscription.updated', 200, true);
+    assert.equal(read().lastStripeEventId, 'evt_deleted');
+    write('evt_resubscribed', 'customer.subscription.created', 300, true);
+    assert.equal(read().premiumActive, true);
+  } finally { sqlite.close(); }
 });

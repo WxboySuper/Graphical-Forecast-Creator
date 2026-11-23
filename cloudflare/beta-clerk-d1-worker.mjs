@@ -360,6 +360,11 @@ async function requirePremiumCloudStorage(env, user) {
   return entitlement?.premiumActive === true ? null : json({ error: 'Premium cloud storage is required.' }, 403);
 }
 
+async function requirePremiumCustomProducts(env, user) {
+  const entitlement = await readJsonRecord(env.DB, 'user_entitlements', user.clerk_id);
+  return entitlement?.premiumActive === true ? null : json({ error: 'Premium is required to create or edit custom products.' }, 403);
+}
+
 async function cloudCycleSaveResult(env, user, id, saved) {
   if (saved.response) return saved.response;
   if (!saved.meta.changes) {
@@ -553,6 +558,8 @@ async function classifyCustomProductSlotFailure({ db, error, userId, productId, 
 }
 
 async function createCustomProduct(request, env, user) {
+  const denied = await requirePremiumCustomProducts(env, user);
+  if (denied) return denied;
   const input = parseNewCustomProduct(await readBody(request), user.clerk_id);
   if (input.response) return input.response;
   const failure = await reserveCustomProductSlot(env, user.clerk_id, input.product, input.dataJson);
@@ -584,6 +591,8 @@ function hasValidPayloadSize(dataJson) { return new TextEncoder().encode(dataJso
 function oversizedCustomProduct() { return { response: json({ error: 'Custom product is too large.' }, 413) }; }
 
 async function patchCustomProduct({ request, env, user, productId, currentRow, current }) {
+  const denied = await requirePremiumCustomProducts(env, user);
+  if (denied) return denied;
   const body = await readBody(request);
   if (body === BODY_TOO_LARGE) return json({ error: 'Request body is too large.' }, 413);
   const input = parseCustomProductPatch(body, productId, user.clerk_id, current.version);
@@ -787,8 +796,8 @@ async function findStripeOwner(db, candidates) {
   return null;
 }
 
-function buildStripeEntitlement({ ownerId, prior, subscription, object, eventType }) {
-  const status = stripeStatus(subscription, checkoutFallbackStatus(eventType));
+function buildStripeEntitlement({ ownerId, prior, subscription, object, event }) {
+  const status = stripeStatus(subscription, checkoutFallbackStatus(event.type));
   const active = hasActiveStripeStatus(status);
   const betaOverrideActive = hasBetaOverride(prior);
   return {
@@ -797,6 +806,7 @@ function buildStripeEntitlement({ ownerId, prior, subscription, object, eventTyp
     premiumActive: betaOverrideActive || active, effectiveSource: resolveEffectiveSource(betaOverrideActive, active),
     cancelAtPeriodEnd: hasCancelAtPeriodEnd(subscription), currentPeriodEnd: stripePeriodEnd(subscription),
     planInterval: stripePlanInterval(subscription, prior.planInterval),
+    lastStripeEventId: event.id, lastStripeEventType: event.type, lastStripeEventCreated: Number(event.created) || 0,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -838,15 +848,24 @@ function isStripeMetricQuotaError(error, metricType) {
   return String(error?.message || '').includes('product_metric_daily_quota_reached');
 }
 
+// Applies only when the event is not older than the last applied one, in one atomic statement (mirrors server/billing-webhook-state.js).
+const STRIPE_EVENT_ORDER_GUARD = `WHERE COALESCE(json_extract(user_entitlements.data_json, '$.lastStripeEventCreated'), 0) < json_extract(excluded.data_json, '$.lastStripeEventCreated')
+      OR (COALESCE(json_extract(user_entitlements.data_json, '$.lastStripeEventCreated'), 0) = json_extract(excluded.data_json, '$.lastStripeEventCreated')
+        AND NOT (json_extract(user_entitlements.data_json, '$.lastStripeEventType') = 'customer.subscription.deleted'
+          AND json_extract(excluded.data_json, '$.lastStripeEventType') != 'customer.subscription.deleted'))`;
+
 async function writeStripeEntitlement(db, { event, ownerId, prior, subscription, object }) {
-  const entitlement = buildStripeEntitlement({ ownerId, prior, subscription, object, eventType: event.type });
+  const entitlement = buildStripeEntitlement({ ownerId, prior, subscription, object, event });
   const statements = [db.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+    ON CONFLICT(user_id) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
+    ${STRIPE_EVENT_ORDER_GUARD}`)
     .bind(ownerId, JSON.stringify(entitlement), entitlement.updatedAt)];
   const metricType = stripeMetricTransition(prior.premiumActive, entitlement.premiumActive);
   if (metricType) {
-    statements.push(db.prepare('INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id) VALUES (?, ?, ?, ?, ?)')
-      .bind(`stripe:${event.id}:${metricType === 'upgrades' ? 'upgrade' : 'cancellation'}`, entitlement.updatedAt.slice(0, 10), event.id, metricType, ownerId));
+    // Records the transition only when this event is the one that was applied.
+    statements.push(db.prepare(`INSERT OR IGNORE INTO product_metric_events (event_id, event_date, installation_id, event_type, user_id)
+      SELECT ?, ?, ?, ?, ? WHERE (SELECT json_extract(data_json, '$.lastStripeEventId') FROM user_entitlements WHERE user_id = ?) = ?`)
+      .bind(`stripe:${event.id}:${metricType === 'upgrades' ? 'upgrade' : 'cancellation'}`, entitlement.updatedAt.slice(0, 10), event.id, metricType, ownerId, ownerId, event.id));
   }
   await saveStripeEntitlementBatch(db, statements, event.id, metricType);
 }
@@ -1136,4 +1155,4 @@ export default {
   },
 };
 
-export const __test = { authenticate, emailSnapshotKey, deleteBetaUserData, clearAuthCache: () => clearAuthProfileCache() };
+export const __test = { stripeEventOrderGuard: STRIPE_EVENT_ORDER_GUARD, authenticate, emailSnapshotKey, deleteBetaUserData, clearAuthCache: () => clearAuthProfileCache() };

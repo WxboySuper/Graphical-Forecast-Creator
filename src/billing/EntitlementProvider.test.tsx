@@ -295,6 +295,35 @@ describe('EntitlementProvider', () => {
     expect((useAuth as jest.Mock).mock.results[0].value.user.getIdToken).not.toHaveBeenCalled();
   });
 
+  test('refreshes the beta entitlement when the window regains focus after checkout', async () => {
+    (isBetaClerkD1Mode as jest.Mock).mockReturnValue(true);
+    (useAuth as jest.Mock).mockReturnValue({
+      hostedAuthEnabled: true,
+      status: 'signed_in',
+      user: { uid: 'clerk-user', getIdToken: jest.fn() },
+    });
+    (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
+    const entitlementResponse = (premiumActive: boolean) => ({
+      ok: true,
+      json: () => Promise.resolve({ entitlement: { uid: 'clerk-user', premiumActive } }),
+    });
+    (fetchBetaApi as jest.Mock)
+      .mockResolvedValueOnce(entitlementResponse(false))
+      .mockResolvedValue(entitlementResponse(true));
+
+    const { result } = renderHook(() => useEntitlement(), {
+      wrapper: ({ children }) => <EntitlementProvider>{children}</EntitlementProvider>,
+    });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(result.current.premiumActive).toBe(false);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(result.current.premiumActive).toBe(true);
+  });
+
   test('openCheckout throws error if user not signed in', async () => {
     (useAuth as jest.Mock).mockReturnValue({
       hostedAuthEnabled: true,

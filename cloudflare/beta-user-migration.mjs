@@ -28,6 +28,7 @@ function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accou
   if (entitlement === null || entitlement === undefined) return;
   if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
   accountForMigrationBytes(entitlement);
+  const betaOverrideActive = entitlement.betaOverrideActive === true;
   statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(
           json_patch(excluded.data_json, user_entitlements.data_json),
@@ -39,9 +40,10 @@ function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accou
         ), updated_at = excluded.updated_at`)
         .bind(user.clerkId, JSON.stringify({
           uid: user.clerkId,
-          premiumActive: false,
+          premiumActive: betaOverrideActive,
+          betaOverrideActive,
           billingStatus: 'pending_verification',
-          effectiveSource: 'none',
+          effectiveSource: betaOverrideActive ? 'beta_override' : 'none',
           stripeCustomerId: typeof entitlement.stripeCustomerId === 'string' ? entitlement.stripeCustomerId : null,
           stripeSubscriptionId: typeof entitlement.stripeSubscriptionId === 'string' ? entitlement.stripeSubscriptionId : null,
           planInterval: normalizePlanInterval(entitlement.planInterval),

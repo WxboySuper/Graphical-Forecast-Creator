@@ -321,11 +321,14 @@ const startSignedInEntitlementSubscription = (
   return subscribeToEntitlements(userId, handlers);
 };
 
+const BETA_ENTITLEMENT_REFRESH_MS = 30_000;
+
 const startBetaEntitlementSubscription = (
   userId: string,
   handlers: EntitlementEffectHandlers
 ) => {
   let active = true;
+  let loaded = false;
   let attempts = 0;
   let retryTimer: number | undefined;
   handlers.setEntitlementStatus('loading');
@@ -334,9 +337,11 @@ const startBetaEntitlementSubscription = (
     try {
       const state = await fetchBetaEntitlementState(userId);
       if (!active) return;
+      loaded = true;
       applyBetaEntitlementState(state, handlers);
     } catch (nextError) {
-      if (!active) return;
+      // A failed background refresh keeps the last known entitlement instead of flipping to an error.
+      if (!active || loaded) return;
       const message = nextError instanceof Error ? nextError.message : 'Unable to load account billing status.';
       if (scheduleEntitlementRetry(message, attempts, () => {
         attempts += 1;
@@ -346,8 +351,22 @@ const startBetaEntitlementSubscription = (
     }
   };
 
+  // Billing changes land through a webhook, so pick up new access after checkout, portal changes, or another tab.
+  const refreshWhenVisible = (): void => {
+    if (loaded && document.visibilityState === 'visible') void loadEntitlement();
+  };
+  const refreshTimer = window.setInterval(refreshWhenVisible, BETA_ENTITLEMENT_REFRESH_MS);
+  window.addEventListener('focus', refreshWhenVisible);
+  document.addEventListener('visibilitychange', refreshWhenVisible);
+
   void loadEntitlement();
-  return () => { active = false; if (retryTimer !== undefined) window.clearTimeout(retryTimer); };
+  return () => {
+    active = false;
+    if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    window.clearInterval(refreshTimer);
+    window.removeEventListener('focus', refreshWhenVisible);
+    document.removeEventListener('visibilitychange', refreshWhenVisible);
+  };
 };
 
 const fetchBetaEntitlementState = async (userId: string): Promise<EntitlementListenerState> => {
