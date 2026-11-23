@@ -23,6 +23,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Stable v2.x hotfixes
 
+#### Changed
+
+- **Terms of Service:** Version 4 names GFC's operator. You'll be asked to accept the updated Terms.
+
 #### Fixed
 
 - **Monitor alerts:** Monitor again loads active weather alerts instead of failing the refresh.

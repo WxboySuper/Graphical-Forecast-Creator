@@ -13,7 +13,7 @@ describe('ToSModal', () => {
   test('tracks current ToS acceptance and gates the accept button behind the checkbox', () => {
     const onAccept = jest.fn();
     render(<ToSModal onAccept={onAccept} />);
-    expect(screen.getByText(/Version 3, Effective November 21, 2026/u)).toBeInTheDocument();
+    expect(screen.getByText(/Version 4, Effective November 23, 2026/u)).toBeInTheDocument();
 
     const acceptButton = screen.getByRole('button', { name: /Accept & Continue/i });
     expect(hasAcceptedToS()).toBe(false);
@@ -30,9 +30,20 @@ describe('ToSModal', () => {
     expect(hasAcceptedToS()).toBe(true);
   });
 
-  test('requires users with a stored semver ToS acceptance to accept Version 3', () => {
-    localStorage.setItem('gfc-tos-accepted', '2.0.0');
+  test('requires users with an older ToS acceptance to accept Version 4', () => {
+    localStorage.setItem('gfc-tos-accepted', '3');
     expect(hasAcceptedToS()).toBe(false);
+  });
+
+  test('shows the operator attribution and uses Alex in the liability clauses', () => {
+    render(<ToSModal onAccept={jest.fn()} />);
+
+    expect(
+      screen.getByText('GFC is operated by Alexander Miller ("Alex," also known as wxboysuper).'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/creator of GFC \(Alex\)/u)).toHaveLength(2);
+    expect(screen.queryByText(/Alex\/wxboysuper/u)).not.toBeInTheDocument();
+    expect(screen.getByText(/THE TOTAL LIABILITY OF THE CREATOR OF GFC/u)).toBeInTheDocument();
   });
 
   test('lists the Discord and the contact email in the Contact Us section', () => {
