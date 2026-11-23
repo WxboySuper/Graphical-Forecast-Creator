@@ -15,22 +15,29 @@ import { fileURLToPath } from 'node:url';
 
 const EMAIL_HASH_PATTERN = /^[a-f0-9]{64}$/;
 
-/** Returns true when the manifest is complete, matches the beta project, and lists unique per-user hashes. */
-export const isValidSnapshotManifest = (manifest, expectedProjectId) => Boolean(
-  expectedProjectId
-  && manifest
-  && manifest.projectId === expectedProjectId
-  && manifest.complete === true
+const isPositiveInteger = (value) => Number.isInteger(value) && value >= 1;
+
+const isCompleteExport = (manifest) => manifest.complete === true
   && manifest.skippedNoEmailCount === 0
   && manifest.malformedLegacyCycleCount === 0
-  && Array.isArray(manifest.accountFailures) && manifest.accountFailures.length === 0
-  && Number.isInteger(manifest.fullSnapshotCount) && manifest.fullSnapshotCount >= 1
-  && Number.isInteger(manifest.userSnapshotCount) && manifest.userSnapshotCount >= 1
-  && Array.isArray(manifest.userSnapshotEmailHashes)
-  && manifest.userSnapshotEmailHashes.length === manifest.userSnapshotCount
-  && manifest.userSnapshotEmailHashes.every((hash) => typeof hash === 'string' && EMAIL_HASH_PATTERN.test(hash))
-  && new Set(manifest.userSnapshotEmailHashes).size === manifest.userSnapshotEmailHashes.length,
-);
+  && Array.isArray(manifest.accountFailures)
+  && manifest.accountFailures.length === 0;
+
+const hasConsistentCounts = (manifest) => isPositiveInteger(manifest.fullSnapshotCount)
+  && isPositiveInteger(manifest.userSnapshotCount);
+
+const hasUniqueEmailHashes = (manifest) => {
+  const hashes = manifest.userSnapshotEmailHashes;
+  if (!Array.isArray(hashes) || hashes.length !== manifest.userSnapshotCount) return false;
+  if (!hashes.every((hash) => typeof hash === 'string' && EMAIL_HASH_PATTERN.test(hash))) return false;
+  return new Set(hashes).size === hashes.length;
+};
+
+/** Returns true when the manifest is complete, matches the beta project, and lists unique per-user hashes. */
+export const isValidSnapshotManifest = (manifest, expectedProjectId) => {
+  if (!expectedProjectId || !manifest || manifest.projectId !== expectedProjectId) return false;
+  return [isCompleteExport, hasConsistentCounts, hasUniqueEmailHashes].every((check) => check(manifest));
+};
 
 /** Counts non-empty JSONL records, throwing on any line that is not valid JSON. */
 export const countSnapshotRecords = async (snapshotPath) => {
