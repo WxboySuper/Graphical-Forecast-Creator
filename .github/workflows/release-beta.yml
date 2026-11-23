@@ -451,12 +451,12 @@ jobs:
             node scripts/prepare-beta-clerk-d1-config.mjs
             pnpm dlx wrangler@4.149.0 d1 export gfc-beta --remote --skip-confirmation --output beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
-            pnpm dlx wrangler@4.149.0 r2 object put "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
-            pnpm dlx wrangler@4.149.0 r2 object get "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object put --remote "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object get --remote "gfc-beta-firestore-migration-snapshot/$BACKUP_KEY" --file beta-d1-backup-verified.sql --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             test -s beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip verification produced an empty file." >&2; exit 1; }
             cmp --silent beta-d1-backup.sql beta-d1-backup-verified.sql || { echo "::error::D1 backup round-trip mismatch." >&2; exit 1; }
-            pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
-            pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object get --remote gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
+            pnpm dlx wrangler@4.149.0 r2 object get --remote gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             test -s beta-firestore-full-snapshot.jsonl || { echo "::error::Firestore full snapshot download produced an empty file." >&2; exit 1; }
             node scripts/verify-beta-snapshot-manifest.mjs manifest beta-firestore-manifest.json beta-firestore-full-snapshot.jsonl beta-firestore-email-hashes.txt
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
@@ -476,7 +476,7 @@ jobs:
             xargs -r -P 4 -I '{}' bash -euo pipefail -c '
               EMAIL_HASH="$1"
               attempt=1
-              until "$WRANGLER_BIN" r2 object get "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --config "$WRANGLER_CONFIG"; do
+              until "$WRANGLER_BIN" r2 object get --remote "gfc-beta-firestore-migration-snapshot/by-email/$EMAIL_HASH.json" --file "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" --config "$WRANGLER_CONFIG"; do
                 if [[ "$attempt" -ge 3 ]]; then echo "::error::Could not download snapshot for email hash $EMAIL_HASH." >&2; exit 1; fi
                 sleep "$((attempt * 2))"
                 attempt=$((attempt + 1))
@@ -505,7 +505,7 @@ jobs:
           echo "pnpm dlx wrangler@4.149.0 rollback --config $CONFIG"
           if [ "$AUTH_BACKEND" = "clerk-d1" ]; then
             BACKUP_KEY="d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
-            echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql --config $CONFIG && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
+            echo "If D1 needs restoring, retrieve and verify d1-backups/${RELEASE_VERSION}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql from R2, then run: pnpm dlx wrangler@4.149.0 r2 object get --remote gfc-beta-firestore-migration-snapshot/$BACKUP_KEY --file beta-d1-backup-verified.sql --config $CONFIG && pnpm dlx wrangler@4.149.0 d1 execute gfc-beta --remote --file beta-d1-backup-verified.sql --config $CONFIG"
           fi
 
   deploy_mesoscale_worker:
