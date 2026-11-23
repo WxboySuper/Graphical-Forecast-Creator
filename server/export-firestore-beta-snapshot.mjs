@@ -44,9 +44,9 @@ function createAccountFailure(uid, email, error) {
   return { uidHash: sha256(uid), emailHash: sha256(email), reason: reason.slice(0, 500) };
 }
 export const serializeFirestoreValue = (value) => {
-  // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class). Check by type, not
-  // constructor identity, so Buffers from another realm and plain Uint8Array views are tagged too.
-  if (value instanceof Uint8Array) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
+  // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class). ArrayBuffer.isView is
+  // realm-safe, so Buffers and typed-array views from any realm are tagged too.
+  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
   const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
   if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
@@ -228,6 +228,20 @@ export const readIncludeEmails = async (includeEmailsPath) =>
 export const isProfileIncluded = (profile, includeEmails) =>
   !includeEmails || includeEmails.has(normalizeEmail(profile?.email));
 
+/**
+ * Decides how the profile scan treats one profile: 'excluded' (not on the include list), 'missing-email',
+ * 'duplicate-email', or 'included'. The include-list check runs first so unlisted profiles never count as
+ * missing an email. Records included emails in seenEmails.
+ */
+export const classifyProfile = (profile, { includeEmails, seenEmails }) => {
+  if (!isProfileIncluded(profile, includeEmails)) return { status: 'excluded' };
+  const email = normalizeEmail(profile?.email);
+  if (!email) return { status: 'missing-email' };
+  if (seenEmails.has(email)) return { status: 'duplicate-email', email };
+  seenEmails.add(email);
+  return { status: 'included', email };
+};
+
 /** Writes one document (when it exists) and every subcollection beneath it; returns the documents written here. */
 async function exportDocumentTree(docRef, writeSnapshotLine, exportCollection) {
   const document = await docRef.get();
@@ -242,32 +256,37 @@ async function exportDocumentTree(docRef, writeSnapshotLine, exportCollection) {
 }
 
 /**
- * Full-snapshot export limited to the included accounts' own documents: their root user documents,
- * the users/{uid} subtree, and cloudCycles owned by the account (with each cycle's subcollections).
+ * Full-snapshot export limited to the included accounts' own documents, the same set account-lifecycle.js deletes:
+ * their root user documents, the users/{uid} subtree, owned cloudCycles (with subcollections) and adminMetricDedupes.
  */
 const ACCOUNT_ROOT_COLLECTIONS = ['userProfiles', 'userSettings', 'userEntitlements', 'userMetrics', 'users'];
 
-async function exportOwnedCloudCycles({ db, uid, writeSnapshotLine, exportCollection }) {
+// Top-level collections whose account documents are found by an owner field, matching account-lifecycle.js.
+const ACCOUNT_OWNED_QUERIES = [['cloudCycles', 'userId'], ['adminMetricDedupes', 'uid']];
+
+// Equality-only queries return documents in document-name order, so snapshot cursors are stable without an
+// explicit orderBy (the same approach migrateAccount uses for cloudCycles).
+async function exportOwnedDocuments({ db, uid, collectionName, ownerField, writeSnapshotLine, exportCollection }) {
   let exportedCount = 0;
   let cursor = null;
   while (true) {
-    let cycleQuery = db.collection('cloudCycles').where('userId', '==', uid).limit(500);
-    if (cursor) cycleQuery = cycleQuery.startAfter(cursor);
-    const cycles = await cycleQuery.get();
-    for (let offset = 0; offset < cycles.docs.length; offset += 10) {
-      const page = cycles.docs.slice(offset, offset + 10);
+    let ownedQuery = db.collection(collectionName).where(ownerField, '==', uid).limit(500);
+    if (cursor) ownedQuery = ownedQuery.startAfter(cursor);
+    const owned = await ownedQuery.get();
+    for (let offset = 0; offset < owned.docs.length; offset += 10) {
+      const page = owned.docs.slice(offset, offset + 10);
       await exportSnapshotPage(page, writeSnapshotLine, exportCollection);
       exportedCount += page.length;
     }
-    if (cycles.docs.length < 500) return exportedCount;
-    cursor = cycles.docs.at(-1);
+    if (owned.docs.length < 500) return exportedCount;
+    cursor = owned.docs.at(-1);
   }
 }
 
 /**
  * Returns the number of documents written directly here (account root documents and owned cycle documents).
  * Documents in subcollections are written, and counted, by the caller's exportCollection, exactly as in the
- * unfiltered listCollections() export; the caller adds both to fullSnapshotCount.
+ * unfiltered listCollections() export; main() adds both for the manifest's fullSnapshotCount.
  */
 export async function exportIncludedAccountDocuments({ db, uids, writeSnapshotLine, exportCollection }) {
   let exportedCount = 0;
@@ -275,7 +294,9 @@ export async function exportIncludedAccountDocuments({ db, uids, writeSnapshotLi
     const rootCounts = await Promise.all(ACCOUNT_ROOT_COLLECTIONS.map((collectionName) =>
       exportDocumentTree(db.collection(collectionName).doc(uid), writeSnapshotLine, exportCollection)));
     exportedCount += rootCounts.reduce((sum, written) => sum + written, 0);
-    exportedCount += await exportOwnedCloudCycles({ db, uid, writeSnapshotLine, exportCollection });
+    for (const [collectionName, ownerField] of ACCOUNT_OWNED_QUERIES) {
+      exportedCount += await exportOwnedDocuments({ db, uid, collectionName, ownerField, writeSnapshotLine, exportCollection });
+    }
   }
   return exportedCount;
 }
@@ -293,6 +314,20 @@ async function exportChildCollections(page, exportCollection) {
 async function exportSnapshotPage(page, writeSnapshotLine, exportCollection) {
   await Promise.all(page.map((document) => writeSnapshotLine({ path: document.ref.path, data: serializeFirestoreValue(document.data()) })));
   await exportChildCollections(page, exportCollection);
+}
+
+/**
+ * Recursive collection export that counts every document it writes, including nested subcollections.
+ * Sibling subcollections export concurrently, so each count is awaited before it is added; the shorthand
+ * `count += await ...` would read a stale count and drop concurrent additions.
+ */
+export function createCollectionExporter(writeSnapshotLine) {
+  let count = 0;
+  const exportCollection = async (collectionRef) => {
+    const exportedCount = await exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection);
+    count += exportedCount;
+  };
+  return { exportCollection, getCount: () => count };
 }
 
 async function exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection) {
@@ -332,7 +367,8 @@ async function main() {
   await fs.mkdir(output, { recursive: false, mode: 0o700 });
   const fullSnapshotPath = path.join(output, 'full-snapshot.jsonl');
   let fullSnapshotFile = null;
-  let fullSnapshotCount = 0;
+  // Documents written outside collectionExporter (filtered mode's account root and owned documents).
+  let directSnapshotCount = 0;
   let snapshotWriteError = null;
   let snapshotWriteQueue = Promise.resolve();
   const writeSnapshotLine = (record) => {
@@ -347,9 +383,8 @@ async function main() {
     });
     return snapshotWriteQueue;
   };
-  const exportCollection = async (collectionRef) => {
-    fullSnapshotCount += await exportCollectionPages(collectionRef, writeSnapshotLine, exportCollection);
-  };
+  const collectionExporter = createCollectionExporter(writeSnapshotLine);
+  const { exportCollection } = collectionExporter;
   const forEachDocumentPage = async (query, visitPage, { orderByDocumentId = true } = {}) => {
     let cursor = null;
     while (true) {
@@ -435,23 +470,22 @@ async function main() {
     const pageAccounts = [];
     for (const profileDoc of profilePage.docs) {
       const profile = profileDoc.data();
-      if (!isProfileIncluded(profile, includeEmails)) {
+      const { status, email } = classifyProfile(profile, { includeEmails, seenEmails });
+      if (status === 'excluded') {
         excludedProfileCount += 1;
         continue;
       }
-      const email = normalizeEmail(profile.email);
-      if (!email) {
+      if (status === 'missing-email') {
         skippedNoEmail += 1;
         missingEmailHashes.push(sha256(profileDoc.id));
         console.warn(`Skipping beta user profile without an email (uid hash ${sha256(profileDoc.id)}).`);
         continue;
       }
-      if (seenEmails.has(email)) {
+      if (status === 'duplicate-email') {
         accountFailures.push({ uidHash: sha256(profileDoc.id), emailHash: sha256(email), reason: 'duplicate-email' });
         console.error(`Duplicate beta email hash ${sha256(email)}; skipping profile ${sha256(profileDoc.id)}.`);
         continue;
       }
-      seenEmails.add(email);
       includedUids.push(profileDoc.id);
       pageAccounts.push({
         uid: profileDoc.id,
@@ -481,9 +515,7 @@ async function main() {
   const includeSummary = {};
   if (includeEmails) {
     await writeFullSnapshot(async () => {
-      // Await first: `fullSnapshotCount += await ...` would read the count before subcollection exports add to it.
-      const directCount = await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
-      fullSnapshotCount += directCount;
+      directSnapshotCount = await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
     });
     const unmatchedIncludeEmailHashes = [...includeEmails].filter((email) => !seenEmails.has(email)).map(sha256);
     if (unmatchedIncludeEmailHashes.length) console.warn(`${unmatchedIncludeEmailHashes.length} included emails matched no Firestore profile.`);
@@ -493,6 +525,7 @@ async function main() {
       unmatchedIncludeEmailHashes,
     });
   }
+  const fullSnapshotCount = directSnapshotCount + collectionExporter.getCount();
   const complete = accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0;
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({
     projectId,
