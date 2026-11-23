@@ -351,19 +351,26 @@ const startBetaEntitlementSubscription = (
     }
   };
 
-  // Billing changes land through a webhook, so pick up new access after checkout, portal changes, or another tab.
-  const refreshWhenVisible = (): void => {
-    if (loaded && document.visibilityState === 'visible') void loadEntitlement();
-  };
-  const refreshTimer = window.setInterval(refreshWhenVisible, BETA_ENTITLEMENT_REFRESH_MS);
-  window.addEventListener('focus', refreshWhenVisible);
-  document.addEventListener('visibilitychange', refreshWhenVisible);
+  const stopRefreshing = startVisibleRefresh(() => { if (loaded) void loadEntitlement(); });
 
   void loadEntitlement();
   return () => {
     active = false;
     if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-    window.clearInterval(refreshTimer);
+    stopRefreshing();
+  };
+};
+
+/** Billing changes land through a webhook, so refresh after checkout, portal changes, or another tab. */
+const startVisibleRefresh = (refresh: () => void): (() => void) => {
+  const refreshWhenVisible = (): void => {
+    if (document.visibilityState === 'visible') refresh();
+  };
+  const timer = window.setInterval(refreshWhenVisible, BETA_ENTITLEMENT_REFRESH_MS);
+  window.addEventListener('focus', refreshWhenVisible);
+  document.addEventListener('visibilitychange', refreshWhenVisible);
+  return () => {
+    window.clearInterval(timer);
     window.removeEventListener('focus', refreshWhenVisible);
     document.removeEventListener('visibilitychange', refreshWhenVisible);
   };

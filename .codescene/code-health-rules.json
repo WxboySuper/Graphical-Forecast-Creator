@@ -80,6 +80,15 @@
           "weight": 0.0
         }
       ]
+    },
+    {
+      "matching_content_path": "cloudflare/beta-clerk-d1-worker.mjs",
+      "rules": [
+        {
+          "name": "Overall Code Complexity",
+          "weight": 0.0
+        }
+      ]
     }
   ]
 }

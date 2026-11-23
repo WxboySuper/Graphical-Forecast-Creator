@@ -23,13 +23,7 @@ function appendSnapshotSettings({ snapshot, user, env, now, statements, accountF
     .bind(user.clerkId, JSON.stringify(settingsWithoutLegacyCycles), now));
 }
 
-function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
-  const entitlement = snapshot.userEntitlement;
-  if (entitlement === null || entitlement === undefined) return;
-  if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
-  accountForMigrationBytes(entitlement);
-  const betaOverrideActive = entitlement.betaOverrideActive === true;
-  statements.push(env.DB.prepare(`INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
+const ENTITLEMENT_UPSERT_SQL = `INSERT INTO user_entitlements (user_id, data_json, updated_at) VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET data_json = json_patch(
           json_patch(excluded.data_json, user_entitlements.data_json),
           json_object(
@@ -37,21 +31,36 @@ function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accou
             'stripeSubscriptionId', COALESCE(json_extract(user_entitlements.data_json, '$.stripeSubscriptionId'), json_extract(excluded.data_json, '$.stripeSubscriptionId')),
             'pendingStripeSync', CASE WHEN json_extract(user_entitlements.data_json, '$.pendingStripeSync') = 1 OR json_extract(excluded.data_json, '$.pendingStripeSync') = 1 THEN json('true') ELSE json('false') END
           )
-        ), updated_at = excluded.updated_at`)
-        .bind(user.clerkId, JSON.stringify({
-          uid: user.clerkId,
-          premiumActive: betaOverrideActive,
-          betaOverrideActive,
-          billingStatus: 'pending_verification',
-          effectiveSource: betaOverrideActive ? 'beta_override' : 'none',
-          stripeCustomerId: typeof entitlement.stripeCustomerId === 'string' ? entitlement.stripeCustomerId : null,
-          stripeSubscriptionId: typeof entitlement.stripeSubscriptionId === 'string' ? entitlement.stripeSubscriptionId : null,
-          planInterval: normalizePlanInterval(entitlement.planInterval),
-          cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd === true,
-          currentPeriodEnd: typeof entitlement.currentPeriodEnd === 'string' ? entitlement.currentPeriodEnd : null,
-          pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
-          migratedFromSnapshot: true,
-    }), now));
+        ), updated_at = excluded.updated_at`;
+
+const stringOrNull = (value) => (typeof value === 'string' ? value : null);
+
+/** Builds the pending-verification entitlement for a snapshot; Stripe re-verifies paid access, beta overrides carry over. */
+function buildSnapshotEntitlement(entitlement, userId) {
+  const betaOverrideActive = entitlement.betaOverrideActive === true;
+  return {
+    uid: userId,
+    premiumActive: betaOverrideActive,
+    betaOverrideActive,
+    billingStatus: 'pending_verification',
+    effectiveSource: betaOverrideActive ? 'beta_override' : 'none',
+    stripeCustomerId: stringOrNull(entitlement.stripeCustomerId),
+    stripeSubscriptionId: stringOrNull(entitlement.stripeSubscriptionId),
+    planInterval: normalizePlanInterval(entitlement.planInterval),
+    cancelAtPeriodEnd: entitlement.cancelAtPeriodEnd === true,
+    currentPeriodEnd: stringOrNull(entitlement.currentPeriodEnd),
+    pendingStripeSync: Boolean(entitlement.stripeCustomerId || entitlement.stripeSubscriptionId),
+    migratedFromSnapshot: true,
+  };
+}
+
+function appendSnapshotEntitlement({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
+  const entitlement = snapshot.userEntitlement;
+  if (entitlement === null || entitlement === undefined) return;
+  if (!isObject(entitlement)) throw new Error('SNAPSHOT_ENTITLEMENT_INVALID');
+  accountForMigrationBytes(entitlement);
+  statements.push(env.DB.prepare(ENTITLEMENT_UPSERT_SQL)
+    .bind(user.clerkId, JSON.stringify(buildSnapshotEntitlement(entitlement, user.clerkId)), now));
 }
 
 function appendSnapshotMetrics({ snapshot, user, env, now, statements, accountForMigrationBytes }) {
