@@ -1,4 +1,4 @@
-import type { FullResult, Reporter, Suite, TestCase, TestResult } from '@playwright/test/reporter';
+import type { FullConfig, FullResult, Reporter, Suite, TestCase, TestResult } from '@playwright/test/reporter';
 
 const seconds = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 
@@ -10,7 +10,7 @@ const elapsed = (ms: number): string => {
 
 /**
  * Prints RUN / PASS / FAIL / DONE lines with a running count and percentage, e.g.
- * `[ 3/47   6%] PASS  chromium › navigation.spec.ts › opens home  1.7s`, so CI logs show how far the run is.
+ * `[ 3/47   6%] PASS  navigation.spec.ts › Navigation › opens home  1.7s`, so CI logs show how far the run is.
  */
 export default class ProgressReporter implements Reporter {
   private total = 0;
@@ -18,7 +18,7 @@ export default class ProgressReporter implements Reporter {
   private outcomes = new Map<string, boolean>();
   private startedAt = Date.now();
 
-  onBegin(_config: unknown, suite: Suite): void {
+  onBegin(_config: FullConfig, suite: Suite): void {
     this.total = suite.allTests().length;
     this.startedAt = Date.now();
   }
@@ -38,6 +38,7 @@ export default class ProgressReporter implements Reporter {
   }
 
   private label(test: TestCase): string {
+    // titlePath() is ['', project, file, ...suites, title]; drop the empty root and the project name.
     return test.titlePath().filter(Boolean).slice(1).join(' › ');
   }
 
