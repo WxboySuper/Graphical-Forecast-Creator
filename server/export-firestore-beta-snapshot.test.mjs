@@ -11,6 +11,7 @@ import {
 
 /** Minimal in-memory Firestore stand-in: documents keyed by path, subcollections keyed by parent path. */
 function createFakeDb(documents, subcollections = {}) {
+  const queries = [];
   const docRef = (docPath) => ({
     path: docPath,
     get: async () => ({ exists: docPath in documents, data: () => documents[docPath] }),
@@ -20,20 +21,38 @@ function createFakeDb(documents, subcollections = {}) {
   const collection = (name) => ({
     doc: (id) => docRef(`${name}/${id}`),
     where: (field, op, value) => {
+      let limitCount = Infinity;
+      let after = null;
       const query = {
-        limit: () => query,
-        startAfter: () => query,
-        get: async () => ({
-          docs: Object.keys(documents)
+        limit: (count) => { limitCount = count; return query; },
+        startAfter: (cursor) => { after = cursor; return query; },
+        get: async () => {
+          queries.push({ name, after: after?.ref.path ?? null });
+          let docs = Object.keys(documents).sort()
             .filter((docPath) => docPath.startsWith(`${name}/`) && docPath.split('/').length === 2)
             .filter((docPath) => op === '==' && documents[docPath][field] === value)
-            .map(snapshotOf),
-        }),
+            .map(snapshotOf);
+          if (after) docs = docs.slice(docs.findIndex((doc) => doc.ref.path === after.ref.path) + 1);
+          return { docs: docs.slice(0, limitCount) };
+        },
       };
       return query;
     },
   });
-  return { collection };
+  return { collection, queries };
+}
+
+/** Mirrors main(): subcollection documents are written and counted through exportCollection. */
+function createCountingExport(documents) {
+  const state = { lines: [], subcollectionCount: 0 };
+  state.writeSnapshotLine = async (record) => { state.lines.push(record); };
+  state.exportCollection = async (collectionRef) => {
+    for (const docPath of Object.keys(documents).filter((key) => key.startsWith(`${collectionRef.path}/`))) {
+      await state.writeSnapshotLine({ path: docPath, data: documents[docPath] });
+      state.subcollectionCount += 1;
+    }
+  };
+  return state;
 }
 
 describe('readArguments', () => {
@@ -81,45 +100,65 @@ describe('isProfileIncluded', () => {
 });
 
 describe('exportIncludedAccountDocuments', () => {
-  it('writes only the included accounts\' documents and their subcollections', async () => {
-    const db = createFakeDb({
+  it('writes only the included accounts\' documents, and every written line is counted', async () => {
+    const documents = {
       'userProfiles/beta-1': { email: 'tester@example.com' },
       'userSettings/beta-1': { theme: 'dark' },
       'userMetrics/beta-1': { opens: 3 },
+      'users/beta-1/workflowAwareness/w1': { seen: true },
+      'users/beta-1/customProducts/p1': { name: 'Mine' },
       'cloudCycles/cycle-a': { userId: 'beta-1', label: 'A' },
+      'cloudCycles/cycle-a/payload/payload': { payloadJson: '{}' },
       'userProfiles/prod-1': { email: 'prod-user@example.com' },
       'userSettings/prod-1': { theme: 'light' },
+      'users/prod-1/customProducts/p2': { name: 'Theirs' },
       'cloudCycles/cycle-b': { userId: 'prod-1', label: 'B' },
-    }, {
-      'users/beta-1': ['workflowAwareness'],
+    };
+    const db = createFakeDb(documents, {
+      'users/beta-1': ['workflowAwareness', 'customProducts'],
+      'users/prod-1': ['customProducts'],
       'cloudCycles/cycle-a': ['payload'],
     });
-    const lines = [];
-    const exportedCollections = [];
-    const count = await exportIncludedAccountDocuments({
-      db,
-      uids: ['beta-1'],
-      writeSnapshotLine: async (record) => { lines.push(record); },
-      exportCollection: async (collectionRef) => { exportedCollections.push(collectionRef.path); },
+    const exporter = createCountingExport(documents);
+    const directCount = await exportIncludedAccountDocuments({
+      db, uids: ['beta-1'], writeSnapshotLine: exporter.writeSnapshotLine, exportCollection: exporter.exportCollection,
     });
 
-    assert.equal(count, 4);
-    assert.deepEqual(lines.map((line) => line.path).sort(), [
-      'cloudCycles/cycle-a', 'userMetrics/beta-1', 'userProfiles/beta-1', 'userSettings/beta-1',
+    assert.equal(directCount, 4);
+    assert.equal(directCount + exporter.subcollectionCount, exporter.lines.length);
+    assert.deepEqual(exporter.lines.map((line) => line.path).sort(), [
+      'cloudCycles/cycle-a',
+      'cloudCycles/cycle-a/payload/payload',
+      'userMetrics/beta-1',
+      'userProfiles/beta-1',
+      'userSettings/beta-1',
+      'users/beta-1/customProducts/p1',
+      'users/beta-1/workflowAwareness/w1',
     ]);
-    assert.deepEqual(lines.find((line) => line.path === 'userSettings/beta-1').data, { theme: 'dark' });
-    assert.deepEqual(exportedCollections.sort(), ['cloudCycles/cycle-a/payload', 'users/beta-1/workflowAwareness']);
-    assert.ok(lines.every((line) => !line.path.includes('prod-1') && !line.path.endsWith('cycle-b')));
+    assert.deepEqual(exporter.lines.find((line) => line.path === 'userSettings/beta-1').data, { theme: 'dark' });
+  });
+
+  it('pages through more than 500 owned cloud cycles without repeating or dropping any', async () => {
+    const documents = {};
+    for (let index = 0; index < 1001; index += 1) documents[`cloudCycles/c${String(index).padStart(4, '0')}`] = { userId: 'beta-1' };
+    const db = createFakeDb(documents);
+    const exporter = createCountingExport(documents);
+    const directCount = await exportIncludedAccountDocuments({
+      db, uids: ['beta-1'], writeSnapshotLine: exporter.writeSnapshotLine, exportCollection: exporter.exportCollection,
+    });
+    assert.equal(directCount, 1001);
+    assert.equal(new Set(exporter.lines.map((line) => line.path)).size, 1001);
+    assert.deepEqual(db.queries.map((query) => query.after), [null, 'cloudCycles/c0499', 'cloudCycles/c0999']);
   });
 
   it('writes nothing when no profile matched the list', async () => {
-    const db = createFakeDb({ 'userProfiles/prod-1': { email: 'prod-user@example.com' } });
-    const lines = [];
-    const count = await exportIncludedAccountDocuments({
-      db, uids: [], writeSnapshotLine: async (record) => { lines.push(record); }, exportCollection: async () => {},
+    const documents = { 'userProfiles/prod-1': { email: 'prod-user@example.com' } };
+    const exporter = createCountingExport(documents);
+    const directCount = await exportIncludedAccountDocuments({
+      db: createFakeDb(documents), uids: [], writeSnapshotLine: exporter.writeSnapshotLine, exportCollection: exporter.exportCollection,
     });
-    assert.equal(count, 0);
-    assert.deepEqual(lines, []);
+    assert.equal(directCount, 0);
+    assert.deepEqual(exporter.lines, []);
   });
 });
 
@@ -130,12 +169,14 @@ describe('serializeFirestoreValue', () => {
       where: new GeoPoint(35.2, -97.4),
       at: Timestamp.fromDate(new Date('2026-11-23T16:00:00.000Z')),
       nested: [{ raw: Buffer.from([0, 255]) }],
+      view: new Uint8Array([1, 2, 3]).subarray(1),
     });
     assert.deepEqual(serialized, {
       blob: { __type: 'bytes', base64: 'aGk=' },
       where: { __type: 'geoPoint', latitude: 35.2, longitude: -97.4 },
       at: '2026-11-23T16:00:00.000Z',
       nested: [{ raw: { __type: 'bytes', base64: 'AP8=' } }],
+      view: { __type: 'bytes', base64: 'AgM=' },
     });
   });
 });

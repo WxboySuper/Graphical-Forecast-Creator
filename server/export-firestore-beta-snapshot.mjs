@@ -20,8 +20,6 @@ const FIRESTORE_VALUE_SERIALIZERS = new Map([
   [Timestamp, (value) => value.toDate().toISOString()],
   [GeoPoint, (value) => ({ __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude })],
   [DocumentReference, (value) => ({ __type: 'documentReference', path: value.path })],
-  // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class).
-  [Buffer, (value) => ({ __type: 'bytes', base64: value.toString('base64') })],
 ]);
 
 function assertSnapshotCollectionLimit(context) {
@@ -46,6 +44,9 @@ function createAccountFailure(uid, email, error) {
   return { uidHash: sha256(uid), emailHash: sha256(email), reason: reason.slice(0, 500) };
 }
 export const serializeFirestoreValue = (value) => {
+  // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class). Check by type, not
+  // constructor identity, so Buffers from another realm and plain Uint8Array views are tagged too.
+  if (value instanceof Uint8Array) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
   const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
   if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
@@ -244,25 +245,37 @@ async function exportDocumentTree(docRef, writeSnapshotLine, exportCollection) {
  * Full-snapshot export limited to the included accounts' own documents: their root user documents,
  * the users/{uid} subtree, and cloudCycles owned by the account (with each cycle's subcollections).
  */
+const ACCOUNT_ROOT_COLLECTIONS = ['userProfiles', 'userSettings', 'userEntitlements', 'userMetrics', 'users'];
+
+async function exportOwnedCloudCycles({ db, uid, writeSnapshotLine, exportCollection }) {
+  let exportedCount = 0;
+  let cursor = null;
+  while (true) {
+    let cycleQuery = db.collection('cloudCycles').where('userId', '==', uid).limit(500);
+    if (cursor) cycleQuery = cycleQuery.startAfter(cursor);
+    const cycles = await cycleQuery.get();
+    for (let offset = 0; offset < cycles.docs.length; offset += 10) {
+      const page = cycles.docs.slice(offset, offset + 10);
+      await exportSnapshotPage(page, writeSnapshotLine, exportCollection);
+      exportedCount += page.length;
+    }
+    if (cycles.docs.length < 500) return exportedCount;
+    cursor = cycles.docs.at(-1);
+  }
+}
+
+/**
+ * Returns the number of documents written directly here (account root documents and owned cycle documents).
+ * Documents in subcollections are written, and counted, by the caller's exportCollection, exactly as in the
+ * unfiltered listCollections() export; the caller adds both to fullSnapshotCount.
+ */
 export async function exportIncludedAccountDocuments({ db, uids, writeSnapshotLine, exportCollection }) {
   let exportedCount = 0;
   for (const uid of uids) {
-    for (const collectionName of ['userProfiles', 'userSettings', 'userEntitlements', 'userMetrics', 'users']) {
-      exportedCount += await exportDocumentTree(db.collection(collectionName).doc(uid), writeSnapshotLine, exportCollection);
-    }
-    let cursor = null;
-    while (true) {
-      let cycleQuery = db.collection('cloudCycles').where('userId', '==', uid).limit(500);
-      if (cursor) cycleQuery = cycleQuery.startAfter(cursor);
-      const cycles = await cycleQuery.get();
-      for (let offset = 0; offset < cycles.docs.length; offset += 10) {
-        const page = cycles.docs.slice(offset, offset + 10);
-        await exportSnapshotPage(page, writeSnapshotLine, exportCollection);
-        exportedCount += page.length;
-      }
-      if (cycles.docs.length < 500) break;
-      cursor = cycles.docs.at(-1);
-    }
+    const rootCounts = await Promise.all(ACCOUNT_ROOT_COLLECTIONS.map((collectionName) =>
+      exportDocumentTree(db.collection(collectionName).doc(uid), writeSnapshotLine, exportCollection)));
+    exportedCount += rootCounts.reduce((sum, written) => sum + written, 0);
+    exportedCount += await exportOwnedCloudCycles({ db, uid, writeSnapshotLine, exportCollection });
   }
   return exportedCount;
 }
@@ -317,7 +330,8 @@ async function main() {
   });
   const db = getFirestore(app);
   await fs.mkdir(output, { recursive: false, mode: 0o700 });
-  const fullSnapshotFile = await fs.open(path.join(output, 'full-snapshot.jsonl'), 'wx', 0o600);
+  const fullSnapshotPath = path.join(output, 'full-snapshot.jsonl');
+  let fullSnapshotFile = null;
   let fullSnapshotCount = 0;
   let snapshotWriteError = null;
   let snapshotWriteQueue = Promise.resolve();
@@ -349,7 +363,9 @@ async function main() {
       cursor = page.docs.at(-1);
     }
   };
+  // Opens the snapshot file only for the export itself, so a failure elsewhere never leaves it open.
   const writeFullSnapshot = async (exportDocuments) => {
+    fullSnapshotFile = await fs.open(fullSnapshotPath, 'wx', 0o600);
     try {
       await exportDocuments();
     } finally {
@@ -423,7 +439,6 @@ async function main() {
         excludedProfileCount += 1;
         continue;
       }
-      includedUids.push(profileDoc.id);
       const email = normalizeEmail(profile.email);
       if (!email) {
         skippedNoEmail += 1;
@@ -437,6 +452,7 @@ async function main() {
         continue;
       }
       seenEmails.add(email);
+      includedUids.push(profileDoc.id);
       pageAccounts.push({
         uid: profileDoc.id,
         email,
@@ -465,7 +481,9 @@ async function main() {
   const includeSummary = {};
   if (includeEmails) {
     await writeFullSnapshot(async () => {
-      fullSnapshotCount += await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
+      // Await first: `fullSnapshotCount += await ...` would read the count before subcollection exports add to it.
+      const directCount = await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
+      fullSnapshotCount += directCount;
     });
     const unmatchedIncludeEmailHashes = [...includeEmails].filter((email) => !seenEmails.has(email)).map(sha256);
     if (unmatchedIncludeEmailHashes.length) console.warn(`${unmatchedIncludeEmailHashes.length} included emails matched no Firestore profile.`);
