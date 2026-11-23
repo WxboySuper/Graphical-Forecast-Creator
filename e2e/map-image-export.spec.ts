@@ -86,8 +86,11 @@ for (const width of [1280, 320]) {
     expect(overlayBounds.footer.right).toBeLessThanOrEqual(overlayBounds.container.right);
     expect(overlayBounds.footer.bottom).toBeLessThanOrEqual(overlayBounds.warning.top - 12);
     const downloadReady = page.waitForEvent('download');
+    const successToastReady = expect(
+      page.getByText('Forecast exported successfully!', { exact: true }),
+    ).toBeVisible({ timeout: 60000 });
     await page.getByRole('dialog', { name: 'Export Forecast Image' }).getByRole('button', { name: 'Export', exact: true }).click();
-    const download = await downloadReady;
+    const [download] = await Promise.all([downloadReady, successToastReady]);
     expect(download.suggestedFilename()).toMatch(/^forecast-outlook-.*\.jpg$/);
     const path = testInfo.outputPath(`forecast-${theme}-${width}.jpg`);
     await download.saveAs(path);
@@ -101,7 +104,6 @@ for (const width of [1280, 320]) {
     }, [...bytes]);
     expect(dimensions.width).toBe(Math.floor(exportBox.width) * 2);
     expect(dimensions.height).toBe(Math.floor(exportBox.height) * 2);
-    await expect(page.getByText('Forecast exported successfully!', { exact: true })).toBeVisible();
     });
   }
 }
