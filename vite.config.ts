@@ -24,7 +24,11 @@ const vendorChunkFor = (id: string): string | undefined =>
 /** Builds a Vite logger that drops the log entries `shouldDrop` matches and forwards everything else unchanged. */
 const createQuietProxyLogger = (shouldDrop: (msg: unknown) => boolean) => {
   const logger = createLogger();
-  return { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!shouldDrop(msg)) logger.error(msg, options); } };
+  const forwardError = logger.error;
+  logger.error = (msg, options) => {
+    if (!shouldDrop(msg)) forwardError(msg, options);
+  };
+  return logger;
 };
 
 export default defineConfig(({ mode }) => {

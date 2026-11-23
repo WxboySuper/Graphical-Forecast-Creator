@@ -40,7 +40,7 @@ class ProgressReporter {
     console.log(`${this.prefix()} RUN   ${this.label(test?.path)}`);
   }
 
-  onTestResult(test, result) {
+  onTestFileResult(test, result) {
     this.finished += 1;
     const failed = (result?.numFailingTests ?? 0) > 0 || Boolean(result?.testExecError);
     if (failed) this.failed += 1;
