@@ -20,6 +20,7 @@ function createFakeDb(documents, subcollections = {}) {
   const docRef = (docPath) => ({
     path: docPath,
     get: async () => ({ exists: Object.hasOwn(documents, docPath), data: () => documents[docPath] }),
+    collection: (id) => collectionRef(`${docPath}/${id}`),
     listCollections: async () => (subcollections[docPath] || []).map((name) => collectionRef(`${docPath}/${name}`)),
   });
   const snapshotOf = (docPath) => ({ id: docPath.split('/').at(-1), ref: docRef(docPath), data: () => documents[docPath] });
@@ -27,12 +28,13 @@ function createFakeDb(documents, subcollections = {}) {
   const query = (collectionPath, ownerFilter) => {
     let limitCount = Infinity;
     let after = null;
+    let ordered = false;
     const self = {
-      orderBy: () => self,
+      orderBy: () => { ordered = true; return self; },
       limit: (count) => { limitCount = count; return self; },
       startAfter: (cursor) => { after = cursor; return self; },
       get: async () => {
-        queries.push({ collectionPath, after: after?.ref.path ?? null });
+        queries.push({ collectionPath, ordered, after: after?.ref.path ?? null });
         let docs = Object.keys(documents).sort()
           .filter((docPath) => docPath.startsWith(`${collectionPath}/`) && docPath.split('/').length === depth(collectionPath))
           .filter((docPath) => ownerFilter === null || documents[docPath][ownerFilter.field] === ownerFilter.value)
@@ -181,7 +183,8 @@ describe('exportIncludedAccountDocuments', () => {
     });
     assert.equal(directCount, 1001);
     assert.equal(new Set(exporter.lines.map((line) => line.path)).size, 1001);
-    assert.equal(db.queries.filter((query) => query.collectionPath === 'cloudCycles').length, 3);
+    assert.equal(db.queries.filter((query) => query.collectionPath === 'cloudCycles').length, Math.ceil(1001 / 500));
+    assert.ok(db.queries.every((query) => query.ordered));
   });
 
   it('writes nothing when no profile matched the list', async () => {
@@ -228,7 +231,7 @@ describe('serializeFirestoreValue', () => {
       at: '2026-11-23T16:00:00.000Z',
       nested: [{ raw: { __type: 'bytes', base64: 'AP8=' } }],
       view: { __type: 'bytes', base64: 'AgM=' },
-      dataView: {},
+      dataView: { __type: 'bytes', base64: 'AAA=' },
     });
   });
 });

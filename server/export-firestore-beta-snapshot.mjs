@@ -45,8 +45,8 @@ function createAccountFailure(uid, email, error) {
 }
 export const serializeFirestoreValue = (value) => {
   // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class). ArrayBuffer.isView is
-  // realm-safe, so Buffers and typed-array views from any realm are tagged too.
-  if (ArrayBuffer.isView(value) && !(value instanceof DataView)) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
+  // realm-safe, so Buffers, typed arrays and DataViews from any realm are tagged too (no silent data loss).
+  if (ArrayBuffer.isView(value)) return { __type: 'bytes', base64: Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString('base64') };
   const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
   if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
@@ -270,7 +270,7 @@ async function exportOwnedDocuments({ db, uid, collectionName, ownerField, write
   let exportedCount = 0;
   let cursor = null;
   while (true) {
-    let ownedQuery = db.collection(collectionName).where(ownerField, '==', uid).limit(500);
+    let ownedQuery = db.collection(collectionName).where(ownerField, '==', uid).orderBy(FieldPath.documentId()).limit(500);
     if (cursor) ownedQuery = ownedQuery.startAfter(cursor);
     const owned = await ownedQuery.get();
     for (let offset = 0; offset < owned.docs.length; offset += 10) {
@@ -513,11 +513,13 @@ async function main() {
     profileCursor = profilePage.docs.at(-1);
   }
   const includeSummary = {};
+  let unmatchedIncludeCount = 0;
   if (includeEmails) {
     await writeFullSnapshot(async () => {
       directSnapshotCount = await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
     });
     const unmatchedIncludeEmailHashes = [...includeEmails].filter((email) => !seenEmails.has(email)).map(sha256);
+    unmatchedIncludeCount = unmatchedIncludeEmailHashes.length;
     if (unmatchedIncludeEmailHashes.length) console.warn(`${unmatchedIncludeEmailHashes.length} included emails matched no Firestore profile.`);
     Object.assign(includeSummary, {
       includeEmailCount: includeEmails.size,
@@ -526,7 +528,7 @@ async function main() {
     });
   }
   const fullSnapshotCount = directSnapshotCount + collectionExporter.getCount();
-  const complete = accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0;
+  const complete = accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0 && unmatchedIncludeCount === 0;
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({
     projectId,
     fullSnapshotCount,
