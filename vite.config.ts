@@ -114,6 +114,18 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: 'http://127.0.0.1:3006',
           changeOrigin: false,
+          // E2E runs have no API server on 3006; keep the same 500 response but skip the per-request ECONNREFUSED log spam.
+          configure: env.GFC_E2E_QUIET_PROXY === '1'
+            ? (proxy) => {
+                proxy.on('error', (_err, _req, res) => {
+                  if ('writeHead' in res && !res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
+                  res.end('API unavailable in e2e');
+                });
+                // Vite registers its own logging 'error' listener right after configure(); ignore that one.
+                const registerListener = proxy.on.bind(proxy);
+                proxy.on = ((event: string, listener: never) => (event === 'error' ? proxy : registerListener(event, listener))) as typeof proxy.on;
+              }
+            : undefined,
         },
       },
     },

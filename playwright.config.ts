@@ -9,7 +9,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'list',
+  reporter: [['list'], ['./e2e/progressReporter.ts']],
   use: {
     baseURL,
     trace: 'on-first-retry',
@@ -26,5 +26,6 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
+    env: { GFC_E2E_QUIET_PROXY: '1' },
   },
 });
