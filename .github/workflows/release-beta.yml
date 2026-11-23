@@ -458,29 +458,7 @@ jobs:
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/manifest.json --file beta-firestore-manifest.json --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 r2 object get gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file beta-firestore-full-snapshot.jsonl --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             test -s beta-firestore-full-snapshot.jsonl || { echo "::error::Firestore full snapshot download produced an empty file." >&2; exit 1; }
-            node --input-type=module - <<'NODE'
-            import fs from 'node:fs';
-            import readline from 'node:readline';
-            import { createReadStream } from 'node:fs';
-            const manifest = JSON.parse(fs.readFileSync('beta-firestore-manifest.json', 'utf8'));
-            if (!process.env.EXPECTED_BETA_FIREBASE_PROJECT_ID || manifest.projectId !== process.env.EXPECTED_BETA_FIREBASE_PROJECT_ID
-              || manifest.complete !== true || manifest.skippedNoEmailCount !== 0 || manifest.malformedLegacyCycleCount !== 0
-              || !Array.isArray(manifest.accountFailures) || manifest.accountFailures.length !== 0
-              || !Number.isInteger(manifest.fullSnapshotCount) || manifest.fullSnapshotCount < 1
-              || !Number.isInteger(manifest.userSnapshotCount) || manifest.userSnapshotCount < 1
-              || !Array.isArray(manifest.userSnapshotEmailHashes)
-              || manifest.userSnapshotEmailHashes.length !== manifest.userSnapshotCount
-              || manifest.userSnapshotEmailHashes.some((hash) => !/^[a-f0-9]{64}$/.test(hash))
-              || new Set(manifest.userSnapshotEmailHashes).size !== manifest.userSnapshotEmailHashes.length) {
-              throw new Error('Firestore snapshot manifest is incomplete or has skipped users/data.');
-            }
-            fs.writeFileSync('beta-firestore-email-hashes.txt', `${manifest.userSnapshotEmailHashes.join('\n')}\n`, { mode: 0o600 });
-            let lines = 0;
-            for await (const line of readline.createInterface({ input: createReadStream('beta-firestore-full-snapshot.jsonl'), crlfDelay: Infinity })) {
-              if (line.trim()) { JSON.parse(line); lines += 1; }
-            }
-            if (lines !== manifest.fullSnapshotCount) throw new Error(`Full snapshot has ${lines} records; manifest expects ${manifest.fullSnapshotCount}.`);
-            NODE
+            node scripts/verify-beta-snapshot-manifest.mjs manifest beta-firestore-manifest.json beta-firestore-full-snapshot.jsonl beta-firestore-email-hashes.txt
             SNAPSHOT_VERIFY_DIR=$(mktemp -d)
             trap 'rm -rf "$SNAPSHOT_VERIFY_DIR"' EXIT
             WRANGLER_BIN="$RUNNER_TEMP/beta-migration-tools/node_modules/.bin/wrangler"
@@ -504,7 +482,7 @@ jobs:
                 attempt=$((attempt + 1))
               done
               test -s "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" || { echo "::error::Snapshot for email hash $EMAIL_HASH is empty." >&2; exit 1; }
-              node -e 'const fs=require("node:fs"), crypto=require("node:crypto"); const snapshot=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); const email=typeof snapshot.email==="string"?snapshot.email.trim().toLowerCase():""; if (!email || !snapshot.uid || !snapshot.userProfile || crypto.createHash("sha256").update(email).digest("hex")!==process.argv[2]) process.exit(1)' "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" "$EMAIL_HASH"
+              node scripts/verify-beta-snapshot-manifest.mjs user "$SNAPSHOT_VERIFY_DIR/$EMAIL_HASH.json" "$EMAIL_HASH"
             ' _ '{}' < beta-firestore-email-hashes.txt
             pnpm dlx wrangler@4.149.0 d1 migrations list gfc-beta --remote --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
             pnpm dlx wrangler@4.149.0 d1 migrations apply gfc-beta --remote --yes --config cloudflare/wrangler.beta.clerk-d1.generated.jsonc
