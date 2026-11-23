@@ -44,15 +44,17 @@ class ProgressReporter {
     this.finished += 1;
     const failed = result.numFailingTests > 0 || Boolean(result.testExecError);
     if (failed) this.failed += 1;
-    const duration = seconds(result.perfStats.end - result.perfStats.start);
+    const { start, end } = result.perfStats ?? {};
+    const duration = Number.isFinite(end - start) ? seconds(end - start) : 'n/a';
     console.log(`${this.prefix()} ${failed ? 'FAIL' : 'PASS'}  ${this.label(test.path)}  ${duration}`);
   }
 
   onRunComplete() {
     const time = elapsed(Date.now() - this.startedAt);
-    const summary = this.failed === 0
+    const notRun = this.total - this.finished;
+    const summary = this.failed === 0 && notRun === 0
       ? `all ${this.total} test files passed in ${time}`
-      : `${this.failed} of ${this.total} test files failed in ${time}`;
+      : `${this.failed} failed, ${this.finished - this.failed} passed, ${notRun} not run of ${this.total} test files in ${time}`;
     console.log(`${this.prefix()} DONE  ${summary}`);
   }
 

@@ -124,6 +124,7 @@ export default defineConfig(({ mode }) => {
                     res.destroy();
                     return;
                   }
+                  if (res.writableEnded) return;
                   if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain' });
                   res.end('API unavailable in e2e');
                 });
