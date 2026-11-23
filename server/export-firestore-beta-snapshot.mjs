@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { Bytes, DocumentReference, FieldPath, GeoPoint, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { DocumentReference, FieldPath, GeoPoint, getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 const required = (name) => {
   const value = process.env[name];
@@ -19,7 +20,8 @@ const FIRESTORE_VALUE_SERIALIZERS = new Map([
   [Timestamp, (value) => value.toDate().toISOString()],
   [GeoPoint, (value) => ({ __type: 'geoPoint', latitude: value.latitude, longitude: value.longitude })],
   [DocumentReference, (value) => ({ __type: 'documentReference', path: value.path })],
-  [Bytes, (value) => ({ __type: 'bytes', base64: value.toBase64() })],
+  // The Admin SDK returns Firestore bytes fields as Node Buffers (it has no Bytes class).
+  [Buffer, (value) => ({ __type: 'bytes', base64: value.toString('base64') })],
 ]);
 
 function assertSnapshotCollectionLimit(context) {
@@ -43,7 +45,7 @@ function createAccountFailure(uid, email, error) {
   const reason = error instanceof Error ? error.message : String(error || 'unknown error');
   return { uidHash: sha256(uid), emailHash: sha256(email), reason: reason.slice(0, 500) };
 }
-const serializeFirestoreValue = (value) => {
+export const serializeFirestoreValue = (value) => {
   const serializer = FIRESTORE_VALUE_SERIALIZERS.get(value?.constructor);
   if (serializer) return serializer(value);
   if (Array.isArray(value)) return value.map(serializeFirestoreValue);
@@ -189,11 +191,81 @@ function mergeMigratedCloudCycles(account, migratedCycles) {
   }
 }
 
-const readArguments = () => {
-  const args = process.argv.slice(2);
-  const outputAt = args.indexOf('--output');
-  return { output: outputAt >= 0 ? args[outputAt + 1] : '' };
+const readFlagValue = (args, flag) => {
+  const at = args.indexOf(flag);
+  if (at < 0) return '';
+  const value = args[at + 1];
+  if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value.`);
+  return value;
 };
+
+export const readArguments = (args = process.argv.slice(2)) => ({
+  output: readFlagValue(args, '--output'),
+  includeEmailsPath: readFlagValue(args, '--include-emails'),
+});
+
+/**
+ * Parses an include list: one email per line, normalized like the snapshot hash key.
+ * Blank lines and lines starting with # are ignored. Returns a Set of normalized emails.
+ */
+export const parseIncludeEmails = (text) => {
+  const emails = new Set();
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    const email = normalizeEmail(line);
+    if (!email || email.startsWith('#')) continue;
+    if (!/^[^\s@]+@[^\s@]+$/.test(email)) throw new Error(`Include list line ${index + 1} is not an email address.`);
+    emails.add(email);
+  }
+  if (emails.size === 0) throw new Error('Include list contains no email addresses.');
+  return emails;
+};
+
+export const readIncludeEmails = async (includeEmailsPath) =>
+  includeEmailsPath ? parseIncludeEmails(await fs.readFile(includeEmailsPath, 'utf8')) : null;
+
+/** Without an include list every profile is eligible; with one, only listed (normalized) emails are. */
+export const isProfileIncluded = (profile, includeEmails) =>
+  !includeEmails || includeEmails.has(normalizeEmail(profile?.email));
+
+/** Writes one document (when it exists) and every subcollection beneath it; returns the documents written here. */
+async function exportDocumentTree(docRef, writeSnapshotLine, exportCollection) {
+  const document = await docRef.get();
+  let written = 0;
+  if (document.exists) {
+    await writeSnapshotLine({ path: docRef.path, data: serializeFirestoreValue(document.data()) });
+    written = 1;
+  }
+  // Subcollections can exist under a document that has no fields of its own (for example users/{uid}).
+  for (const child of await docRef.listCollections()) await exportCollection(child);
+  return written;
+}
+
+/**
+ * Full-snapshot export limited to the included accounts' own documents: their root user documents,
+ * the users/{uid} subtree, and cloudCycles owned by the account (with each cycle's subcollections).
+ */
+export async function exportIncludedAccountDocuments({ db, uids, writeSnapshotLine, exportCollection }) {
+  let exportedCount = 0;
+  for (const uid of uids) {
+    for (const collectionName of ['userProfiles', 'userSettings', 'userEntitlements', 'userMetrics', 'users']) {
+      exportedCount += await exportDocumentTree(db.collection(collectionName).doc(uid), writeSnapshotLine, exportCollection);
+    }
+    let cursor = null;
+    while (true) {
+      let cycleQuery = db.collection('cloudCycles').where('userId', '==', uid).limit(500);
+      if (cursor) cycleQuery = cycleQuery.startAfter(cursor);
+      const cycles = await cycleQuery.get();
+      for (let offset = 0; offset < cycles.docs.length; offset += 10) {
+        const page = cycles.docs.slice(offset, offset + 10);
+        await exportSnapshotPage(page, writeSnapshotLine, exportCollection);
+        exportedCount += page.length;
+      }
+      if (cycles.docs.length < 500) break;
+      cursor = cycles.docs.at(-1);
+    }
+  }
+  return exportedCount;
+}
 
 async function exportChildCollections(page, exportCollection) {
   const childLists = await Promise.all(page.map((document) => document.ref.listCollections()));
@@ -229,8 +301,9 @@ async function exportCollectionPages(collectionRef, writeSnapshotLine, exportCol
 }
 
 async function main() {
-  const { output } = readArguments();
-  if (!output) throw new Error('Usage: node server/export-firestore-beta-snapshot.mjs --output <private-directory>');
+  const { output, includeEmailsPath } = readArguments();
+  if (!output) throw new Error('Usage: node server/export-firestore-beta-snapshot.mjs --output <private-directory> [--include-emails <file>]');
+  const includeEmails = await readIncludeEmails(includeEmailsPath);
   const projectId = required('FIREBASE_ADMIN_PROJECT_ID');
   const expectedBetaProjectId = required('BETA_FIREBASE_PROJECT_ID');
   if (projectId !== expectedBetaProjectId) throw new Error('Refusing export: FIREBASE_ADMIN_PROJECT_ID does not match BETA_FIREBASE_PROJECT_ID.');
@@ -276,11 +349,18 @@ async function main() {
       cursor = page.docs.at(-1);
     }
   };
-  try {
-    for (const collection of await db.listCollections()) await exportCollection(collection);
-  } finally {
-    try { await snapshotWriteQueue; }
-    finally { await fullSnapshotFile.close(); }
+  const writeFullSnapshot = async (exportDocuments) => {
+    try {
+      await exportDocuments();
+    } finally {
+      try { await snapshotWriteQueue; }
+      finally { await fullSnapshotFile.close(); }
+    }
+  };
+  if (!includeEmails) {
+    await writeFullSnapshot(async () => {
+      for (const collection of await db.listCollections()) await exportCollection(collection);
+    });
   }
 
   const seenEmails = new Set();
@@ -293,6 +373,8 @@ async function main() {
   const missingEmailHashes = [];
   const accountFailures = [];
   const malformedLegacyCycles = [];
+  const includedUids = [];
+  let excludedProfileCount = 0;
   const migrateAccount = async (account) => {
     const [settingsDoc, entitlementDoc, metricsDoc] = await Promise.all([
       db.collection('userSettings').doc(account.uid).get(),
@@ -337,6 +419,11 @@ async function main() {
     const pageAccounts = [];
     for (const profileDoc of profilePage.docs) {
       const profile = profileDoc.data();
+      if (!isProfileIncluded(profile, includeEmails)) {
+        excludedProfileCount += 1;
+        continue;
+      }
+      includedUids.push(profileDoc.id);
       const email = normalizeEmail(profile.email);
       if (!email) {
         skippedNoEmail += 1;
@@ -375,6 +462,19 @@ async function main() {
     if (profilePage.docs.length < 500) break;
     profileCursor = profilePage.docs.at(-1);
   }
+  const includeSummary = {};
+  if (includeEmails) {
+    await writeFullSnapshot(async () => {
+      fullSnapshotCount += await exportIncludedAccountDocuments({ db, uids: includedUids, writeSnapshotLine, exportCollection });
+    });
+    const unmatchedIncludeEmailHashes = [...includeEmails].filter((email) => !seenEmails.has(email)).map(sha256);
+    if (unmatchedIncludeEmailHashes.length) console.warn(`${unmatchedIncludeEmailHashes.length} included emails matched no Firestore profile.`);
+    Object.assign(includeSummary, {
+      includeEmailCount: includeEmails.size,
+      excludedProfileCount,
+      unmatchedIncludeEmailHashes,
+    });
+  }
   const complete = accountFailures.length === 0 && skippedNoEmail === 0 && malformedLegacyCycles.length === 0;
   await fs.writeFile(path.join(output, 'manifest.json'), JSON.stringify({
     projectId,
@@ -386,6 +486,7 @@ async function main() {
     accountFailures,
     malformedLegacyCycleCount: malformedLegacyCycles.length,
     malformedLegacyCycleHashes: malformedLegacyCycles,
+    ...includeSummary,
     complete,
   }, null, 2), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
   if (!complete) throw new Error(`Snapshot export incomplete: ${accountFailures.length} account failures, ${skippedNoEmail} profiles without email, and ${malformedLegacyCycles.length} malformed legacy cycles; review manifest.json and rerun into a new output directory.`);
@@ -393,7 +494,9 @@ async function main() {
   console.log('Keep this directory private; upload the full snapshot and per-email objects to the configured beta R2 bucket, then securely remove the local copies.');
 }
 
-main().catch((error) => {
-  console.error(error?.stack || error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(error?.stack || error);
+    process.exitCode = 1;
+  });
+}

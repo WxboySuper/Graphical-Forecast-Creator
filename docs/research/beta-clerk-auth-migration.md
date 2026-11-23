@@ -10,7 +10,7 @@
 - Added a Cloudflare Worker API path backed by D1. The existing Worker proxy remains the default Firebase beta path until a release explicitly selects `clerk-d1`.
 - Added D1 tables for Clerk users, settings, entitlements, metrics, cloud cycles, workflow awareness, custom products, Stripe event idempotency, and user forecast/discussion/verification records.
 - Added the beta Firestore snapshot exporter. It requires the configured Firebase project to exactly match `BETA_FIREBASE_PROJECT_ID`, normalizes and hashes email addresses, and writes per-user JSON files with private file permissions. The files are intended for the beta R2 snapshot bucket; no user snapshot is committed to this repository.
-- Snapshot JSON converts Firestore timestamps to ISO strings and tags GeoPoint, DocumentReference, and Bytes values so their types remain distinguishable in the archival export.
+- Snapshot JSON converts Firestore timestamps to ISO strings and tags GeoPoint, DocumentReference, and bytes (Buffer) values so their types remain distinguishable in the archival export.
 - Added first-request migration. The Worker accepts only a Clerk session with a verified primary email, fetches that email from Clerk's Backend API, matches it to the snapshot, and moves owned records into D1 under the Clerk user ID. D1's `users` row records the legacy Firebase UID for continuity with migrated billing metadata; there is no identity mapping table. Migration writes are idempotent, failed attempts can retry, and the R2 snapshot has no automatic expiry.
 - Added beta release selection for Firebase or Clerk+D1. The VPS API deploy job only runs for Firebase releases. The Clerk+D1 path applies D1 migrations and deploys the Worker using a generated config containing the database ID.
 
@@ -36,17 +36,27 @@ Firebase password hashes are not imported into Clerk by this implementation. Use
 
 ## Snapshot export and upload
 
-Install the `server` package dependencies, then export using a beta-only Firebase Admin service account:
+Beta and production share one Firebase project, so export only the beta testers' accounts. Put their sign-in emails in a private text file, one per line (blank lines and `#` comments are ignored; emails are trimmed and lowercased, the same normalization the per-user hash uses). Install the `server` package dependencies, then export using a Firebase Admin service account for that project:
 
 ```powershell
-$env:FIREBASE_ADMIN_PROJECT_ID = '<beta Firebase project id>'
-$env:BETA_FIREBASE_PROJECT_ID = '<same beta Firebase project id>'
-$env:FIREBASE_ADMIN_CLIENT_EMAIL = '<beta service account email>'
-$env:FIREBASE_ADMIN_PRIVATE_KEY = '<beta service account private key>'
- node server/export-firestore-beta-snapshot.mjs --output C:\private\gfc-beta-firestore-snapshot
+$env:FIREBASE_ADMIN_PROJECT_ID = '<Firebase project id>'
+$env:BETA_FIREBASE_PROJECT_ID = '<same Firebase project id>'
+$env:FIREBASE_ADMIN_CLIENT_EMAIL = '<service account email>'
+$env:FIREBASE_ADMIN_PRIVATE_KEY = '<service account private key>'
+node server/export-firestore-beta-snapshot.mjs --output C:\private\gfc-beta-firestore-snapshot --include-emails C:\private\beta-tester-emails.txt
 ```
 
-The output directory contains `full-snapshot.jsonl`, hashed per-user JSON files, and `manifest.json`. Confirm `complete: true`, compare document and per-user counts with the beta Firestore inventory, and investigate each missing-email UID hash before deployment; those accounts remain recoverable from the full snapshot but cannot auto-link by email. On an incomplete export, review hashed account failures and rerun into a new, empty output directory. Upload the full snapshot as the root R2 object `full-snapshot.jsonl` and each hashed per-user file to `by-email/<sha256-of-normalized-email>.json` first; upload `manifest.json` last so it never advertises an upload that has not finished. Keep the R2 objects until the maintainer explicitly decides the migration source can be deleted. Securely remove local export files after upload and validation.
+`--include-emails <file>` is optional. With it, `userProfiles` whose email is not on the list are skipped before the missing-email check, and `full-snapshot.jsonl` contains only the included accounts' documents (`userProfiles`, `userSettings`, `userEntitlements`, `userMetrics`, the `users/{uid}` subtree, and owned `cloudCycles` with their subcollections) instead of every collection in the project. The manifest then also records `includeEmailCount`, `excludedProfileCount`, and `unmatchedIncludeEmailHashes` (listed emails with no Firestore profile; those testers simply start fresh in beta). The list file must contain at least one valid email. Without the flag, the exporter keeps its original behavior and snapshots every collection and every profile.
+
+The output directory contains `full-snapshot.jsonl`, hashed per-user JSON files, and `manifest.json`. Confirm `complete: true`, compare document and per-user counts with the expected beta inventory, and investigate each missing-email UID hash before deployment; those accounts remain recoverable from the full snapshot but cannot auto-link by email. On an incomplete export, review hashed account failures and rerun into a new, empty output directory.
+
+Upload to the beta R2 bucket in this order, always with `--remote` (Wrangler 4 `r2 object` commands otherwise write to local Miniflare storage):
+
+1. The full snapshot as the root object: `pnpm dlx wrangler@4.149.0 r2 object put --remote gfc-beta-firestore-migration-snapshot/full-snapshot.jsonl --file <output>/full-snapshot.jsonl`
+2. Each hashed per-user file: `pnpm dlx wrangler@4.149.0 r2 object put --remote gfc-beta-firestore-migration-snapshot/by-email/<sha256-of-normalized-email>.json --file <output>/by-email/<sha256-of-normalized-email>.json`
+3. `manifest.json` last, so it never advertises an upload that has not finished: `pnpm dlx wrangler@4.149.0 r2 object put --remote gfc-beta-firestore-migration-snapshot/manifest.json --file <output>/manifest.json`
+
+Keep the R2 objects until the maintainer explicitly decides the migration source can be deleted. Securely remove local export files and the email list after upload and validation.
 
 ## Beta deployment
 
