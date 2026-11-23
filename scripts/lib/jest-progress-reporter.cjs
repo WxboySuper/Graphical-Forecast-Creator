@@ -28,7 +28,7 @@ class ProgressReporter {
   }
 
   label(testPath) {
-    return path.relative(process.cwd(), testPath).split(path.sep).join('/');
+    return path.relative(process.cwd(), testPath ?? '').split(path.sep).join('/');
   }
 
   onRunStart(results) {
@@ -37,16 +37,16 @@ class ProgressReporter {
   }
 
   onTestFileStart(test) {
-    console.log(`${this.prefix()} RUN   ${this.label(test.path)}`);
+    console.log(`${this.prefix()} RUN   ${this.label(test?.path)}`);
   }
 
   onTestResult(test, result) {
     this.finished += 1;
-    const failed = result.numFailingTests > 0 || Boolean(result.testExecError);
+    const failed = (result?.numFailingTests ?? 0) > 0 || Boolean(result?.testExecError);
     if (failed) this.failed += 1;
-    const { start, end } = result.perfStats ?? {};
+    const { start, end } = result?.perfStats ?? {};
     const duration = Number.isFinite(end - start) ? seconds(end - start) : 'n/a';
-    console.log(`${this.prefix()} ${failed ? 'FAIL' : 'PASS'}  ${this.label(test.path)}  ${duration}`);
+    console.log(`${this.prefix()} ${failed ? 'FAIL' : 'PASS'}  ${this.label(test?.path)}  ${duration}`);
   }
 
   onRunComplete() {

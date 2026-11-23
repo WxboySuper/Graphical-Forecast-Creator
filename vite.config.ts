@@ -54,10 +54,10 @@ export default defineConfig(({ mode }) => {
       : [];
 
   // E2E runs have no API server on 3006, so Vite's proxy would log an ECONNREFUSED stack for every /api call.
-  // Drop only those proxy-error log lines; the proxy still answers 500 exactly as before.
+  // Drop only those ECONNREFUSED proxy-error log lines; the proxy still answers 500 exactly as before.
   const logger = createLogger();
-  const customLogger = env.GFC_E2E_QUIET_PROXY === '1'
-    ? { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!msg.includes('http proxy error')) logger.error(msg, options); } }
+  const customLogger = process.env.GFC_E2E_QUIET_PROXY === '1'
+    ? { ...logger, error: (msg: string, options?: Parameters<typeof logger.error>[1]) => { if (!(msg.includes('http proxy error') && msg.includes('ECONNREFUSED 127.0.0.1:3006'))) logger.error(msg, options); } }
     : undefined;
 
   return {
