@@ -7,6 +7,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Next major / beta
 
+#### Dependencies
+
+- **Server dependencies:** Updated server error reporting, request rate limiting, and premium billing libraries to keep monitoring, abuse protection, and checkout reliable.
+
 #### Changed
 
 - **Send feedback:** Send feedback is now available in the production app as well as the beta site.
