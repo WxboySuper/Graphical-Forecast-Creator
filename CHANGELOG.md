@@ -13,6 +13,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Stable v2.x hotfixes
 
+#### Changed
+
+- **Terms of Service:** Version 4 names Alexander Miller as the GFC operator and prompts existing users to accept the updated terms again.
+
 #### Added
 
 - **Send feedback:** Send feedback is now available in the production app from the Resources menu.
