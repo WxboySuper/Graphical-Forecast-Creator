@@ -15,7 +15,7 @@ const elapsed = (ms: number): string => {
 export default class ProgressReporter implements Reporter {
   private total = 0;
   /** Latest final outcome per test id, so serial suites that re-run passed tests on retry are not counted twice. */
-  private outcomes = new Map<string, boolean>();
+  private outcomes = new Map<string, 'passed' | 'skipped' | 'failed'>();
   private startedAt = Date.now();
 
   onBegin(_config: FullConfig, suite: Suite): void {
@@ -28,7 +28,11 @@ export default class ProgressReporter implements Reporter {
   }
 
   private get failed(): number {
-    return [...this.outcomes.values()].filter((ok) => !ok).length;
+    return [...this.outcomes.values()].filter((outcome) => outcome === 'failed').length;
+  }
+
+  private get skipped(): number {
+    return [...this.outcomes.values()].filter((outcome) => outcome === 'skipped').length;
   }
 
   private prefix(count: number): string {
@@ -52,7 +56,7 @@ export default class ProgressReporter implements Reporter {
     const passed = result.status === 'passed' || result.status === 'skipped';
     const willRetry = !passed && result.retry < test.retries;
     if (willRetry) this.outcomes.delete(test.id);
-    else this.outcomes.set(test.id, passed);
+    else this.outcomes.set(test.id, result.status === 'skipped' ? 'skipped' : passed ? 'passed' : 'failed');
     const verb = result.status === 'skipped' ? 'SKIP' : passed ? 'PASS' : 'FAIL';
     const note = willRetry ? ' (will retry)' : '';
     console.log(`${this.prefix(this.finished)} ${verb}  ${this.label(test)}  ${seconds(result.duration)}${note}`);
@@ -61,7 +65,7 @@ export default class ProgressReporter implements Reporter {
   onEnd(result: FullResult): void {
     const time = elapsed(Date.now() - this.startedAt);
     const summary = this.failed === 0 && result.status === 'passed'
-      ? `all ${this.total} tests passed in ${time}`
+      ? `all ${this.total} tests passed${this.skipped ? ` (${this.skipped} skipped)` : ''} in ${time}`
       : `${this.failed} of ${this.total} tests failed (${result.status}) in ${time}`;
     console.log(`${this.prefix(this.finished)} DONE  ${summary}`);
   }
