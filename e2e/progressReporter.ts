@@ -8,6 +8,16 @@ const elapsed = (ms: number): string => {
   return minutes > 0 ? `${minutes}m${String(total % 60).padStart(2, '0')}s` : `${total}s`;
 };
 
+type Outcome = 'passed' | 'skipped' | 'failed';
+
+const VERBS: Record<Outcome, string> = { passed: 'PASS', skipped: 'SKIP', failed: 'FAIL' };
+
+/** Classifies one attempt, honoring `test.fail()` where the expected status is a failure. */
+const attemptOutcome = (test: TestCase, result: TestResult): Outcome => {
+  if (result.status === 'skipped') return 'skipped';
+  return result.status === test.expectedStatus ? 'passed' : 'failed';
+};
+
 /**
  * Prints RUN / PASS / FAIL / DONE lines with a running count and percentage, e.g.
  * `[ 3/47   6%] PASS  navigation.spec.ts › Navigation › opens home  1.7s`, so CI logs show how far the run is.
@@ -15,7 +25,7 @@ const elapsed = (ms: number): string => {
 export default class ProgressReporter implements Reporter {
   private total = 0;
   /** Latest final outcome per test id, so serial suites that re-run passed tests on retry are not counted twice. */
-  private outcomes = new Map<string, 'passed' | 'skipped' | 'failed'>();
+  private outcomes = new Map<string, Outcome>();
   private startedAt = Date.now();
 
   onBegin(_config: FullConfig, suite: Suite): void {
@@ -53,13 +63,12 @@ export default class ProgressReporter implements Reporter {
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    const passed = result.status === 'passed' || result.status === 'skipped';
-    const willRetry = !passed && result.retry < test.retries;
+    const outcome = attemptOutcome(test, result);
+    const willRetry = outcome === 'failed' && result.retry < test.retries;
     if (willRetry) this.outcomes.delete(test.id);
-    else this.outcomes.set(test.id, result.status === 'skipped' ? 'skipped' : passed ? 'passed' : 'failed');
-    const verb = result.status === 'skipped' ? 'SKIP' : passed ? 'PASS' : 'FAIL';
+    else this.outcomes.set(test.id, outcome);
     const note = willRetry ? ' (will retry)' : '';
-    console.log(`${this.prefix(this.finished)} ${verb}  ${this.label(test)}  ${seconds(result.duration)}${note}`);
+    console.log(`${this.prefix(this.finished)} ${VERBS[outcome]}  ${this.label(test)}  ${seconds(result.duration)}${note}`);
   }
 
   onEnd(result: FullResult): void {
