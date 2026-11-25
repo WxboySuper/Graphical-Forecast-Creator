@@ -11,7 +11,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 <!-- Next-major work goes here. -->
 
-### Stable v2.x hotfixes
+## v2.1.0
 
 #### Changed
 
@@ -31,6 +31,11 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 <!-- Production fixes for the stable v2.x line go here. -->
 
+### Stable v2.x hotfixes
+
+#### Added
+
+<!-- Add stable-line changes here. -->
 ## v2.0.0
 
 #### Added
