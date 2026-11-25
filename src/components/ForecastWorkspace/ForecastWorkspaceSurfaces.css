@@ -12,9 +12,15 @@
 
 .custom-workspace__map {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   min-height: 0;
+}
+
+/* Match the Severe shell so the map fills the pane instead of its content width. */
+.custom-workspace__map > * {
+  width: 100%;
+  min-width: 0;
 }
 
 .custom-workspace__map.is-offscreen {
