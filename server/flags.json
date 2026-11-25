@@ -19,7 +19,7 @@
     "mesoscaleAreaStyling": { "kind": "dev", "owner": "WxboySuper", "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
     "mesoscaleDerivedParameters": { "kind": "dev", "owner": "WxboySuper", "issue": 1801, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
     "winterWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 913, "removeBy": "3.0.0", "default": false },
-    "collaborationRoom": { "kind": "dev", "owner": "WxboySuper", "issue": 433, "removeBy": "3.0.0", "default": false },
+    "collaborationRoom": { "kind": "dev", "owner": "WxboySuper", "issue": 1927, "removeBy": "3.x", "default": false },
     "paintBucketTool": { "kind": "dev", "owner": "WxboySuper", "issue": 623, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
     "kmzExport": { "kind": "dev", "owner": "WxboySuper", "issue": 621, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true, "staging": true } },
     "populationEstimate": { "kind": "dev", "owner": "WxboySuper", "issue": 622, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } },
