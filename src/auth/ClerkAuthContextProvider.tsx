@@ -885,7 +885,7 @@ export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> =
   );
   const backend = useMemo(() => createClerkAuthBackend({
     user: currentUser,
-    getToken: async () => (await session.getToken()) ?? null,
+    getToken: async (forceRefresh = false) => (await session.getToken({ skipCache: forceRefresh })) ?? null,
     signOut: () => session.clerk.signOut(),
     deleteAccount: async () => session.deleteClerkUser(),
   }), [currentUser, session]);

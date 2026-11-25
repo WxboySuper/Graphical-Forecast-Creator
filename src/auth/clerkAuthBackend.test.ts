@@ -20,4 +20,14 @@ describe('createClerkAuthBackend', () => {
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(deleteAccount).toHaveBeenCalledWith(user);
   });
+
+  it('forwards a forced token refresh to the Clerk binding', async () => {
+    const getToken = jest.fn(async () => 'fresh-token');
+    const backend = createClerkAuthBackend({
+      user: null, getToken, signOut: jest.fn(async () => undefined), deleteAccount: jest.fn(async () => undefined),
+    });
+
+    await expect(backend.getToken(true)).resolves.toBe('fresh-token');
+    expect(getToken).toHaveBeenCalledWith(true);
+  });
 });

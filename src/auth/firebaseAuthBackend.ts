@@ -51,19 +51,20 @@ export const signOutFirebaseFixture = async (): Promise<void> => {
   }
 };
 
-const deleteFirebaseAccount = async (user: User, password?: string): Promise<void> => {
-  const hasGoogleProvider = user.providerData.some((provider) => provider.providerId === 'google.com');
-  const hasPasswordProvider = user.providerData.some((provider) => provider.providerId === 'password');
-  if (hasGoogleProvider) {
+const reauthenticateForDeletion = async (user: User, password?: string): Promise<void> => {
+  const providerIds = user.providerData.map((provider) => provider.providerId);
+  if (providerIds.includes('google.com')) {
     await reauthenticateWithPopup(user, googleAuthProvider);
-  } else if (hasPasswordProvider && user.email) {
-    if (!password) throw new Error('Enter your current password to delete this account.');
-    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
-  } else {
+    return;
+  }
+  if (!providerIds.includes('password') || !user.email) {
     throw new Error('This sign-in method cannot be reauthenticated here. Contact support for account deletion.');
   }
+  if (!password) throw new Error('Enter your current password to delete this account.');
+  await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+};
 
-  const token = await user.getIdToken(true);
+const requestAccountDeletion = async (token: string): Promise<void> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30_000);
   try {
@@ -82,3 +83,7 @@ const deleteFirebaseAccount = async (user: User, password?: string): Promise<voi
   }
 };
 
+const deleteFirebaseAccount = async (user: User, password?: string): Promise<void> => {
+  await reauthenticateForDeletion(user, password);
+  await requestAccountDeletion(await user.getIdToken(true));
+};
