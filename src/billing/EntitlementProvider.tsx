@@ -5,9 +5,9 @@
  * should consume this context instead of reading billing documents directly.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
-import { db, requireDb } from '../lib/firebase';
-import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from '../lib/betaApi';
+import { doc, onSnapshot, Timestamp, db, requireDb } from '../auth/firebaseDataAdapter';
+import { fetchBetaApi, isBetaSessionInitializing } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 import { useAuth } from '../auth/AuthProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 
@@ -293,7 +293,7 @@ const subscribeToEntitlements = (
 };
 
 /** True when the provider should operate in hosted mode for the current render. */
-const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && (db || isBetaClerkD1Mode()));
+const isHostedEntitlementMode = (hostedAuthEnabled: boolean): boolean => Boolean(hostedAuthEnabled && (db || getSelectedAuthBackend() === 'clerk'));
 
 /** Applies the loading state used while auth is still resolving. */
 const applyLoadingEntitlementState = (
@@ -480,7 +480,7 @@ const resolveEntitlementEffect = (
     return null;
   }
 
-  if (isBetaClerkD1Mode()) return startBetaEntitlementSubscription(args.user.uid, handlers);
+  if (getSelectedAuthBackend() === 'clerk') return startBetaEntitlementSubscription(args.user.uid, handlers);
   return startSignedInEntitlementSubscription(args.user.uid, handlers);
 };
 
@@ -519,7 +519,7 @@ const fetchBillingAction = async (
   endpoint: string,
   body?: Record<string, unknown>
 ) => {
-  if (isBetaClerkD1Mode()) {
+  if (getSelectedAuthBackend() === 'clerk') {
     const response = await fetchBetaApi(endpoint, {
       method: 'POST',
       ...(body ? { body: JSON.stringify(body) } : {}),

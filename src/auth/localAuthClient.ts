@@ -1,9 +1,8 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
-import type { User } from 'firebase/auth';
-import { signOut } from 'firebase/auth';
 import type { OverlaysState } from '../store/overlaysSlice';
-import { auth } from '../lib/firebase';
+import type { AuthBackendUser } from './AuthBackend';
+import { signOutFirebaseFixture } from './firebaseAuthBackend';
 import { clearLocalTestAccount, createLocalTestUser, readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
 import type { UserSettingsDocument } from './userSettingsDocument';
@@ -18,7 +17,7 @@ interface LocalAuthDeps {
   dispatch: ReturnType<typeof useDispatch>;
   currentDarkModeRef: React.MutableRefObject<boolean>;
   currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setUser: React.Dispatch<React.SetStateAction<AuthBackendUser | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
@@ -31,7 +30,7 @@ type InitLocalAuthStateOpts = {
   dispatch: ReturnType<typeof useDispatch>;
   currentDarkModeRef: React.MutableRefObject<boolean>;
   currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setUser: React.Dispatch<React.SetStateAction<AuthBackendUser | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
@@ -128,7 +127,7 @@ export function applyLocalAuthData(
     dispatch: ReturnType<typeof useDispatch>;
     currentDarkModeRef: React.MutableRefObject<boolean>;
     currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-    setUser: React.Dispatch<React.SetStateAction<User | null>>;
+    setUser: React.Dispatch<React.SetStateAction<AuthBackendUser | null>>;
     setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
     setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
     setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
@@ -136,7 +135,7 @@ export function applyLocalAuthData(
     setError: React.Dispatch<React.SetStateAction<string | null>>;
   }
 ) {
-  const localUser = extractLocalUserFromData(data) as unknown as User;
+  const localUser = extractLocalUserFromData(data) as unknown as AuthBackendUser;
 
   setUser(localUser);
   setStatus('signed_in');
@@ -190,7 +189,7 @@ async function localCredentialAction(
   }
 
   const data = (await safeParseJson<Record<string, unknown>>(resp)) ?? {};
-  const localUser = extractLocalUserFromData(data) as unknown as User;
+  const localUser = extractLocalUserFromData(data) as unknown as AuthBackendUser;
   applyLocalAuthData(data, deps);
   queueProductMetric({ event: action === 'signin' ? 'account_signin' : 'account_signup', user: localUser });
 }
@@ -205,20 +204,14 @@ export const localSignUpWithEmail = (creds: { email: string; password: string },
 
 /** Local-only sign out helper: invalidates local session and clears local state. */
 export const localSignOutUser = async (deps: {
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setUser: React.Dispatch<React.SetStateAction<AuthBackendUser | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
 }) => {
   const { setUser, setStatus, setSyncedSettings, setSettingsSyncStatus } = deps;
   const fixtureActive = Boolean(readLocalTestAccount());
-  if (fixtureActive && auth) {
-    try {
-      await signOut(auth);
-    } catch {
-      // Fixture sign-out must still clear the local session if hosted auth is unavailable.
-    }
-  }
+  if (fixtureActive) await signOutFirebaseFixture();
   try {
     await postLocalJson('/api/local/signout', { failureMessage: 'Unable to sign out right now.' });
   } catch {

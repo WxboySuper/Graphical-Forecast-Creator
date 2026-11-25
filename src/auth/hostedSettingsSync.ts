@@ -11,8 +11,8 @@ import {
   serverTimestamp,
   setDoc,
   type Unsubscribe,
-} from 'firebase/firestore';
-import type { User } from 'firebase/auth';
+} from './firebaseDataAdapter';
+import type { AuthBackendUser } from './AuthBackend';
 import { setDarkMode } from '../store/themeSlice';
 import { applyOverlaySettings } from '../store/overlaysSlice';
 import type { OverlaysState } from '../store/overlaysSlice';
@@ -711,7 +711,7 @@ export const startSettingsSubscription = (opts: {
   );
 
 const buildHostedProfilePayload = (
-  user: User,
+  user: AuthBackendUser,
   opts?: { includeCreatedAt?: boolean },
 ) => ({
   email: user.email ?? '',
@@ -725,9 +725,9 @@ const buildHostedProfilePayload = (
 /** Creates or updates the hosted profile document while preserving the original creation timestamp. */
 export const syncProfileDocument = async (
   profileRef: ReturnType<typeof doc>,
-  user: User,
+  user: AuthBackendUser,
   createPayload: (
-    profileUser: User,
+  profileUser: AuthBackendUser,
     payloadOpts?: { includeCreatedAt?: boolean },
   ) => Record<string, unknown> = buildHostedProfilePayload,
 ): Promise<void> => {
@@ -747,7 +747,7 @@ export const syncProfileDocument = async (
 export const runInitialHostedSync = async (opts: {
   profileRef: ReturnType<typeof doc>;
   settingsRef: ReturnType<typeof doc>;
-  user: User;
+  user: AuthBackendUser;
   buildLocalSettingsSnapshot: () => UserSettingsDocument;
   applyRemoteSettings: (settings: UserSettingsDocument) => void;
   isActive: () => boolean;

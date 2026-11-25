@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
-import { GoogleOneTap, SignIn, SignUp } from '@clerk/react';
+import { GoogleOneTap, SignIn, SignUp } from '../../auth/clerkUiAdapter';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';

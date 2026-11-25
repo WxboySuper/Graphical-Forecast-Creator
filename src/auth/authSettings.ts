@@ -2,8 +2,8 @@
  * Local-auth settings helpers. This module defines persisted settings and
  * normalizes account preferences before they enter auth state.
  */
-import { serverTimestamp } from 'firebase/firestore';
-import type { User } from 'firebase/auth';
+import { serverTimestamp } from './firebaseDataAdapter';
+import type { AuthBackendUser } from './AuthBackend';
 import { DEFAULT_MONITOR_SETTINGS, areSyncedMonitorSettingsEqual, type MonitorSettings } from '../monitor/types';
 import { normalizeMonitorSettings } from '../monitor/monitorSettingsNormalize';
 import {
@@ -123,7 +123,7 @@ export const createSettingsSnapshot = (args: BuildSettingsArgs): UserSettingsDoc
 };
 
 /** Creates the user profile payload written to Firestore on hosted sign-in. */
-export const createProfilePayload = (user: User, opts?: { includeCreatedAt?: boolean }) => ({
+export const createProfilePayload = (user: AuthBackendUser, opts?: { includeCreatedAt?: boolean }) => ({
   email: user.email ?? '',
   displayName: user.displayName ?? '',
   photoURL: user.photoURL ?? '',

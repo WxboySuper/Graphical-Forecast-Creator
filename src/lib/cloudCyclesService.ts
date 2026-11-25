@@ -6,9 +6,9 @@
  * rename/delete/list/subscribe primitives. UI hooks own permission and status
  * policy; this service owns transport and record-shape boundaries.
  */
-import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, setDoc, where, db } from '../auth/firebaseDataAdapter';
 import { v4 as uuidv4 } from 'uuid';
-import { auth, db } from './firebase';
+import { firebaseAuthBackend } from '../auth/firebaseAuthBackend';
 import { CloudCycleMetadata, CloudCycle, CloudOperationResult } from '../types/cloudCycles';
 import { GFCForecastSaveData } from '../types/outlooks';
 import type { ForecastWorkspacePayload } from '../utils/forecastWorkspaceEnvelope';
@@ -18,7 +18,8 @@ import { boundWorkflowMetadataForPersistence, isValidWorkflowMetadata } from './
 import { SavedCycleStats } from '../store/forecastSlice';
 import { validateForecastData } from '../utils/fileUtils';
 import { DEFAULT_FORECAST_WORKSPACE, resolveStoredWorkspaceId, type ForecastWorkspaceId } from '../config/forecastWorkspaces';
-import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
+import { fetchBetaApi, isBetaSessionInitializing } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 
 const LEGACY_USER_SETTINGS_COLLECTION = 'userSettings';
 const CLOUD_CYCLES_COLLECTION = 'cloudCycles';
@@ -109,7 +110,7 @@ interface SaveCloudCycleParams {
 
 /** Sends a normalized cloud cycle payload to the authenticated API. */
 const postCloudCycle = async (token: string, body: Record<string, unknown>) => {
-  const response = isBetaClerkD1Mode() ? await fetchBetaApi('/api/cloud-cycles', {
+  const response = getSelectedAuthBackend() === 'clerk' ? await fetchBetaApi('/api/cloud-cycles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -134,9 +135,8 @@ const buildCloudCycleRequest = ({ cycleId, params, metadata, workflowMetadata }:
 
 /** Returns a Clerk session marker or the current Firebase token. */
 const getCloudSaveToken = async (): Promise<string | null> => {
-  if (isBetaClerkD1Mode()) return 'clerk-session';
-  const currentUser = auth?.currentUser;
-  return currentUser ? currentUser.getIdToken() : null;
+  if (getSelectedAuthBackend() === 'clerk') return 'clerk-session';
+  return firebaseAuthBackend.getToken();
 };
 
 type LegacyCloudCyclesValue = string | Record<string, unknown> | undefined;
@@ -479,7 +479,7 @@ const getOwnedCloudCycle = async ({ userId, cycleId }: UserCycleLookupParams): P
  */
 const buildCloudCycleSaveContext = async (params: SaveCloudCycleParams) => {
   const cycleId = params.existingId || createCloudCycleId({ userId: params.userId, cycleDate: params.cycleDate });
-  if (isBetaClerkD1Mode()) return buildBetaCloudCycleSaveContext(params, cycleId);
+  if (getSelectedAuthBackend() === 'clerk') return buildBetaCloudCycleSaveContext(params, cycleId);
   return buildFirestoreCloudCycleSaveContext(params, cycleId);
 };
 
@@ -557,7 +557,7 @@ export const loadCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult<CloudCycle>> => {
   try {
-    if (isBetaClerkD1Mode()) return await loadBetaCloudCycle(params);
+    if (getSelectedAuthBackend() === 'clerk') return await loadBetaCloudCycle(params);
     const record = await fetchCloudCycleById(params);
 
     if (!record) {
@@ -595,7 +595,7 @@ export const deleteCloudCycle = async (
   params: UserCycleLookupParams
 ): Promise<CloudOperationResult> => {
   try {
-    if (isBetaClerkD1Mode()) return await deleteBetaCloudCycle(params);
+    if (getSelectedAuthBackend() === 'clerk') return await deleteBetaCloudCycle(params);
     const existingCycle = await getOwnedCloudCycle(params);
     if (!existingCycle) {
       return { success: true };
@@ -626,7 +626,7 @@ export const renameCloudCycle = async (
   params: RenameCloudCycleParams
 ): Promise<CloudOperationResult> => {
   try {
-    if (isBetaClerkD1Mode()) {
+    if (getSelectedAuthBackend() === 'clerk') {
       const response = await fetchBetaApi(`/api/cloud-cycles/${encodeURIComponent(params.cycleId)}`, {
         method: 'PATCH', body: JSON.stringify({ label: params.newLabel }),
       });
@@ -670,7 +670,7 @@ export async function listCloudCycles(
   { userId }: ListCloudCyclesParams
 ): Promise<CloudOperationResult<CloudCycleMetadata[]>> {
   try {
-    if (isBetaClerkD1Mode()) {
+    if (getSelectedAuthBackend() === 'clerk') {
       const result = await listBetaCloudCyclePages(userId);
       return result.success && result.data ? { success: true, data: sortCloudCycleMetadata(result.data) } : result;
     }
@@ -800,7 +800,7 @@ const reportCloudCycleRefreshError = (
 export const subscribeToCloudCycles = (
   { userId, onUpdate, onError }: CloudCycleSubscriptionParams
 ): (() => void) => {
-  if (isBetaClerkD1Mode()) {
+  if (getSelectedAuthBackend() === 'clerk') {
     let active = true;
     let retryTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const scheduleRetry = () => {

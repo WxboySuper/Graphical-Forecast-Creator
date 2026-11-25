@@ -10,8 +10,8 @@ import './darkMode.css';
 import App from './App';
 import { store } from './store';
 import { initializeStorePersistence } from './store/persistence';
-import { ClerkProvider } from '@clerk/react';
-import { betaClerkPublishableKey } from './lib/betaApi';
+import { ClerkProvider } from './auth/clerkUiAdapter';
+import { betaClerkPublishableKey } from './auth/clerkAuthBackend';
 
 // Browser-only hydration and persistence are explicit application bootstrap,
 // not import-time behavior of the Redux store modules.
