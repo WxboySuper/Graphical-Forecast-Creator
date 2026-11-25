@@ -2,7 +2,7 @@
  * Feedback submission client. Sends one authenticated feedback entry to the
  * feedback service and maps failures to user-presentable messages.
  */
-import type { User } from 'firebase/auth';
+import type { AuthBackendUser } from '../auth/AuthBackend';
 import { getBuildTarget } from '../config/buildTarget';
 import { getFeedbackApiUrl, type FeedbackCategory } from '../config/feedback';
 
@@ -60,7 +60,7 @@ const readEntryId = async (response: Response): Promise<string> => {
 };
 
 /** Posts feedback and resolves with the new entry id. */
-export const submitFeedback = async (user: User, submission: FeedbackSubmission): Promise<string> => {
+export const submitFeedback = async (user: AuthBackendUser, submission: FeedbackSubmission): Promise<string> => {
   const baseUrl = getFeedbackApiUrl();
   if (!baseUrl) {
     throw new FeedbackSubmitError('Feedback is not available on this build.');

@@ -2,9 +2,10 @@
  * Defines product-usage metric events and queues them for the configured analytics boundary.
  * This utility owns metric-shape normalization and the client request to the analytics endpoint; callers own when product events are emitted.
  */
-import type { User } from 'firebase/auth';
+import type { AuthBackendUser } from '../auth/AuthBackend';
 import { isHostedAuthEnabled } from '../lib/firebase';
-import { fetchBetaApi, isBetaClerkD1Mode } from '../lib/betaApi';
+import { fetchBetaApi } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 
 export type ProductMetricEvent =
   | 'account_signup'
@@ -17,13 +18,13 @@ export type ProductMetricEvent =
 
 interface RecordProductMetricOptions {
   event: ProductMetricEvent;
-  user?: User | null;
+  user?: AuthBackendUser | null;
 }
 
 const INSTALLATION_ID_STORAGE_KEY = 'gfcInstallationId';
 
 /** True when a hosted backend (Firebase or beta Clerk) can receive product metrics. */
-const isMetricsBackendEnabled = (): boolean => isHostedAuthEnabled || isBetaClerkD1Mode();
+const isMetricsBackendEnabled = (): boolean => isHostedAuthEnabled || getSelectedAuthBackend() === 'clerk';
 
 /** Returns the browser-scoped anonymous installation id used for daily active-device dedupe. */
 const getInstallationId = (): string | null => {
@@ -57,7 +58,7 @@ export const recordProductMetric = async ({
     }
 
     const body = JSON.stringify({ event, installationId });
-    if (isBetaClerkD1Mode()) {
+    if (getSelectedAuthBackend() === 'clerk') {
       // Clerk sessions authenticate through the beta API token source rather than a Firebase user.
       await fetchBetaApi('/api/metrics/event', { method: 'POST', keepalive: true, body });
       return;

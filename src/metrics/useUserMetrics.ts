@@ -3,10 +3,10 @@
  * subscribes to updates when hosted auth is enabled, and exposes request state.
  */
 import { useEffect, useRef, useState } from 'react';
-import { doc, getDoc, type Timestamp } from 'firebase/firestore';
-import { db, isHostedAuthEnabled } from '../lib/firebase';
+import { doc, getDoc, Timestamp, db, isHostedAuthEnabled } from '../auth/firebaseDataAdapter';
 import { useAuth } from '../auth/AuthProvider';
-import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from '../lib/betaApi';
+import { fetchBetaApi, isBetaSessionInitializing } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 
 export interface UserMetricsDocument {
   uid: string;
@@ -81,7 +81,7 @@ const readUserMetricsDocument = (value: UserMetricsSnapshot | undefined): UserMe
 };
 
 const fetchUserMetricsSnapshot = async (userId: string): Promise<UserMetricsSnapshot | undefined> => {
-  if (!isBetaClerkD1Mode()) {
+  if (getSelectedAuthBackend() !== 'clerk') {
     const snapshot = await getDoc(doc(db!, 'userMetrics', userId));
     return snapshot.data() as UserMetricsSnapshot | undefined;
   }
@@ -108,7 +108,7 @@ const isCurrentMetricsRequest = (active: boolean, requestId: number, currentRequ
   active && requestId === currentRequestId;
 
 const retryMetricsLoad = (message: string, attempts: number, schedule: () => void): boolean => {
-  if (!isBetaClerkD1Mode()) return false;
+  if (getSelectedAuthBackend() !== 'clerk') return false;
   if (!isBetaSessionInitializing(message)) return false;
   if (attempts >= 20) return false;
   schedule();
@@ -116,7 +116,7 @@ const retryMetricsLoad = (message: string, attempts: number, schedule: () => voi
 };
 
 const canLoadUserMetrics = (): boolean => {
-  if (isBetaClerkD1Mode()) return true;
+  if (getSelectedAuthBackend() === 'clerk') return true;
   return isHostedAuthEnabled && Boolean(db);
 };
 
@@ -160,7 +160,7 @@ const startUserMetricsRequest = (userId: string, handlers: MetricsStateHandlers,
 export const useUserMetrics = (): UseUserMetricsResult => {
   const { user, status } = useAuth();
   const [metrics, setMetrics] = useState<UserMetricsDocument>(DEFAULT_USER_METRICS);
-  const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled || isBetaClerkD1Mode()));
+  const [loading, setLoading] = useState(Boolean(isHostedAuthEnabled || getSelectedAuthBackend() === 'clerk'));
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 

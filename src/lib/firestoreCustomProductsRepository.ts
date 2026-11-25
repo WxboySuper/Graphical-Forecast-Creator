@@ -10,7 +10,7 @@ import {
   runTransaction,
   type DocumentReference,
   type Transaction,
-} from 'firebase/firestore';
+} from '../auth/firebaseDataAdapter';
 import { v4 as uuidv4 } from 'uuid';
 import { CUSTOM_PRODUCT_LIMITS, type HostedCustomProduct } from '../types/customProducts';
 import type { CustomProductDraft, CustomProductsRepository } from './customProductsRepository';
@@ -22,7 +22,8 @@ import {
   sortProducts,
 } from './customProductRepositoryModel';
 import { requireDb } from './firebase';
-import { fetchBetaApi, isBetaClerkD1Mode, isBetaSessionInitializing } from './betaApi';
+import { fetchBetaApi, isBetaSessionInitializing } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 
 export const CUSTOM_PRODUCT_DOCUMENT_SLOTS = Array.from(
   { length: CUSTOM_PRODUCT_LIMITS.productsPerAccount },
@@ -233,30 +234,30 @@ const createFirestoreProduct = async (userId: string, draft: CustomProductDraft)
 
 export const firestoreCustomProductsRepository: CustomProductsRepository = {
   async list(userId) {
-    if (isBetaClerkD1Mode()) return readBetaProducts(userId);
+    if (getSelectedAuthBackend() === 'clerk') return readBetaProducts(userId);
     return sortProducts((await readRecords(userId)).map(({ product }) => product));
   },
   subscribe(userId, onUpdate, onError) {
-    if (isBetaClerkD1Mode()) return subscribeBetaProducts(userId, onUpdate, onError);
+    if (getSelectedAuthBackend() === 'clerk') return subscribeBetaProducts(userId, onUpdate, onError);
     return onSnapshot(collectionRef(userId), (snapshot) => {
       const products = snapshot.docs.map((item) => item.data()).filter((value) => ownedProduct(value, userId));
       onUpdate(sortProducts(products));
     }, (error) => onError?.(error));
   },
   create(userId, draft) {
-    if (isBetaClerkD1Mode()) return createBetaProduct({ userId, draft });
+    if (getSelectedAuthBackend() === 'clerk') return createBetaProduct({ userId, draft });
     return createFirestoreProduct(userId, draft);
   },
   update(userId, product, draft) {
-    if (isBetaClerkD1Mode()) return reviseBetaProduct(userId, product, reviseProduct(product, draft)).then((next) => next as HostedCustomProduct);
+    if (getSelectedAuthBackend() === 'clerk') return reviseBetaProduct(userId, product, reviseProduct(product, draft)).then((next) => next as HostedCustomProduct);
     return writeRevision(userId, product, draft);
   },
   setStatus(userId, product, status) {
-    if (isBetaClerkD1Mode()) return reviseBetaProduct(userId, product, reviseProduct(product, product, status)).then((next) => next as HostedCustomProduct);
+    if (getSelectedAuthBackend() === 'clerk') return reviseBetaProduct(userId, product, reviseProduct(product, product, status)).then((next) => next as HostedCustomProduct);
     return writeRevision(userId, product, product, status);
   },
   async delete(userId, product) {
-    if (isBetaClerkD1Mode()) { await reviseBetaProduct(userId, product, null); return; }
+    if (getSelectedAuthBackend() === 'clerk') { await reviseBetaProduct(userId, product, null); return; }
     await withStoredProduct(userId, product, (transaction, reference) => transaction.delete(reference));
   },
 };

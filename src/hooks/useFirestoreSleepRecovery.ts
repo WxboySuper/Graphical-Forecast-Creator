@@ -8,7 +8,7 @@ import {
   disableNetwork,
   enableNetwork,
   waitForPendingWrites,
-} from 'firebase/firestore';
+} from '../auth/firebaseDataAdapter';
 import { db } from '../lib/firebase';
 
 /**

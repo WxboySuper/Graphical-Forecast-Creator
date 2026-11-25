@@ -14,9 +14,10 @@ import {
   setDoc,
   type DocumentData,
   type QuerySnapshot,
-} from 'firebase/firestore';
+} from '../auth/firebaseDataAdapter';
 import { db } from './firebase';
-import { fetchBetaApi, isBetaClerkD1Mode } from './betaApi';
+import { fetchBetaApi } from '../auth/clerkAuthBackend';
+import { getSelectedAuthBackend } from '../auth/authBackendSelection';
 import {
   WORKFLOW_AWARENESS_CONSENT_VERSION,
   WORKFLOW_AWARENESS_SCHEMA_VERSION,
@@ -216,7 +217,7 @@ export const saveWorkflowAwareness = async ({
 }): Promise<void> => {
   if (!isCurrentAwarenessConsent(consent)) return;
   if (!isValidWorkflowAwarenessMetadata(metadata)) throw new Error('Invalid workflow awareness metadata');
-  if (isBetaClerkD1Mode()) return saveBetaWorkflowAwareness(metadata);
+  if (getSelectedAuthBackend() === 'clerk') return saveBetaWorkflowAwareness(metadata);
   await saveFirestoreWorkflowAwareness({ userId, metadata });
 };
 
@@ -266,7 +267,7 @@ export const listWorkflowAwareness = async ({
   consent: WorkflowAwarenessConsent;
 }): Promise<WorkflowAwarenessRecord[]> => {
   if (!isCurrentAwarenessConsent(consent)) return [];
-  if (isBetaClerkD1Mode()) return readBetaAwareness({ userId });
+  if (getSelectedAuthBackend() === 'clerk') return readBetaAwareness({ userId });
   const snapshot = await getDocs(query(getAwarenessCollection({ userId })));
   const { valid, malformedIds } = readSnapshotRecords(snapshot);
   // A malformed record must not hide valid recommendations if its cleanup is
@@ -277,7 +278,7 @@ export const listWorkflowAwareness = async ({
 
 /** Deletes every awareness record for the current user; never touches full cloud-cycle documents. */
 export const deleteWorkflowAwareness = async ({ userId }: UserAwarenessParams): Promise<void> => {
-  if (isBetaClerkD1Mode()) {
+  if (getSelectedAuthBackend() === 'clerk') {
     const response = await fetchBetaApi('/api/workflow-awareness', { method: 'DELETE' });
     if (!response.ok) throw new Error('Unable to clear workflow awareness.');
     return;
@@ -288,7 +289,7 @@ export const deleteWorkflowAwareness = async ({ userId }: UserAwarenessParams): 
 
 /** Deletes one cycle-scoped awareness record for the current user. */
 export const deleteOneWorkflowAwareness = async ({ userId, cycleId }: AwarenessRecordParams): Promise<void> => {
-  if (isBetaClerkD1Mode()) {
+  if (getSelectedAuthBackend() === 'clerk') {
     const response = await fetchBetaApi(`/api/workflow-awareness/${encodeURIComponent(cycleId)}`, { method: 'DELETE' });
     if (!response.ok) throw new Error('Unable to delete workflow awareness.');
     return;

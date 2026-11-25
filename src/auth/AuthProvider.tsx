@@ -1,35 +1,18 @@
 /**
  * Auth and profile boundary for the client application.
  *
- * This provider owns Firebase auth observation, local fixture accounts,
+ * This provider owns app auth state, local fixture accounts,
  * profile/settings hydration, and the auth actions exposed to route consumers.
  * Hosted persistence and billing remain behind their dedicated services and
  * entitlement provider; this module coordinates identity and account state.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  createUserWithEmailAndPassword,
-  EmailAuthProvider,
-  getAdditionalUserInfo,
-  onAuthStateChanged,
-  reauthenticateWithCredential,
-  reauthenticateWithPopup,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  type User,
-} from 'firebase/auth';
-import {
-  doc,
-  serverTimestamp,
-  setDoc,
-  type Unsubscribe,
-} from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc, type Unsubscribe } from './firebaseDataAdapter';
 import type { RootState } from '../store';
 import type { OverlaysState } from '../store/overlaysSlice';
-import { auth, db, googleAuthProvider, isHostedAuthEnabled, requireAuth, requireDb } from '../lib/firebase';
-import { isBetaClerkD1Mode } from '../lib/betaApi';
+import { db, isHostedAuthEnabled, requireDb } from './firebaseDataAdapter';
+import { getSelectedAuthBackend } from './authBackendSelection';
 import { ClerkAuthContextProvider } from './ClerkAuthContextProvider';
 import { readLocalTestAccount } from '../lib/localTestAccount';
 import { queueProductMetric } from '../utils/productMetrics';
@@ -98,7 +81,9 @@ export {
 } from './hostedSettingsSync';
 export { asRecord, extractLocalUserFromData, postLocalJson, safeParseJson } from './authLocalTransport';
 
-import { safeParseJson } from './authCommon';
+import type { AuthBackendUser } from './AuthBackend';
+import type { AuthBackend } from './AuthBackend';
+import { firebaseAuthBackend, subscribeToFirebaseAuth } from './firebaseAuthBackend';
 import {
   initLocalAuthState,
   localSignInWithEmail,
@@ -113,7 +98,7 @@ export type SettingsSyncStatus = 'disabled' | 'idle' | 'syncing' | 'synced' | 'e
 export interface AuthContextValue {
   status: AuthStatus;
   settingsSyncStatus: SettingsSyncStatus;
-  user: User | null;
+  user: AuthBackendUser | null;
   authProvider: 'firebase' | 'clerk' | 'local';
   syncedSettings: UserSettingsDocument | null;
   error: string | null;
@@ -138,7 +123,7 @@ export const disabledAuthAction = (): Promise<void> => {
 export const getDisabledSettingsStatus = (): SettingsSyncStatus => (isHostedAuthEnabled ? 'idle' : 'disabled');
 
 /** True when the hosted settings sync has everything it needs to run for the current user. */
-export const canSyncHostedUserDocuments = (user: User | null): user is User =>
+export const canSyncHostedUserDocuments = (user: AuthBackendUser | null): user is AuthBackendUser =>
   Boolean(isHostedAuthEnabled && db && user);
 
 /** Clears local Firebase state after the server has already completed deletion. */
@@ -157,45 +142,15 @@ export const clearDeletedAccountSession = async (
   }
 };
 
-/** Reauthenticates the current hosted user and requests the server-side deletion cascade. */
+/** Requests server-side deletion, then clears app state after the backend action succeeds. */
 export const deleteHostedAccount = async (
-  user: User,
-  password?: string,
-  clearLocalState: () => void = () => undefined,
+  backend: Pick<AuthBackend, 'deleteAccount' | 'signOut'>,
+  user: AuthBackendUser,
+  password: string | undefined,
+  clearLocalState: () => void,
 ): Promise<void> => {
-  const hasGoogleProvider = user.providerData.some((provider) => provider.providerId === 'google.com');
-  const hasPasswordProvider = user.providerData.some((provider) => provider.providerId === 'password');
-  if (hasGoogleProvider) {
-    await reauthenticateWithPopup(user, googleAuthProvider);
-  } else if (hasPasswordProvider && user.email) {
-    if (!password) throw new Error('Enter your current password to delete this account.');
-    await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
-  } else {
-    throw new Error('This sign-in method cannot be reauthenticated here. Contact support for account deletion.');
-  }
-
-  const token = await user.getIdToken(true);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const response = await fetch('/api/account/delete', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ confirmation: 'DELETE' }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      const body = await safeParseJson<{ error?: string }>(response);
-      throw new Error(body?.error || 'Unable to delete your account right now.');
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  await clearDeletedAccountSession(() => signOut(requireAuth()), clearLocalState);
+  await backend.deleteAccount(user, password);
+  await clearDeletedAccountSession(() => backend.signOut(), clearLocalState);
 };
 
 /** Builds the normalized settings document shape from current local state. */
@@ -284,7 +239,7 @@ export const buildHostedAccountFallbackSettings = (
   });
 
 interface PersistHostedSettingsContext {
-  user: User;
+  user: AuthBackendUser;
   darkMode: boolean;
   overlays: OverlaysState;
   syncedSettings: UserSettingsDocument | null;
@@ -375,7 +330,7 @@ interface LocalAuthDeps {
   dispatch: ReturnType<typeof useDispatch>;
   currentDarkModeRef: React.MutableRefObject<boolean>;
   currentOverlaysRef: React.MutableRefObject<OverlaysState>;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setUser: React.Dispatch<React.SetStateAction<AuthBackendUser | null>>;
   setStatus: React.Dispatch<React.SetStateAction<AuthStatus>>;
   setSyncedSettings: React.Dispatch<React.SetStateAction<UserSettingsDocument | null>>;
   setSettingsSyncStatus: React.Dispatch<React.SetStateAction<SettingsSyncStatus>>;
@@ -429,7 +384,7 @@ const useLocalAuthState = (): AuthContextValue => {
   const lastSyncedSettingsRef = useRef<UserSettingsDocument | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>('idle');
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthBackendUser | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -540,7 +495,7 @@ const useHostedAuthState = (): AuthContextValue => {
   const hostedUserSyncActiveRef = useRef(false);
   const [status, setStatus] = useState<AuthStatus>(isHostedAuthEnabled ? 'loading' : 'disabled');
   const [settingsSyncStatus, setSettingsSyncStatus] = useState<SettingsSyncStatus>(INITIAL_PROFILE_SYNC_STATUS);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthBackendUser | null>(null);
   const [syncedSettings, setSyncedSettings] = useState<UserSettingsDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -561,7 +516,7 @@ const useHostedAuthState = (): AuthContextValue => {
   }, [user]);
 
   useEffect(function subscribeToHostedAuthState() {
-    if (!isHostedAuthEnabled || !auth) {
+    if (!firebaseAuthBackend.enabled) {
       setStatus('disabled');
       setSettingsSyncStatus('disabled');
       setUser(null);
@@ -572,9 +527,16 @@ const useHostedAuthState = (): AuthContextValue => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      (nextUser) => {
+    const unsubscribe = subscribeToFirebaseAuth(
+      (nextUser, nextError) => {
+        if (nextError) {
+          setUser(null);
+          setStatus('error');
+          setSettingsSyncStatus('error');
+          setSyncedSettings(null);
+          setError(nextError.message);
+          return;
+        }
         setUser(nextUser);
         setStatus(nextUser ? 'signed_in' : 'signed_out');
         setSettingsSyncStatus('idle');
@@ -582,13 +544,6 @@ const useHostedAuthState = (): AuthContextValue => {
           setSyncedSettings(null);
         }
         setError(null);
-      },
-      (nextError) => {
-        setUser(null);
-        setStatus('error');
-        setSettingsSyncStatus('error');
-        setSyncedSettings(null);
-        setError(nextError.message);
       }
     );
 
@@ -769,7 +724,7 @@ const useHostedAuthState = (): AuthContextValue => {
     (settings: Partial<UserSettingsDocument>): Promise<void> =>
       persistHostedSettingsUpdate(
         {
-          user: user as User,
+          user: user as AuthBackendUser,
           darkMode,
           overlays,
           syncedSettings,
@@ -785,7 +740,7 @@ const useHostedAuthState = (): AuthContextValue => {
   );
 
   const value = useMemo<AuthContextValue>(() => {
-    if (!isHostedAuthEnabled || !auth) {
+    if (!firebaseAuthBackend.enabled) {
       return getDefaultContextValue();
     }
 
@@ -799,30 +754,30 @@ const useHostedAuthState = (): AuthContextValue => {
       hostedAuthEnabled: true,
       signInWithGoogle: async () => {
         setError(null);
-        const credential = await signInWithPopup(requireAuth(), googleAuthProvider);
+        const { user: signedInUser, isNewUser } = await firebaseAuthBackend.signInWithGoogle();
         queueProductMetric({
-          event: getAdditionalUserInfo(credential)?.isNewUser ? 'account_signup' : 'account_signin',
-          user: credential.user,
+          event: isNewUser ? 'account_signup' : 'account_signin',
+          user: signedInUser,
         });
       },
       signInWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await signInWithEmailAndPassword(requireAuth(), email, password);
-        queueProductMetric({ event: 'account_signin', user: credential.user });
+        const signedInUser = await firebaseAuthBackend.signInWithEmail(email, password);
+        queueProductMetric({ event: 'account_signin', user: signedInUser });
       },
       signUpWithEmail: async (email: string, password: string) => {
         setError(null);
-        const credential = await createUserWithEmailAndPassword(requireAuth(), email, password);
-        queueProductMetric({ event: 'account_signup', user: credential.user });
+        const signedUpUser = await firebaseAuthBackend.signUpWithEmail(email, password);
+        queueProductMetric({ event: 'account_signup', user: signedUpUser });
       },
       signOutUser: async () => {
         setError(null);
-        await signOut(requireAuth());
+        await firebaseAuthBackend.signOut();
       },
       deleteAccount: async (password?: string) => {
         setError(null);
         if (!user) throw new Error('Sign in before deleting your account.');
-        await deleteHostedAccount(user, password, () => {
+        await deleteHostedAccount(firebaseAuthBackend, user, password, () => {
           setUser(null);
           setStatus('signed_out');
           setSyncedSettings(null);
@@ -856,7 +811,7 @@ const HostedAuthContextProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 /** Exposes exactly one auth implementation so fixture sessions never run hosted listeners. */
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (readLocalTestAccount()) return <LocalAuthContextProvider>{children}</LocalAuthContextProvider>;
-  if (isBetaClerkD1Mode()) return <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>;
+  if (getSelectedAuthBackend() === 'clerk') return <ClerkAuthContextProvider>{children}</ClerkAuthContextProvider>;
   return <HostedAuthContextProvider>{children}</HostedAuthContextProvider>;
 };
 

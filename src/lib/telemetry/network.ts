@@ -1,4 +1,4 @@
-import type { User } from 'firebase/auth';
+import type { AuthBackendUser } from '../../auth/AuthBackend';
 
 const ACTIVE_DAY_KEY = 'gfc-telemetry-active-day';
 const DEFAULT_TELEMETRY_BASE_URL = 'https://telemetry.gfcweather.com';
@@ -61,7 +61,7 @@ const isAlreadyCountedToday = (today: string): boolean =>
 
 let activePingInFlight = false;
 
-const requestDailyActivePing = async (user: User, day: string): Promise<void> => {
+const requestDailyActivePing = async (user: AuthBackendUser, day: string): Promise<void> => {
   try {
     const token = await user.getIdToken();
     const sent = await postTelemetry('/v1/active', undefined, token);
@@ -73,7 +73,7 @@ const requestDailyActivePing = async (user: User, day: string): Promise<void> =>
   }
 };
 
-export const pingDailyActive = (user: User | null | undefined): void => {
+export const pingDailyActive = (user: AuthBackendUser | null | undefined): void => {
   if (!user) return;
   try {
     const day = getUtcDay();

@@ -27,6 +27,8 @@ import {
   type SettingsSyncStatus,
   type UserSettingsDocument,
 } from './AuthProvider';
+import type { AuthBackend } from './AuthBackend';
+import { createClerkAuthBackend } from './clerkAuthBackend';
 const shouldResetForClerkAccountChange = (isSignedIn: boolean, userId: string | undefined, bootstrapKey: string): boolean => {
   if (!isSignedIn) return false;
   if (!userId) return false;
@@ -808,6 +810,7 @@ const useClerkSettings = (context: ClerkProviderSettingsContext) => {
 type ClerkProviderActionsContext = {
   session: ReturnType<typeof useClerkSession>;
   state: ReturnType<typeof useClerkProviderState>;
+  backend: AuthBackend;
   refreshBetaAccess: () => Promise<void>;
 };
 
@@ -831,7 +834,7 @@ const resetClerkAccountState = (state: ClerkAccountResetContext): void => {
 };
 
 const useClerkAccountActions = (context: ClerkProviderActionsContext) => {
-  const { session, state, refreshBetaAccess } = context;
+  const { backend, state, refreshBetaAccess } = context;
   const resetAccountState = useCallback(() => resetClerkAccountState({
     betaAccessRequestIdRef: state.betaAccessRequestIdRef,
     settingsRequestIdRef: state.settingsRequestIdRef,
@@ -847,15 +850,19 @@ const useClerkAccountActions = (context: ClerkProviderActionsContext) => {
     state.setBetaAccess, state.setBetaAccessLoading, state.setBootstrapKey, state.setSyncedSettings,
     state.setSettingsSyncStatus, state.lastSyncedSettingsRef, state.hasInitializedSettingsRef]);
   const signOutUser = useCallback(() => runClerkAccountAction({
-    action: () => session.clerk.signOut(), fallbackMessage: 'Unable to sign out right now.',
+    action: backend.signOut, fallbackMessage: 'Unable to sign out right now.',
     refreshBetaAccess, resetAccountState,
     setBetaAccess: state.setBetaAccess, setBetaAccessLoading: state.setBetaAccessLoading, setError: state.setError,
-  }), [session.clerk, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
+  }), [backend, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
   const deleteAccount = useCallback(() => runClerkAccountAction({
-    action: session.deleteClerkUser, fallbackMessage: 'Unable to delete your account right now.',
+    action: () => {
+      const currentUser = backend.getCurrentUser();
+      if (!currentUser) throw new Error('Sign in before deleting your account.');
+      return backend.deleteAccount(currentUser);
+    }, fallbackMessage: 'Unable to delete your account right now.',
     refreshBetaAccess, resetAccountState,
     setBetaAccess: state.setBetaAccess, setBetaAccessLoading: state.setBetaAccessLoading, setError: state.setError,
-  }), [session.deleteClerkUser, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
+  }), [backend, refreshBetaAccess, resetAccountState, state.setBetaAccess, state.setBetaAccessLoading, state.setError]);
   return { signOutUser, deleteAccount };
 };
 
@@ -876,8 +883,14 @@ export const ClerkAuthContextProvider: React.FC<{ children: React.ReactNode }> =
     () => createClerkUserFacade(session.clerkUser, session.getToken, session.deleteClerkUser),
     [session.clerkUser, session.deleteClerkUser, session.getToken],
   );
+  const backend = useMemo(() => createClerkAuthBackend({
+    user: currentUser,
+    getToken: async () => (await session.getToken()) ?? null,
+    signOut: () => session.clerk.signOut(),
+    deleteAccount: async () => session.deleteClerkUser(),
+  }), [currentUser, session]);
   const updateSyncedSettings = useClerkSettings({ session, preferences, state, currentUser, putSettings });
-  const { signOutUser, deleteAccount } = useClerkAccountActions({ session, state, refreshBetaAccess });
+  const { signOutUser, deleteAccount } = useClerkAccountActions({ session, state, backend, refreshBetaAccess });
   const hasInitializedSettings = Boolean(currentUser && state.bootstrapKey === currentUser.uid && state.hasInitializedSettingsRef.current);
   const authStatus = resolveClerkAuthStatus({
     isLoaded: session.isLoaded, isUserLoaded: session.isUserLoaded, error: state.error,
