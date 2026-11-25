@@ -52,12 +52,12 @@ export const signOutFirebaseFixture = async (): Promise<void> => {
 };
 
 const reauthenticateForDeletion = async (user: User, password?: string): Promise<void> => {
-  const providerIds = user.providerData.map((provider) => provider.providerId);
-  if (providerIds.includes('google.com')) {
+  const hasProvider = (providerId: string) => user.providerData.some((provider) => provider.providerId === providerId);
+  if (hasProvider('google.com')) {
     await reauthenticateWithPopup(user, googleAuthProvider);
     return;
   }
-  if (!providerIds.includes('password') || !user.email) {
+  if (!hasProvider('password') || !user.email) {
     throw new Error('This sign-in method cannot be reauthenticated here. Contact support for account deletion.');
   }
   if (!password) throw new Error('Enter your current password to delete this account.');
