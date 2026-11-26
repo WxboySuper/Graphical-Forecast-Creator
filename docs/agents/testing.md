@@ -41,3 +41,7 @@ Worth documenting:
 - **Test harness helpers**: the observable condition they establish.
 
 Test fixtures are not held to doc-comment rules; comment only a non-obvious setup invariant.
+
+## Combined local test command
+
+`pnpm test` runs the Jest, Cloudflare Worker, repository script, and analytics server suites. It takes longer than a focused Jest run because it includes every test under `scripts/` and `server/`. Use `pnpm test --runInBand <path>` for focused app tests, or `pnpm run test:scripts` and `pnpm run test:server` to run the added suites separately. `test:server` uses npm because the server has its own `package-lock.json`.
