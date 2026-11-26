@@ -12,6 +12,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Forecast days navigation:** Screen readers now announce Previous day, Next day, Cycle date, and which day is selected and has forecast data.
 - **Toast notifications:** Every notification now has a dismiss button and error toasts are announced immediately to assistive technology.
 - **Discussion editor and error messages:** Formatting controls are now labeled with visible focus, and save and verification errors are announced while informational messages remain polite.
+- **Documentation drawer focus:** Opening the Documentation drawer moves keyboard focus inside it, keeps Tab inside while open, hides background content from screen readers, and returns focus to the previous control on close.
+- **Dialog focus return:** Cycle history keeps keyboard focus inside the dialog and returns focus to its opener on close, while Documentation, feedback, legal, and usage dialogs opened from More actions return focus to More actions.
 - **Skip to main content link:** Pressing Tab now reveals a Skip to main content link that moves keyboard and screen-reader focus past the navigation to the main content.
 - **Page titles and focus reset:** Each page now shows its own browser tab title, such as Severe Forecast or Verification, and focus moves to the main content when switching pages.
 - **Accessible loading indicators:** Gated pages and the Forecast Grade dashboard now show and announce a loading message instead of a blank pane while content loads.

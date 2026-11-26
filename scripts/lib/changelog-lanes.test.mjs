@@ -10,6 +10,7 @@ import {
   findChangelogLaneBounds,
   moveLaneToReleaseSection,
 } from './changelog-lanes.mjs';
+import { addOpenCodeChangelogEntries } from './opencode-changelog-insert.mjs';
 
 const sample = '# Changelog\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable v2.x hotfixes\n\n#### Fixed\n- Fix\n';
 
@@ -35,7 +36,30 @@ test('moves stable lane content into a version section and resets the lane', () 
   assert.equal(result.moved, true);
   assert.match(result.changelog, /## v2\.1\.0\n\n#### Fixed\n- Fix/);
   assert.match(result.changelog, /### Stable v2\.x hotfixes\n\n#### Added\n\n<!-- Add stable-line changes here\. -->/);
-  assert.doesNotMatch(result.changelog.slice(result.changelog.indexOf('### Stable v2.x hotfixes')), /- Fix/);
+  const lane = result.changelog.slice(result.changelog.indexOf('### Stable v2.x hotfixes'), result.changelog.indexOf('## v2.1.0'));
+  assert.doesNotMatch(lane, /- Fix/);
+});
+
+test('keeps the reset stable lane under Unreleased, above the new release section', () => {
+  const changelog = '# Changelog\n\n## [Unreleased]\n\n### Next major / beta\n\n#### Added\n- Feature\n\n### Stable v2.x hotfixes\n\n#### Fixed\n- Fix\n\n## v2.0.0\n\n- Old\n';
+  const result = moveLaneToReleaseSection(changelog, '2.1.0', 'stable-hotfix').changelog;
+  const at = (text) => {
+    const index = result.indexOf(text);
+    assert.notEqual(index, -1, `missing ${text}`);
+    return index;
+  };
+  assert.ok(at('## [Unreleased]') < at('### Stable v2.x hotfixes'));
+  assert.ok(at('### Stable v2.x hotfixes') < at('## v2.1.0'));
+  assert.ok(at('## v2.1.0') < at('- Fix') && at('- Fix') < at('## v2.0.0'));
+  const next = addOpenCodeChangelogEntries({
+    changelog: result,
+    laneHeading: '### Stable v2.x hotfixes',
+    section: 'Fixed',
+    entries: ['- Next fix'],
+  });
+  const entry = next.indexOf('- Next fix');
+  assert.notEqual(entry, -1);
+  assert.ok(entry < next.indexOf('## v2.1.0'));
 });
 
 test('rejects an empty stable lane and avoids duplicating an existing release section', () => {
