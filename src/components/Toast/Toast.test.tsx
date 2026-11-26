@@ -69,6 +69,40 @@ describe('Toast', () => {
     expect(before).toHaveFocus();
   });
 
+  test('returns focus when the queue drops a focused toast', () => {
+    const Harness = ({ ids }: { ids: string[] }) => (
+      <>
+        <button type="button">Before</button>
+        <ToastManager toasts={ids.map((id) => ({ id, message: `Toast ${id}`, type: 'info' as const }))} onDismiss={() => undefined} />
+      </>
+    );
+    const { rerender } = render(<Harness ids={['a', 'b']} />);
+    const before = screen.getByRole('button', { name: 'Before' });
+    before.focus();
+    act(() => screen.getByRole('button', { name: 'Dismiss notification Toast a' }).focus());
+
+    rerender(<Harness ids={['b', 'c']} />);
+    expect(screen.queryByText('Toast a')).not.toBeInTheDocument();
+    expect(before).toHaveFocus();
+  });
+
+  test('does not move focus when an unfocused toast is dropped', () => {
+    const Harness = ({ ids }: { ids: string[] }) => (
+      <>
+        <button type="button">Elsewhere</button>
+        <ToastManager toasts={ids.map((id) => ({ id, message: `Toast ${id}`, type: 'info' as const }))} onDismiss={() => undefined} />
+      </>
+    );
+    const { rerender } = render(<Harness ids={['a']} />);
+    const dismiss = screen.getByRole('button', { name: 'Dismiss notification Toast a' });
+    act(() => dismiss.focus());
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    act(() => elsewhere.focus());
+
+    rerender(<Harness ids={['b']} />);
+    expect(elsewhere).toHaveFocus();
+  });
+
   test('names each dismiss button after its toast', () => {
     render(<ToastManager toasts={[{ id: 'a', message: 'Saved', type: 'info' }, { id: 'b', message: 'Copied', type: 'info' }]} onDismiss={() => undefined} />);
 

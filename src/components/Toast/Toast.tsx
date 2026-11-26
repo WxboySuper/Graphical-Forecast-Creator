@@ -74,18 +74,30 @@ const useToastFocusHold = () => {
   const [hasFocus, setHasFocus] = useState(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
+  // Cleared only when focus moves to another element; a blur with no target can mean the toast is being removed.
+  const holdsFocusRef = useRef(false);
+
   const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+    holdsFocusRef.current = true;
     if (event.currentTarget.contains(event.relatedTarget)) return;
     returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
     setHasFocus(true);
   };
   const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    if (event.relatedTarget) holdsFocusRef.current = false;
+    setHasFocus(false);
   };
   const restoreFocus = useCallback(() => {
     const returnTo = returnFocusRef.current;
     if (returnTo?.isConnected) returnTo.focus();
   }, []);
+
+  // The queue can drop a toast (e.g. the oldest when a fifth arrives) while its dismiss button has focus.
+  useEffect(() => () => {
+    const focusLost = !document.activeElement || document.activeElement === document.body;
+    if (holdsFocusRef.current && focusLost) restoreFocus();
+  }, [restoreFocus]);
 
   return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
 };
