@@ -62,8 +62,15 @@ function configureApp(app, express) {
   app.use((_req, res) => res.status(404).end());
 
   // Keep Express's default error response from exposing stack traces.
-  app.use((_error, _req, res, next) => {
-    if (res.headersSent) return next(_error);
+  app.use((error, _req, res, next) => {
+    if (res.headersSent) return next(error);
+    const status = Number(error?.status || error?.statusCode);
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({
+        error: status === 413 ? 'Request body too large.' : 'Invalid request.',
+      });
+    }
+    console.error('[analytics] request:error', error);
     return res.status(500).json({ error: 'Internal server error.' });
   });
 }

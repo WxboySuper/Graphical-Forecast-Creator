@@ -99,4 +99,24 @@ describe('analytics server stack (express 5)', () => {
       await new Promise((resolve) => server.close(resolve));
     }
   });
+
+  it('preserves JSON parser client-error statuses with sanitized bodies', async () => {
+    const server = await serverReady;
+    const port = getServerPort(server);
+    const malformed = await fetch(`http://127.0.0.1:${port}/api/metrics/event`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{',
+    });
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), { error: 'Invalid request.' });
+
+    const oversized = await fetch(`http://127.0.0.1:${port}/api/metrics/event`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event: 'cycle_saved', padding: 'x'.repeat(3000) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { error: 'Request body too large.' });
+  });
 });
