@@ -14,26 +14,29 @@ const getFocusableElements = (root: HTMLElement | null): HTMLElement[] => {
   );
 };
 
+/**
+ * Returns the control Tab should wrap to, or null to let the browser move focus.
+ * Focus outside the modal (e.g. on <body> after a deleted row's button unmounts) always wraps back in.
+ */
+const getWrapTarget = (focusable: HTMLElement[], root: HTMLElement, backwards: boolean): HTMLElement | null => {
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  const edge = backwards ? first : last;
+  const active = document.activeElement;
+  if (active !== edge && root.contains(active)) return null;
+  return backwards ? last : first;
+};
+
 /** Wraps Tab and Shift+Tab so focus stays inside the modal. */
 const handleTabNavigation = (event: KeyboardEvent, root: HTMLElement | null): void => {
   if (!root) return;
   const focusable = getFocusableElements(root);
   if (focusable.length === 0) return;
 
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  // Focus can land outside the modal, e.g. on <body> after a deleted row's button unmounts.
-  const isOutside = !root.contains(document.activeElement);
-  const isFirstActive = document.activeElement === first || isOutside;
-  const isLastActive = document.activeElement === last || isOutside;
-
-  if (event.shiftKey && isFirstActive) {
-    event.preventDefault();
-    last.focus();
-  } else if (!event.shiftKey && isLastActive) {
-    event.preventDefault();
-    first.focus();
-  }
+  const target = getWrapTarget(focusable, root, event.shiftKey);
+  if (!target) return;
+  event.preventDefault();
+  target.focus();
 };
 
 /** Handles Escape for the history modal or its nested confirm dialog. */
