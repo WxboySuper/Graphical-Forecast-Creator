@@ -2,7 +2,7 @@
  * Toast primitives. Renders timed feedback messages and manages the add, update,
  * dismissal, and automatic-expiry behavior of the shared toast collection.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { trackEvent } from '../../lib/telemetry';
 import './Toast.css';
 
@@ -66,6 +66,79 @@ export interface ToastProps {
   onClose: () => void;
 }
 
+/**
+ * Keeps a toast open while keyboard focus is inside it, and remembers where focus came from
+ * so dismissing the toast can send it back.
+ */
+const useToastFocusHold = () => {
+  const [hasFocus, setHasFocus] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    setHasFocus(true);
+  };
+  const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
+  };
+  const restoreFocus = useCallback(() => {
+    const returnTo = returnFocusRef.current;
+    if (returnTo?.isConnected) returnTo.focus();
+  }, []);
+
+  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
+};
+
+interface ToastExpiryOptions {
+  emptyMessage: boolean;
+  timingMessage: string;
+  /** While true (focus is inside the toast) no expiry timer runs. */
+  paused: boolean;
+  mountedAtRef: { current: number | null };
+  closedRef: { current: boolean };
+  onCloseRef: { current: () => void };
+  setIsClosed: (closed: boolean) => void;
+}
+
+/** Closes the toast after its reading window, capped by its maximum lifetime. */
+const useToastExpiry = ({
+  emptyMessage,
+  timingMessage,
+  paused,
+  mountedAtRef,
+  closedRef,
+  onCloseRef,
+  setIsClosed,
+}: ToastExpiryOptions): void => {
+  useEffect(() => {
+    const close = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    // Message changes restart the reading window without extending the maximum lifetime.
+    if (emptyMessage) {
+      close();
+      return;
+    }
+    if (paused) return;
+    const now = getCurrentTime();
+    mountedAtRef.current ??= now;
+    const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
+    if (remainingLifetime === 0) {
+      close();
+      return;
+    }
+    // A changed message starts a new reading window and may close once for that version.
+    closedRef.current = false;
+    setIsClosed(false);
+    const duration = Math.min(getToastDuration(timingMessage), remainingLifetime);
+    const timer = setTimeout(close, duration);
+
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [emptyMessage, timingMessage, paused, mountedAtRef, closedRef, onCloseRef, setIsClosed]);
+};
+
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -79,37 +152,34 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
   const displayType = normalizeToastType(type);
 
+  const { hasFocus, focusHandlers, restoreFocus } = useToastFocusHold();
+  useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
+  // A focused toast whose copy is cleared disappears; send focus back instead of dropping it on <body>.
   useEffect(() => {
-    // Message changes restart the reading window without extending the maximum lifetime.
-    if (emptyMessage) {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-      return;
-    }
-    const now = getCurrentTime();
-    mountedAtRef.current ??= now;
-    const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
-    if (remainingLifetime === 0) {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-      return;
-    }
-    // A changed message starts a new reading window and may close once for that version.
-    closedRef.current = false;
-    setIsClosed(false);
-    const readingWindow = getToastDuration(timingMessage);
-    const duration = Math.min(readingWindow, remainingLifetime);
-    const timer = setTimeout(() => {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-    }, duration);
+    if (emptyMessage && hasFocus) restoreFocus();
+  }, [emptyMessage, hasFocus, restoreFocus]);
+  const messageId = useId();
+  const dismissId = useId();
 
-    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [emptyMessage, timingMessage]);
+  const handleDismiss = () => {
+    closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    restoreFocus();
+  };
 
   return !emptyMessage && !isClosed ? (
-    <div className={`toast toast-${displayType}`}>
-      {displayMessage}
+    <div className={`toast toast-${displayType}`} {...focusHandlers}>
+      <span id={messageId} className="toast-message">{displayMessage}</span>
+      {/* Named "Dismiss notification <message>" so several open toasts' buttons can be told apart. */}
+      <button
+        type="button"
+        id={dismissId}
+        className="toast-dismiss"
+        aria-label="Dismiss notification"
+        aria-labelledby={`${dismissId} ${messageId}`}
+        onClick={handleDismiss}
+      >
+        <span aria-hidden="true">×</span>
+      </button>
     </div>
   ) : null;
 };
@@ -142,13 +212,25 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: st
   return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 }
 
-/** Keeps the polite status region mounted and renders the current toast queue. */
+/**
+ * Keeps both live regions mounted and renders the current toast queue. Errors go to the
+ * assertive region so they interrupt; everything else is announced politely.
+ */
 export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.ReactElement {
+  const isError = (toast: ToastData) => normalizeToastType(toast.type) === 'error';
   return (
-    <div className="toast-container" role="status" aria-live="polite">
-      {toasts.map(toast => (
-        <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
-      ))}
+    <div className="toast-container">
+      <div className="toast-region" role="status" aria-live="polite">
+        {toasts.filter((toast) => !isError(toast)).map((toast) => (
+          <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
+        ))}
+      </div>
+      {/* No role="alert": an always-mounted, usually empty alert would read as a standing alert. */}
+      <div className="toast-region" aria-live="assertive" data-testid="toast-error-region">
+        {toasts.filter(isError).map((toast) => (
+          <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
+        ))}
+      </div>
     </div>
   );
 }

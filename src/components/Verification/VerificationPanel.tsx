@@ -109,8 +109,8 @@ const ErrorBanner: React.FC<{ error: string }> = ({ error }) => {
   const icon = isInfo ? 'ℹ️' : '⚠️';
 
   return (
-    <div className={isInfo ? 'info-message' : 'error-message'}>
-      <p>{icon} {message}</p>
+    <div className={isInfo ? 'info-message' : 'error-message'} role={isInfo ? 'status' : 'alert'}>
+      <p><span aria-hidden="true">{icon}</span> {message}</p>
     </div>
   );
 };

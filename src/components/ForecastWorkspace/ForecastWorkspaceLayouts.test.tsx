@@ -75,7 +75,7 @@ describe('Tabbed toolbar layout', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: /days/i }));
-    await user.click(screen.getByRole('button', { name: '2' }));
+    await user.click(screen.getByRole('button', { name: /^Day 2\b/ }));
     await user.click(screen.getByRole('tab', { name: /draw/i }));
 
     await user.click(screen.getAllByRole('button', { name: /wind/i })[0]);

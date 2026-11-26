@@ -88,21 +88,21 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
 
   return (
     <div className="diy-editor">
-      <div className="diy-toolbar">
-        <button type="button" onClick={handleBold} title="Bold (Ctrl+B)" className="toolbar-button">
+      <div className="diy-toolbar" role="group" aria-label="Text formatting">
+        <button type="button" onClick={handleBold} title="Bold (Ctrl+B)" aria-label="Bold" className="toolbar-button">
           <strong>B</strong>
         </button>
-        <button type="button" onClick={handleItalic} title="Italic (Ctrl+I)" className="toolbar-button">
+        <button type="button" onClick={handleItalic} title="Italic (Ctrl+I)" aria-label="Italic" className="toolbar-button">
           <em>I</em>
         </button>
         <div className="toolbar-divider" />
-        <button type="button" onClick={handleH1} title="Heading 1" className="toolbar-button">
+        <button type="button" onClick={handleH1} title="Heading 1" aria-label="Heading 1" className="toolbar-button">
           H1
         </button>
-        <button type="button" onClick={handleH2} title="Heading 2" className="toolbar-button">
+        <button type="button" onClick={handleH2} title="Heading 2" aria-label="Heading 2" className="toolbar-button">
           H2
         </button>
-        <button type="button" onClick={handleH3} title="Heading 3" className="toolbar-button">
+        <button type="button" onClick={handleH3} title="Heading 3" aria-label="Heading 3" className="toolbar-button">
           H3
         </button>
       </div>
@@ -110,6 +110,7 @@ const DIYDiscussionEditor: React.FC<DIYDiscussionEditorProps> = ({ content, onCh
       <textarea
         ref={textareaRef}
         className="diy-textarea"
+        aria-label="Forecast discussion"
         value={content}
         onChange={handleTextChange}
         placeholder="Write your forecast discussion here...
