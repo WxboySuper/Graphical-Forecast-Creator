@@ -22,7 +22,10 @@ jest.mock('../../auth/AuthProvider', () => ({
 
 jest.mock('../ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  // Clicking an item bubbles here, standing in for the menu closing and calling onCloseAutoFocus.
+  DropdownMenuContent: ({ children, onCloseAutoFocus }: { children: React.ReactNode; onCloseAutoFocus?: (event: Event) => void }) => (
+    <div onClick={() => onCloseAutoFocus?.(new Event('focusout'))}>{children}</div>
+  ),
   DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
     <button onClick={onSelect}>{children}</button>
   ),

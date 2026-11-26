@@ -21,6 +21,7 @@ import { isFeedbackEnabled } from '../../config/feedback';
 import FeedbackDialog from '../Feedback/FeedbackDialog';
 import { FeedbackProvider } from '../Feedback/FeedbackContext';
 import { BetaFeedbackBanner, BetaFeedbackButton } from '../Feedback/BetaFeedbackChrome';
+import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
@@ -59,6 +60,8 @@ interface ViewOnlyViewerProps {
 
 // Small presentational subcomponent that encapsulates the documentation side-panel. It lives at module scope so React keeps the same component type across AppLayout renders; declaring it inside the layout would remount the drawer (and reset its open tab) on every toast or theme change.
 const DocumentationPanel: React.FC<DocumentationPanelProps> = ({ show, onClose }) => {
+  // Escape is handled by the layout key handler, so the trap only owns Tab, focus, and background isolation.
+  const { setModalRef } = useModalFocusTrap({ active: show });
   if (!show) return null;
 
   return (
@@ -71,6 +74,7 @@ const DocumentationPanel: React.FC<DocumentationPanelProps> = ({ show, onClose }
       />
       <div
         className="fixed right-0 bottom-0 top-16 z-[901] w-[440px] max-w-[92vw] bg-background border-l border-border shadow-2xl overflow-y-auto"
+        ref={setModalRef}
         role="dialog"
         aria-label="Documentation"
         aria-modal="true"

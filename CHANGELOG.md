@@ -15,6 +15,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Documentation drawer focus:** Tab stays inside the open Documentation drawer and focus returns to the More actions button after closing it with Escape.
+- **Cycle history focus:** Tab stays inside the open cycle history modal and focus returns to the History button that opened it after closing with Escape.
 - **Keyboard focus on buttons:** Buttons now show a visible focus outline when navigated to with a keyboard.
 
 ## v2.1.0
