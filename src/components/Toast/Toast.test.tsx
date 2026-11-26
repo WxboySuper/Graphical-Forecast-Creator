@@ -129,6 +129,18 @@ describe('Toast', () => {
     );
     expect(screen.queryByRole('button', { name: /^Dismiss notification/ })).not.toBeInTheDocument();
     expect(before).toHaveFocus();
+
+    // New copy on the same toast must not stay paused by the earlier focus.
+    const onClose = jest.fn();
+    rerender(
+      <>
+        <button type="button">Before</button>
+        <Toast message="Back again" onClose={onClose} />
+      </>,
+    );
+    expect(screen.getByText('Back again')).toBeInTheDocument();
+    advanceTimersByTime(30000);
+    expect(onClose).toHaveBeenCalled();
   });
 
   test('restarts the timer when the displayed copy changes', () => {

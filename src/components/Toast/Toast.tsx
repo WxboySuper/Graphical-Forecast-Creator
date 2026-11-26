@@ -92,6 +92,12 @@ const useToastFocusHold = () => {
     const returnTo = returnFocusRef.current;
     if (returnTo?.isConnected) returnTo.focus();
   }, []);
+  /** Hands focus back and forgets the hold; a hidden toast gets no blur event to clear it. */
+  const releaseFocus = useCallback(() => {
+    holdsFocusRef.current = false;
+    setHasFocus(false);
+    restoreFocus();
+  }, [restoreFocus]);
 
   // The queue can drop a toast (e.g. the oldest when a fifth arrives) while its dismiss button has focus.
   useEffect(() => () => {
@@ -99,7 +105,7 @@ const useToastFocusHold = () => {
     if (holdsFocusRef.current && focusLost) restoreFocus();
   }, [restoreFocus]);
 
-  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
+  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus, releaseFocus };
 };
 
 interface ToastExpiryOptions {
@@ -164,12 +170,12 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
   const displayType = normalizeToastType(type);
 
-  const { hasFocus, focusHandlers, restoreFocus } = useToastFocusHold();
+  const { hasFocus, focusHandlers, restoreFocus, releaseFocus } = useToastFocusHold();
   useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
   // A focused toast whose copy is cleared disappears; send focus back instead of dropping it on <body>.
   useEffect(() => {
-    if (emptyMessage && hasFocus) restoreFocus();
-  }, [emptyMessage, hasFocus, restoreFocus]);
+    if (emptyMessage && hasFocus) releaseFocus();
+  }, [emptyMessage, hasFocus, releaseFocus]);
   const messageId = useId();
   const dismissId = useId();
 
