@@ -79,10 +79,15 @@ export const moveLaneToReleaseSection = (changelog, version, lane) => {
     throw new Error(`The stable changelog lane is empty; release ${version} requires release notes.`);
   }
 
-  const releaseSection = `${releaseHeading}\n\n${body}\n\n`;
-  const laneReset = `${heading}\n\n#### Added\n\n<!-- Add stable-line changes here. -->\n`;
+  // The reset lane stays under Unreleased; the release section goes after the rest of Unreleased.
+  const laneReset = `${heading}\n\n#### Added\n\n<!-- Add stable-line changes here. -->`;
+  const afterLane = changelog.slice(bounds.end).replace(/^\s*/, '');
+  const nextRelease = afterLane.search(/^## /m);
+  const unreleasedTail = (nextRelease === -1 ? afterLane : afterLane.slice(0, nextRelease)).trim();
+  const olderReleases = nextRelease === -1 ? '' : afterLane.slice(nextRelease).trimEnd();
+  const parts = [laneReset, unreleasedTail, `${releaseHeading}\n\n${body}`, olderReleases].filter(Boolean);
   return {
-    changelog: `${changelog.slice(0, bounds.start)}${releaseSection}${laneReset}${changelog.slice(bounds.end).replace(/^\s*/, '')}`,
+    changelog: `${changelog.slice(0, bounds.start)}${parts.join('\n\n')}\n`,
     moved: true,
   };
 };
