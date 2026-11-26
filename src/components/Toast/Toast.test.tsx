@@ -48,6 +48,27 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  test('stays open while focused and returns focus when dismissed', () => {
+    const onClose = jest.fn();
+    render(
+      <>
+        <button type="button">Before</button>
+        <Toast message="Keep me" onClose={onClose} />
+      </>,
+    );
+    const before = screen.getByRole('button', { name: 'Before' });
+    const dismiss = screen.getByRole('button', { name: 'Dismiss notification' });
+    before.focus();
+    act(() => dismiss.focus());
+
+    advanceTimersByTime(30000);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(dismiss);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(before).toHaveFocus();
+  });
+
   test('restarts the timer when the displayed copy changes', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" onClose={onClose} />);

@@ -109,7 +109,6 @@ const CloudSaveDialogBody: React.FC<{
         onChange={(e) => onLabelChange(e.target.value)}
         placeholder="e.g., March 29 - Strong Pattern"
         aria-describedby={error ? 'cloud-save-dialog-error' : undefined}
-        aria-invalid={error ? true : undefined}
         disabled={isSaving}
       />
     </div>

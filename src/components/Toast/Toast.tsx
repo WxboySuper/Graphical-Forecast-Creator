@@ -79,12 +79,17 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
   const displayType = normalizeToastType(type);
 
+  // While keyboard focus is inside the toast it stays open; dismissing it returns focus to where it came from.
+  const [hasFocus, setHasFocus] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     // Message changes restart the reading window without extending the maximum lifetime.
     if (emptyMessage) {
       closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
       return;
     }
+    if (hasFocus) return;
     const now = getCurrentTime();
     mountedAtRef.current ??= now;
     const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
@@ -105,12 +110,24 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [emptyMessage, timingMessage]);
+  }, [emptyMessage, timingMessage, hasFocus]);
 
-  const handleDismiss = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+  const handleFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    setHasFocus(true);
+  };
+  const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
+  };
+  const handleDismiss = () => {
+    const returnTo = returnFocusRef.current;
+    closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    if (returnTo?.isConnected) returnTo.focus();
+  };
 
   return !emptyMessage && !isClosed ? (
-    <div className={`toast toast-${displayType}`}>
+    <div className={`toast toast-${displayType}`} onFocus={handleFocus} onBlur={handleBlur}>
       <span className="toast-message">{displayMessage}</span>
       <button type="button" className="toast-dismiss" aria-label="Dismiss notification" onClick={handleDismiss}>
         <span aria-hidden="true">×</span>
