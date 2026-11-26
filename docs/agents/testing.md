@@ -41,3 +41,7 @@ Worth documenting:
 - **Test harness helpers**: the observable condition they establish.
 
 Test fixtures are not held to doc-comment rules; comment only a non-obvious setup invariant.
+
+## Combined local test command
+
+`pnpm test` runs Jest only, so `pnpm test --runInBand <path>` stays a focused run. `pnpm run test:all` runs every unit suite CI runs: Jest, the Cloudflare Worker tests, the repository script tests and the analytics server tests. Install the server package first with `npm ci --prefix server` (it has its own `package-lock.json`). Run `pnpm run test:all` before opening a PR that touches `scripts/`, `server/` or `cloudflare/`.
