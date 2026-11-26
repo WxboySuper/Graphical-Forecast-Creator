@@ -66,6 +66,79 @@ export interface ToastProps {
   onClose: () => void;
 }
 
+/**
+ * Keeps a toast open while keyboard focus is inside it, and remembers where focus came from
+ * so dismissing the toast can send it back.
+ */
+const useToastFocusHold = () => {
+  const [hasFocus, setHasFocus] = useState(false);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    setHasFocus(true);
+  };
+  const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
+  };
+  const restoreFocus = () => {
+    const returnTo = returnFocusRef.current;
+    if (returnTo?.isConnected) returnTo.focus();
+  };
+
+  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
+};
+
+interface ToastExpiryOptions {
+  emptyMessage: boolean;
+  timingMessage: string;
+  /** While true (focus is inside the toast) no expiry timer runs. */
+  paused: boolean;
+  mountedAtRef: { current: number | null };
+  closedRef: { current: boolean };
+  onCloseRef: { current: () => void };
+  setIsClosed: (closed: boolean) => void;
+}
+
+/** Closes the toast after its reading window, capped by its maximum lifetime. */
+const useToastExpiry = ({
+  emptyMessage,
+  timingMessage,
+  paused,
+  mountedAtRef,
+  closedRef,
+  onCloseRef,
+  setIsClosed,
+}: ToastExpiryOptions): void => {
+  useEffect(() => {
+    const close = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    // Message changes restart the reading window without extending the maximum lifetime.
+    if (emptyMessage) {
+      close();
+      return;
+    }
+    if (paused) return;
+    const now = getCurrentTime();
+    mountedAtRef.current ??= now;
+    const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
+    if (remainingLifetime === 0) {
+      close();
+      return;
+    }
+    // A changed message starts a new reading window and may close once for that version.
+    closedRef.current = false;
+    setIsClosed(false);
+    const duration = Math.min(getToastDuration(timingMessage), remainingLifetime);
+    const timer = setTimeout(close, duration);
+
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [emptyMessage, timingMessage, paused, mountedAtRef, closedRef, onCloseRef, setIsClosed]);
+};
+
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -79,55 +152,16 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
   const displayType = normalizeToastType(type);
 
-  // While keyboard focus is inside the toast it stays open; dismissing it returns focus to where it came from.
-  const [hasFocus, setHasFocus] = useState(false);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const { hasFocus, focusHandlers, restoreFocus } = useToastFocusHold();
+  useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
 
-  useEffect(() => {
-    // Message changes restart the reading window without extending the maximum lifetime.
-    if (emptyMessage) {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-      return;
-    }
-    if (hasFocus) return;
-    const now = getCurrentTime();
-    mountedAtRef.current ??= now;
-    const remainingLifetime = getRemainingLifetime(mountedAtRef.current, now);
-    if (remainingLifetime === 0) {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-      return;
-    }
-    // A changed message starts a new reading window and may close once for that version.
-    closedRef.current = false;
-    setIsClosed(false);
-    const readingWindow = getToastDuration(timingMessage);
-    const duration = Math.min(readingWindow, remainingLifetime);
-    const timer = setTimeout(() => {
-      closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-    }, duration);
-
-    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [emptyMessage, timingMessage, hasFocus]);
-
-  const handleFocus = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
-    setHasFocus(true);
-  };
-  const handleBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
-  };
   const handleDismiss = () => {
-    const returnTo = returnFocusRef.current;
     closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
-    if (returnTo?.isConnected) returnTo.focus();
+    restoreFocus();
   };
 
   return !emptyMessage && !isClosed ? (
-    <div className={`toast toast-${displayType}`} onFocus={handleFocus} onBlur={handleBlur}>
+    <div className={`toast toast-${displayType}`} {...focusHandlers}>
       <span className="toast-message">{displayMessage}</span>
       <button type="button" className="toast-dismiss" aria-label="Dismiss notification" onClick={handleDismiss}>
         <span aria-hidden="true">×</span>
