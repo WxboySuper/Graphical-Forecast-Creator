@@ -131,8 +131,9 @@ registered only through the same feature exposure decision. The existing top-lev
 Existing links remain useful during the migration:
 
 - `/forecast` redirects to `/forecast/severe`.
-- `/discussion` redirects to the matching workspace with `surface=discussion`;
-  unmatched legacy links go to Severe. The query and hash are preserved.
+- `/discussion` redirects to Severe with `surface=discussion` by default;
+  matching workspace hints and the hash are preserved. Mesoscale has a
+  separate Discussion tab and does not open it from `surface=discussion`.
 - `/custom-products` remains the Custom Products library route after #915 adds
   `/forecast/custom`. It is not an alias for the Forecast editor; #915 owns the
   explicit product-to-editor handoff.

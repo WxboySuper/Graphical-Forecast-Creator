@@ -8,7 +8,7 @@ Facts verified against the code on 2026-11-26 (v3 beta 6). Re-verify with grep b
 |------|------|-------|
 | `/` | `HomePage` | `*` redirects to `/`; retired `/beta` and `/beta-access/*` links also redirect to `/` |
 | `/forecast`, `/forecast/<workspace>` | forecast workspace pages | Workspaces from `src/config/forecastWorkspaces.ts`; legacy routes redirect through `src/routing/forecastWorkspaceRoutes.ts`. Contract: [workspace boundaries](../architecture/forecast-workspace-boundaries.md) |
-| `/discussion/*` | redirect | Legacy paths redirect through `DiscussionLegacyRedirect` |
+| `/discussion/*` | redirect | Legacy paths go to Severe with `surface=discussion` by default; a workspace hint can select another workspace |
 | `/verification`, `/monitor` | lazy pages | `Suspense` + `RouteFallback` |
 | `/account`, `/cloud`, `/admin` | account (including checkout), cloud library, admin metrics | none |
 | `/pricing`, `/updates` | redirect to the marketing site (`gfcweather.com/pricing/`, `/updates/`) through `ExternalRedirect`; the pages live in `marketing/src` | the VPS nginx exact-match rule for `/updates` only matters for the legacy VPS frontend |

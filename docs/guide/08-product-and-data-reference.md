@@ -8,7 +8,7 @@ A decision-maker's cheat sheet: what exists, who gets it, where data goes, and w
 |------|------|----------------|
 | Home | `/` | No |
 | Forecast | `/forecast` (+ workspaces) | No |
-| Discussion | `/forecast/<workspace>?surface=discussion` (`/discussion` redirects here) | No |
+| Discussion | Severe: `/forecast/severe?surface=discussion` (`/discussion` redirects here). Custom, where enabled: `/forecast/custom?surface=discussion`. Mesoscale, where enabled: select the Discussion tab in `/forecast/mesoscale`. | No |
 | Monitor | `/monitor` | No |
 | Verification | `/verification` | No |
 | Pricing | `/pricing` | No |
