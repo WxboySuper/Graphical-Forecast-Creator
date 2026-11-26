@@ -301,6 +301,46 @@ describe('CycleManager Components', () => {
       fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
       expect(last).toHaveFocus();
     });
+
+    it('returns focus to the opener when the modal closes', () => {
+      const Harness = () => {
+        const [open, setOpen] = React.useState(false);
+        return (
+          <>
+            <button type="button" onClick={() => setOpen(true)}>Open history</button>
+            <CycleHistoryModal isOpen={open} onClose={() => setOpen(false)} />
+          </>
+        );
+      };
+      renderWithForecastStore(<Harness />);
+      const opener = screen.getByText('Open history');
+      opener.focus();
+      fireEvent.click(opener);
+      expect(screen.getByRole('button', { name: 'Close cycle history modal' })).toHaveFocus();
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      expect(screen.queryByTestId('cycle-history-modal')).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
+    });
+
+    it('does not move focus when the stacked confirm opens, and wraps Tab when focus is outside the modal', () => {
+      const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: {}, stats: {} }];
+      renderCycleHistoryModal({}, { savedCycles });
+
+      const deleteButton = screen.getByTitle('Delete this cycle');
+      deleteButton.focus();
+      fireEvent.click(deleteButton);
+      expect(screen.getByTestId('confirmation-modal')).toBeInTheDocument();
+      // The real confirm (Radix) takes focus itself; the history modal must not pull it back to its first button.
+      expect(deleteButton).toHaveFocus();
+
+      fireEvent.click(screen.getByText('Confirm'));
+      expect(screen.queryByTestId('confirmation-modal')).not.toBeInTheDocument();
+      expect(document.body).toHaveFocus();
+      fireEvent.keyDown(window, { key: 'Tab' });
+      const buttons = screen.getAllByRole('button');
+      expect(buttons[0]).toHaveFocus();
+    });
   });
 
   describe('CopyFromPreviousModal', () => {

@@ -22,8 +22,10 @@ const handleTabNavigation = (event: KeyboardEvent, root: HTMLElement | null): vo
 
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
-  const isFirstActive = document.activeElement === first;
-  const isLastActive = document.activeElement === last;
+  // Focus can land outside the modal, e.g. on <body> after a deleted row's button unmounts.
+  const isOutside = !root.contains(document.activeElement);
+  const isFirstActive = document.activeElement === first || isOutside;
+  const isLastActive = document.activeElement === last || isOutside;
 
   if (event.shiftKey && isFirstActive) {
     event.preventDefault();
@@ -106,19 +108,24 @@ export const useCycleHistoryModalKeyboard = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    /** Focuses the first tabbable control when the modal opens. */
-    const syncFocus = () => {
-      if (!modalRef.current) return;
-      const focusable = getFocusableElements(modalRef.current);
-      focusable[0]?.focus();
-    };
-
     window.addEventListener('keydown', handleModalKeyDown);
-    syncFocus();
 
     // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
     return () => {
       window.removeEventListener('keydown', handleModalKeyDown);
     };
-  }, [handleModalKeyDown, isOpen, modalRef]);
+  }, [handleModalKeyDown, isOpen]);
+
+  // Runs only on open and close, so opening or closing the stacked confirm leaves focus where Radix puts it.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    getFocusableElements(modalRef.current)[0]?.focus();
+
+    // skipcq: JS-0045 React effects intentionally return cleanup callbacks.
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [isOpen, modalRef]);
 };
