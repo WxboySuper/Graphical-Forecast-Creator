@@ -29,13 +29,13 @@ const setup = ({ stableFiles, mainFiles }) => {
   run('git', ['config', 'user.name', 'test']);
   run('git', ['config', 'core.autocrlf', 'false']);
   write({ 'CHANGELOG.md': 'top\nlane\n', 'app.txt': 'one\n' });
-  run('git', ['commit', '-qm', 'base']);
+  run('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'base']);
   run('git', ['switch', '-qc', 'stable']);
   write(stableFiles);
-  run('git', ['commit', '-qm', 'stable', '--allow-empty']);
+  run('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'stable', '--allow-empty']);
   run('git', ['switch', '-q', 'main']);
   write(mainFiles);
-  run('git', ['commit', '-qm', 'feature']);
+  run('git', ['-c', 'commit.gpgsign=false', 'commit', '-qm', 'feature']);
   const sha = run('git', ['rev-parse', 'HEAD']);
   run('git', ['switch', '-q', 'stable']);
   return { dir, run, sha };
