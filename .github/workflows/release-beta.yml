@@ -536,7 +536,7 @@ jobs:
           node-version: '24.x'
 
       - name: Test Worker
-        run: node --test "cloudflare/*.test.mjs"
+        run: node --test cloudflare/mesoscale-worker.test.mjs cloudflare/mesoscale-scheduler.test.mjs cloudflare/pmtiles-reader.test.mjs
 
       - name: Render Worker config
         run: node scripts/render-mesoscale-wrangler.mjs cloudflare/wrangler.mesoscale.jsonc cloudflare/wrangler.mesoscale.rendered.json
