@@ -96,9 +96,17 @@ const useToastFocusHold = () => {
   };
   const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     if (isInternalMove(event)) return;
-    // A blur with no target can mean the toast is being removed, so only a real move ends the hold.
-    holdsFocusRef.current = holdsFocusRef.current && !event.relatedTarget;
     setHasFocus(false);
+    if (event.relatedTarget) {
+      holdsFocusRef.current = false;
+      return;
+    }
+    // No target: either the toast is being removed (keep the hold so focus can be returned) or the user
+    // clicked non-focusable content (end it). The toast is still in the page only in the second case.
+    const toast = event.currentTarget;
+    queueMicrotask(() => {
+      if (toast.isConnected) holdsFocusRef.current = false;
+    });
   };
   const restoreFocus = useCallback(() => {
     const returnTo = returnFocusRef.current;

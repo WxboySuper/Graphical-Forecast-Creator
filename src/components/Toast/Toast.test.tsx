@@ -86,6 +86,29 @@ describe('Toast', () => {
     expect(before).toHaveFocus();
   });
 
+  test('does not pull focus back after the user clicks away from a toast', () => {
+    const Harness = ({ ids }: { ids: string[] }) => (
+      <>
+        <button type="button">Before</button>
+        <ToastManager toasts={ids.map((id) => ({ id, message: `Toast ${id}`, type: 'info' as const }))} onDismiss={() => undefined} />
+      </>
+    );
+    const { rerender } = render(<Harness ids={['a']} />);
+    const before = screen.getByRole('button', { name: 'Before' });
+    before.focus();
+    const dismiss = screen.getByRole('button', { name: 'Dismiss notification Toast a' });
+    act(() => dismiss.focus());
+    // Clicking non-focusable content blurs with no relatedTarget and leaves focus on <body>.
+    act(() => {
+      dismiss.blur();
+      jest.runAllTicks();
+    });
+
+    rerender(<Harness ids={['b']} />);
+    expect(before).not.toHaveFocus();
+    expect(document.body).toHaveFocus();
+  });
+
   test('does not move focus when an unfocused toast is dropped', () => {
     const Harness = ({ ids }: { ids: string[] }) => (
       <>
