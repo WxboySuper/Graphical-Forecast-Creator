@@ -37,4 +37,19 @@ describe('useRouteOrientation', () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 0);
     scrollTo.mockRestore();
   });
+
+  it('leaves focus inside an open modal when the route changes', () => {
+    render(<MemoryRouter initialEntries={['/']}><Harness /></MemoryRouter>);
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    const dialogButton = document.createElement('button');
+    dialog.appendChild(dialogButton);
+    document.body.appendChild(dialog);
+    dialogButton.focus();
+
+    act(() => navigateTo('/verification'));
+    expect(dialogButton).toHaveFocus();
+    dialog.remove();
+  });
 });

@@ -12,4 +12,8 @@ describe('getPageTitle', () => {
   ])('titles %s%s', (pathname, search, expected) => {
     expect(getPageTitle(pathname, search)).toBe(expected);
   });
+
+  it('never throws on malformed percent-encoding', () => {
+    expect(() => getPageTitle('/discussion/%')).not.toThrow();
+  });
 });

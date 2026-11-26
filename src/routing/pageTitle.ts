@@ -23,7 +23,8 @@ const describeSection = (segments: string[], search: string): string | null => {
 
 /** Returns the document title for a route, such as "Severe Forecast | Graphical Forecast Creator". */
 export const getPageTitle = (pathname: string, search = ''): string => {
-  const segments = pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  // Route segments are known ASCII names; decoding is unnecessary and throws on malformed links such as /discussion/%.
+  const segments = pathname.split('/').filter(Boolean);
   const section = describeSection(segments, search);
   return section ? `${section} | ${APP_TITLE}` : APP_TITLE;
 };
