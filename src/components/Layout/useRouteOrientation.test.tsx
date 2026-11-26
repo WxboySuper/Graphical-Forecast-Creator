@@ -30,8 +30,11 @@ describe('useRouteOrientation', () => {
     expect(document.title).toBe('Severe Discussion | Graphical Forecast Creator');
     expect(link).toHaveFocus();
 
+    const scrollTo = jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     act(() => navigateTo('/verification'));
     expect(document.title).toBe('Verification | Graphical Forecast Creator');
     expect(screen.getByRole('main')).toHaveFocus();
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    scrollTo.mockRestore();
   });
 });

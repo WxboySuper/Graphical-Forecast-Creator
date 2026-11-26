@@ -21,6 +21,8 @@ export const useRouteOrientation = (mainRef: RefObject<HTMLElement | null>): voi
     const pathnameChanged = previousPathname.current !== pathname;
     previousPathname.current = pathname;
     if (isFirstRender || !pathnameChanged) return;
+    // A new page should start at the top, like a full page load.
+    window.scrollTo(0, 0);
     mainRef.current?.focus({ preventScroll: true });
   }, [mainRef, pathname]);
 };
