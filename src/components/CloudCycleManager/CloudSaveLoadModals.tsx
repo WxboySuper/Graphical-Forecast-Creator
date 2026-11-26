@@ -59,8 +59,8 @@ const CloudSaveDialogCallout: React.FC<{ currentLabel: string }> = ({ currentLab
 
 /** Error banner shown when the current cloud save attempt fails. */
 const CloudSaveDialogError: React.FC<{ error: string }> = ({ error }) => (
-  <div className="cloud-save-dialog-error">
-    <AlertCircle className="h-5 w-5 shrink-0 text-red-600" />
+  <div id="cloud-save-dialog-error" className="cloud-save-dialog-error" role="alert">
+    <AlertCircle className="h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
     <p>{error}</p>
   </div>
 );
@@ -108,6 +108,7 @@ const CloudSaveDialogBody: React.FC<{
         value={label}
         onChange={(e) => onLabelChange(e.target.value)}
         placeholder="e.g., March 29 - Strong Pattern"
+        aria-describedby={error ? 'cloud-save-dialog-error' : undefined}
         disabled={isSaving}
       />
     </div>

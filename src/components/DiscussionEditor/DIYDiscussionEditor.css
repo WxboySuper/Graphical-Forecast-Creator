@@ -99,9 +99,14 @@
   color: rgb(248, 250, 252) !important;
 }
 
+.toolbar-button:focus-visible {
+  outline: 2px solid var(--button-bg);
+  outline-offset: 2px;
+}
+
 .dark-mode .toolbar-button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.28);
+  outline: 2px solid rgb(148, 163, 184);
+  outline-offset: 2px;
 }
 
 .dark-mode .diy-textarea {

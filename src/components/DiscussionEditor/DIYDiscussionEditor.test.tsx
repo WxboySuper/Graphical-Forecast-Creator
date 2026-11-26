@@ -30,6 +30,15 @@ describe('DIYDiscussionEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('Storm *mode*');
   });
 
+  test('names the formatting buttons and the discussion textarea', () => {
+    render(<DIYDiscussionEditor content="" onChange={jest.fn()} />);
+
+    for (const name of ['Bold', 'Italic', 'Heading 1', 'Heading 2', 'Heading 3']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('textbox', { name: 'Forecast discussion' })).toBeInTheDocument();
+  });
+
   test('inserts heading prefixes at the start of the current line', () => {
     const onChange = jest.fn();
     render(<DIYDiscussionEditor content="Discussion" onChange={onChange} />);

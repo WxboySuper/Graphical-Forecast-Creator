@@ -44,6 +44,7 @@ const CycleHistoryCurrentSection: React.FC<CycleHistoryCurrentSectionProps> = ({
       <div className="history-save-form">
         <input
           type="text"
+          aria-label="Cycle label (optional)"
           placeholder="Optional label (e.g. Morning, Afternoon, 00Z)"
           value={newLabel}
           onChange={onNewLabelChange}
