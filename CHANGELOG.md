@@ -9,6 +9,8 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Skip to main content link:** Pressing Tab now reveals a Skip to main content link that moves keyboard and screen-reader focus past the navigation to the main content.
+- **Page titles and focus reset:** Each page now shows its own browser tab title, such as Severe Forecast or Verification, and focus moves to the main content when switching pages.
 - **Accessible loading indicators:** Gated pages and the Forecast Grade dashboard now show and announce a loading message instead of a blank pane while content loads.
 - **Keyboard focus on buttons:** Buttons now show a visible focus outline when navigated to with a keyboard.
 

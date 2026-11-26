@@ -107,6 +107,15 @@ describe('AppLayout', () => {
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
   });
 
+  it('skips keyboard users past the navbar to the main landmark', () => {
+    renderWithRouter(<AppLayout />);
+    const skipLink = screen.getByRole('link', { name: 'Skip to main content' });
+    const main = screen.getByRole('main');
+    expect(main).toHaveAttribute('id', 'main-content');
+    fireEvent.click(skipLink);
+    expect(main).toHaveFocus();
+  });
+
   it('renders the navbar', () => {
     renderWithRouter(<AppLayout />);
     expect(screen.getByTestId('navbar')).toBeInTheDocument();
