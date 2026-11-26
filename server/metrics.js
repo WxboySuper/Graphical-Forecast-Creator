@@ -36,7 +36,7 @@ const METRIC_EVENT_TYPES = new Set([
 const MAX_DAILY_DEVICES_PER_ACCOUNT = 5;
 
 /** Returns the verified Firebase user for requests that need server-side admin authorization. */
-const verifyRequestUser = (req, checkRevoked = false) => verifyFirebaseToken(req, checkRevoked);
+const verifyRequestUser = (req, checkRevoked = true) => verifyFirebaseToken(req, checkRevoked);
 
 /** Returns the current server-side admin UID allowlist parsed from env. */
 const getAdminUidAllowlist = () =>

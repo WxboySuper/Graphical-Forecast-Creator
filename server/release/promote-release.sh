@@ -83,9 +83,9 @@ node "$RELEASE_LIB/write-live-alert-banner.mjs" \
   --web-root "$GFC_WEB_ROOT/current"
 
 if pm2 describe "$PM2_APP" > /dev/null 2>&1; then
-  pm2 restart "$PM2_APP"
+  NODE_ENV=production pm2 restart "$PM2_APP" --update-env
 else
-  pm2 start "$ANALYTICS_ROOT/current/analytics.js" --name "$PM2_APP"
+  NODE_ENV=production pm2 start "$ANALYTICS_ROOT/current/analytics.js" --name "$PM2_APP"
 fi
 pm2 save
 
