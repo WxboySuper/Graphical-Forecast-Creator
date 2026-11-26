@@ -66,6 +66,17 @@ export interface ToastProps {
   onClose: () => void;
 }
 
+/** True when a focus event's other element is inside the toast, i.e. focus moved within it. */
+const isInternalMove = (event: React.FocusEvent<HTMLDivElement>): boolean =>
+  event.currentTarget.contains(event.relatedTarget);
+
+/** The element focus came from, if it is one that can take focus back. */
+const focusOrigin = (event: React.FocusEvent<HTMLDivElement>): HTMLElement | null =>
+  event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+
+/** True when nothing useful has focus, as after the focused element was removed. */
+const isFocusLost = (): boolean => !document.activeElement || document.activeElement === document.body;
+
 /**
  * Keeps a toast open while keyboard focus is inside it, and remembers where focus came from
  * so dismissing the toast can send it back.
@@ -79,13 +90,14 @@ const useToastFocusHold = () => {
 
   const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
     holdsFocusRef.current = true;
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    if (isInternalMove(event)) return;
+    returnFocusRef.current = focusOrigin(event);
     setHasFocus(true);
   };
   const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    if (event.relatedTarget) holdsFocusRef.current = false;
+    if (isInternalMove(event)) return;
+    // A blur with no target can mean the toast is being removed, so only a real move ends the hold.
+    holdsFocusRef.current = holdsFocusRef.current && !event.relatedTarget;
     setHasFocus(false);
   };
   const restoreFocus = useCallback(() => {
@@ -101,8 +113,7 @@ const useToastFocusHold = () => {
 
   // The queue can drop a toast (e.g. the oldest when a fifth arrives) while its dismiss button has focus.
   useEffect(() => () => {
-    const focusLost = !document.activeElement || document.activeElement === document.body;
-    if (holdsFocusRef.current && focusLost) restoreFocus();
+    if (holdsFocusRef.current && isFocusLost()) restoreFocus();
   }, [restoreFocus]);
 
   return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus, releaseFocus };
