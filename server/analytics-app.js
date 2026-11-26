@@ -43,6 +43,7 @@ function configureApp(app, express) {
   const { registerSentryTunnelRoutes } = require('./sentry-tunnel');
   const { registerTstmIngestion, registerTstmRoutes } = require('./tstm');
 
+  app.disable('x-powered-by');
   app.set('trust proxy', 'loopback');
   app.use(trustBetaWorkerClientIp);
 
@@ -59,6 +60,19 @@ function configureApp(app, express) {
 
   // Reject everything else quietly
   app.use((_req, res) => res.status(404).end());
+
+  // Keep Express's default error response from exposing stack traces.
+  app.use((error, _req, res, next) => {
+    if (res.headersSent) return next(error);
+    const status = Number(error?.status || error?.statusCode);
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({
+        error: status === 413 ? 'Request body too large.' : 'Invalid request.',
+      });
+    }
+    console.error('[analytics] request:error', error);
+    return res.status(500).json({ error: 'Internal server error.' });
+  });
 }
 
 module.exports = {

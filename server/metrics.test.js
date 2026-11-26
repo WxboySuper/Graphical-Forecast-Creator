@@ -236,6 +236,22 @@ describe('product metric authentication contract', () => {
     assert.equal(documents.size, 0);
   });
 
+  it('checks token revocation before writing authenticated product metrics', async () => {
+    let checkedRevoked = false;
+    adminAuth = {
+      verifyIdToken: async (_token, checkRevoked) => {
+        checkedRevoked = checkRevoked;
+        return { uid: 'user-1' };
+      },
+    };
+    const response = createResponse();
+
+    await handleMetricEvent(createAuthenticatedRequest('cycle_saved'), response);
+
+    assert.equal(response.statusCode, 204);
+    assert.equal(checkedRevoked, true);
+  });
+
   it('leaves billing webhook events out of the client-authenticated allowlist', () => {
     assert.equal(requiresAuthenticatedMetricEvent('premium_upgrade'), false);
     assert.equal(requiresAuthenticatedMetricEvent('premium_cancellation'), false);

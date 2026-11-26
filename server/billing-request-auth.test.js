@@ -51,9 +51,10 @@ const createUnreachableVerifier = (message) => ({
 });
 
 /** Builds an auth stub that records the token and resolves the given user. */
-const createTokenVerifier = (user, onToken) => ({
-  verifyIdToken: async (token) => {
+const createTokenVerifier = (user, onToken, onRevocationCheck) => ({
+  verifyIdToken: async (token, checkRevoked) => {
     onToken(token);
+    onRevocationCheck(checkRevoked);
     return user;
   },
 });
@@ -91,8 +92,11 @@ const runValidTokenCase = async ({ request, token, uid, expectedToken }) => {
   const response = createResponse();
   const expectedUser = { uid };
   let receivedToken = null;
+  let checkedRevoked = false;
   const adminAuth = createTokenVerifier(expectedUser, (seenToken) => {
     receivedToken = seenToken;
+  }, (checkRevoked) => {
+    checkedRevoked = checkRevoked;
   });
   const overrides =
     token === undefined ? { adminAuth, hasConfig: true } : { adminAuth, hasConfig: true, token };
@@ -101,6 +105,7 @@ const runValidTokenCase = async ({ request, token, uid, expectedToken }) => {
 
   assert.deepStrictEqual(result, expectedUser);
   assert.equal(receivedToken, expectedToken);
+  assert.equal(checkedRevoked, true);
   assertUntouchedResponse(response);
 };
 

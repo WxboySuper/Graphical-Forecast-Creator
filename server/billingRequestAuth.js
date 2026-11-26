@@ -20,7 +20,7 @@ const verifyRequestUser = async (
   }
 
   try {
-    return await adminAuth.verifyIdToken(token);
+    return await adminAuth.verifyIdToken(token, true);
   } catch {
     res.status(401).json({ error: 'Invalid Firebase ID token.' });
     return null;

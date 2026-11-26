@@ -14,9 +14,10 @@ const getServerPort = (server) => {
 };
 
 /** @returns {Promise<import('node:http').Server>} */
-const startTestAnalyticsServer = async () => {
+const startTestAnalyticsServer = async (beforeConfigure = () => {}) => {
   const express = require('express');
   const app = express();
+  beforeConfigure(app);
   configureApp(app, express);
 
   return new Promise((resolve, reject) => {
@@ -81,5 +82,41 @@ describe('analytics server stack (express 5)', () => {
     const port = getServerPort(server);
     const response = await fetch(`http://127.0.0.1:${port}/collect`, { method: 'POST' });
     assert.equal(response.status, 404);
+  });
+
+  it('disables X-Powered-By and returns JSON without an error stack', async () => {
+    const server = await startTestAnalyticsServer((app) => {
+      app.get('/test-error', () => { throw new Error('private stack marker'); });
+    });
+    const port = getServerPort(server);
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/test-error`);
+      assert.equal(response.status, 500);
+      assert.equal(response.headers.get('x-powered-by'), null);
+      assert.deepEqual(await response.json(), { error: 'Internal server error.' });
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  it('preserves JSON parser client-error statuses with sanitized bodies', async () => {
+    const server = await serverReady;
+    const port = getServerPort(server);
+    const malformed = await fetch(`http://127.0.0.1:${port}/api/metrics/event`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{',
+    });
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), { error: 'Invalid request.' });
+
+    const oversized = await fetch(`http://127.0.0.1:${port}/api/metrics/event`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ event: 'cycle_saved', padding: 'x'.repeat(3000) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { error: 'Request body too large.' });
   });
 });
