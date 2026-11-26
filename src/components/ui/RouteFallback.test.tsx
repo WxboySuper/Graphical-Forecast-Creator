@@ -5,7 +5,8 @@ describe('RouteFallback', () => {
   it('announces a visible loading status', () => {
     render(<RouteFallback />);
     const status = screen.getByRole('status', { name: 'Loading page' });
-    expect(status).toHaveAttribute('aria-busy', 'true');
+    // aria-busy would tell screen readers to hold the announcement, so the live region must not set it.
+    expect(status).not.toHaveAttribute('aria-busy');
     expect(status).toHaveTextContent('Loading…');
   });
 
