@@ -9,6 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Accessible loading indicators:** Gated pages and the Forecast Grade dashboard now show and announce a loading message instead of a blank pane while content loads.
 - **Keyboard focus on buttons:** Buttons now show a visible focus outline when navigated to with a keyboard.
 
 #### Dependencies

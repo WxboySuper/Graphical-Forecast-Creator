@@ -23,6 +23,7 @@ import { setupCycleHistoryListener, useCycleHistoryPersistence } from './utils/c
 import { WorkflowAwarenessProvider } from './hooks/useWorkflowAwarenessSync';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { EntitlementProvider } from './billing/EntitlementProvider';
+import { RouteFallback } from './components/ui/RouteFallback';
 
 // New UI components
 import { AppLayout } from './components/Layout';
@@ -64,13 +65,6 @@ const MonitorPage = lazyWithReload('monitor', () =>
 const CloudLibraryPage = lazyWithReload('cloud', () => import('./pages/CloudLibraryPage'));
 const AdminPage = lazyWithReload('admin', () =>
   import('./pages/AdminPage').then((module) => ({ default: module.AdminPage }))
-);
-
-/** Accessible loading placeholder shown while a lazy route chunk downloads. */
-const RouteFallback = () => (
-  <div className="flex h-full items-center justify-center p-6" role="status" aria-busy="true" aria-label="Loading page">
-    <span className="text-sm text-muted-foreground">Loading…</span>
-  </div>
 );
 
 /** Redirects the legacy Forecast entry point without dropping deep-link options. */
