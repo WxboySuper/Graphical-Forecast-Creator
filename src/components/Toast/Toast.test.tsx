@@ -289,8 +289,10 @@ describe('ToastManager', () => {
 
     expect(screen.getByRole('status')).toHaveTextContent('Saved');
     expect(screen.getByRole('status')).not.toHaveTextContent('Save failed');
-    expect(screen.getByRole('alert')).toHaveTextContent('Save failed');
-    expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
+    expect(screen.getByTestId('toast-error-region')).toHaveTextContent('Save failed');
+    expect(screen.getByTestId('toast-error-region')).toHaveAttribute('aria-live', 'assertive');
+    // The always-mounted region must not read as a standing alert or collide with page alerts.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   test('dismisses a toast from its close button', () => {

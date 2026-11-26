@@ -177,7 +177,8 @@ export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.Re
           <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
         ))}
       </div>
-      <div className="toast-region" role="alert" aria-live="assertive">
+      {/* No role="alert": an always-mounted, usually empty alert would read as a standing alert. */}
+      <div className="toast-region" aria-live="assertive" data-testid="toast-error-region">
         {toasts.filter(isError).map((toast) => (
           <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
         ))}

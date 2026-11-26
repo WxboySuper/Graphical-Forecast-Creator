@@ -42,7 +42,7 @@ test.describe('Navigation', () => {
     await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
-    await page.getByRole('button', { name: '2', exact: true }).click();
+    await page.getByRole('button', { name: /^Day 2\b/ }).click();
 
     await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
@@ -52,7 +52,7 @@ test.describe('Navigation', () => {
     await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
-    await page.getByRole('button', { name: '1', exact: true }).click();
+    await page.getByRole('button', { name: /^Day 1\b/ }).click();
     await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     await expect(editor).toHaveValue('Day 1 draft');
@@ -60,7 +60,7 @@ test.describe('Navigation', () => {
     await navigateToSevereForecast(page);
     await expect(page).toHaveURL(/\/forecast\/severe$/);
     await page.getByRole('tab', { name: /^Days$/i }).click();
-    await page.getByRole('button', { name: '2', exact: true }).click();
+    await page.getByRole('button', { name: /^Day 2\b/ }).click();
     await navigateToDiscussion(page);
     await expect(page).toHaveURL(/\/forecast\/severe\?.*surface=discussion/);
     await expect(editor).toHaveValue('Day 2 draft');

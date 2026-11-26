@@ -180,7 +180,7 @@ test.describe('App smoke tests', () => {
     await expect(page.getByRole('button', { name: /15%/i }).first()).toBeVisible();
 
     await page.getByRole('tab', { name: 'Days' }).click();
-    await expect(page.getByRole('button', { name: '2' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Day 2\b/ })).toBeVisible();
 
     await page.getByRole('tab', { name: 'Tools' }).click();
     await expect(page.getByRole('button', { name: /Save/i }).first()).toBeVisible();
