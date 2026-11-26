@@ -1,17 +1,17 @@
 # Lookup tables
 
-Facts verified against the code on 2026-11-08 (v2 beta 6). Re-verify with grep before relying on a value; the code wins.
+Facts verified against the code on 2026-11-26 (v3 beta 6). Re-verify with grep before relying on a value; the code wins.
 
 ## Routes (`src/App.tsx`)
 
 | Path | Page | Notes |
 |------|------|-------|
 | `/` | `HomePage` | `*` redirects to `/`; retired `/beta` and `/beta-access/*` links also redirect to `/` |
-| `/forecast`, `/forecast/<workspace>` | `ForecastPage` | Workspaces from `src/routing/forecastWorkspaceRoutes.ts`; legacy `?workspace=` handled there. Contract: [workspace boundaries](../architecture/forecast-workspace-boundaries.md) |
-| `/discussion`, `/verification`, `/monitor` | lazy pages | `Suspense` + `RouteFallback` |
+| `/forecast`, `/forecast/<workspace>` | forecast workspace pages | Workspaces from `src/config/forecastWorkspaces.ts`; legacy routes redirect through `src/routing/forecastWorkspaceRoutes.ts`. Contract: [workspace boundaries](../architecture/forecast-workspace-boundaries.md) |
+| `/discussion/*` | redirect | Legacy paths redirect through `DiscussionLegacyRedirect` |
+| `/verification`, `/monitor` | lazy pages | `Suspense` + `RouteFallback` |
 | `/account`, `/cloud`, `/admin` | account (including checkout), cloud library, admin metrics | none |
 | `/pricing`, `/updates` | redirect to the marketing site (`gfcweather.com/pricing/`, `/updates/`) through `ExternalRedirect`; the pages live in `marketing/src` | the VPS nginx exact-match rule for `/updates` only matters for the legacy VPS frontend |
-| `/dev/feature-exposure` | `FeatureExposureDiagnosticsPage` | dev diagnostics |
 | gated | built by `src/routing/buildFeatureGatedRoutes.tsx` | e.g. `/tropical`, `/collaborate`; absent when disabled |
 
 ## Redux slices (`src/store`)
@@ -26,7 +26,6 @@ Facts verified against the code on 2026-11-08 (v2 beta 6). Re-verify with grep b
 
 | Route | Auth | Source |
 |-------|------|--------|
-| `GET /` | none | health |
 | `GET /api/capabilities/status` | none | capability status (exact shape locked by tests) |
 | `GET /api/billing/config` | none | public billing config |
 | `POST /api/billing/checkout`, `/portal` | Firebase ID token | `billingRoutes.js` |
@@ -62,6 +61,5 @@ Server: `PORT`, `SERVER_TARGET`, `APP_BASE_URL` (`https://app.gfcweather.com` in
 
 ## GitHub
 
-- Milestones: `v2` (current), `Future Features`.
 - Labels in use: type (`Bug`, `Enhancement`, `Feature`, `Refactor`, `Documentation`, `Accessibility`, `Performance`), area (`Component: Map|Outlooks|Drawing-Tools|Export|UI|Storage`), priority (`P0`-`P2`, `Priority: *`), `Emergency`, `dependencies`, plus automation labels (`opencode-audit`, `opencode-audit-eligible`, `backport-2.x`, `backport-conflict`). Several roadmap-style labels (`reliability`, `ecosystem`, ...) come from another project's template and are unused; ignore them. The `Component: Map` description still says Leaflet; the map is OpenLayers.
 - `main` has **no branch protection rule** (API returned 404); required checks are enforced by workflow policy and review habit, not GitHub settings. Do not assume a red check blocks the merge button.

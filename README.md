@@ -9,7 +9,7 @@ Live App: [app.gfcweather.com](https://app.gfcweather.com/). Marketing site: [gf
 ## Features
 
 ### Outlook Creation
-- Draw, edit, and cut polygons for tornado, wind, hail, categorical, and Day 3-8 outlooks
+- Draw, edit, and cut polygons for tornado, wind, hail, categorical, Day 3 total severe, and Day 4-8 outlooks
 - Automatic categorical risk derivation from probabilistic outlooks (no manual editing needed)
 - CIG hatching levels (CIG1-CIG3) for significant threat areas
 - Full Day 1-8 forecast cycle support with day-specific outlook types
@@ -40,9 +40,8 @@ Live App: [app.gfcweather.com](https://app.gfcweather.com/). Marketing site: [gf
 - Copy cycle JSON to clipboard for sharing
 
 ### Map & UI
-- Multiple base map styles: Standard (OSM), Light (CartoDB), Dark (CartoDB), Satellite (Esri), **Blank (Weather)** (classic weather-style flat map — cream US, gray neighbors, blue ocean)
-- Map auto-switches to dark tile set when dark mode is enabled
-- Overlay toggles: state borders, county/CWA boundaries
+- Base map styles: OpenStreetMap (OpenFreeMap vector tiles), Esri satellite, and **Blank (Weather)** (a flat map with state outlines)
+- State outlines remain visible over the map
 - Full light/dark theme with persistent preference
 - Toast notifications for all major actions
 
@@ -58,10 +57,9 @@ Live App: [app.gfcweather.com](https://app.gfcweather.com/). Marketing site: [gf
 | `H` | Switch to Hail outlook |
 | `C` | Switch to Categorical outlook |
 | `G` | Add General Thunderstorm (TSTM) to current day |
-| `Ctrl+S` | Export forecast JSON |
-| `Ctrl+O` | Open/load a forecast JSON file |
-| `Ctrl+E` | Export map image |
-| `Ctrl+D` | Toggle dark mode |
+| `Ctrl/Cmd+S` | Save the forecast |
+| `Ctrl/Cmd+O` or `Ctrl/Cmd+L` | Import a forecast JSON file |
+| `Ctrl/Cmd+E` | Export a map image |
 
 ---
 
@@ -121,7 +119,7 @@ needs; `@typescript/native` provides the fast native `tsc` used by
 cross-env VITE_BUILD_TARGET=beta pnpm run dev -- --port 3002
 ```
 
-PowerShell: `$env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002`. Point feedback at another Worker with `VITE_FEEDBACK_API_URL` (default `https://feedback.gfcweather.com`; see [beta feedback](docs/operations/beta-feedback.md)). On localhost, `?localBetaBypass=1` skips the Terms and Privacy modals (used by E2E). Hosted auth locally needs the `VITE_FIREBASE_*` variables.
+PowerShell: `$env:VITE_BUILD_TARGET='beta'; pnpm run dev -- --port 3002`. Point feedback at another Worker with `VITE_FEEDBACK_API_URL` (default `https://feedback.gfcweather.com`; see [beta feedback](docs/operations/beta-feedback.md)). On localhost, `?localBetaBypass=true` skips the Terms and Privacy modals (used by E2E). Hosted auth locally needs the `VITE_FIREBASE_*` variables.
 
 ### Error monitoring
 

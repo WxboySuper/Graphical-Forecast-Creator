@@ -1,6 +1,6 @@
 # 8. Product and data reference
 
-A decision-maker's cheat sheet: what exists, who gets it, where data goes, and what it costs to run. Verified 2026-11-08 against v2 beta 6; the code is the source of truth.
+A decision-maker's cheat sheet: what exists, who gets it, where data goes, and what it costs to run. Verified 2026-11-26 against v3 beta 6; the code is the source of truth.
 
 ## Pages (what a user can open)
 
@@ -8,7 +8,7 @@ A decision-maker's cheat sheet: what exists, who gets it, where data goes, and w
 |------|------|----------------|
 | Home | `/` | No |
 | Forecast | `/forecast` (+ workspaces) | No |
-| Discussion | `/discussion` | No |
+| Discussion | `/forecast/<workspace>?surface=discussion` (`/discussion` redirects here) | No |
 | Monitor | `/monitor` | No |
 | Verification | `/verification` | No |
 | Pricing | `/pricing` | No |

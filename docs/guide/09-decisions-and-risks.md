@@ -29,9 +29,9 @@ Why things are the way they are, so you can change them on purpose. This is a li
 |----------|---------|
 | Turn on GitHub branch protection / required checks? | Currently off, so merges rely on habit ([page 7](07-working-with-agents.md)) |
 | Which hostname is canonical for beta? | Config says `beta.gfcweather.com`; old text says `beta-gfc.weatherboysuper.com`. The production app uses `app.gfcweather.com`, and the marketing site uses `gfcweather.com`. |
-| What ships in v2? | 6 open issues in the `v2` milestone (128 closed). Direction: independent forecast workspaces, explicit persistence ownership. |
+| How are forecasts organized? | Forecast workspaces have separate routes and persistence ownership. See [workspace boundaries](../architecture/forecast-workspace-boundaries.md) and [implemented route/state decisions](../architecture/forecast-workspace-route-state-914.md). |
 | Tropical workspace and collaboration room | Gated off. Each needs its own product decision and exposure key before work starts. |
-| WarnGen, historical replay, WxSim game | Ideas only (`Future Features` milestone, 10 issues). No contract exists. |
+| WarnGen, historical replay, WxSim game | Ideas only. No implementation contract exists. |
 | Which components move first when restructuring? | See "soft spots" in [architecture](02-architecture.md) |
 
 ## Risks and debt
