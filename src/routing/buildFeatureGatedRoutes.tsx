@@ -3,6 +3,7 @@ import { Route } from 'react-router';
 import { getBuildTarget, type BuildTarget } from '../config/buildTarget';
 import { flag, type FlagName } from '../config/flags';
 import { lazyWithReload } from './lazyWithReload';
+import { RouteFallback } from '../components/ui/RouteFallback';
 
 type GatedRouteDefinition = {
   feature: FlagName;
@@ -37,11 +38,6 @@ export const getExposedGatedRoutePaths = (target: BuildTarget = getBuildTarget()
     (definition) => `/${definition.path}`
   );
 
-/** Minimal loading placeholder shown while a gated lazy route chunk downloads. */
-const GatedRouteFallback = () => (
-  <div className="flex h-full items-center justify-center p-6" aria-busy="true" aria-label="Loading page" />
-);
-
 /** Registers lazy routes only for features exposed on the current build target. */
 export const buildFeatureGatedRoutes = (target: BuildTarget = getBuildTarget()): ReactElement[] =>
   GATED_ROUTE_DEFINITIONS.filter((definition) => flag(definition.feature, target)).map(
@@ -53,7 +49,7 @@ export const buildFeatureGatedRoutes = (target: BuildTarget = getBuildTarget()):
           key={definition.path}
           path={definition.path}
           element={
-            <Suspense fallback={<GatedRouteFallback />}>
+            <Suspense fallback={<RouteFallback />}>
               <Page />
             </Suspense>
           }
