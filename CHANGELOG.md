@@ -7,6 +7,10 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 ### Next major / beta
 
+#### Fixed
+
+- **Keyboard focus on buttons:** Buttons now show a visible focus outline when navigated to with a keyboard.
+
 #### Dependencies
 
 - **App libraries:** Updated Firebase to 13.4, Clerk backend to 3.31 and Clerk React to 6.19, Redux Toolkit to 2.15, Sentry React to 11.16, Lucide icons to 1.77, React Router to 8.5.2, and related build and test tools while keeping existing forecast, discussion, monitor, and verification behavior unchanged.
