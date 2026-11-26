@@ -9,7 +9,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import CycleHistoryModal from './CycleHistoryModal';
 import CopyFromPreviousModal from './CopyFromPreviousModal';
-import forecastReducer, { type ForecastState } from '../../store/forecastSlice';
+import forecastReducer, { type ForecastState, type SavedCycle } from '../../store/forecastSlice';
 import { AppLayoutContext } from '../Layout/AppLayout';
 
 type ConfirmationModalMockProps = {
@@ -324,7 +324,7 @@ describe('CycleManager Components', () => {
     });
 
     it('does not move focus when the stacked confirm opens, and wraps Tab when focus is outside the modal', () => {
-      const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: { currentDay: 1, cycleDate: '2026-04-20', days: {} }, stats: { forecastDays: 1, totalOutlooks: 0, totalFeatures: 0 } }];
+      const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: { currentDay: 1, cycleDate: '2026-04-20', days: {} }, stats: { forecastDays: 1, totalOutlooks: 0, totalFeatures: 0 } }] as unknown as SavedCycle[];
       renderCycleHistoryModal({}, { savedCycles });
 
       const deleteButton = screen.getByTitle('Delete this cycle');
