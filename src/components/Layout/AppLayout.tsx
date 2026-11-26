@@ -2,7 +2,7 @@
  * Top-level application layout. It owns the shared navigation shell, outlet
  * context, responsive layout state, and global UI actions around page content.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router';
 import { useSelector } from 'react-redux';
 import { Navbar } from './Navbar';
@@ -21,6 +21,7 @@ import { isFeedbackEnabled } from '../../config/feedback';
 import FeedbackDialog from '../Feedback/FeedbackDialog';
 import { FeedbackProvider } from '../Feedback/FeedbackContext';
 import { BetaFeedbackBanner, BetaFeedbackButton } from '../Feedback/BetaFeedbackChrome';
+import { useRouteOrientation } from './useRouteOrientation';
 
 /** Maximum number of toasts kept in the queue; older entries are dropped first. */
 const MAX_TOASTS = 4;
@@ -123,6 +124,13 @@ export const AppLayout: React.FC = () => {
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const darkMode = useSelector((state: RootState) => state.theme.darkMode);
   const navigate = useNavigate();
+  const mainRef = useRef<HTMLElement>(null);
+  useRouteOrientation(mainRef);
+
+  const skipToMainContent = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    mainRef.current?.focus();
+  }, []);
 
   // Toast management
   const addToast = useCallback<AddToastFn>((message, type = 'info') => {
@@ -208,6 +216,13 @@ export const AppLayout: React.FC = () => {
     <AppLayoutContext.Provider value={{ addToast }}>
       <FeedbackProvider openFeedback={openFeedback}>
       <div className={cn('flex min-h-screen flex-col bg-background text-foreground', darkMode && 'dark-mode')}>
+        <a
+          href="#main-content"
+          onClick={skipToMainContent}
+          className="skip-link"
+        >
+          Skip to main content
+        </a>
         <Navbar 
           onToggleDocumentation={toggleDocumentation}
           showDocumentation={showDocumentation}
@@ -222,7 +237,7 @@ export const AppLayout: React.FC = () => {
         <DocumentationPanel show={showDocumentation} onClose={handleCloseDocumentation} />
 
         {/* Main content area - below navbar */}
-        <main className="flex-1 min-h-0">
+        <main id="main-content" ref={mainRef} tabIndex={-1} className="main-content flex-1 min-h-0">
           {/* Page content via router outlet */}
           <Outlet context={{ addToast }} />
         </main>
