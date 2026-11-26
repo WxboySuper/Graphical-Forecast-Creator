@@ -4,7 +4,7 @@
  * feature-exposure checks. It supplies presentation metadata and does not own
  * route registration or authorization policy.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router';
 import {
@@ -245,6 +245,19 @@ const MoreActionsMenu: FC<{
   };
   const { openFeedback } = useFeedback();
   const [usageDataOpen, setUsageDataOpen] = useState(false);
+  // Dialogs open only after the menu has returned focus to its trigger, so the dialog takes focus
+  // last and restores it to "More actions" instead of an unmounted menu item.
+  const pendingDialogRef = useRef<(() => void) | null>(null);
+  /** Queues a dialog-opening action until the menu finishes closing. */
+  const openAfterClose = (open?: () => void) => () => {
+    pendingDialogRef.current = open ?? null;
+  };
+  /** Runs the queued dialog action once the menu has handed focus back. */
+  const handleMenuCloseAutoFocus = () => {
+    const open = pendingDialogRef.current;
+    pendingDialogRef.current = null;
+    open?.();
+  };
 
   return (
     <>
@@ -261,14 +274,14 @@ const MoreActionsMenu: FC<{
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" className="w-56" onCloseAutoFocus={handleMenuCloseAutoFocus}>
         <DropdownMenuLabel>Resources</DropdownMenuLabel>
-        <DropdownMenuItem onSelect={onToggleDocumentation}>
+        <DropdownMenuItem onSelect={openAfterClose(onToggleDocumentation)}>
           <HelpCircle className="h-4 w-4" />
           Documentation
         </DropdownMenuItem>
         {isFeedbackEnabled() ? (
-          <DropdownMenuItem onSelect={openFeedback}>
+          <DropdownMenuItem onSelect={openAfterClose(openFeedback)}>
             <MessageSquarePlus className="h-4 w-4" />
             Send feedback
           </DropdownMenuItem>
@@ -279,15 +292,15 @@ const MoreActionsMenu: FC<{
             What&apos;s New
           </a>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onViewTerms}>
+        <DropdownMenuItem onSelect={openAfterClose(onViewTerms)}>
           <FileText className="h-4 w-4" />
           Terms of Service
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onViewPrivacyPolicy}>
+        <DropdownMenuItem onSelect={openAfterClose(onViewPrivacyPolicy)}>
           <Shield className="h-4 w-4" />
           Privacy Policy
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setUsageDataOpen(true)}>
+        <DropdownMenuItem onSelect={openAfterClose(() => setUsageDataOpen(true))}>
           <Activity className="h-4 w-4" />
           Usage data
         </DropdownMenuItem>

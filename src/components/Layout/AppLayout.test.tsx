@@ -144,6 +144,24 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('privacy')).not.toBeInTheDocument();
   });
 
+  it('traps focus in the documentation drawer and returns it to the opener', () => {
+    renderWithRouter(<AppLayout />);
+    const opener = screen.getByText('Docs');
+    opener.focus();
+    fireEvent.click(opener);
+
+    const close = screen.getByText('Close Docs');
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    // The background is hidden from assistive technology while the drawer is open.
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('docs')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
   it('does not throw when Ctrl/Cmd keydown omits KeyboardEvent.key', () => {
     renderWithRouter(<AppLayout />);
 

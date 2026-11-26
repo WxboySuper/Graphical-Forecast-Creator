@@ -114,6 +114,8 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
             size="icon-sm"
             className="h-6 w-6"
             onClick={handleToggleButtonClick}
+            aria-expanded={!isCollapsed}
+            aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${title}`}
           >
             {isCollapsed ? (
               <ChevronDown className="h-4 w-4" />
@@ -128,6 +130,7 @@ export const FloatingPanel: React.FC<FloatingPanelProps> = ({
               size="icon-sm"
               className="h-6 w-6"
               onClick={handleCloseButtonClick}
+              aria-label={`Close ${title}`}
             >
               <X className="h-4 w-4" />
             </Button>
