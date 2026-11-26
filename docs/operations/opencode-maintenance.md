@@ -99,8 +99,12 @@ The automatic review runs from `ocr-review.yml` on PR open, ready-for-review,
 push, reopen, and edit events. It reports its required check on each PR head;
 draft PRs, HOLD/WIP titles, and fork heads skip the review itself. A non-bot
 owner, member, or collaborator can request a review by commenting with `/ocr`
-on the PR. The workflow posts one summary comment and updates it on later
-reviews.
+on the PR. The workflow posts inline findings, a sticky review summary, and a
+separate OCR digest comment. The sticky summary and digest each update on later
+reviews. The digest records the review scope, findings, cost, and full run link.
+The required `ocr-review` check fails for medium-or-higher findings; low,
+style, and nit findings are suppressed. The workflow does not resolve inline
+review threads.
 
 `opencode.yml` handles owner-requested `/oc` and `/opencode` comments on issues
 and PR review threads. `opencode-issue-triage.yml` separately handles newly
@@ -305,9 +309,10 @@ settings:
 - Weekly/manual changelog audit and stable-release preflight: `opencode-changelog-audit.yml`
 
 The daily bug hunt, security and dependency inspections, weekly/monthly audits,
-and audit issue worker are scheduled outside the repository. Disable or change
-their schedules in the external scheduler; there are no corresponding workflow
-files to turn off in Actions.
+and audit issue worker are scheduled outside the repository. Their scheduler
+account and location are not documented here. WxboySuper, the project owner,
+maintains those jobs; ask the owner to stop or change their schedules. There
+are no corresponding workflow files to turn off in Actions.
 
 Model confidence is informational. Scheduled publishers do not discard concrete
 findings based on a numeric confidence cutoff. Audit issues are reports for
