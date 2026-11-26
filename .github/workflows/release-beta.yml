@@ -130,7 +130,7 @@ jobs:
         run: npm ci --prefix server
 
       - name: Test
-        run: pnpm run test
+        run: pnpm run test:all
 
       - name: Test the beta Worker API
         run: pnpm run test:beta-worker

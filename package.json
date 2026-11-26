@@ -23,7 +23,8 @@
       "ip-address": "^10.3.1",
       "re2": "^1.26.1",
       "qs": "^6.16.0",
-      "browserslist": "^4.28.7"
+      "browserslist": "^4.28.7",
+      "rollup": ">=4.68.7"
     }
   },
   "engines": {
@@ -71,8 +72,8 @@
     "docs:inventory": "node scripts/generate-repository-inventory.mjs",
     "docs:site": "node scripts/build-local-docs.mjs",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",
-    "licenses:check": "node scripts/check-third-party-licenses.mjs",
-    "test": "jest && node --test \"cloudflare/*.test.mjs\" && pnpm run test:scripts && pnpm run test:server",
+    "test": "jest",
+    "test:all": "jest && node --test \"cloudflare/*.test.mjs\" && pnpm run test:scripts && pnpm run test:server",
     "test:cloudflare": "node --test \"cloudflare/*.test.mjs\"",
     "test:toolbar:timezone": "cross-env TZ=America/New_York jest src/components/IntegratedToolbar/IntegratedToolbar.test.tsx",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
@@ -85,8 +86,6 @@
     "test:e2e:ui": "playwright test --ui",
     "flags": "node scripts/flags.mjs",
     "branches:report": "cross-env DRY_RUN=1 node scripts/generate-stale-branch-report.mjs",
-    "predeploy": "pnpm run build",
-    "deploy": "gh-pages -d build",
     "prebuild": "pnpm run css:build",
     "css:build": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css",
     "css:watch": "tailwindcss -i ./src/tailwind.input.css -o ./src/tailwind.generated.css --watch",
@@ -130,7 +129,6 @@
     "@vitejs/plugin-react": "^6.3.0",
     "autoprefixer": "^10.7.0",
     "babel-jest": "^30.5.2",
-    "babel-plugin-istanbul": "^8.0.0",
     "cross-env": "^10.1.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
@@ -139,7 +137,6 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-testing-library": "^7.16.2",
     "firebase-tools": "15.37.0",
-    "gh-pages": "^6.3.0",
     "globals": "^17.14.0",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.5.2",
@@ -147,7 +144,6 @@
     "maplibre-gl": "6.19.0",
     "marked": "18.2.1",
     "postcss": "8.5.33",
-    "rollup": ">=4.68.7",
     "tailwindcss": "^4.3.5",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.73.0",
