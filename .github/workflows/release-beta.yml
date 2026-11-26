@@ -126,6 +126,9 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
+      - name: Install analytics server dependencies
+        run: npm ci --prefix server
+
       - name: Test
         run: pnpm run test
 
