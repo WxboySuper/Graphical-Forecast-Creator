@@ -2,7 +2,7 @@
  * Toast primitives. Renders timed feedback messages and manages the add, update,
  * dismissal, and automatic-expiry behavior of the shared toast collection.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { trackEvent } from '../../lib/telemetry';
 import './Toast.css';
 
@@ -82,10 +82,10 @@ const useToastFocusHold = () => {
   const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
   };
-  const restoreFocus = () => {
+  const restoreFocus = useCallback(() => {
     const returnTo = returnFocusRef.current;
     if (returnTo?.isConnected) returnTo.focus();
-  };
+  }, []);
 
   return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
 };
@@ -154,6 +154,12 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
 
   const { hasFocus, focusHandlers, restoreFocus } = useToastFocusHold();
   useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
+  // A focused toast whose copy is cleared disappears; send focus back instead of dropping it on <body>.
+  useEffect(() => {
+    if (emptyMessage && hasFocus) restoreFocus();
+  }, [emptyMessage, hasFocus, restoreFocus]);
+  const messageId = useId();
+  const dismissId = useId();
 
   const handleDismiss = () => {
     closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
@@ -162,8 +168,16 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
 
   return !emptyMessage && !isClosed ? (
     <div className={`toast toast-${displayType}`} {...focusHandlers}>
-      <span className="toast-message">{displayMessage}</span>
-      <button type="button" className="toast-dismiss" aria-label="Dismiss notification" onClick={handleDismiss}>
+      <span id={messageId} className="toast-message">{displayMessage}</span>
+      {/* Named "Dismiss notification <message>" so several open toasts' buttons can be told apart. */}
+      <button
+        type="button"
+        id={dismissId}
+        className="toast-dismiss"
+        aria-label="Dismiss notification"
+        aria-labelledby={`${dismissId} ${messageId}`}
+        onClick={handleDismiss}
+      >
         <span aria-hidden="true">×</span>
       </button>
     </div>

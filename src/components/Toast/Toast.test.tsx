@@ -57,7 +57,7 @@ describe('Toast', () => {
       </>,
     );
     const before = screen.getByRole('button', { name: 'Before' });
-    const dismiss = screen.getByRole('button', { name: 'Dismiss notification' });
+    const dismiss = screen.getByRole('button', { name: /^Dismiss notification/ });
     before.focus();
     act(() => dismiss.focus());
 
@@ -66,6 +66,34 @@ describe('Toast', () => {
 
     fireEvent.click(dismiss);
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(before).toHaveFocus();
+  });
+
+  test('names each dismiss button after its toast', () => {
+    render(<ToastManager toasts={[{ id: 'a', message: 'Saved', type: 'info' }, { id: 'b', message: 'Copied', type: 'info' }]} onDismiss={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: 'Dismiss notification Saved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss notification Copied' })).toBeInTheDocument();
+  });
+
+  test('returns focus when a focused toast closes because its copy is cleared', () => {
+    const { rerender } = render(
+      <>
+        <button type="button">Before</button>
+        <Toast message="Keep me" onClose={() => undefined} />
+      </>,
+    );
+    const before = screen.getByRole('button', { name: 'Before' });
+    before.focus();
+    act(() => screen.getByRole('button', { name: /^Dismiss notification/ }).focus());
+
+    rerender(
+      <>
+        <button type="button">Before</button>
+        <Toast message="" onClose={() => undefined} />
+      </>,
+    );
+    expect(screen.queryByRole('button', { name: /^Dismiss notification/ })).not.toBeInTheDocument();
     expect(before).toHaveFocus();
   });
 
@@ -299,7 +327,7 @@ describe('ToastManager', () => {
     const onDismiss = jest.fn();
     render(<ToastManager toasts={[{ id: 'a', message: 'Hello', type: 'info' }]} onDismiss={onDismiss} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Dismiss notification/ }));
     expect(onDismiss).toHaveBeenCalledWith('a');
     expect(screen.queryByText('Hello')).not.toBeInTheDocument();
   });
