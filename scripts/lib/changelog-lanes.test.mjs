@@ -8,6 +8,7 @@ import {
   extractChangelogLane,
   extractLaneReleaseNotes,
   findChangelogLaneBounds,
+  moveLaneToReleaseSection,
 } from './changelog-lanes.mjs';
 import { addOpenCodeChangelogEntries } from './opencode-changelog-insert.mjs';
 
@@ -29,8 +30,6 @@ test('shares lane headings and boundaries with lane consumers', () => {
   assert.match(sample.slice(bounds?.start ?? 0, bounds?.end), /Feature/);
   assert.doesNotMatch(sample.slice(bounds?.start ?? 0, bounds?.end), /Fix/);
 });
-<<<<<<< HEAD
-=======
 
 test('moves stable lane content into a version section and resets the lane', () => {
   const result = moveLaneToReleaseSection(sample, '2.1.0', 'stable-hotfix');
@@ -78,4 +77,3 @@ test('a bullet inside an HTML comment, or after an unterminated one, does not co
   const real = sample.replace('#### Fixed\n- Fix', '#### Added\n\n<!-- note -->\n- Real fix');
   assert.equal(moveLaneToReleaseSection(real, '2.1.0', 'stable-hotfix').moved, true);
 });
->>>>>>> 50e9503c (fix(release): keep the reset stable lane under Unreleased (#1959))
