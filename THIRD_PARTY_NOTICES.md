@@ -40,7 +40,6 @@ to each.
 - **@vitejs/plugin-react** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **autoprefixer** ^10.7.0 (root (pnpm)) — MIT — allowed
 - **babel-jest** ^30.5.2 (root (pnpm)) — MIT — allowed
-- **babel-plugin-istanbul** ^8.0.0 (root (pnpm)) — BSD-3-Clause — allowed
 - **class-variance-authority** ^0.7.1 (root (pnpm)) — Apache-2.0 — allowed
 - **clsx** ^2.1.1 (root (pnpm)) — MIT — allowed
 - **cross-env** ^10.1.0 (root (pnpm)) — MIT — allowed
@@ -52,7 +51,6 @@ to each.
 - **eslint-plugin-testing-library** ^7.16.2 (root (pnpm)) — MIT — allowed
 - **firebase** ^13.4.0 (root (pnpm)) — Apache-2.0 — allowed
 - **firebase-tools** 15.37.0 (root (pnpm)) — MIT — allowed
-- **gh-pages** ^6.3.0 (root (pnpm)) — MIT — allowed
 - **globals** ^17.14.0 (root (pnpm)) — MIT — allowed
 - **html2canvas** ^1.4.1 (root (pnpm)) — MIT — allowed
 - **identity-obj-proxy** ^3.0.0 (root (pnpm)) — MIT — allowed
@@ -71,7 +69,6 @@ to each.
 - **react-redux** ^9.3.1 (root (pnpm)) — MIT — allowed
 - **react-router** ~8.5.2 (root (pnpm)) — MIT — allowed
 - **redux** ^5.0.1 (root (pnpm)) — MIT — allowed
-- **rollup** >=4.68.7 (root (pnpm)) — MIT — allowed
 - **tailwind-merge** ^3.7.1 (root (pnpm)) — MIT — allowed
 - **tailwindcss** ^4.3.5 (root (pnpm)) — MIT — allowed
 - **typescript** npm:@typescript/typescript6@^6.0.2 (root (pnpm)) — Apache-2.0 — allowed
