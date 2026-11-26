@@ -324,7 +324,7 @@ describe('CycleManager Components', () => {
     });
 
     it('does not move focus when the stacked confirm opens, and wraps Tab when focus is outside the modal', () => {
-      const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: {}, stats: {} }];
+      const savedCycles = [{ id: 'cycle-1', timestamp: '2026-04-20T10:00:00Z', cycleDate: '2026-04-20', label: 'To Delete', forecastCycle: { currentDay: 1, cycleDate: '2026-04-20', days: {} }, stats: { forecastDays: 1, totalOutlooks: 0, totalFeatures: 0 } }];
       renderCycleHistoryModal({}, { savedCycles });
 
       const deleteButton = screen.getByTitle('Delete this cycle');
