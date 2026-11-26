@@ -9,6 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Toast keyboard focus:** Keyboard focus returns to its previous control when a focused notification is removed to make room for a new one instead of being lost.
 - **Forecast days navigation:** Screen readers now announce Previous day, Next day, Cycle date, and which day is selected and has forecast data.
 - **Toast notifications:** Every notification now has a dismiss button and error toasts are announced immediately to assistive technology.
 - **Discussion editor and error messages:** Formatting controls are now labeled with visible focus, and save and verification errors are announced while informational messages remain polite.
