@@ -107,9 +107,14 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
     };
   }, [emptyMessage, timingMessage]);
 
+  const handleDismiss = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+
   return !emptyMessage && !isClosed ? (
     <div className={`toast toast-${displayType}`}>
-      {displayMessage}
+      <span className="toast-message">{displayMessage}</span>
+      <button type="button" className="toast-dismiss" aria-label="Dismiss notification" onClick={handleDismiss}>
+        <span aria-hidden="true">×</span>
+      </button>
     </div>
   ) : null;
 };
@@ -142,13 +147,24 @@ function ToastEntry({ toast, onDismiss }: { toast: ToastData; onDismiss: (id: st
   return <Toast message={toast.message} type={toast.type} onClose={handleClose} />;
 }
 
-/** Keeps the polite status region mounted and renders the current toast queue. */
+/**
+ * Keeps both live regions mounted and renders the current toast queue. Errors go to the
+ * assertive region so they interrupt; everything else is announced politely.
+ */
 export function ToastManager({ toasts, onDismiss }: ToastManagerProps): React.ReactElement {
+  const isError = (toast: ToastData) => normalizeToastType(toast.type) === 'error';
   return (
-    <div className="toast-container" role="status" aria-live="polite">
-      {toasts.map(toast => (
-        <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
-      ))}
+    <div className="toast-container">
+      <div className="toast-region" role="status" aria-live="polite">
+        {toasts.filter((toast) => !isError(toast)).map((toast) => (
+          <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
+        ))}
+      </div>
+      <div className="toast-region" role="alert" aria-live="assertive">
+        {toasts.filter(isError).map((toast) => (
+          <ToastEntry key={toast.id} toast={toast} onDismiss={onDismiss} />
+        ))}
+      </div>
     </div>
   );
 }

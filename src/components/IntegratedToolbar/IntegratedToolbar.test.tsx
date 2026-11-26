@@ -208,6 +208,18 @@ describe('TabbedIntegratedToolbar layout scaffolding', () => {
     });
   });
 
+  test('Days tab names its icon buttons and marks the active day as pressed', async () => {
+    const user = userEvent.setup();
+    renderToolbar();
+
+    await user.click(screen.getByRole('tab', { name: /Days/i }));
+
+    expect(screen.getByRole('button', { name: 'Previous day' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next day' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Day 1/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Day 2/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   test('Days tab forecast strip reserves enough width for all day controls', async () => {
     const user = userEvent.setup();
     renderToolbar();

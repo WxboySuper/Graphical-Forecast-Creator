@@ -98,6 +98,7 @@ describe('CloudSaveModal', () => {
         error="Something went wrong"
       />
     );
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong');
+    expect(screen.getByLabelText('Cycle name')).toHaveAccessibleDescription('Something went wrong');
   });
 });

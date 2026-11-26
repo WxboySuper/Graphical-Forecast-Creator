@@ -274,6 +274,7 @@ const CycleDateControl: React.FC<{ controller: ForecastWorkspaceController }> = 
       <div className="flex items-center gap-2">
         <Input
           type="date"
+          aria-label="Cycle date"
           value={controller.tempDate}
           onChange={controller.onTempDateChange}
           className="tabbed-integrated-toolbar__input h-10 w-[170px] rounded-xl"
@@ -314,7 +315,7 @@ const CycleDateStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({
 const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> = ({ controller }) => (
   <TabbedToolbarStripSection label="Forecast Days" hint="1-8" className="tabbed-integrated-toolbar__section--days min-w-[518px] shrink-0">
     <div className="flex shrink-0 items-center gap-1.5">
-      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1}>
+      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onPrevDay} disabled={controller.currentDay === 1} aria-label="Previous day">
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <div className="shrink-0">
@@ -328,6 +329,8 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
                 key={day}
                 type="button"
                 data-day={day}
+                aria-label={`Day ${day}${hasData ? ', has forecast data' : ''}`}
+                aria-pressed={isActive}
                 onClick={controller.onDayButtonClick}
                 className={cn(
                   'tabbed-integrated-toolbar__day-button relative h-10 min-w-[40px] rounded-xl border px-2 text-sm font-semibold transition-all',
@@ -337,13 +340,13 @@ const ForecastDaysStrip: React.FC<{ controller: ForecastWorkspaceController }> =
                 )}
               >
                 {day}
-                {hasData ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-success" /> : null}
+                {hasData ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-success" aria-hidden="true" /> : null}
               </button>
             );
           })}
         </div>
       </div>
-      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onNextDay} disabled={controller.currentDay === 8}>
+      <Button size="icon" variant="outline" className="tabbed-integrated-toolbar__ghost-action h-10 w-10 shrink-0 rounded-xl" onClick={controller.onNextDay} disabled={controller.currentDay === 8} aria-label="Next day">
         <ChevronRight className="h-4 w-4" />
       </Button>
     </div>

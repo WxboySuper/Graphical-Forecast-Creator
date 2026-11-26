@@ -2,7 +2,7 @@
  * Toast tests. Verify message rendering, dismissal timing, and the toast manager's
  * add, update, and remove behavior.
  */
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import Toast, { normalizeToastType, ToastManager } from './Toast';
 
 const advanceTimersByTime = (milliseconds: number): void => {
@@ -34,7 +34,7 @@ describe('Toast', () => {
   test('retains source whitespace in the message text', () => {
     const message = '  - Gusts 40kt\n  - Hail possible  ';
     render(<Toast message={message} onClose={() => undefined} />);
-    const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
+    const toast = screen.getByText((_, element) => element?.classList.contains('toast-message') ?? false);
 
     expect(toast.textContent).toBe(message);
   });
@@ -257,6 +257,28 @@ describe('ToastManager', () => {
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  test('announces errors assertively and other toasts politely', () => {
+    const toasts = [
+      { id: '1', message: 'Saved', type: 'success' as const },
+      { id: '2', message: 'Save failed', type: 'error' as const },
+    ];
+    render(<ToastManager toasts={toasts} onDismiss={() => undefined} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Save failed');
+    expect(screen.getByRole('alert')).toHaveTextContent('Save failed');
+    expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
+  });
+
+  test('dismisses a toast from its close button', () => {
+    const onDismiss = jest.fn();
+    render(<ToastManager toasts={[{ id: 'a', message: 'Hello', type: 'info' }]} onDismiss={onDismiss} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
+    expect(onDismiss).toHaveBeenCalledWith('a');
+    expect(screen.queryByText('Hello')).not.toBeInTheDocument();
   });
 
   test('keeps the live region mounted when the queue is empty', () => {
