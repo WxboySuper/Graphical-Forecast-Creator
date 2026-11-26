@@ -26,10 +26,10 @@ There is also an account page (`AccountPage`) for sign-in, billing and cloud cyc
 ## Other things you can do
 
 - **Save / load / share**: autosave to the browser every 5 s; export forecast JSON, a map PNG, a ZIP package (JSON + discussion + image), or KMZ.
-- **Map styles**: OSM, light/dark CartoDB, satellite, and a flat "weather" style; overlays for states, counties, CWAs.
+- **Map styles**: OpenStreetMap (OpenFreeMap vector tiles), Esri satellite, and a flat "weather" style with state outlines.
 - **Custom layers and products**: your own categories, colours and hatching on top of the severe layers.
 - **Population estimate (beta)**: rough people/cities inside an outlook, using WorldPop. Informational only.
-- **Keyboard shortcuts**: `1`-`8` days, `T`/`W`/`H`/`C` outlooks, `G` add TSTM, `Ctrl+S/O/E/D` save / open / export image / dark mode.
+- **Keyboard shortcuts**: `1`-`8` days, `T`/`W`/`H`/`C` outlooks, `G` add TSTM, `Ctrl/Cmd+S` save, `Ctrl/Cmd+O` or `L` import, and `Ctrl/Cmd+E` export a map image.
 
 ## Risk levels at a glance
 

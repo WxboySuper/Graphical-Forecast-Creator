@@ -12,10 +12,10 @@ GFC hides unfinished work and can switch risky features off without branching th
 A flag has a value per target (`local`, `beta`, `staging`, `production`). Anything not written for a target gets the flag's default, so **production is on only when the file says so**. Turning a feature on in production is a one-line change in a reviewed PR.
 
 ```json
-"mesoscaleWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 919, "removeBy": "2.1.0", "default": false, "values": { "local": true, "beta": true } }
+"mesoscaleWorkspace": { "kind": "dev", "owner": "WxboySuper", "issue": 919, "removeBy": "2.x", "default": false, "values": { "local": true, "beta": true } }
 ```
 
-That line reads: off everywhere except local and beta, and it must be removed (or promoted) by v2.1.
+That line reads: off by default, enabled for local and beta, and due for removal or promotion by the end of v2.
 
 ## The lifecycle commands
 

@@ -52,7 +52,9 @@ This record pins down what #1456 actually built. The base doc describes the plan
 - Full workspace switcher stays with #917.
 - `/custom-products` remains the product library. Selecting a product hands its detached snapshot to `/forecast/custom`; Severe never offers custom editing controls.
 - Legacy forecast files and saved cycles keep their embedded `customLayers` data and remain readable through existing render, export, and import paths. They are not relabeled as Custom workspace records because no owner metadata exists to safely move the whole forecast.
-- Discussion embedding and `/discussion` handoff stay with #916.
+- #916 implemented Discussion embedding and the `/discussion` handoff. Legacy
+  links now set `surface=discussion` on Severe by default; Mesoscale has a
+  separate Discussion tab.
 - Mesoscale registration stays with #919.
 
 ## Browser coverage

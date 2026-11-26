@@ -61,6 +61,5 @@ Hourly (plus on issue events and manual dispatch), each open issue and ready PR 
 | Dependabot changelog prep | Trusted `pull_request_target` workflow |
 | PR labels (CI, exposure) | `pr-ci-label.yml`, `scripts/lib/pr-labels*` |
 | Stale branch report | `stale-branch-report.yml` |
-| Port-branch cleanup | `cleanup-port-branches.yml` |
 | Local docs site | `pnpm run docs:site` (renders docs to ignored `docs/personal/site`) |
 | Local repo inventory | `pnpm run docs:inventory` (ignored output) |
