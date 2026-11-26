@@ -11,6 +11,12 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 <!-- Next-major work goes here. -->
 
+### Stable v2.x hotfixes
+
+#### Fixed
+
+- **Keyboard focus on buttons:** Buttons now show a visible focus outline when navigated to with a keyboard.
+
 ## v2.1.0
 
 #### Changed
@@ -29,13 +35,6 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 - **Mesoscale session:** Opening the Mesoscale page restores the saved areas and discussion and keeps saving edits on this device.
 - **Send feedback:** The production app hides Send feedback until the feedback service is live. The beta site keeps it.
 
-<!-- Production fixes for the stable v2.x line go here. -->
-
-### Stable v2.x hotfixes
-
-#### Added
-
-<!-- Add stable-line changes here. -->
 ## v2.0.0
 
 #### Added
