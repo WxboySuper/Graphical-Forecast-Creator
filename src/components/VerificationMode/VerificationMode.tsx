@@ -110,12 +110,8 @@ const OutlookTypeSelector: React.FC<{
 }) => (
   <div className="outlook-type-selector">
     <label id="verification-outlook-type-label">View Outlook Type</label>
-    <div
-      className="outlook-type-buttons"
-      role="tablist"
-      aria-labelledby="verification-outlook-type-label"
-      onKeyDown={handleTablistKeyDown}
-    >
+    {/* A filter for the map, not a set of panels, so these are toggle buttons rather than tabs. */}
+    <div className="outlook-type-buttons" role="group" aria-labelledby="verification-outlook-type-label">
       {([
         ['categorical', 'Categorical', onSelectCategorical],
         ['tornado', 'Tornado', onSelectTornado],
@@ -125,10 +121,8 @@ const OutlookTypeSelector: React.FC<{
         <button
           key={type}
           type="button"
-          role="tab"
           className={`outlook-type-btn ${activeOutlookType === type ? 'active' : ''}`}
-          aria-selected={activeOutlookType === type}
-          tabIndex={activeOutlookType === type ? 0 : -1}
+          aria-pressed={activeOutlookType === type}
           onClick={onSelect}
         >
           {type === 'categorical' ? <Layers3 className="h-4 w-4" aria-hidden="true" /> : null}

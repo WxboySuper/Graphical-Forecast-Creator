@@ -136,7 +136,7 @@ describe('VerificationMode', () => {
     expect(screen.getByRole('button', { name: /Day 4/i })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /Day 1/i })).toHaveAttribute('aria-pressed', 'false');
 
-    await user.click(screen.getByRole('tab', { name: /Tornado/i }));
+    await user.click(screen.getByRole('button', { name: /Tornado/i }));
     expect(screen.getByTestId('verification-map')).toHaveTextContent('tornado:4');
 
     await user.click(screen.getByRole('tab', { name: /Analysis/i }));
@@ -151,28 +151,19 @@ describe('VerificationMode', () => {
     expect(screen.queryByText(/Forecast Loaded/i)).not.toBeInTheDocument();
   });
 
-  test('exposes the outlook type and sidebar switchers as keyboard-operable tabs', async () => {
+  test('exposes outlook type as toggle buttons and the sidebar as keyboard-operable tabs', async () => {
     const user = userEvent.setup();
     renderWithStore();
     const fileInput = screen.getByLabelText(/Choose Forecast File/i) as HTMLInputElement;
     await user.upload(fileInput, new File(['{}'], 'forecast.json', { type: 'application/json' }));
     expect(await screen.findByText(/Forecast Loaded/i)).toBeInTheDocument();
 
-    const outlookTabs = screen.getByRole('tablist', { name: 'View Outlook Type' });
-    const categorical = within(outlookTabs).getByRole('tab', { name: 'Categorical' });
-    expect(categorical).toHaveAttribute('aria-selected', 'true');
-    expect(within(outlookTabs).getByRole('tab', { name: 'Hail' })).toHaveAttribute('tabindex', '-1');
-
-    categorical.focus();
-    await user.keyboard('{ArrowRight}');
-    const tornado = within(outlookTabs).getByRole('tab', { name: 'Tornado' });
-    expect(tornado).toHaveFocus();
-    expect(tornado).toHaveAttribute('aria-selected', 'true');
+    const outlookTypes = screen.getByRole('group', { name: 'View Outlook Type' });
+    expect(within(outlookTypes).getByRole('button', { name: 'Categorical' })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(within(outlookTypes).getByRole('button', { name: 'Tornado' }));
+    expect(within(outlookTypes).getByRole('button', { name: 'Tornado' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(outlookTypes).getByRole('button', { name: 'Categorical' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByTestId('verification-map')).toHaveTextContent('tornado:1');
-    await user.keyboard('{End}');
-    expect(within(outlookTabs).getByRole('tab', { name: 'Hail' })).toHaveFocus();
-    await user.keyboard('{ArrowRight}');
-    expect(categorical).toHaveFocus();
 
     const sidebarTabs = screen.getByRole('tablist', { name: 'Verification sidebar' });
     const loadData = within(sidebarTabs).getByRole('tab', { name: /Load Data/ });
@@ -180,7 +171,7 @@ describe('VerificationMode', () => {
     loadData.focus();
     await user.keyboard('{ArrowLeft}');
     expect(within(sidebarTabs).getByRole('tab', { name: /Analysis/ })).toHaveFocus();
-    expect(screen.getByRole('tabpanel', { name: /Analysis/ })).toHaveTextContent('analysis:categorical:1');
+    expect(screen.getByRole('tabpanel', { name: /Analysis/ })).toHaveTextContent('analysis:tornado:1');
   });
 
   test('clearing the loaded forecast also clears the storm reports', async () => {
