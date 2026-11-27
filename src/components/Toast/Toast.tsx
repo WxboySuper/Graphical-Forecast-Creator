@@ -85,7 +85,7 @@ const useToastFocusHold = () => {
   const [hasFocus, setHasFocus] = useState(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  // Cleared only when focus moves to another element; a blur with no target can mean the toast is being removed.
+  // Cleared only when focus moves to another element; an onBlur with no target can mean the toast is being removed.
   const holdsFocusRef = useRef(false);
 
   const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
@@ -112,7 +112,7 @@ const useToastFocusHold = () => {
     const returnTo = returnFocusRef.current;
     if (returnTo?.isConnected) returnTo.focus();
   }, []);
-  /** Hands focus back and forgets the hold; a hidden toast gets no blur event to clear it. */
+  /** Hands focus back and forgets the hold; a hidden toast gets no onBlur to clear it. */
   const releaseFocus = useCallback(() => {
     holdsFocusRef.current = false;
     setHasFocus(false);
