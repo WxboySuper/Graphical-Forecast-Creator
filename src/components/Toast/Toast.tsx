@@ -138,7 +138,10 @@ interface ToastExpiryOptions {
   setIsClosed: (closed: boolean) => void;
 }
 
-/** Closes the toast after its reading window, capped by its maximum lifetime. */
+/**
+ * Closes the toast after its reading window, capped by its maximum lifetime. Returns the close
+ * action so a manual dismiss is recorded the same way as an expiry.
+ */
 const useToastExpiry = ({
   emptyMessage,
   timingMessage,
@@ -147,9 +150,18 @@ const useToastExpiry = ({
   closedRef,
   onCloseRef,
   setIsClosed,
-}: ToastExpiryOptions): void => {
+}: ToastExpiryOptions): (() => void) => {
+  // The copy the toast last closed on; only different copy may reopen it.
+  const closedOnRef = useRef<string | null>(null);
+  const close = useCallback(
+    () =>
+      closeToastOnce(closedRef, onCloseRef, () => {
+        closedOnRef.current = timingMessage;
+        setIsClosed(true);
+      }),
+    [closedRef, onCloseRef, setIsClosed, timingMessage],
+  );
   useEffect(() => {
-    const close = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
     // Message changes restart the reading window without extending the maximum lifetime.
     if (emptyMessage) {
       close();
@@ -163,6 +175,8 @@ const useToastExpiry = ({
       close();
       return;
     }
+    // Dismissing moves focus out, which unpauses; that alone must not reopen the closed toast.
+    if (closedRef.current && closedOnRef.current === timingMessage) return;
     // A changed message starts a new reading window and may close once for that version.
     closedRef.current = false;
     setIsClosed(false);
@@ -173,7 +187,8 @@ const useToastExpiry = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [emptyMessage, timingMessage, paused, mountedAtRef, closedRef, onCloseRef, setIsClosed]);
+  }, [close, emptyMessage, timingMessage, paused, mountedAtRef, closedRef, setIsClosed]);
+  return close;
 };
 
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
@@ -190,7 +205,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const displayType = normalizeToastType(type);
 
   const { hasFocus, focusHandlers, restoreFocus, releaseFocus } = useToastFocusHold();
-  useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
+  const close = useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
   // A focused toast whose copy is cleared disappears; send focus back instead of dropping it on <body>.
   useEffect(() => {
     if (emptyMessage && hasFocus) releaseFocus();
@@ -199,7 +214,7 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const dismissId = useId();
 
   const handleDismiss = () => {
-    closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    close();
     restoreFocus();
   };
 

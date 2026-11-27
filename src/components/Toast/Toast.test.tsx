@@ -67,6 +67,10 @@ describe('Toast', () => {
     fireEvent.click(dismiss);
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(before).toHaveFocus();
+    // Losing focus on dismiss must not reopen the toast or schedule a second close.
+    expect(screen.queryByText('Keep me')).not.toBeInTheDocument();
+    advanceTimersByTime(30000);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   test('returns focus when the queue drops a focused toast', () => {
