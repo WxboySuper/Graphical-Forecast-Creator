@@ -41,6 +41,22 @@ test('static header rules cover CSP and avoid caching runtime release markers', 
   const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8');
   assert.match(headers, /Content-Security-Policy:.*frame-ancestors 'none'/);
   assert.match(headers, /\/assets\/\*[\s\S]*Cache-Control: public, max-age=31536000, immutable/);
+  // Clerk (beta sign-in) loads its script and API from its own subdomain and uses Turnstile and a blob worker.
+  const cspLine = headers.match(/Content-Security-Policy: (.*)/);
+  assert.ok(cspLine, 'public/_headers must declare a Content-Security-Policy');
+  const directive = (name) => cspLine[1].split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? '';
+  const expected = {
+    'script-src': ['https://clerk.gfcweather.com', 'https://challenges.cloudflare.com', 'https://accounts.google.com'],
+    'connect-src': ['https://clerk.gfcweather.com'],
+    'frame-src': ['https://challenges.cloudflare.com'],
+    'img-src': ['https://img.clerk.com'],
+    'style-src': ['https://accounts.google.com'],
+    'worker-src': ["'self'", 'blob:'],
+  };
+  for (const [name, sources] of Object.entries(expected)) {
+    const allowed = directive(name).split(/\s+/);
+    for (const source of sources) assert.ok(allowed.includes(source), `${name} should allow ${source}`);
+  }
   assert.match(headers, /\/version\.json\s+Cache-Control: no-store/);
   assert.match(headers, /\/alert-banner\.json\s+Cache-Control: no-store/);
   const nginx = readFileSync(new URL('../server/nginx-legacy-redirect.conf', import.meta.url), 'utf8');
