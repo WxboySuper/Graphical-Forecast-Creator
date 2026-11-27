@@ -165,6 +165,8 @@ const useToastExpiry = ({
     // Message changes restart the reading window without extending the maximum lifetime.
     if (emptyMessage) {
       close();
+      // Cleared copy ends that version, so the same text coming back is new copy.
+      closedOnRef.current = timingMessage;
       return;
     }
     if (paused) return;
