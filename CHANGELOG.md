@@ -28,6 +28,9 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Changed
 
+- **Beta sign-in layout:** Beta sign-in now pairs the heading and account details beside Clerk's card with a Sign in and Create account switch, stacking the form under the title on narrow screens.
+- **Beta account carryover:** Beta sign-in explains saved work syncs across devices, existing accounts carry over by email, and prior email-password users create an account with the same email to set a new password.
+- **Beta sign-in dark mode:** Clerk's card follows GFC light and dark colors so text, divider, footer, Continue button, and the selected switch option stay readable in dark mode.
 - **Send feedback:** Send feedback is now available in the production app as well as the beta site.
 
 #### Added
