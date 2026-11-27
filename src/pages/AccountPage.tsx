@@ -897,7 +897,7 @@ const resolveAccountView = (
 };
 
 const BetaSignInCard = () => (
-  <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
+  <BetaAuthCard title="Sign in to GFC" description="One account for your settings, your plan, and Premium cloud saves." allowSignUp />
 );
 
 const BetaAccountLoading = () => (
@@ -905,12 +905,15 @@ const BetaAccountLoading = () => (
 );
 
 const BetaAccountError = ({ error }: { error: string | null }) => (
-  <div className="mx-auto max-w-xl rounded-xl border border-destructive/40 bg-card p-8 text-center">
-    <p role="alert" className="text-destructive">
-      {error ?? 'Unable to load your beta account. Refresh the page and try again.'}
-    </p>
-    <div className="mt-4"><BetaSignInCard /></div>
-  </div>
+  <>
+    {/* The sign-in layout needs the page width, so it sits below the error instead of inside it. */}
+    <div className="mx-auto max-w-xl rounded-xl border border-destructive/40 bg-card p-6 text-center">
+      <p role="alert" className="text-destructive">
+        {error ?? 'Unable to load your beta account. Refresh the page and try again.'}
+      </p>
+    </div>
+    <BetaSignInCard />
+  </>
 );
 
 export default AccountPage;
