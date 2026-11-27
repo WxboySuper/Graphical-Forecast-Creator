@@ -46,8 +46,9 @@ test('static header rules cover CSP and avoid caching runtime release markers', 
   assert.ok(cspLine, 'public/_headers must declare a Content-Security-Policy');
   const directive = (name) => cspLine[1].split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? '';
   const expected = {
-    'script-src': ['https://clerk.gfcweather.com', 'https://challenges.cloudflare.com', 'https://accounts.google.com'],
-    'connect-src': ['https://clerk.gfcweather.com'],
+    'script-src': ['https://clerk.gfcweather.com', 'https://challenges.cloudflare.com', 'https://accounts.google.com', 'https://cdn.protect.clerk.com'],
+    // Clerk Protect probes its client host on several ports and may use a WebSocket.
+    'connect-src': ['https://clerk.gfcweather.com', 'https://*.protect.clerk.com:*', 'wss://*.protect.clerk.com:*'],
     'frame-src': ['https://challenges.cloudflare.com'],
     'img-src': ['https://img.clerk.com'],
     'style-src': ['https://accounts.google.com'],
