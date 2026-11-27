@@ -170,6 +170,19 @@ describe('Toast', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  test('reopens for the same copy after it was dismissed and then cleared', () => {
+    const { rerender } = render(<Toast message="Hello" onClose={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Dismiss notification/ }));
+    expect(screen.queryByText('Hello')).not.toBeInTheDocument();
+
+    rerender(<Toast message="" onClose={() => undefined} />);
+    const onClose = jest.fn();
+    rerender(<Toast message="Hello" onClose={onClose} />);
+    expect(screen.getByText('Hello')).toBeInTheDocument();
+    advanceTimersByTime(3000);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('restarts the timer when the displayed copy changes', () => {
     const onClose = jest.fn();
     const { rerender } = render(<Toast message="Original" onClose={onClose} />);
