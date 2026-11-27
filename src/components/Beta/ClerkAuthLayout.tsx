@@ -3,7 +3,7 @@
  * sign-in or sign-up card, themed to match the app in light and dark mode.
  */
 import React, { useEffect, useState } from 'react';
-import { CloudUpload, KeyRound, UserCheck } from 'lucide-react';
+import { CloudUpload, KeyRound, Settings2, UserCheck } from 'lucide-react';
 import { GoogleOneTap, SignIn, SignUp } from '../../auth/clerkUiAdapter';
 import './ClerkAuthLayout.css';
 
@@ -22,43 +22,59 @@ const useDocumentDarkMode = (): boolean => {
   return dark;
 };
 
-/** Clerk theme values mirroring the GFC light and dark palettes in darkMode.css. */
-const clerkAppearance = (dark: boolean) => ({
-  variables: {
-    colorPrimary: dark ? '#2563eb' : '#007bff',
-    colorBackground: dark ? '#202020' : '#ffffff',
-    colorText: dark ? '#e4e4e4' : '#212529',
-    colorTextSecondary: dark ? '#b8b8b8' : '#495057',
-    colorInputBackground: dark ? '#2d2d2d' : '#ffffff',
-    colorInputText: dark ? '#e4e4e4' : '#212529',
-    colorNeutral: dark ? '#e4e4e4' : '#212529',
-    // Current Clerk names for the same roles; older names above cover earlier clerk-js builds.
-    colorForeground: dark ? '#e4e4e4' : '#212529',
-    colorMutedForeground: dark ? '#a3a3a3' : '#495057',
-    colorMuted: dark ? '#2a2a2a' : '#f8f9fa',
-    colorInput: dark ? '#2d2d2d' : '#ffffff',
-    colorInputForeground: dark ? '#e4e4e4' : '#212529',
-    // Clerk draws borders from this colour at reduced opacity, so it needs more contrast than --border-color.
-    colorBorder: dark ? '#737373' : '#6c757d',
-    colorPrimaryForeground: '#ffffff',
-    colorRing: dark ? '#2563eb' : '#007bff',
-    borderRadius: '0.7rem',
-    fontFamily: 'inherit',
+/** GFC light and dark palettes (darkMode.css) in the roles Clerk's appearance API uses. */
+const PALETTES = {
+  light: {
+    primary: '#007bff', background: '#ffffff', text: '#212529', muted: '#495057', subtle: '#f8f9fa',
+    input: '#ffffff', border: '#6c757d',
   },
-  elements: {
-    rootBox: { width: '100%' },
-    cardBox: { width: '100%', maxWidth: 'none', boxShadow: 'none', border: 'none', borderRadius: '0' },
-    card: { boxShadow: 'none', border: 'none', borderRadius: '0', background: 'transparent' },
-    footer: { background: 'transparent' },
-    formButtonPrimary: { backgroundColor: dark ? '#2563eb' : '#007bff', backgroundImage: 'none', color: '#ffffff' },
-    // Switching between sign-in and sign-up happens in the GFC control above the card.
-    footerAction: { display: 'none' },
+  dark: {
+    primary: '#2563eb', background: '#202020', text: '#e4e4e4', muted: '#a3a3a3', subtle: '#2a2a2a',
+    input: '#2d2d2d', border: '#737373',
   },
-});
+} as const;
+
+/** Clerk theme for the current GFC palette. */
+const clerkAppearance = (dark: boolean) => {
+  const p = dark ? PALETTES.dark : PALETTES.light;
+  return {
+    variables: {
+      colorPrimary: p.primary,
+      colorBackground: p.background,
+      colorText: p.text,
+      colorTextSecondary: p.muted,
+      colorInputBackground: p.input,
+      colorInputText: p.text,
+      colorNeutral: p.text,
+      // Current Clerk names for the same roles; the older names above cover earlier clerk-js builds.
+      colorForeground: p.text,
+      colorMutedForeground: p.muted,
+      colorMuted: p.subtle,
+      colorInput: p.input,
+      colorInputForeground: p.text,
+      // Clerk draws borders from this colour at reduced opacity, so it needs more contrast than --border-color.
+      colorBorder: p.border,
+      colorPrimaryForeground: '#ffffff',
+      colorRing: p.primary,
+      borderRadius: '0.7rem',
+      fontFamily: 'inherit',
+    },
+    elements: {
+      rootBox: { width: '100%' },
+      cardBox: { width: '100%', maxWidth: 'none', boxShadow: 'none', border: 'none', borderRadius: '0' },
+      card: { boxShadow: 'none', border: 'none', borderRadius: '0', background: 'transparent' },
+      footer: { background: 'transparent' },
+      formButtonPrimary: { backgroundColor: p.primary, backgroundImage: 'none', color: '#ffffff' },
+      // Switching between sign-in and sign-up happens in the GFC control above the card.
+      footerAction: { display: 'none' },
+    },
+  };
+};
 
 const PERKS = [
-  { icon: CloudUpload, title: 'Your work, everywhere', text: 'Saved cycles and settings sync to any device you sign in on.' },
-  { icon: UserCheck, title: 'Bring your existing account', text: 'Use the email you used before. Your forecasts, settings, and plan come with you on your first sign-in.' },
+  { icon: Settings2, title: 'Settings that follow you', text: 'Your GFC settings sync to any device you sign in on.' },
+  { icon: UserCheck, title: 'Bring your existing account', text: 'Use the email you used before. Your plan, settings, and cloud-saved forecasts come with you on your first sign-in.' },
+  { icon: CloudUpload, title: 'Premium cloud saves', text: 'With Premium, save forecast cycles to the cloud and open them anywhere. Forecasts saved in this browser stay on this device.' },
 ] as const;
 
 interface ClerkAuthLayoutProps {
