@@ -41,6 +41,12 @@ test('static header rules cover CSP and avoid caching runtime release markers', 
   const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8');
   assert.match(headers, /Content-Security-Policy:.*frame-ancestors 'none'/);
   assert.match(headers, /\/assets\/\*[\s\S]*Cache-Control: public, max-age=31536000, immutable/);
+  // Clerk (beta sign-in) loads its script and API from its own subdomain and uses Turnstile and a blob worker.
+  const csp = headers.match(/Content-Security-Policy: (.*)/)[1];
+  assert.match(csp, /script-src [^;]*https:\/\/clerk\.gfcweather\.com[^;]*https:\/\/challenges\.cloudflare\.com/);
+  assert.match(csp, /connect-src [^;]*https:\/\/clerk\.gfcweather\.com/);
+  assert.match(csp, /frame-src [^;]*https:\/\/challenges\.cloudflare\.com/);
+  assert.match(csp, /worker-src 'self' blob:/);
   assert.match(headers, /\/version\.json\s+Cache-Control: no-store/);
   assert.match(headers, /\/alert-banner\.json\s+Cache-Control: no-store/);
   const nginx = readFileSync(new URL('../server/nginx-legacy-redirect.conf', import.meta.url), 'utf8');
