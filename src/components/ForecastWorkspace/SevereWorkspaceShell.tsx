@@ -6,7 +6,7 @@
  * and focus handling only.
  */
 import React, { useRef } from 'react';
-import type { KeyboardEvent, ReactNode, RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { ClipboardCheck, FileText, Map as MapIcon, PanelRight, RectangleHorizontal, type LucideIcon } from 'lucide-react';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
 import { useHiddenMapGuards } from './useHiddenMapGuards';
@@ -19,6 +19,7 @@ import {
   type DiscussionLayout,
 } from './useSevereDiscussionLayout';
 import './SevereWorkspaceShell.css';
+import { handleTablistKeyDown } from '../../utils/tablistKeyboard';
 
 const SURFACES: ReadonlyArray<{ id: WorkspaceSurface; label: string; icon: LucideIcon }> = [
   { id: 'map', label: 'Map', icon: MapIcon },
@@ -31,30 +32,11 @@ const LAYOUTS: ReadonlyArray<{ id: DiscussionLayout; label: string; icon: Lucide
   { id: 'panel', label: 'Side panel', icon: PanelRight },
 ];
 
-/** Moves focus and selection between surface tabs with the arrow, Home, and End keys. */
-const handleTabKeys = (event: KeyboardEvent<HTMLDivElement>): void => {
-  if (!(event.target instanceof HTMLElement) || !event.target.matches('[role="tab"]')) return;
-  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
-  const current = Math.max(0, tabs.findIndex((tab) => tab === document.activeElement));
-  const nextIndexByKey: Record<string, number> = {
-    ArrowRight: (current + 1) % tabs.length,
-    ArrowLeft: (current - 1 + tabs.length) % tabs.length,
-    Home: 0,
-    End: tabs.length - 1,
-  };
-  const next = nextIndexByKey[event.key];
-  if (next === undefined) return;
-  event.preventDefault();
-  event.stopPropagation();
-  tabs[next]?.focus();
-  tabs[next]?.click();
-};
-
 const SurfaceTabs: React.FC<{ surface: WorkspaceSurface; onChange: (next: WorkspaceSurface) => void }> = ({
   surface,
   onChange,
 }) => (
-  <div className="severe-workspace__tabs" role="tablist" aria-label="Severe forecast workspace" onKeyDown={handleTabKeys}>
+  <div className="severe-workspace__tabs" role="tablist" aria-label="Severe forecast workspace" onKeyDown={handleTablistKeyDown}>
     {SURFACES.map(({ id, label, icon: Icon }) => (
       <button
         key={id}

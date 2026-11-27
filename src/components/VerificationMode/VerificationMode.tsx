@@ -20,8 +20,14 @@ import { queueProductMetric } from '../../utils/productMetrics';
 import { trackEvent } from '../../lib/telemetry';
 import './VerificationMode.css';
 import ConfirmationModal from '../DrawingTools/ConfirmationModal';
+import { handleTablistKeyDown } from '../../utils/tablistKeyboard';
 
 type VerificationOutlookType = 'categorical' | 'tornado' | 'wind' | 'hail';
+
+const SIDEBAR_TABS = [
+  { id: 'setup', label: 'Load Data', icon: FileUp },
+  { id: 'analysis', label: 'Analysis', icon: Eye },
+] as const;
 
 // Helper function to extract available days from the loaded forecast data, which checks the days object in the deserialized forecast and returns an array of day types that have data. This is used to populate the day selector buttons in the UI so users can only select days that actually have forecast data to view.
 const getAvailableDays = (days: Record<string, unknown> | undefined): DayType[] => {
@@ -29,8 +35,10 @@ const getAvailableDays = (days: Record<string, unknown> | undefined): DayType[] 
     return [];
   }
 
-  return (Object.keys(days) as unknown as DayType[])
-    .filter((day) => Boolean((days as Record<DayType, unknown>)[day]))
+  // Object keys are strings; days are numbers everywhere else, so the selected-day match needs numbers.
+  return Object.keys(days)
+    .filter((key) => Boolean(days[key]))
+    .map((key) => Number(key) as DayType)
     .sort((a, b) => a - b);
 };
 
@@ -72,7 +80,9 @@ const DaySelectorSection: React.FC<{
       {availableDays.map((day) => (
         <button
           key={day}
+          type="button"
           className={`day-btn ${selectedDay === day ? 'active' : ''}`}
+          aria-pressed={selectedDay === day}
           data-day={day}
           onClick={onDayClick}
           title={`Day ${day}`}
@@ -99,37 +109,32 @@ const OutlookTypeSelector: React.FC<{
   onSelectHail
 }) => (
   <div className="outlook-type-selector">
-    <label>View Outlook Type</label>
-    <div className="outlook-type-buttons" role="tablist" aria-label="Verification outlook type">
-      <button
-        type="button"
-        className={`outlook-type-btn ${activeOutlookType === 'categorical' ? 'active' : ''}`}
-        onClick={onSelectCategorical}
-      >
-        <Layers3 className="h-4 w-4" />
-        Categorical
-      </button>
-      <button
-        type="button"
-        className={`outlook-type-btn ${activeOutlookType === 'tornado' ? 'active' : ''}`}
-        onClick={onSelectTornado}
-      >
-        Tornado
-      </button>
-      <button
-        type="button"
-        className={`outlook-type-btn ${activeOutlookType === 'wind' ? 'active' : ''}`}
-        onClick={onSelectWind}
-      >
-        Wind
-      </button>
-      <button
-        type="button"
-        className={`outlook-type-btn ${activeOutlookType === 'hail' ? 'active' : ''}`}
-        onClick={onSelectHail}
-      >
-        Hail
-      </button>
+    <label id="verification-outlook-type-label">View Outlook Type</label>
+    <div
+      className="outlook-type-buttons"
+      role="tablist"
+      aria-labelledby="verification-outlook-type-label"
+      onKeyDown={handleTablistKeyDown}
+    >
+      {([
+        ['categorical', 'Categorical', onSelectCategorical],
+        ['tornado', 'Tornado', onSelectTornado],
+        ['wind', 'Wind', onSelectWind],
+        ['hail', 'Hail', onSelectHail],
+      ] as const).map(([type, label, onSelect]) => (
+        <button
+          key={type}
+          type="button"
+          role="tab"
+          className={`outlook-type-btn ${activeOutlookType === type ? 'active' : ''}`}
+          aria-selected={activeOutlookType === type}
+          tabIndex={activeOutlookType === type ? 0 : -1}
+          onClick={onSelect}
+        >
+          {type === 'categorical' ? <Layers3 className="h-4 w-4" aria-hidden="true" /> : null}
+          {label}
+        </button>
+      ))}
     </div>
   </div>
 );
@@ -231,58 +236,70 @@ const VerificationSidebar: React.FC<{
 
   return (
     <div className="verification-sidebar">
-      <div className="verification-sidebar-tabs" role="tablist" aria-label="Verification sidebar">
-        <button
-          type="button"
-          className={`verification-sidebar-tab ${activeSidebarTab === 'setup' ? 'active' : ''}`}
-          onClick={() => setActiveSidebarTab('setup')}
-        >
-          <FileUp className="h-4 w-4" />
-          Load Data
-        </button>
-        <button
-          type="button"
-          className={`verification-sidebar-tab ${activeSidebarTab === 'analysis' ? 'active' : ''}`}
-          onClick={() => setActiveSidebarTab('analysis')}
-        >
-          <Eye className="h-4 w-4" />
-          Analysis
-        </button>
+      <div
+        className="verification-sidebar-tabs"
+        role="tablist"
+        aria-label="Verification sidebar"
+        onKeyDown={handleTablistKeyDown}
+      >
+        {SIDEBAR_TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            id={`verification-sidebar-tab-${id}`}
+            aria-controls="verification-sidebar-panel"
+            aria-selected={activeSidebarTab === id}
+            tabIndex={activeSidebarTab === id ? 0 : -1}
+            className={`verification-sidebar-tab ${activeSidebarTab === id ? 'active' : ''}`}
+            onClick={() => setActiveSidebarTab(id)}
+          >
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {label}
+          </button>
+        ))}
       </div>
 
-      {activeSidebarTab === 'setup' ? (
-        <>
-          <ForecastLoaderSection
-            forecastLoaded={forecastLoaded}
-            fileName={fileName}
-            onLoadForecast={onLoadForecast}
-            onClearForecast={onClearForecast}
-          />
+      <div
+        id="verification-sidebar-panel"
+        className="verification-sidebar-panel"
+        role="tabpanel"
+        aria-labelledby={`verification-sidebar-tab-${activeSidebarTab}`}
+      >
+        {activeSidebarTab === 'setup' ? (
+          <>
+            <ForecastLoaderSection
+              forecastLoaded={forecastLoaded}
+              fileName={fileName}
+              onLoadForecast={onLoadForecast}
+              onClearForecast={onClearForecast}
+            />
+            <div className="reports-section">
+              <div className="verification-section-header">
+                <span className="verification-section-step">Step 2</span>
+                <h3>Load Storm Reports</h3>
+              </div>
+              <VerificationPanel
+                activeOutlookType={activeOutlookType}
+                selectedDay={selectedDay}
+                activePanel="setup"
+              />
+            </div>
+          </>
+        ) : (
           <div className="reports-section">
             <div className="verification-section-header">
-              <span className="verification-section-step">Step 2</span>
-              <h3>Load Storm Reports</h3>
+              <span className="verification-section-step">Analysis</span>
+              <h3>Verification Results</h3>
             </div>
             <VerificationPanel
               activeOutlookType={activeOutlookType}
               selectedDay={selectedDay}
-              activePanel="setup"
+              activePanel="analysis"
             />
           </div>
-        </>
-      ) : (
-        <div className="reports-section">
-          <div className="verification-section-header">
-            <span className="verification-section-step">Analysis</span>
-            <h3>Verification Results</h3>
-          </div>
-          <VerificationPanel
-            activeOutlookType={activeOutlookType}
-            selectedDay={selectedDay}
-            activePanel="analysis"
-          />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
