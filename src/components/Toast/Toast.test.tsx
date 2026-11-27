@@ -2,7 +2,7 @@
  * Toast tests. Verify message rendering, dismissal timing, and the toast manager's
  * add, update, and remove behavior.
  */
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import Toast, { normalizeToastType, ToastManager } from './Toast';
 
 const advanceTimersByTime = (milliseconds: number): void => {
@@ -34,7 +34,7 @@ describe('Toast', () => {
   test('retains source whitespace in the message text', () => {
     const message = '  - Gusts 40kt\n  - Hail possible  ';
     render(<Toast message={message} onClose={() => undefined} />);
-    const toast = screen.getByText((_, element) => element?.classList.contains('toast') ?? false);
+    const toast = screen.getByText((_, element) => element?.classList.contains('toast-message') ?? false);
 
     expect(toast.textContent).toBe(message);
   });
@@ -46,6 +46,55 @@ describe('Toast', () => {
     advanceTimersByTime(3000);
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  test('stays open while focused and returns focus when dismissed', () => {
+    const onClose = jest.fn();
+    render(
+      <>
+        <button type="button">Before</button>
+        <Toast message="Keep me" onClose={onClose} />
+      </>,
+    );
+    const before = screen.getByRole('button', { name: 'Before' });
+    const dismiss = screen.getByRole('button', { name: /^Dismiss notification/ });
+    before.focus();
+    act(() => dismiss.focus());
+
+    advanceTimersByTime(30000);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(dismiss);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(before).toHaveFocus();
+  });
+
+  test('names each dismiss button after its toast', () => {
+    render(<ToastManager toasts={[{ id: 'a', message: 'Saved', type: 'info' }, { id: 'b', message: 'Copied', type: 'info' }]} onDismiss={() => undefined} />);
+
+    expect(screen.getByRole('button', { name: 'Dismiss notification Saved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dismiss notification Copied' })).toBeInTheDocument();
+  });
+
+  test('returns focus when a focused toast closes because its copy is cleared', () => {
+    const { rerender } = render(
+      <>
+        <button type="button">Before</button>
+        <Toast message="Keep me" onClose={() => undefined} />
+      </>,
+    );
+    const before = screen.getByRole('button', { name: 'Before' });
+    before.focus();
+    act(() => screen.getByRole('button', { name: /^Dismiss notification/ }).focus());
+
+    rerender(
+      <>
+        <button type="button">Before</button>
+        <Toast message="" onClose={() => undefined} />
+      </>,
+    );
+    expect(screen.queryByRole('button', { name: /^Dismiss notification/ })).not.toBeInTheDocument();
+    expect(before).toHaveFocus();
   });
 
   test('restarts the timer when the displayed copy changes', () => {
@@ -257,6 +306,30 @@ describe('ToastManager', () => {
     expect(screen.getByText('First')).toBeInTheDocument();
     expect(screen.getByText('Second')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+  });
+
+  test('announces errors assertively and other toasts politely', () => {
+    const toasts = [
+      { id: '1', message: 'Saved', type: 'success' as const },
+      { id: '2', message: 'Save failed', type: 'error' as const },
+    ];
+    render(<ToastManager toasts={toasts} onDismiss={() => undefined} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Saved');
+    expect(screen.getByRole('status')).not.toHaveTextContent('Save failed');
+    expect(screen.getByTestId('toast-error-region')).toHaveTextContent('Save failed');
+    expect(screen.getByTestId('toast-error-region')).toHaveAttribute('aria-live', 'assertive');
+    // The always-mounted region must not read as a standing alert or collide with page alerts.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test('dismisses a toast from its close button', () => {
+    const onDismiss = jest.fn();
+    render(<ToastManager toasts={[{ id: 'a', message: 'Hello', type: 'info' }]} onDismiss={onDismiss} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Dismiss notification/ }));
+    expect(onDismiss).toHaveBeenCalledWith('a');
+    expect(screen.queryByText('Hello')).not.toBeInTheDocument();
   });
 
   test('keeps the live region mounted when the queue is empty', () => {
