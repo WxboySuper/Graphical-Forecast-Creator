@@ -166,9 +166,9 @@ describe('VerificationMode with in-flight storm reports', () => {
   test('keeps an in-flight report load when switching between sidebar tabs', async () => {
     const { user, store, pendingReports, resolveReports } = await startPendingReportLoad();
 
-    await user.click(screen.getByRole('button', { name: /Analysis/i }));
+    await user.click(screen.getByRole('tab', { name: /Analysis/i }));
     expect(store.getState().stormReports.loading).toBe(true);
-    await user.click(screen.getByRole('button', { name: /Load Data/i }));
+    await user.click(screen.getByRole('tab', { name: /Load Data/i }));
 
     await finishPendingReportLoad(resolveReports, pendingReports, 'tab-switch-report');
 
