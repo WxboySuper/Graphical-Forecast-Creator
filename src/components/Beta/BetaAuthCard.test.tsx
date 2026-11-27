@@ -8,10 +8,13 @@ jest.mock('../../auth/AuthProvider', () => ({
 }));
 
 // Mock lucide-react
-jest.mock('lucide-react', () => ({
-  Cloud: () => <div data-testid="cloud-icon" />,
-  LoaderCircle: () => <div data-testid="loader-icon" />,
-  Mail: () => <div data-testid="mail-icon" />,
+jest.mock('lucide-react', () => new Proxy({}, {
+  // Named icons the tests look for get test ids; any other icon renders as an empty svg.
+  get: (_target, name) => {
+    const ids: Record<string, string> = { Cloud: 'cloud-icon', LoaderCircle: 'loader-icon', Mail: 'mail-icon' };
+    const Icon = () => (typeof name === 'string' && ids[name] ? <div data-testid={ids[name]} /> : <svg />);
+    return name === '__esModule' ? false : Icon;
+  },
 }));
 
 jest.mock('@clerk/react', () => ({
@@ -147,6 +150,34 @@ describe('BetaAuthCard', () => {
     fireEvent.click(restartButton);
 
     await waitFor(() => expect(window.location.hash).toBe(''));
+    expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+  });
+
+  test('frames the Clerk card with the account intro and a sign-in / create-account switch', () => {
+    window.history.replaceState(null, '', '/account');
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out', error: null });
+    render(<BetaAuthCard title="Sign in to GFC" description="One account." allowSignUp />);
+
+    expect(screen.getByRole('region', { name: 'Sign in to GFC' })).toBeInTheDocument();
+    expect(screen.getByText('Bring your existing account')).toBeInTheDocument();
+    expect(screen.getByText(/Signed in with an email and password before\?/)).toBeInTheDocument();
+    const signIn = screen.getByRole('button', { name: 'Sign in' });
+    const createAccount = screen.getByRole('button', { name: 'Create account' });
+    expect(signIn).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
+
+    fireEvent.click(createAccount);
+    expect(createAccount).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('clerk-sign-up')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).has('clerkSignUp')).toBe(true);
+  });
+
+  test('hides the account switch and password note on a sign-in-only Clerk gate', () => {
+    (useAuth as jest.Mock).mockReturnValue({ authProvider: 'clerk', status: 'signed_out', error: null });
+    render(<BetaAuthCard title="T" description="D" />);
+
+    expect(screen.queryByRole('group', { name: 'Choose account action' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Signed in with an email and password before/)).not.toBeInTheDocument();
     expect(screen.getByTestId('clerk-sign-in')).toBeInTheDocument();
   });
 

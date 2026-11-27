@@ -897,7 +897,7 @@ const resolveAccountView = (
 };
 
 const BetaSignInCard = () => (
-  <BetaAuthCard title="Sign in to GFC" description="Sign in or create your beta account to sync settings and access beta features." allowSignUp />
+  <BetaAuthCard title="Sign in to GFC" description="One account for your saved forecasts, synced settings, and premium features." allowSignUp />
 );
 
 const BetaAccountLoading = () => (

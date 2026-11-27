@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Cloud, LoaderCircle, Mail } from 'lucide-react';
-import { GoogleOneTap, SignIn, SignUp } from '../../auth/clerkUiAdapter';
+import ClerkAuthLayout from './ClerkAuthLayout';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -314,37 +314,27 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
     });
   };
 
+  if (authProvider === 'clerk') {
+    return (
+      <ClerkAuthLayout
+        title={title}
+        description={description}
+        allowSignUp={allowSignUp}
+        mode={mode}
+        isBusy={isBusy}
+        routingInProgress={clerkRoutingInProgress}
+        verificationInProgress={clerkVerificationInProgress}
+        redirectUrl={clerkRedirectUrl}
+        signUpUrl={clerkSignUpUrl}
+        error={error ?? formError}
+        onSelectMode={setClerkMode}
+        onRestart={restartClerkVerification}
+      />
+    );
+  }
+
   return (
     <BetaInfoCard title={title} description={description} className="beta-auth-card">
-      {authProvider === 'clerk' ? (
-        <div className="beta-auth-content">
-          {allowSignUp ? <GoogleOneTap signInForceRedirectUrl={clerkRedirectUrl} signUpForceRedirectUrl={clerkRedirectUrl} /> : null}
-          {allowSignUp ? (
-            <div className="flex justify-center gap-2" role="group" aria-label="Choose account action">
-              <Button type="button" variant={mode === 'sign_in' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_in')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_in'}>
-                Sign in
-              </Button>
-              <Button type="button" variant={mode === 'sign_up' ? 'default' : 'outline'} onClick={() => setClerkMode('sign_up')} disabled={isBusy || clerkRoutingInProgress} aria-pressed={mode === 'sign_up'}>
-                Create account
-              </Button>
-            </div>
-          ) : null}
-          {clerkRoutingInProgress ? (
-            <div className="text-sm text-muted-foreground">
-              <p role="status">{clerkVerificationInProgress ? 'Finish verification before switching account actions.' : 'A sign-in route is still active.'}</p>
-              <Button type="button" variant="outline" onClick={restartClerkVerification}>Restart sign-in</Button>
-            </div>
-          ) : null}
-          {mode === 'sign_up' && allowSignUp ? (
-            <SignUp routing="hash" signInUrl={clerkRedirectUrl} forceRedirectUrl={clerkRedirectUrl}
-              appearance={{ elements: { footerAction: { display: 'none' } } }} />
-          ) : (
-            <SignIn routing="hash" signUpUrl={allowSignUp ? clerkSignUpUrl : undefined} forceRedirectUrl={clerkRedirectUrl}
-              appearance={{ elements: { footerAction: { display: 'none' } } }} />
-          )}
-          {error || formError ? <div className="beta-auth-error">{error ?? formError}</div> : null}
-        </div>
-      ) : (
       <BetaAuthCardBody
         allowSignUp={allowSignUp}
         confirmPassword={confirmPassword}
@@ -362,7 +352,6 @@ const BetaAuthCard: React.FC<BetaAuthCardProps> = ({
         onSelectMode={setMode}
         onSubmit={handleEmailSubmit}
       />
-      )}
     </BetaInfoCard>
   );
 };
