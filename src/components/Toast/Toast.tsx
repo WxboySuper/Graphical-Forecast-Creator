@@ -66,6 +66,17 @@ export interface ToastProps {
   onClose: () => void;
 }
 
+/** True when a focus event's other element is inside the toast, i.e. focus moved within it. */
+const isInternalMove = (event: React.FocusEvent<HTMLDivElement>): boolean =>
+  event.currentTarget.contains(event.relatedTarget);
+
+/** The element focus came from, if it is one that can take focus back. */
+const focusOrigin = (event: React.FocusEvent<HTMLDivElement>): HTMLElement | null =>
+  event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+
+/** True when nothing useful has focus, as after the focused element was removed. */
+const isFocusLost = (): boolean => !document.activeElement || document.activeElement === document.body;
+
 /**
  * Keeps a toast open while keyboard focus is inside it, and remembers where focus came from
  * so dismissing the toast can send it back.
@@ -74,20 +85,46 @@ const useToastFocusHold = () => {
   const [hasFocus, setHasFocus] = useState(false);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
+  // Cleared only when focus moves to another element; an onBlur with no target can mean the toast is being removed.
+  const holdsFocusRef = useRef(false);
+
   const onFocus = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    returnFocusRef.current = event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
+    holdsFocusRef.current = true;
+    if (isInternalMove(event)) return;
+    returnFocusRef.current = focusOrigin(event);
     setHasFocus(true);
   };
   const onBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setHasFocus(false);
+    if (isInternalMove(event)) return;
+    setHasFocus(false);
+    if (event.relatedTarget) {
+      holdsFocusRef.current = false;
+      return;
+    }
+    // No target: either the toast is being removed (keep the hold so focus can be returned) or the user
+    // clicked non-focusable content (end it). The toast is still in the page only in the second case.
+    const toast = event.currentTarget;
+    queueMicrotask(() => {
+      if (toast.isConnected) holdsFocusRef.current = false;
+    });
   };
   const restoreFocus = useCallback(() => {
     const returnTo = returnFocusRef.current;
     if (returnTo?.isConnected) returnTo.focus();
   }, []);
+  /** Hands focus back and forgets the hold; a hidden toast gets no onBlur to clear it. */
+  const releaseFocus = useCallback(() => {
+    holdsFocusRef.current = false;
+    setHasFocus(false);
+    restoreFocus();
+  }, [restoreFocus]);
 
-  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus };
+  // The queue can drop a toast (e.g. the oldest when a fifth arrives) while its dismiss button has focus.
+  useEffect(() => () => {
+    if (holdsFocusRef.current && isFocusLost()) restoreFocus();
+  }, [restoreFocus]);
+
+  return { hasFocus, focusHandlers: { onFocus, onBlur }, restoreFocus, releaseFocus };
 };
 
 interface ToastExpiryOptions {
@@ -101,7 +138,10 @@ interface ToastExpiryOptions {
   setIsClosed: (closed: boolean) => void;
 }
 
-/** Closes the toast after its reading window, capped by its maximum lifetime. */
+/**
+ * Closes the toast after its reading window, capped by its maximum lifetime. Returns the close
+ * action so a manual dismiss is recorded the same way as an expiry.
+ */
 const useToastExpiry = ({
   emptyMessage,
   timingMessage,
@@ -110,9 +150,18 @@ const useToastExpiry = ({
   closedRef,
   onCloseRef,
   setIsClosed,
-}: ToastExpiryOptions): void => {
+}: ToastExpiryOptions): (() => void) => {
+  // The copy the toast last closed on; only different copy may reopen it.
+  const closedOnRef = useRef<string | null>(null);
+  const close = useCallback(
+    () =>
+      closeToastOnce(closedRef, onCloseRef, () => {
+        closedOnRef.current = timingMessage;
+        setIsClosed(true);
+      }),
+    [closedRef, onCloseRef, setIsClosed, timingMessage],
+  );
   useEffect(() => {
-    const close = () => closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
     // Message changes restart the reading window without extending the maximum lifetime.
     if (emptyMessage) {
       close();
@@ -126,6 +175,8 @@ const useToastExpiry = ({
       close();
       return;
     }
+    // Dismissing moves focus out, which unpauses; that alone must not reopen the closed toast.
+    if (closedRef.current && closedOnRef.current === timingMessage) return;
     // A changed message starts a new reading window and may close once for that version.
     closedRef.current = false;
     setIsClosed(false);
@@ -136,7 +187,8 @@ const useToastExpiry = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [emptyMessage, timingMessage, paused, mountedAtRef, closedRef, onCloseRef, setIsClosed]);
+  }, [close, emptyMessage, timingMessage, paused, mountedAtRef, closedRef, setIsClosed]);
+  return close;
 };
 
 const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
@@ -152,17 +204,17 @@ const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose }) => {
   const timingMessage = displayMessage.trim().replace(/\s+/gu, ' ');
   const displayType = normalizeToastType(type);
 
-  const { hasFocus, focusHandlers, restoreFocus } = useToastFocusHold();
-  useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
+  const { hasFocus, focusHandlers, restoreFocus, releaseFocus } = useToastFocusHold();
+  const close = useToastExpiry({ emptyMessage, timingMessage, paused: hasFocus, mountedAtRef, closedRef, onCloseRef, setIsClosed });
   // A focused toast whose copy is cleared disappears; send focus back instead of dropping it on <body>.
   useEffect(() => {
-    if (emptyMessage && hasFocus) restoreFocus();
-  }, [emptyMessage, hasFocus, restoreFocus]);
+    if (emptyMessage && hasFocus) releaseFocus();
+  }, [emptyMessage, hasFocus, releaseFocus]);
   const messageId = useId();
   const dismissId = useId();
 
   const handleDismiss = () => {
-    closeToastOnce(closedRef, onCloseRef, () => setIsClosed(true));
+    close();
     restoreFocus();
   };
 
