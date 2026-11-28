@@ -1,6 +1,10 @@
 {
-  "enabled": false,
-  "message": "",
+  "enabled": true,
+  "id": "cyber-week-2026",
+  "message": "Cyber Week deal: your first year of GFC Premium for $25 with code YEAR25. Annual plans only, renews at $30/yr. Ends Tue, Dec 1 at 11:59 PM CT.",
   "type": "info",
-  "dismissible": true
+  "dismissible": true,
+  "linkUrl": "/account",
+  "linkLabel": "Get Premium",
+  "expiresAt": "2026-12-02T05:59:59Z"
 }
