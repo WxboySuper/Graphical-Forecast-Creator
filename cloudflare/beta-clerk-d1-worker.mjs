@@ -180,7 +180,7 @@ async function startBillingCheckout(request, env, user) {
 
 function buildCheckoutParams({ env, user, plan, price, entitlement }) {
   return {
-    mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1',
+    mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1', allow_promotion_codes: 'true',
     success_url: `${env.PUBLIC_ORIGIN}/account?checkout=success`, cancel_url: `${env.PUBLIC_ORIGIN}/pricing?checkout=cancelled`,
     ...(!entitlement.stripeCustomerId ? { customer_email: user.email } : {}),
     client_reference_id: user.clerk_id,

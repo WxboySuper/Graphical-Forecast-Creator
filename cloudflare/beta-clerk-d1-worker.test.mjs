@@ -623,11 +623,13 @@ test('billing checkout requires a configured public origin and builds a trusted 
   const env = { ...createEnv(), STRIPE_SECRET_KEY: 'sk_test', STRIPE_PRICE_MONTHLY: 'price_monthly' };
   const originalFetch = globalThis.fetch;
   const urls = [];
-  globalThis.fetch = async (input) => {
+  const bodies = [];
+  globalThis.fetch = async (input, init) => {
     if (String(input).startsWith('https://api.clerk.com/v1/users/')) {
       return Response.json({ id: 'user_beta_test', first_name: 'Beta', primary_email_address_id: 'email_test', email_addresses: [{ id: 'email_test', email_address: 'test@example.com', verification: { status: 'verified' } }] });
     }
     urls.push(String(input));
+    bodies.push(String(init?.body ?? ''));
     return Response.json({ url: 'https://checkout.stripe.test/session' });
   };
   try {
@@ -636,6 +638,7 @@ test('billing checkout requires a configured public origin and builds a trusted 
     assert.deepStrictEqual(await response.json(), { url: 'https://checkout.stripe.test/session' });
     assert.equal(urls.length, 1);
     assert.match(urls[0], /^https:\/\/api\.stripe\.com\/v1\/checkout\/sessions$/);
+    assert.equal(new URLSearchParams(bodies[0]).get('allow_promotion_codes'), 'true');
     delete env.PUBLIC_ORIGIN;
     const unconfigured = await call('/api/billing/checkout', env, { method: 'POST', body: { plan: 'monthly' } });
     assert.equal(unconfigured.status, 503);

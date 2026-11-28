@@ -9,6 +9,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Premium promo codes on beta checkout:** Checkout now has a promotion code field on the new sign-in backend, so codes such as YEAR25 can be applied.
 - **Verification tabs and days:** Verification's Load Data and Analysis switcher now works as tabs for screen readers and arrow keys, the outlook type buttons announce which one is selected, and the selected forecast day stays highlighted and is announced after you pick it.
 - **Toast keyboard focus:** Keyboard focus returns to its previous control when a focused notification is removed to make room for a new one instead of being lost.
 - **Forecast days navigation:** Screen readers now announce Previous day, Next day, Cycle date, and which day is selected and has forecast data.
