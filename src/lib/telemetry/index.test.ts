@@ -1,4 +1,4 @@
-import { getTelemetryConsent, pageNameForPath, pingDailyActive, pingVisit, setTelemetryConsent, TELEMETRY_CONSENT_KEY, trackEvent, useTelemetryConsent } from './index';
+import { getTelemetryConsent, isAllowedTelemetryEvent, pageNameForPath, pingDailyActive, pingVisit, setTelemetryConsent, TELEMETRY_CONSENT_KEY, trackEvent, useTelemetryConsent } from './index';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { User } from 'firebase/auth';
 
@@ -23,10 +23,24 @@ afterEach(() => {
 
 test('keeps opt-in events silent until consent is granted', () => {
   trackEvent('forecast_created');
+  trackEvent('first_shape_drawn');
+  trackEvent('mesoscale_workspace_opened', 'mesoscale');
   expect(fetchMock).not.toHaveBeenCalled();
   setTelemetryConsent('denied');
   trackEvent('forecast_created');
+  trackEvent('first_shape_drawn');
+  trackEvent('mesoscale_workspace_opened', 'mesoscale');
   expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test('sends new telemetry events only after consent is granted', () => {
+  expect(isAllowedTelemetryEvent('first_shape_drawn')).toBe(true);
+  expect(isAllowedTelemetryEvent('mesoscale_workspace_opened')).toBe(true);
+  setTelemetryConsent('granted');
+  trackEvent('first_shape_drawn');
+  trackEvent('mesoscale_workspace_opened', 'mesoscale');
+  expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://telemetry.gfcweather.com/v1/event', expect.objectContaining({ body: JSON.stringify({ event: 'first_shape_drawn', version: '2.0.0' }) }));
+  expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://telemetry.gfcweather.com/v1/event', expect.objectContaining({ body: JSON.stringify({ event: 'mesoscale_workspace_opened', version: '2.0.0', detail: 'mesoscale' }) }));
 });
 
 test('resets an old opt-in, preserves an opt-out, and leaves unanswered consent unset', () => {

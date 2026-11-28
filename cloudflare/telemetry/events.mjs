@@ -3,8 +3,8 @@ import { parseJson, requestError } from './http.mjs';
 import { takeRateToken } from './rate-limit.mjs';
 
 export const ALLOWED_EVENTS = Object.freeze([
-  'page_view', 'forecast_created', 'forecast_exported', 'forecast_shared', 'forecast_saved_cloud',
-  'mesoscale_layer_opened', 'verification_used', 'map_layer_changed', 'premium_feature_used', 'error_shown',
+  'page_view', 'forecast_created', 'first_shape_drawn', 'forecast_exported', 'forecast_shared', 'forecast_saved_cloud',
+  'mesoscale_layer_opened', 'mesoscale_workspace_opened', 'verification_used', 'map_layer_changed', 'premium_feature_used', 'error_shown',
 ]);
 
 export const validDetail = (value) => typeof value === 'string' && value.length <= 80 && /^[A-Za-z0-9 _:./-]*$/.test(value);

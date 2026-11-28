@@ -47,6 +47,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Usage statistics:** Count the first outlook shape in each cycle, JPEG map exports, and Mesoscale workspace opens when optional statistics are enabled.
 - **Monitor alerts:** Monitor again loads active weather alerts instead of failing the refresh.
 - **Mesoscale session:** Opening the Mesoscale page restores the saved areas and discussion and keeps saving edits on this device.
 

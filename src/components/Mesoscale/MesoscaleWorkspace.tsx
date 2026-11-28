@@ -5,6 +5,7 @@
  * discussion never depend on the model data, so they keep working when it is down.
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { trackEvent } from '../../lib/telemetry/events';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { MesoscaleCatalogParameter, MesoscaleLayerSpec } from '../../mesoscale';
 import UnofficialBadge from '../Map/UnofficialBadge';
@@ -94,5 +95,8 @@ const WorkspaceBody: React.FC<{ selection: MesoscaleSelection; onRetry: () => vo
 export const MesoscaleWorkspace: React.FC = () => {
   const selection = useMesoscaleSelection();
   const [retryKey, setRetryKey] = useState(0);
+  useEffect(() => {
+    trackEvent('mesoscale_workspace_opened', 'mesoscale');
+  }, []);
   return <WorkspaceBody key={retryKey} selection={selection} onRetry={() => setRetryKey(key => key + 1)} />;
 };
