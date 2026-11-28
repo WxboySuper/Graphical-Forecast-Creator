@@ -15,6 +15,7 @@ All notable changes to GFC are recorded here. Entries focus on changes users can
 
 #### Fixed
 
+- **Usage reporting:** Opted-in counts for the first drawn shape, JPEG map exports, and mesoscale workspace opens are now accepted and shown with readable names on the usage dashboard.
 - **Toast focus return:** Keyboard focus returns to the previous control when a focused notification is removed by the queue instead of being dropped.
 - **Accessible day and error announcements:** Forecast day buttons are announced as Day 1 through Day 8, and error messages are announced assertively for screen-reader users.
 - **Documentation drawer focus:** Tab stays inside the open Documentation drawer and focus returns to the More actions button after closing it with Escape.

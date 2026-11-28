@@ -62,6 +62,7 @@ function el(tag,props,kids){let n=document.createElement(tag);Object.keys(props|
 function sv(tag,attrs){let n=document.createElementNS(SVGNS,tag);Object.keys(attrs||{}).forEach(function(k){if(k==='text')n.textContent=attrs[k];else n.setAttribute(k,attrs[k]);});return n;}
 function fmt(n){return Number(n||0).toLocaleString();}
 function words(s){return String(s).replace(/_/g,' ').replace(/^./,function(c){return c.toUpperCase();});}
+function eventLabel(name){return ({forecast_created:'New cycle started',first_shape_drawn:'First shape drawn',mesoscale_workspace_opened:'Mesoscale workspace opened'})[name]||words(name);}
 let KNOWN_FAILURES={401:'Your Access session ended or you are not allowed here. Reload the page to sign in again.',403:'Your Access session ended or you are not allowed here. Reload the page to sign in again.'};
 function failure(status,body){if(KNOWN_FAILURES[status])return new Error(KNOWN_FAILURES[status]);
   if(status===503)return new Error('Not configured yet: '+(body.error||'the service needs its Cloudflare settings.'));
@@ -96,15 +97,15 @@ function renderEvents(rows){let host=$('events');host.textContent='';
   let sel=$('version');let current=state.version;sel.textContent='';sel.appendChild(el('option',{value:'',text:'All versions'}));versionsOf(rows).forEach(function(x){sel.appendChild(el('option',{value:x,text:x}));});sel.value=current;if(sel.value!==current){state.version='';sel.value='';}
   let shown=state.version?rows.filter(function(r){return r.version===state.version;}):rows;
   let byEvent=group(shown,function(r){return r.event;});
-  let top=barList(byEvent,{limit:20,label:words});host.appendChild(top);
+  let top=barList(byEvent,{limit:20,label:eventLabel});host.appendChild(top);
   host.appendChild(el('div',{class:'sub-title note',text:'Open an event to see its details'}));
   byEvent.slice(0,20).forEach(function(e){let details=group(shown.filter(function(r){return r.event===e.name&&r.detail;}),function(r){return r.detail;});if(!details.length)return;
-    let d=el('details',{class:'ev'},[el('summary',{text:words(e.name)+' \\u00b7 '+fmt(e.count)}),el('div',{class:'sub'},[barList(details,{limit:12})])]);host.appendChild(d);});
+    let d=el('details',{class:'ev'},[el('summary',{text:eventLabel(e.name)+' \\u00b7 '+fmt(e.count)}),el('div',{class:'sub'},[barList(details,{limit:12})])]);host.appendChild(d);});
   renderVersions(rows);}
 function renderVersions(rows){let host=$('versions');host.textContent='';if(!rows.length){note(host,'Counts per app version will show here, so you can compare before and after a release.');return;}
   let versions=versionsOf(rows).slice(0,6);let events=group(rows,function(r){return r.event;}).slice(0,10);
   let table=el('table',{class:'ver'});let head=el('tr',{},[el('th',{text:'Event'})]);versions.forEach(function(x){head.appendChild(el('th',{text:x}));});table.appendChild(head);
-  events.forEach(function(e){let tr=el('tr',{},[el('td',{text:words(e.name)})]);versions.forEach(function(x){tr.appendChild(el('td',{text:fmt(sum(rows.filter(function(r){return r.event===e.name&&r.version===x;})))}));});table.appendChild(tr);});host.appendChild(table);}
+  events.forEach(function(e){let tr=el('tr',{},[el('td',{text:eventLabel(e.name)})]);versions.forEach(function(x){tr.appendChild(el('td',{text:fmt(sum(rows.filter(function(r){return r.event===e.name&&r.version===x;})))}));});table.appendChild(tr);});host.appendChild(table);}
 function renderPages(rows){let host=$('pages');host.textContent='';if(!rows.length){note(host,'No page views from opted-in visitors yet.');return;}host.appendChild(barList(group(rows,function(r){return r.page||'(unknown)';}),{limit:15}));}
 function countryName(code){try{if(code&&code!=='XX')return new Intl.DisplayNames(['en'],{type:'region'}).of(code)+' ('+code+')';}catch(e){}return code==='XX'?'Unknown':code;}
 function renderLocations(rows){let host=$('locations');host.textContent='';if(!rows.length){note(host,'No location data yet.');return;}host.appendChild(barList(group(rows,function(r){return r.country||'XX';}),{limit:15,label:countryName}));}

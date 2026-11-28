@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { RootState } from '../store';
+import { useFirstShapeTelemetry } from '../lib/telemetry/useFirstShapeTelemetry';
 import {
   setActiveOutlookType,
   setActiveProbability,
@@ -622,6 +623,8 @@ const useForecastPageWorkspace = ({
   workspaceId: ForecastWorkspaceId;
 }) => {
   const forecastCycle = useSelector(selectForecastCycle);
+  const cycleGeneration = useSelector((state: RootState) => state.forecast.cycleGeneration);
+  useFirstShapeTelemetry(forecastCycle, cycleGeneration);
   const discussionDraftsByScope = useSelector((state: RootState) => state.forecast.discussionDraftsByScope);
   const currentMapView = useSelector((state: RootState) => state.forecast.currentMapView);
   const isSaved = useSelector((state: RootState) => state.forecast.isSaved);
