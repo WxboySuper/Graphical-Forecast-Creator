@@ -27,11 +27,11 @@ description: Forecasting in Graphical Forecast Creator is always free. Premium c
    <a class="btn btn-ghost" href="{{ appUrl }}">Keep using GFC free</a>
   </article>
   <article class="plan featured reveal">
-   <span class="badge"><span class="deal-only">Cyber Week deal</span><span class="deal-hide">Hosted</span></span>
+   <span class="badge"><span class="deal-only">{{ promoName }}</span><span class="deal-hide">Hosted</span></span>
    <p class="eyebrow">Hosted plan</p>
    <h2>Premium</h2>
-   <div class="price"><span class="deal-only"><s class="was" aria-label="Was {{ annualPrice }}">{{ annualPrice }}</s>$25</span><span class="deal-hide">{{ annualPrice }}</span><small>/year</small></div>
-   <p class="deal deal-only">Your first year is $25 with code <strong>YEAR25</strong>, then {{ annualPrice }}/year. Annual plan only, account required. Ends Tue, Dec 1 at 11:59 PM CT.</p>
+   <div class="price"><span class="deal-only"><s class="was" aria-label="Was {{ annualPrice }}">{{ annualPrice }}</s>{{ promoAnnualPrice }}</span><span class="deal-hide">{{ annualPrice }}</span><small>/year</small></div>
+   <p class="deal deal-only">Your first year is {{ promoAnnualPrice }} with code <strong>{{ promoCode }}</strong>, then {{ annualPrice }}/year. Annual plan only, account required. Ends {{ promoEndsLabel }}.</p>
    <p class="alt">or {{ monthlyPrice }}/month</p>
    <p class="blurb">The official hosted service: cloud storage, sync between devices, and a way to support the infrastructure.</p>
    <ul>

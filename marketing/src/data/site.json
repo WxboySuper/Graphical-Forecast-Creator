@@ -11,5 +11,9 @@
   "discordUrl": "https://discord.gg/SGk37rg8sz",
   "repoUrl": "https://github.com/WxboySuper/Graphical-Forecast-Creator",
   "promoId": "cyber-week-2026",
-  "promoEndsAt": "2026-12-02T05:59:59Z"
+  "promoEndsAt": "2026-12-02T05:59:59Z",
+  "promoName": "Cyber Week deal",
+  "promoCode": "YEAR25",
+  "promoAnnualPrice": "$25",
+  "promoEndsLabel": "Tue, Dec 1 at 11:59 PM CT"
 }
