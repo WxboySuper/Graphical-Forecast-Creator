@@ -4,7 +4,7 @@ Opt-in product events use `trackEvent` exported from [`src/lib/telemetry/index.t
 
 ## Events
 
-The product event names are `page_view`, `forecast_created`, `forecast_exported`, `forecast_shared`, `forecast_saved_cloud`, `mesoscale_layer_opened`, `verification_used`, `map_layer_changed`, `premium_feature_used`, and `error_shown`.
+The product event names are `page_view`, `forecast_created`, `first_shape_drawn`, `forecast_exported`, `forecast_shared`, `forecast_saved_cloud`, `mesoscale_layer_opened`, `mesoscale_workspace_opened`, `verification_used`, `map_layer_changed`, `premium_feature_used`, and `error_shown`. `forecast_created` means a new cycle started. `forecast_shared` remains allowlisted but unused.
 
 ## Dimensions
 

@@ -7,12 +7,14 @@ import type { RefObject } from 'react';
 import { useExportMap } from './useExportMap';
 import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils/exportUtils';
 import type { ForecastMapHandle } from '../Map/ForecastMap';
+import { trackEvent } from '../../lib/telemetry/events';
 
 jest.mock('../../utils/exportUtils', () => ({
   exportMapAsImage: jest.fn(),
   downloadDataUrl: jest.fn(),
   getFormattedDate: jest.fn(() => '2026-04-22 15:49'),
 }));
+jest.mock('../../lib/telemetry/events', () => ({ trackEvent: jest.fn() }));
 
 const mockExportMapAsImage = exportMapAsImage as jest.MockedFunction<typeof exportMapAsImage>;
 const mockDownloadDataUrl = downloadDataUrl as jest.MockedFunction<typeof downloadDataUrl>;
@@ -106,6 +108,7 @@ describe('useExportMap', () => {
     );
     expect(mockDownloadDataUrl).toHaveBeenCalledWith('data:image/jpeg;base64,abc', 'forecast-outlook-2026-04-22 15:49.jpg');
     expect(addToast).toHaveBeenCalledWith('Forecast exported successfully!', 'success');
+    expect(trackEvent).toHaveBeenCalledWith('forecast_exported', 'jpeg');
     expect(result.current.isExporting).toBe(false);
     expect(result.current.isModalOpen).toBe(false);
 
@@ -136,5 +139,6 @@ describe('useExportMap', () => {
     });
 
     expect(addToast).toHaveBeenCalledWith('Failed to export the map. Please try again.', 'error');
+    expect(trackEvent).not.toHaveBeenCalled();
   });
 });
