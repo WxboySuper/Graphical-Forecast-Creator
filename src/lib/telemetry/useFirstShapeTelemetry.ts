@@ -20,10 +20,15 @@ export const useFirstShapeTelemetry = (cycle: ForecastCycle, cycleGeneration: nu
       return;
     }
 
-    if (current.shapeCount === 0 && shapeCount > 0 && !current.fired) {
-      current.fired = true;
-      trackEvent('first_shape_drawn');
+    if (current.shapeCount !== 0) {
+      current.shapeCount = shapeCount;
+      return;
     }
+    if (shapeCount === 0) return;
     current.shapeCount = shapeCount;
+    if (current.fired) return;
+
+    current.fired = true;
+    trackEvent('first_shape_drawn');
   }, [cycleGeneration, shapeCount]);
 };
