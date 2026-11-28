@@ -128,6 +128,12 @@ test('active fails closed without Firebase config and rejects missing tokens', a
 
 test('event allowlist rejects unknown names and fields', () => {
   assert.equal(ALLOWED_EVENTS.includes('page_view'), true);
+  assert.equal(ALLOWED_EVENTS.includes('first_shape_drawn'), true);
+  assert.equal(ALLOWED_EVENTS.includes('mesoscale_workspace_opened'), true);
+  assert.equal(ALLOWED_EVENTS.includes('forecast_shared'), true);
+  for (const event of ['first_shape_drawn', 'mesoscale_workspace_opened']) {
+    assert.deepEqual(validateEvent({ event, detail: 'mesoscale', version: '2.1.0' }), { event, detail: 'mesoscale', version: '2.1.0' });
+  }
   assert.deepEqual(validateEvent({ event: 'page_view', detail: '/forecast', version: '2.1.0' }), { event: 'page_view', detail: '/forecast', version: '2.1.0' });
   for (const body of [
     { event: 'unknown', version: '2.1.0' },

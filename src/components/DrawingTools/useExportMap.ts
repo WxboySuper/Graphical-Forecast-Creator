@@ -7,6 +7,7 @@ import { exportMapAsImage, downloadDataUrl, getFormattedDate } from '../../utils
 import type OLMap from 'ol/Map';
 import { ForecastMapHandle } from '../Map/ForecastMap';
 import type { MapAdapterHandle } from '../../maps/contracts';
+import { trackEvent } from '../../lib/telemetry/events';
 
 interface UseExportMapParams {
   mapRef: RefObject<ForecastMapHandle | null>;
@@ -33,6 +34,7 @@ async function performExport(
 
     const filename = `forecast-outlook-${getFormattedDate()}.jpg`;
     downloadDataUrl(dataUrl, filename);
+    trackEvent('forecast_exported', 'jpeg');
     addToast('Forecast exported successfully!', 'success');
   } catch (err) {
     addToast('Failed to export the map. Please try again.', 'error');

@@ -12,6 +12,7 @@ import mesoscaleReducer from '../../store/mesoscaleSlice';
 import { getDemoCatalog } from '../../mesoscale/fixtures/demoCatalogs';
 import { MesoscaleWorkspace } from './MesoscaleWorkspace';
 import { formatAge, formatUtc } from './SourcePanel';
+import { trackEvent } from '../../lib/telemetry/events';
 
 const mockLatest = jest.fn();
 const mockFrames = jest.fn();
@@ -26,6 +27,7 @@ jest.mock('./MesoscaleMap', () => ({
     <div data-testid="map-stub">{layers.map(layer => `${layer.id}:${layer.opacity}`).join(',')}</div>
   ),
 }));
+jest.mock('../../lib/telemetry/events', () => ({ trackEvent: jest.fn() }));
 
 const NOW = Date.parse('2026-11-08T21:35:00Z');
 const catalog = getDemoCatalog('hrrr', NOW);
@@ -46,6 +48,17 @@ describe('MesoscaleWorkspace', () => {
   beforeEach(() => {
     mockLatest.mockReset();
     mockFrames.mockReset();
+    jest.mocked(trackEvent).mockClear();
+  });
+
+  it('tracks one workspace open when the component mounts', () => {
+    mockLatest.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
+    mockFrames.mockReturnValue({ result: { state: 'loading' }, ageMinutes: null, stale: false });
+    const view = renderWorkspace();
+    expect(trackEvent).toHaveBeenCalledTimes(1);
+    expect(trackEvent).toHaveBeenCalledWith('mesoscale_workspace_opened', 'mesoscale');
+    view.rerender(<Provider store={configureStore({ reducer: { mesoscale: mesoscaleReducer } })}><MesoscaleWorkspace /></Provider>);
+    expect(trackEvent).toHaveBeenCalledTimes(1);
   });
 
   it('shows a loading state in the rail while the latest run resolves, with the workspace already usable', () => {
