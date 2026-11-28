@@ -21,6 +21,14 @@
     });
   }
 
+  const promoClose = document.getElementById('promoClose');
+  if (promoClose) {
+    promoClose.addEventListener('click', () => {
+      root.classList.remove('promo-bar-on');
+      try { localStorage.setItem('gfc-promo-dismissed', root.dataset.promoId || ''); } catch { /* storage unavailable */ }
+    });
+  }
+
   const top = document.getElementById('top');
   const onScroll = () => top && top.classList.toggle('scrolled', window.scrollY > 20);
   let scrollFrame = 0;

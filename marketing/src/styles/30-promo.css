@@ -1,0 +1,20 @@
+/* Time-limited deal: top bar and pricing swap. theme.js adds .deal-on and .promo-bar-on before first paint. */
+:root{--promo-h:0px}
+.promo{display:none}
+.promo-bar-on{--promo-h:40px}
+.promo-bar-on .promo{display:flex;position:fixed;inset:0 0 auto 0;z-index:60;height:var(--promo-h);align-items:center;justify-content:center;gap:12px;padding:0 48px;background:var(--brand-blue);color:#fff;font-size:.92rem}
+.promo-bar-on body{padding-top:var(--promo-h)}
+.promo-bar-on .top{top:var(--promo-h)}
+.promo p{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.promo b{font:600 .88rem "IBM Plex Mono",monospace;letter-spacing:.04em}
+.promo a{color:#fff;font-weight:700;margin-left:6px}
+.promo-short{display:none}
+@media(max-width:820px){.promo-long{display:none}.promo-short{display:block}.promo-short a{margin:0;text-decoration:none}.promo{padding:0 40px 0 14px!important;font-size:.85rem}}
+.promo-close{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:0;color:#fff;font-size:1.4rem;line-height:1;cursor:pointer;padding:4px 8px;opacity:.85}
+.promo-close:hover{opacity:1}.promo-close:focus-visible,.promo a:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.deal-only{display:none}
+.deal-on .deal-only{display:inline}
+.deal-on p.deal-only{display:block}
+.deal-on .deal-hide{display:none}
+.plan .price .was{font-size:.5em;font-weight:500;color:var(--ink-soft);margin-right:10px;letter-spacing:0;vertical-align:.35em}
+.plan .deal{margin:10px 0 0;padding:10px 14px;border-radius:12px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.35);line-height:1.5;font-size:.95rem}

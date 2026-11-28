@@ -22,3 +22,7 @@ See [hosted-rollout.md](./hosted-rollout.md) and [production-release.example-v1.
 | `linkUrl` | CTA; paths starting with `/` use in-app routing |
 | `linkLabel` | CTA label (default: Learn more) |
 | `startsAt` / `expiresAt` | Optional ISO schedule (client does not poll; use phased manifest for timed releases) |
+
+## Marketing site deal bar
+
+The marketing site (`gfcweather.com`) does not read `alert-banner.json`. A time-limited deal uses `promoId` and `promoEndsAt` in `marketing/src/data/site.json`, the `promo` partial, and `marketing/src/styles/30-promo.css`. `theme.js` adds `deal-on` (deal pricing) and `promo-bar-on` (top bar, unless dismissed for that `promoId`) before first paint while the current time is before `promoEndsAt`, so the bar and deal pricing turn off on their own. Remove the partial, styles, and `deal-only` markup in a follow-up once the deal ends.

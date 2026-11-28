@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-promo-id="{{ promoId }}" data-promo-ends="{{ promoEndsAt }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -22,6 +22,7 @@
 </head>
 <body class="{{ bodyClass }}" data-active="{{ active }}" data-version="{{ versionLabel }}">
 <a class="skip" href="#main">Skip to content</a>
+{{> promo}}
 {{> header}}
 <main id="main">
 {{{ content }}}
