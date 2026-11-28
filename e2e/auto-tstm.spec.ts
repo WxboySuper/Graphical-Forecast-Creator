@@ -24,6 +24,10 @@ const acceptAgreementsIfPresent = async (page: import('@playwright/test').Page) 
 test.describe('Auto-TSTM disabled (HREF decommission)', () => {
   test.beforeEach(async ({ page }) => {
     await bypassLocalBeta(page);
+    // These tests measure the toolbar, so keep a live site-wide alert banner from shifting the layout.
+    await page.route('**/alert-banner.json', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false, message: '', type: 'info', dismissible: true }) });
+    });
     await page.route('**/api/capabilities/status', async (route) => {
       await route.fulfill({
         status: 200,

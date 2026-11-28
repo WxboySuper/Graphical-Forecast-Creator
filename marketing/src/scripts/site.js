@@ -21,6 +21,24 @@
     });
   }
 
+  // Turn the deal off at its end instant even if the page stays open or comes back from the back/forward cache.
+  const promoEnds = Date.parse(root.dataset.promoEnds || '');
+  const endPromo = () => root.classList.remove('deal-on', 'promo-bar-on');
+  if (!Number.isNaN(promoEnds)) {
+    const remaining = promoEnds - Date.now();
+    if (remaining <= 0) endPromo();
+    else if (remaining < 2147483647) setTimeout(endPromo, remaining);
+    addEventListener('pageshow', () => { if (Date.now() >= promoEnds) endPromo(); });
+  }
+
+  const promoClose = document.getElementById('promoClose');
+  if (promoClose) {
+    promoClose.addEventListener('click', () => {
+      root.classList.remove('promo-bar-on');
+      try { localStorage.setItem('gfc-promo-dismissed', root.dataset.promoId || ''); } catch { /* storage unavailable */ }
+    });
+  }
+
   const top = document.getElementById('top');
   const onScroll = () => top && top.classList.toggle('scrolled', window.scrollY > 20);
   let scrollFrame = 0;
